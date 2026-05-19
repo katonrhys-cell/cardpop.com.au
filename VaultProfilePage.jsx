@@ -1,0 +1,477 @@
+
+import React, { useState, useEffect, useRef } from 'react';
+import { Helmet } from 'react-helmet';
+import { Link } from 'react-router-dom';
+import { Camera, MapPin, Calendar, Star, Package, TrendingUp, ShieldCheck, Edit2, Save, X, Eye } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext.jsx';
+import pb from '@/lib/pocketbaseClient.js';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { VerificationBadge } from '@/components/VerificationBadge.jsx';
+import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
+import { toast } from 'sonner';
+
+const VaultProfilePage = () => {
+  const { currentUser, isVerified } = useAuth();
+  const [profile, setProfile] = useState(null);
+  const [vaultCards, setVaultCards] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  
+  const [selectedCard, setSelectedCard] = useState(null);
+  const [isCardModalOpen, setIsCardModalOpen] = useState(false);
+
+  const [formData, setFormData] = useState({
+    name: '',
+    bio: '',
+    location: '',
+    emailVisibility: false
+  });
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    const fetchProfileAndCards = async () => {
+      if (!currentUser) return;
+      try {
+        const record = await pb.collection('users').getOne(currentUser.id, { $autoCancel: false });
+        setProfile(record);
+        setFormData({
+          name: record.name || '',
+          bio: record.bio || '',
+          location: record.location || '',
+          emailVisibility: record.emailVisibility || false
+        });
+        if (record.avatar) {
+          setAvatarPreview(pb.files.getUrl(record, record.avatar));
+        }
+
+        // Fetch user's vault cards
+        const cardsRes = await pb.collection('cards').getList(1, 12, {
+          filter: `owner="${currentUser.id}"`,
+          sort: '-created',
+          $autoCancel: false
+        });
+        setVaultCards(cardsRes.items);
+
+      } catch (error) {
+        console.error('Error fetching profile data:', error);
+        toast.error('Failed to load profile data.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfileAndCards();
+  }, [currentUser]);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSwitchChange = (checked) => {
+    setFormData(prev => ({ ...prev, emailVisibility: checked }));
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setAvatarFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const data = new FormData();
+      data.append('name', formData.name);
+      data.append('bio', formData.bio);
+      data.append('location', formData.location);
+      data.append('emailVisibility', formData.emailVisibility);
+      
+      if (avatarFile) {
+        data.append('avatar', avatarFile);
+      }
+
+      const updatedRecord = await pb.collection('users').update(currentUser.id, data, { $autoCancel: false });
+      setProfile(updatedRecord);
+      setIsEditing(false);
+      toast.success('Profile updated successfully.');
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      toast.error('Failed to update profile. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const cancelEdit = () => {
+    setIsEditing(false);
+    setFormData({
+      name: profile?.name || '',
+      bio: profile?.bio || '',
+      location: profile?.location || '',
+      emailVisibility: profile?.emailVisibility || false
+    });
+    setAvatarFile(null);
+    if (profile?.avatar) {
+      setAvatarPreview(pb.files.getUrl(profile, profile.avatar));
+    } else {
+      setAvatarPreview(null);
+    }
+  };
+
+  const openCardModal = (card) => {
+    setSelectedCard(card);
+    setIsCardModalOpen(true);
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-12 space-y-8">
+        <Skeleton className="h-64 w-full rounded-2xl" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <Skeleton className="h-96 md:col-span-2 rounded-2xl" />
+          <Skeleton className="h-96 rounded-2xl" />
+        </div>
+      </div>
+    );
+  }
+
+  const memberSinceDate = profile?.created 
+    ? new Date(profile.created).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    : 'Unknown';
+
+  const rating = profile?.rating || 0;
+  const reviewsCount = profile?.reviewsCount || 0;
+  const inventoryCount = profile?.inventoryCount || vaultCards.length;
+  const itemsSold = profile?.reviewsCount ? Math.floor(profile.reviewsCount * 1.5) : 0;
+  const positivePercentage = rating ? Math.round((rating / 5) * 100) : 100;
+
+  return (
+    <div className="min-h-screen bg-background pb-20">
+      <Helmet>
+        <title>Vault Profile | CardPop</title>
+      </Helmet>
+
+      <div className="h-48 md:h-64 bg-secondary relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.2),transparent_50%)]" />
+      </div>
+
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 -mt-24 relative z-10">
+        
+        {!isVerified && (
+          <div className="mb-6 p-4 bg-muted border border-border rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+            <div>
+              <h3 className="font-bold text-foreground">Verify your account to access trading features</h3>
+              <p className="text-sm text-muted-foreground">Unverified accounts cannot initiate or accept trades.</p>
+            </div>
+            <Button asChild variant="outline" className="shrink-0">
+              <Link to="/security">Verify Now</Link>
+            </Button>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+          
+          <div className="lg:col-span-2 space-y-6">
+            <div className="bg-card rounded-2xl shadow-sm border border-border p-6 sm:p-8">
+              <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-end mb-8">
+                <div className="relative group">
+                  <div className="w-32 h-32 rounded-full border-4 border-card bg-muted overflow-hidden shadow-md">
+                    {avatarPreview ? (
+                      <img src={avatarPreview} alt="Profile" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary text-4xl font-bold">
+                        {(formData.name || profile?.email || 'U').substring(0, 1).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  {isEditing && (
+                    <button 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="absolute bottom-0 right-0 w-10 h-10 bg-primary text-primary-foreground rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
+                      aria-label="Change avatar"
+                    >
+                      <Camera className="w-5 h-5" />
+                    </button>
+                  )}
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleFileChange} 
+                    accept="image/*" 
+                    className="hidden" 
+                  />
+                </div>
+
+                <div className="flex-1 w-full flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <div className="flex items-center gap-3 mb-1">
+                      <h1 className="text-3xl font-serif font-bold text-foreground">
+                        {profile?.name || 'Collector'}
+                      </h1>
+                      <VerificationBadge is_verified={isVerified} />
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span className="flex items-center gap-1"><Calendar className="w-4 h-4" /> Joined {memberSinceDate}</span>
+                    </div>
+                  </div>
+                  
+                  {!isEditing ? (
+                    <Button onClick={() => setIsEditing(true)} variant="outline" className="rounded-xl font-medium">
+                      <Edit2 className="w-4 h-4 mr-2" /> Edit Profile
+                    </Button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button onClick={cancelEdit} variant="ghost" size="icon" className="rounded-xl text-muted-foreground hover:text-foreground">
+                        <X className="w-5 h-5" />
+                      </Button>
+                      <Button onClick={handleSave} disabled={saving} className="rounded-xl font-medium bg-primary text-primary-foreground">
+                        {saving ? 'Saving...' : <><Save className="w-4 h-4 mr-2" /> Save</>}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {isEditing ? (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="name">Display Name</Label>
+                      <Input 
+                        id="name" 
+                        name="name" 
+                        value={formData.name} 
+                        onChange={handleInputChange} 
+                        placeholder="Your public name"
+                        className="bg-background"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="location">Location</Label>
+                      <Input 
+                        id="location" 
+                        name="location" 
+                        value={formData.location} 
+                        onChange={handleInputChange} 
+                        placeholder="e.g. Melbourne, VIC"
+                        className="bg-background"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="bio">Bio</Label>
+                    <Textarea 
+                      id="bio" 
+                      name="bio" 
+                      value={formData.bio} 
+                      onChange={handleInputChange} 
+                      placeholder="Tell the community about your collection..."
+                      className="min-h-[120px] bg-background resize-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-muted/30">
+                    <div className="space-y-0.5">
+                      <Label className="text-base">Public Profile</Label>
+                      <p className="text-sm text-muted-foreground">Allow other users to see your email address and contact you directly.</p>
+                    </div>
+                    <Switch 
+                      checked={formData.emailVisibility} 
+                      onCheckedChange={handleSwitchChange} 
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  {profile?.bio ? (
+                    <p className="text-foreground leading-relaxed whitespace-pre-wrap">{profile.bio}</p>
+                  ) : (
+                    <p className="text-muted-foreground italic">No bio provided yet.</p>
+                  )}
+                  
+                  {profile?.location && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <MapPin className="w-5 h-5 text-primary" />
+                      <span className="font-medium">{profile.location}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="bg-card rounded-2xl shadow-sm border border-border p-6">
+              <h3 className="font-serif font-bold text-xl text-foreground mb-6">Seller Reputation</h3>
+              
+              <div className="flex items-center gap-4 mb-8">
+                <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-600">
+                  <Star className="w-8 h-8 fill-current" />
+                </div>
+                <div>
+                  <div className="text-3xl font-bold text-foreground">{rating > 0 ? rating.toFixed(1) : 'N/A'}</div>
+                  <div className="text-sm text-muted-foreground font-medium">{reviewsCount} Reviews</div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50">
+                  <div className="flex items-center gap-3 text-muted-foreground">
+                    <Package className="w-5 h-5" />
+                    <span className="font-medium">Active Listings</span>
+                  </div>
+                  <span className="font-bold text-foreground">{inventoryCount}</span>
+                </div>
+                
+                <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50">
+                  <div className="flex items-center gap-3 text-muted-foreground">
+                    <TrendingUp className="w-5 h-5" />
+                    <span className="font-medium">Items Sold</span>
+                  </div>
+                  <span className="font-bold text-foreground">{itemsSold}</span>
+                </div>
+
+                <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50">
+                  <div className="flex items-center gap-3 text-muted-foreground">
+                    <ShieldCheck className="w-5 h-5" />
+                    <span className="font-medium">Positive Feedback</span>
+                  </div>
+                  <span className="font-bold text-emerald-600">{positivePercentage}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        {/* Vault Inventory Section */}
+        <div className="bg-card rounded-2xl shadow-sm border border-border p-6 sm:p-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="font-serif text-2xl font-bold">My Vault Inventory</h2>
+            <Button asChild variant="outline" className="rounded-xl">
+              <Link to="/vault">Manage Vault</Link>
+            </Button>
+          </div>
+
+          {vaultCards.length === 0 ? (
+            <div className="text-center py-12 bg-muted/30 rounded-xl border border-border/50">
+              <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+              <h3 className="text-lg font-bold mb-2">Your vault is empty</h3>
+              <p className="text-muted-foreground mb-6">Add cards to your vault to start trading and selling.</p>
+              <Button asChild>
+                <Link to="/vault/add">Add First Card</Link>
+              </Button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              {vaultCards.map(card => (
+                <div 
+                  key={card.id} 
+                  className="group relative aspect-[3/4] bg-muted rounded-xl overflow-hidden border border-border/50 cursor-pointer hover:border-primary/50 transition-colors"
+                  onClick={() => openCardModal(card)}
+                >
+                  {card.cardImage && card.cardImage.length > 0 ? (
+                    <img 
+                      src={pb.files.getUrl(card, card.cardImage[0])} 
+                      alt={card.cardName}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Package className="w-8 h-8 text-muted-foreground/50" />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
+                    <p className="text-white font-bold text-sm truncate">{card.cardName}</p>
+                    <p className="text-white/80 text-xs">{card.condition}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Card Detail Modal with Carousel */}
+      <Dialog open={isCardModalOpen} onOpenChange={setIsCardModalOpen}>
+        <DialogContent className="max-w-3xl p-0 overflow-hidden bg-card border-border rounded-2xl">
+          {selectedCard && (
+            <div className="grid grid-cols-1 md:grid-cols-2 h-full max-h-[80vh]">
+              <div className="bg-muted/30 p-6 flex items-center justify-center border-r border-border/50">
+                <ProductImageCarousel 
+                  images={selectedCard.cardImage} 
+                  record={selectedCard} 
+                  className="w-full max-w-sm"
+                />
+              </div>
+              <div className="p-6 flex flex-col overflow-y-auto">
+                <DialogHeader className="mb-6">
+                  <DialogTitle className="text-2xl font-serif font-bold">{selectedCard.cardName}</DialogTitle>
+                  <p className="text-muted-foreground font-medium">{selectedCard.collectionType}</p>
+                </DialogHeader>
+                
+                <div className="space-y-4 flex-1">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-muted/50 p-3 rounded-xl">
+                      <p className="text-xs text-muted-foreground font-bold uppercase mb-1">Condition</p>
+                      <p className="font-medium">{selectedCard.condition}</p>
+                    </div>
+                    <div className="bg-muted/50 p-3 rounded-xl">
+                      <p className="text-xs text-muted-foreground font-bold uppercase mb-1">
+                        {['For Sale', 'For Both'].includes(selectedCard.listingStatus) ? 'Asking Price' : 'Est. Value'}
+                      </p>
+                      <p className="font-medium tabular-nums">
+                        ${(['For Sale', 'For Both'].includes(selectedCard.listingStatus) && selectedCard.askingPrice) 
+                          ? selectedCard.askingPrice.toFixed(2) 
+                          : (selectedCard.estimatedValue?.toFixed(2) || '0.00')}
+                      </p>
+                    </div>
+                    <div className="bg-muted/50 p-3 rounded-xl">
+                      <p className="text-xs text-muted-foreground font-bold uppercase mb-1">Status</p>
+                      <p className="font-medium">{selectedCard.listingStatus}</p>
+                    </div>
+                  </div>
+                  
+                  {selectedCard.description && (
+                    <div className="mt-6">
+                      <p className="text-sm font-bold text-foreground mb-2">Description</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{selectedCard.description}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-8 pt-6 border-t border-border flex gap-3">
+                  <Button asChild className="flex-1 rounded-xl font-bold">
+                    <Link to={`/card/${selectedCard.id}`}>View Full Details</Link>
+                  </Button>
+                  <Button variant="outline" onClick={() => setIsCardModalOpen(false)} className="rounded-xl">
+                    Close
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default VaultProfilePage;
