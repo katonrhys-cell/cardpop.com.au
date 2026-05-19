@@ -1,0 +1,232 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Core UI Colors */
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    
+    /* Semantic Colors - Brand Red (#E63946) */
+    --brand-red: 355 78% 59%;
+    --primary: var(--brand-red);
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    
+    --destructive: var(--brand-red);
+    --destructive-foreground: 0 0% 100%;
+
+    /* Brand Borders & Inputs */
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: var(--brand-red);
+
+    /* Admin Specific Tokens */
+    --admin-sidebar: 240 10% 3.9%;
+    --admin-sidebar-foreground: 0 0% 98%;
+    --admin-sidebar-accent: 240 3.7% 15.9%;
+    --admin-success: 142 71% 45%;
+    --admin-success-foreground: 0 0% 100%;
+    --admin-warning: 38 92% 50%;
+    --admin-warning-foreground: 0 0% 100%;
+    --admin-danger: var(--brand-red);
+    --admin-danger-foreground: 0 0% 100%;
+    --admin-info: 221 83% 53%;
+    --admin-info-foreground: 0 0% 100%;
+
+    /* Secure Vault Status Tokens */
+    --vault-private: 215 14% 44%;
+    --vault-private-foreground: 0 0% 100%;
+    --vault-sale: 142 71% 45%;
+    --vault-sale-foreground: 0 0% 100%;
+    --vault-trade: 262 83% 58%;
+    --vault-trade-foreground: 0 0% 100%;
+    --vault-both: 38 92% 50%;
+    --vault-both-foreground: 240 10% 4%;
+
+    /* Profile Tokens */
+    --profile-bg: 0 0% 100%;
+    --rating-color: 43 96% 56%;
+    --verified-badge: 221 83% 53%;
+    --section-divider: 220 13% 91%;
+
+    /* Drag and Drop Tokens */
+    --drag-active: 220 13% 95%;
+    --drag-over: 355 78% 95%;
+    --drag-disabled: 0 100% 97%;
+
+    /* Typography & Structure */
+    --radius: 0.75rem;
+    --font-sans: 'Plus Jakarta Sans', sans-serif;
+    --font-heading: 'Syne', sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    
+    /* SEO & Content Values */
+    --seo-breadcrumb-bg: 240 4.8% 98%;
+    --seo-breadcrumb-text: 240 3.8% 46.1%;
+  }
+
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    
+    --brand-red: 355 78% 59%;
+    --primary: var(--brand-red);
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+    
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+    
+    --accent: 240 3.7% 15.9%;
+    --accent-foreground: 0 0% 98%;
+    
+    --destructive: var(--brand-red);
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 20%;
+    --input: 220 13% 20%;
+    --ring: var(--brand-red);
+
+    /* Admin Specific Tokens (Dark) */
+    --admin-sidebar: 240 10% 3.9%;
+    --admin-sidebar-foreground: 0 0% 98%;
+    --admin-sidebar-accent: 240 3.7% 15.9%;
+    --admin-success: 142 71% 40%;
+    --admin-success-foreground: 0 0% 100%;
+    --admin-warning: 38 92% 50%;
+    --admin-warning-foreground: 0 0% 100%;
+    --admin-danger: var(--brand-red);
+    --admin-danger-foreground: 0 0% 100%;
+    --admin-info: 221 83% 53%;
+    --admin-info-foreground: 0 0% 100%;
+
+    /* Secure Vault Status Tokens (Dark) */
+    --vault-private: 215 14% 34%;
+    --vault-private-foreground: 0 0% 100%;
+    --vault-sale: 142 71% 40%;
+    --vault-sale-foreground: 0 0% 100%;
+    --vault-trade: 262 83% 65%;
+    --vault-trade-foreground: 0 0% 100%;
+    --vault-both: 38 92% 50%;
+    --vault-both-foreground: 240 10% 4%;
+
+    /* Profile Tokens (Dark) */
+    --profile-bg: 240 10% 6%;
+    --rating-color: 43 96% 56%;
+    --verified-badge: 221 83% 60%;
+    --section-divider: 220 13% 20%;
+
+    /* Drag and Drop Tokens (Dark) */
+    --drag-active: 240 3.7% 20%;
+    --drag-over: 355 78% 15%;
+    --drag-disabled: 0 100% 10%;
+
+    /* SEO & Content Values Dark */
+    --seo-breadcrumb-bg: 240 3.7% 12%;
+    --seo-breadcrumb-text: 240 5% 64.9%;
+  }
+
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    text-wrap: balance;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  .section-padding {
+    @apply py-16 md:py-24;
+  }
+  .container-default {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Vault Badges */
+  .badge-vault-private {
+    background-color: hsl(var(--vault-private));
+    color: hsl(var(--vault-private-foreground));
+    border: none;
+  }
+  .badge-vault-sale {
+    background-color: hsl(var(--vault-sale));
+    color: hsl(var(--vault-sale-foreground));
+    border: none;
+  }
+  .badge-vault-trade {
+    background-color: hsl(var(--vault-trade));
+    color: hsl(var(--vault-trade-foreground));
+    border: none;
+  }
+  .badge-vault-both {
+    background-color: hsl(var(--vault-both));
+    color: hsl(var(--vault-both-foreground));
+    border: none;
+  }
+
+  /* Drag and Drop Styles */
+  .dragging {
+    opacity: 0.5;
+    background-color: hsl(var(--drag-active));
+    transform: scale(0.98);
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 50;
+  }
+
+  .drag-over {
+    background-color: hsl(var(--drag-over));
+    border: 2px dashed hsl(var(--primary));
+    transform: scale(1.01);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .drag-disabled {
+    background-color: hsl(var(--drag-disabled));
+    border: 2px dashed hsl(var(--destructive));
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  .drop-zone-active {
+    min-height: 2rem;
+    border-radius: var(--radius);
+    transition: all 0.3s ease;
+  }
+}
