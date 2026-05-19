@@ -1,0 +1,227 @@
+
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet';
+import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, AlertCircle, RefreshCcw, Package, ChevronLeft, BarChart3 } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
+import pb from '@/lib/pocketbaseClient.js';
+import { toast } from 'sonner';
+import ShopProductForm from '@/components/ShopProductForm.jsx';
+
+const ProductManagementPage = () => {
+  const navigate = useNavigate();
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const isMounted = useRef(true);
+
+  const fetchProducts = async () => {
+    if (!isMounted.current) return;
+    setLoading(true);
+    try {
+      const records = await pb.collection('shop_products').getList(1, 100, {
+        sort: '-created',
+        $autoCancel: false
+      });
+      if (isMounted.current) setProducts(records.items);
+    } catch (err) {
+      if (isMounted.current) setError(err.message);
+      toast.error("Failed to load products.");
+    } finally {
+      if (isMounted.current) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    isMounted.current = true;
+    fetchProducts();
+    return () => { isMounted.current = false; };
+  }, []);
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this shop product?")) return;
+    try {
+      await pb.collection('shop_products').delete(id, { $autoCancel: false });
+      toast.success("Product deleted.");
+      setProducts(products.filter(p => p.id !== id));
+    } catch (err) {
+      toast.error("Failed to delete product.");
+    }
+  };
+
+  const handleEdit = (product) => {
+    setEditingProduct(product);
+    setIsAddModalOpen(true);
+  };
+
+  const handleFormSuccess = () => {
+    setIsAddModalOpen(false);
+    fetchProducts();
+  };
+
+  const filteredProducts = products.filter(p => 
+    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    p.category?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const stats = {
+    total: products.length,
+    public: products.filter(p => p.visibility === 'public').length,
+    private: products.filter(p => p.visibility === 'private').length,
+    marketplaceOnly: products.filter(p => p.visibility === 'marketplace-only').length
+  };
+
+  return (
+    <div className="w-full space-y-6 animate-in fade-in duration-300 py-6 px-4 sm:px-6 md:px-8">
+      <Helmet><title>Official Shop Management | Admin</title></Helmet>
+
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex items-start gap-3 w-full sm:w-auto">
+          <Button variant="ghost" onClick={() => navigate('/admin')} className="h-10 rounded-xl px-3 mt-0.5 shrink-0">
+            <ChevronLeft className="w-5 h-5 mr-1" /> Back
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold font-serif text-foreground">Shop Products</h1>
+            <p className="text-muted-foreground text-sm mt-1">Manage official catalog and inventory.</p>
+          </div>
+        </div>
+        <Button className="gap-2 font-bold rounded-xl h-10 px-4" onClick={() => { setEditingProduct(null); setIsAddModalOpen(true); }}>
+          <Plus className="w-4 h-4" /> New Product
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <Card className="p-5 rounded-2xl bg-card border border-border shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-primary/10 text-primary rounded-xl"><Package className="w-6 h-6" /></div>
+          <div><p className="text-sm font-bold text-muted-foreground uppercase">Total Products</p><p className="text-2xl font-bold">{stats.total}</p></div>
+        </Card>
+        <Card className="p-5 rounded-2xl bg-card border border-border shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-xl"><BarChart3 className="w-6 h-6" /></div>
+          <div><p className="text-sm font-bold text-muted-foreground uppercase">Shop + Market</p><p className="text-2xl font-bold">{stats.public}</p></div>
+        </Card>
+        <Card className="p-5 rounded-2xl bg-card border border-border shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl"><BarChart3 className="w-6 h-6" /></div>
+          <div><p className="text-sm font-bold text-muted-foreground uppercase">Shop Only</p><p className="text-2xl font-bold">{stats.private}</p></div>
+        </Card>
+        <Card className="p-5 rounded-2xl bg-card border border-border shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-amber-500/10 text-amber-500 rounded-xl"><BarChart3 className="w-6 h-6" /></div>
+          <div><p className="text-sm font-bold text-muted-foreground uppercase">Market Only</p><p className="text-2xl font-bold">{stats.marketplaceOnly}</p></div>
+        </Card>
+      </div>
+
+      <Card className="rounded-xl border border-border shadow-sm overflow-hidden bg-card">
+        <div className="p-4 border-b border-border bg-muted/20 flex gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search products..." 
+              className="pl-9 h-10 rounded-xl bg-background border-border text-foreground"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="overflow-x-auto relative w-full">
+          <Table>
+            <TableHeader className="bg-muted/40">
+              <TableRow>
+                <TableHead className="font-semibold text-foreground">Product Name</TableHead>
+                <TableHead className="font-semibold text-foreground">Category</TableHead>
+                <TableHead className="font-semibold text-foreground">Price</TableHead>
+                <TableHead className="font-semibold text-foreground">Visibility</TableHead>
+                <TableHead className="font-semibold text-foreground">Stock</TableHead>
+                <TableHead className="w-[80px]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-5 w-48" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-24" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                    <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-12" /></TableCell>
+                    <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
+                  </TableRow>
+                ))
+              ) : error ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-48 text-center text-muted-foreground">
+                    <AlertCircle className="w-10 h-10 text-destructive mb-3 mx-auto" />
+                    <p>Failed to load products</p>
+                  </TableCell>
+                </TableRow>
+              ) : filteredProducts.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="h-48 text-center text-muted-foreground">
+                    <Package className="w-10 h-10 mb-3 mx-auto opacity-40" />
+                    <p>No products found</p>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredProducts.map((product) => (
+                  <TableRow key={product.id}>
+                    <TableCell className="font-bold text-foreground">{product.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{product.category || '-'}</TableCell>
+                    <TableCell className="tabular-nums">${product.price?.toFixed(2)}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="bg-background">
+                        {product.visibility === 'public' ? 'Shop + Market' : product.visibility === 'private' ? 'Shop Only' : 'Market Only'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="tabular-nums">{product.stockQuantity ?? '-'}</TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="rounded-xl">
+                          <DropdownMenuItem onClick={() => handleEdit(product)} className="cursor-pointer gap-2 font-medium">
+                            <Edit className="w-4 h-4" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDelete(product.id)} className="cursor-pointer gap-2 text-destructive focus:bg-destructive/10 font-medium">
+                            <Trash2 className="w-4 h-4" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
+
+      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-background rounded-2xl border-border p-0">
+          <div className="p-8">
+            <DialogHeader className="mb-8">
+              <DialogTitle className="text-2xl font-bold font-serif text-foreground">
+                {editingProduct ? 'Edit Shop Product' : 'Add Shop Product'}
+              </DialogTitle>
+            </DialogHeader>
+            <ShopProductForm product={editingProduct} onSuccess={handleFormSuccess} onCancel={() => setIsAddModalOpen(false)} />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+export default ProductManagementPage;
