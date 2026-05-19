@@ -1,0 +1,366 @@
+Id,Name,Shape Library,Page ID,Contained By,Group,Line Source,Line Destination,Source Arrow,Destination Arrow,Status,Text Area 1,Comments,Id,ParentId,Text
+1,Document,,,,,,,,,Draft,Horizons Hosting ? Marketplace: Sports Cards,,,,
+2,Page,,,,,,,,,,Horizons Hosting – Marketplace: Sports Cards,,,,
+3,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Turbo Attax,,f1-turbo,f1-topps,Turbo Attax
+4,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Bowman Draft,,bb-bdraft,bb-bowman,Bowman Draft
+5,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Exquisite Collection,,nba-exquisite,nba-ud,Exquisite Collection
+6,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Donruss Soccer,,soc-donruss,soc-panini,Donruss Soccer
+7,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Select Australia,,cric-select,cricket,Select Australia
+8,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Dynasty F1,,f1-dynasty,f1-topps,Dynasty F1
+9,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Bowman,,bb-bowman,baseball,Bowman
+10,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Instant F1,,f1-instant,f1-panini,Instant F1
+11,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,E-X2000,,nba-ex2000,nba-skybox,E-X2000
+12,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,BBL,,cric-bbl,cric-select,BBL
+13,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,National Treasures,,nfl-nt,nfl-panini,National Treasures
+14,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Flawless,,nfl-flawless,nfl-panini,Flawless
+15,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Extended Series,,nhl-ext,nhl-ud,Extended Series
+16,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Ace Authentic,,ten-ace,tennis,Ace Authentic
+17,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Chronicles UFC,,ufc-chronicles,ufc-panini,Chronicles UFC
+18,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Donruss,,nba-donruss,nba-pan-flagship,Donruss
+19,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Flagship Lines,,nba-pan-flagship,nba-panini,Flagship Lines
+20,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Panini America,,nfl-panini,nfl,Panini America
+21,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Topps,,bb-topps,baseball,Topps
+22,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Topps Chrome Basketball,,nba-tcb,nba-topps,Topps Chrome Basketball
+23,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Donruss Optic,,nba-doptic,nba-pan-flagship,Donruss Optic
+24,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Topps Chrome,,bb-chrome,bb-topps,Topps Chrome
+25,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Immaculate,,nfl-immaculate,nfl-panini,Immaculate
+26,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Bowman Sapphire,,bb-bsapphire,bb-bowman,Bowman Sapphire
+27,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Series 1,,bb-ts1,bb-topps,Series 1
+28,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Prizm UFC,,ufc-prizm,ufc-panini,Prizm UFC
+29,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Premium,,nba-skyprem,nba-skybox,Premium
+30,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Footy Stars,,afl-footy,afl-select,Footy Stars
+31,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Supremacy,,afl-sup,afl-select,Supremacy
+32,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Panini America,,bb-panini,baseball,Panini America
+33,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Knockout,,ufc-knockout,ufc-topps,Knockout
+34,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,O-Pee-Chee Platinum,,nhl-opcplat,nhl-opc,O-Pee-Chee Platinum
+35,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Prizm,,nba-prizm,nba-pan-flagship,Prizm
+36,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Donruss Baseball,,bb-donruss,bb-panini,Donruss Baseball
+37,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Sapphire F1,,f1-sapphire,f1-topps,Sapphire F1
+38,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,NBL Hoops,,nbl-hoops,nbl-cherry,NBL Hoops
+39,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Throwbacks,,nbl-throw,nbl-select,Throwbacks
+40,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Authentic Signatures,,nbl-sigs,nbl-cherry,Authentic Signatures
+41,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Select FIFA,,soc-select,soc-panini,Select FIFA
+42,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Finest UFC,,ufc-finest,ufc-topps,Finest UFC
+43,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,NBL Champions,,nbl-champs,nbl-cherry,NBL Champions
+44,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Signature Golf,,golf-sig,golf-leaf,Signature Golf
+45,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Bowman Basketball,,nba-bowman,nba-topps,Bowman Basketball
+46,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Archives,,bb-archives,bb-topps,Archives
+47,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Origins,,nfl-origins,nfl-panini,Origins
+48,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Select UFC,,ufc-select,ufc-panini,Select UFC
+49,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Origins,,nba-origins,nba-pan-mid,Origins
+50,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Formula 1,,f1,root,Formula 1
+51,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,O-Pee-Chee,,nhl-opc,nhl,O-Pee-Chee
+52,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Australian Cricket Collection,,cric-aus,cric-select,Australian Cricket Collection
+53,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,UD Black,,nba-udblack,nba-ud,UD Black
+54,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,NFL Football,,nfl,root,NFL Football
+55,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Prizm,,nfl-prizm,nfl-panini,Prizm
+56,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Chrome UFC,,ufc-chrome,ufc-topps,Chrome UFC
+57,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Tap N Play,,cric-tap,cricket,Tap N Play
+58,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Elite,,nrl-elite,nrl-tla,Elite
+59,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,SkyBox,,nba-skybox,nba,SkyBox
+60,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Panini,,f1-panini,f1,Panini
+61,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,TLA Merchandising,,nrl-tla,nrl,TLA Merchandising
+62,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Donruss,,nfl-donruss,nfl-panini,Donruss
+63,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Cricket,,cricket,root,Cricket
+64,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Premiership,,nrl-prem,nrl-tla,Premiership
+65,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Series 2,,bb-ts2,bb-topps,Series 2
+66,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Immortals,,nrl-immortals,nrl-tla,Immortals
+67,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Grand Slam,,ten-grandslam,ten-ace,Grand Slam
+68,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,National Treasures,,nba-nt,nba-pan-premium,National Treasures
+69,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Unique,,soc-unique,soc-futera,Unique
+70,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Topps Finest,,nba-finest,nba-topps,Topps Finest
+71,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Mid/High-End Lines,,nba-pan-mid,nba-panini,Mid/High-End Lines
+72,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,OPC Retro,,nhl-opcretro,nhl-opc,OPC Retro
+73,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Contenders,,nfl-contenders,nfl-panini,Contenders
+74,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Eminence,,nba-eminence,nba-pan-premium,Eminence
+75,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Panini America,,ufc-panini,ufc,Panini America
+76,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,WWE Prizm,,wres-prizm,wres-panini,WWE Prizm
+77,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,AFL TeamCoach,,afl-tc,afl-teamcoach,AFL TeamCoach
+78,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,State of Origin,,nrl-soo,nrl-tla,State of Origin
+79,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Serves Collection,,ten-serves,ten-ace,Serves Collection
+80,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Wrestling,,wrestling,root,Wrestling
+81,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Topps,,soc-topps,soccer,Topps
+82,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,AFL,,afl,root,AFL
+83,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Contenders,,nba-contenders,nba-pan-mid,Contenders
+84,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Bowman Sterling,,bb-bsterling,bb-bowman,Bowman Sterling
+85,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Baseball,,baseball,root,Baseball
+86,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Series 2,,nhl-s2,nhl-ud,Series 2
+87,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,TeamCoach,,afl-teamcoach,afl,TeamCoach
+88,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Topps,,ufc-topps,ufc,Topps
+89,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Chronicles Soccer,,soc-chronicles,soc-panini,Chronicles Soccer
+90,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Ice,,nhl-ice,nhl-ud,Ice
+91,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Topps,,wres-topps,wrestling,Topps
+92,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Select Australia,,nbl-select,nbl,Select Australia
+93,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Fleer Ultra,,nba-ultra,nba-fleer,Fleer Ultra
+94,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Panini,,soc-panini,soccer,Panini
+95,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Spectra,,nba-spectra,nba-pan-mid,Spectra
+96,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Match Attax,,soc-match,soc-topps,Match Attax
+97,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Legends,,nbl-legends,nbl-select,Legends
+98,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Big Bash League Cards,,cric-bbl2,cric-tap,Big Bash League Cards
+99,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Series 1,,nhl-s1,nhl-ud,Series 1
+100,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Vintage,,soc-vintage,soc-futera,Vintage
+101,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Prizm Premier League,,soc-prizm,soc-panini,Prizm Premier League
+102,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,NBA Basketball,,nba,root,NBA Basketball
+103,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Mosaic,,nfl-mosaic,nfl-panini,Mosaic
+104,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Mosaic,,nba-mosaic,nba-pan-flagship,Mosaic
+105,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,WWE Heritage,,wres-heritage,wres-topps,WWE Heritage
+106,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Metal Universe,,nba-metal,nba-fleer,Metal Universe
+107,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,SP Authentic Golf,,golf-spa,golf-ud,SP Authentic Golf
+108,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Thunder,,nba-thunder,nba-skybox,Thunder
+109,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Bundesliga Chrome,,soc-bundes,soc-topps,Bundesliga Chrome
+110,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Prizm Baseball,,bb-prizm,bb-panini,Prizm Baseball
+111,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Select,,nba-select,nba-pan-flagship,Select
+112,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,NBL,,nbl,root,NBL
+113,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,World Football,,soc-world,soc-futera,World Football
+114,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Prestige,,afl-prestige,afl-select,Prestige
+115,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,NHL Hockey,,nhl,root,NHL Hockey
+116,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,NRL,,nrl,root,NRL
+117,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Stadium Club,,nba-stadium,nba-topps,Stadium Club
+118,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Cricket Attax,,cric-attax,cric-tap,Cricket Attax
+119,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Donruss UFC,,ufc-donruss,ufc-panini,Donruss UFC
+120,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Golf,,golf,root,Golf
+121,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Premium Lines,,nba-pan-premium,nba-panini,Premium Lines
+122,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Topps Chrome F1,,f1-chrome,f1-topps,Topps Chrome F1
+123,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Allen & Ginter,,bb-allen,bb-topps,Allen & Ginter
+124,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Topps,,f1-topps,f1,Topps
+125,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Fleer Tradition,,nba-tradition,nba-fleer,Fleer Tradition
+126,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,SP Authentic,,nhl-spa,nhl-ud,SP Authentic
+127,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,The Cup,,nhl-cup,nhl-ud,The Cup
+128,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Immaculate,,nba-immaculate,nba-pan-premium,Immaculate
+129,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Panini America,,wres-panini,wrestling,Panini America
+130,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Court Kings,,nba-ck,nba-pan-mid,Court Kings
+131,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Finest UEFA,,soc-finest,soc-topps,Finest UEFA
+132,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Select Baseball,,bb-select,bb-panini,Select Baseball
+133,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Revolution,,nba-revolution,nba-pan-flagship,Revolution
+134,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Stadium Club,,bb-stadium,bb-topps,Stadium Club
+135,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Select Australia,,afl-select,afl,Select Australia
+136,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Infinity,,afl-infinity,afl-select,Infinity
+137,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Fleer,,nba-fleer,nba,Fleer
+138,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Dominance,,afl-dom,afl-select,Dominance
+139,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Topps,,ten-topps,tennis,Topps
+140,IntelligentMindMapRootNodeBlock,Mind Maps,2,,,,,,,,Marketplace – Sports Cards,,root,,Marketplace – Sports Cards
+141,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Tennis,,tennis,root,Tennis
+142,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Finest Tennis,,ten-finest,ten-topps,Finest Tennis
+143,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Flair Showcase,,nba-flair,nba-fleer,Flair Showcase
+144,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Upper Deck,,nba-ud,nba,Upper Deck
+145,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Black Diamond,,nhl-bd,nhl-ud,Black Diamond
+146,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Upper Deck,,golf-ud,golf,Upper Deck
+147,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Topps Chrome Tennis,,ten-chrome,ten-topps,Topps Chrome Tennis
+148,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Heritage,,bb-heritage,bb-topps,Heritage
+149,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,WWE Finest,,wres-finest,wres-topps,WWE Finest
+150,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Panini America,,nba-panini,nba,Panini America
+151,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,WWE Chrome,,wres-chrome,wres-topps,WWE Chrome
+152,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Bowman Chrome,,bb-bchrome,bb-bowman,Bowman Chrome
+153,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Upper Deck,,nhl-ud,nhl,Upper Deck
+154,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Exquisite Golf,,golf-exquisite,golf-ud,Exquisite Golf
+155,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Trilogy,,nhl-trilogy,nhl-ud,Trilogy
+156,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Flawless,,nba-flawless,nba-pan-premium,Flawless
+157,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Leaf Trading Cards,,golf-leaf,golf,Leaf Trading Cards
+158,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Mosaic UEFA,,soc-mosaic,soc-panini,Mosaic UEFA
+159,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Cherry Collectables,,nbl-cherry,nbl,Cherry Collectables
+160,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Test Series,,cric-test,cric-select,Test Series
+161,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Futera,,soc-futera,soccer,Futera
+162,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Flux,,nba-flux,nba-pan-flagship,Flux
+163,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Ultimate Collection,,nba-ultimate,nba-ud,Ultimate Collection
+164,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Recon,,nba-recon,nba-pan-flagship,Recon
+165,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Topps,,nba-topps,nba,Topps
+166,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Noir,,nba-noir,nba-pan-premium,Noir
+167,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Obsidian,,nba-obsidian,nba-pan-mid,Obsidian
+168,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,UFC,,ufc,root,UFC
+169,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Z-Force,,nba-zforce,nba-skybox,Z-Force
+170,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,UEFA Chrome,,soc-uefa,soc-topps,UEFA Chrome
+171,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Crown Royale,,nba-cr,nba-pan-mid,Crown Royale
+172,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Ultimate Collection,,nhl-ultimate,nhl-ud,Ultimate Collection
+173,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Finest,,bb-finest,bb-topps,Finest
+174,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,WWE Revolution,,wres-revolution,wres-panini,WWE Revolution
+175,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,SP Authentic,,nba-spa,nba-ud,SP Authentic
+176,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Prizm F1,,f1-prizm,f1-panini,Prizm F1
+177,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Pro Set Golf,,golf-proset,golf-leaf,Pro Set Golf
+178,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Select,,nfl-select,nfl-panini,Select
+179,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Soccer / Football,,soccer,root,Soccer / Football
+180,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Merlin Chrome,,soc-merlin,soc-topps,Merlin Chrome
+181,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,WWE Select,,wres-select,wres-panini,WWE Select
+182,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Donruss Optic,,nfl-doptic,nfl-panini,Donruss Optic
+183,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Finest F1,,f1-finest,f1-topps,Finest F1
+184,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Hoops,,nba-hoops,nba-pan-flagship,Hoops
+185,Line,,2,,,141,139,None,None,,,,,,
+186,Line,,2,,,16,79,None,None,,,,,,
+187,Line,,2,,,161,113,None,None,,,,,,
+188,Line,,2,,,137,93,None,None,,,,,,
+189,Line,,2,,,75,48,None,None,,,,,,
+190,Line,,2,,,129,181,None,None,,,,,,
+191,Line,,2,,,59,169,None,None,,,,,,
+192,Line,,2,,,7,160,None,None,,,,,,
+193,Line,,2,,,85,21,None,None,,,,,,
+194,Line,,2,,,50,124,None,None,,,,,,
+195,Line,,2,,,71,95,None,None,,,,,,
+196,Line,,2,,,54,20,None,None,,,,,,
+197,Line,,2,,,157,44,None,None,,,,,,
+198,Line,,2,,,165,22,None,None,,,,,,
+199,Line,,2,,,19,111,None,None,,,,,,
+200,Line,,2,,,159,40,None,None,,,,,,
+201,Line,,2,,,139,142,None,None,,,,,,
+202,Line,,2,,,60,176,None,None,,,,,,
+203,Line,,2,,,115,153,None,None,,,,,,
+204,Line,,2,,,88,33,None,None,,,,,,
+205,Line,,2,,,94,41,None,None,,,,,,
+206,Line,,2,,,51,72,None,None,,,,,,
+207,Line,,2,,,146,107,None,None,,,,,,
+208,Line,,2,,,9,84,None,None,,,,,,
+209,Line,,2,,,135,31,None,None,,,,,,
+210,Line,,2,,,121,68,None,None,,,,,,
+211,Line,,2,,,150,121,None,None,,,,,,
+212,Line,,2,,,144,163,None,None,,,,,,
+213,Line,,2,,,124,3,None,None,,,,,,
+214,Line,,2,,,153,172,None,None,,,,,,
+215,Line,,2,,,80,91,None,None,,,,,,
+216,Line,,2,,,92,39,None,None,,,,,,
+217,Line,,2,,,120,146,None,None,,,,,,
+218,Line,,2,,,112,92,None,None,,,,,,
+219,Line,,2,,,61,78,None,None,,,,,,
+220,Line,,2,,,20,178,None,None,,,,,,
+221,Line,,2,,,102,144,None,None,,,,,,
+222,Line,,2,,,32,132,None,None,,,,,,
+223,Line,,2,,,91,105,None,None,,,,,,
+224,Line,,2,,,87,77,None,None,,,,,,
+225,Line,,2,,,179,81,None,None,,,,,,
+226,Line,,2,,,168,88,None,None,,,,,,
+227,Line,,2,,,63,57,None,None,,,,,,
+228,Line,,2,,,21,65,None,None,,,,,,
+229,Line,,2,,,81,170,None,None,,,,,,
+230,Line,,2,,,140,80,None,None,,,,,,
+231,Line,,2,,,116,61,None,None,,,,,,
+232,Line,,2,,,82,87,None,None,,,,,,
+233,Line,,2,,,57,98,None,None,,,,,,
+234,Line,,2,,,94,101,None,None,,,,,,
+235,Line,,2,,,144,53,None,None,,,,,,
+236,Line,,2,,,135,114,None,None,,,,,,
+237,Line,,2,,,124,37,None,None,,,,,,
+238,Line,,2,,,51,34,None,None,,,,,,
+239,Line,,2,,,20,55,None,None,,,,,,
+240,Line,,2,,,157,177,None,None,,,,,,
+241,Line,,2,,,146,154,None,None,,,,,,
+242,Line,,2,,,21,27,None,None,,,,,,
+243,Line,,2,,,19,133,None,None,,,,,,
+244,Line,,2,,,75,28,None,None,,,,,,
+245,Line,,2,,,150,71,None,None,,,,,,
+246,Line,,2,,,153,155,None,None,,,,,,
+247,Line,,2,,,85,32,None,None,,,,,,
+248,Line,,2,,,71,49,None,None,,,,,,
+249,Line,,2,,,88,42,None,None,,,,,,
+250,Line,,2,,,159,38,None,None,,,,,,
+251,Line,,2,,,7,12,None,None,,,,,,
+252,Line,,2,,,102,165,None,None,,,,,,
+253,Line,,2,,,165,117,None,None,,,,,,
+254,Line,,2,,,60,10,None,None,,,,,,
+255,Line,,2,,,16,67,None,None,,,,,,
+256,Line,,2,,,80,129,None,None,,,,,,
+257,Line,,2,,,179,94,None,None,,,,,,
+258,Line,,2,,,161,100,None,None,,,,,,
+259,Line,,2,,,137,125,None,None,,,,,,
+260,Line,,2,,,121,166,None,None,,,,,,
+261,Line,,2,,,112,159,None,None,,,,,,
+262,Line,,2,,,32,110,None,None,,,,,,
+263,Line,,2,,,120,157,None,None,,,,,,
+264,Line,,2,,,91,149,None,None,,,,,,
+265,Line,,2,,,129,174,None,None,,,,,,
+266,Line,,2,,,81,180,None,None,,,,,,
+267,Line,,2,,,139,147,None,None,,,,,,
+268,Line,,2,,,9,26,None,None,,,,,,
+269,Line,,2,,,61,64,None,None,,,,,,
+270,Line,,2,,,57,118,None,None,,,,,,
+271,Line,,2,,,59,108,None,None,,,,,,
+272,Line,,2,,,92,97,None,None,,,,,,
+273,Line,,2,,,168,75,None,None,,,,,,
+274,Line,,2,,,141,16,None,None,,,,,,
+275,Line,,2,,,82,135,None,None,,,,,,
+276,Line,,2,,,50,60,None,None,,,,,,
+277,Line,,2,,,115,51,None,None,,,,,,
+278,Line,,2,,,140,168,None,None,,,,,,
+279,Line,,2,,,63,7,None,None,,,,,,
+280,Line,,2,,,140,141,None,None,,,,,,
+281,Line,,2,,,7,52,None,None,,,,,,
+282,Line,,2,,,135,136,None,None,,,,,,
+283,Line,,2,,,153,126,None,None,,,,,,
+284,Line,,2,,,19,164,None,None,,,,,,
+285,Line,,2,,,161,69,None,None,,,,,,
+286,Line,,2,,,137,106,None,None,,,,,,
+287,Line,,2,,,102,59,None,None,,,,,,
+288,Line,,2,,,32,36,None,None,,,,,,
+289,Line,,2,,,20,47,None,None,,,,,,
+290,Line,,2,,,59,29,None,None,,,,,,
+291,Line,,2,,,71,167,None,None,,,,,,
+292,Line,,2,,,75,119,None,None,,,,,,
+293,Line,,2,,,121,128,None,None,,,,,,
+294,Line,,2,,,9,4,None,None,,,,,,
+295,Line,,2,,,94,158,None,None,,,,,,
+296,Line,,2,,,91,151,None,None,,,,,,
+297,Line,,2,,,61,66,None,None,,,,,,
+298,Line,,2,,,21,134,None,None,,,,,,
+299,Line,,2,,,165,70,None,None,,,,,,
+300,Line,,2,,,159,43,None,None,,,,,,
+301,Line,,2,,,144,175,None,None,,,,,,
+302,Line,,2,,,85,9,None,None,,,,,,
+303,Line,,2,,,88,56,None,None,,,,,,
+304,Line,,2,,,150,19,None,None,,,,,,
+305,Line,,2,,,81,96,None,None,,,,,,
+306,Line,,2,,,179,161,None,None,,,,,,
+307,Line,,2,,,129,76,None,None,,,,,,
+308,Line,,2,,,124,183,None,None,,,,,,
+309,Line,,2,,,102,150,None,None,,,,,,
+310,Line,,2,,,21,148,None,None,,,,,,
+311,Line,,2,,,140,179,None,None,,,,,,
+312,Line,,2,,,165,45,None,None,,,,,,
+313,Line,,2,,,61,58,None,None,,,,,,
+314,Line,,2,,,75,17,None,None,,,,,,
+315,Line,,2,,,19,35,None,None,,,,,,
+316,Line,,2,,,121,156,None,None,,,,,,
+317,Line,,2,,,59,11,None,None,,,,,,
+318,Line,,2,,,124,8,None,None,,,,,,
+319,Line,,2,,,20,13,None,None,,,,,,
+320,Line,,2,,,135,30,None,None,,,,,,
+321,Line,,2,,,71,171,None,None,,,,,,
+322,Line,,2,,,153,86,None,None,,,,,,
+323,Line,,2,,,9,152,None,None,,,,,,
+324,Line,,2,,,94,6,None,None,,,,,,
+325,Line,,2,,,137,143,None,None,,,,,,
+326,Line,,2,,,144,5,None,None,,,,,,
+327,Line,,2,,,81,131,None,None,,,,,,
+328,Line,,2,,,81,109,None,None,,,,,,
+329,Line,,2,,,124,122,None,None,,,,,,
+330,Line,,2,,,19,104,None,None,,,,,,
+331,Line,,2,,,135,138,None,None,,,,,,
+332,Line,,2,,,21,173,None,None,,,,,,
+333,Line,,2,,,20,103,None,None,,,,,,
+334,Line,,2,,,121,74,None,None,,,,,,
+335,Line,,2,,,94,89,None,None,,,,,,
+336,Line,,2,,,140,116,None,None,,,,,,
+337,Line,,2,,,71,83,None,None,,,,,,
+338,Line,,2,,,102,137,None,None,,,,,,
+339,Line,,2,,,153,99,None,None,,,,,,
+340,Line,,2,,,21,24,None,None,,,,,,
+341,Line,,2,,,20,25,None,None,,,,,,
+342,Line,,2,,,19,184,None,None,,,,,,
+343,Line,,2,,,71,130,None,None,,,,,,
+344,Line,,2,,,140,115,None,None,,,,,,
+345,Line,,2,,,153,90,None,None,,,,,,
+346,Line,,2,,,21,46,None,None,,,,,,
+347,Line,,2,,,153,15,None,None,,,,,,
+348,Line,,2,,,140,54,None,None,,,,,,
+349,Line,,2,,,19,162,None,None,,,,,,
+350,Line,,2,,,20,14,None,None,,,,,,
+351,Line,,2,,,19,23,None,None,,,,,,
+352,Line,,2,,,20,182,None,None,,,,,,
+353,Line,,2,,,153,127,None,None,,,,,,
+354,Line,,2,,,140,112,None,None,,,,,,
+355,Line,,2,,,21,123,None,None,,,,,,
+356,Line,,2,,,20,62,None,None,,,,,,
+357,Line,,2,,,140,102,None,None,,,,,,
+358,Line,,2,,,153,145,None,None,,,,,,
+359,Line,,2,,,19,18,None,None,,,,,,
+360,Line,,2,,,20,73,None,None,,,,,,
+361,Line,,2,,,140,120,None,None,,,,,,
+362,Line,,2,,,140,50,None,None,,,,,,
+363,Line,,2,,,140,63,None,None,,,,,,
+364,Line,,2,,,140,85,None,None,,,,,,
+365,Line,,2,,,140,82,None,None,,,,,,

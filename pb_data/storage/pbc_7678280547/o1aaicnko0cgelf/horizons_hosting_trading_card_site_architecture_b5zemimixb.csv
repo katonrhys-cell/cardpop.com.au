@@ -1,0 +1,118 @@
+Id,Name,Shape Library,Page ID,Contained By,Group,Line Source,Line Destination,Source Arrow,Destination Arrow,Status,Text Area 1,Id,ParentId,Text
+1,Document,,,,,,,,,Draft,Horizons Hosting ? Trading Card Site Architecture,,,
+2,Page,,,,,,,,,,Horizons Hosting – Trading Card Site Architecture,,,
+3,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,🏆 Grading,grading,root,🏆 Grading
+4,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,🛒 Shop,shop,root,🛒 Shop
+5,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Sealed Product,shop-mtg-sealed,shop-mtg,Sealed Product
+6,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Card Sleeves,shop-accessories-sleeves,shop-accessories,Card Sleeves
+7,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,My Collection,account-collection,account,My Collection
+8,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Sealed Product,shop-pokemon-sealed,shop-pokemon,Sealed Product
+9,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Wishlist,account-wishlist,account,Wishlist
+10,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Accessories & Supplies,shop-accessories,shop,Accessories & Supplies
+11,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,🔄 Marketplace,marketplace,root,🔄 Marketplace
+12,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Browse Listings,marketplace-browse,marketplace,Browse Listings
+13,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Sell Your Cards,marketplace-sell,marketplace,Sell Your Cards
+14,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,How to Sell Cards for Max Value,blog-investing-sell,blog-investing,How to Sell Cards for Max Value
+15,IntelligentMindMapRootNodeBlock,Mind Maps,2,,,,,,,,horizonshosting.com.au,root,,horizonshosting.com.au
+16,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Auctions,marketplace-auctions,marketplace,Auctions
+17,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,👤 My Account,account,root,👤 My Account
+18,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,About Us,info-about,info,About Us
+19,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Card Recommendations,ai-recommend,ai,Card Recommendations
+20,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Other TCGs,shop-other,shop,Other TCGs
+21,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Card Investing & Value,blog-investing,blog,Card Investing & Value
+22,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Login,account-login,account,Login
+23,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Submit for Grading,grading-submit,grading,Submit for Grading
+24,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Pokémon,shop-pokemon,shop,Pokémon
+25,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,How to Start Collecting in AU,blog-beginners-start,blog-beginners,How to Start Collecting in AU
+26,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,🏠 Home,home,root,🏠 Home
+27,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,ℹ️ Info,info,root,ℹ️ Info
+28,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,My Orders,account-orders,account,My Orders
+29,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Returns Policy,info-returns,info,Returns Policy
+30,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Card Scanner,ai-scanner,ai,Card Scanner
+31,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Binders & Storage,shop-accessories-binders,shop-accessories,Binders & Storage
+32,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Top Loaders,shop-accessories-toploader,shop-accessories,Top Loaders
+33,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Magic: The Gathering,shop-mtg,shop,Magic: The Gathering
+34,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Grading Guide,grading-guide,grading,Grading Guide
+35,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Trade Cards,marketplace-trade,marketplace,Trade Cards
+36,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,FAQ,info-faq,info,FAQ
+37,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Collection Manager,ai-collection,ai,Collection Manager
+38,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Want Lists,marketplace-wantlist,marketplace,Want Lists
+39,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,AI Card Valuation,ai-valuation,ai,AI Card Valuation
+40,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Booster Packs,shop-mtg-booster,shop-mtg,Booster Packs
+41,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,📝 Blog & Guides,blog,root,📝 Blog & Guides
+42,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Register,account-register,account,Register
+43,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,My Listings,account-listings,account,My Listings
+44,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Single Cards,shop-yugioh-singles,shop-yugioh,Single Cards
+45,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Rarest Cards in Australia,blog-investing-rare,blog-investing,Rarest Cards in Australia
+46,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Where to Buy Cards in Australia,blog-beginners-buy,blog-beginners,Where to Buy Cards in Australia
+47,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,🤖 AI Tools,ai,root,🤖 AI Tools
+48,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Contact,info-contact,info,Contact
+49,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Grading Services (PSA/BGS),grading-services,grading,Grading Services (PSA/BGS)
+50,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,TCG News & Updates,blog-news,blog,TCG News & Updates
+51,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Single Cards,shop-mtg-singles,shop-mtg,Single Cards
+52,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Booster Packs,shop-pokemon-booster,shop-pokemon,Booster Packs
+53,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Beginner Guides,blog-beginners,blog,Beginner Guides
+54,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Yu-Gi-Oh!,shop-yugioh,shop,Yu-Gi-Oh!
+55,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Shipping Info (AU),info-shipping,info,Shipping Info (AU)
+56,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Terms & Conditions,info-terms,info,Terms & Conditions
+57,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Privacy Policy,info-privacy,info,Privacy Policy
+58,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Price Tracker,ai-price,ai,Price Tracker
+59,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Single Cards,shop-pokemon-singles,shop-pokemon,Single Cards
+60,IntelligentMindMapNodeBlock,Mind Maps,2,,,,,,,,Booster Packs,shop-yugioh-booster,shop-yugioh,Booster Packs
+61,Line,,2,,,54,44,None,None,,,,,
+62,Line,,2,,,47,39,None,None,,,,,
+63,Line,,2,,,15,4,None,None,,,,,
+64,Line,,2,,,33,51,None,None,,,,,
+65,Line,,2,,,4,54,None,None,,,,,
+66,Line,,2,,,53,25,None,None,,,,,
+67,Line,,2,,,10,32,None,None,,,,,
+68,Line,,2,,,27,56,None,None,,,,,
+69,Line,,2,,,11,38,None,None,,,,,
+70,Line,,2,,,17,9,None,None,,,,,
+71,Line,,2,,,24,59,None,None,,,,,
+72,Line,,2,,,21,14,None,None,,,,,
+73,Line,,2,,,3,23,None,None,,,,,
+74,Line,,2,,,41,50,None,None,,,,,
+75,Line,,2,,,27,55,None,None,,,,,
+76,Line,,2,,,17,42,None,None,,,,,
+77,Line,,2,,,54,60,None,None,,,,,
+78,Line,,2,,,53,46,None,None,,,,,
+79,Line,,2,,,33,5,None,None,,,,,
+80,Line,,2,,,11,35,None,None,,,,,
+81,Line,,2,,,4,24,None,None,,,,,
+82,Line,,2,,,24,8,None,None,,,,,
+83,Line,,2,,,10,6,None,None,,,,,
+84,Line,,2,,,41,21,None,None,,,,,
+85,Line,,2,,,15,11,None,None,,,,,
+86,Line,,2,,,47,30,None,None,,,,,
+87,Line,,2,,,3,49,None,None,,,,,
+88,Line,,2,,,21,45,None,None,,,,,
+89,Line,,2,,,17,28,None,None,,,,,
+90,Line,,2,,,3,34,None,None,,,,,
+91,Line,,2,,,27,29,None,None,,,,,
+92,Line,,2,,,24,52,None,None,,,,,
+93,Line,,2,,,15,27,None,None,,,,,
+94,Line,,2,,,4,20,None,None,,,,,
+95,Line,,2,,,47,19,None,None,,,,,
+96,Line,,2,,,10,31,None,None,,,,,
+97,Line,,2,,,33,40,None,None,,,,,
+98,Line,,2,,,41,53,None,None,,,,,
+99,Line,,2,,,11,13,None,None,,,,,
+100,Line,,2,,,47,58,None,None,,,,,
+101,Line,,2,,,15,26,None,None,,,,,
+102,Line,,2,,,27,57,None,None,,,,,
+103,Line,,2,,,11,12,None,None,,,,,
+104,Line,,2,,,4,33,None,None,,,,,
+105,Line,,2,,,17,22,None,None,,,,,
+106,Line,,2,,,17,43,None,None,,,,,
+107,Line,,2,,,11,16,None,None,,,,,
+108,Line,,2,,,47,37,None,None,,,,,
+109,Line,,2,,,15,3,None,None,,,,,
+110,Line,,2,,,27,36,None,None,,,,,
+111,Line,,2,,,4,10,None,None,,,,,
+112,Line,,2,,,27,48,None,None,,,,,
+113,Line,,2,,,15,41,None,None,,,,,
+114,Line,,2,,,17,7,None,None,,,,,
+115,Line,,2,,,15,47,None,None,,,,,
+116,Line,,2,,,27,18,None,None,,,,,
+117,Line,,2,,,15,17,None,None,,,,,
