@@ -1,0 +1,4 @@
+supabase db pull --db-url <db_connection_string>
+
+# Your Database connection string will look like this:
+#postgresql://postgres.odoglvswwymyjuwlonkf:[xivnit-tadra4-qohhIj]@aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres#
