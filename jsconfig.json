@@ -2,8 +2,25 @@
 	"compilerOptions": {
 		"baseUrl": ".",
 		"paths": {
-			"@/*": ["./src/*"]
+			"@/pages/marketplace/*": ["./marketplace/*"],
+			"@/pages/shop/*":        ["./shop/*"],
+			"@/pages/blog/*":        ["./blog/*"],
+			"@/pages/community/*":   ["./community/*"],
+			"@/pages/markets/*":     ["./markets/*"],
+			"@/pages/grading/*":     ["./grading/*"],
+			"@/pages/account/*":     ["./account/*"],
+			"@/pages/admin/*":       ["./admin/*"],
+			"@/pages/info/*":        ["./info/*"],
+			"@/pages/vault/*":       ["./vault/*"],
+			"@/pages/*":             ["./*"],
+			"@/components/ui/*":     ["./ui/*"],
+			"@/components/*":        ["./*"],
+			"@/*":                   ["./*"]
 		}
 	},
-	"include": ["src"]
+	"include": [
+		"./**/*.js",
+		"./**/*.jsx"
+	],
+	"exclude": ["node_modules", "dist", "pb_data"]
 }
