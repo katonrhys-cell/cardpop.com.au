@@ -98,8 +98,8 @@ const HomePage = () => {
   return (
     <div className="min-h-screen bg-background font-sans overflow-hidden">
       <Helmet>
-        <title>CardPop | The Premier Trading Card Marketplace</title>
-        <meta name="description" content="Buy, sell, and trade your favorite trading cards securely on CardPop." />
+        <title>CardPop | Australia's Trading Card Marketplace</title>
+        <meta name="description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop — Australia's most trusted trading card platform." />
       </Helmet>
 
       {/* Hero Section */}
@@ -119,18 +119,18 @@ const HomePage = () => {
           >
             <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-muted text-muted-foreground text-sm font-bold tracking-wide mb-8 border border-border shadow-sm">
               <Zap className="w-4 h-4 text-primary" />
-              The New Standard in Card Trading
+              Australia's Trading Card Marketplace
             </span>
-            
+
             <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold font-serif tracking-tight text-balance mb-8 leading-[1.1]">
-              Collect, Trade, and <br className="hidden md:block" />
+              Buy, Sell & Trade Cards <br className="hidden md:block" />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-primary/80">
-                Dominate the Market
+                Across Australia
               </span>
             </h1>
-            
+
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-12 leading-relaxed text-balance">
-              Join thousands of collectors on the most secure and advanced platform for trading cards. Real-time analytics, verified sellers, and seamless transactions.
+              The safest place to buy, sell and trade Pokémon, Magic, sports cards and more — with Australian sellers, AUD pricing, and real-time market data.
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -223,7 +223,7 @@ const HomePage = () => {
           <div className="flex items-end justify-between mb-12">
             <div>
               <h2 className="text-3xl font-bold font-serif mb-2">Recent Vault Additions</h2>
-              <p className="text-muted-foreground">Fresh listings from collectors around the world.</p>
+              <p className="text-muted-foreground">Fresh listings from Australian collectors.</p>
             </div>
             <Button asChild variant="ghost" className="hidden sm:flex font-bold hover:bg-muted">
               <Link to="/marketplace">View All <ArrowRight className="ml-2 w-4 h-4" /></Link>
@@ -272,8 +272,8 @@ const HomePage = () => {
       <section className="py-24 bg-muted/30 border-t border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold font-serif mb-4">Trusted Community</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">Trade with confidence. Meet our top-rated sellers with proven track records.</p>
+            <h2 className="text-3xl font-bold font-serif mb-4">Trusted Australian Sellers</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">Trade with confidence. Every seller is verified and rated by the CardPop community.</p>
           </div>
 
           {loading ? (
