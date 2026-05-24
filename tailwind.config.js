@@ -2,10 +2,26 @@
 module.exports = {
   darkMode: ["class"],
   content: [
+    "./*.{js,jsx}",
     "./pages/**/*.{js,jsx}",
     "./components/**/*.{js,jsx}",
     "./app/**/*.{js,jsx}",
     "./src/**/*.{js,jsx}",
+    "./account/**/*.{js,jsx}",
+    "./admin/**/*.{js,jsx}",
+    "./blog/**/*.{js,jsx}",
+    "./community/**/*.{js,jsx}",
+    "./contexts/**/*.{js,jsx}",
+    "./grading/**/*.{js,jsx}",
+    "./hooks/**/*.{js,jsx}",
+    "./info/**/*.{js,jsx}",
+    "./lib/**/*.{js,jsx}",
+    "./marketplace/**/*.{js,jsx}",
+    "./markets/**/*.{js,jsx}",
+    "./shop/**/*.{js,jsx}",
+    "./ui/**/*.{js,jsx}",
+    "./utils/**/*.{js,jsx}",
+    "./vault/**/*.{js,jsx}",
   ],
   theme: {
     container: {
@@ -18,7 +34,8 @@ module.exports = {
     extend: {
       fontFamily: {
         sans: ["var(--font-sans)", "sans-serif"],
-        serif: ["var(--font-serif)", "serif"],
+        serif: ["var(--font-heading)", "sans-serif"],
+        heading: ["var(--font-heading)", "sans-serif"],
       },
       colors: {
         border: "hsl(var(--border))",

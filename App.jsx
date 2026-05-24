@@ -152,8 +152,8 @@ const App = () => {
                 <ScrollToTop />
                 <div className="flex flex-col min-h-screen bg-background text-foreground">
                   <Helmet>
-                    <title>CardPop | The Premier Trading Card Marketplace</title>
-                    <meta name="description" content="Buy, sell, and trade your favorite trading cards on CardPop." />
+                    <title>CardPop | Australia's Trading Card Marketplace</title>
+                    <meta name="description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop — Australia's most trusted trading card platform." />
                   </Helmet>
                   
                   <Header />

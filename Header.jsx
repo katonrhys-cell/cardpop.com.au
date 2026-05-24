@@ -1,10 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { 
-  ShoppingCart, Menu, Shield, MessageSquare, ArrowRightLeft, 
-  LayoutDashboard, Package, Users, Calendar, FileText, Building2, Layers, CheckCircle
+import {
+  ShoppingCart, Menu, Shield, MessageSquare, ArrowRightLeft,
+  LayoutDashboard, Package, Users, Calendar, FileText, Building2, Layers, CheckCircle,
+  Sun, Moon
 } from 'lucide-react';
+import { useDarkMode } from '@/hooks/useDarkMode.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { useCart } from '@/hooks/useCart.jsx';
 import pb from '@/lib/pocketbaseClient.js';
@@ -57,6 +59,7 @@ const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [tradeCount, setTradeCount] = useState(0);
+  const { isDark, toggle: toggleDarkMode } = useDarkMode();
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -209,10 +212,20 @@ const Header = () => {
               </Button>
             )}
 
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="relative shrink-0 rounded-xl hover:bg-muted" 
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0 rounded-xl hover:bg-muted"
+              aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+              onClick={toggleDarkMode}
+            >
+              {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative shrink-0 rounded-xl hover:bg-muted"
               aria-label="Cart"
               onClick={() => setIsCartOpen(true)}
             >
@@ -318,7 +331,15 @@ const Header = () => {
                   )}
                 </div>
 
-                <div className="p-4 border-t border-border bg-card shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.05)] shrink-0">
+                <div className="p-4 border-t border-border bg-card shadow-[0_-4px_10px_-4px_rgba(0,0,0,0.05)] shrink-0 flex flex-col gap-3">
+                  <Button
+                    variant="outline"
+                    className="w-full rounded-xl h-12 font-bold text-base flex items-center gap-2"
+                    onClick={toggleDarkMode}
+                  >
+                    {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                    {isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                  </Button>
                   {isAuthenticated ? (
                     <VaultDropdown isMobile={true} />
                   ) : (
