@@ -314,27 +314,9 @@ export default defineConfig({
 	},
 	resolve: {
 		extensions: ['.jsx', '.js', '.tsx', '.ts', '.json'],
-		alias: [
-			// Nested page directories (more specific aliases must come first)
-			{ find: '@/pages/marketplace', replacement: path.resolve(__dirname, './marketplace') },
-			{ find: '@/pages/shop',        replacement: path.resolve(__dirname, './shop') },
-			{ find: '@/pages/blog',        replacement: path.resolve(__dirname, './blog') },
-			{ find: '@/pages/community',   replacement: path.resolve(__dirname, './community') },
-			{ find: '@/pages/markets',     replacement: path.resolve(__dirname, './markets') },
-			{ find: '@/pages/grading',     replacement: path.resolve(__dirname, './grading') },
-			{ find: '@/pages/account',     replacement: path.resolve(__dirname, './account') },
-			{ find: '@/pages/admin',       replacement: path.resolve(__dirname, './admin') },
-			{ find: '@/pages/info',        replacement: path.resolve(__dirname, './info') },
-			{ find: '@/pages/vault',       replacement: path.resolve(__dirname, './vault') },
-			// Flat pages (HomePage, LoginPage, etc.) live at the project root
-			{ find: '@/pages',             replacement: path.resolve(__dirname, '.') },
-			// shadcn UI components are in /ui/ but imported as @/components/ui
-			{ find: '@/components/ui',     replacement: path.resolve(__dirname, './ui') },
-			// Shared components (Header, Footer, etc.) live at the project root
-			{ find: '@/components',        replacement: path.resolve(__dirname, '.') },
-			// Everything else (@/contexts, @/hooks, @/lib, @/api …) resolves from root
-			{ find: '@',                   replacement: path.resolve(__dirname, '.') },
-		],
+		alias: {
+			'@': path.resolve(__dirname, '.'),
+		},
 	},
 	build: {
 		rollupOptions: {
