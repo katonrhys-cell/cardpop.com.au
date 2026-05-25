@@ -92,6 +92,9 @@ const AustralianMarketsPage = lazy(() => import('@/pages/AustralianMarketsPage.j
 // Grading
 const GradingPage = lazy(() => import('@/pages/grading/GradingPage.jsx'));
 const GradingScalePage = lazy(() => import('@/pages/grading/GradingScalePage.jsx'));
+const WhatIsGradingPage = lazy(() => import('@/pages/grading/WhatIsGradingPage.jsx'));
+const GradingScalesPage = lazy(() => import('@/pages/grading/GradingScalesPage.jsx'));
+const GradingCompaniesPage = lazy(() => import('@/pages/grading/GradingCompaniesPage.jsx'));
 
 // Community & Blog
 const BlogPage = lazy(() => import('@/pages/blog/BlogPage.jsx'));
@@ -230,6 +233,9 @@ const App = () => {
                         
                         {/* Grading */}
                         <Route path="/grading" element={<GradingPage />} />
+                        <Route path="/grading/what-is-grading" element={<WhatIsGradingPage />} />
+                        <Route path="/grading/scales" element={<GradingScalesPage />} />
+                        <Route path="/grading/companies" element={<GradingCompaniesPage />} />
                         <Route path="/grading/guide/:scale" element={<GradingScalePage />} />
                         
                         {/* Community & Blog */}
