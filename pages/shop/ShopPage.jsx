@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import pb from '@/lib/pocketbaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PackageX, SlidersHorizontal, Search } from 'lucide-react';
+import { PackageX, SlidersHorizontal, Search, ShoppingBag } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -69,13 +69,14 @@ const ShopPage = () => {
         <title>The Shop | CardPop</title>
       </Helmet>
 
-      <section className="bg-secondary text-secondary-foreground py-16 md:py-24 border-b border-border text-center px-4">
-        <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold font-serif mb-4 tracking-tight text-balance">
-          Official CardPop Shop
-        </h1>
-        <p className="text-lg text-secondary-foreground/80 max-w-2xl mx-auto leading-relaxed">
-          Curated premium sealed boxes, rare singles, and exclusive drops sourced and verified by our experts.
-        </p>
+      <section className="bg-card border-b border-border py-20 text-center">
+        <div className="container-default">
+          <ShoppingBag className="w-12 h-12 text-primary mx-auto mb-6" />
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">The Card Shop</h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Curated premium sealed boxes, rare singles, and exclusive drops sourced and verified by our experts.
+          </p>
+        </div>
       </section>
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">

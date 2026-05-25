@@ -27,7 +27,7 @@ const GradingPage = () => {
     <div className="min-h-screen bg-background">
       <Helmet><title>Grading Hub | CardPop</title></Helmet>
 
-      <section className="bg-secondary/30 border-b border-border py-20 text-center">
+      <section className="bg-card border-b border-border py-20 text-center">
         <div className="container-default">
           <SearchCheck className="w-12 h-12 text-primary mx-auto mb-6" />
           <h1 className="text-4xl md:text-5xl font-bold mb-4">Grading Intelligence</h1>
