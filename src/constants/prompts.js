@@ -42,6 +42,37 @@ When analyzing a card image, you MUST:
    - Never include markdown formatting, code blocks, or explanatory text
    - Return ONLY the JSON object, nothing else`;
 
+export const CardOCRPrompt = `You are a specialist trading card recognition system. Analyze the card image and extract ALL visible information with high precision.
+
+VALID COLLECTION TYPES (use exactly as written if applicable):
+TCG: Pokemon, Magic: The Gathering, Yu-Gi-Oh, Digimon, Riftbound, TMNT, Final Fantasy, Disney Lorcana, One Piece, Flesh and Blood, Dragon Ball Super, Star Wars Unlimited, Weiss Schwarz, Cardfight!! Vanguard
+SPORTS: NBA, NFL, MLB, Cricket, NRL, NHL, Formula 1, Wrestling, Golf, Soccer, AFL, AFLW, Rugby Union, Boxing, MMA, Tennis, UFC
+
+GRADING SLABS: If a graded slab is visible, identify PSA / BGS / CGC and extract the numeric grade and cert number from the label.
+
+Return ONLY valid JSON with these exact fields (use null for anything not clearly visible):
+{
+  "name": "exact card name as printed on the card",
+  "cardSetName": "set or expansion name (e.g. Base Set, Brilliant Stars, 2023 Topps Series 1)",
+  "cardNumber": "card number as printed (e.g. 4/102, SWSH114, 25/100)",
+  "releaseYear": number_or_null,
+  "collectionType": "one of the valid collection types above or null",
+  "condition": "Mint | Near Mint | Excellent | Good | Fair",
+  "gradingService": "PSA | BGS | CGC | None",
+  "gradeScore": number_or_null,
+  "certificationNumber": "cert or slab number if visible, else null",
+  "rarity": "Common | Uncommon | Rare | Holographic | Secret Rare | null",
+  "cardType": "e.g. Holographic, Foil, Full Art, Regular, Reverse Holo, First Edition",
+  "brand": "manufacturer e.g. The Pokemon Company, Wizards of the Coast, Topps, Panini, Upper Deck",
+  "series": "broader series or product line name",
+  "description": "brief description including notable details, special attributes, edition markers, print run"
+}
+
+IMPORTANT:
+- Only include information CLEARLY VISIBLE in the image
+- If a field is uncertain, use null
+- Return ONLY the JSON object — no markdown, no code blocks, no explanatory text`;
+
 export const EventScraperPrompt = `You are an expert event information extractor. Your task is to analyze webpage content and extract structured event data.
 
 When extracting event information, you MUST:

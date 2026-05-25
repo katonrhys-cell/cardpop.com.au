@@ -10,6 +10,7 @@ import migrateRouter from './migrate.js';
 import csvImportRouter from './csv-import.js';
 import verificationRouter from './verification.js';
 import integratedAiRouter from './integrated-ai.js';
+import cardOcrRouter from './card-ocr.js';
 import eventScraperRouter from './event-scraper.js';
 import categoriesRouter from './categories.js';
 import subcategoriesRouter from './subcategories.js';
@@ -26,6 +27,9 @@ export default () => {
     
     // Integrated AI routes with rate limiting
     router.use('/integrated-ai', integratedAiRouter);
+
+    // Card OCR routes with rate limiting
+    router.use('/card-ocr', cardOcrRouter);
     
     // Event scraper routes with API rate limiting
     router.use('/event-scraper', apiLimiter);
