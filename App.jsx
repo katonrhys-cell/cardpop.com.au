@@ -85,6 +85,7 @@ const TransactionHistoryPage = lazy(() => import('@/pages/TransactionHistoryPage
 
 // Markets & Analytics
 const MarketsPage = lazy(() => import('@/pages/markets/MarketsPage.jsx'));
+const CardAnalyticsPage = lazy(() => import('@/pages/markets/CardAnalyticsPage.jsx'));
 const MarketDetailPage = lazy(() => import('@/pages/markets/MarketDetailPage.jsx'));
 const MarketCategoryPage = lazy(() => import('@/pages/markets/MarketCategoryPage.jsx'));
 const AustralianMarketsPage = lazy(() => import('@/pages/AustralianMarketsPage.jsx'));
@@ -227,6 +228,7 @@ const App = () => {
 
                         {/* Markets & Analytics */}
                         <Route path="/markets" element={<MarketsPage />} />
+                        <Route path="/markets/card" element={<CardAnalyticsPage />} />
                         <Route path="/markets/:category" element={<MarketCategoryPage />} />
                         <Route path="/markets/:category/:market" element={<MarketDetailPage />} />
                         <Route path="/australian-markets" element={<AustralianMarketsPage />} />
