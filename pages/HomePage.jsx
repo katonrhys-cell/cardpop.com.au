@@ -1,99 +1,184 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users } from 'lucide-react';
+import { motion, useInView } from 'framer-motion';
+import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import pb from '@/lib/pocketbaseClient.js';
 import VaultListingCard from '@/components/VaultListingCard.jsx';
 import SellerCard from '@/components/SellerCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 
+// ─── Animated counter ────────────────────────────────────────────────────────
+const useCountUp = (end, inView, isDecimal = false) => {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (!inView) return;
+    let frame = 0;
+    const totalFrames = 90;
+    const timer = setInterval(() => {
+      frame++;
+      const progress = frame / totalFrames;
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = isDecimal ? +(end * eased).toFixed(1) : Math.floor(end * eased);
+      setCount(current);
+      if (frame >= totalFrames) {
+        setCount(end);
+        clearInterval(timer);
+      }
+    }, 16);
+    return () => clearInterval(timer);
+  }, [end, inView, isDecimal]);
+  return count;
+};
+
+// ─── Static data ──────────────────────────────────────────────────────────────
+const STATS = [
+  { value: 12400, suffix: '+', label: 'Cards Listed' },
+  { value: 850,   suffix: '+', label: 'Verified Sellers' },
+  { value: 3200,  suffix: '+', label: 'Trades Completed' },
+  { value: 4.9,   suffix: '★', label: 'Average Rating', isDecimal: true },
+];
+
+const CATEGORIES = [
+  { name: 'Pokémon',              gradient: 'from-yellow-300 to-yellow-500',   text: 'text-yellow-950', emoji: '⚡' },
+  { name: 'Magic: The Gathering', gradient: 'from-purple-500 to-violet-700',   text: 'text-white',      emoji: '🔮' },
+  { name: 'Sports Cards',         gradient: 'from-emerald-400 to-teal-600',    text: 'text-white',      emoji: '🏆' },
+  { name: 'Yu-Gi-Oh!',            gradient: 'from-amber-300 to-amber-500',     text: 'text-amber-950',  emoji: '👁️' },
+  { name: 'One Piece',            gradient: 'from-red-500 to-rose-700',        text: 'text-white',      emoji: '⚓' },
+  { name: 'Lorcana',              gradient: 'from-blue-400 to-indigo-600',     text: 'text-white',      emoji: '✨' },
+  { name: 'Dragon Ball',          gradient: 'from-orange-400 to-orange-600',   text: 'text-white',      emoji: '🐉' },
+  { name: 'Digimon',              gradient: 'from-sky-400 to-cyan-600',        text: 'text-white',      emoji: '💾' },
+];
+
+const HOW_IT_WORKS = [
+  {
+    step: '01', icon: Package,
+    title: 'List Your Cards',
+    desc: 'Add cards to your vault in seconds. Set prices, conditions, and trade preferences with ease.',
+  },
+  {
+    step: '02', icon: Search,
+    title: 'Find or Get Found',
+    desc: 'Smart search connects you with buyers and sellers across Australia in real time.',
+  },
+  {
+    step: '03', icon: ShieldCheck,
+    title: 'Trade Safely',
+    desc: 'Our escrow system protects every deal. Funds release only when both parties are satisfied.',
+  },
+];
+
+const ACTIVITY_FEED = [
+  { user: '@PokeTrader_SYD',   action: 'sold a PSA 10 Charizard Base Set',    price: '$2,400', time: '2m ago' },
+  { user: '@MTG_Melbourne',    action: 'listed a Dual Land Alpha',             price: '$5,200', time: '5m ago' },
+  { user: '@SportsCardsBris',  action: 'completed a trade — Rookie Gretzky',  price: '$950',   time: '9m ago' },
+  { user: '@PokeFan_Perth',    action: 'sold a Shadowless Blastoise',          price: '$620',   time: '12m ago' },
+  { user: '@CardKing_ADE',     action: 'listed 3× PSA 9 Venusaur',            price: '$1,100', time: '18m ago' },
+  { user: '@YuGiOh_GLD',       action: 'sold a Dark Magician 1st Edition',    price: '$340',   time: '21m ago' },
+  { user: '@LorcanaMaster',    action: 'completed trade — Rare Sorcerers',    price: '$210',   time: '25m ago' },
+  { user: '@BrisbaneBaller',   action: 'sold a 2023 Panini LeBron SSP',       price: '$480',   time: '31m ago' },
+];
+
+// ─── Hero floating card shapes ────────────────────────────────────────────────
+const HERO_CARDS = [
+  { gradient: 'from-yellow-300 via-yellow-400 to-orange-400', rotate: -14, x: -170, y: 30,  delay: 0,    floatY: -12 },
+  { gradient: 'from-purple-400 via-violet-500 to-purple-700', rotate: -5,  x: -55,  y: -15, delay: 0.15, floatY: -16 },
+  { gradient: 'from-sky-400 via-blue-500 to-indigo-600',      rotate: 4,   x: 60,   y: 10,  delay: 0.3,  floatY: -10 },
+  { gradient: 'from-emerald-400 via-teal-500 to-emerald-600', rotate: 14,  x: 170,  y: 35,  delay: 0.45, floatY: -14 },
+];
+
+// ─── Stat counter item ────────────────────────────────────────────────────────
+const StatItem = ({ value, suffix, label, isDecimal, inView }) => {
+  const count = useCountUp(value, inView, isDecimal);
+  return (
+    <div className="text-center">
+      <div className="text-3xl md:text-4xl font-extrabold font-serif text-foreground tabular-nums">
+        {count}{suffix}
+      </div>
+      <div className="text-sm text-muted-foreground mt-1 font-medium">{label}</div>
+    </div>
+  );
+};
+
+// ─── Animation variants ───────────────────────────────────────────────────────
+const containerVariants = {
+  hidden:  { opacity: 0 },
+  visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
+};
+const itemVariants = {
+  hidden:  { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+};
+
+// ─── Component ────────────────────────────────────────────────────────────────
 const HomePage = () => {
-  const [featuredCards, setFeaturedCards] = useState([]);
+  const [featuredCards, setFeaturedCards]     = useState([]);
   const [featuredSellers, setFeaturedSellers] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]                 = useState(true);
+
+  const statsRef   = useRef(null);
+  const statsInView = useInView(statsRef, { once: true, margin: '-80px' });
 
   useEffect(() => {
     let isMounted = true;
 
     const fetchHomeData = async () => {
       try {
-        // Fetch featured sellers
         const sellersRes = await pb.collection('featuredSellers').getList(1, 4, {
           expand: 'seller_id',
           filter: 'is_active = true',
           sort: 'order',
-          $autoCancel: false
+          $autoCancel: false,
         });
 
-        // Fetch recent vault listings instead of featuredCards to ensure we have valid data
         const recentListings = await pb.collection('trading_cards').getList(1, 4, {
           filter: '(is_for_sale = true || is_for_trade = true)',
           sort: '-created',
-          $autoCancel: false
+          $autoCancel: false,
         });
 
         const productIds = [...new Set(recentListings.items.map(i => i.product_id).filter(Boolean))];
-        const userIds = [...new Set(recentListings.items.map(i => i.user_id).filter(Boolean))];
+        const userIds    = [...new Set(recentListings.items.map(i => i.user_id).filter(Boolean))];
 
-        let catalogProducts = [];
-        let customCards = [];
-        let users = [];
+        let catalogProducts = [], customCards = [], users = [];
 
         if (productIds.length > 0) {
           const idFilter = productIds.map(id => `id="${id}"`).join('||');
-          try { catalogProducts = await pb.collection('officialCatalog').getFullList({ filter: idFilter, $autoCancel: false }); } catch (e) {}
-          try { customCards = await pb.collection('cards').getFullList({ filter: idFilter, $autoCancel: false }); } catch (e) {}
+          try { catalogProducts = await pb.collection('officialCatalog').getFullList({ filter: idFilter, $autoCancel: false }); } catch {}
+          try { customCards     = await pb.collection('cards').getFullList({ filter: idFilter, $autoCancel: false });           } catch {}
         }
 
         if (userIds.length > 0) {
           try {
             users = await pb.collection('users').getFullList({
               filter: userIds.map(id => `id="${id}"`).join('||'),
-              $autoCancel: false
+              $autoCancel: false,
             });
-          } catch (e) {}
+          } catch {}
         }
 
         const mappedListings = recentListings.items.map(item => {
           const product = catalogProducts.find(p => p.id === item.product_id) || customCards.find(c => c.id === item.product_id) || null;
-          const user = users.find(u => u.id === item.user_id) || null;
+          const user    = users.find(u => u.id === item.user_id) || null;
           return { ...item, product, user };
         });
 
         if (isMounted) {
-          const sellers = sellersRes.items.map(item => item.expand?.seller_id).filter(Boolean);
           setFeaturedCards(mappedListings);
-          setFeaturedSellers(sellers);
+          setFeaturedSellers(sellersRes.items.map(item => item.expand?.seller_id).filter(Boolean));
         }
       } catch (error) {
-        console.error("Failed to fetch homepage data:", error);
+        console.error('Failed to fetch homepage data:', error);
       } finally {
         if (isMounted) setLoading(false);
       }
     };
 
     fetchHomeData();
-
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
   }, []);
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: { staggerChildren: 0.1 }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
-  };
 
   return (
     <div className="min-h-screen bg-background font-sans overflow-hidden">
@@ -102,38 +187,77 @@ const HomePage = () => {
         <meta name="description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop — Australia's most trusted trading card platform." />
       </Helmet>
 
-      {/* Hero Section */}
-      <section className="relative min-h-[90dvh] flex items-center justify-center pt-20 pb-32 px-4 sm:px-6 lg:px-8">
-        {/* Subtle Noise Overlay */}
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-soft-light bg-[url('data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZmlsdGVyIGlkPSJhIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC42NSIgbnVtT2N0YXZlcz0iMyIgc3RpdGNoVGlsZXM9InN0aXRjaCIvPjwvZmlsdGVyPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbHRlcj0idXJsKCNhKSIvPjwvc3ZnPg==')]"></div>
-        
-        {/* Gradient Orbs */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-3xl -z-10 animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-[30rem] h-[30rem] bg-blue-500/10 rounded-full blur-3xl -z-10"></div>
+      {/* ── Hero ─────────────────────────────────────────────────────────── */}
+      <section className="relative min-h-[92dvh] flex items-center justify-center pt-20 pb-32 px-4 sm:px-6 lg:px-8 overflow-hidden">
+        {/* Noise texture */}
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-soft-light bg-[url('data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZmlsdGVyIGlkPSJhIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC42NSIgbnVtT2N0YXZlcz0iMyIgc3RpdGNoVGlsZXM9InN0aXRjaCIvPjwvZmlsdGVyPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbHRlcj0idXJsKCNhKSIvPjwvc3ZnPg==')]" />
 
-        <div className="max-w-5xl mx-auto text-center relative z-10">
+        {/* Gradient orbs */}
+        <div className="absolute top-1/3 -left-32 w-[32rem] h-[32rem] bg-primary/15 rounded-full blur-3xl -z-10 animate-pulse" />
+        <div className="absolute bottom-1/4 -right-32 w-[28rem] h-[28rem] bg-blue-500/10 rounded-full blur-3xl -z-10" />
+
+        {/* Floating card stack — desktop only */}
+        <div className="absolute right-[6%] xl:right-[10%] top-1/2 -translate-y-1/2 hidden lg:block w-[320px] h-[420px] pointer-events-none select-none">
+          {HERO_CARDS.map((card, i) => (
+            <motion.div
+              key={i}
+              className={`absolute w-44 h-60 rounded-2xl bg-gradient-to-br ${card.gradient} shadow-2xl`}
+              style={{ left: '50%', top: '50%', marginLeft: -88, marginTop: -120 }}
+              initial={{ opacity: 0, scale: 0.85, rotate: card.rotate, x: card.x, y: card.y + 40 }}
+              animate={{
+                opacity: 1,
+                scale: 1,
+                rotate: card.rotate,
+                x: card.x,
+                y: [card.y, card.y + card.floatY, card.y],
+              }}
+              transition={{
+                opacity: { duration: 0.5, delay: card.delay },
+                scale:   { duration: 0.5, delay: card.delay },
+                y: {
+                  duration: 3.5 + i * 0.4,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                  delay: card.delay + 0.5,
+                },
+              }}
+            >
+              {/* Subtle card shine */}
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/30 to-transparent" />
+              {/* Card "art" placeholder lines */}
+              <div className="absolute bottom-5 left-5 right-5 space-y-2">
+                <div className="h-2 rounded-full bg-white/25 w-3/4" />
+                <div className="h-1.5 rounded-full bg-white/15 w-1/2" />
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Hero text — offset left on desktop to make room for cards */}
+        <div className="max-w-5xl mx-auto w-full relative z-10 lg:pr-[340px] xl:pr-[360px]">
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
+            initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
+            transition={{ duration: 0.6, ease: 'easeOut' }}
+            className="text-center lg:text-left"
           >
             <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-muted text-muted-foreground text-sm font-bold tracking-wide mb-8 border border-border shadow-sm">
               <Zap className="w-4 h-4 text-primary" />
               Australia's Trading Card Marketplace
             </span>
 
-            <h1 className="text-5xl md:text-7xl lg:text-8xl font-extrabold font-serif tracking-tight text-balance mb-8 leading-[1.1]">
-              Buy, Sell & Trade Cards <br className="hidden md:block" />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-primary/80">
+            <h1 className="text-5xl md:text-7xl lg:text-7xl font-extrabold font-serif tracking-tight text-balance mb-8 leading-[1.08]">
+              Buy, Sell &amp; Trade Cards{' '}
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-primary/70">
                 Across Australia
               </span>
             </h1>
 
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-12 leading-relaxed text-balance">
+            <p className="text-lg md:text-xl text-muted-foreground max-w-xl mb-12 leading-relaxed text-balance mx-auto lg:mx-0">
               The safest place to buy, sell and trade Pokémon, Magic, sports cards and more — with Australian sellers, AUD pricing, and real-time market data.
             </p>
-            
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+
+            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
               <Button asChild size="lg" className="w-full sm:w-auto h-14 px-8 rounded-2xl font-bold text-lg shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5">
                 <Link to="/marketplace">
                   Explore Marketplace <ArrowRight className="ml-2 w-5 h-5" />
@@ -149,7 +273,54 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Bento Grid Features */}
+      {/* ── Stats strip ──────────────────────────────────────────────────── */}
+      <section ref={statsRef} className="py-12 border-y border-border bg-card">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-4">
+            {STATS.map((stat) => (
+              <StatItem key={stat.label} {...stat} inView={statsInView} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Category browse ───────────────────────────────────────────────── */}
+      <section className="py-16 bg-background">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-end justify-between mb-8">
+            <div>
+              <h2 className="text-2xl md:text-3xl font-bold font-serif mb-1">Browse by Category</h2>
+              <p className="text-muted-foreground text-sm">Find exactly what you collect.</p>
+            </div>
+            <Button asChild variant="ghost" className="hidden sm:flex font-bold text-sm hover:bg-muted">
+              <Link to="/marketplace">All categories <ArrowRight className="ml-1 w-4 h-4" /></Link>
+            </Button>
+          </div>
+
+          <div className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-4 lg:grid-cols-8 sm:overflow-visible sm:pb-0">
+            {CATEGORIES.map((cat, i) => (
+              <motion.div
+                key={cat.name}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: i * 0.05 }}
+                className="flex-shrink-0 snap-start w-36 sm:w-auto"
+              >
+                <Link
+                  to="/marketplace"
+                  className={`group flex flex-col items-center justify-center gap-3 p-5 rounded-2xl bg-gradient-to-br ${cat.gradient} ${cat.text} aspect-square shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 font-bold text-sm text-center leading-tight`}
+                >
+                  <span className="text-3xl">{cat.emoji}</span>
+                  <span className="text-xs font-bold leading-tight">{cat.name}</span>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Bento features ───────────────────────────────────────────────── */}
       <section className="py-24 bg-card border-y border-border relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -158,7 +329,7 @@ const HomePage = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[minmax(250px,auto)]">
-            {/* Large Feature */}
+            {/* Large feature */}
             <div className="md:col-span-2 bg-secondary rounded-3xl p-8 md:p-12 flex flex-col justify-between relative overflow-hidden group">
               <div className="relative z-10 max-w-md">
                 <div className="w-12 h-12 bg-background rounded-xl flex items-center justify-center mb-6 shadow-sm">
@@ -169,10 +340,10 @@ const HomePage = () => {
                   Every transaction is protected by our advanced escrow system. Funds are only released when both parties are completely satisfied with the trade.
                 </p>
               </div>
-              <div className="absolute right-0 bottom-0 w-2/3 h-2/3 bg-gradient-to-tl from-primary/10 to-transparent rounded-tl-full transition-transform duration-500 group-hover:scale-110"></div>
+              <div className="absolute right-0 bottom-0 w-2/3 h-2/3 bg-gradient-to-tl from-primary/10 to-transparent rounded-tl-full transition-transform duration-500 group-hover:scale-110" />
             </div>
 
-            {/* Small Feature 1 */}
+            {/* Small feature 1 */}
             <div className="bg-muted rounded-3xl p-8 flex flex-col justify-between group hover:bg-muted/80 transition-colors">
               <div>
                 <div className="w-12 h-12 bg-background rounded-xl flex items-center justify-center mb-6 shadow-sm">
@@ -185,7 +356,7 @@ const HomePage = () => {
               </div>
             </div>
 
-            {/* Small Feature 2 */}
+            {/* Small feature 2 */}
             <div className="bg-muted rounded-3xl p-8 flex flex-col justify-between group hover:bg-muted/80 transition-colors">
               <div>
                 <div className="w-12 h-12 bg-background rounded-xl flex items-center justify-center mb-6 shadow-sm">
@@ -198,7 +369,7 @@ const HomePage = () => {
               </div>
             </div>
 
-            {/* Medium Feature */}
+            {/* CTA feature */}
             <div className="md:col-span-2 bg-primary text-primary-foreground rounded-3xl p-8 md:p-12 flex flex-col sm:flex-row items-center justify-between gap-8 relative overflow-hidden">
               <div className="relative z-10 max-w-md">
                 <h3 className="text-2xl md:text-3xl font-bold mb-4">Ready to start trading?</h3>
@@ -217,8 +388,52 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Featured Cards Section */}
+      {/* ── How it works ─────────────────────────────────────────────────── */}
       <section className="py-24 bg-background">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold font-serif mb-4">How CardPop Works</h2>
+            <p className="text-muted-foreground max-w-xl mx-auto">
+              Three simple steps to start trading with confidence across Australia.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+            {/* Connecting line — desktop only */}
+            <div className="hidden md:block absolute top-10 left-[calc(16.67%+1.5rem)] right-[calc(16.67%+1.5rem)] h-px bg-gradient-to-r from-primary/20 via-primary/60 to-primary/20 z-0" />
+
+            {HOW_IT_WORKS.map((step, i) => (
+              <motion.div
+                key={step.step}
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-60px' }}
+                transition={{ duration: 0.5, delay: i * 0.15 }}
+                className="relative z-10 flex flex-col items-center text-center"
+              >
+                {/* Step number badge */}
+                <div className="w-20 h-20 rounded-2xl bg-primary flex items-center justify-center mb-6 shadow-lg shadow-primary/20 relative">
+                  <step.icon className="w-9 h-9 text-primary-foreground" />
+                  <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-background border-2 border-border text-[10px] font-extrabold text-muted-foreground flex items-center justify-center">
+                    {step.step}
+                  </span>
+                </div>
+                <h3 className="text-xl font-bold mb-3 font-serif">{step.title}</h3>
+                <p className="text-muted-foreground text-sm leading-relaxed max-w-xs">{step.desc}</p>
+              </motion.div>
+            ))}
+          </div>
+
+          <div className="mt-14 text-center">
+            <Button asChild size="lg" className="h-14 px-10 rounded-2xl font-bold text-lg shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5">
+              <Link to="/signup">Start for Free <ArrowRight className="ml-2 w-5 h-5" /></Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Recent vault additions ────────────────────────────────────────── */}
+      <section className="py-24 bg-muted/30 border-t border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-end justify-between mb-12">
             <div>
@@ -241,11 +456,11 @@ const HomePage = () => {
               ))}
             </div>
           ) : featuredCards.length > 0 ? (
-            <motion.div 
+            <motion.div
               variants={containerVariants}
               initial="hidden"
               whileInView="visible"
-              viewport={{ once: true, margin: "-100px" }}
+              viewport={{ once: true, margin: '-100px' }}
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
             >
               {featuredCards.map(card => (
@@ -255,11 +470,11 @@ const HomePage = () => {
               ))}
             </motion.div>
           ) : (
-            <div className="text-center py-12 bg-muted rounded-3xl border border-border">
+            <div className="text-center py-12 bg-background rounded-3xl border border-border">
               <p className="text-muted-foreground font-medium">No recent cards available at the moment.</p>
             </div>
           )}
-          
+
           <div className="mt-8 text-center sm:hidden">
             <Button asChild variant="outline" className="w-full rounded-xl font-bold">
               <Link to="/marketplace">View All Listings</Link>
@@ -268,8 +483,39 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Featured Sellers Section */}
-      <section className="py-24 bg-muted/30 border-t border-border">
+      {/* ── Community activity marquee ────────────────────────────────────── */}
+      <section className="py-14 bg-foreground overflow-hidden">
+        <div className="mb-6 text-center">
+          <span className="inline-flex items-center gap-2 text-background/60 text-sm font-semibold tracking-widest uppercase">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block" />
+            Live Activity
+          </span>
+        </div>
+
+        {/* Marquee wrapper — CSS animation via inline style */}
+        <div className="relative">
+          <div
+            className="flex gap-4 w-max"
+            style={{ animation: 'marquee 40s linear infinite' }}
+          >
+            {[...ACTIVITY_FEED, ...ACTIVITY_FEED].map((item, i) => (
+              <div
+                key={i}
+                className="flex-shrink-0 flex items-center gap-3 px-5 py-3 rounded-2xl bg-background/[0.07] border border-background/10 text-sm"
+              >
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                <span className="font-bold text-background/90">{item.user}</span>
+                <span className="text-background/60">{item.action}</span>
+                <span className="font-bold text-primary bg-primary/15 px-2 py-0.5 rounded-lg">{item.price}</span>
+                <span className="text-background/40 text-xs">{item.time}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Featured sellers ──────────────────────────────────────────────── */}
+      <section className="py-24 bg-background border-t border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold font-serif mb-4">Trusted Australian Sellers</h2>
@@ -283,11 +529,11 @@ const HomePage = () => {
               ))}
             </div>
           ) : featuredSellers.length > 0 ? (
-            <motion.div 
+            <motion.div
               variants={containerVariants}
               initial="hidden"
               whileInView="visible"
-              viewport={{ once: true, margin: "-100px" }}
+              viewport={{ once: true, margin: '-100px' }}
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
             >
               {featuredSellers.map(seller => (
@@ -297,7 +543,7 @@ const HomePage = () => {
               ))}
             </motion.div>
           ) : (
-            <div className="text-center py-12 bg-background rounded-3xl border border-border shadow-sm">
+            <div className="text-center py-12 bg-muted rounded-3xl border border-border shadow-sm">
               <p className="text-muted-foreground font-medium">Seller profiles are currently being updated.</p>
             </div>
           )}
