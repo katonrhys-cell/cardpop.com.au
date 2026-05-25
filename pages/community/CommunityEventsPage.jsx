@@ -130,13 +130,13 @@ const CommunityEventsPage = () => {
       {/* Hero — matches all other main section pages */}
       <section className="bg-card border-b border-border py-20 text-center">
         <div className="container-default">
-          <Badge variant="outline" className="mb-4 text-xs font-semibold tracking-widest uppercase border-primary/40 text-primary px-3 py-1">
-            Event Calendar
-          </Badge>
-          <CalendarDays className="w-12 h-12 text-primary mx-auto mb-6 mt-4" />
+          <CalendarDays className="w-12 h-12 text-primary mx-auto mb-6" />
           <h1 className="text-4xl md:text-5xl font-bold mb-4">
             Trading Card Events<br className="hidden sm:block" /> Across Australia
           </h1>
+          <Badge variant="outline" className="mb-4 text-xs font-semibold tracking-widest uppercase border-primary/40 text-primary px-3 py-1">
+            Event Calendar
+          </Badge>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Your go-to directory for TCG tournaments, card fairs, and collector shows happening nationwide. Find events near you — from major expos to local meetups.
           </p>
