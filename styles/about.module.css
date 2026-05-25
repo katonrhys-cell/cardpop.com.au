@@ -1,0 +1,151 @@
+.hero {
+  background: #1F2937;
+  color: #ffffff;
+  padding: 120px 24px;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.narrow {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.eyebrow {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #CE1126;
+  margin-bottom: 20px;
+}
+
+.hero h1 {
+  font-size: 4rem;
+  line-height: 1;
+  margin: 0 0 24px;
+}
+
+.hero p {
+  font-size: 1.2rem;
+  line-height: 1.7;
+  max-width: 720px;
+  color: #d7dce2;
+  margin: 0;
+}
+
+.heroButtons {
+  display: flex;
+  gap: 16px;
+  margin-top: 32px;
+}
+
+.btnPrimary {
+  background: #CE1126;
+  color: #ffffff;
+  padding: 14px 28px;
+  border-radius: 999px;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.95rem;
+  transition: opacity 0.15s;
+}
+
+.btnPrimary:hover {
+  opacity: 0.88;
+}
+
+.btnSecondary {
+  border: 1px solid #ffffff;
+  color: #ffffff;
+  padding: 14px 28px;
+  border-radius: 999px;
+  text-decoration: none;
+  font-size: 0.95rem;
+  transition: background 0.15s;
+}
+
+.btnSecondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.story {
+  padding: 96px 24px;
+  background: #ffffff;
+}
+
+.story h2,
+.vision h2 {
+  font-size: 2rem;
+  margin: 0 0 24px;
+}
+
+.story p,
+.vision p {
+  font-size: 1.1rem;
+  line-height: 1.75;
+  color: #374151;
+  margin: 0 0 20px;
+}
+
+.story p:last-child,
+.vision p:last-child {
+  margin-bottom: 0;
+}
+
+.featuresSection {
+  padding: 48px 24px 96px;
+  background: #F5F7FA;
+}
+
+.featuresGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.featureCard {
+  background: #ffffff;
+  padding: 32px;
+  border-radius: 16px;
+  border: 1px solid #e7eaef;
+}
+
+.featureCard h3 {
+  font-size: 1.15rem;
+  margin: 0 0 12px;
+}
+
+.featureCard p {
+  color: #4B5563;
+  line-height: 1.65;
+  margin: 0;
+  font-size: 0.975rem;
+}
+
+.vision {
+  padding: 96px 24px;
+  background: #ffffff;
+}
+
+@media (max-width: 768px) {
+  .hero {
+    padding: 72px 24px;
+  }
+
+  .hero h1 {
+    font-size: 2.6rem;
+  }
+
+  .heroButtons {
+    flex-direction: column;
+  }
+
+  .featuresGrid {
+    grid-template-columns: 1fr;
+  }
+}

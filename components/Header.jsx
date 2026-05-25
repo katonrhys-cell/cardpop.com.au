@@ -37,6 +37,7 @@ const NAV_LINKS = [
   { label: 'Community', href: '/community' },
   { label: 'Events', href: '/community/events' },
   { label: 'Grading', href: '/grading' },
+  { label: 'About', href: '/about' },
 ];
 
 const ADMIN_LINKS = [

@@ -1,35 +1,93 @@
 import React from 'react';
 import { Helmet } from 'react-helmet';
-import InfoPageLayout from '@/components/InfoPageLayout.jsx';
+import { Link } from 'react-router-dom';
+import styles from '@/styles/about.module.css';
+
+const FEATURES = [
+  {
+    title: 'Community First',
+    desc: 'Built around hobby culture, not just transactions.',
+  },
+  {
+    title: 'Built for Collectors',
+    desc: 'Every feature is designed for real collectors and traders.',
+  },
+  {
+    title: 'Trusted Marketplace',
+    desc: 'Secure listings, verified sellers, and transparency.',
+  },
+];
 
 const AboutPage = () => {
   return (
-    <InfoPageLayout 
-      title="About CardPop" 
-      description="Australia's premier destination for trading card collectors."
-      breadcrumbs={[{ label: 'About Us' }]}
-    >
+    <>
       <Helmet>
         <title>About Us | CardPop</title>
+        <meta
+          name="description"
+          content="CardPop Australia was created to bring the energy of card shows, trade nights, and collector culture into one trusted digital marketplace."
+        />
       </Helmet>
-      
-      <h2>Our Mission</h2>
-      <p>
-        At CardPop, we believe that collecting is more than just a hobby—it's a passion that connects people across generations. Our mission is to provide a secure, transparent, and vibrant marketplace for collectors in Australia and beyond.
-      </p>
-      
-      <h2>Our Story</h2>
-      <p>
-        Founded by lifelong collectors, CardPop was born out of frustration with existing platforms that lacked specialized tools for trading cards. We built the platform we always wanted to use: one with accurate market data, secure vaulting, and a community-first approach.
-      </p>
-      
-      <h2>Why Choose Us?</h2>
-      <ul>
-        <li><strong>Security First:</strong> Every transaction is protected, and our vaulting service ensures your high-value items are safe.</li>
-        <li><strong>Market Intelligence:</strong> Access real-time pricing data and trends to make informed decisions.</li>
-        <li><strong>Community Driven:</strong> We host events, facilitate trades, and foster a welcoming environment for all collectors.</li>
-      </ul>
-    </InfoPageLayout>
+
+      {/* Hero */}
+      <section className={styles.hero}>
+        <div className={styles.container}>
+          <span className={styles.eyebrow}>About CardPop Australia</span>
+          <h1>
+            Built for the hobby.<br />Powered by collectors.
+          </h1>
+          <p>
+            CardPop Australia was created to bring the energy of card shows,
+            trade nights, and collector culture into one trusted digital marketplace.
+          </p>
+          <div className={styles.heroButtons}>
+            <Link to="/marketplace" className={styles.btnPrimary}>
+              Explore Marketplace
+            </Link>
+            <Link to="/signup" className={styles.btnSecondary}>
+              Join Community
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Story */}
+      <section className={styles.story}>
+        <div className={styles.narrow}>
+          <h2>Why we built CardPop</h2>
+          <p>The hobby deserves a platform built by collectors — not corporations.</p>
+          <p>
+            We created CardPop to feel like a digital card show: discovering grails,
+            making trades, meeting collectors, and building collections in a trusted environment.
+          </p>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className={styles.featuresSection}>
+        <div className={styles.container}>
+          <div className={styles.featuresGrid}>
+            {FEATURES.map(({ title, desc }) => (
+              <div key={title} className={styles.featureCard}>
+                <h3>{title}</h3>
+                <p>{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Vision */}
+      <section className={styles.vision}>
+        <div className={styles.narrow}>
+          <h2>The future of collecting</h2>
+          <p>
+            CardPop is building a connected ecosystem for collectors across
+            Australia and beyond.
+          </p>
+        </div>
+      </section>
+    </>
   );
 };
 
