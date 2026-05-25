@@ -25,6 +25,7 @@
 - [Analytics & Reports | Admin Portal](/analyticsreports): No description available
 - [Australian Markets | Card Pop Investment Dashboard](/australianmarkets): Live trading card market data, trends, and recent sales from eBay Australia.
 - [Brand Management | Admin Portal](/brandsmanagement): No description available
+- [Card Market Analytics | CardPop](/markets): No description available
 - [Category Hierarchy | Admin](/categorymanagement): No description available
 - [Category Mapping Tools | Admin](/categorymapping): No description available
 - [Check Your Email | Card Pop](/signup): No description available
@@ -44,7 +45,6 @@
 - [Log In | CardPop](/login): No description available
 - [Manage Events | Admin Portal](/eventsadmin): No description available
 - [Manage Events | Admin Portal](/eventsmanagement): No description available
-- [Market Analytics | CardPop](/markets): No description available
 - [Market Dashboard | CardPop](/market): Analyze trading card market trends, sales history, and live eBay data.
 - [Market Data | CardPop](/marketdetail): No description available
 - [Market Data` : 'Card Market Details'} - Card Pop](/cardmarketdetail): No description available
