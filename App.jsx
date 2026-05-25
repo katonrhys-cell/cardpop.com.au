@@ -112,7 +112,7 @@ const UserManagementPage = lazy(() => import('@/pages/admin/UserManagementPage.j
 const UserDetailPage = lazy(() => import('@/pages/admin/UserDetailPage.jsx'));
 const OrderManagementPage = lazy(() => import('@/pages/admin/OrderManagementPage.jsx'));
 const AdminSettingsPage = lazy(() => import('@/pages/admin/AdminSettingsPage.jsx'));
-const EventsAdminPage = lazy(() => import('@/pages/admin/EventsAdminPage.jsx'));
+const EventsAdminPage = lazy(() => import('@/pages/admin/EventsManagementPage.jsx'));
 const ContentManagementPage = lazy(() => import('@/pages/admin/ContentManagementPage.jsx'));
 const SystemDiagnosticsPage = lazy(() => import('@/pages/admin/SystemDiagnosticsPage.jsx'));
 const CSVManagementPage = lazy(() => import('@/pages/CSVManagementPage.jsx'));
