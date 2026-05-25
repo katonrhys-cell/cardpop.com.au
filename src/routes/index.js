@@ -6,8 +6,6 @@ import healthCheck from './health-check.js';
 import ebayRouter from './ebay.js';
 import authRouter from './auth/index.js';
 import stripeRouter from './stripe.js';
-import migrateRouter from './migrate.js';
-import csvImportRouter from './csv-import.js';
 import verificationRouter from './verification.js';
 import integratedAiRouter from './integrated-ai.js';
 import eventScraperRouter from './event-scraper.js';
@@ -44,14 +42,6 @@ export default () => {
     // Note: Stripe checkout and purchase routes bypass email verification
     router.use('/stripe', apiLimiter);
     router.use('/stripe', stripeRouter);
-
-    // Migration routes with API rate limiting
-    router.use('/migrate', apiLimiter);
-    router.use('/migrate', migrateRouter);
-
-    // CSV import routes with API rate limiting
-    router.use('/csv', apiLimiter);
-    router.use('/csv', csvImportRouter);
 
     // Category management routes with API rate limiting
     router.use('/categories', apiLimiter);
