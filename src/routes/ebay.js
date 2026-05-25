@@ -3,6 +3,7 @@ import express from 'express';
 import { callEbayApi } from '../utils/ebayClient.js';
 import { getMarketData, getCardDetails } from '../utils/ebayMarketData.js';
 import { getSalesData, getStatistics } from '../utils/ebaySalesStats.js';
+import * as ebayCache from '../utils/ebayCache.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -290,6 +291,112 @@ router.get('/statistics', async (req, res) => {
 
   logger.info(`[EBAY_STATISTICS] Statistics retrieved: ${statistics.totalSalesVolume} sales`);
   res.json(statistics);
+});
+
+/**
+ * GET /ebay/price-estimate
+ * Estimate the market value of a card from current eBay AU listings.
+ *
+ * Query Parameters:
+ * - name (required): Card name
+ * - set (optional): Set or expansion name
+ * - gradingService (optional): PSA | BGS | CGC | None
+ * - gradeScore (optional): Numeric grade (e.g. 9.5)
+ *
+ * Response:
+ * {
+ *   "suggested": 45.00,
+ *   "median": 45.00,
+ *   "average": 47.50,
+ *   "low": 30.00,
+ *   "high": 65.00,
+ *   "count": 12,
+ *   "currency": "AUD",
+ *   "searchQuery": "Charizard Base Set PSA 9",
+ *   "sampleListings": [{ "title", "price", "url" }]
+ * }
+ */
+router.get('/price-estimate', async (req, res) => {
+  const { name, set, gradingService, gradeScore } = req.query;
+
+  if (!name?.trim()) {
+    return res.status(400).json({ error: 'name query parameter is required' });
+  }
+
+  const isGraded = gradingService && gradingService !== 'None';
+
+  // Build a targeted search query
+  const parts = [name.trim()];
+  if (set?.trim() && !isGraded) parts.push(set.trim());
+  if (isGraded) {
+    parts.push(gradingService.trim());
+    if (gradeScore) parts.push(gradeScore.trim());
+  }
+  const searchQuery = parts.join(' ');
+
+  const cacheKey = `price-estimate:${searchQuery.toLowerCase()}`;
+  const cached = ebayCache.get(cacheKey);
+  if (cached) {
+    logger.debug(`[EBAY_PRICE_ESTIMATE] Cache hit for: "${searchQuery}"`);
+    return res.json(cached);
+  }
+
+  logger.info(`[EBAY_PRICE_ESTIMATE] Querying eBay AU for: "${searchQuery}"`);
+
+  const params = new URLSearchParams({
+    q: searchQuery,
+    filter: 'buyingOptions:{AUCTION|FIXED_PRICE},itemLocationCountry:AU',
+    limit: '50',
+    sort: 'newlyListed',
+  });
+
+  const data = await callEbayApi(`/buy/browse/v1/item_summary/search?${params}`);
+
+  const prices = (data.itemSummaries || [])
+    .map(item => parseFloat(item.price?.value || 0))
+    .filter(p => p > 0)
+    .sort((a, b) => a - b);
+
+  if (!prices.length) {
+    const empty = { suggested: null, median: null, average: null, low: null, high: null, count: 0, currency: 'AUD', searchQuery, sampleListings: [] };
+    ebayCache.set(cacheKey, empty);
+    return res.json(empty);
+  }
+
+  // Trim top and bottom 10% outliers when we have enough data
+  let trimmed = prices;
+  if (prices.length >= 10) {
+    const cut = Math.floor(prices.length * 0.1);
+    trimmed = prices.slice(cut, prices.length - cut);
+  }
+
+  const round = v => Math.round(v * 100) / 100;
+  const median = round(trimmed[Math.floor(trimmed.length / 2)]);
+  const average = round(trimmed.reduce((s, p) => s + p, 0) / trimmed.length);
+  const low = round(trimmed[0]);
+  const high = round(trimmed[trimmed.length - 1]);
+
+  const sampleListings = (data.itemSummaries || []).slice(0, 5).map(item => ({
+    title: item.title,
+    price: parseFloat(item.price?.value || 0),
+    url: item.itemWebUrl || '',
+  }));
+
+  const result = {
+    suggested: median,
+    median,
+    average,
+    low,
+    high,
+    count: prices.length,
+    currency: 'AUD',
+    searchQuery,
+    sampleListings,
+  };
+
+  ebayCache.set(cacheKey, result);
+  logger.info(`[EBAY_PRICE_ESTIMATE] Estimated $${median} AUD (${prices.length} listings) for: "${searchQuery}"`);
+  res.json(result);
 });
 
 /**

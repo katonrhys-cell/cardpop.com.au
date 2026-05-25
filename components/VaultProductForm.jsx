@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { Loader2, X, ImagePlus } from 'lucide-react';
 import { useCardOCR } from '@/hooks/useCardOCR.js';
+import { useEbayPriceLookup } from '@/hooks/useEbayPriceLookup.js';
 import CardScanPanel from '@/components/CardScanPanel.jsx';
 import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 
@@ -44,6 +45,11 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState(INITIAL_STATE);
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
+  const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
+
+  useEffect(() => {
+    if (scanResult) lookupPrice(scanResult);
+  }, [scanResult, lookupPrice]);
   
   // Independent Classification Toggles
   const [enableCat, setEnableCat] = useState(false);
@@ -191,6 +197,7 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
       ...(scanResult.cardType && { cardType: scanResult.cardType }),
     }));
     clearScan();
+    clearPrice();
     toast.success('Fields updated from scan. Review and adjust as needed.');
   };
 
@@ -332,7 +339,13 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
         isScanning={isScanning}
         scanResult={scanResult}
         onApply={handleApplyScan}
-        onDismiss={clearScan}
+        onDismiss={() => { clearScan(); clearPrice(); }}
+        isLookingUp={isLookingUp}
+        priceData={priceData}
+        onApplyPrice={(price) => {
+          handleInputChange('price', String(price));
+          toast.success(`Price set to $${price.toFixed(2)} AUD from eBay estimate.`);
+        }}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
