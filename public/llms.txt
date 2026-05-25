@@ -38,8 +38,10 @@
 - [Contact Us | CardPop](/contact): No description available
 - [CSV Import Manager | Admin](/csvimport): No description available
 - [FAQ | CardPop](/faq): No description available
+- [Grading Companies | CardPop](/gradingcompanies): No description available
 - [Grading Hub | CardPop](/grading): No description available
 - [Grading Scale | CardPop](/gradingscale): No description available
+- [Grading Scales | CardPop](/gradingscales): No description available
 - [Identity Verification | Admin Dashboard](/adminverificationdashboard): No description available
 - [Insider Trading | Card Pop Australia](/insidertrading): Exclusive affiliate partners and insider deals from Card Pop Australia.
 - [Log In | CardPop](/login): No description available
@@ -93,3 +95,4 @@
 - [Verification Status | CardPop](/verificationsubmission): No description available
 - [Wallet | CardPop](/accountwallet): No description available
 - [Watchlist | CardPop](/accountwatchlist): No description available
+- [What is Card Grading? | CardPop](/whatisgrading): No description available
