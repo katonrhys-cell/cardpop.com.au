@@ -31,6 +31,7 @@
 - [Collections & Marketplace | Card Pop Australia](/publiccollections): No description available
 - [Collector Marketplace | CardPop](/marketplace): No description available
 - [Community Events | Card Pop](/communityevents): Discover upcoming trading card events, trade shows, and exhibits across Australia.
+- [Community Events | CardPop](/communityevents): Find TCG tournaments, card fairs, and collector shows happening across Australia.
 - [Community Hub | CardPop](/community): No description available
 - [Complete Profile | Card Pop](/profilecompletion): No description available
 - [Contact Us | CardPop](/contact): No description available
