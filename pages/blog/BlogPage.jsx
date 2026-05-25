@@ -48,20 +48,16 @@ const BlogPage = () => {
     <div className="min-h-[100dvh] bg-background">
       <Helmet><title>The Parallel Report | CardPop</title></Helmet>
 
-      <section className="bg-secondary/30 border-b border-border py-16 md:py-24 text-center relative overflow-hidden px-4">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background pointer-events-none" />
-        <div className="max-w-4xl mx-auto relative z-10">
-          <BookOpen className="w-10 h-10 md:w-12 md:h-12 text-primary mx-auto mb-4 md:mb-6" />
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight mb-4 text-balance" style={{ letterSpacing: '-0.02em' }}>
-            The Parallel Report
-          </h1>
-          <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed mb-8">
+      <section className="bg-card border-b border-border py-20 text-center">
+        <div className="container-default">
+          <BookOpen className="w-12 h-12 text-primary mx-auto mb-6" />
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">The Parallel Report</h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
             Insights, news, and deep-dives from the forefront of the collecting world.
           </p>
-          
           <div className="max-w-md mx-auto relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-            <Input 
+            <Input
               type="text"
               placeholder="Search articles by title or author..."
               value={searchTerm}

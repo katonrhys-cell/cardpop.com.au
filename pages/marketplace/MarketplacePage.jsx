@@ -139,16 +139,11 @@ const MarketplacePage = () => {
     <div className="min-h-screen bg-background flex flex-col font-sans pb-20">
       <Helmet><title>Collector Marketplace | CardPop</title></Helmet>
 
-      <section className="bg-card border-b border-border py-16 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background pointer-events-none" />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 text-primary mb-6 shadow-inner">
-            <Users className="w-8 h-8" />
-          </div>
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold font-serif mb-6 text-balance tracking-tight">
-            Collector Marketplace
-          </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed text-balance">
+      <section className="bg-card border-b border-border py-20 text-center">
+        <div className="container-default">
+          <Users className="w-12 h-12 text-primary mx-auto mb-6" />
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">The Marketplace</h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Discover cards directly from other collectors' vaults alongside official CardPop listings.
           </p>
         </div>
