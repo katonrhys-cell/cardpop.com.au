@@ -32,7 +32,7 @@ const NAV_LINKS = [
   { label: 'Home', href: '/' },
   { label: 'Shop', href: '/shop' },
   { label: 'Marketplace', href: '/marketplace' },
-  { label: 'Market', href: '/markets' },
+  { label: 'Analytics', href: '/markets' },
   { label: 'Blog', href: '/blog' },
   { label: 'Community', href: '/community' },
   { label: 'Events', href: '/community/events' },
