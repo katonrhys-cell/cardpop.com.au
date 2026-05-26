@@ -334,7 +334,7 @@ const Header = () => {
         <div className="flex flex-wrap items-center justify-between py-3 md:py-0 md:min-h-20 transition-all duration-300">
           
           <Link to="/" className="shrink-0 mr-2 lg:mr-4 xl:mr-8 text-2xl" onClick={() => setMobileMenuOpen(false)}>
-            <CardPopLogo variant="header" iconClassName="w-7 h-[34px]" />
+            <CardPopLogo variant="full" iconClassName="w-7 h-[34px]" />
           </Link>
 
           <nav className="hidden lg:flex items-center gap-0.5 xl:gap-1 mr-auto shrink-0">
@@ -456,7 +456,7 @@ const Header = () => {
                 <SheetHeader className="p-6 border-b border-border text-left bg-muted/30 shrink-0">
                   <SheetTitle asChild>
                     <span className="text-2xl">
-                      <CardPopLogo variant="header" iconClassName="w-7 h-[34px]" />
+                      <CardPopLogo variant="full" iconClassName="w-7 h-[34px]" />
                     </span>
                   </SheetTitle>
                 </SheetHeader>
