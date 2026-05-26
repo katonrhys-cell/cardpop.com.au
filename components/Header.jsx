@@ -144,9 +144,13 @@ const Header = () => {
       <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-center justify-between py-3 md:py-0 md:min-h-20 transition-all duration-300">
           
-          <Link to="/" className="shrink-0 flex items-center gap-2 group mr-2 lg:mr-4 xl:mr-8" onClick={() => setMobileMenuOpen(false)}>
-            <span className="font-serif font-bold text-2xl tracking-tight text-foreground transition-colors">
+          <Link to="/" className="shrink-0 flex flex-col mr-2 lg:mr-4 xl:mr-8" onClick={() => setMobileMenuOpen(false)}>
+            <span className="block h-[3px] bg-primary rounded-full mb-1.5" />
+            <span className="font-heading font-bold text-[22px] leading-none tracking-tight text-foreground">
               Card<span className="text-primary">Pop</span>
+            </span>
+            <span className="text-[9px] font-bold tracking-[0.22em] uppercase text-muted-foreground mt-1">
+              Australia
             </span>
           </Link>
 
@@ -266,8 +270,16 @@ const Header = () => {
               </SheetTrigger>
               <SheetContent side="right" className="w-[85vw] sm:w-[350px] p-0 flex flex-col border-l border-border bg-background overflow-hidden">
                 <SheetHeader className="p-6 border-b border-border text-left bg-muted/30 shrink-0">
-                  <SheetTitle className="font-serif font-bold text-2xl tracking-tight text-foreground">
-                    Card<span className="text-primary">Pop</span>
+                  <SheetTitle asChild>
+                    <div className="inline-flex flex-col">
+                      <span className="block h-[3px] bg-primary rounded-full mb-1.5" />
+                      <span className="font-heading font-bold text-[22px] leading-none tracking-tight text-foreground">
+                        Card<span className="text-primary">Pop</span>
+                      </span>
+                      <span className="text-[9px] font-bold tracking-[0.22em] uppercase text-muted-foreground mt-1">
+                        Australia
+                      </span>
+                    </div>
                   </SheetTitle>
                 </SheetHeader>
                 

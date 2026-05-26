@@ -22,9 +22,13 @@ const Footer = () => {
       <div className="container-default">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-12 mb-16">
           <div className="lg:col-span-2">
-            <div className="bg-foreground px-4 py-2 rounded-xl inline-block mb-6">
-              <span className="font-heading text-xl font-bold text-background tracking-tight">
+            <div className="inline-flex flex-col mb-6">
+              <span className="block h-[3px] bg-primary rounded-full mb-1.5" />
+              <span className="font-heading font-bold text-[22px] leading-none tracking-tight text-foreground">
                 Card<span className="text-primary">Pop</span>
+              </span>
+              <span className="text-[9px] font-bold tracking-[0.22em] uppercase text-muted-foreground mt-1">
+                Australia
               </span>
             </div>
             <p className="text-muted-foreground text-sm max-w-sm leading-relaxed mb-6">
