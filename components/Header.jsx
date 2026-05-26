@@ -462,6 +462,9 @@ const Header = () => {
                 </SheetHeader>
                 
                 <div className="flex-1 overflow-y-auto py-6 px-4">
+                  {/* Mobile Browse Collections */}
+                  <MobileBrowseSection onNavigate={() => setMobileMenuOpen(false)} />
+
                   <nav className="flex flex-col gap-1.5 mb-6">
                     {NAV_LINKS.map((link) => {
                       const isActive = isNavLinkActive(link);
@@ -480,9 +483,6 @@ const Header = () => {
                       );
                     })}
                   </nav>
-
-                  {/* Mobile Browse Collections */}
-                  <MobileBrowseSection onNavigate={() => setMobileMenuOpen(false)} />
 
                   {isAdmin && (
                     <div className="mb-8">
