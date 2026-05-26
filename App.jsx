@@ -34,6 +34,9 @@ const VerificationPendingPage = lazy(() => import('@/pages/VerificationPendingPa
 const ProfileCompletionPage = lazy(() => import('@/pages/ProfileCompletionPage.jsx'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage.jsx'));
 
+// Collections
+const CollectionPage = lazy(() => import('@/pages/collections/CollectionPage.jsx'));
+
 // Marketplace
 const MarketplacePage = lazy(() => import('@/pages/marketplace/MarketplacePage.jsx'));
 const MarketplaceCategoryPage = lazy(() => import('@/pages/marketplace/MarketplaceCategoryPage.jsx'));
@@ -113,7 +116,7 @@ const UserManagementPage = lazy(() => import('@/pages/admin/UserManagementPage.j
 const UserDetailPage = lazy(() => import('@/pages/admin/UserDetailPage.jsx'));
 const OrderManagementPage = lazy(() => import('@/pages/admin/OrderManagementPage.jsx'));
 const AdminSettingsPage = lazy(() => import('@/pages/admin/AdminSettingsPage.jsx'));
-const EventsAdminPage = lazy(() => import('@/pages/admin/EventsAdminPage.jsx'));
+const EventsAdminPage = lazy(() => import('@/pages/admin/EventsManagementPage.jsx'));
 const ContentManagementPage = lazy(() => import('@/pages/admin/ContentManagementPage.jsx'));
 const SystemDiagnosticsPage = lazy(() => import('@/pages/admin/SystemDiagnosticsPage.jsx'));
 const CSVManagementPage = lazy(() => import('@/pages/CSVManagementPage.jsx'));
@@ -175,6 +178,9 @@ const App = () => {
                         <Route path="/verification-pending" element={<VerificationPendingPage />} />
                         <Route path="/complete-profile/:token" element={<ProfileCompletionPage />} />
                         
+                        {/* Collections */}
+                        <Route path="/collections/:collectionSlug" element={<CollectionPage />} />
+
                         {/* Marketplace */}
                         <Route path="/marketplace" element={<MarketplacePage />} />
                         <Route path="/marketplace/category/:category" element={<MarketplaceCategoryPage />} />

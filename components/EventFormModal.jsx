@@ -50,28 +50,46 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved }) => {
       setFormData({
         name: scrapedData.name || '',
         description: scrapedData.description || '',
-        // The AI prompt specifies YYYY-MM-DD
-        date: scrapedData.date ? scrapedData.date.split('T')[0] : '', 
+        date: scrapedData.date ? scrapedData.date.split('T')[0] : '',
         time: scrapedData.time || '',
         location: scrapedData.location || '',
         status: 'active',
         category: scrapedData.category || '',
         type: scrapedData.type || '',
-        price: scrapedData.ticketPrice !== undefined && scrapedData.ticketPrice !== null 
-          ? String(scrapedData.ticketPrice) 
+        price: scrapedData.price !== undefined && scrapedData.price !== null
+          ? String(scrapedData.price)
           : '',
-        capacity: scrapedData.capacity !== undefined && scrapedData.capacity !== null 
-          ? String(scrapedData.capacity) 
+        capacity: scrapedData.capacity !== undefined && scrapedData.capacity !== null
+          ? String(scrapedData.capacity)
           : '',
         organizer: scrapedData.organizer || '',
-        contactEmail: scrapedData.contactInfo?.email || '',
-        contactPhone: scrapedData.contactInfo?.phone || '',
-        contactWebsite: scrapedData.contactInfo?.website || '',
-        registrationLink: scrapedData.eventUrl || ''
+        contactEmail: scrapedData.contact?.email || '',
+        contactPhone: scrapedData.contact?.phone || '',
+        contactWebsite: scrapedData.contact?.website || '',
+        registrationLink: scrapedData.registrationLink || ''
       });
-      
-      setImagePreview(null);
-      setImageFile(null);
+
+      // Attempt to fetch the scraped image URL as a File for upload
+      if (scrapedData.imageUrl) {
+        fetch(scrapedData.imageUrl)
+          .then(res => {
+            if (!res.ok) throw new Error('Image fetch failed');
+            return res.blob();
+          })
+          .then(blob => {
+            const ext = blob.type.split('/')[1] || 'jpg';
+            const file = new File([blob], `scraped-event.${ext}`, { type: blob.type });
+            setImageFile(file);
+            setImagePreview(URL.createObjectURL(file));
+          })
+          .catch(() => {
+            // Silently ignore — image stays blank if unreachable
+          });
+      } else {
+        setImagePreview(null);
+        setImageFile(null);
+      }
+
       setRemoveExistingImage(false);
       setActiveTab('general');
 
