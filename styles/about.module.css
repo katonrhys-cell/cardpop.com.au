@@ -73,29 +73,76 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
-.story {
+/* ── Founder ── */
+
+.founder {
   padding: 96px 24px;
   background: #ffffff;
 }
 
-.story h2,
-.vision h2 {
-  font-size: 2rem;
-  margin: 0 0 24px;
+.founderInner {
+  max-width: 760px;
+  margin: 0 auto;
 }
 
-.story p,
-.vision p {
+.quoteMark {
+  font-family: 'Syne', sans-serif;
+  font-size: 6rem;
+  line-height: 0.6;
+  color: #CE1126;
+  margin-bottom: 32px;
+  display: block;
+  user-select: none;
+}
+
+.founderInner p {
   font-size: 1.1rem;
-  line-height: 1.75;
+  line-height: 1.8;
   color: #374151;
   margin: 0 0 20px;
 }
 
-.story p:last-child,
-.vision p:last-child {
+.founderInner p:last-of-type {
   margin-bottom: 0;
 }
+
+.founderAttribution {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 40px;
+  padding-top: 32px;
+  border-top: 1px solid #e7eaef;
+}
+
+.founderAvatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: #CE1126;
+  color: #ffffff;
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.founderName {
+  font-weight: 700;
+  color: #1F2937;
+  font-size: 0.95rem;
+}
+
+.founderRole {
+  font-size: 0.85rem;
+  color: #6B7280;
+  margin-top: 2px;
+}
+
+/* ── Features ── */
 
 .featuresSection {
   padding: 48px 24px 96px;
@@ -127,9 +174,91 @@
   font-size: 0.975rem;
 }
 
+/* ── Testimonials ── */
+
+.testimonials {
+  padding: 96px 24px;
+  background: #1F2937;
+}
+
+.testimonialsHeader {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.testimonialsHeader h2 {
+  color: #ffffff;
+  font-size: 2rem;
+  margin: 0 0 12px;
+}
+
+.testimonialsHeader p {
+  color: #9CA3AF;
+  font-size: 1rem;
+}
+
+.testimonialsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.testimonialCard {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 32px;
+}
+
+.testimonialQuote {
+  font-size: 2rem;
+  line-height: 1;
+  color: #CE1126;
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  margin-bottom: 16px;
+}
+
+.testimonialCard p {
+  font-size: 0.975rem;
+  line-height: 1.7;
+  color: #D1D5DB;
+  margin: 0 0 24px;
+}
+
+.testimonialAuthor {
+  font-weight: 700;
+  color: #ffffff;
+  font-size: 0.875rem;
+}
+
+.testimonialLocation {
+  font-size: 0.8rem;
+  color: #6B7280;
+  margin-top: 2px;
+}
+
+/* ── Vision ── */
+
 .vision {
   padding: 96px 24px;
   background: #ffffff;
+}
+
+.vision h2 {
+  font-size: 2rem;
+  margin: 0 0 24px;
+}
+
+.vision p {
+  font-size: 1.1rem;
+  line-height: 1.75;
+  color: #374151;
+  margin: 0 0 20px;
+}
+
+.vision p:last-child {
+  margin-bottom: 0;
 }
 
 @media (max-width: 768px) {
@@ -145,7 +274,8 @@
     flex-direction: column;
   }
 
-  .featuresGrid {
+  .featuresGrid,
+  .testimonialsGrid {
     grid-template-columns: 1fr;
   }
 }
