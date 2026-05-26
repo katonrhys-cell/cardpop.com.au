@@ -1,8 +1,7 @@
 import React from 'react';
 import BlogPage from './BlogPage.jsx';
 
-const BlogCategoryPage = () => {
-  return <BlogPage />;
-};
+// Renders BlogPage which reads :category from useParams automatically
+const BlogCategoryPage = () => <BlogPage />;
 
 export default BlogCategoryPage;
