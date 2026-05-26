@@ -10,6 +10,8 @@ import VaultListingCard from '@/components/VaultListingCard.jsx';
 import SellerCard from '@/components/SellerCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 
+import { HOMEPAGE_CATEGORIES } from '@/components/CategoryIcons.jsx';
+
 // ─── Animated counter ────────────────────────────────────────────────────────
 const useCountUp = (end, inView, isDecimal = false) => {
   const [count, setCount] = useState(0);
@@ -33,147 +35,6 @@ const useCountUp = (end, inView, isDecimal = false) => {
   return count;
 };
 
-// ─── Category SVG icons ───────────────────────────────────────────────────────
-
-/* Pokémon-inspired: split capture sphere with hexagonal lock button */
-const CaptureSphereIcon = ({ className }) => (
-  <svg viewBox="0 0 40 40" fill="none" className={className}>
-    <circle cx="20" cy="20" r="18" fill="white"/>
-    {/* Top red dome */}
-    <path d="M2 20 A18 18 0 0 0 38 20 Z" fill="#E63946"/>
-    <circle cx="20" cy="20" r="18" stroke="#1c1c1e" strokeWidth="2" fill="none"/>
-    {/* Equatorial band */}
-    <rect x="2" y="18.5" width="36" height="3" fill="#1c1c1e"/>
-    {/* Flat-top hexagonal button */}
-    <polygon points="26,20 23,14.8 17,14.8 14,20 17,25.2 23,25.2"
-      fill="white" stroke="#1c1c1e" strokeWidth="1.5"/>
-    <circle cx="20" cy="20" r="2.5" fill="#1c1c1e"/>
-    {/* Vent lines on red half */}
-    <line x1="10" y1="11" x2="12" y2="14" stroke="rgba(255,255,255,0.4)" strokeWidth="1.2" strokeLinecap="round"/>
-    <line x1="14" y1="8" x2="15" y2="11.5" stroke="rgba(255,255,255,0.4)" strokeWidth="1.2" strokeLinecap="round"/>
-  </svg>
-);
-
-/* MTG-inspired: arcane pentagon with 5 mana-colour dots */
-const ArcaneGemIcon = ({ className }) => (
-  <svg viewBox="0 0 40 40" fill="none" className={className}>
-    <polygon points="20,4 34.3,15.4 28.8,32.1 11.2,32.1 5.7,15.4"
-      fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.85)" strokeWidth="1.8"/>
-    <circle cx="20"  cy="6.5" r="3.2" fill="white"/>
-    <circle cx="33"  cy="16"  r="3.2" fill="#60A5FA"/>
-    <circle cx="28"  cy="31"  r="3.2" fill="#D1D5DB"/>
-    <circle cx="12"  cy="31"  r="3.2" fill="#F87171"/>
-    <circle cx="7"   cy="16"  r="3.2" fill="#4ADE80"/>
-    <circle cx="20" cy="20" r="4.5"
-      fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.7)" strokeWidth="1.4"/>
-    <path d="M20 16 V24 M16 20 H24" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
-  </svg>
-);
-
-/* Sports Cards: trophy cup with winner's star */
-const TrophyCupIcon = ({ className }) => (
-  <svg viewBox="0 0 40 40" fill="none" className={className}>
-    <path d="M13 5 H27 L25 21 Q23 28 20 28 Q17 28 15 21 Z"
-      fill="rgba(255,255,255,0.2)" stroke="white" strokeWidth="1.5"/>
-    <path d="M13 7 Q5 7 5 14 Q5 22 13 22" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
-    <path d="M27 7 Q35 7 35 14 Q35 22 27 22" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
-    <rect x="18.5" y="28" width="3" height="5" fill="white" opacity="0.85"/>
-    <rect x="13" y="33" width="14" height="3" rx="1.5" fill="white" opacity="0.85"/>
-    {/* 5-point star */}
-    <path d="M20 10 L21.2 14 L25.3 14 L22 16.5 L23.2 20.5 L20 18 L16.8 20.5 L18 16.5 L14.7 14 L18.8 14 Z"
-      fill="white"/>
-  </svg>
-);
-
-/* Yu-Gi-Oh-inspired: mystic eye with ankh — dark tones for amber background */
-const MysticEyeIcon = ({ className }) => (
-  <svg viewBox="0 0 40 40" fill="none" className={className}>
-    <path d="M4 19.5 Q20 5 36 19.5 Q20 34 4 19.5 Z"
-      fill="rgba(0,0,0,0.1)" stroke="rgba(60,30,0,0.75)" strokeWidth="2"/>
-    <circle cx="20" cy="19.5" r="7" fill="rgba(60,30,0,0.25)" stroke="rgba(60,30,0,0.7)" strokeWidth="1.5"/>
-    <circle cx="20" cy="19.5" r="3.2" fill="rgba(20,8,0,0.9)"/>
-    <circle cx="17.5" cy="17" r="1.4" fill="rgba(255,255,255,0.45)"/>
-    <line x1="4" y1="19.5" x2="1" y2="23" stroke="rgba(60,30,0,0.5)" strokeWidth="1.5" strokeLinecap="round"/>
-    <line x1="36" y1="19.5" x2="39" y2="23" stroke="rgba(60,30,0,0.5)" strokeWidth="1.5" strokeLinecap="round"/>
-    {/* Mini ankh */}
-    <circle cx="20" cy="31" r="2.2" stroke="rgba(60,30,0,0.6)" strokeWidth="1" fill="none"/>
-    <path d="M20 33.2 V37 M17.5 35 H22.5" stroke="rgba(60,30,0,0.6)" strokeWidth="1" strokeLinecap="round"/>
-  </svg>
-);
-
-/* One Piece-inspired: nautical anchor */
-const NauticalAnchorIcon = ({ className }) => (
-  <svg viewBox="0 0 40 40" fill="none" className={className}>
-    <circle cx="20" cy="8" r="4.5" stroke="white" strokeWidth="2" fill="none"/>
-    <line x1="20" y1="12.5" x2="20" y2="34" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
-    <line x1="9" y1="17" x2="31" y2="17" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-    <path d="M20 34 Q9 34 9 27" stroke="white" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-    <path d="M20 34 Q31 34 31 27" stroke="white" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-    <circle cx="9"  cy="27" r="2.8" fill="white"/>
-    <circle cx="31" cy="27" r="2.8" fill="white"/>
-  </svg>
-);
-
-/* Lorcana-inspired: magic ink teardrop with sparkles */
-const MagicDropIcon = ({ className }) => (
-  <svg viewBox="0 0 40 40" fill="none" className={className}>
-    <path d="M20 5 C20 5 31 17 31 24 A11 11 0 0 1 9 24 C9 17 20 5 20 5 Z"
-      fill="rgba(255,255,255,0.2)" stroke="white" strokeWidth="1.5"/>
-    <path d="M20 10 C20 10 27 20 27 24"
-      stroke="rgba(255,255,255,0.4)" strokeWidth="1" strokeLinecap="round" fill="none"/>
-    {/* 4-pointed star left */}
-    <path d="M8 11 L9 8 L10 11 L13 12 L10 13 L9 16 L8 13 L5 12 Z" fill="white" opacity="0.85"/>
-    {/* Small star right */}
-    <path d="M32 9 L32.7 7 L33.4 9 L35.4 9.7 L33.4 10.4 L32.7 12.4 L32 10.4 L30 9.7 Z"
-      fill="white" opacity="0.55"/>
-    <circle cx="35" cy="22" r="1.4" fill="white" opacity="0.4"/>
-  </svg>
-);
-
-/* Dragon Ball-inspired: glowing orb with 4-pointed star */
-const StarOrbIcon = ({ className }) => (
-  <svg viewBox="0 0 40 40" fill="none" className={className}>
-    <circle cx="20" cy="21" r="17" fill="rgba(255,255,255,0.15)" stroke="white" strokeWidth="1.5"/>
-    <path d="M11 13 Q16 8 23 10" stroke="rgba(255,255,255,0.5)" strokeWidth="2" fill="none" strokeLinecap="round"/>
-    <path d="M20 7 L21.8 18.2 L33 21 L21.8 23.8 L20 35 L18.2 23.8 L7 21 L18.2 18.2 Z"
-      fill="white" opacity="0.9"/>
-    <circle cx="20" cy="21" r="2.5" fill="rgba(251,146,60,0.9)"/>
-  </svg>
-);
-
-/* Digimon-inspired: D-shaped digital badge with pixel grid */
-const DigitalBadgeIcon = ({ className }) => (
-  <svg viewBox="0 0 40 40" fill="none" className={className}>
-    <path d="M8 5 H22 Q35 5 35 20 Q35 35 22 35 H8 Z"
-      fill="rgba(255,255,255,0.15)" stroke="white" strokeWidth="1.5"/>
-    <rect x="12" y="10"   width="5" height="5" rx="1" fill="white" opacity="0.9"/>
-    <rect x="19" y="10"   width="5" height="5" rx="1" fill="white" opacity="0.5"/>
-    <rect x="26" y="12"   width="5" height="5" rx="1" fill="white" opacity="0.7"/>
-    <rect x="12" y="17.5" width="5" height="5" rx="1" fill="white" opacity="0.5"/>
-    <rect x="19" y="17.5" width="5" height="5" rx="1" fill="white" opacity="0.9"/>
-    <rect x="26" y="19.5" width="5" height="5" rx="1" fill="white" opacity="0.5"/>
-    <rect x="12" y="25"   width="5" height="5" rx="1" fill="white" opacity="0.7"/>
-    <rect x="19" y="25"   width="5" height="5" rx="1" fill="white" opacity="0.5"/>
-    <rect x="26" y="27"   width="5" height="5" rx="1" fill="white" opacity="0.9"/>
-  </svg>
-);
-
-/* NBA-inspired: basketball with panel seams + tiny court arc */
-const CourtBallIcon = ({ className }) => (
-  <svg viewBox="0 0 40 40" fill="none" className={className}>
-    <circle cx="20" cy="20" r="17" fill="rgba(255,255,255,0.2)" stroke="white" strokeWidth="1.8"/>
-    {/* Vertical seam */}
-    <line x1="20" y1="3" x2="20" y2="37" stroke="white" strokeWidth="1.5"/>
-    {/* Horizontal seam */}
-    <line x1="3" y1="20" x2="37" y2="20" stroke="white" strokeWidth="1.5"/>
-    {/* Left panel curve */}
-    <path d="M20 3 Q10 11 10 20 Q10 29 20 37" stroke="white" strokeWidth="1.5" fill="none"/>
-    {/* Right panel curve */}
-    <path d="M20 3 Q30 11 30 20 Q30 29 20 37" stroke="white" strokeWidth="1.5" fill="none"/>
-    {/* Centre court arc — tiny detail */}
-    <path d="M14 20 A6 6 0 0 1 26 20" stroke="white" strokeWidth="1" fill="none" opacity="0.6"/>
-  </svg>
-);
 
 // ─── Static data ──────────────────────────────────────────────────────────────
 const STATS = [
@@ -183,17 +44,7 @@ const STATS = [
   { value: 4.9,   suffix: '★', label: 'Average Rating', isDecimal: true },
 ];
 
-const CATEGORIES = [
-  { name: 'Pokémon',              gradient: 'from-yellow-300 to-yellow-500',   Icon: CaptureSphereIcon },
-  { name: 'Magic: The Gathering', gradient: 'from-purple-500 to-violet-700',   Icon: ArcaneGemIcon     },
-  { name: 'Sports Cards',         gradient: 'from-emerald-400 to-teal-600',    Icon: TrophyCupIcon     },
-  { name: 'Yu-Gi-Oh!',            gradient: 'from-amber-300 to-amber-500',     Icon: MysticEyeIcon     },
-  { name: 'One Piece',            gradient: 'from-red-500 to-rose-700',        Icon: NauticalAnchorIcon },
-  { name: 'Lorcana',              gradient: 'from-blue-400 to-indigo-600',     Icon: MagicDropIcon     },
-  { name: 'Dragon Ball',          gradient: 'from-orange-400 to-orange-600',   Icon: StarOrbIcon       },
-  { name: 'Digimon',              gradient: 'from-sky-400 to-cyan-600',        Icon: DigitalBadgeIcon  },
-  { name: 'NBA Cards',            gradient: 'from-blue-700 to-red-600',        Icon: CourtBallIcon     },
-];
+const CATEGORIES = HOMEPAGE_CATEGORIES;
 
 const HOW_IT_WORKS = [
   {
@@ -451,7 +302,7 @@ const HomePage = () => {
                 className="flex-shrink-0 snap-start w-32 sm:w-auto"
               >
                 <Link
-                  to="/marketplace"
+                  to={cat.slug ? `/collections/${cat.slug}` : '/marketplace'}
                   className={`group flex flex-col items-center justify-center gap-3 p-4 rounded-2xl bg-gradient-to-br ${cat.gradient} aspect-square shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-center leading-tight`}
                 >
                   <cat.Icon className="w-9 h-9 drop-shadow-sm" />

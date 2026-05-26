@@ -1,14 +1,15 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ShoppingCart, Menu, Shield, MessageSquare, ArrowRightLeft,
   LayoutDashboard, Package, Users, Calendar, FileText, Building2, Layers, CheckCircle,
-  Sun, Moon
+  Sun, Moon, ChevronDown, ArrowRight, Layers2
 } from 'lucide-react';
 import { useDarkMode } from '@/hooks/useDarkMode.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import CardPopLogo from '@/components/CardPopLogo.jsx';
+import { TCG_CATEGORY_DATA, SPORTS_CATEGORY_DATA } from '@/components/CategoryIcons.jsx';
 import { useCart } from '@/hooks/useCart.jsx';
 import pb from '@/lib/pocketbaseClient.js';
 import { Button } from '@/components/ui/button';
@@ -51,6 +52,193 @@ const ADMIN_LINKS = [
   { label: 'Events', href: '/admin/events', icon: Calendar },
   { label: 'Content', href: '/admin/content', icon: FileText },
 ];
+
+// ─── Category badge used inside the dropdown ──────────────────────────────────
+const CategoryBadge = ({ gradient, Icon }) => (
+  <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${gradient} shrink-0 shadow-sm`}>
+    <Icon className="w-4 h-4" />
+  </span>
+);
+
+// ─── Mobile browse section (expandable) ──────────────────────────────────────
+const MobileBrowseSection = ({ onNavigate }) => {
+  const [tcgOpen, setTcgOpen] = useState(false);
+  const [sportsOpen, setSportsOpen] = useState(false);
+
+  return (
+    <div className="mb-6">
+      <p className="px-1 text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground mb-2">
+        Browse Collections
+      </p>
+
+      {/* TCG accordion */}
+      <button
+        onClick={() => setTcgOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-muted transition-colors mb-0.5"
+      >
+        <span className="text-sm font-bold text-foreground flex items-center gap-2">
+          <Layers2 className="w-4 h-4 text-primary" />
+          Trading Card Games
+        </span>
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${tcgOpen ? 'rotate-180' : ''}`} />
+      </button>
+      {tcgOpen && (
+        <div className="grid grid-cols-2 gap-0.5 mb-1 pl-2">
+          {TCG_CATEGORY_DATA.map(cat => (
+            <Link
+              key={cat.name}
+              to={`/collections/${cat.slug}`}
+              onClick={onNavigate}
+              className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
+            >
+              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${cat.gradient} shrink-0`}>
+                <cat.Icon className="w-3.5 h-3.5" />
+              </span>
+              <span className="text-xs font-semibold text-foreground truncate">{cat.name}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+
+      {/* Sports accordion */}
+      <button
+        onClick={() => setSportsOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-muted transition-colors mb-0.5"
+      >
+        <span className="text-sm font-bold text-foreground flex items-center gap-2">
+          <Layers2 className="w-4 h-4 text-primary" />
+          Sporting Cards
+        </span>
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${sportsOpen ? 'rotate-180' : ''}`} />
+      </button>
+      {sportsOpen && (
+        <div className="grid grid-cols-2 gap-0.5 mb-1 pl-2">
+          {SPORTS_CATEGORY_DATA.map(cat => (
+            <Link
+              key={cat.name}
+              to={`/collections/${cat.slug}`}
+              onClick={onNavigate}
+              className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
+            >
+              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${cat.gradient} shrink-0`}>
+                <cat.Icon className="w-3.5 h-3.5" />
+              </span>
+              <span className="text-xs font-semibold text-foreground truncate">{cat.name}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Browse Collections mega-dropdown ─────────────────────────────────────────
+const BrowseDropdown = ({ onNavigate }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const timerRef = useRef(null);
+
+  const handleMouseEnter = () => {
+    clearTimeout(timerRef.current);
+    setOpen(true);
+  };
+  const handleMouseLeave = () => {
+    timerRef.current = setTimeout(() => setOpen(false), 120);
+  };
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  return (
+    <div
+      className="relative"
+      ref={ref}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
+      {/* Trigger */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        className={`flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+          open
+            ? 'bg-primary text-primary-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+        }`}
+      >
+        Browse Collections
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {/* Panel */}
+      {open && (
+        <div className="absolute top-full left-0 mt-2 w-[580px] bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+          {/* View all row */}
+          <Link
+            to="/marketplace"
+            onClick={() => { setOpen(false); onNavigate?.(); }}
+            className="flex items-center justify-between px-5 py-3.5 border-b border-border hover:bg-muted/60 transition-colors group"
+          >
+            <span className="text-sm font-bold text-foreground">View All Listings</span>
+            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+          </Link>
+
+          {/* Two columns */}
+          <div className="grid grid-cols-2 divide-x divide-border">
+            {/* Trading Card Games */}
+            <div className="p-4">
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <Layers2 className="w-3.5 h-3.5 text-primary" />
+                <span className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                  Trading Card Games
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-0.5">
+                {TCG_CATEGORY_DATA.map(cat => (
+                  <Link
+                    key={cat.name}
+                    to={`/collections/${cat.slug}`}
+                    onClick={() => { setOpen(false); onNavigate?.(); }}
+                    className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-muted transition-colors group"
+                  >
+                    <CategoryBadge gradient={cat.gradient} Icon={cat.Icon} />
+                    <span className="text-[13px] font-medium text-foreground group-hover:text-primary transition-colors truncate">
+                      {cat.name}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* Sporting Cards */}
+            <div className="p-4">
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <Layers2 className="w-3.5 h-3.5 text-primary" />
+                <span className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                  Sporting Cards
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-0.5">
+                {SPORTS_CATEGORY_DATA.map(cat => (
+                  <Link
+                    key={cat.name}
+                    to={`/collections/${cat.slug}`}
+                    onClick={() => { setOpen(false); onNavigate?.(); }}
+                    className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-muted transition-colors group"
+                  >
+                    <CategoryBadge gradient={cat.gradient} Icon={cat.Icon} />
+                    <span className="text-[13px] font-medium text-foreground group-hover:text-primary transition-colors truncate">
+                      {cat.name}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const Header = () => {
   const { isAuthenticated, currentUser, isAdmin } = useAuth();
@@ -150,6 +338,7 @@ const Header = () => {
           </Link>
 
           <nav className="hidden lg:flex items-center gap-0.5 xl:gap-1 mr-auto shrink-0">
+            <BrowseDropdown onNavigate={() => setMobileMenuOpen(false)} />
             {NAV_LINKS.map((link) => {
               const isActive = isNavLinkActive(link);
               return (
@@ -273,7 +462,7 @@ const Header = () => {
                 </SheetHeader>
                 
                 <div className="flex-1 overflow-y-auto py-6 px-4">
-                  <nav className="flex flex-col gap-1.5 mb-8">
+                  <nav className="flex flex-col gap-1.5 mb-6">
                     {NAV_LINKS.map((link) => {
                       const isActive = isNavLinkActive(link);
                       return (
@@ -281,8 +470,8 @@ const Header = () => {
                           key={link.label}
                           to={link.href}
                           className={`px-4 py-3.5 rounded-xl text-base font-bold transition-colors ${
-                            isActive 
-                              ? 'bg-primary text-primary-foreground shadow-sm' 
+                            isActive
+                              ? 'bg-primary text-primary-foreground shadow-sm'
                               : 'text-foreground hover:bg-muted'
                           }`}
                         >
@@ -291,6 +480,9 @@ const Header = () => {
                       );
                     })}
                   </nav>
+
+                  {/* Mobile Browse Collections */}
+                  <MobileBrowseSection onNavigate={() => setMobileMenuOpen(false)} />
 
                   {isAdmin && (
                     <div className="mb-8">
