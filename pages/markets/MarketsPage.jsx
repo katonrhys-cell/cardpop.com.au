@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet';
+import { Link } from 'react-router-dom';
 import pb from '@/lib/pocketbaseClient';
 import {
   TrendingUp, TrendingDown, Search, LineChart, Star, StarOff,
@@ -175,10 +176,12 @@ const MarketsPage = () => {
     setSearchResult(null);
   };
 
+  const cardUrl = (card) => `/markets/card?name=${encodeURIComponent(card.name)}&set=${encodeURIComponent(card.set)}&collection=${encodeURIComponent(card.collection)}&price=${card.price}&change=${card.change}`;
+
   const MoverRow = ({ card }) => (
-    <div className="flex items-center gap-3 py-3 px-4 hover:bg-muted/30 rounded-xl transition-colors">
+    <Link to={cardUrl(card)} className="flex items-center gap-3 py-3 px-4 hover:bg-muted/30 rounded-xl transition-colors group">
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm truncate">{card.name}</p>
+        <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">{card.name}</p>
         <p className="text-xs text-muted-foreground truncate">{card.set} · {card.collection}</p>
       </div>
       <div className="text-right flex-shrink-0 space-y-0.5">
@@ -188,7 +191,7 @@ const MarketsPage = () => {
       <div className="text-right text-xs text-muted-foreground w-14 flex-shrink-0">
         {card.volume.toLocaleString()} sold
       </div>
-    </div>
+    </Link>
   );
 
   return (
@@ -437,14 +440,15 @@ const MarketsPage = () => {
                     <p className="text-2xl font-bold">${card.price}</p>
                     <PriceBadge change={card.change} />
                   </div>
+                  <Link to={cardUrl(card)} className="w-full">
                   <Button
                     size="sm"
                     variant="outline"
                     className="w-full gap-1.5 text-xs"
-                    onClick={() => { setSearchInput(card.name); setSearchInput(card.name); setTimeout(() => handleSearch(), 0); }}
                   >
                     <Search className="w-3.5 h-3.5" /> Research this card
                   </Button>
+                  </Link>
                 </div>
               ))}
             </div>

@@ -1,14 +1,119 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import { Helmet } from 'react-helmet';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import pb from '@/lib/pocketbaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { BookOpen, FileX, AlertCircle, Search, User } from 'lucide-react';
+import { BookOpen, FileX, AlertCircle, Search, User, Calendar, ArrowRight } from 'lucide-react';
+
+const CATEGORIES = [
+  { slug: 'australia-focus',  label: 'Australia Focus',   desc: 'Australian trading card market and events' },
+  { slug: 'beginner-guides',  label: 'Beginner Guides',   desc: 'Essential guides for new collectors and traders' },
+  { slug: 'card-spotlight',   label: 'Card Spotlight',    desc: 'Deep dives into iconic and valuable cards' },
+  { slug: 'grading-guides',   label: 'Grading Guides',    desc: 'Card grading standards and preparation guides' },
+  { slug: 'investing-value',  label: 'Investing & Value', desc: 'Investment strategies and card valuation insights' },
+  { slug: 'news-releases',    label: 'News & Releases',   desc: 'Latest TCG releases and industry news' },
+];
+
+const CATEGORY_MAP = Object.fromEntries(CATEGORIES.map(c => [c.slug, c.label]));
+
+const formatDate = (dateStr) =>
+  new Date(dateStr).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+
+const CategoryBadge = ({ slug }) => {
+  const label = CATEGORY_MAP[slug] || slug;
+  if (!label) return null;
+  return (
+    <span className="absolute top-4 left-4 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm">
+      {label}
+    </span>
+  );
+};
+
+const ImagePlaceholder = () => (
+  <div className="absolute inset-0 flex items-center justify-center bg-secondary/50">
+    <BookOpen className="w-8 h-8 text-muted-foreground opacity-20" />
+  </div>
+);
+
+// Large card for Featured Stories (2-col grid)
+const FeaturedCard = ({ article }) => {
+  const imageUrl = article.featuredImage ? pb.files.getUrl(article, article.featuredImage) : null;
+  return (
+    <Link
+      to={`/blog/${article.id}`}
+      className="group flex flex-col bg-card border border-border rounded-2xl overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    >
+      <div className="aspect-video bg-muted relative overflow-hidden">
+        {imageUrl
+          ? <img src={imageUrl} alt={article.title} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
+          : <ImagePlaceholder />
+        }
+        <CategoryBadge slug={article.category} />
+      </div>
+      <div className="p-6 flex flex-col flex-1">
+        <h3 className="font-bold text-xl mb-2 line-clamp-2 group-hover:text-primary transition-colors leading-snug">
+          {article.title}
+        </h3>
+        <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed mb-4 flex-1">
+          {article.excerpt || article.content?.substring(0, 130)}
+        </p>
+        <div className="flex items-center justify-between text-xs text-muted-foreground border-t border-border pt-4 mt-auto">
+          <span className="flex items-center gap-1.5">
+            <User className="w-3.5 h-3.5" />
+            {article.author || 'CardPop Australia'}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5" />
+            {formatDate(article.created)}
+          </span>
+        </div>
+      </div>
+    </Link>
+  );
+};
+
+// Standard card for the main articles grid (3-col)
+const ArticleCard = ({ article }) => {
+  const imageUrl = article.featuredImage ? pb.files.getUrl(article, article.featuredImage) : null;
+  return (
+    <Link
+      to={`/blog/${article.id}`}
+      className="group flex flex-col bg-card border border-border rounded-2xl overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    >
+      <div className="aspect-[16/9] bg-muted relative overflow-hidden">
+        {imageUrl
+          ? <img src={imageUrl} alt={article.title} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
+          : <ImagePlaceholder />
+        }
+        <CategoryBadge slug={article.category} />
+      </div>
+      <div className="p-5 flex flex-col flex-1">
+        <div className="flex items-center justify-between mb-3 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <User className="w-3 h-3" />
+            {article.author || 'CardPop Australia'}
+          </span>
+          <span className="flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
+            {formatDate(article.created)}
+          </span>
+        </div>
+        <h3 className="font-bold text-lg mb-2 line-clamp-2 group-hover:text-primary transition-colors leading-snug">
+          {article.title}
+        </h3>
+        <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed mt-auto">
+          {article.excerpt || article.content?.substring(0, 110)}
+        </p>
+      </div>
+    </Link>
+  );
+};
 
 const BlogPage = () => {
+  const { category: categoryParam } = useParams();
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -18,42 +123,67 @@ const BlogPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await pb.collection('blog_articles').getList(1, 50, {
+      const res = await pb.collection('blog_articles').getList(1, 100, {
         sort: '-created',
-        $autoCancel: false
+        $autoCancel: false,
       });
       setArticles(res.items);
     } catch (err) {
-      console.error("Error fetching articles:", err);
+      console.error('Error fetching articles:', err);
       setError('Failed to load articles. Please try again later.');
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchArticles();
-  }, []);
+  useEffect(() => { fetchArticles(); }, []);
 
-  const filteredArticles = useMemo(() => {
-    if (!searchTerm.trim()) return articles;
-    const lowerSearch = searchTerm.toLowerCase();
-    return articles.filter(article => 
-      article.title?.toLowerCase().includes(lowerSearch) || 
-      article.author?.toLowerCase().includes(lowerSearch)
-    );
-  }, [articles, searchTerm]);
+  // Articles for the Featured Stories strip (only on the main blog page, no search/category filter)
+  const featuredArticles = useMemo(
+    () => (!categoryParam && !searchTerm ? articles.filter(a => a.featured).slice(0, 4) : []),
+    [articles, categoryParam, searchTerm]
+  );
+
+  // Articles for the main grid, filtered by category param or search
+  const displayedArticles = useMemo(() => {
+    let filtered = articles;
+    if (categoryParam) filtered = filtered.filter(a => a.category === categoryParam);
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
+      filtered = filtered.filter(a =>
+        a.title?.toLowerCase().includes(q) ||
+        a.author?.toLowerCase().includes(q) ||
+        a.excerpt?.toLowerCase().includes(q)
+      );
+    }
+    return filtered;
+  }, [articles, categoryParam, searchTerm]);
+
+  // Article count per category for the Explore section
+  const categoryCounts = useMemo(() => {
+    const counts = {};
+    articles.forEach(a => { if (a.category) counts[a.category] = (counts[a.category] || 0) + 1; });
+    return counts;
+  }, [articles]);
+
+  const activeCategory = categoryParam ? CATEGORY_MAP[categoryParam] : null;
+  const pageTitle = activeCategory ? `${activeCategory} | Blog` : 'The Parallel Report | CardPop';
 
   return (
     <div className="min-h-[100dvh] bg-background">
-      <Helmet><title>The Parallel Report | CardPop</title></Helmet>
+      <Helmet><title>{pageTitle}</title></Helmet>
 
+      {/* ── Hero ── */}
       <section className="bg-card border-b border-border py-20 text-center">
         <div className="container-default">
           <BookOpen className="w-12 h-12 text-primary mx-auto mb-6" />
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">The Parallel Report</h1>
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">
+            {activeCategory ? activeCategory : 'The Parallel Report'}
+          </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
-            Insights, news, and deep-dives from the forefront of the collecting world.
+            {activeCategory
+              ? `Showing all articles in ${activeCategory}`
+              : 'Insights, news, and deep-dives from the forefront of the collecting world.'}
           </p>
           <div className="max-w-md mx-auto relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -68,94 +198,108 @@ const BlogPage = () => {
         </div>
       </section>
 
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-20">
-        {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-            {Array(6).fill(0).map((_, i) => (
-              <div key={i} className="flex flex-col space-y-4">
-                <Skeleton className="aspect-[16/9] w-full rounded-2xl" />
-                <Skeleton className="h-4 w-1/3 rounded-md" />
-                <Skeleton className="h-7 w-5/6 rounded-md" />
-                <Skeleton className="h-16 w-full rounded-md" />
-              </div>
-            ))}
-          </div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center py-16 md:py-24 px-4 bg-destructive/5 rounded-3xl border border-destructive/10 text-center max-w-2xl mx-auto">
-            <AlertCircle className="w-10 h-10 md:w-12 md:h-12 text-destructive mb-4" />
-            <h2 className="text-xl md:text-2xl font-bold text-foreground mb-2">Connection Error</h2>
-            <p className="text-sm md:text-base text-muted-foreground mb-6">{error}</p>
-            <Button onClick={fetchArticles} variant="default" size="lg" className="w-full sm:w-auto">
-              Retry Connection
-            </Button>
-          </div>
-        ) : filteredArticles.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-            {filteredArticles.map(article => {
-              const imageUrl = article.featuredImage ? pb.files.getUrl(article, article.featuredImage) : null;
-              const publishDate = new Date(article.created).toLocaleDateString('en-US', {
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric'
-              });
-              
-              return (
-                <Link 
-                  key={article.id} 
-                  to={`/blog/${article.id}`} 
-                  className="group flex flex-col bg-card border border-border rounded-2xl overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16 space-y-16">
+
+        {/* ── Featured Stories ── */}
+        {!loading && featuredArticles.length > 0 && (
+          <section>
+            <h2 className="text-2xl font-bold mb-6">Featured Stories</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {featuredArticles.map(article => (
+                <FeaturedCard key={article.id} article={article} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── Explore by Topic ── */}
+        {!categoryParam && !searchTerm && !loading && (
+          <section>
+            <h2 className="text-2xl font-bold mb-6">Explore by Topic</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {CATEGORIES.map(cat => (
+                <Link
+                  key={cat.slug}
+                  to={`/blog/category/${cat.slug}`}
+                  className="group flex flex-col justify-between bg-card border border-border rounded-2xl p-6 hover:shadow-md hover:border-primary/30 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <div className="aspect-[16/9] bg-muted relative overflow-hidden">
-                    {imageUrl ? (
-                      <img 
-                        src={imageUrl} 
-                        alt={article.title} 
-                        className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" 
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center text-muted-foreground bg-secondary/50">
-                        <BookOpen className="w-8 h-8 opacity-20" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-5 md:p-6 flex flex-col flex-1">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="text-xs md:text-sm font-medium text-muted-foreground tabular-nums tracking-wide uppercase">
-                        {publishDate}
-                      </div>
-                      {article.author && (
-                        <div className="flex items-center text-xs font-medium text-muted-foreground bg-secondary px-2 py-1 rounded-md">
-                          <User className="w-3 h-3 mr-1" />
-                          {article.author}
-                        </div>
-                      )}
-                    </div>
-                    <h3 className="font-bold text-xl md:text-2xl mb-2 md:mb-3 line-clamp-2 text-card-foreground group-hover:text-primary transition-colors text-balance leading-snug">
-                      {article.title}
+                  <div>
+                    <h3 className="font-bold text-lg mb-2 group-hover:text-primary transition-colors">
+                      {cat.label}
                     </h3>
-                    <p className="text-sm md:text-base text-muted-foreground line-clamp-3 leading-relaxed mt-auto">
-                      {article.content?.substring(0, 120)}...
+                    <p className="text-sm text-muted-foreground leading-relaxed mb-6">
+                      {cat.desc}
                     </p>
                   </div>
+                  <span className="flex items-center gap-1.5 text-primary text-xs font-bold uppercase tracking-wider">
+                    View Articles
+                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                  </span>
                 </Link>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-16 md:py-24 px-4 bg-muted/20 rounded-3xl border border-border border-dashed text-center">
-            <FileX className="w-10 h-10 md:w-12 md:h-12 text-muted-foreground mb-4 opacity-50" />
-            <p className="text-foreground text-lg md:text-xl font-bold mb-2">No articles found</p>
-            <p className="text-sm md:text-base text-muted-foreground max-w-md">
-              {searchTerm ? `No articles match your search for "${searchTerm}". Try different keywords.` : "We're currently working on new content. Check back soon for the latest news and insights."}
-            </p>
-            {searchTerm && (
-              <Button variant="outline" className="mt-6" onClick={() => setSearchTerm('')}>
-                Clear Search
-              </Button>
-            )}
-          </div>
+              ))}
+            </div>
+          </section>
         )}
-      </section>
+
+        {/* ── All / Filtered Articles ── */}
+        <section>
+          {activeCategory && (
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold">{activeCategory}</h2>
+              <Link to="/blog" className="text-sm text-primary font-semibold hover:underline">
+                ← All Articles
+              </Link>
+            </div>
+          )}
+          {!activeCategory && !searchTerm && !loading && displayedArticles.length > 0 && (
+            <h2 className="text-2xl font-bold mb-6">Latest Articles</h2>
+          )}
+
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {Array(6).fill(0).map((_, i) => (
+                <div key={i} className="flex flex-col space-y-4">
+                  <Skeleton className="aspect-[16/9] w-full rounded-2xl" />
+                  <Skeleton className="h-4 w-1/3 rounded-md" />
+                  <Skeleton className="h-7 w-5/6 rounded-md" />
+                  <Skeleton className="h-16 w-full rounded-md" />
+                </div>
+              ))}
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-16 px-4 bg-destructive/5 rounded-3xl border border-destructive/10 text-center max-w-2xl mx-auto">
+              <AlertCircle className="w-10 h-10 text-destructive mb-4" />
+              <h2 className="text-xl font-bold mb-2">Connection Error</h2>
+              <p className="text-sm text-muted-foreground mb-6">{error}</p>
+              <Button onClick={fetchArticles} size="lg">Retry Connection</Button>
+            </div>
+          ) : displayedArticles.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {displayedArticles.map(article => (
+                <ArticleCard key={article.id} article={article} />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-16 px-4 bg-muted/20 rounded-3xl border border-border border-dashed text-center">
+              <FileX className="w-10 h-10 text-muted-foreground mb-4 opacity-50" />
+              <p className="text-lg font-bold mb-2">No articles found</p>
+              <p className="text-sm text-muted-foreground max-w-md">
+                {searchTerm
+                  ? `No articles match "${searchTerm}". Try different keywords.`
+                  : activeCategory
+                    ? `No articles in ${activeCategory} yet. Check back soon.`
+                    : "We're working on new content. Check back soon."}
+              </p>
+              {(searchTerm || activeCategory) && (
+                <Button variant="outline" className="mt-6" asChild>
+                  <Link to="/blog">View All Articles</Link>
+                </Button>
+              )}
+            </div>
+          )}
+        </section>
+
+      </div>
     </div>
   );
 };

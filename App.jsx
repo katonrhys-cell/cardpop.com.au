@@ -34,6 +34,9 @@ const VerificationPendingPage = lazy(() => import('@/pages/VerificationPendingPa
 const ProfileCompletionPage = lazy(() => import('@/pages/ProfileCompletionPage.jsx'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage.jsx'));
 
+// Collections
+const CollectionPage = lazy(() => import('@/pages/collections/CollectionPage.jsx'));
+
 // Marketplace
 const MarketplacePage = lazy(() => import('@/pages/marketplace/MarketplacePage.jsx'));
 const MarketplaceCategoryPage = lazy(() => import('@/pages/marketplace/MarketplaceCategoryPage.jsx'));
@@ -85,6 +88,7 @@ const TransactionHistoryPage = lazy(() => import('@/pages/TransactionHistoryPage
 
 // Markets & Analytics
 const MarketsPage = lazy(() => import('@/pages/markets/MarketsPage.jsx'));
+const CardAnalyticsPage = lazy(() => import('@/pages/markets/CardAnalyticsPage.jsx'));
 const MarketDetailPage = lazy(() => import('@/pages/markets/MarketDetailPage.jsx'));
 const MarketCategoryPage = lazy(() => import('@/pages/markets/MarketCategoryPage.jsx'));
 const AustralianMarketsPage = lazy(() => import('@/pages/AustralianMarketsPage.jsx'));
@@ -112,7 +116,7 @@ const UserManagementPage = lazy(() => import('@/pages/admin/UserManagementPage.j
 const UserDetailPage = lazy(() => import('@/pages/admin/UserDetailPage.jsx'));
 const OrderManagementPage = lazy(() => import('@/pages/admin/OrderManagementPage.jsx'));
 const AdminSettingsPage = lazy(() => import('@/pages/admin/AdminSettingsPage.jsx'));
-const EventsAdminPage = lazy(() => import('@/pages/admin/EventsAdminPage.jsx'));
+const EventsAdminPage = lazy(() => import('@/pages/admin/EventsManagementPage.jsx'));
 const ContentManagementPage = lazy(() => import('@/pages/admin/ContentManagementPage.jsx'));
 const SystemDiagnosticsPage = lazy(() => import('@/pages/admin/SystemDiagnosticsPage.jsx'));
 const AnalyticsPage = lazy(() => import('@/pages/admin/AnalyticsPage.jsx'));
@@ -173,6 +177,9 @@ const App = () => {
                         <Route path="/verification-pending" element={<VerificationPendingPage />} />
                         <Route path="/complete-profile/:token" element={<ProfileCompletionPage />} />
                         
+                        {/* Collections */}
+                        <Route path="/collections/:collectionSlug" element={<CollectionPage />} />
+
                         {/* Marketplace */}
                         <Route path="/marketplace" element={<MarketplacePage />} />
                         <Route path="/marketplace/category/:category" element={<MarketplaceCategoryPage />} />
@@ -226,6 +233,7 @@ const App = () => {
 
                         {/* Markets & Analytics */}
                         <Route path="/markets" element={<MarketsPage />} />
+                        <Route path="/markets/card" element={<CardAnalyticsPage />} />
                         <Route path="/markets/:category" element={<MarketCategoryPage />} />
                         <Route path="/markets/:category/:market" element={<MarketDetailPage />} />
                         <Route path="/australian-markets" element={<AustralianMarketsPage />} />
