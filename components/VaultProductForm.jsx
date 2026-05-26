@@ -10,11 +10,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { Loader2, X, ImagePlus } from 'lucide-react';
+import { useCardOCR } from '@/hooks/useCardOCR.js';
+import { useEbayPriceLookup } from '@/hooks/useEbayPriceLookup.js';
+import CardScanPanel from '@/components/CardScanPanel.jsx';
+import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 
 const INITIAL_STATE = {
   name: '',
   description: '',
   price: '',
+  collectionType: '',
   categoryId: '',
   subcategoryId: '',
   brandId: '',
@@ -36,9 +41,15 @@ const INITIAL_STATE = {
 
 const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
   const { currentUser } = useAuth();
-  
+
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState(INITIAL_STATE);
+  const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
+  const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
+
+  useEffect(() => {
+    if (scanResult) lookupPrice(scanResult);
+  }, [scanResult, lookupPrice]);
   
   // Independent Classification Toggles
   const [enableCat, setEnableCat] = useState(false);
@@ -79,6 +90,7 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
             name: card.name || '',
             description: card.description || '',
             price: card.price !== null && card.price !== undefined ? String(card.price) : '',
+            collectionType: card.collectionType || '',
             categoryId: card.categoryId || '',
             subcategoryId: card.subcategoryId || '',
             brandId: card.brandId || '',
@@ -155,9 +167,38 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
       newPreviewUrls.push(URL.createObjectURL(file));
     }
 
+    if (!validFiles.length) return;
+
+    const isFirstImage = selectedFiles.length === 0 && previewUrls.length === 0;
     setSelectedFiles(prev => [...prev, ...validFiles]);
     setPreviewUrls(prev => [...prev, ...newPreviewUrls]);
     if (fileInputRef.current) fileInputRef.current.value = '';
+
+    if (isFirstImage) {
+      scanCard(validFiles[0]);
+    }
+  };
+
+  const handleApplyScan = () => {
+    if (!scanResult) return;
+    setFormData(prev => ({
+      ...prev,
+      ...(scanResult.name && { name: scanResult.name }),
+      ...(scanResult.description && { description: scanResult.description }),
+      ...(scanResult.collectionType && { collectionType: scanResult.collectionType }),
+      ...(scanResult.cardSetName && { cardSetName: scanResult.cardSetName }),
+      ...(scanResult.cardNumber && { cardNumber: scanResult.cardNumber }),
+      ...(scanResult.releaseYear && { releaseYear: scanResult.releaseYear }),
+      ...(scanResult.condition && { condition: scanResult.condition }),
+      ...(scanResult.gradingService && { gradingService: scanResult.gradingService }),
+      ...(scanResult.gradeScore && { gradeScore: scanResult.gradeScore }),
+      ...(scanResult.certificationNumber && { certificationNumber: scanResult.certificationNumber }),
+      ...(scanResult.rarity && { rarity: scanResult.rarity }),
+      ...(scanResult.cardType && { cardType: scanResult.cardType }),
+    }));
+    clearScan();
+    clearPrice();
+    toast.success('Fields updated from scan. Review and adjust as needed.');
   };
 
   const removeFile = (index) => {
@@ -294,6 +335,19 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
         <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" multiple className="hidden" />
       </div>
 
+      <CardScanPanel
+        isScanning={isScanning}
+        scanResult={scanResult}
+        onApply={handleApplyScan}
+        onDismiss={() => { clearScan(); clearPrice(); }}
+        isLookingUp={isLookingUp}
+        priceData={priceData}
+        onApplyPrice={(price) => {
+          handleInputChange('price', String(price));
+          toast.success(`Price set to $${price.toFixed(2)} AUD from eBay estimate.`);
+        }}
+      />
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-5">
           <div className="border-b border-border pb-3">
@@ -396,6 +450,16 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
           <div className="border-b border-border pb-3">
             <h3 className="font-bold text-lg text-foreground">Details & Grading</h3>
             <p className="text-sm text-muted-foreground mt-1">Optional specifications for advanced collectors.</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Collection Type</Label>
+            <Select value={formData.collectionType} onValueChange={(v) => handleInputChange('collectionType', v)}>
+              <SelectTrigger className="bg-background"><SelectValue placeholder="Select collection..." /></SelectTrigger>
+              <SelectContent>
+                {COLLECTIONS_LIST.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
