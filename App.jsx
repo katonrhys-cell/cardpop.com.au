@@ -119,7 +119,6 @@ const AdminSettingsPage = lazy(() => import('@/pages/admin/AdminSettingsPage.jsx
 const EventsAdminPage = lazy(() => import('@/pages/admin/EventsManagementPage.jsx'));
 const ContentManagementPage = lazy(() => import('@/pages/admin/ContentManagementPage.jsx'));
 const SystemDiagnosticsPage = lazy(() => import('@/pages/admin/SystemDiagnosticsPage.jsx'));
-const CSVManagementPage = lazy(() => import('@/pages/CSVManagementPage.jsx'));
 const AnalyticsPage = lazy(() => import('@/pages/admin/AnalyticsPage.jsx'));
 const AnalyticsReportsPage = lazy(() => import('@/pages/admin/AnalyticsReportsPage.jsx'));
 const MediaLibraryPage = lazy(() => import('@/pages/admin/MediaLibraryPage.jsx'));
@@ -289,7 +288,6 @@ const App = () => {
                           <Route path="events-calendar" element={<EventsAdminPage />} />
                           <Route path="content" element={<ContentManagementPage />} />
                           <Route path="diagnostics" element={<SystemDiagnosticsPage />} />
-                          <Route path="csv-import" element={<CSVManagementPage />} />
                           <Route path="analytics" element={<AnalyticsReportsPage />} />
                           <Route path="analytics-reports" element={<AnalyticsReportsPage />} />
                           <Route path="media" element={<MediaLibraryPage />} />
