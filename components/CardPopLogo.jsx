@@ -44,7 +44,7 @@ const CardPopLogo = ({
 
       <span className="flex flex-col leading-none">
         {/* Wordmark */}
-        <span className="font-serif font-extrabold tracking-tight leading-none" style={{ fontSize: 'inherit' }}>
+        <span className="font-heading font-extrabold tracking-[-0.02em] leading-none" style={{ fontSize: 'inherit' }}>
           <span className={cardText}>Card</span>
           <span className="text-primary">Pop</span>
         </span>
