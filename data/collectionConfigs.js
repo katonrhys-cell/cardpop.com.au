@@ -55,6 +55,8 @@ export const COLLECTION_CONFIGS = {
     ],
     holyGrailLabel: 'Legendary Pulls',
     holyGrailDesc:  'CardPop-curated Pokémon cards worth chasing — hand-picked for condition, rarity, and value.',
+    showGradedSection: true,
+    showTrendingSection: true,
   },
 
   // ── Magic: The Gathering ───────────────────────────────────────────────────

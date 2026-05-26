@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronDown, ChevronRight, Star, ArrowRight, Plus,
   SlidersHorizontal, X, RefreshCw, Sparkles, ShoppingBag,
-  AlertCircle, Search,
+  AlertCircle, Search, Award, TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -38,13 +38,15 @@ const CardSkeleton = () => (
 );
 
 // ─── Mini listing card for horizontal scroll sections ────────────────────────
-const MiniListingCard = ({ listing, accentHex }) => {
+const MiniListingCard = ({ listing, accentHex, badge }) => {
   const imageUrl = listing.images?.[0];
   const imgSrc = imageUrl ? pb.files.getUrl(listing, imageUrl) : null;
   const price = listing.price ?? listing.sale_price ?? 0;
   const title = listing.title ?? listing.cardName ?? listing.name ?? 'Untitled';
   const source = listing.source ?? 'vault';
   const detailPath = `/product/${source}/${listing.id}`;
+  const grade = listing.grade ?? listing.gradeText ?? listing.gradeScore;
+  const gradingCompany = listing.gradingCompany;
 
   return (
     <Link
@@ -62,6 +64,21 @@ const MiniListingCard = ({ listing, accentHex }) => {
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground/40">
             <ShoppingBag className="w-8 h-8" />
+          </div>
+        )}
+        {/* Grade badge overlay */}
+        {grade && (
+          <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-yellow-400 text-yellow-900 shadow">
+            {gradingCompany ? `${gradingCompany} ${grade}` : grade}
+          </div>
+        )}
+        {/* Custom badge (e.g. "Trending") */}
+        {badge && !grade && (
+          <div
+            className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-extrabold text-white shadow"
+            style={{ background: accentHex }}
+          >
+            {badge}
           </div>
         )}
       </div>
@@ -102,7 +119,6 @@ const HolyGrailCard = ({ card, accentHex }) => {
       className="group relative flex flex-col rounded-2xl overflow-hidden border-2 bg-card hover:shadow-2xl transition-all duration-300"
       style={{ borderColor: `${accentHex}40` }}
     >
-      {/* Golden badge */}
       <div
         className="absolute top-3 left-3 z-10 flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"
         style={{ background: accentHex, color: '#fff' }}
@@ -165,6 +181,7 @@ const HolyGrailCard = ({ card, accentHex }) => {
 const CollectionPage = () => {
   const { collectionSlug: rawSlug } = useParams();
   const navigate = useNavigate();
+  const browseGridRef = useRef(null);
 
   // Resolve config
   const slug = resolveCollectionSlug(rawSlug);
@@ -179,6 +196,14 @@ const CollectionPage = () => {
 
   const [holyGrail, setHolyGrail] = useState([]);
   const [holyGrailLoading, setHolyGrailLoading] = useState(true);
+
+  // Graded slabs section (opt-in per config)
+  const [gradedListings, setGradedListings] = useState([]);
+  const [gradedLoading, setGradedLoading] = useState(false);
+
+  // Trending spotlight (opt-in per config)
+  const [trendingListings, setTrendingListings] = useState([]);
+  const [trendingLoading, setTrendingLoading] = useState(false);
 
   const [listings, setListings] = useState([]);
   const [listingsLoading, setListingsLoading] = useState(true);
@@ -245,6 +270,28 @@ const CollectionPage = () => {
     else { setSeriesOpts([]); setFilterSeries(''); }
   }, [filterBrand, getSeriesByBrand]);
 
+  // ─── Era click: match against PocketBase brands and auto-filter ───────────
+  // When user selects an era, try to find a matching brand in the first subcategory
+  useEffect(() => {
+    if (!activeEra || !categoryId || subOpts.length === 0) return;
+
+    const tryMatchEra = async () => {
+      for (const sub of subOpts) {
+        const brands = await getBrandsBySubcategory(sub.id);
+        const match = brands.find(b => b.name.toLowerCase().includes(activeEra.toLowerCase()) || activeEra.toLowerCase().includes(b.name.toLowerCase()));
+        if (match) {
+          setFilterSub(sub.id);
+          setBrandOpts(brands);
+          setFilterBrand(match.id);
+          return;
+        }
+      }
+      // No match found — just show the hint banner, filters stay unchanged
+    };
+
+    tryMatchEra();
+  }, [activeEra, categoryId, subOpts, getBrandsBySubcategory]);
+
   // ─── New Releases ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!categoryId) return;
@@ -267,6 +314,49 @@ const CollectionPage = () => {
       setNewReleasesLoading(false);
     });
   }, [categoryId]);
+
+  // ─── Graded Slabs ─────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!categoryId || !config?.showGradedSection) return;
+    setGradedLoading(true);
+
+    // Filter for cards that have a grade or grading company set
+    const gradedFilter = `is_public=true && categoryId="${categoryId}" && (grade!="" || gradingCompany!="")`;
+
+    pb.collection('user_vaults').getList(1, 10, {
+      filter: gradedFilter,
+      sort: '-created',
+      $autoCancel: false,
+    }).then(res => {
+      if (!isMounted.current) return;
+      setGradedListings(res.items.map(i => ({ ...i, source: 'vault' })));
+    }).catch(() => {
+      if (isMounted.current) setGradedListings([]);
+    }).finally(() => {
+      if (isMounted.current) setGradedLoading(false);
+    });
+  }, [categoryId, config]);
+
+  // ─── Trending (highest-priced listings = premium market signal) ───────────
+  useEffect(() => {
+    if (!categoryId || !config?.showTrendingSection) return;
+    setTrendingLoading(true);
+
+    const filter = `is_public=true && categoryId="${categoryId}" && price>0`;
+
+    pb.collection('user_vaults').getList(1, 8, {
+      filter,
+      sort: '-price',
+      $autoCancel: false,
+    }).then(res => {
+      if (!isMounted.current) return;
+      setTrendingListings(res.items.map(i => ({ ...i, source: 'vault' })));
+    }).catch(() => {
+      if (isMounted.current) setTrendingListings([]);
+    }).finally(() => {
+      if (isMounted.current) setTrendingLoading(false);
+    });
+  }, [categoryId, config]);
 
   // ─── Holy Grail (featured picks) ─────────────────────────────────────────
   useEffect(() => {
@@ -298,7 +388,6 @@ const CollectionPage = () => {
         const vaultItems = vaultRes.status === 'fulfilled' ? vaultRes.value.items.map(i => ({ ...i, source: 'vault' })) : [];
         const shopItems = shopRes.status === 'fulfilled' ? shopRes.value.items.map(i => ({ ...i, source: 'shop' })) : [];
 
-        // Sort by featuredCards `order`
         const idOrderMap = Object.fromEntries(featuredRefs.items.map((r, idx) => [r.card_id, idx]));
         const all = [...vaultItems, ...shopItems].sort((a, b) => (idOrderMap[a.id] ?? 99) - (idOrderMap[b.id] ?? 99));
 
@@ -377,11 +466,20 @@ const CollectionPage = () => {
     setActiveEra(null);
   };
 
+  const handleEraClick = (eraName) => {
+    const next = eraName === activeEra ? null : eraName;
+    setActiveEra(next);
+    if (next) {
+      // Scroll to browse grid after a short delay so state updates first
+      setTimeout(() => browseGridRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+    }
+  };
+
   const hasActiveFilters = filterType !== 'All' || filterCondition || filterSort !== '-created' || filterSub || filterBrand || filterSeries;
 
   if (!config) return null;
 
-  const { Icon, heroGradient, heroTextDark, accentHex, tagline, name, seoTitle, seoDescription, seoIntro, eras, holyGrailLabel, holyGrailDesc } = config;
+  const { Icon, heroGradient, heroTextDark, accentHex, tagline, name, seoTitle, seoDescription, seoIntro, eras, holyGrailLabel, holyGrailDesc, showGradedSection, showTrendingSection } = config;
 
   const textColor = heroTextDark ? 'text-gray-900' : 'text-white';
   const textMuted = heroTextDark ? 'text-gray-700' : 'text-white/80';
@@ -395,13 +493,11 @@ const CollectionPage = () => {
 
       {/* ── HERO ──────────────────────────────────────────────────────────── */}
       <section className={`relative overflow-hidden bg-gradient-to-br ${heroGradient} pt-16 pb-20`}>
-        {/* Subtle noise texture */}
         <div className="absolute inset-0 opacity-10" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.4'/%3E%3C/svg%3E")`
         }} />
 
         <div className="relative container mx-auto px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row items-center gap-10">
-          {/* Text block */}
           <div className="flex-1 text-center lg:text-left">
             <Badge
               className="mb-4 text-xs font-bold uppercase tracking-widest px-3 py-1"
@@ -420,7 +516,7 @@ const CollectionPage = () => {
                 size="lg"
                 className="rounded-full font-bold px-8 shadow-lg"
                 style={{ background: heroTextDark ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)', color: heroTextDark ? '#111' : '#fff', backdropFilter: 'blur(8px)' }}
-                onClick={() => document.getElementById('browse-grid')?.scrollIntoView({ behavior: 'smooth' })}
+                onClick={() => browseGridRef.current?.scrollIntoView({ behavior: 'smooth' })}
               >
                 Browse All <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
@@ -438,12 +534,7 @@ const CollectionPage = () => {
             </div>
           </div>
 
-          {/* Floating icon */}
-          <motion.div
-            variants={floatVariants}
-            animate="animate"
-            className="flex-shrink-0"
-          >
+          <motion.div variants={floatVariants} animate="animate" className="flex-shrink-0">
             <div
               className="w-40 h-40 sm:w-52 sm:h-52 lg:w-64 lg:h-64 rounded-3xl flex items-center justify-center shadow-2xl"
               style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(20px)', border: '1.5px solid rgba(255,255,255,0.3)' }}
@@ -454,41 +545,74 @@ const CollectionPage = () => {
         </div>
       </section>
 
-      {/* ── ERA NAVIGATION ───────────────────────────────────────────────── */}
+      {/* ── ERA / SET BRAND STRIP ─────────────────────────────────────────── */}
       {eras && eras.length > 0 && (
-        <section className="border-b border-border bg-card sticky top-0 z-20 shadow-sm">
-          <div className="container mx-auto px-4 sm:px-6">
-            <div className="flex items-center gap-3 overflow-x-auto scrollbar-hide py-3">
-              <button
-                onClick={clearFilters}
-                className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-bold transition-all duration-200 ${
-                  !activeEra
-                    ? 'bg-foreground text-background'
-                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                }`}
-              >
-                All Eras
-              </button>
-              {eras.map(era => (
-                <button
-                  key={era.name}
-                  onClick={() => setActiveEra(era.name === activeEra ? null : era.name)}
-                  className={`flex-shrink-0 group relative px-4 py-2 rounded-full text-sm font-bold transition-all duration-200 ${
-                    activeEra === era.name
-                      ? `bg-gradient-to-r ${era.gradient} text-white shadow-md`
-                      : 'bg-muted text-muted-foreground hover:text-foreground'
-                  }`}
-                  title={era.hint}
-                >
-                  {era.name}
-                  {era.years && (
-                    <span className="ml-1.5 text-[10px] font-normal opacity-70">{era.years}</span>
-                  )}
-                </button>
-              ))}
+        <>
+          {/* Visual era tiles — full-width horizontal scroll */}
+          <section className="bg-card border-b border-border overflow-hidden">
+            <div className="container mx-auto px-4 sm:px-6 py-5">
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground mb-3 px-1">Browse by Set Era</p>
+              <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
+                {eras.map(era => (
+                  <button
+                    key={era.name}
+                    onClick={() => handleEraClick(era.name)}
+                    className={`group flex-shrink-0 relative rounded-2xl overflow-hidden transition-all duration-200 ${
+                      activeEra === era.name ? 'ring-2 ring-offset-2 scale-[1.03]' : 'hover:scale-[1.02]'
+                    }`}
+                    style={activeEra === era.name ? { ringColor: accentHex } : {}}
+                  >
+                    <div className={`bg-gradient-to-br ${era.gradient} px-5 py-4 min-w-[140px] text-left`}>
+                      <p className="text-white font-extrabold text-sm leading-tight">{era.name}</p>
+                      <p className="text-white/70 text-[11px] mt-0.5">{era.years}</p>
+                      {era.hint && (
+                        <p className="text-white/50 text-[10px] mt-1.5 leading-snug line-clamp-2 hidden group-hover:block">
+                          {era.hint}
+                        </p>
+                      )}
+                    </div>
+                    {activeEra === era.name && (
+                      <div className="absolute inset-0 bg-white/10 flex items-center justify-center">
+                        <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow">
+                          <Search className="w-3 h-3 text-gray-700" />
+                        </div>
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+
+          {/* Sticky filter pills (compact) */}
+          <section className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-20 shadow-sm">
+            <div className="container mx-auto px-4 sm:px-6">
+              <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide py-2">
+                <button
+                  onClick={clearFilters}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 ${
+                    !activeEra ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  All
+                </button>
+                {eras.map(era => (
+                  <button
+                    key={era.name}
+                    onClick={() => handleEraClick(era.name)}
+                    className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 ${
+                      activeEra === era.name
+                        ? `bg-gradient-to-r ${era.gradient} text-white shadow-sm`
+                        : 'bg-muted text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {era.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+        </>
       )}
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-16">
@@ -545,6 +669,53 @@ const CollectionPage = () => {
           </div>
         </section>
 
+        {/* ── GRADED SLABS ─────────────────────────────────────────────────── */}
+        {showGradedSection && (
+          <section>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm"
+                  style={{ background: `linear-gradient(135deg, #F59E0B, #D97706)` }}
+                >
+                  <Award className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-extrabold tracking-tight">Graded Slabs</h2>
+                  <p className="text-sm text-muted-foreground mt-0.5">PSA · BGS · CGC · ACE graded {name} cards</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setFilterCondition('');
+                  browseGridRef.current?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="text-sm font-bold hover:underline flex items-center gap-1"
+                style={{ color: accentHex }}
+              >
+                View All <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
+              {gradedLoading
+                ? Array.from({ length: 5 }).map((_, i) => <CardSkeleton key={i} />)
+                : gradedListings.length === 0
+                  ? (
+                    <div className="py-8 text-muted-foreground w-full flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border">
+                      <Award className="w-8 h-8 opacity-30" />
+                      <p className="text-sm">No graded {name} cards listed yet.</p>
+                      <p className="text-xs text-muted-foreground/70">List a PSA or BGS slab to appear here.</p>
+                    </div>
+                  )
+                  : gradedListings.map(listing => (
+                    <MiniListingCard key={listing.id} listing={listing} accentHex="#D97706" />
+                  ))
+              }
+            </div>
+          </section>
+        )}
+
         {/* ── HOLY GRAIL ───────────────────────────────────────────────────── */}
         <section className="rounded-3xl overflow-hidden border-2 p-6 sm:p-8" style={{ borderColor: `${accentHex}30`, background: `linear-gradient(135deg, ${accentHex}08 0%, transparent 60%)` }}>
           <div className="flex items-start justify-between mb-6">
@@ -585,8 +756,54 @@ const CollectionPage = () => {
           )}
         </section>
 
+        {/* ── TRENDING SPOTLIGHT ───────────────────────────────────────────── */}
+        {showTrendingSection && (
+          <section>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm"
+                  style={{ background: `linear-gradient(135deg, ${accentHex}, ${accentHex}cc)` }}
+                >
+                  <TrendingUp className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-extrabold tracking-tight">Trending Now</h2>
+                  <p className="text-sm text-muted-foreground mt-0.5">Premium {name} cards at the top of the market</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setFilterSort('-price');
+                  browseGridRef.current?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="text-sm font-bold hover:underline flex items-center gap-1"
+                style={{ color: accentHex }}
+              >
+                View All <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2">
+              {trendingLoading
+                ? Array.from({ length: 5 }).map((_, i) => <CardSkeleton key={i} />)
+                : trendingListings.length === 0
+                  ? (
+                    <div className="py-8 text-muted-foreground w-full flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border">
+                      <TrendingUp className="w-8 h-8 opacity-30" />
+                      <p className="text-sm">No trending {name} cards yet.</p>
+                    </div>
+                  )
+                  : trendingListings.map(listing => (
+                    <MiniListingCard key={listing.id} listing={listing} accentHex={accentHex} badge="Premium" />
+                  ))
+              }
+            </div>
+          </section>
+        )}
+
         {/* ── FULL BROWSE GRID ─────────────────────────────────────────────── */}
-        <section id="browse-grid">
+        <section ref={browseGridRef} id="browse-grid">
           <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
             <div>
               <h2 className="text-2xl font-extrabold tracking-tight">Browse {name}</h2>
@@ -618,7 +835,6 @@ const CollectionPage = () => {
                 className="overflow-hidden mb-6"
               >
                 <div className="bg-muted/30 border border-border rounded-2xl p-4 flex flex-wrap gap-3 items-center">
-                  {/* Listing type */}
                   <Select value={filterType} onValueChange={setFilterType}>
                     <SelectTrigger className="w-[150px] rounded-xl bg-background border-border font-medium">
                       <SelectValue placeholder="Listing Type" />
@@ -630,7 +846,6 @@ const CollectionPage = () => {
                     </SelectContent>
                   </Select>
 
-                  {/* Condition */}
                   <Select value={filterCondition} onValueChange={setFilterCondition}>
                     <SelectTrigger className="w-[150px] rounded-xl bg-background border-border font-medium">
                       <SelectValue placeholder="Condition" />
@@ -648,7 +863,6 @@ const CollectionPage = () => {
                     </SelectContent>
                   </Select>
 
-                  {/* Sort */}
                   <Select value={filterSort} onValueChange={setFilterSort}>
                     <SelectTrigger className="w-[160px] rounded-xl bg-background border-border font-medium">
                       <SelectValue placeholder="Sort By" />
@@ -661,7 +875,6 @@ const CollectionPage = () => {
                     </SelectContent>
                   </Select>
 
-                  {/* Subcategory */}
                   {subOpts.length > 0 && (
                     <Select value={filterSub} onValueChange={setFilterSub}>
                       <SelectTrigger className="w-[160px] rounded-xl bg-background border-border font-medium">
@@ -674,7 +887,6 @@ const CollectionPage = () => {
                     </Select>
                   )}
 
-                  {/* Brand */}
                   {brandOpts.length > 0 && (
                     <Select value={filterBrand} onValueChange={setFilterBrand}>
                       <SelectTrigger className="w-[150px] rounded-xl bg-background border-border font-medium">
@@ -687,7 +899,6 @@ const CollectionPage = () => {
                     </Select>
                   )}
 
-                  {/* Series */}
                   {seriesOpts.length > 0 && (
                     <Select value={filterSeries} onValueChange={setFilterSeries}>
                       <SelectTrigger className="w-[150px] rounded-xl bg-background border-border font-medium">
@@ -710,17 +921,19 @@ const CollectionPage = () => {
             )}
           </AnimatePresence>
 
-          {/* Era info hint */}
+          {/* Active era hint banner */}
           {activeEra && (
             <div
               className="mb-6 px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2"
               style={{ background: `${accentHex}15`, color: accentHex }}
             >
               <Search className="w-4 h-4 flex-shrink-0" />
-              Showing era: <strong>{activeEra}</strong>
-              <span className="text-muted-foreground font-normal ml-1">
-                — {eras.find(e => e.name === activeEra)?.hint}
-              </span>
+              <span>Browsing era: <strong>{activeEra}</strong></span>
+              {eras?.find(e => e.name === activeEra)?.hint && (
+                <span className="text-muted-foreground font-normal ml-1 hidden sm:inline">
+                  — {eras.find(e => e.name === activeEra).hint}
+                </span>
+              )}
               <button onClick={() => setActiveEra(null)} className="ml-auto opacity-60 hover:opacity-100">
                 <X className="w-4 h-4" />
               </button>
@@ -768,10 +981,7 @@ const CollectionPage = () => {
                 className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
                 initial="hidden"
                 animate="visible"
-                variants={{
-                  hidden: {},
-                  visible: { transition: { staggerChildren: 0.04 } },
-                }}
+                variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.04 } } }}
               >
                 {listings.map(listing => (
                   <motion.div
@@ -783,7 +993,6 @@ const CollectionPage = () => {
                 ))}
               </motion.div>
 
-              {/* Load more */}
               {listings.length < totalListings && (
                 <div className="flex justify-center mt-10">
                   <Button
