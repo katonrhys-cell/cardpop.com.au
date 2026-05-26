@@ -86,7 +86,7 @@ const MobileBrowseSection = ({ onNavigate }) => {
           {TCG_CATEGORY_DATA.map(cat => (
             <Link
               key={cat.name}
-              to="/marketplace"
+              to={`/collections/${cat.slug}`}
               onClick={onNavigate}
               className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
             >
@@ -115,7 +115,7 @@ const MobileBrowseSection = ({ onNavigate }) => {
           {SPORTS_CATEGORY_DATA.map(cat => (
             <Link
               key={cat.name}
-              to="/marketplace"
+              to={`/collections/${cat.slug}`}
               onClick={onNavigate}
               className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
             >
@@ -195,7 +195,7 @@ const BrowseDropdown = ({ onNavigate }) => {
                 {TCG_CATEGORY_DATA.map(cat => (
                   <Link
                     key={cat.name}
-                    to="/marketplace"
+                    to={`/collections/${cat.slug}`}
                     onClick={() => { setOpen(false); onNavigate?.(); }}
                     className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-muted transition-colors group"
                   >
@@ -220,7 +220,7 @@ const BrowseDropdown = ({ onNavigate }) => {
                 {SPORTS_CATEGORY_DATA.map(cat => (
                   <Link
                     key={cat.name}
-                    to="/marketplace"
+                    to={`/collections/${cat.slug}`}
                     onClick={() => { setOpen(false); onNavigate?.(); }}
                     className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-muted transition-colors group"
                   >

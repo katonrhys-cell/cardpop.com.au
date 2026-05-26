@@ -302,7 +302,7 @@ const HomePage = () => {
                 className="flex-shrink-0 snap-start w-32 sm:w-auto"
               >
                 <Link
-                  to="/marketplace"
+                  to={cat.slug ? `/collections/${cat.slug}` : '/marketplace'}
                   className={`group flex flex-col items-center justify-center gap-3 p-4 rounded-2xl bg-gradient-to-br ${cat.gradient} aspect-square shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-center leading-tight`}
                 >
                   <cat.Icon className="w-9 h-9 drop-shadow-sm" />

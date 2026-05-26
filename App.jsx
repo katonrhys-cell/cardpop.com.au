@@ -34,6 +34,9 @@ const VerificationPendingPage = lazy(() => import('@/pages/VerificationPendingPa
 const ProfileCompletionPage = lazy(() => import('@/pages/ProfileCompletionPage.jsx'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage.jsx'));
 
+// Collections
+const CollectionPage = lazy(() => import('@/pages/collections/CollectionPage.jsx'));
+
 // Marketplace
 const MarketplacePage = lazy(() => import('@/pages/marketplace/MarketplacePage.jsx'));
 const MarketplaceCategoryPage = lazy(() => import('@/pages/marketplace/MarketplaceCategoryPage.jsx'));
@@ -174,6 +177,9 @@ const App = () => {
                         <Route path="/verification-pending" element={<VerificationPendingPage />} />
                         <Route path="/complete-profile/:token" element={<ProfileCompletionPage />} />
                         
+                        {/* Collections */}
+                        <Route path="/collections/:collectionSlug" element={<CollectionPage />} />
+
                         {/* Marketplace */}
                         <Route path="/marketplace" element={<MarketplacePage />} />
                         <Route path="/marketplace/category/:category" element={<MarketplaceCategoryPage />} />
