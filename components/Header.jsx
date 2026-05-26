@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useDarkMode } from '@/hooks/useDarkMode.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import CardPopLogo from '@/components/CardPopLogo.jsx';
 import { useCart } from '@/hooks/useCart.jsx';
 import pb from '@/lib/pocketbaseClient.js';
 import { Button } from '@/components/ui/button';
@@ -144,10 +145,8 @@ const Header = () => {
       <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-center justify-between py-3 md:py-0 md:min-h-20 transition-all duration-300">
           
-          <Link to="/" className="shrink-0 flex items-center gap-2 group mr-2 lg:mr-4 xl:mr-8" onClick={() => setMobileMenuOpen(false)}>
-            <span className="font-serif font-bold text-2xl tracking-tight text-foreground transition-colors">
-              Card<span className="text-primary">Pop</span>
-            </span>
+          <Link to="/" className="shrink-0 mr-2 lg:mr-4 xl:mr-8 text-2xl" onClick={() => setMobileMenuOpen(false)}>
+            <CardPopLogo variant="header" iconClassName="w-7 h-[34px]" />
           </Link>
 
           <nav className="hidden lg:flex items-center gap-0.5 xl:gap-1 mr-auto shrink-0">
@@ -266,8 +265,10 @@ const Header = () => {
               </SheetTrigger>
               <SheetContent side="right" className="w-[85vw] sm:w-[350px] p-0 flex flex-col border-l border-border bg-background overflow-hidden">
                 <SheetHeader className="p-6 border-b border-border text-left bg-muted/30 shrink-0">
-                  <SheetTitle className="font-serif font-bold text-2xl tracking-tight text-foreground">
-                    Card<span className="text-primary">Pop</span>
+                  <SheetTitle asChild>
+                    <span className="text-2xl">
+                      <CardPopLogo variant="header" iconClassName="w-7 h-[34px]" />
+                    </span>
                   </SheetTitle>
                 </SheetHeader>
                 

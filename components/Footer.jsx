@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Twitter, Instagram, Facebook, Youtube } from 'lucide-react';
+import CardPopLogo from '@/components/CardPopLogo.jsx';
 
 const DiscordIcon = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -22,11 +23,9 @@ const Footer = () => {
       <div className="container-default">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-12 mb-16">
           <div className="lg:col-span-2">
-            <div className="bg-foreground px-4 py-2 rounded-xl inline-block mb-6">
-              <span className="font-heading text-xl font-bold text-background tracking-tight">
-                Card<span className="text-primary">Pop</span>
-              </span>
-            </div>
+            <Link to="/" className="inline-block mb-6 text-2xl">
+              <CardPopLogo variant="full" iconClassName="w-8 h-[39px]" />
+            </Link>
             <p className="text-muted-foreground text-sm max-w-sm leading-relaxed mb-6">
               The premier destination for collecting, trading, and analyzing trading cards and sports memorabilia.
             </p>
