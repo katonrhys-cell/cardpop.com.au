@@ -172,6 +172,7 @@ const App = () => {
                         <Route path="/login" element={<LoginPage />} />
                         <Route path="/signup" element={<SignupPage />} />
                         <Route path="/reset-password" element={<PasswordResetPage />} />
+                        <Route path="/forgot-password" element={<PasswordResetPage />} />
                         <Route path="/verification-pending" element={<VerificationPendingPage />} />
                         <Route path="/complete-profile/:token" element={<ProfileCompletionPage />} />
                         
