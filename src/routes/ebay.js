@@ -3,6 +3,8 @@ import express from 'express';
 import { callEbayApi } from '../utils/ebayClient.js';
 import { getMarketData, getCardDetails } from '../utils/ebayMarketData.js';
 import { getSalesData, getStatistics } from '../utils/ebaySalesStats.js';
+import { POPULAR_CARDS } from '../utils/ebayPopularCards.js';
+import * as ebayCache from '../utils/ebayCache.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -290,6 +292,100 @@ router.get('/statistics', async (req, res) => {
 
   logger.info(`[EBAY_STATISTICS] Statistics retrieved: ${statistics.totalSalesVolume} sales`);
   res.json(statistics);
+});
+
+/**
+ * GET /ebay/popular-cards
+ * Returns live eBay AU prices for the curated popular card list.
+ * Each card is looked up via the Browse API search; we sample up to 10 listings
+ * to compute an average price and volume signal.
+ *
+ * Response:
+ * [
+ *   {
+ *     id, name, set, collection, avgPrice, minPrice, maxPrice,
+ *     volume, listings: [{ title, price, condition, listingUrl, thumbnailUrl }]
+ *   },
+ *   ...
+ * ]
+ */
+router.get('/popular-cards', async (req, res) => {
+  const CACHE_KEY = 'popular-cards';
+  const cached = ebayCache.get(CACHE_KEY);
+  if (cached) {
+    logger.info('[POPULAR_CARDS] Returning cached popular cards');
+    return res.json(cached);
+  }
+
+  logger.info(`[POPULAR_CARDS] Fetching live prices for ${POPULAR_CARDS.length} popular cards`);
+
+  const results = await Promise.allSettled(
+    POPULAR_CARDS.map(async (card) => {
+      const params = new URLSearchParams({
+        q: card.searchQuery,
+        filter: 'buyingOptions:{AUCTION|FIXED_PRICE},itemLocationCountry:AU',
+        limit: 10,
+        sort: 'newlyListed',
+      });
+
+      const data = await callEbayApi(`/buy/browse/v1/item_summary/search?${params}`);
+      const items = data.itemSummaries || [];
+
+      const prices = items
+        .map(i => parseFloat(i.price?.value || 0))
+        .filter(p => p > 0);
+
+      const avgPrice = prices.length > 0
+        ? Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) / 100
+        : 0;
+
+      const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+      const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+
+      const listings = items.slice(0, 4).map(i => ({
+        title: i.title,
+        price: parseFloat(i.price?.value || 0),
+        condition: i.condition || 'Unknown',
+        listingUrl: i.itemWebUrl || '',
+        thumbnailUrl: i.image?.imageUrl || '',
+      }));
+
+      return {
+        id: card.id,
+        name: card.name,
+        set: card.set,
+        collection: card.collection,
+        avgPrice,
+        minPrice,
+        maxPrice,
+        volume: items.length,
+        listings,
+        liveAt: new Date().toISOString(),
+      };
+    })
+  );
+
+  const output = results.map((r, i) => {
+    if (r.status === 'fulfilled') return r.value;
+    logger.warn(`[POPULAR_CARDS] Failed to fetch "${POPULAR_CARDS[i].name}": ${r.reason?.message}`);
+    // Return card with null prices so the frontend can show a fallback
+    return {
+      id: POPULAR_CARDS[i].id,
+      name: POPULAR_CARDS[i].name,
+      set: POPULAR_CARDS[i].set,
+      collection: POPULAR_CARDS[i].collection,
+      avgPrice: null,
+      minPrice: null,
+      maxPrice: null,
+      volume: 0,
+      listings: [],
+      error: r.reason?.message || 'Failed to fetch',
+    };
+  });
+
+  ebayCache.set(CACHE_KEY, output);
+  logger.info(`[POPULAR_CARDS] Returning ${output.length} popular cards`);
+  res.json(output);
 });
 
 /**
