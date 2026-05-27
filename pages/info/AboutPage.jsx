@@ -110,12 +110,48 @@ const AboutPage = () => {
           </div>
 
           <div className="flex items-center gap-4 mt-10 pt-8 border-t border-border">
-            <div className="w-12 h-12 rounded-full bg-primary text-primary-foreground font-heading font-extrabold text-base flex items-center justify-center shrink-0">
-              K
-            </div>
+            {/* Cartoon founder face */}
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-16 h-16 shrink-0" aria-hidden="true">
+              {/* Face */}
+              <circle cx="32" cy="32" r="30" fill="#FCD34D" />
+              {/* Hair */}
+              <path d="M6 26 Q8 4 32 3 Q56 4 58 26 Q54 14 32 14 Q10 14 6 26Z" fill="#78350F" />
+              {/* Left eye white */}
+              <ellipse cx="21" cy="26" rx="5" ry="5.5" fill="white" />
+              {/* Right eye white */}
+              <ellipse cx="43" cy="26" rx="5" ry="5.5" fill="white" />
+              {/* Left pupil */}
+              <circle cx="22" cy="27" r="3" fill="#1F2937" />
+              {/* Right pupil */}
+              <circle cx="44" cy="27" r="3" fill="#1F2937" />
+              {/* Eye highlights */}
+              <circle cx="23.5" cy="25.5" r="1.1" fill="white" />
+              <circle cx="45.5" cy="25.5" r="1.1" fill="white" />
+              {/* Eyebrows — raised comically high */}
+              <path d="M14 17 Q21 12 28 16" stroke="#78350F" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+              <path d="M36 16 Q43 12 50 17" stroke="#78350F" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+              {/* Nose */}
+              <ellipse cx="32" cy="34" rx="2" ry="1.5" fill="#F59E0B" />
+              {/* THE MOUSTACHE — handlebar curls */}
+              {/* Center dip */}
+              <path d="M22 39 Q27 44 32 41 Q37 44 42 39" stroke="#1F2937" strokeWidth="4.5" strokeLinecap="round" fill="none" />
+              {/* Left wing out */}
+              <path d="M22 39 C18 38 14 36 12 33" stroke="#1F2937" strokeWidth="4.5" strokeLinecap="round" fill="none" />
+              {/* Left curl tip — spirals upward */}
+              <path d="M12 33 C9 29 10 25 13 25 C16 25 17 29 15 32" stroke="#1F2937" strokeWidth="4" strokeLinecap="round" fill="none" />
+              {/* Right wing out */}
+              <path d="M42 39 C46 38 50 36 52 33" stroke="#1F2937" strokeWidth="4.5" strokeLinecap="round" fill="none" />
+              {/* Right curl tip — spirals upward */}
+              <path d="M52 33 C55 29 54 25 51 25 C48 25 47 29 49 32" stroke="#1F2937" strokeWidth="4" strokeLinecap="round" fill="none" />
+              {/* Smile */}
+              <path d="M24 50 Q32 56 40 50" stroke="#92400E" strokeWidth="2.5" strokeLinecap="round" fill="none" />
+              {/* Rosy cheeks */}
+              <ellipse cx="13" cy="38" rx="5" ry="3.5" fill="#FCA5A5" opacity="0.5" />
+              <ellipse cx="51" cy="38" rx="5" ry="3.5" fill="#FCA5A5" opacity="0.5" />
+            </svg>
             <div>
-              <p className="font-bold text-foreground text-sm">Katon</p>
-              <p className="text-xs text-muted-foreground mt-0.5">Founder, CardPop · Melbourne, VIC</p>
+              <p className="font-bold text-foreground text-sm">Stache Bros</p>
+              <p className="text-xs text-muted-foreground mt-0.5">CardPop Founders · Melbourne, Victoria</p>
             </div>
           </div>
         </div>
