@@ -112,7 +112,8 @@ app.use(csrfMiddleware);
 app.use(sessionTimeoutMiddleware);
 
 // Routes
-app.use('/', routes());
+app.get('/health', (req, res) => res.json({ status: 'ok' }));
+app.use('/hcgi/api', routes());
 
 // Security.txt endpoint
 app.get('/.well-known/security.txt', (req, res) => {
