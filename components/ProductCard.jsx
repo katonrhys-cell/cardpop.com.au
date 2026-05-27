@@ -4,16 +4,19 @@ import { Link } from 'react-router-dom';
 import { Star, ShieldCheck } from 'lucide-react';
 import pb from '@/lib/pocketbaseClient.js';
 import { Badge } from '@/components/ui/badge';
+import { slugify } from '@/lib/slugify.js';
 
 const ProductCard = ({ product }) => {
   const imageUrl = product.images?.[0] || product.cardImage?.[0];
   const imgSrc = imageUrl ? pb.files.getUrl(product, imageUrl) : null;
   const sellerId = product.seller || product.owner || product.user_id;
   const sellerObj = product.expand?.seller || product.expand?.owner || product.expand?.user_id;
+  const titleSlug = slugify(product.name || product.cardName || 'card');
+  const detailPath = `/product/shop/${product.id}/${titleSlug}`;
 
   return (
     <div className="group flex flex-col h-full bg-card rounded-2xl border border-border overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
-      <Link to={`/product/shop/${product.id}`} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
+      <Link to={detailPath} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
         {imgSrc ? (
           <img 
             src={imgSrc} 
@@ -35,7 +38,7 @@ const ProductCard = ({ product }) => {
       </Link>
       
       <div className="p-5 flex flex-col flex-1">
-        <Link to={`/product/shop/${product.id}`} className="block mb-2">
+        <Link to={detailPath} className="block mb-2">
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
             {product.category || product.collectionType || 'Trading Card'}
           </p>

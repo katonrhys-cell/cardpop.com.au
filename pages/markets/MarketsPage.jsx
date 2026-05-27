@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet';
+import { Link } from 'react-router-dom';
 import pb from '@/lib/pocketbaseClient';
+import { slugify } from '@/lib/slugify.js';
 import {
   TrendingUp, TrendingDown, Search, LineChart, Star, StarOff,
   ArrowUpRight, ArrowDownRight, Activity, DollarSign, BarChart3,
@@ -176,9 +178,12 @@ const MarketsPage = () => {
   };
 
   const MoverRow = ({ card }) => (
-    <div className="flex items-center gap-3 py-3 px-4 hover:bg-muted/30 rounded-xl transition-colors">
+    <Link
+      to={`/markets/${slugify(card.collection)}/${slugify(card.name)}`}
+      className="flex items-center gap-3 py-3 px-4 hover:bg-muted/30 rounded-xl transition-colors group"
+    >
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm truncate">{card.name}</p>
+        <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">{card.name}</p>
         <p className="text-xs text-muted-foreground truncate">{card.set} · {card.collection}</p>
       </div>
       <div className="text-right flex-shrink-0 space-y-0.5">
@@ -188,7 +193,7 @@ const MarketsPage = () => {
       <div className="text-right text-xs text-muted-foreground w-14 flex-shrink-0">
         {card.volume.toLocaleString()} sold
       </div>
-    </div>
+    </Link>
   );
 
   return (
