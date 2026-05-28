@@ -3,13 +3,28 @@ import { Link } from 'react-router-dom';
 import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 const EventDetailCard = ({ event }) => {
   const isTradeShow = event.type === 'Trade Show';
 
   const handleShare = (platform) => {
-    // Placeholder share functionality
-    console.log(`Sharing on ${platform}`);
+    const url = window.location.href;
+    const text = `Check out ${event.name}`;
+
+    if (platform === 'Facebook') {
+      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank', 'noopener,noreferrer,width=600,height=400');
+    } else if (platform === 'Twitter') {
+      window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer,width=600,height=400');
+    } else if (platform === 'LinkedIn') {
+      window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`, '_blank', 'noopener,noreferrer,width=600,height=400');
+    } else if (platform === 'Link') {
+      navigator.clipboard.writeText(url).then(() => {
+        toast.success('Link copied to clipboard');
+      }).catch(() => {
+        toast.error('Failed to copy link');
+      });
+    }
   };
 
   return (
