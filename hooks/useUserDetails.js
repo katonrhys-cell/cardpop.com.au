@@ -1,6 +1,5 @@
-
 import { useState, useEffect, useCallback } from 'react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 
 export const useUserDetails = (userId) => {
   const [data, setData] = useState({
@@ -14,73 +13,50 @@ export const useUserDetails = (userId) => {
     preferences: null,
   });
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError]         = useState(null);
 
   const fetchUserDetails = useCallback(async () => {
-    if (!userId) return;
-    
+    if (!userId) { setIsLoading(false); return; }
+
     setIsLoading(true);
     setError(null);
 
     try {
-      // Fetch user profile
-      const user = await pb.collection('users').getOne(userId, { $autoCancel: false });
-
-      // Fetch related data concurrently
       const [
-        vaultProductsRes,
-        ordersBuyerRes,
-        ordersSellerRes,
-        reviewsRes
+        profileRes,
+        vaultRes,
+        buyerOrdersRes,
+        sellerOrdersRes,
+        reviewsRes,
+        addressesRes,
       ] = await Promise.allSettled([
-        pb.collection('user_vaults').getList(1, 50, { filter: `user_id = "${userId}"`, sort: '-created', $autoCancel: false }),
-        pb.collection('orders').getList(1, 50, { filter: `buyer_id = "${userId}"`, sort: '-created', expand: 'seller_id', $autoCancel: false }),
-        pb.collection('orders').getList(1, 50, { filter: `seller_id = "${userId}"`, sort: '-created', expand: 'buyer_id', $autoCancel: false }),
-        pb.collection('reviews').getList(1, 50, { filter: `reviewer = "${userId}"`, sort: '-created', expand: 'reviewee', $autoCancel: false })
+        supabase.from('profiles').select('*').eq('id', userId).single(),
+        supabase.from('vault_items').select('*, categories(name,slug)').eq('owner_id', userId).order('created_at', { ascending: false }).limit(50),
+        supabase.from('orders').select('*, profiles!seller_id(username,display_name,avatar_url)').eq('buyer_id', userId).order('created_at', { ascending: false }).limit(50),
+        supabase.from('orders').select('*, profiles!buyer_id(username,display_name,avatar_url)').eq('seller_id', userId).order('created_at', { ascending: false }).limit(50),
+        supabase.from('reviews').select('*').eq('reviewer_id', userId).order('created_at', { ascending: false }).limit(50),
+        supabase.from('shipping_addresses').select('*').eq('user_id', userId),
       ]);
 
-      // Optional collections (might not exist, so we handle failures gracefully)
-      let addresses = [];
-      let paymentMethods = [];
-      let preferences = null;
-
-      try {
-        const addrRes = await pb.collection('user_addresses').getList(1, 50, { filter: `user_id = "${userId}"`, $autoCancel: false });
-        addresses = addrRes.items;
-      } catch (e) { /* Ignore if collection doesn't exist */ }
-
-      try {
-        const pmRes = await pb.collection('user_payment_methods').getList(1, 50, { filter: `user_id = "${userId}"`, $autoCancel: false });
-        paymentMethods = pmRes.items;
-      } catch (e) { /* Ignore if collection doesn't exist */ }
-
-      try {
-        const prefRes = await pb.collection('user_preferences').getFirstListItem(`user_id = "${userId}"`, { $autoCancel: false });
-        preferences = prefRes;
-      } catch (e) { /* Ignore if collection doesn't exist or no record */ }
-
       setData({
-        user,
-        vaultProducts: vaultProductsRes.status === 'fulfilled' ? vaultProductsRes.value.items : [],
-        ordersAsBuyer: ordersBuyerRes.status === 'fulfilled' ? ordersBuyerRes.value.items : [],
-        ordersAsSeller: ordersSellerRes.status === 'fulfilled' ? ordersSellerRes.value.items : [],
-        reviews: reviewsRes.status === 'fulfilled' ? reviewsRes.value.items : [],
-        addresses,
-        paymentMethods,
-        preferences
+        user:           profileRes.status === 'fulfilled' ? profileRes.value.data : null,
+        vaultProducts:  vaultRes.status === 'fulfilled'       ? (vaultRes.value.data ?? [])        : [],
+        ordersAsBuyer:  buyerOrdersRes.status === 'fulfilled' ? (buyerOrdersRes.value.data ?? [])  : [],
+        ordersAsSeller: sellerOrdersRes.status === 'fulfilled'? (sellerOrdersRes.value.data ?? []) : [],
+        reviews:        reviewsRes.status === 'fulfilled'     ? (reviewsRes.value.data ?? [])      : [],
+        addresses:      addressesRes.status === 'fulfilled'   ? (addressesRes.value.data ?? [])    : [],
+        paymentMethods: [],
+        preferences:    null,
       });
-
     } catch (err) {
-      console.error("Error fetching user details:", err);
-      setError(err.message || "Failed to load user details");
+      console.error('Error fetching user details:', err);
+      setError(err.message || 'Failed to load user details');
     } finally {
       setIsLoading(false);
     }
   }, [userId]);
 
-  useEffect(() => {
-    fetchUserDetails();
-  }, [fetchUserDetails]);
+  useEffect(() => { fetchUserDetails(); }, [fetchUserDetails]);
 
   return { ...data, isLoading, error, refetch: fetchUserDetails };
 };

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 import { Loader2, Lock, ShoppingCart, ArrowRightLeft, Layers } from 'lucide-react';
 import {
@@ -32,10 +32,10 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
     
     setLoading(true);
     try {
-      await pb.collection('user_vaults').update(product.id, {
+      await supabase.from('vault_items').update({
         listing_type: newListingType,
         is_public: isPublic
-      }, { $autoCancel: false });
+      }).eq('id', product.id);
       
       toast.success(`Listing status updated to ${newListingType}`);
       if (onUpdate) onUpdate();

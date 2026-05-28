@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
 
@@ -7,108 +7,157 @@ export function useTradeRequests() {
   const { currentUser } = useAuth();
   const [loading, setLoading] = useState(false);
 
-  const fetchWithCards = async (filterString) => {
+  const fetchTrades = async (filter) => {
     if (!currentUser) return [];
     try {
-      const trades = await pb.collection('trade_requests').getFullList({
-        filter: filterString,
-        sort: '-created',
-        $autoCancel: false
-      });
-      
-      if (trades.length === 0) return [];
-      
-      const cardIds = [...new Set(trades.flatMap(t => [t.offerer_card_id, t.recipient_card_id]))].filter(Boolean);
-      let cardMap = {};
-      
-      if (cardIds.length > 0) {
-        // Build a filter to fetch all related cards at once
-        const chunks = [];
-        for (let i = 0; i < cardIds.length; i += 50) {
-          const chunk = cardIds.slice(i, i + 50);
-          const filter = chunk.map(id => `id="${id}"`).join(' || ');
-          const cards = await pb.collection('cards').getFullList({ filter, $autoCancel: false });
-          cards.forEach(c => cardMap[c.id] = c);
-        }
-      }
+      const { data, error } = await supabase
+        .from('trades')
+        .select(`
+          *,
+          initiator:profiles!initiator_id(id,username,display_name,avatar_url),
+          responder:profiles!responder_id(id,username,display_name,avatar_url),
+          initiator_listing:listings!initiator_listing_id(
+            *, vault_item:vault_items(*, vault_images(*))
+          ),
+          responder_listing:listings!responder_listing_id(
+            *, vault_item:vault_items(*, vault_images(*))
+          )
+        `)
+        .match(filter)
+        .order('created_at', { ascending: false });
 
-      return trades.map(t => ({
-        ...t,
-        offererCard: cardMap[t.offerer_card_id] || null,
-        recipientCard: cardMap[t.recipient_card_id] || null
-      }));
+      if (error) throw error;
+      return data ?? [];
     } catch (err) {
-      console.error("Error fetching trades:", err);
+      console.error('Error fetching trades:', err);
       return [];
     }
   };
 
   const getMyTradesSent = useCallback(async () => {
     setLoading(true);
-    const res = await fetchWithCards(`offerer_id="${currentUser?.id}" && status="pending"`);
+    const res = await fetchTrades({ initiator_id: currentUser?.id, status: 'proposed' });
     setLoading(false);
     return res;
   }, [currentUser]);
 
   const getMyTradesReceived = useCallback(async () => {
     setLoading(true);
-    const res = await fetchWithCards(`recipient_id="${currentUser?.id}" && status="pending"`);
+    const { data } = await supabase
+      .from('trades')
+      .select(`
+        *,
+        initiator:profiles!initiator_id(id,username,display_name,avatar_url),
+        initiator_listing:listings!initiator_listing_id(*, vault_item:vault_items(*, vault_images(*))),
+        responder_listing:listings!responder_listing_id(*, vault_item:vault_items(*, vault_images(*)))
+      `)
+      .eq('responder_id', currentUser?.id)
+      .eq('status', 'proposed')
+      .order('created_at', { ascending: false });
     setLoading(false);
-    return res;
+    return data ?? [];
   }, [currentUser]);
 
   const getTradeHistory = useCallback(async () => {
+    if (!currentUser) return [];
     setLoading(true);
-    const res = await fetchWithCards(`(offerer_id="${currentUser?.id}" || recipient_id="${currentUser?.id}") && status!="pending"`);
+    const { data } = await supabase
+      .from('trades')
+      .select(`
+        *,
+        initiator:profiles!initiator_id(id,username,display_name,avatar_url),
+        responder:profiles!responder_id(id,username,display_name,avatar_url),
+        initiator_listing:listings!initiator_listing_id(*, vault_item:vault_items(*)),
+        responder_listing:listings!responder_listing_id(*, vault_item:vault_items(*))
+      `)
+      .or(`initiator_id.eq.${currentUser.id},responder_id.eq.${currentUser.id}`)
+      .not('status', 'eq', 'proposed')
+      .order('updated_at', { ascending: false });
     setLoading(false);
-    return res;
+    return data ?? [];
   }, [currentUser]);
 
   const acceptTrade = async (trade) => {
     try {
-      // 1. Swap owners (Updates the cards in place, preserving images and IDs)
-      if (trade.offererCard) {
-        await pb.collection('cards').update(trade.offerer_card_id, { owner: trade.recipient_id }, { $autoCancel: false });
-      }
-      if (trade.recipientCard) {
-        await pb.collection('cards').update(trade.recipient_card_id, { owner: trade.offerer_id }, { $autoCancel: false });
-      }
-      
-      // 2. Update trade status
-      await pb.collection('trade_requests').update(trade.id, { status: 'accepted' }, { $autoCancel: false });
-      
-      // 3. Decline any other pending trades involving these exact cards to prevent double-spending
-      const relatedTrades = await pb.collection('trade_requests').getFullList({
-        filter: `status="pending" && (offerer_card_id="${trade.offerer_card_id}" || recipient_card_id="${trade.offerer_card_id}" || offerer_card_id="${trade.recipient_card_id}" || recipient_card_id="${trade.recipient_card_id}")`,
-        $autoCancel: false
-      });
-      
-      for (const t of relatedTrades) {
-        if (t.id !== trade.id) {
-          await pb.collection('trade_requests').update(t.id, { status: 'declined' }, { $autoCancel: false });
-        }
-      }
+      const { error } = await supabase
+        .from('trades')
+        .update({ status: 'accepted' })
+        .eq('id', trade.id);
+      if (error) throw error;
 
-      toast.success('Trade accepted successfully! Cards have been swapped.');
+      // Decline any other pending trades involving same listings
+      await supabase
+        .from('trades')
+        .update({ status: 'cancelled' })
+        .or(`initiator_listing_id.eq.${trade.initiator_listing_id},responder_listing_id.eq.${trade.responder_listing_id}`)
+        .eq('status', 'proposed')
+        .neq('id', trade.id);
+
+      toast.success('Trade accepted! The fee will be calculated and contact details shared.');
       return true;
     } catch (err) {
-      console.error("Accept trade error:", err);
-      toast.error('Failed to complete trade. Please try again.');
+      console.error('Accept trade error:', err);
+      toast.error('Failed to accept trade. Please try again.');
       return false;
     }
   };
 
   const declineTrade = async (tradeId) => {
     try {
-      await pb.collection('trade_requests').update(tradeId, { status: 'declined' }, { $autoCancel: false });
+      const { error } = await supabase
+        .from('trades')
+        .update({ status: 'cancelled' })
+        .eq('id', tradeId);
+      if (error) throw error;
       toast.success('Trade request declined.');
       return true;
     } catch (err) {
-      console.error("Decline trade error:", err);
+      console.error('Decline trade error:', err);
       toast.error('Failed to decline trade.');
       return false;
     }
   };
 
-  return { getMyTradesSent, getMyTradesReceived, getTradeHistory, acceptTrade, declineTrade, loading };
+  const proposeTrade = async ({
+    initiatorListingId,
+    responderListingId,
+    responderId,
+    initiatorValue,
+    responderValue,
+    message,
+  }) => {
+    if (!currentUser) return null;
+    const cashTopup = Math.abs(initiatorValue - responderValue);
+    const topupFrom = initiatorValue < responderValue ? currentUser.id : responderId;
+
+    const { data, error } = await supabase
+      .from('trades')
+      .insert({
+        initiator_id:               currentUser.id,
+        responder_id:               responderId,
+        initiator_listing_id:       initiatorListingId,
+        responder_listing_id:       responderListingId,
+        initiator_trade_value_aud:  initiatorValue,
+        responder_trade_value_aud:  responderValue,
+        cash_topup_aud:             cashTopup,
+        topup_required_from:        cashTopup > 0 ? topupFrom : null,
+        message,
+      })
+      .select()
+      .single();
+
+    if (error) { toast.error(error.message); return null; }
+    toast.success('Trade proposed!');
+    return data;
+  };
+
+  return {
+    getMyTradesSent,
+    getMyTradesReceived,
+    getTradeHistory,
+    acceptTrade,
+    declineTrade,
+    proposeTrade,
+    loading,
+  };
 }

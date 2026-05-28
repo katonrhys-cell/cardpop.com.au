@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { CheckCircle2, XCircle, Clock, ArrowRightLeft, ImageOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import pb from '@/lib/pocketbaseClient.js';
 
 const TradeCard = ({ trade, isSent, isHistory, onAccept, onDecline, onCancel }) => {
   const [processing, setProcessing] = useState(false);
@@ -28,9 +27,10 @@ const TradeCard = ({ trade, isSent, isHistory, onAccept, onDecline, onCancel }) 
       );
     }
 
-    const imgUrl = card.cardImage && card.cardImage.length > 0 
-      ? pb.files.getUrl(card, Array.isArray(card.cardImage) ? card.cardImage[0] : card.cardImage)
+    const rawImg = card.cardImage && card.cardImage.length > 0
+      ? (Array.isArray(card.cardImage) ? card.cardImage[0] : card.cardImage)
       : null;
+    const imgUrl = rawImg && typeof rawImg === 'string' && rawImg.startsWith('http') ? rawImg : null;
 
     return (
       <div className={`flex-1 p-4 rounded-xl border ${highlight ? 'bg-primary/5 border-primary/20' : 'bg-muted/30 border-border'} flex flex-col`}>
@@ -78,7 +78,7 @@ const TradeCard = ({ trade, isSent, isHistory, onAccept, onDecline, onCancel }) 
               </Badge>
             )}
           </div>
-          <p className="text-xs text-muted-foreground font-medium">Initiated: {new Date(trade.created).toLocaleDateString()}</p>
+          <p className="text-xs text-muted-foreground font-medium">Initiated: {new Date(trade.created_at || trade.created).toLocaleDateString()}</p>
         </div>
         
         <div className="text-right flex items-center gap-4 bg-muted/40 px-4 py-2 rounded-xl border border-border/50">

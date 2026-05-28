@@ -2,7 +2,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Star, ShieldCheck, Lock, ShoppingCart, ArrowRightLeft, Layers } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
 import { Badge } from '@/components/ui/badge';
 
 const getStatusBadge = (listingType) => {
