@@ -15,6 +15,7 @@ import pb from '@/lib/pocketbaseClient.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import { COLLECTION_CONFIGS, resolveCollectionSlug } from '@/data/collectionConfigs.js';
+import { slugify } from '@/lib/slugify.js';
 
 // ─── Hero floating icon animation ───────────────────────────────────────────
 const floatVariants = {
@@ -44,7 +45,7 @@ const MiniListingCard = ({ listing, accentHex, badge }) => {
   const price = listing.price ?? listing.sale_price ?? 0;
   const title = listing.title ?? listing.cardName ?? listing.name ?? 'Untitled';
   const source = listing.source ?? 'vault';
-  const detailPath = `/product/${source}/${listing.id}`;
+  const detailPath = `/product/${source}/${listing.id}/${slugify(title)}`;
   const grade = listing.grade ?? listing.gradeText ?? listing.gradeScore;
   const gradingCompany = listing.gradingCompany;
 
@@ -108,7 +109,7 @@ const HolyGrailCard = ({ card, accentHex }) => {
   const sellerId = card.seller ?? card.owner;
   const avatarSrc = sellerAvatar ? pb.files.getUrl(card.expand?.seller ?? card.expand?.owner, sellerAvatar) : null;
   const source = card.source ?? 'vault';
-  const detailPath = `/product/${source}/${card.id}`;
+  const detailPath = `/product/${source}/${card.id}/${slugify(title)}`;
 
   return (
     <motion.div

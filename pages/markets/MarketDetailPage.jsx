@@ -1,19 +1,30 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import pb from '@/lib/pocketbaseClient';
 import { Skeleton } from '@/components/ui/skeleton';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, ArrowLeft } from 'lucide-react';
+import { slugify } from '@/lib/slugify.js';
 
 const MarketDetailPage = () => {
-  const { market } = useParams();
+  const { category, market } = useParams();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchMarket = async () => {
       try {
-        const res = await pb.collection('market_data').getOne(market, { $autoCancel: false });
+        // Try direct ID lookup first, then fall back to name-slug matching
+        let res = null;
+        try {
+          res = await pb.collection('market_data').getOne(market, { $autoCancel: false });
+        } catch {
+          // market param may be a slug, not a record ID — search by name
+          const list = await pb.collection('market_data').getFullList({
+            $autoCancel: false,
+          });
+          res = list.find(r => slugify(r.marketName || r.name || '') === market) || null;
+        }
         setData(res);
       } catch (error) {
         console.error(error);
@@ -25,7 +36,14 @@ const MarketDetailPage = () => {
   }, [market]);
 
   if (loading) return <div className="container-default section-padding"><Skeleton className="h-[400px] rounded-2xl" /></div>;
-  if (!data) return <div className="container-default section-padding text-center">Market data not found</div>;
+  if (!data) return (
+    <div className="container-default section-padding text-center space-y-4">
+      <p>Market data not found</p>
+      <Link to="/markets" className="text-primary text-sm font-bold hover:underline flex items-center justify-center gap-1">
+        <ArrowLeft className="w-4 h-4" /> Back to Markets
+      </Link>
+    </div>
+  );
 
   return (
     <div className="container-default section-padding min-h-screen">
