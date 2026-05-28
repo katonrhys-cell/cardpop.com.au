@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
-import { FolderTree, Plus, RefreshCw, Loader2, AlertCircle, Info, Settings2 } from 'lucide-react';
+import { FolderTree, Plus, RefreshCw, Loader2, AlertCircle, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,7 +17,6 @@ import SubcategoryDragItem from '@/components/admin/SubcategoryDragItem.jsx';
 import BrandDragItem from '@/components/admin/BrandDragItem.jsx';
 import SeriesDragItem from '@/components/admin/SeriesDragItem.jsx';
 import DropZoneContainer from '@/components/admin/DropZoneContainer.jsx';
-import MigrationPanel from '@/components/admin/MigrationPanel.jsx';
 
 const TreeNode = ({ node, type, childrenNodes, onAddChild, onEdit, onDelete, onDropSuccess }) => {
   const [expanded, setExpanded] = useState(true);
@@ -209,10 +208,6 @@ const CategoryManagementPage = () => {
     if (!Object.values(errors).some(Boolean)) {
       toast.success('Hierarchy refreshed successfully');
     }
-  };
-
-  const handleMigrationComplete = () => {
-    loadAllData();
   };
 
   const handleAddChild = (parentNode, childType) => {
@@ -437,17 +432,6 @@ const CategoryManagementPage = () => {
 
       {isAdmin && (
         <Accordion type="single" collapsible className="w-full bg-transparent border-none">
-          <AccordionItem value="migration" className="border-none">
-            <AccordionTrigger className="bg-card px-4 py-3 rounded-xl border border-border shadow-sm hover:no-underline hover:bg-muted/50 transition-colors">
-              <div className="flex items-center gap-2 font-bold text-sm">
-                <Settings2 className="w-4 h-4 text-primary" />
-                Data Migration Tools
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="pt-4 pb-0">
-              <MigrationPanel onMigrationComplete={handleMigrationComplete} />
-            </AccordionContent>
-          </AccordionItem>
         </Accordion>
       )}
 

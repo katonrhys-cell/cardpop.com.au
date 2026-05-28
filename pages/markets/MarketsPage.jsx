@@ -279,6 +279,8 @@ const MarketsPage = () => {
     setSearchResult(null);
   };
 
+  const cardUrl = (card) => `/markets/card?name=${encodeURIComponent(card.name)}&set=${encodeURIComponent(card.set)}&collection=${encodeURIComponent(card.collection)}&price=${card.price}&change=${card.change}`;
+
   const MoverRow = ({ card }) => (
     <Link
       to={`/markets/${slugify(card.collection)}/${slugify(card.name)}`}
@@ -593,14 +595,15 @@ const MarketsPage = () => {
                     <p className="text-2xl font-bold">${card.price}</p>
                     <PriceBadge change={card.change} />
                   </div>
+                  <Link to={cardUrl(card)} className="w-full">
                   <Button
                     size="sm"
                     variant="outline"
                     className="w-full gap-1.5 text-xs"
-                    onClick={() => { setSearchInput(card.name); setSearchInput(card.name); setTimeout(() => handleSearch(), 0); }}
                   >
                     <Search className="w-3.5 h-3.5" /> Research this card
                   </Button>
+                  </Link>
                 </div>
               ))}
             </div>

@@ -1,27 +1,10 @@
-import dotenv from 'dotenv';
-dotenv.config();
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-
-import routes from './routes/index.js';
-import { errorMiddleware } from './middleware/error.js';
-import { globalRateLimit } from './middleware/global-rate-limit.js';
-import { sessionTimeoutMiddleware } from './middleware/sessionTimeout.js';
-import { csrfMiddleware } from './middleware/csrf.js';
-import { secureHeadersMiddleware } from './middleware/secureHeaders.js';
+import app from './app.js';
 import logger from './utils/logger.js';
-import { BodyLimit } from './constants/common.js';
-
-const app = express();
-
-app.set('trust proxy', true);
 
 process.on('uncaughtException', (error) => {
 	logger.error('Uncaught exception:', error);
 });
-  
+
 process.on('unhandledRejection', (reason, promise) => {
 	logger.error('Unhandled rejection at:', promise, 'reason:', reason);
 });
@@ -33,9 +16,7 @@ process.on('SIGINT', async () => {
 
 process.on('SIGTERM', async () => {
 	logger.info('SIGTERM signal received');
-
 	await new Promise(resolve => setTimeout(resolve, 3000));
-
 	logger.info('Exiting');
 	process.exit();
 });

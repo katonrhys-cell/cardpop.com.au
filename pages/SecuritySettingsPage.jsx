@@ -129,7 +129,7 @@ const SecuritySettingsPage = () => {
                   <p className="text-sm text-muted-foreground mb-4">
                     Change your password regularly to keep your account secure.
                   </p>
-                  <Button variant="outline" className="w-full font-bold" onClick={() => window.location.href = '/password-reset'}>
+                  <Button variant="outline" className="w-full font-bold" onClick={() => window.location.href = '/reset-password'}>
                     Update Password
                   </Button>
                 </CardContent>

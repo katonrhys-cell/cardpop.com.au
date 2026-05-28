@@ -85,9 +85,7 @@ const EventScraperPanel = ({ isOpen, onClose, onSaved }) => {
                 extractedData = data.eventData;
               }
             } catch (err) {
-              if (err.message !== "Unexpected end of JSON input") {
-                console.error("SSE parse error:", err);
-              }
+              // Silently skip non-JSON SSE lines (e.g. [DONE] from the AI proxy)
             }
           }
         }

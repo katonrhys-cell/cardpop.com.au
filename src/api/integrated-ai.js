@@ -171,6 +171,41 @@ export async function uploadImagesToPocketBase({ images }) {
 }
 
 /**
+ * One-shot AI call without conversation history or persistence.
+ * Intended for structured extraction tasks like card OCR.
+ *
+ * @param {{ systemPrompt: string, userMessage: ContentBlock[] }} params
+ * @returns {Promise<import('node:stream').Readable>}
+ */
+export async function streamOneShot({ systemPrompt, userMessage }) {
+	const response = await fetch(`${process.env.INTEGRATED_AI_API_URL}/generate`, {
+		method: 'POST',
+		headers: {
+			'Accept': 'text/event-stream',
+			'Content-Type': 'application/json',
+			'Authorization': `Bearer ${process.env.INTEGRATED_AI_API_KEY}`,
+			...(process.env.PROXY_ENTRANCE_ID && { 'X-Proxy-Entrance-Id': process.env.PROXY_ENTRANCE_ID }),
+		},
+		body: JSON.stringify({
+			website_id: process.env.WEBSITE_ID,
+			history: [mapUserMessage({ message: userMessage })],
+			system_prompt: systemPrompt,
+			stream: true,
+			environment: process.env.NODE_ENV === NodeEnv.Production ? 'prod' : 'dev',
+		}),
+	});
+
+	if (!response.ok) {
+		const errorBody = await response.text().catch(() => 'Unknown error');
+		throw new Error(`AI proxy request failed with status ${response.status}: ${errorBody}`);
+	}
+
+	const passThrough = new PassThrough();
+	Readable.fromWeb(response.body).pipe(passThrough);
+	return passThrough;
+}
+
+/**
  * Sends a message to the AI proxy and pipes SSE events to the client.
  * Assistant message is saved to PocketBase when the stream ends.
  * This method should be used for text/text, image/text, image/image, text/image combinations.

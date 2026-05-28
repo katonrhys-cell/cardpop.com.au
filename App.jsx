@@ -88,6 +88,7 @@ const TransactionHistoryPage = lazy(() => import('@/pages/TransactionHistoryPage
 
 // Markets & Analytics
 const MarketsPage = lazy(() => import('@/pages/markets/MarketsPage.jsx'));
+const CardAnalyticsPage = lazy(() => import('@/pages/markets/CardAnalyticsPage.jsx'));
 const MarketDetailPage = lazy(() => import('@/pages/markets/MarketDetailPage.jsx'));
 const MarketCategoryPage = lazy(() => import('@/pages/markets/MarketCategoryPage.jsx'));
 const AustralianMarketsPage = lazy(() => import('@/pages/AustralianMarketsPage.jsx'));
@@ -115,10 +116,9 @@ const UserManagementPage = lazy(() => import('@/pages/admin/UserManagementPage.j
 const UserDetailPage = lazy(() => import('@/pages/admin/UserDetailPage.jsx'));
 const OrderManagementPage = lazy(() => import('@/pages/admin/OrderManagementPage.jsx'));
 const AdminSettingsPage = lazy(() => import('@/pages/admin/AdminSettingsPage.jsx'));
-const EventsAdminPage = lazy(() => import('@/pages/admin/EventsAdminPage.jsx'));
+const EventsAdminPage = lazy(() => import('@/pages/admin/EventsManagementPage.jsx'));
 const ContentManagementPage = lazy(() => import('@/pages/admin/ContentManagementPage.jsx'));
 const SystemDiagnosticsPage = lazy(() => import('@/pages/admin/SystemDiagnosticsPage.jsx'));
-const CSVManagementPage = lazy(() => import('@/pages/CSVManagementPage.jsx'));
 const AnalyticsPage = lazy(() => import('@/pages/admin/AnalyticsPage.jsx'));
 const AnalyticsReportsPage = lazy(() => import('@/pages/admin/AnalyticsReportsPage.jsx'));
 const MediaLibraryPage = lazy(() => import('@/pages/admin/MediaLibraryPage.jsx'));
@@ -174,6 +174,7 @@ const App = () => {
                         <Route path="/login" element={<LoginPage />} />
                         <Route path="/signup" element={<SignupPage />} />
                         <Route path="/reset-password" element={<PasswordResetPage />} />
+                        <Route path="/forgot-password" element={<PasswordResetPage />} />
                         <Route path="/verification-pending" element={<VerificationPendingPage />} />
                         <Route path="/complete-profile/:token" element={<ProfileCompletionPage />} />
                         
@@ -233,6 +234,7 @@ const App = () => {
 
                         {/* Markets & Analytics */}
                         <Route path="/markets" element={<MarketsPage />} />
+                        <Route path="/markets/card" element={<CardAnalyticsPage />} />
                         <Route path="/markets/:category" element={<MarketCategoryPage />} />
                         <Route path="/markets/:category/:market" element={<MarketDetailPage />} />
                         <Route path="/australian-markets" element={<AustralianMarketsPage />} />
@@ -287,7 +289,6 @@ const App = () => {
                           <Route path="events-calendar" element={<EventsAdminPage />} />
                           <Route path="content" element={<ContentManagementPage />} />
                           <Route path="diagnostics" element={<SystemDiagnosticsPage />} />
-                          <Route path="csv-import" element={<CSVManagementPage />} />
                           <Route path="analytics" element={<AnalyticsReportsPage />} />
                           <Route path="analytics-reports" element={<AnalyticsReportsPage />} />
                           <Route path="media" element={<MediaLibraryPage />} />

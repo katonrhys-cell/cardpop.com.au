@@ -567,11 +567,12 @@ ${trimmedContent}`;
     sseStream.destroy();
   }, AI_PROCESSING_TIMEOUT);
 
-  // Collect all stream data for final validation
+  // Accumulate the AI-generated text content from integrated-ai SSE events
   let fullJsonResponse = '';
-  let validatedEventData = null;
 
-  // Handle stream data events for logging and JSON validation
+  // Each chunk from integrated-ai looks like:
+  //   data: {"type":"content","data":{"content":"...partial text..."}}\n\n
+  // We parse each line and collect only the text from 'content' type events.
   sseStream.on('data', (chunk) => {
     if (responseEnded) {
       logger.debug('[EVENT_SCRAPER] Ignoring data chunk after response ended');
@@ -581,22 +582,22 @@ ${trimmedContent}`;
     const chunkStr = chunk.toString();
     logger.debug(`[EVENT_SCRAPER] Stream data chunk received: ${chunkStr.substring(0, 100)}...`);
 
-    // Collect JSON response
-    if (chunkStr.startsWith('data: ')) {
-      try {
-        const jsonStr = chunkStr.substring(6).trim();
-        fullJsonResponse += jsonStr;
-        logger.debug('[EVENT_SCRAPER] JSON chunk collected');
+    const lines = chunkStr.split('\n');
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      if (!trimmedLine.startsWith('data: ')) continue;
 
-        // Try to parse and validate the JSON
-        try {
-          validatedEventData = parseAndValidateEventJson(jsonStr);
-          logger.info('[EVENT_SCRAPER] Event data successfully parsed and validated');
-        } catch (validationError) {
-          logger.warn(`[EVENT_SCRAPER] Validation error (will retry on stream end): ${validationError.message}`);
+      const jsonStr = trimmedLine.substring(6).trim();
+      if (!jsonStr) continue;
+
+      try {
+        const event = JSON.parse(jsonStr);
+        if (event.type === 'content' && event.data?.content) {
+          fullJsonResponse += event.data.content;
+          logger.debug('[EVENT_SCRAPER] Content chunk accumulated');
         }
-      } catch (parseError) {
-        logger.warn(`[EVENT_SCRAPER] Error processing JSON chunk: ${parseError.message}`);
+      } catch (e) {
+        logger.debug('[EVENT_SCRAPER] Skipping non-JSON SSE line');
       }
     }
   });
@@ -613,7 +614,7 @@ ${trimmedContent}`;
       // Final validation of collected JSON
       if (fullJsonResponse) {
         try {
-          validatedEventData = parseAndValidateEventJson(fullJsonResponse);
+          const validatedEventData = parseAndValidateEventJson(fullJsonResponse);
           logger.info('[EVENT_SCRAPER] Final event data validation successful');
           logger.debug(`[EVENT_SCRAPER] Extracted event: ${validatedEventData.name}`);
 

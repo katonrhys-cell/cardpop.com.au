@@ -19,13 +19,16 @@ import VaultDropdown from '@/components/VaultDropdown.jsx';
 import SearchBar from '@/components/SearchBar.jsx';
 
 export const TCG_COLLECTIONS = [
-  'Pokemon', 'Magic: The Gathering', 'Yu-Gi-Oh', 'Digimon', 
-  'Riftbound', 'TMNT', 'Final Fantasy', 'Disney Lorcana', 'One Piece'
+  'Pokemon', 'Magic: The Gathering', 'Yu-Gi-Oh', 'Digimon',
+  'Riftbound', 'TMNT', 'Final Fantasy', 'Disney Lorcana', 'One Piece',
+  'Flesh and Blood', 'Dragon Ball Super', 'Star Wars Unlimited',
+  'Weiss Schwarz', 'Cardfight!! Vanguard',
 ];
 
 export const SPORTS_COLLECTIONS = [
-  'NBA', 'NFL', 'MLB', 'Cricket', 'NRL', 'Formula 1', 
-  'Wrestling', 'Golf', 'Soccer', 'AFL', 'Tennis', 'UFC'
+  'NBA', 'NFL', 'MLB', 'Cricket', 'NRL', 'NHL', 'Formula 1',
+  'Wrestling', 'Golf', 'Soccer', 'AFL', 'AFLW', 'Rugby Union',
+  'Boxing', 'MMA', 'Tennis', 'UFC',
 ];
 
 export const COLLECTIONS_LIST = [...TCG_COLLECTIONS, ...SPORTS_COLLECTIONS].sort();
@@ -39,6 +42,7 @@ const NAV_LINKS = [
   { label: 'Community', href: '/community' },
   { label: 'Events', href: '/community/events' },
   { label: 'Grading', href: '/grading' },
+  { label: 'About', href: '/about' },
 ];
 
 const ADMIN_LINKS = [
@@ -330,41 +334,19 @@ const Header = () => {
       }`}
     >
       <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-wrap items-center justify-between py-3 md:py-0 md:min-h-20 transition-all duration-300">
-          
-          <Link to="/" className="shrink-0 mr-2 lg:mr-4 xl:mr-8 text-2xl" onClick={() => setMobileMenuOpen(false)}>
-            <CardPopLogo variant="header" iconClassName="w-7 h-[34px]" />
+
+        {/* ── Row 1: Logo + Search + actions ── */}
+        <div className="flex items-center justify-between py-2.5 border-b border-border/40">
+
+          <Link to="/" className="shrink-0 text-2xl" onClick={() => setMobileMenuOpen(false)}>
+            <CardPopLogo variant="full" iconClassName="w-7 h-[34px]" />
           </Link>
 
-          <nav className="hidden lg:flex items-center gap-0.5 xl:gap-1 mr-auto shrink-0">
-            <BrowseDropdown onNavigate={() => setMobileMenuOpen(false)} />
-            {NAV_LINKS.map((link) => {
-              const isActive = isNavLinkActive(link);
-              return (
-                <Link
-                  key={link.label}
-                  to={link.href}
-                  className={`px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
-                    isActive 
-                      ? 'bg-primary text-primary-foreground shadow-sm' 
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              );
-            })}
-          </nav>
-
-          <div className="w-full order-last mt-3 md:mt-0 md:order-none md:flex-1 md:max-w-[160px] xl:max-w-xs md:mx-2 xl:mx-4 shrink-1">
-            <SearchBar 
-              onSearchChange={handleGlobalSearch} 
-              placeholder="Search..." 
-            />
+          {/* Search bar — centred, takes available space */}
+          <div className="hidden lg:block flex-1 max-w-2xl mx-8">
+            <SearchBar onSearchChange={handleGlobalSearch} placeholder="Search cards, sets, sellers..." />
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 xl:gap-4 shrink-0">
-            
             {isAdmin && (
               <Button asChild variant="ghost" size="sm" className="hidden xl:flex gap-2 text-[hsl(var(--admin-warning,24.6_95%_53.1%))] hover:text-[hsl(var(--admin-warning,24.6_95%_53.1%))] hover:bg-[hsl(var(--admin-warning,24.6_95%_53.1%))]/10 rounded-xl">
                 <Link to="/admin">
@@ -419,29 +401,28 @@ const Header = () => {
             >
               <ShoppingCart className="h-5 w-5" />
               {cartItemCount > 0 && (
-                <Badge 
-                  className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px] bg-primary text-primary-foreground border-none font-bold tabular-nums shadow-sm"
-                >
+                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px] bg-primary text-primary-foreground border-none font-bold tabular-nums shadow-sm">
                   {cartItemCount > 99 ? '99+' : cartItemCount}
                 </Badge>
               )}
             </Button>
 
-            <div className="hidden md:block shrink-0">
+            <div className="hidden md:flex items-center gap-2 shrink-0">
               {isAuthenticated ? (
                 <VaultDropdown isMobile={false} />
               ) : (
-                <div className="flex items-center gap-2">
+                <>
                   <Button asChild variant="ghost" size="sm" className="font-bold hidden xl:inline-flex rounded-xl">
                     <Link to="/login">Login</Link>
                   </Button>
                   <Button asChild size="sm" className="font-bold rounded-xl shadow-sm tracking-wide">
                     <Link to="/signup">Join Vault</Link>
                   </Button>
-                </div>
+                </>
               )}
             </div>
 
+            {/* Mobile hamburger */}
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="lg:hidden shrink-0 rounded-xl relative" aria-label="Open Menu">
@@ -455,12 +436,15 @@ const Header = () => {
                 <SheetHeader className="p-6 border-b border-border text-left bg-muted/30 shrink-0">
                   <SheetTitle asChild>
                     <span className="text-2xl">
-                      <CardPopLogo variant="header" iconClassName="w-7 h-[34px]" />
+                      <CardPopLogo variant="full" iconClassName="w-7 h-[34px]" />
                     </span>
                   </SheetTitle>
                 </SheetHeader>
-                
+
                 <div className="flex-1 overflow-y-auto py-6 px-4">
+                  {/* Mobile Browse Collections */}
+                  <MobileBrowseSection onNavigate={() => setMobileMenuOpen(false)} />
+
                   <nav className="flex flex-col gap-1.5 mb-6">
                     {NAV_LINKS.map((link) => {
                       const isActive = isNavLinkActive(link);
@@ -479,9 +463,6 @@ const Header = () => {
                       );
                     })}
                   </nav>
-
-                  {/* Mobile Browse Collections */}
-                  <MobileBrowseSection onNavigate={() => setMobileMenuOpen(false)} />
 
                   {isAdmin && (
                     <div className="mb-8">
@@ -551,6 +532,30 @@ const Header = () => {
 
           </div>
         </div>
+
+        {/* ── Row 2: Nav links (desktop only) ── */}
+        <div className="hidden lg:flex items-center gap-1 py-1.5">
+          <nav className="flex items-center gap-0.5 xl:gap-1">
+            <BrowseDropdown onNavigate={() => setMobileMenuOpen(false)} />
+            {NAV_LINKS.map((link) => {
+              const isActive = isNavLinkActive(link);
+              return (
+                <Link
+                  key={link.label}
+                  to={link.href}
+                  className={`px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+                    isActive
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
       </div>
     </header>
   );
