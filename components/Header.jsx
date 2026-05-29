@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ShoppingCart, Menu, Shield, MessageSquare, ArrowRightLeft,
   LayoutDashboard, Package, Users, Calendar, FileText, Building2, Layers, CheckCircle,
-  Sun, Moon, ChevronDown, ArrowRight, Layers2
+  Sun, Moon, ChevronDown, ArrowRight, Layers2, User, LogOut, Settings
 } from 'lucide-react';
 import { useDarkMode } from '@/hooks/useDarkMode.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -243,8 +243,54 @@ const BrowseDropdown = ({ onNavigate }) => {
   );
 };
 
+// Plain inline account section — no nested Radix portals inside the Sheet Dialog
+const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout }) => {
+  const [expanded, setExpanded] = useState(false);
+  if (!currentUser) return null;
+  return (
+    <div className="w-full">
+      <button
+        className="w-full flex items-center gap-3 h-14 px-4 rounded-xl bg-muted/30 hover:bg-muted/50 border border-border/50 transition-colors"
+        onClick={() => setExpanded(o => !o)}
+      >
+        <div className="relative h-8 w-8 rounded-full overflow-hidden shrink-0 bg-primary/10 flex items-center justify-center">
+          {currentUser.avatar_url ? (
+            <img src={currentUser.avatar_url} alt={currentUser.name} className="h-full w-full object-cover" />
+          ) : (
+            <User className="h-4 w-4 text-primary" />
+          )}
+        </div>
+        <div className="flex flex-col items-start overflow-hidden flex-1">
+          <span className="text-sm font-bold truncate w-full text-left">{currentUser.name || 'Collector'}</span>
+          <span className="text-xs text-muted-foreground truncate w-full text-left">View Profile Options</span>
+        </div>
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
+      </button>
+      {expanded && (
+        <div className="mt-1 flex flex-col gap-0.5 pl-2">
+          <Link to="/account" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
+            <LayoutDashboard className="w-4 h-4" /> Dashboard
+          </Link>
+          <Link to="/my-vault" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
+            <Package className="w-4 h-4" /> My Vault
+          </Link>
+          <Link to="/trade-requests" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
+            <ArrowRightLeft className="w-4 h-4" /> Trade Requests
+          </Link>
+          <Link to="/account/profile" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
+            <Settings className="w-4 h-4" /> Account Settings
+          </Link>
+          <button onClick={onLogout} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-destructive/10 text-destructive transition-colors text-sm font-medium w-full text-left">
+            <LogOut className="w-4 h-4" /> Log out
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Header = () => {
-  const { isAuthenticated, currentUser, isAdmin } = useAuth();
+  const { isAuthenticated, currentUser, isAdmin, logout, isVerified } = useAuth();
   const { cartItems, setIsCartOpen } = useCart();
   const location = useLocation();
   const navigate = useNavigate();
@@ -319,6 +365,12 @@ const Header = () => {
       navigate(`/marketplace?q=${encodeURIComponent(query)}`);
       setMobileMenuOpen(false);
     }
+  };
+
+  const handleMobileLogout = () => {
+    logout();
+    setMobileMenuOpen(false);
+    navigate('/');
   };
 
   const isNavLinkActive = (link) => {
@@ -440,7 +492,7 @@ const Header = () => {
                   )}
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[85vw] sm:w-[350px] p-0 flex flex-col border-l border-border bg-background overflow-hidden">
+              <SheetContent side="right" className="w-[85vw] sm:w-[350px] p-0 flex flex-col border-l border-border bg-background">
                 <SheetHeader className="p-6 border-b border-border text-left bg-muted/30 shrink-0">
                   <SheetTitle asChild>
                     <span className="text-2xl">
@@ -509,13 +561,13 @@ const Header = () => {
 
                   {isAuthenticated && (
                     <div className="grid grid-cols-2 gap-3 mb-8">
-                      <Button asChild variant="outline" className="w-full justify-center rounded-xl h-12 font-bold">
+                      <Button asChild variant="outline" className="w-full justify-center rounded-xl h-12 font-bold" onClick={() => setMobileMenuOpen(false)}>
                         <Link to="/verify-account" className="flex items-center gap-2 text-xs px-1">
                           <CheckCircle className="w-4 h-4" />
                           Verify
                         </Link>
                       </Button>
-                      <Button asChild variant="outline" className="w-full justify-center rounded-xl h-12 font-bold">
+                      <Button asChild variant="outline" className="w-full justify-center rounded-xl h-12 font-bold" onClick={() => setMobileMenuOpen(false)}>
                         <Link to="/trade-requests" className="flex items-center gap-2 text-xs px-1">
                           <ArrowRightLeft className="w-4 h-4" />
                           Trades
@@ -536,14 +588,19 @@ const Header = () => {
                     {isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
                   </Button>
                   {isAuthenticated ? (
-                    <VaultDropdown isMobile={true} />
+                    <MobileAccountSection
+                      currentUser={currentUser}
+                      isVerified={isVerified}
+                      onNavigate={() => setMobileMenuOpen(false)}
+                      onLogout={handleMobileLogout}
+                    />
                   ) : (
                     <div className="flex flex-col gap-3">
                       <Button asChild variant="default" className="w-full rounded-xl h-12 font-bold tracking-wide text-base shadow-sm">
-                        <Link to="/signup">Join Vault</Link>
+                        <Link to="/signup" onClick={() => setMobileMenuOpen(false)}>Join Vault</Link>
                       </Button>
                       <Button asChild variant="outline" className="w-full rounded-xl h-12 font-bold text-base">
-                        <Link to="/login">Sign In</Link>
+                        <Link to="/login" onClick={() => setMobileMenuOpen(false)}>Sign In</Link>
                       </Button>
                     </div>
                   )}
