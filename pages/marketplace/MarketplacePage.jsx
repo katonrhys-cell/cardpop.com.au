@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import { toast } from 'sonner';
+import { CARD_VARIANTS } from '@/lib/cardVariants.js';
 
 const MarketplacePage = () => {
   const [listings, setListings] = useState([]);
@@ -16,7 +17,8 @@ const MarketplacePage = () => {
   const [error, setError] = useState(null);
   
   const [sort, setSort] = useState('-created');
-  const [filterType, setFilterType] = useState('All'); 
+  const [filterType, setFilterType] = useState('All');
+  const [filterVariant, setFilterVariant] = useState('');
   
   // Category Filter States
   const { buildNameMap, getCategories, getSubcategoriesByCategory, getBrandsBySubcategory, getSeriesByBrand } = useCategories();
@@ -72,6 +74,7 @@ const MarketplacePage = () => {
       if (filterSub) { shopFilter += ` && subcategoryId="${filterSub}"`; vaultFilter += ` && subcategoryId="${filterSub}"`; }
       if (filterBrand) { shopFilter += ` && brandId="${filterBrand}"`; vaultFilter += ` && brandId="${filterBrand}"`; }
       if (filterSeries) { shopFilter += ` && seriesId="${filterSeries}"`; vaultFilter += ` && seriesId="${filterSeries}"`; }
+      if (filterVariant) vaultFilter += ` && cardVariants~"${filterVariant}"`;
 
       if (filterType === 'For Sale') {
         vaultFilter += ' && (listing_type="For Sale" || listing_type="For Sale & Trade")';
@@ -106,7 +109,7 @@ const MarketplacePage = () => {
     } finally {
       if (isMounted.current) setLoading(false);
     }
-  }, [sort, filterType, filterCat, filterSub, filterBrand, filterSeries]);
+  }, [sort, filterType, filterVariant, filterCat, filterSub, filterBrand, filterSeries]);
 
   useEffect(() => {
     isMounted.current = true;
@@ -120,6 +123,7 @@ const MarketplacePage = () => {
     setFilterBrand('');
     setFilterSeries('');
     setFilterType('All');
+    setFilterVariant('');
   };
 
   const getBreadcrumbPath = () => {
@@ -169,7 +173,14 @@ const MarketplacePage = () => {
             <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Series" /></SelectTrigger>
             <SelectContent>{seriesOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
           </Select>
-          {(filterCat || filterSub || filterBrand || filterSeries || filterType !== 'All') && (
+          <Select value={filterVariant} onValueChange={setFilterVariant}>
+            <SelectTrigger className="w-[170px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="Card Variant" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Variants</SelectItem>
+              {CARD_VARIANTS.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          {(filterCat || filterSub || filterBrand || filterSeries || filterVariant || filterType !== 'All') && (
             <Button variant="ghost" onClick={clearFilters} className="rounded-xl text-muted-foreground hover:text-foreground ml-auto">
               <X className="w-4 h-4 mr-2" /> Clear All Filters
             </Button>
