@@ -1,6 +1,6 @@
 
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { Toaster } from '@/components/ui/sonner';
 
@@ -36,6 +36,8 @@ const NotFoundPage = lazy(() => import('@/pages/NotFoundPage.jsx'));
 
 // Collections
 const CollectionPage = lazy(() => import('@/pages/collections/CollectionPage.jsx'));
+// Forces CollectionPage to fully remount when the slug changes, resetting all filter/state
+const CollectionRoute = () => { const { collectionSlug } = useParams(); return <CollectionPage key={collectionSlug} />; };
 
 // Marketplace
 const MarketplacePage = lazy(() => import('@/pages/marketplace/MarketplacePage.jsx'));
@@ -179,7 +181,7 @@ const App = () => {
                         <Route path="/complete-profile/:token" element={<ProfileCompletionPage />} />
                         
                         {/* Collections */}
-                        <Route path="/collections/:collectionSlug" element={<CollectionPage />} />
+                        <Route path="/collections/:collectionSlug" element={<CollectionRoute />} />
 
                         {/* Marketplace */}
                         <Route path="/marketplace" element={<MarketplacePage />} />
