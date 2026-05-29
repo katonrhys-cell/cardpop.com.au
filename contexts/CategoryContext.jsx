@@ -13,8 +13,8 @@ export const CategoryHierarchyProvider = ({ children }) => {
       try {
         setLoading(true);
         const data = await getCategoryHierarchy();
-        if (data && data.categories) {
-          setHierarchy(data.categories);
+        if (Array.isArray(data) && data.length > 0) {
+          setHierarchy(data);
         } else {
           // Fallback static structure if DB doesn't have it yet
           setHierarchy([
