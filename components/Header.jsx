@@ -37,7 +37,7 @@ const NAV_LINKS = [
   { label: 'Home', href: '/' },
   { label: 'Shop', href: '/shop' },
   { label: 'Marketplace', href: '/marketplace' },
-  { label: 'Analytics', href: '/markets' },
+  { label: 'Analytics', href: '/analytics' },
   { label: 'Blog', href: '/blog' },
   { label: 'Community', href: '/community' },
   { label: 'Events', href: '/community/events' },

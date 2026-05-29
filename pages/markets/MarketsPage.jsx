@@ -265,11 +265,11 @@ const MarketsPage = () => {
     setSearchResult(null);
   };
 
-  const cardUrl = (card) => `/markets/card?name=${encodeURIComponent(card.name)}&set=${encodeURIComponent(card.set)}&collection=${encodeURIComponent(card.collection)}&price=${card.price}&change=${card.change}`;
+  const cardUrl = (card) => `/analytics/card?name=${encodeURIComponent(card.name)}&set=${encodeURIComponent(card.set)}&collection=${encodeURIComponent(card.collection)}&price=${card.price}&change=${card.change}`;
 
   const MoverRow = ({ card }) => (
     <Link
-      to={`/markets/${slugify(card.collection)}/${slugify(card.name)}`}
+      to={`/analytics/${slugify(card.collection)}/${slugify(card.name)}`}
       className="flex items-center gap-3 py-3 px-4 hover:bg-muted/30 rounded-xl transition-colors group"
     >
       <div className="flex-1 min-w-0">

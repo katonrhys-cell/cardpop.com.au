@@ -1,6 +1,6 @@
 
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { Toaster } from '@/components/ui/sonner';
 
@@ -235,10 +235,12 @@ const App = () => {
                         <Route path="/transactions" element={<ProtectedRoute><TransactionHistoryPage /></ProtectedRoute>} />
 
                         {/* Markets & Analytics */}
-                        <Route path="/markets" element={<MarketsPage />} />
-                        <Route path="/markets/card" element={<CardAnalyticsPage />} />
-                        <Route path="/markets/:category" element={<MarketCategoryPage />} />
-                        <Route path="/markets/:category/:market" element={<MarketDetailPage />} />
+                        <Route path="/analytics" element={<MarketsPage />} />
+                        <Route path="/analytics/card" element={<CardAnalyticsPage />} />
+                        <Route path="/analytics/:category" element={<MarketCategoryPage />} />
+                        <Route path="/analytics/:category/:market" element={<MarketDetailPage />} />
+                        <Route path="/markets" element={<Navigate to="/analytics" replace />} />
+                        <Route path="/markets/*" element={<Navigate to="/analytics" replace />} />
                         <Route path="/australian-markets" element={<AustralianMarketsPage />} />
                         
                         {/* Grading */}
