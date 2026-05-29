@@ -3,13 +3,31 @@ import { Link } from 'react-router-dom';
 import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 const EventDetailCard = ({ event }) => {
   const isTradeShow = event.type === 'Trade Show';
 
   const handleShare = (platform) => {
-    // Placeholder share functionality
-    console.log(`Sharing on ${platform}`);
+    const url = encodeURIComponent(window.location.href);
+    const text = encodeURIComponent(`Check out ${event.name}!`);
+
+    const shareUrls = {
+      Facebook: `https://www.facebook.com/sharer/sharer.php?u=${url}`,
+      Twitter: `https://twitter.com/intent/tweet?text=${text}&url=${url}`,
+      LinkedIn: `https://www.linkedin.com/sharing/share-offsite/?url=${url}`,
+    };
+
+    if (platform === 'Link') {
+      navigator.clipboard.writeText(window.location.href).then(() => {
+        toast.success('Link copied to clipboard!');
+      }).catch(() => {
+        toast.error('Failed to copy link.');
+      });
+      return;
+    }
+
+    window.open(shareUrls[platform], '_blank', 'noopener,noreferrer,width=600,height=400');
   };
 
   return (
