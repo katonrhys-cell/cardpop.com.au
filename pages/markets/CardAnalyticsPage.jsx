@@ -108,9 +108,7 @@ const InvestmentSignal = ({ change7d, change30d }) => {
 
 // ─── Marketplace listing card (compact) ─────────────────────────────────────
 const ListingCard = ({ listing }) => {
-  const imgUrl = listing.images?.[0]
-    ? pb.files.getUrl(listing, listing.images[0])
-    : listing.image || null;
+  const imgUrl = listing.vault_images?.[0]?.image_url || listing.image_url || listing.image || null;
   return (
     <div className="flex gap-4 bg-card border border-border rounded-2xl p-4 hover:shadow-md hover:border-primary/40 transition-all">
       <div className="w-16 h-20 flex-shrink-0 bg-muted rounded-xl overflow-hidden">

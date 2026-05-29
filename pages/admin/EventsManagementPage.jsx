@@ -154,7 +154,7 @@ const EventsManagementPage = () => {
                         <div className="w-16 h-12 bg-background rounded-lg flex items-center justify-center shrink-0 overflow-hidden border border-border shadow-sm">
                           {event.image ? (
                             <img 
-                              src={pb.files.getUrl(event, event.image)} 
+                              src={event.image_url || event.image} 
                               alt={event.name} 
                               className="w-full h-full object-cover" 
                             />

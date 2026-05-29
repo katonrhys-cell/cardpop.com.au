@@ -15,9 +15,8 @@ const getStatusBadge = (listingType) => {
 };
 
 const VaultListingCard = ({ vaultItem }) => {
-  const imageUrl = vaultItem.images?.[0];
-  const imgSrc = imageUrl ? pb.files.getUrl(vaultItem, imageUrl) : null;
-  const sellerId = vaultItem.user_id;
+  const imgSrc = vaultItem.vault_images?.[0]?.image_url || vaultItem.image_url || null;
+  const sellerId = vaultItem.user_id || vaultItem.owner_id;
   const sellerObj = vaultItem.expand?.user_id;
   
   const badgeConfig = getStatusBadge(vaultItem.listing_type);
@@ -88,8 +87,8 @@ const VaultListingCard = ({ vaultItem }) => {
               className="flex items-center gap-2 group/seller p-2 -mx-2 rounded-xl hover:bg-muted/50 transition-colors"
             >
               <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
-                {sellerObj?.profile_photo_or_character ? (
-                  <img src={pb.files.getUrl(sellerObj, sellerObj.profile_photo_or_character)} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" />
+                {sellerObj?.avatar_url ? (
+                  <img src={sellerObj.avatar_url} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" />
                 ) : (
                   (sellerObj?.display_name || sellerObj?.name || 'U')[0].toUpperCase()
                 )}

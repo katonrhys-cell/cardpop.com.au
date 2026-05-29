@@ -283,7 +283,7 @@ const ProductLinesManagementPage = () => {
                       <TableCell className="text-center">
                         <div className="w-10 h-10 rounded-xl bg-background border border-border flex items-center justify-center mx-auto overflow-hidden shadow-sm p-1">
                           {line.image ? (
-                            <img src={pb.files.getUrl(line, line.image)} alt={line.name} className="w-full h-full object-contain" />
+                            <img src={line.image_url || line.image} alt={line.name} className="w-full h-full object-contain" />
                           ) : (
                             <ImageOff className="w-4 h-4 text-muted-foreground opacity-50" />
                           )}

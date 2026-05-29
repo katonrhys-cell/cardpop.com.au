@@ -246,7 +246,7 @@ const EventsAdminPage = () => {
                         {event.image ? (
                           <div className="w-16 h-10 rounded overflow-hidden border border-border bg-muted shrink-0 shadow-sm">
                             <img 
-                              src={pb.files.getUrl(event, event.image, { thumb: '100x100' })} 
+                              src={event.image_url || event.image} 
                               alt={event.name} 
                               className="w-full h-full object-cover"
                             />

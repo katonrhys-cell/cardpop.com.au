@@ -1,29 +1,22 @@
-import { Buffer } from 'node:buffer';
-import Pocketbase from 'pocketbase';
+import { supabase } from '../utils/supabaseClient.js';
 
-export async function pocketbaseAuth(req, res, next) {
-	const token = req.headers.authorization?.split(' ')?.[1];
+export async function supabaseAuth(req, res, next) {
+  const token = req.headers.authorization?.split(' ')?.[1];
 
-	if (!token) {
-		return next();
-	}
+  if (!token) {
+    return next();
+  }
 
-	const base64Decoded = Buffer.from(token, 'base64').toString('utf-8');
-
-	try {
-		const tokenData = JSON.parse(base64Decoded);
-		if (!tokenData?.record) {
-			return next();
-		}
-		// by refreshing token we verify that it was not intercepted by a malicious user
-		const pocketbaseClient = new Pocketbase('http://localhost:8090');
-		pocketbaseClient.authStore.save(tokenData.token, tokenData.record);
-		const newToken = await pocketbaseClient.collection(tokenData.record.collectionName).authRefresh();
-
-		req.pocketbaseUserId = newToken.record.id;
-
-		return next();
-	} catch (error) {
-		return next(new Error(error.message));
-	}
+  try {
+    const { data, error } = await supabase.auth.getUser(token);
+    if (!error && data?.user) {
+      req.userId = data.user.id;
+    }
+    return next();
+  } catch (error) {
+    return next(new Error(error.message));
+  }
 }
+
+// Keep backward-compatible alias
+export const pocketbaseAuth = supabaseAuth;

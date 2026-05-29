@@ -39,8 +39,7 @@ const CardSkeleton = () => (
 
 // ─── Mini listing card for horizontal scroll sections ────────────────────────
 const MiniListingCard = ({ listing, accentHex, badge }) => {
-  const imageUrl = listing.images?.[0];
-  const imgSrc = imageUrl ? pb.files.getUrl(listing, imageUrl) : null;
+  const imgSrc = listing.vault_images?.[0]?.image_url || listing.image_url || listing.image || null;
   const price = listing.price ?? listing.sale_price ?? 0;
   const title = listing.title ?? listing.cardName ?? listing.name ?? 'Untitled';
   const source = listing.source ?? 'vault';
@@ -99,14 +98,12 @@ const MiniListingCard = ({ listing, accentHex, badge }) => {
 
 // ─── Holy grail card (featured picks) ───────────────────────────────────────
 const HolyGrailCard = ({ card, accentHex }) => {
-  const imageUrl = card.images?.[0] ?? card.image;
-  const imgSrc = imageUrl ? pb.files.getUrl(card, imageUrl) : null;
-  const price = card.price ?? card.sale_price ?? 0;
-  const title = card.title ?? card.cardName ?? card.name ?? 'Featured Card';
-  const sellerName = card.expand?.seller?.name ?? card.expand?.owner?.name ?? card.expand?.owner?.username ?? 'Seller';
-  const sellerAvatar = card.expand?.seller?.avatar ?? card.expand?.owner?.avatar;
-  const sellerId = card.seller ?? card.owner;
-  const avatarSrc = sellerAvatar ? pb.files.getUrl(card.expand?.seller ?? card.expand?.owner, sellerAvatar) : null;
+  const imgSrc = card.vault_images?.[0]?.image_url || card.image_url || card.image || null;
+  const price = card.price ?? card.asking_price_aud ?? card.sale_price ?? 0;
+  const title = card.card_name ?? card.title ?? card.name ?? 'Featured Card';
+  const sellerName = card.owner?.display_name || card.owner?.username || 'Seller';
+  const sellerId = card.owner_id;
+  const avatarSrc = card.owner?.avatar_url || null;
   const source = card.source ?? 'vault';
   const detailPath = `/product/${source}/${card.id}`;
 

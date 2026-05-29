@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import pb from '../utils/pocketbaseClient.js';
+import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 
 async function authMiddleware(req, res, next) {
@@ -12,15 +12,14 @@ async function authMiddleware(req, res, next) {
   const token = authHeader.substring(7);
 
   try {
-    pb.authStore.save(token);
-    const user = pb.authStore.record;
+    const { data, error } = await supabase.auth.getUser(token);
 
-    if (!user) {
-      return res.status(401).json({ error: 'Invalid token' });
+    if (error || !data?.user) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
     }
 
-    req.user = user;
-    req.pb = pb;
+    req.user = data.user;
+    req.supabase = supabase;
     next();
   } catch (error) {
     logger.error('Auth middleware error:', error);

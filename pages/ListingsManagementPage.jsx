@@ -252,7 +252,7 @@ const ListingsManagementPage = () => {
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded bg-muted flex items-center justify-center overflow-hidden shrink-0">
                             {listing.image ? (
-                              <img src={pb.files.getUrl(listing, listing.image)} alt={listing.name} className="w-full h-full object-cover" />
+                              <img src={listing.image_url || listing.image} alt={listing.name} className="w-full h-full object-cover" />
                             ) : (
                               <span className="text-xs font-medium text-muted-foreground">Img</span>
                             )}

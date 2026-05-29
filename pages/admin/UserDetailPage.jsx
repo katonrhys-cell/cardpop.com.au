@@ -58,12 +58,13 @@ const UserDetailPage = () => {
     );
   }
 
-  const avatarUrl = user.avatar ? pb.files.getUrl(user, user.avatar) : null;
-  const initials = user.name ? user.name.substring(0, 2).toUpperCase() : user.email.substring(0, 2).toUpperCase();
+  const avatarUrl = user.avatar_url || null;
+  const displayName = user.display_name || user.username || user.email;
+  const initials = displayName.substring(0, 2).toUpperCase();
 
   return (
     <div className="w-full space-y-8 animate-in fade-in duration-300 py-6 px-4 sm:px-6 md:px-8 max-w-7xl mx-auto">
-      <Helmet><title>{user.name || user.email} | User Details</title></Helmet>
+      <Helmet><title>{displayName} | User Details</title></Helmet>
 
       {/* Header Navigation */}
       <div className="flex items-center gap-3">
@@ -77,10 +78,10 @@ const UserDetailPage = () => {
         <Card className="border-border shadow-sm rounded-2xl lg:col-span-1 h-fit">
           <CardContent className="p-6 flex flex-col items-center text-center">
             <Avatar className="w-24 h-24 mb-4 border-4 border-background shadow-sm">
-              <AvatarImage src={avatarUrl} alt={user.name} />
+              <AvatarImage src={avatarUrl} alt={displayName} />
               <AvatarFallback className="text-2xl bg-primary/10 text-primary">{initials}</AvatarFallback>
             </Avatar>
-            <h2 className="text-2xl font-bold font-serif">{user.name || 'Unnamed User'}</h2>
+            <h2 className="text-2xl font-bold font-serif">{displayName}</h2>
             <p className="text-muted-foreground mb-4">@{user.username || user.id}</p>
             
             <div className="flex flex-wrap justify-center gap-2 mb-6">
@@ -100,7 +101,7 @@ const UserDetailPage = () => {
               </div>
               <div className="flex items-center gap-3 text-muted-foreground">
                 <Calendar className="w-4 h-4 shrink-0" />
-                <span className="truncate text-foreground">Joined {new Date(user.created).toLocaleDateString()}</span>
+                <span className="truncate text-foreground">Joined {new Date(user.created_at).toLocaleDateString()}</span>
               </div>
             </div>
 

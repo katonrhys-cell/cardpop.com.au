@@ -216,7 +216,7 @@ const MediaLibraryPage = () => {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
             {media.map((item) => {
-              const imageUrl = item.image ? pb.files.getUrl(item, item.image) : item.url;
+              const imageUrl = item.file_url || item.url;
               
               return (
                 <Card key={item.id} className="overflow-hidden group border-border shadow-sm hover:shadow-md transition-all">
@@ -260,7 +260,7 @@ const MediaLibraryPage = () => {
                       {item.filename}
                     </p>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">
-                      {new Date(item.created).toLocaleDateString()}
+                      {new Date(item.created_at).toLocaleDateString()}
                     </p>
                   </div>
                 </Card>
