@@ -396,16 +396,21 @@ const Header = () => {
       <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* ── Row 1: Logo + Search + actions ── */}
-        <div className="flex items-center justify-between py-2.5 border-b border-border/40">
+        <div className="relative flex items-center py-3 border-b border-border/40">
 
-          <Link to="/" className="shrink-0 text-2xl" onClick={() => setMobileMenuOpen(false)}>
-            <CardPopLogo variant="full" iconClassName="w-7 h-[34px]" />
+          <Link to="/" className="shrink-0 relative z-10" onClick={() => setMobileMenuOpen(false)}>
+            <CardPopLogo variant="full" iconClassName="w-9 h-[44px]" />
           </Link>
 
-          {/* Search bar — centred, takes available space */}
-          <div className="hidden lg:block flex-1 max-w-2xl mx-8">
-            <SearchBar onSearchChange={handleGlobalSearch} placeholder="Search cards, sets, sellers..." />
+          {/* Search — absolutely centred so it always sits at the true visual midpoint */}
+          <div className="absolute inset-x-0 hidden lg:flex justify-center pointer-events-none">
+            <div className="w-full max-w-xl pointer-events-auto px-4">
+              <SearchBar onSearchChange={handleGlobalSearch} placeholder="Search cards, sets, sellers..." />
+            </div>
           </div>
+
+          {/* Spacer pushes all action icons to the right edge */}
+          <div className="flex-1" />
 
             {isAdmin && (
               <Button asChild variant="ghost" size="sm" className="hidden xl:flex gap-2 text-[hsl(var(--admin-warning,24.6_95%_53.1%))] hover:text-[hsl(var(--admin-warning,24.6_95%_53.1%))] hover:bg-[hsl(var(--admin-warning,24.6_95%_53.1%))]/10 rounded-xl">
@@ -612,7 +617,7 @@ const Header = () => {
         </div>
 
         {/* ── Row 2: Nav links (desktop only) ── */}
-        <div className="hidden lg:flex items-center gap-1 py-1.5">
+        <div className="hidden lg:flex items-center justify-center py-1.5">
           <nav className="flex items-center gap-0.5 xl:gap-1">
             <BrowseDropdown onNavigate={() => setMobileMenuOpen(false)} />
             {NAV_LINKS.map((link) => {
