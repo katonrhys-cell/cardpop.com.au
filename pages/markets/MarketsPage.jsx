@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import pb from '@/lib/pocketbaseClient';
+import { slugify } from '@/lib/slugify.js';
 import {
   TrendingUp, TrendingDown, Search, LineChart, Star, StarOff,
   ArrowUpRight, ArrowDownRight, Activity, DollarSign, BarChart3,
@@ -84,6 +85,7 @@ const OVERVIEW_STATS = [
 // ─── Sub-components ─────────────────────────────────────────────────────────
 
 const PriceBadge = ({ change }) => {
+  if (change === null || change === undefined) return null;
   const up = change >= 0;
   return (
     <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full ${up ? 'bg-emerald-500/10 text-emerald-600' : 'bg-destructive/10 text-destructive'}`}>
@@ -92,6 +94,13 @@ const PriceBadge = ({ change }) => {
     </span>
   );
 };
+
+const LiveBadge = () => (
+  <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse inline-block" />
+    Live
+  </span>
+);
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
@@ -125,49 +134,143 @@ const InvestmentSignal = ({ change7d, change30d }) => {
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
+const API_BASE = '/hcgi/api';
+
 const MarketsPage = () => {
   const { isAuthenticated } = useAuth();
   const [searchInput, setSearchInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResult, setSearchResult] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
-  const [marketData, setMarketData] = useState([]);
+
+  // Live popular cards from eBay API
+  const [liveCards, setLiveCards] = useState([]);
+  const [liveLoading, setLiveLoading] = useState(true);
+  const [liveError, setLiveError] = useState(false);
+  const [selectedTab, setSelectedTab] = useState('advancers');
+
   const [watchlist, setWatchlist] = useState([
     { name: 'Charizard VSTAR 018/172', set: 'Brilliant Stars', price: 94, change: 18.4 },
     { name: 'Mew ex 151/165', set: 'Scarlet & Violet 151', price: 45, change: 7.9 },
   ]);
   const resultsRef = useRef(null);
 
+  // ── Fetch live popular card prices on mount ────────────────────────────
   useEffect(() => {
-    pb.collection('market_data').getList(1, 20, { $autoCancel: false })
-      .then(res => setMarketData(res.items))
-      .catch(() => {});
+    let cancelled = false;
+    setLiveLoading(true);
+    fetch(`${API_BASE}/ebay/popular-cards`)
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(data => {
+        if (!cancelled) {
+          setLiveCards(data);
+          setLiveError(false);
+        }
+      })
+      .catch(err => {
+        console.warn('[MarketsPage] popular-cards fetch failed, using demo data:', err.message);
+        if (!cancelled) setLiveError(true);
+      })
+      .finally(() => { if (!cancelled) setLiveLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
-  const handleSearch = (e) => {
+  // ── Transform live cards for the movers table ──────────────────────────
+  const liveMoverRows = liveCards
+    .filter(c => c.avgPrice && c.volume > 0)
+    .sort((a, b) => b.volume - a.volume)
+    .map(c => ({
+      id: c.id,
+      name: c.name,
+      set: c.set,
+      collection: c.collection,
+      price: c.avgPrice,
+      minPrice: c.minPrice,
+      maxPrice: c.maxPrice,
+      volume: c.volume,
+      change: null, // historical data needed for real % — shown as "Live" badge
+      isLive: true,
+    }));
+
+  // ── Real eBay search ───────────────────────────────────────────────────
+  const handleSearch = async (e) => {
     e?.preventDefault();
     if (!searchInput.trim()) return;
     setIsSearching(true);
     setSearchTerm(searchInput);
-    setTimeout(() => {
-      const base = 50 + Math.random() * 200;
-      const change7d = (Math.random() * 30 - 10);
+
+    try {
+      const res = await fetch(
+        `${API_BASE}/ebay/search?cardName=${encodeURIComponent(searchInput.trim())}&limit=10`
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const listings = await res.json();
+
+      if (listings.length === 0) {
+        // No eBay results — fall back to demo
+        throw new Error('No listings found');
+      }
+
+      const prices = listings.map(l => l.price).filter(p => p > 0);
+      const avgSale = prices.length > 0
+        ? +(prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2)
+        : 0;
+      const high90d = prices.length > 0 ? +Math.max(...prices).toFixed(2) : 0;
+      const low90d = prices.length > 0 ? +Math.min(...prices).toFixed(2) : 0;
+
+      // Build price history from listing prices as a rough snapshot
+      const priceHistory = listings.map((l, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - (listings.length - i - 1));
+        return { date: d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }), price: l.price };
+      });
+
+      const recentSales = listings.slice(0, 8).map(l => ({
+        date: new Date().toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' }),
+        platform: 'eBay AU',
+        grade: l.condition || 'Raw',
+        price: l.price,
+        listingUrl: l.listingUrl,
+      }));
+
       setSearchResult({
         name: searchInput.trim(),
-        set: 'Scarlet & Violet',
+        set: 'eBay AU',
+        collection: 'Live Data',
+        avgSale,
+        high90d,
+        low90d,
+        change7d: null,
+        change30d: null,
+        volume90d: listings.length,
+        priceHistory,
+        recentSales,
+        isLive: true,
+        rawListings: listings,
+      });
+    } catch (err) {
+      // Fallback to demo simulation
+      console.warn('[MarketsPage] Real search failed, falling back to demo:', err.message);
+      const base = 50 + Math.random() * 200;
+      const change7d = +(Math.random() * 30 - 10).toFixed(1);
+      setSearchResult({
+        name: searchInput.trim(),
+        set: 'Demo data',
         collection: 'Pokémon',
         avgSale: +base.toFixed(2),
         high90d: +(base * 1.35).toFixed(2),
         low90d: +(base * 0.65).toFixed(2),
-        change7d: +change7d.toFixed(1),
+        change7d,
         change30d: +(change7d * 2.1 + (Math.random() * 4 - 2)).toFixed(1),
         volume90d: Math.floor(50 + Math.random() * 500),
         priceHistory: genPriceHistory(base),
         recentSales: DEMO_RECENT_SALES(base),
+        isLive: false,
       });
+    } finally {
       setIsSearching(false);
       setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
-    }, 900);
+    }
   };
 
   const clearSearch = () => {
@@ -179,17 +282,20 @@ const MarketsPage = () => {
   const cardUrl = (card) => `/markets/card?name=${encodeURIComponent(card.name)}&set=${encodeURIComponent(card.set)}&collection=${encodeURIComponent(card.collection)}&price=${card.price}&change=${card.change}`;
 
   const MoverRow = ({ card }) => (
-    <Link to={cardUrl(card)} className="flex items-center gap-3 py-3 px-4 hover:bg-muted/30 rounded-xl transition-colors group">
+    <Link
+      to={`/markets/${slugify(card.collection)}/${slugify(card.name)}`}
+      className="flex items-center gap-3 py-3 px-4 hover:bg-muted/30 rounded-xl transition-colors group"
+    >
       <div className="flex-1 min-w-0">
         <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">{card.name}</p>
         <p className="text-xs text-muted-foreground truncate">{card.set} · {card.collection}</p>
       </div>
       <div className="text-right flex-shrink-0 space-y-0.5">
-        <p className="font-bold text-sm">${card.price.toLocaleString()}</p>
-        <PriceBadge change={card.change} />
+        <p className="font-bold text-sm">${card.price?.toLocaleString() ?? '—'}</p>
+        {card.change !== null && card.change !== undefined ? <PriceBadge change={card.change} /> : <LiveBadge />}
       </div>
       <div className="text-right text-xs text-muted-foreground w-14 flex-shrink-0">
-        {card.volume.toLocaleString()} sold
+        {card.volume.toLocaleString()} {card.isLive ? 'active' : 'sold'}
       </div>
     </Link>
   );
@@ -234,7 +340,7 @@ const MarketsPage = () => {
             </Button>
           </form>
           <p className="text-xs text-muted-foreground text-center mt-2">
-            Live eBay sold data integration in progress — demo data shown for UI preview
+            Searches eBay AU active listings · Sold price history coming soon
           </p>
         </div>
 
@@ -256,10 +362,17 @@ const MarketsPage = () => {
         {(isSearching || searchResult) && (
           <div ref={resultsRef} className="bg-card border border-border rounded-3xl overflow-hidden shadow-sm scroll-mt-8">
             {/* Banner */}
-            <div className="flex items-center gap-2 px-6 py-3 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-700 dark:text-amber-400">
-              <Info className="w-3.5 h-3.5 flex-shrink-0" />
-              Demo preview — eBay sold data will power this panel once integrated. Prices and dates are illustrative.
-            </div>
+            {searchResult?.isLive ? (
+              <div className="flex items-center gap-2 px-6 py-3 bg-emerald-500/10 border-b border-emerald-500/20 text-xs text-emerald-700 dark:text-emerald-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse flex-shrink-0 inline-block" />
+                Live eBay AU listings · Average price based on active listings · Sold price history coming soon
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 px-6 py-3 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-700 dark:text-amber-400">
+                <Info className="w-3.5 h-3.5 flex-shrink-0" />
+                Demo preview — eBay sold data will power this panel once integrated. Prices and dates are illustrative.
+              </div>
+            )}
 
             {isSearching ? (
               <div className="p-8 space-y-4">
@@ -282,8 +395,10 @@ const MarketsPage = () => {
                   </div>
                   <div className="text-right flex-shrink-0">
                     <p className="text-3xl font-bold">${searchResult.avgSale.toFixed(2)}</p>
-                    <p className="text-sm text-muted-foreground">Avg sold (AUD)</p>
-                    <div className="mt-1"><PriceBadge change={searchResult.change7d} /></div>
+                    <p className="text-sm text-muted-foreground">{searchResult.isLive ? 'Avg active listing (AUD)' : 'Avg sold (AUD)'}</p>
+                    <div className="mt-1">
+                      {searchResult.isLive ? <LiveBadge /> : <PriceBadge change={searchResult.change7d} />}
+                    </div>
                   </div>
                 </div>
 
@@ -292,8 +407,8 @@ const MarketsPage = () => {
                   {[
                     { label: '90-Day High',  value: `$${searchResult.high90d}`,     icon: TrendingUp },
                     { label: '90-Day Low',   value: `$${searchResult.low90d}`,      icon: TrendingDown },
-                    { label: '7-Day Change', value: `${searchResult.change7d > 0 ? '+' : ''}${searchResult.change7d}%`, icon: Activity, colored: true, up: searchResult.change7d >= 0 },
-                    { label: '30-Day Change',value: `${searchResult.change30d > 0 ? '+' : ''}${searchResult.change30d}%`, icon: BarChart3, colored: true, up: searchResult.change30d >= 0 },
+                    { label: '7-Day Change', value: searchResult.change7d !== null ? `${searchResult.change7d > 0 ? '+' : ''}${searchResult.change7d}%` : 'N/A', icon: Activity, colored: searchResult.change7d !== null, up: searchResult.change7d !== null && searchResult.change7d >= 0 },
+                    { label: '30-Day Change', value: searchResult.change30d !== null ? `${searchResult.change30d > 0 ? '+' : ''}${searchResult.change30d}%` : 'N/A', icon: BarChart3, colored: searchResult.change30d !== null, up: searchResult.change30d !== null && searchResult.change30d >= 0 },
                     { label: '90-Day Sales', value: searchResult.volume90d,          icon: DollarSign },
                   ].map(({ label, value, icon: Icon, colored, up }) => (
                     <div key={label} className="bg-muted/30 rounded-xl p-4 text-center">
@@ -335,15 +450,23 @@ const MarketsPage = () => {
                   {/* Signal */}
                   <div className="bg-muted/20 rounded-2xl p-6 space-y-4">
                     <h3 className="font-semibold">Investment Signal</h3>
-                    <InvestmentSignal change7d={searchResult.change7d} change30d={searchResult.change30d} />
-                    <div className="space-y-2 text-sm text-muted-foreground">
-                      <p className="flex justify-between"><span>7-day momentum</span><span className={searchResult.change7d >= 0 ? 'text-emerald-600 font-medium' : 'text-destructive font-medium'}>{searchResult.change7d > 0 ? '▲' : '▼'} {Math.abs(searchResult.change7d)}%</span></p>
-                      <p className="flex justify-between"><span>30-day trend</span><span className={searchResult.change30d >= 0 ? 'text-emerald-600 font-medium' : 'text-destructive font-medium'}>{searchResult.change30d > 0 ? '▲' : '▼'} {Math.abs(searchResult.change30d)}%</span></p>
-                      <p className="flex justify-between"><span>Avg vs 90-day high</span><span className="font-medium">{((searchResult.avgSale / searchResult.high90d) * 100).toFixed(0)}%</span></p>
-                    </div>
-                    <p className="text-xs text-muted-foreground pt-2 border-t border-border">
-                      Signal based on price momentum. Not financial advice.
-                    </p>
+                    {searchResult.change7d !== null ? (
+                      <>
+                        <InvestmentSignal change7d={searchResult.change7d} change30d={searchResult.change30d} />
+                        <div className="space-y-2 text-sm text-muted-foreground">
+                          <p className="flex justify-between"><span>7-day momentum</span><span className={searchResult.change7d >= 0 ? 'text-emerald-600 font-medium' : 'text-destructive font-medium'}>{searchResult.change7d > 0 ? '▲' : '▼'} {Math.abs(searchResult.change7d)}%</span></p>
+                          <p className="flex justify-between"><span>30-day trend</span><span className={searchResult.change30d >= 0 ? 'text-emerald-600 font-medium' : 'text-destructive font-medium'}>{searchResult.change30d > 0 ? '▲' : '▼'} {Math.abs(searchResult.change30d)}%</span></p>
+                          <p className="flex justify-between"><span>Avg vs 90-day high</span><span className="font-medium">{((searchResult.avgSale / searchResult.high90d) * 100).toFixed(0)}%</span></p>
+                        </div>
+                        <p className="text-xs text-muted-foreground pt-2 border-t border-border">
+                          Signal based on price momentum. Not financial advice.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-sm text-muted-foreground py-4 text-center">
+                        Trend signals require sold price history — live listing prices are shown above.
+                      </p>
+                    )}
                   </div>
 
                   {/* Recent sales */}
@@ -373,9 +496,22 @@ const MarketsPage = () => {
         <div>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold">Market Movers</h2>
-            <span className="text-xs text-muted-foreground flex items-center gap-1"><Info className="w-3.5 h-3.5" /> Demo data · eBay integration pending</span>
+            {selectedTab === 'active' ? (
+              liveLoading ? (
+                <span className="text-xs text-muted-foreground flex items-center gap-1"><Info className="w-3.5 h-3.5" /> Loading live data…</span>
+              ) : liveMoverRows.length > 0 ? (
+                <span className="text-xs text-emerald-600 font-medium flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                  Live eBay AU prices
+                </span>
+              ) : (
+                <span className="text-xs text-muted-foreground flex items-center gap-1"><Info className="w-3.5 h-3.5" /> Demo data</span>
+              )
+            ) : (
+              <span className="text-xs text-muted-foreground flex items-center gap-1"><Info className="w-3.5 h-3.5" /> Demo data</span>
+            )}
           </div>
-          <Tabs defaultValue="advancers">
+          <Tabs defaultValue="advancers" onValueChange={setSelectedTab}>
             <TabsList className="mb-4">
               <TabsTrigger value="advancers" className="gap-1.5">
                 <TrendingUp className="w-4 h-4 text-emerald-500" /> Advancers
@@ -397,7 +533,26 @@ const MarketsPage = () => {
                     <span className="text-right">Volume</span>
                   </div>
                   <div className="divide-y divide-border/50">
-                    {DEMO_MOVERS[tab].map((card, i) => <MoverRow key={i} card={card} />)}
+                    {tab === 'active' ? (
+                      liveLoading ? (
+                        Array(6).fill(0).map((_, i) => (
+                          <div key={i} className="flex items-center gap-3 py-3 px-4">
+                            <div className="flex-1 space-y-2">
+                              <Skeleton className="h-4 w-3/4 rounded" />
+                              <Skeleton className="h-3 w-1/2 rounded" />
+                            </div>
+                            <Skeleton className="h-8 w-20 rounded-lg" />
+                            <Skeleton className="h-4 w-14 rounded" />
+                          </div>
+                        ))
+                      ) : liveMoverRows.length > 0 ? (
+                        liveMoverRows.map((card, i) => <MoverRow key={i} card={card} />)
+                      ) : (
+                        DEMO_MOVERS.active.map((card, i) => <MoverRow key={i} card={card} />)
+                      )
+                    ) : (
+                      DEMO_MOVERS[tab].map((card, i) => <MoverRow key={i} card={card} />)
+                    )}
                   </div>
                 </div>
               </TabsContent>

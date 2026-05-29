@@ -88,6 +88,7 @@
 - [Transactions | Card Pop](/transactionhistory): No description available
 - [Transactions | CardPop](/accounttransactions): No description available
 - [Trust & Safety | CardPop](/trustsafety): No description available
+- [Untitled Page](/collection): No description available
 - [User Management | Admin Portal](/usermanagement): No description available
 - [User Profile | Community](/communityuserprofile): No description available
 - [Vault Profile | CardPop](/vaultprofile): No description available

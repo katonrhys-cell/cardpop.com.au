@@ -189,8 +189,8 @@ const App = () => {
                         {/* Public Profile Routes */}
                         <Route path="/seller/:userId" element={<PublicSellerProfilePage />} />
                         
-                        {/* Unified Product Route (Source: shop or vault) */}
-                        <Route path="/product/:source/:id" element={<ProductDetailPage />} />
+                        {/* Unified Product Route — optional slug is cosmetic, id is used for fetching */}
+                        <Route path="/product/:source/:id/:slug?" element={<ProductDetailPage />} />
                         
                         {/* Shop */}
                         <Route path="/shop" element={<ShopPage />} />
