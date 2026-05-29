@@ -36,6 +36,4 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./dist/
           server-dir: /public_html/
-          # Don't delete files on the server that aren't in the build output
-          # (set to true once you're confident the build is complete)
-          dangerous-clean-slate: false
+          dangerous-clean-slate: true
