@@ -5,7 +5,7 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import DynamicNavigation from '@/components/DynamicNavigation.jsx';
 import CategorySidebar from '@/components/CategorySidebar.jsx';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 
 const MarketplaceLayout = () => {
   const [categories, setCategories] = useState([]);
@@ -14,15 +14,13 @@ const MarketplaceLayout = () => {
   useEffect(() => {
     const fetchStructure = async () => {
       try {
-        const records = await pb.collection('marketplaceStructure').getList(1, 1, {
-          sort: '-created',
-          $autoCancel: false
-        });
-        
-        if (records.items.length > 0) {
-          const structure = records.items[0];
-          setCategories(structure.categories || []);
-        }
+        // marketplaceStructure has no Supabase equivalent — load categories directly
+        const { data: cats } = await supabase
+          .from('categories')
+          .select('*')
+          .is('parent_id', null)
+          .order('name');
+        setCategories(cats || []);
       } catch (error) {
         console.error('Failed to load marketplace structure:', error);
       } finally {

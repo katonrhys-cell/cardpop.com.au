@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { Plus, Search, Edit, Trash2, Layers, AlertCircle, RefreshCw, ImageOff, ChevronLeft } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,23 +44,11 @@ const ProductLinesManagementPage = () => {
     setLoading(true);
     console.log('[DEBUG] Fetching product lines and brands data...');
     try {
-      const [linesRes, brandsRes] = await Promise.all([
-        pb.collection('productLines').getFullList({
-          sort: '-created', // Changed from 'name' to '-created' to prevent unindexed sort issues
-          expand: 'brand',
-          $autoCancel: false,
-        }),
-        pb.collection('brands').getFullList({
-          sort: '-created',
-          $autoCancel: false,
-        })
-      ]);
-      
-      console.log('[DEBUG] Fetched product lines count:', linesRes.length);
-      console.log('[DEBUG] Fetched brands count:', brandsRes.length);
-      
-      setProductLines(linesRes);
-      setBrands(brandsRes);
+      const { data: allCats } = await supabase.from('categories').select('*').order('sort_order');
+      const topLevel = (allCats ?? []).filter(c => !c.parent_id);
+      const secondLevel = (allCats ?? []).filter(c => c.parent_id);
+      setProductLines(secondLevel.map(c => ({ ...c, brand: c.parent_id })));
+      setBrands(topLevel);
       setError(null);
       if (showToast) toast.success('Product lines refreshed');
     } catch (err) {
@@ -121,11 +109,7 @@ const ProductLinesManagementPage = () => {
       image: null
     });
     
-    if (line.image) {
-      setImagePreview(pb.files.getUrl(line, line.image));
-    } else {
-      setImagePreview(null);
-    }
+    setImagePreview(line.image_url ?? null);
     
     setSelectedLine(line);
     setIsModalOpen(true);
@@ -145,19 +129,21 @@ const ProductLinesManagementPage = () => {
 
     setIsSubmitting(true);
     try {
-      const data = new FormData();
-      data.append('name', formData.name.trim());
-      data.append('brand', formData.brand);
-      if (formData.description) data.append('description', formData.description.trim());
+      let image_url = selectedLine?.image_url ?? null;
       if (formData.image instanceof File) {
-        data.append('image', formData.image);
+        const path = `categories/${Date.now()}-${formData.image.name}`;
+        const { error: upErr } = await supabase.storage.from('categories').upload(path, formData.image, { upsert: true });
+        if (!upErr) image_url = supabase.storage.from('categories').getPublicUrl(path).data.publicUrl;
       }
+      const payload = { name: formData.name.trim(), description: formData.description.trim(), parent_id: formData.brand || null, image_url };
 
       if (selectedLine) {
-        await pb.collection('productLines').update(selectedLine.id, data, { $autoCancel: false });
+        const { error } = await supabase.from('categories').update(payload).eq('id', selectedLine.id);
+        if (error) throw error;
         toast.success('Product line updated successfully');
       } else {
-        await pb.collection('productLines').create(data, { $autoCancel: false });
+        const { error } = await supabase.from('categories').insert(payload);
+        if (error) throw error;
         toast.success('Product line created successfully');
       }
       
@@ -177,7 +163,8 @@ const ProductLinesManagementPage = () => {
     
     setIsSubmitting(true);
     try {
-      await pb.collection('productLines').delete(selectedLine.id, { $autoCancel: false });
+      const { error } = await supabase.from('categories').delete().eq('id', selectedLine.id);
+      if (error) throw error;
       toast.success('Product line deleted successfully');
       setIsDeleteDialogOpen(false);
       setSelectedLine(null);

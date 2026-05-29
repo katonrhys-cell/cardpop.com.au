@@ -6,7 +6,7 @@ import { COLLECTIONS_LIST, TCG_COLLECTIONS, SPORTS_COLLECTIONS } from '@/compone
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import pb from '@/lib/pocketbaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getCollectionImage } from '@/data/collectionImages.js';
@@ -39,15 +39,21 @@ const PublicCollectionsPage = () => {
     setError(null);
     try {
       const [officialRes, vaultRes] = await Promise.allSettled([
-        pb.collection('officialCatalog').getFullList({ $autoCancel: false }), 
-        pb.collection('products').getFullList({ expand: 'seller', $autoCancel: false })
+        supabase.from('listings').select('*').eq('source', 'official'),
+        supabase.from('listings').select('*, profiles:seller_id(name)').neq('source', 'official')
       ]);
 
+      const getImageUrl = (item) => {
+        const img = item.image || item.card_image;
+        if (!img) return null;
+        return img.startsWith('http') ? img : supabase.storage.from('vault-images').getPublicUrl(img).data.publicUrl;
+      };
+
       const processVaultItem = (item) => {
-        const isSportsItem = SPORTS_COLLECTIONS.includes(item.cardType);
+        const isSportsItem = SPORTS_COLLECTIONS.includes(item.collectionType);
         const brand = isSportsItem
-          ? (SPORTS_BRANDS.find(b => item.playerName?.includes(b)) || SPORTS_BRANDS[item.id.charCodeAt(0) % SPORTS_BRANDS.length])
-          : (TCG_BRANDS.find(b => item.grade?.includes(b)) || TCG_BRANDS[item.id.charCodeAt(0) % TCG_BRANDS.length]);
+          ? (SPORTS_BRANDS.find(b => item.card_name?.includes(b)) || SPORTS_BRANDS[item.id.charCodeAt(0) % SPORTS_BRANDS.length])
+          : (TCG_BRANDS.find(b => item.grading_company?.includes(b)) || TCG_BRANDS[item.id.charCodeAt(0) % TCG_BRANDS.length]);
 
         const series = isSportsItem
           ? SPORTS_SERIES[item.id.charCodeAt(1) % SPORTS_SERIES.length]
@@ -56,17 +62,17 @@ const PublicCollectionsPage = () => {
         return {
           id: item.id,
           _key: `vault_${item.id}`,
-          name: item.playerName ? `${item.playerName} ${item.team || ''} ${item.year || ''}`.trim() : 'Vault Card',
-          collectionType: item.cardType || 'Sports',
+          name: item.card_name || 'Vault Card',
+          collectionType: item.collectionType || 'Sports',
           condition: item.condition,
-          grade: item.grade || null,
-          price: item.price || 0,
+          grade: item.grading_company || null,
+          price: item.price_aud || 0,
           tradeValue: null,
-          image: item.image ? pb.files.getUrl(item, item.image) : null,
+          image: getImageUrl(item),
           source: 'Vault',
-          ownerName: item.expand?.seller?.name || 'Collector',
-          isForSale: item.status === 'For Sale' || item.status === 'For Both',
-          isForTrade: item.status === 'For Trade' || item.status === 'For Both',
+          ownerName: item.profiles?.name || 'Collector',
+          isForSale: item.listingStatus === 'For Sale' || item.listingStatus === 'For Both',
+          isForTrade: item.listingStatus === 'For Trade' || item.listingStatus === 'For Both',
           brand,
           series,
           link: `/market/${item.id}`
@@ -77,7 +83,7 @@ const PublicCollectionsPage = () => {
         const isSportsItem = SPORTS_COLLECTIONS.includes(item.collectionType);
         const brand = isSportsItem
           ? (SPORTS_BRANDS.find(b => item.name?.includes(b)) || 'Official')
-          : (TCG_BRANDS.find(b => item.name?.includes(b) || item.gradeText?.includes(b)) || 'Official');
+          : (TCG_BRANDS.find(b => item.name?.includes(b) || item.grading_company?.includes(b)) || 'Official');
 
         const series = isSportsItem
           ? SPORTS_SERIES[item.id.charCodeAt(1) % SPORTS_SERIES.length]
@@ -86,13 +92,13 @@ const PublicCollectionsPage = () => {
         return {
           id: item.id,
           _key: `store_${item.id}`,
-          name: item.name,
+          name: item.name || item.card_name,
           collectionType: item.collectionType,
           condition: item.condition,
-          grade: item.grade || item.gradeText || null,
-          price: item.price || 0,
+          grade: item.grading_company || null,
+          price: item.price_aud || 0,
           tradeValue: null,
-          image: item.image ? pb.files.getUrl(item, item.image) : null,
+          image: getImageUrl(item),
           source: 'Store',
           ownerName: 'Official Store',
           isForSale: true,
@@ -104,11 +110,11 @@ const PublicCollectionsPage = () => {
       };
 
       let combined = [];
-      if (officialRes.status === 'fulfilled') {
-        combined = combined.concat(officialRes.value.map(processStoreItem));
+      if (officialRes.status === 'fulfilled' && officialRes.value?.data) {
+        combined = combined.concat(officialRes.value.data.map(processStoreItem));
       }
-      if (vaultRes.status === 'fulfilled') {
-        combined = combined.concat(vaultRes.value.map(processVaultItem));
+      if (vaultRes.status === 'fulfilled' && vaultRes.value?.data) {
+        combined = combined.concat(vaultRes.value.data.map(processVaultItem));
       }
       
       setItems(combined.sort((a, b) => b.price - a.price));

@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 
 const OrderManagementPage = () => {
@@ -28,12 +28,9 @@ const OrderManagementPage = () => {
     if (!isMounted.current) return;
     setLoading(true);
     try {
-      const records = await pb.collection('orders').getList(1, 100, {
-        sort: '-created',
-        expand: 'buyer_id,seller_id',
-        $autoCancel: false
-      });
-      if (isMounted.current) setOrders(records.items);
+      const { data, error } = await supabase.from('orders').select('*, buyer:profiles!buyer_id(id, display_name, username, email), seller:profiles!seller_id(id, display_name, username)').order('created_at', { ascending: false }).limit(100);
+      if (error) throw error;
+      if (isMounted.current) setOrders(data ?? []);
     } catch (err) {
       if (isMounted.current) setError(err.message);
       toast.error("Failed to load orders.");
@@ -50,7 +47,8 @@ const OrderManagementPage = () => {
 
   const handleStatusChange = async (id, newStatus) => {
     try {
-      await pb.collection('orders').update(id, { status: newStatus }, { $autoCancel: false });
+      const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', id);
+      if (error) throw error;
       toast.success(`Order status updated to ${newStatus}`);
       setOrders(orders.map(o => o.id === id ? { ...o, status: newStatus } : o));
     } catch (err) {

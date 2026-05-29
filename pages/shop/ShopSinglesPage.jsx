@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, SlidersHorizontal, PackageX, Layers } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { useCart } from '@/hooks/useCart.jsx';
 import { toast } from 'sonner';
 import ProductCard from '@/components/ProductCard.jsx';
@@ -20,7 +20,7 @@ const ShopSinglesPage = () => {
   const [loading, setLoading] = useState(true);
   
   // Filters and Sort State
-  const [sort, setSort] = useState('-created');
+  const [sort, setSort] = useState('created_at_desc');
   const [condition, setCondition] = useState('all');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
@@ -31,30 +31,32 @@ const ShopSinglesPage = () => {
     const fetchProducts = async () => {
       setLoading(true);
       try {
-        let filterArray = [`category="Singles"`];
-        
+        let query = supabase
+          .from('listings')
+          .select('*', { count: 'exact' })
+          .eq('category', 'Singles')
+          .limit(48);
+
         if (condition && condition !== 'all') {
-          filterArray.push(`condition="${condition}"`);
+          query = query.eq('condition', condition);
         }
-        
         if (minPrice && !isNaN(minPrice)) {
-          filterArray.push(`price >= ${minPrice}`);
+          query = query.gte('price_aud', Number(minPrice));
         }
         if (maxPrice && !isNaN(maxPrice)) {
-          filterArray.push(`price <= ${maxPrice}`);
+          query = query.lte('price_aud', Number(maxPrice));
         }
-        
-        const filterStr = filterArray.join(' && ');
 
-        const res = await pb.collection('shop_products').getList(1, 48, {
-          filter: filterStr,
-          sort: sort,
-          $autoCancel: false
-        });
-        
+        if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
+        else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
+        else query = query.order('created_at', { ascending: false });
+
+        const { data, count, error } = await query;
+        if (error) throw error;
+
         if (isMounted) {
-          setProducts(res.items);
-          setTotalItems(res.totalItems);
+          setProducts(data || []);
+          setTotalItems(count || 0);
         }
       } catch (err) {
         console.error('Failed to fetch singles:', err);
@@ -186,9 +188,9 @@ const ShopSinglesPage = () => {
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl border-border">
-                  <SelectItem value="-created" className="rounded-lg cursor-pointer">Newest Arrivals</SelectItem>
-                  <SelectItem value="price" className="rounded-lg cursor-pointer">Price: Low to High</SelectItem>
-                  <SelectItem value="-price" className="rounded-lg cursor-pointer">Price: High to Low</SelectItem>
+                  <SelectItem value="created_at_desc" className="rounded-lg cursor-pointer">Newest Arrivals</SelectItem>
+                  <SelectItem value="price_asc" className="rounded-lg cursor-pointer">Price: Low to High</SelectItem>
+                  <SelectItem value="price_desc" className="rounded-lg cursor-pointer">Price: High to Low</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import SEOHead from '@/components/SEOHead.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import { generateStructuredData } from '@/utils/seoUtils.js';
@@ -17,7 +17,12 @@ const VaultListingDetailPage = () => {
   useEffect(() => {
     const fetchListing = async () => {
       try {
-        const record = await pb.collection('cardListings').getOne(itemId, { $autoCancel: false });
+        const { data: record, error } = await supabase
+          .from('listings')
+          .select('*')
+          .eq('id', itemId)
+          .single();
+        if (error) throw error;
         setListing(record);
       } catch (err) {
         console.error("Error fetching listing:", err);
@@ -50,9 +55,11 @@ const VaultListingDetailPage = () => {
   }
 
   const structuredData = generateStructuredData(listing);
-  const title = listing.cardName || 'Card Listing';
-  const price = listing.askingPrice || listing.estimatedValue || 0;
-  const imageUrl = listing.cardImage ? pb.files.getUrl(listing, listing.cardImage) : '/placeholder-card.png';
+  const title = listing.card_name || 'Card Listing';
+  const price = listing.price_aud || listing.estimated_value_aud || 0;
+  const imageUrl = listing.card_image
+    ? (listing.card_image.startsWith('http') ? listing.card_image : supabase.storage.from('vault-images').getPublicUrl(listing.card_image).data.publicUrl)
+    : '/placeholder-card.png';
 
   const breadcrumbs = [
     { label: 'Home', path: '/' },
@@ -95,9 +102,9 @@ const VaultListingDetailPage = () => {
 
           <div className="bg-card rounded-2xl border border-border p-6 mb-8 space-y-4">
             <h3 className="font-bold text-lg mb-2">Card Details</h3>
-            {listing.cardNumber && <div className="flex justify-between"><span className="text-muted-foreground">Card Number</span> <span className="font-medium">{listing.cardNumber}</span></div>}
-            {listing.releaseYear && <div className="flex justify-between"><span className="text-muted-foreground">Year</span> <span className="font-medium">{listing.releaseYear}</span></div>}
-            {listing.gradingService && <div className="flex justify-between"><span className="text-muted-foreground">Grading</span> <span className="font-medium flex items-center gap-1"><ShieldCheck className="w-4 h-4 text-primary" />{listing.gradingService} {listing.gradeScore}</span></div>}
+            {listing.card_number && <div className="flex justify-between"><span className="text-muted-foreground">Card Number</span> <span className="font-medium">{listing.card_number}</span></div>}
+            {listing.year && <div className="flex justify-between"><span className="text-muted-foreground">Year</span> <span className="font-medium">{listing.year}</span></div>}
+            {listing.grading_company && <div className="flex justify-between"><span className="text-muted-foreground">Grading</span> <span className="font-medium flex items-center gap-1"><ShieldCheck className="w-4 h-4 text-primary" />{listing.grading_company} {listing.gradeScore}</span></div>}
           </div>
 
           <div className="mt-auto space-y-4">

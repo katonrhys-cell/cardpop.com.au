@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Wand2 } from 'lucide-react';
 import { format } from 'date-fns';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
@@ -26,29 +26,27 @@ const EventsManagementPage = () => {
   useEffect(() => {
     fetchEvents();
 
-    pb.collection('events').subscribe('*', function (e) {
-      if (e.action === 'create') {
-        setEvents(prev => [e.record, ...prev].sort((a, b) => new Date(b.date) - new Date(a.date)));
-      } else if (e.action === 'update') {
-        setEvents(prev => prev.map(ev => ev.id === e.record.id ? e.record : ev).sort((a, b) => new Date(b.date) - new Date(a.date)));
-      } else if (e.action === 'delete') {
-        setEvents(prev => prev.filter(ev => ev.id !== e.record.id));
-      }
-    });
+    const channel = supabase.channel('events-management')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          setEvents(prev => [payload.new, ...prev].sort((a, b) => new Date(b.event_date) - new Date(a.event_date)));
+        } else if (payload.eventType === 'UPDATE') {
+          setEvents(prev => prev.map(ev => ev.id === payload.new.id ? payload.new : ev));
+        } else if (payload.eventType === 'DELETE') {
+          setEvents(prev => prev.filter(ev => ev.id !== payload.old.id));
+        }
+      })
+      .subscribe();
 
-    return () => {
-      pb.collection('events').unsubscribe('*');
-    };
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const fetchEvents = async () => {
     setIsLoading(true);
     try {
-      const response = await pb.collection('events').getFullList({
-        sort: '-date',
-        $autoCancel: false,
-      });
-      setEvents(response);
+      const { data, error } = await supabase.from('events').select('*').order('event_date', { ascending: false });
+      if (error) throw error;
+      setEvents(data ?? []);
     } catch (err) {
       console.error('Failed to fetch events:', err);
       toast.error('Failed to load events.');
@@ -73,7 +71,8 @@ const EventsManagementPage = () => {
   const handleQuickToggleStatus = async (event, currentStatus) => {
     const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
     try {
-      await pb.collection('events').update(event.id, { status: newStatus }, { $autoCancel: false });
+      const { error } = await supabase.from('events').update({ status: newStatus }).eq('id', event.id);
+      if (error) throw error;
       toast.success(`Event marked as ${newStatus}.`);
     } catch (err) {
       console.error('Failed to toggle status:', err);
@@ -84,7 +83,8 @@ const EventsManagementPage = () => {
   const handleDelete = async (event) => {
     if (window.confirm(`Are you sure you want to delete "${event.name}"? This action cannot be undone.`)) {
       try {
-        await pb.collection('events').delete(event.id, { $autoCancel: false });
+        const { error } = await supabase.from('events').delete().eq('id', event.id);
+        if (error) throw error;
         toast.success('Event deleted successfully.');
       } catch (err) {
         console.error('Failed to delete event:', err);

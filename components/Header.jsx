@@ -11,7 +11,7 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 import CardPopLogo from '@/components/CardPopLogo.jsx';
 import { TCG_CATEGORY_DATA, SPORTS_CATEGORY_DATA } from '@/components/CategoryIcons.jsx';
 import { useCart } from '@/hooks/useCart.jsx';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
@@ -273,34 +273,42 @@ const Header = () => {
     
     const fetchData = async () => {
       try {
-        const [msgRes, tradeRes] = await Promise.all([
-          pb.collection('messages').getList(1, 1, { 
-            filter: `recipient="${currentUser.id}" && isRead=false`, 
-            $autoCancel: false 
-          }),
-          pb.collection('trade_requests').getList(1, 1, { 
-            filter: `recipient_id="${currentUser.id}" && status="pending"`, 
-            $autoCancel: false 
-          })
+        const [{ count: msgCount }, { count: tradeCount }] = await Promise.all([
+          supabase
+            .from('messages')
+            .select('*', { count: 'exact', head: true })
+            .eq('recipient_id', currentUser.id)
+            .eq('is_read', false),
+          supabase
+            .from('trades')
+            .select('*', { count: 'exact', head: true })
+            .eq('responder_id', currentUser.id)
+            .eq('status', 'pending')
         ]);
         if (isMounted) {
-          setUnreadCount(msgRes.totalItems);
-          setTradeCount(tradeRes.totalItems);
+          setUnreadCount(msgCount || 0);
+          setTradeCount(tradeCount || 0);
         }
       } catch (err) {
         console.error("Failed to fetch notification counts:", err);
       }
     };
-    
+
     fetchData();
-    
-    pb.collection('messages').subscribe('*', () => fetchData()).catch(console.error);
-    pb.collection('trade_requests').subscribe('*', () => fetchData()).catch(console.error);
+
+    const msgChannel = supabase
+      .channel('header-messages')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => fetchData())
+      .subscribe();
+    const tradeChannel = supabase
+      .channel('header-trades')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades' }, () => fetchData())
+      .subscribe();
 
     return () => {
       isMounted = false;
-      pb.collection('messages').unsubscribe('*').catch(() => {});
-      pb.collection('trade_requests').unsubscribe('*').catch(() => {});
+      supabase.removeChannel(msgChannel);
+      supabase.removeChannel(tradeChannel);
     };
   }, [isAuthenticated, currentUser]);
 

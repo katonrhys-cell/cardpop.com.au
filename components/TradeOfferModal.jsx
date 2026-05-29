@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Loader2, ArrowRightLeft, AlertCircle, ImageOff, CheckCircle2 } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 
 const TradeOfferModal = ({ isOpen, onClose, targetCard }) => {
@@ -19,20 +19,21 @@ const TradeOfferModal = ({ isOpen, onClose, targetCard }) => {
       const fetchEligibleCards = async () => {
         setLoading(true);
         try {
-          // Fetch user's cards
-          const cards = await pb.collection('cards').getFullList({
-            filter: `owner="${currentUser.id}"`,
-            $autoCancel: false
-          });
-          
+          // Fetch user's vault items
+          const { data: cards } = await supabase
+            .from('vault_items')
+            .select('*')
+            .eq('owner_id', currentUser.id);
+
           // Fetch pending trades to filter out busy cards
-          const pendingTrades = await pb.collection('trade_requests').getFullList({
-            filter: `(offerer_id="${currentUser.id}" || recipient_id="${currentUser.id}") && status="pending"`,
-            $autoCancel: false
-          });
-          
-          const busyCardIds = pendingTrades.flatMap(t => [t.offerer_card_id, t.recipient_card_id]);
-          const available = cards.filter(c => !busyCardIds.includes(c.id));
+          const { data: pendingTrades } = await supabase
+            .from('trades')
+            .select('initiator_listing_id, responder_listing_id')
+            .or(`initiator_id.eq.${currentUser.id},responder_id.eq.${currentUser.id}`)
+            .eq('status', 'pending');
+
+          const busyCardIds = (pendingTrades || []).flatMap(t => [t.initiator_listing_id, t.responder_listing_id]);
+          const available = (cards || []).filter(c => !busyCardIds.includes(c.id));
           
           setMyCards(available);
         } catch (error) {
@@ -52,12 +53,12 @@ const TradeOfferModal = ({ isOpen, onClose, targetCard }) => {
     setSubmitting(true);
     
     try {
-      const myCardValue = Number(selectedCard.tradeValue || selectedCard.estimatedValue || 0);
-      const targetCardValue = Number(targetCard.tradeValue || targetCard.estimatedValue || 0);
+      const myCardValue = Number(selectedCard.trade_value_locked || selectedCard.estimated_value_aud || 0);
+      const targetCardValue = Number(targetCard.trade_value_locked || targetCard.estimated_value_aud || 0);
       const fee = myCardValue * 0.03;
       const finalAmount = myCardValue - fee;
 
-      const recipientId = typeof targetCard.owner === 'string' ? targetCard.owner : targetCard.expand?.owner?.id;
+      const recipientId = targetCard.owner_id || targetCard.owner;
 
       if (!recipientId) {
         throw new Error("Unable to determine recipient ID.");
@@ -67,17 +68,18 @@ const TradeOfferModal = ({ isOpen, onClose, targetCard }) => {
         throw new Error("You cannot trade with yourself.");
       }
 
-      await pb.collection('trade_requests').create({
-        offerer_id: currentUser.id,
-        offerer_card_id: selectedCard.id,
-        recipient_id: recipientId,
-        recipient_card_id: targetCard.id,
-        offerer_card_value: myCardValue,
-        recipient_card_value: targetCardValue,
+      const { error: tradeError } = await supabase.from('trades').insert({
+        initiator_id: currentUser.id,
+        initiator_listing_id: selectedCard.id,
+        responder_id: recipientId,
+        responder_listing_id: targetCard.id,
+        initiator_listing_value: myCardValue,
+        responder_listing_value: targetCardValue,
         fee_amount: fee,
         final_amount: finalAmount,
         status: 'pending'
-      }, { $autoCancel: false });
+      });
+      if (tradeError) throw tradeError;
       
       toast.success("Trade offer submitted successfully!");
       onClose();
@@ -90,8 +92,8 @@ const TradeOfferModal = ({ isOpen, onClose, targetCard }) => {
   };
 
   // Values calculation
-  const myValue = selectedCard ? Number(selectedCard.tradeValue || selectedCard.estimatedValue || 0) : 0;
-  const theirValue = targetCard ? Number(targetCard.tradeValue || targetCard.estimatedValue || 0) : 0;
+  const myValue = selectedCard ? Number(selectedCard.trade_value_locked || selectedCard.estimated_value_aud || 0) : 0;
+  const theirValue = targetCard ? Number(targetCard.trade_value_locked || targetCard.estimated_value_aud || 0) : 0;
   const fee = myValue * 0.03;
   const finalAmount = myValue - fee;
 
@@ -113,8 +115,8 @@ const TradeOfferModal = ({ isOpen, onClose, targetCard }) => {
           {/* Target Card Quick Summary */}
           <div className="flex items-center gap-4 p-4 rounded-xl bg-muted/40 border border-border">
             <div className="w-12 h-16 bg-background rounded overflow-hidden shrink-0 border border-border shadow-sm flex items-center justify-center">
-               {targetCard?.cardImage ? (
-                 <img src={pb.files.getUrl(targetCard, Array.isArray(targetCard.cardImage) ? targetCard.cardImage[0] : targetCard.cardImage)} alt="Target" className="w-full h-full object-cover" />
+               {(targetCard?.image_urls?.[0] || targetCard?.cardImage) ? (
+                 <img src={targetCard?.image_urls?.[0] || (Array.isArray(targetCard.cardImage) ? targetCard.cardImage[0] : targetCard.cardImage)} alt="Target" className="w-full h-full object-cover" />
                ) : <ImageOff className="w-4 h-4 text-muted-foreground opacity-50" />}
             </div>
             <div>
@@ -143,8 +145,8 @@ const TradeOfferModal = ({ isOpen, onClose, targetCard }) => {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {myCards.map(card => {
                   const isSelected = selectedCard?.id === card.id;
-                  const imgUrl = card.cardImage && card.cardImage.length > 0 
-                    ? pb.files.getUrl(card, Array.isArray(card.cardImage) ? card.cardImage[0] : card.cardImage)
+                  const imgUrl = card.image_urls && card.image_urls.length > 0
+                    ? card.image_urls[0]
                     : null;
 
                   return (
@@ -169,10 +171,10 @@ const TradeOfferModal = ({ isOpen, onClose, targetCard }) => {
                           <ImageOff className="w-6 h-6 text-muted-foreground opacity-30" />
                         )}
                       </div>
-                      <p className="text-xs font-bold text-foreground line-clamp-1 mb-1" title={card.cardName}>{card.cardName}</p>
+                      <p className="text-xs font-bold text-foreground line-clamp-1 mb-1" title={card.card_name || card.cardName}>{card.card_name || card.cardName}</p>
                       <Badge variant="secondary" className="w-fit text-[10px] mb-2">{card.condition}</Badge>
                       <p className="text-sm font-extrabold tabular-nums mt-auto">
-                        ${Number(card.tradeValue || card.estimatedValue || 0).toFixed(2)}
+                        ${Number(card.trade_value_locked || card.estimated_value_aud || 0).toFixed(2)}
                       </p>
                     </div>
                   );

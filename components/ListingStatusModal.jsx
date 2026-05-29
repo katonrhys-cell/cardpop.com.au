@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Loader2 } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 
 const ListingStatusModal = ({ isOpen, onClose, listing, onStatusUpdated }) => {
@@ -29,9 +29,11 @@ const ListingStatusModal = ({ isOpen, onClose, listing, onStatusUpdated }) => {
         newStock = 0;
       }
 
-      await pb.collection('officialCatalog').update(listing.id, {
-        stockQuantity: newStock
-      }, { $autoCancel: false });
+      const { error } = await supabase
+        .from('set_cards')
+        .update({ stockQuantity: newStock })
+        .eq('id', listing.id);
+      if (error) throw error;
 
       toast.success('Listing status updated successfully');
       if (onStatusUpdated) onStatusUpdated();

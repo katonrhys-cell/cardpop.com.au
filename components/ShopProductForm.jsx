@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -46,7 +46,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
       });
       
       if (product.images && product.images.length > 0) {
-        const urls = product.images.map(img => pb.files.getUrl(product, img));
+        const urls = product.images.map(img => (typeof img === 'string' && img.startsWith('http') ? img : img));
         setPreviewUrls(urls);
         setSelectedFiles(product.images.map(img => ({ isExisting: true, filename: img })));
       }
@@ -123,11 +123,17 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         submitData.append('images', JSON.stringify(remainingImages));
       }
 
+      // Convert FormData to plain object for Supabase
+      const dataObj = {};
+      submitData.forEach((value, key) => { dataObj[key] = value; });
+
       if (product) {
-        await pb.collection('shop_products').update(product.id, submitData, { $autoCancel: false });
+        const { error } = await supabase.from('listings').update(dataObj).eq('id', product.id);
+        if (error) throw error;
         toast.success('Shop product updated successfully!');
       } else {
-        await pb.collection('shop_products').create(submitData, { $autoCancel: false });
+        const { error } = await supabase.from('listings').insert(dataObj);
+        if (error) throw error;
         toast.success('Product added to shop!');
       }
       

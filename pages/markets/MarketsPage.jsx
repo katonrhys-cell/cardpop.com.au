@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
-import pb from '@/lib/pocketbaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import {
   TrendingUp, TrendingDown, Search, LineChart, Star, StarOff,
   ArrowUpRight, ArrowDownRight, Activity, DollarSign, BarChart3,
@@ -139,8 +139,8 @@ const MarketsPage = () => {
   const resultsRef = useRef(null);
 
   useEffect(() => {
-    pb.collection('market_data').getList(1, 20, { $autoCancel: false })
-      .then(res => setMarketData(res.items))
+    supabase.from('market_data').select('*').limit(20)
+      .then(({ data }) => setMarketData(data ?? []))
       .catch(() => {});
   }, []);
 

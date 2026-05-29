@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 
 const AccountDashboard = () => {
@@ -38,55 +38,48 @@ const AccountDashboard = () => {
 
   const fetchStats = useCallback(async () => {
     if (!currentUser?.id) return;
-    
+
     try {
       setStatsError(null);
-      
-      const [
-        salesRes,
-        revenueRes,
-        listingsRes,
-        vaultRes,
-        tradesRes
-      ] = await Promise.all([
-        pb.collection('transactions').getList(1, 1, {
-          filter: `userIds ~ "${currentUser.id}" && type="Sale" && status="Completed"`,
-          fields: 'id',
-          $autoCancel: false
-        }),
-        pb.collection('transactions').getFullList({
-          filter: `userIds ~ "${currentUser.id}" && status="Completed"`,
-          fields: 'transactionValue',
-          $autoCancel: false
-        }),
-        pb.collection('marketplace_listings').getList(1, 1, {
-          filter: `seller="${currentUser.id}" && status="active"`,
-          fields: 'id',
-          $autoCancel: false
-        }),
-        // FIXED: Using user_vaults instead of cardListings
-        pb.collection('user_vaults').getList(1, 1, {
-          filter: `user_id="${currentUser.id}"`,
-          fields: 'id',
-          $autoCancel: false
-        }),
-        pb.collection('tradeRequests').getList(1, 1, {
-          filter: `(sender="${currentUser.id}" || recipient="${currentUser.id}") && status="Pending"`,
-          fields: 'id',
-          $autoCancel: false
-        })
+
+      const [salesRes, revenueRes, listingsRes, vaultRes, tradesRes] = await Promise.all([
+        supabase
+          .from('orders')
+          .select('id', { count: 'exact', head: true })
+          .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
+          .eq('type', 'Sale')
+          .eq('status', 'Completed'),
+        supabase
+          .from('orders')
+          .select('transaction_value')
+          .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
+          .eq('status', 'Completed'),
+        supabase
+          .from('listings')
+          .select('id', { count: 'exact', head: true })
+          .eq('seller_id', currentUser.id)
+          .eq('status', 'active'),
+        supabase
+          .from('vault_items')
+          .select('id', { count: 'exact', head: true })
+          .eq('owner_id', currentUser.id),
+        supabase
+          .from('trades')
+          .select('id', { count: 'exact', head: true })
+          .or(`sender_id.eq.${currentUser.id},recipient_id.eq.${currentUser.id}`)
+          .eq('status', 'Pending')
       ]);
 
       if (!isMounted.current) return;
 
-      const totalRevenue = revenueRes.reduce((sum, t) => sum + (t.transactionValue || 0), 0);
+      const totalRevenue = (revenueRes.data || []).reduce((sum, t) => sum + (t.transaction_value || 0), 0);
 
       setStats({
-        salesCount: salesRes.totalItems || 0,
+        salesCount: salesRes.count || 0,
         revenue: totalRevenue,
-        listingsCount: listingsRes.totalItems || 0,
-        vaultItemsCount: vaultRes.totalItems || 0,
-        pendingTrades: tradesRes.totalItems || 0
+        listingsCount: listingsRes.count || 0,
+        vaultItemsCount: vaultRes.count || 0,
+        pendingTrades: tradesRes.count || 0
       });
     } catch (err) {
       console.error("Failed to fetch dashboard stats:", err);
@@ -103,17 +96,19 @@ const AccountDashboard = () => {
       setVaultLoading(true);
       setVaultError(null);
       
-      const result = await pb.collection('user_vaults').getList(page, 10, {
-        filter: `user_id = "${currentUser.id}"`,
-        sort: '-created',
-        $autoCancel: false
-      });
-      
+      const from = (page - 1) * 10;
+      const { data: items, count } = await supabase
+        .from('vault_items')
+        .select('*', { count: 'exact' })
+        .eq('owner_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .range(from, from + 9);
+
       if (!isMounted.current) return;
-      
-      setVaultItems(result.items);
-      setVaultPage(result.page);
-      setVaultTotalPages(result.totalPages);
+
+      setVaultItems(items ?? []);
+      setVaultPage(page);
+      setVaultTotalPages(Math.ceil((count ?? 0) / 10));
     } catch (err) {
       console.error("Failed to fetch vault items:", err);
       if (isMounted.current) setVaultError(err.message || "Failed to load vault items.");
@@ -127,30 +122,18 @@ const AccountDashboard = () => {
     fetchStats();
     fetchVaultItems(1);
 
-    const subscribeToUpdates = async () => {
-      try {
-        await pb.collection('transactions').subscribe('*', () => { if (isMounted.current) fetchStats(); });
-        await pb.collection('marketplace_listings').subscribe('*', () => { if (isMounted.current) fetchStats(); });
-        await pb.collection('user_vaults').subscribe('*', () => { 
-          if (isMounted.current) {
-            fetchStats();
-            fetchVaultItems(vaultPage);
-          }
-        });
-        await pb.collection('tradeRequests').subscribe('*', () => { if (isMounted.current) fetchStats(); });
-      } catch (err) {
-        console.warn("Realtime subscription failed:", err);
-      }
-    };
-
-    subscribeToUpdates();
+    const channel = supabase.channel('account-dashboard')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { if (isMounted.current) fetchStats(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'listings' }, () => { if (isMounted.current) fetchStats(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vault_items' }, () => {
+        if (isMounted.current) { fetchStats(); fetchVaultItems(vaultPage); }
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades' }, () => { if (isMounted.current) fetchStats(); })
+      .subscribe();
 
     return () => {
       isMounted.current = false;
-      pb.collection('transactions').unsubscribe('*').catch(() => {});
-      pb.collection('marketplace_listings').unsubscribe('*').catch(() => {});
-      pb.collection('user_vaults').unsubscribe('*').catch(() => {});
-      pb.collection('tradeRequests').unsubscribe('*').catch(() => {});
+      supabase.removeChannel(channel);
     };
   }, [fetchStats, fetchVaultItems, vaultPage]);
 

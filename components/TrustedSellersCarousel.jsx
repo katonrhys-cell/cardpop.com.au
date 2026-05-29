@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Star, MapPin, User, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 
@@ -22,12 +22,13 @@ const TrustedSellersCarousel = () => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await pb.collection('users').getList(1, 20, {
-          sort: '-rating',
-          filter: 'rating > 0',
-          $autoCancel: false,
-        });
-        setSellers(response.items || []);
+        const { data: response } = await supabase
+          .from('profiles')
+          .select('*')
+          .gt('positive_feedback_pct', 0)
+          .order('positive_feedback_pct', { ascending: false })
+          .limit(20);
+        setSellers(response || []);
       } catch (err) {
         console.error("Failed to fetch sellers:", err);
         setError("Unable to load trusted sellers at this time.");
@@ -164,11 +165,11 @@ const TrustedSellersCarousel = () => {
               <div className="bg-card rounded-2xl border border-border p-8 flex flex-col items-center text-center transition-all duration-300 hover:shadow-xl hover:-translate-y-1 h-full">
                 
                 <div className="relative mb-5 group/avatar">
-                  {seller.avatar ? (
-                    <img 
-                      src={pb.files.getUrl(seller, seller.avatar)} 
-                      alt={`${seller.name || 'Seller'} avatar`} 
-                      className="w-24 h-24 rounded-2xl object-cover shadow-sm ring-4 ring-background" 
+                  {seller.avatar_url ? (
+                    <img
+                      src={seller.avatar_url}
+                      alt={`${seller.name || 'Seller'} avatar`}
+                      className="w-24 h-24 rounded-2xl object-cover shadow-sm ring-4 ring-background"
                     />
                   ) : (
                     <div className="w-24 h-24 rounded-2xl bg-muted flex items-center justify-center shadow-sm ring-4 ring-background">

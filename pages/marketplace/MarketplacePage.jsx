@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Helmet } from 'react-helmet';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search, RefreshCw, AlertCircle, Users, X } from 'lucide-react';
@@ -15,21 +15,17 @@ const MarketplacePage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
-  const [sort, setSort] = useState('-created');
+  const [sort, setSort] = useState('created_at_desc');
   const [filterType, setFilterType] = useState('All'); 
   
   // Category Filter States
-  const { buildNameMap, getCategories, getSubcategoriesByCategory, getBrandsBySubcategory, getSeriesByBrand } = useCategories();
+  const { buildNameMap, getCategories, getSubcategoriesByCategory } = useCategories();
   const [nameMap, setNameMap] = useState({});
   const [filterCat, setFilterCat] = useState('');
   const [filterSub, setFilterSub] = useState('');
-  const [filterBrand, setFilterBrand] = useState('');
-  const [filterSeries, setFilterSeries] = useState('');
-  
+
   const [catOpts, setCatOpts] = useState([]);
   const [subOpts, setSubOpts] = useState([]);
-  const [brandOpts, setBrandOpts] = useState([]);
-  const [seriesOpts, setSeriesOpts] = useState([]);
 
   const isMounted = useRef(true);
 
@@ -50,63 +46,48 @@ const MarketplacePage = () => {
     else { setSubOpts([]); setFilterSub(''); }
   }, [filterCat, getSubcategoriesByCategory]);
 
-  useEffect(() => {
-    if (filterSub) getBrandsBySubcategory(filterSub).then(setBrandOpts);
-    else { setBrandOpts([]); setFilterBrand(''); }
-  }, [filterSub, getBrandsBySubcategory]);
-
-  useEffect(() => {
-    if (filterBrand) getSeriesByBrand(filterBrand).then(setSeriesOpts);
-    else { setSeriesOpts([]); setFilterSeries(''); }
-  }, [filterBrand, getSeriesByBrand]);
-
   const fetchListings = useCallback(async (showToast = false) => {
     if (!isMounted.current) return;
     setLoading(true);
     setError(null);
     try {
-      let shopFilter = 'visibility="public" || visibility="marketplace-only"';
-      let vaultFilter = 'is_public=true';
+      // Build listings query (listings table covers shop_products + vault listings)
+      let query = supabase
+        .from('listings')
+        .select('*, vault_item:vault_items(*, vault_images(*), categories(*)), seller:profiles!seller_id(*)')
+        .limit(100);
 
-      if (filterCat) { shopFilter += ` && categoryId="${filterCat}"`; vaultFilter += ` && categoryId="${filterCat}"`; }
-      if (filterSub) { shopFilter += ` && subcategoryId="${filterSub}"`; vaultFilter += ` && subcategoryId="${filterSub}"`; }
-      if (filterBrand) { shopFilter += ` && brandId="${filterBrand}"`; vaultFilter += ` && brandId="${filterBrand}"`; }
-      if (filterSeries) { shopFilter += ` && seriesId="${filterSeries}"`; vaultFilter += ` && seriesId="${filterSeries}"`; }
+      if (filterCat) query = query.eq('vault_item.categories.id', filterCat);
+      if (filterSub) query = query.eq('category_id', filterSub);
+
+      // filterBrand and filterSeries removed (brands/series tables no longer exist)
 
       if (filterType === 'For Sale') {
-        vaultFilter += ' && (listing_type="For Sale" || listing_type="For Sale & Trade")';
+        query = query.in('status', ['For Sale', 'active']);
       } else if (filterType === 'For Trade') {
-        shopFilter = 'id="NONE"';
-        vaultFilter += ' && (listing_type="For Trade" || listing_type="For Sale & Trade")';
+        query = query.eq('status', 'For Trade');
       } else if (filterType === 'Both') {
-        shopFilter = 'id="NONE"'; 
-        vaultFilter += ' && listing_type="For Sale & Trade"';
+        query = query.eq('status', 'For Sale & Trade');
       } else {
-        vaultFilter += ' && (listing_type="For Sale" || listing_type="For Trade" || listing_type="For Sale & Trade")';
+        query = query.in('status', ['For Sale', 'active', 'For Trade', 'For Sale & Trade']);
       }
 
-      const shopPromise = pb.collection('shop_products').getList(1, 50, { filter: shopFilter, sort, $autoCancel: false }).catch(() => ({ items: [] }));
-      const vaultPromise = pb.collection('user_vaults').getList(1, 50, { filter: vaultFilter, sort, $autoCancel: false }).catch(() => ({ items: [] }));
+      if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
+      else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
+      else query = query.order('created_at', { ascending: false });
 
-      const [shopRes, vaultRes] = await Promise.all([shopPromise, vaultPromise]);
+      const { data, error: fetchError } = await query;
       if (!isMounted.current) return;
+      if (fetchError) throw fetchError;
 
-      const shopItems = shopRes.items.map(item => ({ ...item, source: 'shop' }));
-      const vaultItems = vaultRes.items.map(item => ({ ...item, source: 'vault' }));
-
-      let merged = [...shopItems, ...vaultItems];
-      if (sort === '-created') merged.sort((a, b) => new Date(b.created) - new Date(a.created));
-      else if (sort === 'price') merged.sort((a, b) => (a.price || 0) - (b.price || 0));
-      else if (sort === '-price') merged.sort((a, b) => (b.price || 0) - (a.price || 0));
-
-      setListings(merged);
+      setListings(data || []);
       if (showToast) toast.success('Marketplace data refreshed');
     } catch (err) {
       if (isMounted.current) setError(err.message || 'Failed to load marketplace listings.');
     } finally {
       if (isMounted.current) setLoading(false);
     }
-  }, [sort, filterType, filterCat, filterSub, filterBrand, filterSeries]);
+  }, [sort, filterType, filterCat, filterSub]);
 
   useEffect(() => {
     isMounted.current = true;
@@ -117,17 +98,13 @@ const MarketplacePage = () => {
   const clearFilters = () => {
     setFilterCat('');
     setFilterSub('');
-    setFilterBrand('');
-    setFilterSeries('');
     setFilterType('All');
   };
 
   const getBreadcrumbPath = () => {
     const parts = [
       nameMap[filterCat],
-      nameMap[filterSub],
-      nameMap[filterBrand],
-      nameMap[filterSeries]
+      nameMap[filterSub]
     ].filter(Boolean);
     if (parts.length === 0) return null;
     return `Filtering by: ${parts.join(' > ')}`;
@@ -161,15 +138,7 @@ const MarketplacePage = () => {
             <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Subcategories" /></SelectTrigger>
             <SelectContent>{subOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
           </Select>
-          <Select value={filterBrand} onValueChange={setFilterBrand} disabled={!filterSub}>
-            <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Brands" /></SelectTrigger>
-            <SelectContent>{brandOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-          </Select>
-          <Select value={filterSeries} onValueChange={setFilterSeries} disabled={!filterBrand}>
-            <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Series" /></SelectTrigger>
-            <SelectContent>{seriesOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-          </Select>
-          {(filterCat || filterSub || filterBrand || filterSeries || filterType !== 'All') && (
+          {(filterCat || filterSub || filterType !== 'All') && (
             <Button variant="ghost" onClick={clearFilters} className="rounded-xl text-muted-foreground hover:text-foreground ml-auto">
               <X className="w-4 h-4 mr-2" /> Clear All Filters
             </Button>
@@ -223,9 +192,9 @@ const MarketplacePage = () => {
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent className="rounded-xl">
-                <SelectItem value="-created">Newest Listings</SelectItem>
-                <SelectItem value="price">Price: Low to High</SelectItem>
-                <SelectItem value="-price">Price: High to Low</SelectItem>
+                <SelectItem value="created_at_desc">Newest Listings</SelectItem>
+                <SelectItem value="price_asc">Price: Low to High</SelectItem>
+                <SelectItem value="price_desc">Price: High to Low</SelectItem>
               </SelectContent>
             </Select>
           </div>

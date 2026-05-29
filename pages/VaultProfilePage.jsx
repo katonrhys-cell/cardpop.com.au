@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import { Camera, MapPin, Calendar, Star, Package, TrendingUp, ShieldCheck, Edit2, Save, X, Eye } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -41,25 +41,37 @@ const VaultProfilePage = () => {
     const fetchProfileAndCards = async () => {
       if (!currentUser) return;
       try {
-        const record = await pb.collection('users').getOne(currentUser.id, { $autoCancel: false });
+        const { data: record, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', currentUser.id)
+          .single();
+
+        if (profileError) throw profileError;
+
         setProfile(record);
         setFormData({
           name: record.name || '',
           bio: record.bio || '',
           location: record.location || '',
-          emailVisibility: record.emailVisibility || false
+          emailVisibility: record.email_visibility || false
         });
         if (record.avatar) {
-          setAvatarPreview(pb.files.getUrl(record, record.avatar));
+          const avatarUrl = record.avatar.startsWith('http')
+            ? record.avatar
+            : supabase.storage.from('vault-images').getPublicUrl(record.avatar).data.publicUrl;
+          setAvatarPreview(avatarUrl);
         }
 
         // Fetch user's vault cards
-        const cardsRes = await pb.collection('cards').getList(1, 12, {
-          filter: `owner="${currentUser.id}"`,
-          sort: '-created',
-          $autoCancel: false
-        });
-        setVaultCards(cardsRes.items);
+        const { data: cardsData } = await supabase
+          .from('vault_items')
+          .select('*')
+          .eq('owner_id', currentUser.id)
+          .order('created_at', { ascending: false })
+          .limit(12);
+
+        setVaultCards(cardsData || []);
 
       } catch (error) {
         console.error('Error fetching profile data:', error);
@@ -96,17 +108,33 @@ const VaultProfilePage = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const data = new FormData();
-      data.append('name', formData.name);
-      data.append('bio', formData.bio);
-      data.append('location', formData.location);
-      data.append('emailVisibility', formData.emailVisibility);
-      
+      const updatePayload = {
+        name: formData.name,
+        bio: formData.bio,
+        location: formData.location,
+        email_visibility: formData.emailVisibility,
+        updated_at: new Date().toISOString()
+      };
+
       if (avatarFile) {
-        data.append('avatar', avatarFile);
+        const fileExt = avatarFile.name.split('.').pop();
+        const filePath = `avatars/${currentUser.id}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('vault-images')
+          .upload(filePath, avatarFile, { upsert: true });
+        if (uploadError) throw uploadError;
+        updatePayload.avatar = filePath;
       }
 
-      const updatedRecord = await pb.collection('users').update(currentUser.id, data, { $autoCancel: false });
+      const { data: updatedRecord, error: updateError } = await supabase
+        .from('profiles')
+        .update(updatePayload)
+        .eq('id', currentUser.id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
       setProfile(updatedRecord);
       setIsEditing(false);
       toast.success('Profile updated successfully.');
@@ -128,7 +156,10 @@ const VaultProfilePage = () => {
     });
     setAvatarFile(null);
     if (profile?.avatar) {
-      setAvatarPreview(pb.files.getUrl(profile, profile.avatar));
+      const avatarUrl = profile.avatar.startsWith('http')
+        ? profile.avatar
+        : supabase.storage.from('vault-images').getPublicUrl(profile.avatar).data.publicUrl;
+      setAvatarPreview(avatarUrl);
     } else {
       setAvatarPreview(null);
     }
@@ -151,8 +182,8 @@ const VaultProfilePage = () => {
     );
   }
 
-  const memberSinceDate = profile?.created 
-    ? new Date(profile.created).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  const memberSinceDate = profile?.created_at
+    ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     : 'Unknown';
 
   const rating = profile?.rating || 0;
@@ -387,11 +418,11 @@ const VaultProfilePage = () => {
                   className="group relative aspect-[3/4] bg-muted rounded-xl overflow-hidden border border-border/50 cursor-pointer hover:border-primary/50 transition-colors"
                   onClick={() => openCardModal(card)}
                 >
-                  {card.cardImage && card.cardImage.length > 0 ? (
-                    <img 
-                      src={pb.files.getUrl(card, card.cardImage[0])} 
-                      alt={card.cardName}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  {card.card_image ? (
+                    <img
+                      src={card.card_image.startsWith('http') ? card.card_image : supabase.storage.from('vault-images').getPublicUrl(card.card_image).data.publicUrl}
+                      alt={card.card_name}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
@@ -399,7 +430,7 @@ const VaultProfilePage = () => {
                     </div>
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
-                    <p className="text-white font-bold text-sm truncate">{card.cardName}</p>
+                    <p className="text-white font-bold text-sm truncate">{card.card_name}</p>
                     <p className="text-white/80 text-xs">{card.condition}</p>
                   </div>
                 </div>
@@ -423,10 +454,10 @@ const VaultProfilePage = () => {
               </div>
               <div className="p-6 flex flex-col overflow-y-auto">
                 <DialogHeader className="mb-6">
-                  <DialogTitle className="text-2xl font-serif font-bold">{selectedCard.cardName}</DialogTitle>
+                  <DialogTitle className="text-2xl font-serif font-bold">{selectedCard.card_name}</DialogTitle>
                   <p className="text-muted-foreground font-medium">{selectedCard.collectionType}</p>
                 </DialogHeader>
-                
+
                 <div className="space-y-4 flex-1">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-muted/50 p-3 rounded-xl">
@@ -438,9 +469,9 @@ const VaultProfilePage = () => {
                         {['For Sale', 'For Both'].includes(selectedCard.listingStatus) ? 'Asking Price' : 'Est. Value'}
                       </p>
                       <p className="font-medium tabular-nums">
-                        ${(['For Sale', 'For Both'].includes(selectedCard.listingStatus) && selectedCard.askingPrice) 
-                          ? selectedCard.askingPrice.toFixed(2) 
-                          : (selectedCard.estimatedValue?.toFixed(2) || '0.00')}
+                        ${(['For Sale', 'For Both'].includes(selectedCard.listingStatus) && selectedCard.price_aud)
+                          ? selectedCard.price_aud.toFixed(2)
+                          : (selectedCard.estimated_value_aud?.toFixed(2) || '0.00')}
                       </p>
                     </div>
                     <div className="bg-muted/50 p-3 rounded-xl">

@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import { COLLECTION_CONFIGS, resolveCollectionSlug } from '@/data/collectionConfigs.js';
@@ -297,18 +297,15 @@ const CollectionPage = () => {
     if (!categoryId) return;
     setNewReleasesLoading(true);
 
-    const vaultFilter = `is_public=true && categoryId="${categoryId}"`;
-    const shopFilter = `(visibility="public" || visibility="marketplace-only") && categoryId="${categoryId}"`;
-
     Promise.allSettled([
-      pb.collection('user_vaults').getList(1, 8, { filter: vaultFilter, sort: '-created', $autoCancel: false }),
-      pb.collection('shop_products').getList(1, 8, { filter: shopFilter, sort: '-created', $autoCancel: false }),
+      supabase.from('vault_items').select('*, vault_images(*)').eq('category_id', categoryId).neq('listing_status', 'private').order('created_at', { ascending: false }).limit(8),
+      supabase.from('listings').select('*').eq('category_id', categoryId).eq('type', 'shop').order('created_at', { ascending: false }).limit(8),
     ]).then(([vaultRes, shopRes]) => {
       if (!isMounted.current) return;
-      const vaultItems = vaultRes.status === 'fulfilled' ? vaultRes.value.items.map(i => ({ ...i, source: 'vault' })) : [];
-      const shopItems = shopRes.status === 'fulfilled' ? shopRes.value.items.map(i => ({ ...i, source: 'shop' })) : [];
+      const vaultItems = vaultRes.status === 'fulfilled' ? (vaultRes.value.data ?? []).map(i => ({ ...i, source: 'vault' })) : [];
+      const shopItems = shopRes.status === 'fulfilled' ? (shopRes.value.data ?? []).map(i => ({ ...i, source: 'shop' })) : [];
       const merged = [...vaultItems, ...shopItems]
-        .sort((a, b) => new Date(b.created) - new Date(a.created))
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
         .slice(0, 10);
       setNewReleases(merged);
       setNewReleasesLoading(false);
@@ -320,21 +317,20 @@ const CollectionPage = () => {
     if (!categoryId || !config?.showGradedSection) return;
     setGradedLoading(true);
 
-    // Filter for cards that have a grade or grading company set
-    const gradedFilter = `is_public=true && categoryId="${categoryId}" && (grade!="" || gradingCompany!="")`;
-
-    pb.collection('user_vaults').getList(1, 10, {
-      filter: gradedFilter,
-      sort: '-created',
-      $autoCancel: false,
-    }).then(res => {
-      if (!isMounted.current) return;
-      setGradedListings(res.items.map(i => ({ ...i, source: 'vault' })));
-    }).catch(() => {
-      if (isMounted.current) setGradedListings([]);
-    }).finally(() => {
-      if (isMounted.current) setGradedLoading(false);
-    });
+    supabase.from('vault_items').select('*, vault_images(*)')
+      .eq('category_id', categoryId)
+      .neq('listing_status', 'private')
+      .not('grade_score', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(10)
+      .then(({ data }) => {
+        if (!isMounted.current) return;
+        setGradedListings((data ?? []).map(i => ({ ...i, source: 'vault' })));
+      }).catch(() => {
+        if (isMounted.current) setGradedListings([]);
+      }).finally(() => {
+        if (isMounted.current) setGradedLoading(false);
+      });
   }, [categoryId, config]);
 
   // ─── Trending (highest-priced listings = premium market signal) ───────────
@@ -342,20 +338,20 @@ const CollectionPage = () => {
     if (!categoryId || !config?.showTrendingSection) return;
     setTrendingLoading(true);
 
-    const filter = `is_public=true && categoryId="${categoryId}" && price>0`;
-
-    pb.collection('user_vaults').getList(1, 8, {
-      filter,
-      sort: '-price',
-      $autoCancel: false,
-    }).then(res => {
-      if (!isMounted.current) return;
-      setTrendingListings(res.items.map(i => ({ ...i, source: 'vault' })));
-    }).catch(() => {
-      if (isMounted.current) setTrendingListings([]);
-    }).finally(() => {
-      if (isMounted.current) setTrendingLoading(false);
-    });
+    supabase.from('vault_items').select('*, vault_images(*)')
+      .eq('category_id', categoryId)
+      .neq('listing_status', 'private')
+      .gt('asking_price_aud', 0)
+      .order('asking_price_aud', { ascending: false })
+      .limit(8)
+      .then(({ data }) => {
+        if (!isMounted.current) return;
+        setTrendingListings((data ?? []).map(i => ({ ...i, source: 'vault' })));
+      }).catch(() => {
+        if (isMounted.current) setTrendingListings([]);
+      }).finally(() => {
+        if (isMounted.current) setTrendingLoading(false);
+      });
   }, [categoryId, config]);
 
   // ─── Holy Grail (featured picks) ─────────────────────────────────────────
@@ -363,35 +359,10 @@ const CollectionPage = () => {
     setHolyGrailLoading(true);
     const loadHolyGrail = async () => {
       try {
-        const featuredRefs = await pb.collection('featuredCards').getList(1, 20, {
-          filter: 'is_active=true',
-          sort: 'order',
-          $autoCancel: false,
-        });
-
-        const cardIds = featuredRefs.items.map(r => r.card_id).filter(Boolean);
-        if (cardIds.length === 0) { setHolyGrail([]); return; }
-
-        const filterStr = cardIds.map(id => `id="${id}"`).join(' || ');
-        const [vaultRes, shopRes] = await Promise.allSettled([
-          pb.collection('user_vaults').getList(1, 20, {
-            filter: `(${filterStr}) && is_public=true${categoryId ? ` && categoryId="${categoryId}"` : ''}`,
-            expand: 'seller',
-            $autoCancel: false,
-          }),
-          pb.collection('shop_products').getList(1, 20, {
-            filter: filterStr,
-            $autoCancel: false,
-          }),
-        ]);
-
-        const vaultItems = vaultRes.status === 'fulfilled' ? vaultRes.value.items.map(i => ({ ...i, source: 'vault' })) : [];
-        const shopItems = shopRes.status === 'fulfilled' ? shopRes.value.items.map(i => ({ ...i, source: 'shop' })) : [];
-
-        const idOrderMap = Object.fromEntries(featuredRefs.items.map((r, idx) => [r.card_id, idx]));
-        const all = [...vaultItems, ...shopItems].sort((a, b) => (idOrderMap[a.id] ?? 99) - (idOrderMap[b.id] ?? 99));
-
-        if (isMounted.current) setHolyGrail(all.slice(0, 6));
+        let query = supabase.from('vault_items').select('*, vault_images(*), owner:profiles!owner_id(*)').eq('is_featured', true).neq('listing_status', 'private').limit(6);
+        if (categoryId) query = query.eq('category_id', categoryId);
+        const { data: featured } = await query;
+        if (isMounted.current) setHolyGrail((featured ?? []).map(i => ({ ...i, source: 'vault' })));
       } catch {
         if (isMounted.current) setHolyGrail([]);
       } finally {
@@ -406,42 +377,37 @@ const CollectionPage = () => {
     if (!categoryId) return;
     if (isMounted.current) { setListingsLoading(true); setListingsError(null); }
 
-    let vaultFilter = `is_public=true && categoryId="${categoryId}"`;
-    let shopFilter = `(visibility="public" || visibility="marketplace-only") && categoryId="${categoryId}"`;
-
-    if (filterSub) { vaultFilter += ` && subcategoryId="${filterSub}"`; shopFilter += ` && subcategoryId="${filterSub}"`; }
-    if (filterBrand) { vaultFilter += ` && brandId="${filterBrand}"`; shopFilter += ` && brandId="${filterBrand}"`; }
-    if (filterSeries) { vaultFilter += ` && seriesId="${filterSeries}"`; shopFilter += ` && seriesId="${filterSeries}"`; }
-    if (filterCondition) vaultFilter += ` && condition="${filterCondition}"`;
-
-    if (filterType === 'For Sale') {
-      vaultFilter += ' && (listing_type="For Sale" || listing_type="For Sale & Trade")';
-    } else if (filterType === 'For Trade') {
-      shopFilter = 'id="NONE"';
-      vaultFilter += ' && (listing_type="For Trade" || listing_type="For Sale & Trade")';
-    } else {
-      vaultFilter += ' && (listing_type="For Sale" || listing_type="For Trade" || listing_type="For Sale & Trade")';
-    }
+    const perPage = LISTINGS_PER_PAGE;
+    const from = (page - 1) * perPage;
 
     try {
-      const perPage = LISTINGS_PER_PAGE;
-      const [vaultRes, shopRes] = await Promise.allSettled([
-        pb.collection('user_vaults').getList(page, perPage, { filter: vaultFilter, sort: filterSort, $autoCancel: false }),
-        pb.collection('shop_products').getList(page, perPage, { filter: shopFilter, sort: filterSort, $autoCancel: false }),
-      ]);
+      let vaultQ = supabase.from('vault_items').select('*, vault_images(*)', { count: 'exact' }).eq('category_id', categoryId).neq('listing_status', 'private').range(from, from + perPage - 1);
+      let shopQ  = supabase.from('listings').select('*', { count: 'exact' }).eq('category_id', categoryId).eq('type', 'shop').range(from, from + perPage - 1);
+
+      if (filterSub) { vaultQ = vaultQ.eq('subcategory_id', filterSub); shopQ = shopQ.eq('subcategory_id', filterSub); }
+      if (filterCondition) vaultQ = vaultQ.eq('condition', filterCondition);
+
+      if (filterType === 'For Sale') {
+        vaultQ = vaultQ.in('listing_status', ['for_sale', 'for_both']);
+      } else if (filterType === 'For Trade') {
+        vaultQ = vaultQ.in('listing_status', ['for_trade', 'for_both']);
+        shopQ = shopQ.eq('id', 'NONE');
+      }
+
+      if (filterSort === '-created') { vaultQ = vaultQ.order('created_at', { ascending: false }); shopQ = shopQ.order('created_at', { ascending: false }); }
+      else if (filterSort === 'price') { vaultQ = vaultQ.order('asking_price_aud'); shopQ = shopQ.order('price_aud'); }
+      else if (filterSort === '-price') { vaultQ = vaultQ.order('asking_price_aud', { ascending: false }); shopQ = shopQ.order('price_aud', { ascending: false }); }
+
+      const [vaultRes, shopRes] = await Promise.allSettled([vaultQ, shopQ]);
 
       if (!isMounted.current) return;
 
-      const vaultItems = vaultRes.status === 'fulfilled' ? vaultRes.value.items.map(i => ({ ...i, source: 'vault' })) : [];
-      const shopItems = shopRes.status === 'fulfilled' ? shopRes.value.items.map(i => ({ ...i, source: 'shop' })) : [];
-      const vaultTotal = vaultRes.status === 'fulfilled' ? vaultRes.value.totalItems : 0;
-      const shopTotal = shopRes.status === 'fulfilled' ? shopRes.value.totalItems : 0;
+      const vaultItems = vaultRes.status === 'fulfilled' ? (vaultRes.value.data ?? []).map(i => ({ ...i, source: 'vault' })) : [];
+      const shopItems  = shopRes.status === 'fulfilled' ? (shopRes.value.data ?? []).map(i => ({ ...i, source: 'shop' })) : [];
+      const vaultTotal = vaultRes.status === 'fulfilled' ? (vaultRes.value.count ?? 0) : 0;
+      const shopTotal  = shopRes.status === 'fulfilled' ? (shopRes.value.count ?? 0) : 0;
 
-      let merged = [...vaultItems, ...shopItems];
-      if (filterSort === '-created') merged.sort((a, b) => new Date(b.created) - new Date(a.created));
-      else if (filterSort === 'price') merged.sort((a, b) => (a.price || 0) - (b.price || 0));
-      else if (filterSort === '-price') merged.sort((a, b) => (b.price || 0) - (a.price || 0));
-
+      const merged = [...vaultItems, ...shopItems];
       setListings(page === 1 ? merged : prev => [...prev, ...merged]);
       setTotalListings(vaultTotal + shopTotal);
       setListingsPage(page);

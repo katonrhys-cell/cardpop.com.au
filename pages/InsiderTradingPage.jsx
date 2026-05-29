@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet';
 import { ExternalLink, Copy, Edit, Trash, Plus, Store, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import pb from '@/lib/pocketbaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,11 +37,12 @@ const InsiderTradingPage = () => {
   const fetchRetailers = async () => {
     try {
       setLoading(true);
-      const records = await pb.collection('retailers').getFullList({
-        sort: '-created',
-        $autoCancel: false
-      });
-      setRetailers(records);
+      const { data: records, error: fetchError } = await supabase
+        .from('business_profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (fetchError) throw fetchError;
+      setRetailers(records || []);
     } catch (error) {
       console.error('Error fetching retailers:', error);
       toast.error('Failed to load retailers.');
@@ -96,7 +97,8 @@ const InsiderTradingPage = () => {
     if (!window.confirm('Are you sure you want to delete this retailer?')) return;
     
     try {
-      await pb.collection('retailers').delete(id, { $autoCancel: false });
+      const { error: deleteError } = await supabase.from('business_profiles').delete().eq('id', id);
+      if (deleteError) throw deleteError;
       toast.success('Retailer deleted successfully.');
       fetchRetailers();
     } catch (error) {
@@ -107,7 +109,7 @@ const InsiderTradingPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.brandName || !formData.affiliateLink) {
+    if (!formData.brand_name || !formData.affiliate_link) {
       toast.error('Brand Name and Affiliate Link are required.');
       return;
     }
@@ -120,10 +122,12 @@ const InsiderTradingPage = () => {
     try {
       setIsSubmitting(true);
       if (isEditing) {
-        await pb.collection('retailers').update(editingId, formData, { $autoCancel: false });
+        const { error: updateError } = await supabase.from('business_profiles').update(formData).eq('id', editingId);
+        if (updateError) throw updateError;
         toast.success('Retailer updated successfully.');
       } else {
-        await pb.collection('retailers').create(formData, { $autoCancel: false });
+        const { error: insertError } = await supabase.from('business_profiles').insert(formData);
+        if (insertError) throw insertError;
         toast.success('Retailer added successfully.');
       }
       resetForm();

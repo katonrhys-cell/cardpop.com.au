@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from '@/components/ui/dialog';
 import { ZoomIn, ImageOff } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { cn } from '@/lib/utils.js';
 
 const ProductImageCarousel = ({ images = [], record = null }) => {
@@ -11,7 +11,14 @@ const ProductImageCarousel = ({ images = [], record = null }) => {
   const getImageUrl = (img) => {
     if (!img) return null;
     if (typeof img === 'string' && img.startsWith('http')) return img;
-    if (record) return pb.files.getUrl(record, img);
+    // If record has a storage_path, use Supabase Storage
+    if (record && record.storage_path) {
+      return supabase.storage.from('vault-images').getPublicUrl(record.storage_path).data.publicUrl;
+    }
+    // img might itself be a storage path
+    if (typeof img === 'string') {
+      return supabase.storage.from('vault-images').getPublicUrl(img).data.publicUrl;
+    }
     return null;
   };
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Sparkles, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import FeaturedProductCard from '@/components/FeaturedProductCard.jsx';
@@ -20,59 +20,35 @@ const FeaturedCardsSection = () => {
         setIsLoading(true);
         setError(null);
         
-        // 1. Fetch featured card references
-        // Note: card_id is a text field in the schema, not a relation, 
-        // so expand="card_id" will not work natively. We must fetch manually.
-        const featuredResult = await pb.collection('featuredCards').getList(1, 50, {
-          filter: 'is_active = true',
-          sort: 'order',
-          $autoCancel: false
-        });
+        // 1. Fetch featured cards from vault_items (high value, ordered by estimated_value_aud desc)
+        const { data: featuredItems, error: featuredError } = await supabase
+          .from('vault_items')
+          .select('*')
+          .gt('estimated_value_aud', 0)
+          .order('estimated_value_aud', { ascending: false })
+          .limit(50);
 
-        console.log('[FeaturedCardsSection] Featured records fetched:', featuredResult.items);
+        console.log('[FeaturedCardsSection] Featured records fetched:', featuredItems);
 
-        if (!featuredResult.items || featuredResult.items.length === 0) {
+        if (featuredError || !featuredItems || featuredItems.length === 0) {
           if (isMounted) setCards([]);
           return;
         }
 
-        const cardIdsToFetch = featuredResult.items.map(item => item.card_id).filter(Boolean);
-        
-        if (cardIdsToFetch.length === 0) {
-          if (isMounted) setCards([]);
-          return;
-        }
+        // 2. Also check set_cards (officialCatalog equivalent)
+        const { data: catalogItems } = await supabase
+          .from('set_cards')
+          .select('*')
+          .limit(50);
 
-        // 2. Fetch the actual card records.
-        // We look in 'cards' (vault) first, then fallback to 'officialCatalog' or 'shop_products'
-        const filterStr = cardIdsToFetch.map(id => `id="${id}"`).join(' || ');
-        
-        console.log(`[FeaturedCardsSection] Fetching products with filter: ${filterStr}`);
-
-        // Run queries concurrently for efficiency
-        const [vaultCardsRes, catalogCardsRes] = await Promise.allSettled([
-          pb.collection('cards').getList(1, 50, { filter: filterStr, $autoCancel: false }),
-          pb.collection('officialCatalog').getList(1, 50, { filter: filterStr, $autoCancel: false })
-        ]);
-
-        const vaultItems = vaultCardsRes.status === 'fulfilled' ? vaultCardsRes.value.items : [];
-        const catalogItems = catalogCardsRes.status === 'fulfilled' ? catalogCardsRes.value.items : [];
-        
-        const allFetchedProducts = [...vaultItems, ...catalogItems];
+        const allFetchedProducts = [...(featuredItems || []), ...(catalogItems || [])];
         console.log('[FeaturedCardsSection] Retrieved product data:', allFetchedProducts);
 
-        // 3. Map back to the original featured order and filter out missing cards
-        const orderedProducts = featuredResult.items
-          .map(featuredItem => {
-            const productData = allFetchedProducts.find(p => p.id === featuredItem.card_id);
-            if (!productData) {
-              console.warn(`[FeaturedCardsSection] Missing product data for card_id: ${featuredItem.card_id}`);
-              return null;
-            }
-            // Attach the featured order for potential use
-            return { ...productData, _featuredOrder: featuredItem.order };
-          })
-          .filter(Boolean);
+        // 3. Use the ordered products directly
+        const orderedProducts = featuredItems.map((item, idx) => ({
+          ...item,
+          _featuredOrder: idx
+        }));
 
         if (isMounted) {
           setCards(orderedProducts);

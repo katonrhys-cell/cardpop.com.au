@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
-import pb from '@/lib/pocketbaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Building2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -10,9 +10,8 @@ const GradingCompaniesPage = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    pb.collection('grading_guides')
-      .getList(1, 20, { sort: 'gradingService', $autoCancel: false })
-      .then(res => setGuides(res.items))
+    supabase.from('grading_companies').select('*').order('name').limit(20)
+      .then(({ data }) => setGuides(data ?? []))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
@@ -46,23 +45,23 @@ const GradingCompaniesPage = () => {
             guides.map(guide => (
               <Link
                 key={guide.id}
-                to={`/grading/guide/${guide.gradeType}`}
+                to={`/grading/guide/${guide.slug || guide.id}`}
                 className="block bg-card border border-border rounded-2xl p-7 hover:border-primary/50 hover:shadow-md transition-all group"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <h3 className="text-2xl font-bold mb-0.5 group-hover:text-primary transition-colors">
-                      {guide.gradingService}
+                      {guide.name}
                     </h3>
-                    <p className="text-primary text-sm font-medium mb-3">{guide.gradeType}</p>
+                    <p className="text-primary text-sm font-medium mb-3">{guide.abbreviation}</p>
                     <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">
-                      {guide.description || `Scale: ${guide.scaleMin}–${guide.scaleMax}. Click to view full standards.`}
+                      {guide.description || 'Click to view full grading standards.'}
                     </p>
                   </div>
                   <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0 mt-1" />
                 </div>
                 <p className="text-xs text-muted-foreground mt-4">
-                  Scale: {guide.scaleMin}–{guide.scaleMax}
+                  Country: {guide.country || 'International'}
                 </p>
               </Link>
             ))

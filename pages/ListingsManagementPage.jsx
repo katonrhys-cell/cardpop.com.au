@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, Filter, ArrowUpDown, Loader2, MoreHorizontal } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { formatCurrency } from '@/api/EcommerceApi.js';
 import { toast } from 'sonner';
 
@@ -44,26 +44,23 @@ const ListingsManagementPage = () => {
   const fetchListings = useCallback(async () => {
     setLoading(true);
     try {
-      let filterStr = [];
-      if (searchQuery) filterStr.push(`name ~ "${searchQuery}" || productId ~ "${searchQuery}"`);
-      if (categoryFilter !== 'all') filterStr.push(`collectionType = "${categoryFilter}"`);
-      if (statusFilter === 'active') filterStr.push(`stockQuantity > 0`);
-      if (statusFilter === 'inactive') filterStr.push(`stockQuantity = 0`);
+      let query = supabase.from('listings').select('*', { count: 'exact' }).range((page - 1) * 20, page * 20 - 1).order('created_at', { ascending: false });
 
-      const result = await pb.collection('officialCatalog').getList(page, 20, {
-        filter: filterStr.join(' && '),
-        sort: sortOrder,
-        $autoCancel: false
-      });
+      if (searchQuery) query = query.ilike('title', `%${searchQuery}%`);
+      if (categoryFilter !== 'all') query = query.eq('category', categoryFilter);
+      if (statusFilter === 'active') query = query.eq('status', 'active');
+      if (statusFilter === 'inactive') query = query.neq('status', 'active');
 
-      setListings(result.items);
-      setTotalPages(result.totalPages);
-      setTotalItems(result.totalItems);
-      
-      // Fetch separate bulk list for analytics (first 200 items to avoid huge payload)
+      const { data: items, count, error } = await query;
+      if (error) throw error;
+
+      setListings(items ?? []);
+      setTotalPages(Math.ceil((count ?? 0) / 20));
+      setTotalItems(count ?? 0);
+
       if (page === 1) {
-        const all = await pb.collection('officialCatalog').getList(1, 200, { $autoCancel: false, sort: '-created' });
-        setAllListingsForAnalytics(all.items);
+        const { data: allData } = await supabase.from('listings').select('*').order('created_at', { ascending: false }).limit(200);
+        setAllListingsForAnalytics(allData ?? []);
       }
     } catch (error) {
       console.error('Failed to fetch listings:', error);
@@ -95,7 +92,8 @@ const ListingsManagementPage = () => {
   const handleDelete = async (listing) => {
     if (!window.confirm(`Are you sure you want to delete "${listing.name}"?`)) return;
     try {
-      await pb.collection('officialCatalog').delete(listing.id, { $autoCancel: false });
+      const { error } = await supabase.from('listings').delete().eq('id', listing.id);
+      if (error) throw error;
       toast.success('Listing deleted');
       fetchListings();
       if (selectedListing?.id === listing.id) setIsDetailModalOpen(false);
@@ -108,7 +106,8 @@ const ListingsManagementPage = () => {
     if (!window.confirm(`Delete ${selectedItems.size} selected listings?`)) return;
     try {
       for (const id of selectedItems) {
-        await pb.collection('officialCatalog').delete(id, { $autoCancel: false });
+        const { error } = await supabase.from('listings').delete().eq('id', id);
+        if (error) throw error;
       }
       toast.success(`Deleted ${selectedItems.size} listings`);
       setSelectedItems(new Set());

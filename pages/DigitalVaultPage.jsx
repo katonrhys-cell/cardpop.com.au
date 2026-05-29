@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { Layers, DollarSign, Plus, Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
-import pb from '@/lib/pocketbaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import CardForm from '@/components/CardForm.jsx';
@@ -20,19 +20,23 @@ const DigitalVaultPage = () => {
   const fetchCards = async () => {
     setLoading(true);
     try {
-      const result = await pb.collection('shop_products').getList(1, 50, {
-        filter: `owner="${currentUser.id}"`,
-        sort: '-created',
-        $autoCancel: false
-      });
-      setCards(result.items);
-      
+      const { data, error: fetchError } = await supabase
+        .from('listings')
+        .select('*')
+        .eq('owner_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (fetchError) throw fetchError;
+      const items = data || [];
+      setCards(items);
+
       let val = 0, tradeCount = 0;
-      result.items.forEach(c => {
-        val += c.price || 0;
+      items.forEach(c => {
+        val += c.price_aud || 0;
         if (c.marketplaceStatus === 'For Trade' || c.marketplaceStatus === 'For Both') tradeCount++;
       });
-      setStats({ totalCards: result.totalItems, totalValue: val, forTrade: tradeCount });
+      setStats({ totalCards: items.length, totalValue: val, forTrade: tradeCount });
     } catch (error) {
       toast.error('Failed to load vault');
     } finally {
@@ -47,7 +51,7 @@ const DigitalVaultPage = () => {
   const handleDelete = async (id) => {
     if(!window.confirm("Delete this card?")) return;
     try {
-      await pb.collection('shop_products').delete(id, { $autoCancel: false });
+      await supabase.from('listings').delete().eq('id', id);
       toast.success("Card deleted");
       fetchCards();
     } catch (e) {
@@ -143,7 +147,7 @@ const DigitalVaultPage = () => {
                 <div key={card.id} className="premium-card p-4 flex flex-col">
                   <div className="aspect-[3/4] bg-muted rounded-xl mb-4 flex items-center justify-center overflow-hidden relative group">
                     {card.images && card.images.length > 0 ? (
-                      <img src={pb.files.getUrl(card, card.images[0])} alt={card.name} className="object-cover w-full h-full" />
+                      <img src={card.images[0].startsWith('http') ? card.images[0] : supabase.storage.from('vault-images').getPublicUrl(card.images[0]).data.publicUrl} alt={card.name} className="object-cover w-full h-full" />
                     ) : (
                       <span className="text-muted-foreground text-sm font-medium">No Image</span>
                     )}

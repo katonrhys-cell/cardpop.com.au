@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Users, AlertCircle } from 'lucide-react';
 import SellerCard from '@/components/SellerCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,12 +15,14 @@ const CommunityPage = () => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await pb.collection('users').getList(1, 50, {
-          filter: 'inventoryCount > 0 || rating > 0',
-          sort: '-rating',
-          $autoCancel: false,
-        });
-        setSellers(response.items || []);
+        const { data, error: fetchError } = await supabase
+          .from('profiles')
+          .select('*')
+          .or('inventory_count.gt.0,rating.gt.0')
+          .order('rating', { ascending: false })
+          .limit(50);
+        if (fetchError) throw fetchError;
+        setSellers(data || []);
       } catch (err) {
         console.error('Failed to fetch sellers:', err);
         setError('Unable to load the seller directory at this time. Please try again later.');

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { Loader2, PackageX, Plus } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/ProductCard.jsx';
@@ -15,7 +15,7 @@ const ProductListingPage = () => {
   const { isAdmin } = useAuth();
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [sortOrder, setSortOrder] = useState('-created');
+  const [sortOrder, setSortOrder] = useState('created_at_desc');
   
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -26,14 +26,27 @@ const ProductListingPage = () => {
   const fetchAllProducts = async () => {
     setLoading(true);
     try {
-      const result = await pb.collection('shop_products').getList(page, 12, {
-        sort: sortOrder,
-        $autoCancel: false
-      });
-      
-      setProducts(result.items);
-      setTotalPages(result.totalPages);
-      setTotalItems(result.totalItems);
+      const perPage = 12;
+      const from = (page - 1) * perPage;
+
+      const sortAsc = sortOrder === 'price_aud_asc';
+      const sortDesc = sortOrder === 'price_aud_desc';
+
+      let query = supabase
+        .from('listings')
+        .select('*', { count: 'exact' })
+        .range(from, from + perPage - 1);
+
+      if (sortAsc) query = query.order('price_aud', { ascending: true });
+      else if (sortDesc) query = query.order('price_aud', { ascending: false });
+      else query = query.order('created_at', { ascending: false });
+
+      const { data, count, error } = await query;
+      if (error) throw error;
+
+      setProducts(data || []);
+      setTotalItems(count || 0);
+      setTotalPages(Math.ceil((count || 0) / perPage));
     } catch (error) {
       console.error('Error fetching products:', error);
     } finally {
@@ -70,9 +83,9 @@ const ProductListingPage = () => {
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="-created">Newest First</SelectItem>
-              <SelectItem value="price">Price: Low to High</SelectItem>
-              <SelectItem value="-price">Price: High to Low</SelectItem>
+              <SelectItem value="created_at_desc">Newest First</SelectItem>
+              <SelectItem value="price_aud_asc">Price: Low to High</SelectItem>
+              <SelectItem value="price_aud_desc">Price: High to Low</SelectItem>
             </SelectContent>
           </Select>
 

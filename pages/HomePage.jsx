@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { motion, useInView } from 'framer-motion';
 import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import VaultListingCard from '@/components/VaultListingCard.jsx';
 import SellerCard from '@/components/SellerCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -120,48 +120,14 @@ const HomePage = () => {
 
     const fetchHomeData = async () => {
       try {
-        const sellersRes = await pb.collection('featuredSellers').getList(1, 4, {
-          expand: 'seller_id',
-          filter: 'is_active = true',
-          sort: 'order',
-          $autoCancel: false,
-        });
-
-        const recentListings = await pb.collection('trading_cards').getList(1, 4, {
-          filter: '(is_for_sale = true || is_for_trade = true)',
-          sort: '-created',
-          $autoCancel: false,
-        });
-
-        const productIds = [...new Set(recentListings.items.map(i => i.product_id).filter(Boolean))];
-        const userIds    = [...new Set(recentListings.items.map(i => i.user_id).filter(Boolean))];
-
-        let catalogProducts = [], customCards = [], users = [];
-
-        if (productIds.length > 0) {
-          const idFilter = productIds.map(id => `id="${id}"`).join('||');
-          try { catalogProducts = await pb.collection('officialCatalog').getFullList({ filter: idFilter, $autoCancel: false }); } catch {}
-          try { customCards     = await pb.collection('cards').getFullList({ filter: idFilter, $autoCancel: false });           } catch {}
-        }
-
-        if (userIds.length > 0) {
-          try {
-            users = await pb.collection('users').getFullList({
-              filter: userIds.map(id => `id="${id}"`).join('||'),
-              $autoCancel: false,
-            });
-          } catch {}
-        }
-
-        const mappedListings = recentListings.items.map(item => {
-          const product = catalogProducts.find(p => p.id === item.product_id) || customCards.find(c => c.id === item.product_id) || null;
-          const user    = users.find(u => u.id === item.user_id) || null;
-          return { ...item, product, user };
-        });
+        const [listingsRes, sellersRes] = await Promise.all([
+          supabase.from('vault_items').select('*, owner:profiles!owner_id(id, display_name, username, avatar_url), vault_images(*)').in('listing_status', ['for_sale', 'for_trade', 'for_both']).order('created_at', { ascending: false }).limit(4),
+          supabase.from('profiles').select('*').eq('is_featured_seller', true).eq('is_active', true).limit(4),
+        ]);
 
         if (isMounted) {
-          setFeaturedCards(mappedListings);
-          setFeaturedSellers(sellersRes.items.map(item => item.expand?.seller_id).filter(Boolean));
+          setFeaturedCards(listingsRes.data ?? []);
+          setFeaturedSellers(sellersRes.data ?? []);
         }
       } catch (error) {
         console.error('Failed to fetch homepage data:', error);

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
-import pb from '@/lib/pocketbaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BarChart3 } from 'lucide-react';
 
@@ -13,7 +13,7 @@ const MarketDetailPage = () => {
   useEffect(() => {
     const fetchMarket = async () => {
       try {
-        const res = await pb.collection('market_data').getOne(market, { $autoCancel: false });
+        const { data: res } = await supabase.from('market_data').select('*').eq('id', market).maybeSingle();
         setData(res);
       } catch (error) {
         console.error(error);

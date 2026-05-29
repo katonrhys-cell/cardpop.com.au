@@ -6,7 +6,7 @@ import Header, { COLLECTIONS_LIST } from '@/components/Header.jsx';
 import Footer from '@/components/Footer.jsx';
 import CardListingOptions from '@/components/CardListingOptions.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -45,26 +45,36 @@ const AddEditCardPage = () => {
     if (isEdit) {
       const fetchCard = async () => {
         try {
-          const card = await pb.collection('cards').getOne(id, { $autoCancel: false });
-          if (card.owner !== currentUser.id) {
+          const { data: card, error: fetchError } = await supabase
+            .from('vault_items')
+            .select('*')
+            .eq('id', id)
+            .single();
+
+          if (fetchError) throw fetchError;
+
+          if (card.owner_id !== currentUser.id) {
             toast.error("Unauthorized");
             navigate('/vault');
             return;
           }
-          
+
           setFormData({
             collectionType: card.collectionType || 'Pokemon',
-            cardName: card.cardName || '',
+            cardName: card.card_name || '',
             condition: card.condition || 'Mint',
-            estimatedValue: card.estimatedValue || '',
+            estimatedValue: card.estimated_value_aud || '',
             description: card.description || '',
             listingStatus: card.listingStatus || 'Not Listed',
-            tradePrice: card.tradeValue || '',
-            salePrice: card.salePrice || ''
+            tradePrice: card.trade_value_locked || '',
+            salePrice: card.price_aud || ''
           });
 
-          if (card.cardImage) {
-            setImagePreview(pb.files.getUrl(card, card.cardImage));
+          if (card.card_image) {
+            const imgUrl = card.card_image.startsWith('http')
+              ? card.card_image
+              : supabase.storage.from('vault-images').getPublicUrl(card.card_image).data.publicUrl;
+            setImagePreview(imgUrl);
           }
         } catch (error) {
           toast.error("Failed to load card");
@@ -150,52 +160,58 @@ const AddEditCardPage = () => {
 
     setSaving(true);
     try {
-      const data = new FormData();
-      data.append('owner', currentUser.id);
-      data.append('collectionType', formData.collectionType);
-      data.append('cardName', formData.cardName);
-      data.append('condition', formData.condition);
-      data.append('estimatedValue', parseFloat(formData.estimatedValue) || 0);
-      if (formData.description) data.append('description', formData.description);
-      
-      // Listing Options
-      data.append('listingStatus', formData.listingStatus);
-      
-      if (formData.listingStatus === 'For Trade') {
-        data.append('listedForTrade', true);
-        data.append('tradeValue', parseFloat(formData.tradePrice));
-        data.append('listedForSale', false);
-        data.append('salePrice', 0);
-      } else if (formData.listingStatus === 'For Sale') {
-        data.append('listedForSale', true);
-        data.append('salePrice', parseFloat(formData.salePrice));
-        data.append('listedForTrade', false);
-        data.append('tradeValue', 0);
-      } else {
-        data.append('listedForTrade', false);
-        data.append('tradeValue', 0);
-        data.append('listedForSale', false);
-        data.append('salePrice', 0);
+      let cardImagePath = null;
+
+      // Upload image to Supabase Storage if provided
+      if (imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const filePath = `${currentUser.id}/${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('vault-images')
+          .upload(filePath, imageFile, { upsert: true });
+        if (uploadError) throw uploadError;
+        cardImagePath = filePath;
       }
 
-      if (imageFile) {
-        data.append('cardImage', imageFile);
+      const payload = {
+        owner_id: currentUser.id,
+        collectionType: formData.collectionType,
+        card_name: formData.cardName,
+        condition: formData.condition,
+        estimated_value_aud: parseFloat(formData.estimatedValue) || 0,
+        description: formData.description || null,
+        listingStatus: formData.listingStatus,
+        trade_value_locked: formData.listingStatus === 'For Trade' ? parseFloat(formData.tradePrice) : 0,
+        listedForTrade: formData.listingStatus === 'For Trade',
+        price_aud: formData.listingStatus === 'For Sale' ? parseFloat(formData.salePrice) : 0,
+        listedForSale: formData.listingStatus === 'For Sale',
+      };
+
+      if (cardImagePath) {
+        payload.card_image = cardImagePath;
       }
 
       if (isEdit) {
-        await pb.collection('cards').update(id, data, { $autoCancel: false });
+        const { error: updateError } = await supabase
+          .from('vault_items')
+          .update(payload)
+          .eq('id', id);
+        if (updateError) throw updateError;
         toast.success('Card updated successfully!');
         navigate('/vault');
       } else {
-        await pb.collection('cards').create(data, { $autoCancel: false });
+        const { error: insertError } = await supabase
+          .from('vault_items')
+          .insert(payload);
+        if (insertError) throw insertError;
         toast.success('Card added to your vault!', {
           action: {
             label: 'Add Another',
             onClick: () => {
-              setFormData({ 
-                ...formData, 
-                cardName: '', 
-                description: '', 
+              setFormData({
+                ...formData,
+                cardName: '',
+                description: '',
                 estimatedValue: '',
                 listingStatus: 'Not Listed',
                 tradePrice: '',

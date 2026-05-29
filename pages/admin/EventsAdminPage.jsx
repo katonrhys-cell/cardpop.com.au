@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { 
   Plus, 
   MoreHorizontal, 
@@ -60,11 +60,9 @@ const EventsAdminPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const result = await pb.collection('events').getFullList({
-        sort: '-date',
-        $autoCancel: false
-      });
-      setEvents(result);
+      const { data, error } = await supabase.from('events').select('*').order('event_date', { ascending: false });
+      if (error) throw error;
+      setEvents(data ?? []);
     } catch (err) {
       console.error("Failed to fetch events:", err);
       setError("Failed to load events. Please try again.");
@@ -117,7 +115,8 @@ const EventsAdminPage = () => {
     if (!selectedEvent) return;
     
     try {
-      await pb.collection('events').delete(selectedEvent.id, { $autoCancel: false });
+      const { error } = await supabase.from('events').delete().eq('id', selectedEvent.id);
+      if (error) throw error;
       toast.success("Event deleted successfully");
       setIsDeleteDialogOpen(false);
       fetchEvents();
@@ -137,22 +136,29 @@ const EventsAdminPage = () => {
 
     setIsSubmitting(true);
     try {
-      const data = new FormData();
-      data.append('name', formData.name);
-      data.append('description', formData.description);
-      data.append('date', new Date(formData.date).toISOString());
-      data.append('location', formData.location);
-      data.append('status', formData.status);
-      
+      let image_url = selectedEvent?.image_url ?? null;
       if (imageFile) {
-        data.append('image', imageFile);
+        const path = `events/${Date.now()}-${imageFile.name}`;
+        const { error: upErr } = await supabase.storage.from('events').upload(path, imageFile, { upsert: true });
+        if (!upErr) image_url = supabase.storage.from('events').getPublicUrl(path).data.publicUrl;
       }
 
+      const payload = {
+        title: formData.name,
+        description: formData.description,
+        event_date: formData.date ? new Date(formData.date).toISOString() : null,
+        location: formData.location,
+        status: formData.status,
+        image_url,
+      };
+
       if (selectedEvent) {
-        await pb.collection('events').update(selectedEvent.id, data, { $autoCancel: false });
+        const { error } = await supabase.from('events').update(payload).eq('id', selectedEvent.id);
+        if (error) throw error;
         toast.success("Event updated successfully");
       } else {
-        await pb.collection('events').create(data, { $autoCancel: false });
+        const { error } = await supabase.from('events').insert(payload);
+        if (error) throw error;
         toast.success("Event created successfully");
       }
       

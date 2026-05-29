@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 import ShopProductForm from '@/components/ShopProductForm.jsx';
 
@@ -30,11 +30,9 @@ const ProductManagementPage = () => {
     if (!isMounted.current) return;
     setLoading(true);
     try {
-      const records = await pb.collection('shop_products').getList(1, 100, {
-        sort: '-created',
-        $autoCancel: false
-      });
-      if (isMounted.current) setProducts(records.items);
+      const { data, error } = await supabase.from('listings').select('*').eq('type', 'shop').order('created_at', { ascending: false }).limit(100);
+      if (error) throw error;
+      if (isMounted.current) setProducts(data ?? []);
     } catch (err) {
       if (isMounted.current) setError(err.message);
       toast.error("Failed to load products.");
@@ -52,7 +50,8 @@ const ProductManagementPage = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this shop product?")) return;
     try {
-      await pb.collection('shop_products').delete(id, { $autoCancel: false });
+      const { error } = await supabase.from('listings').delete().eq('id', id);
+      if (error) throw error;
       toast.success("Product deleted.");
       setProducts(products.filter(p => p.id !== id));
     } catch (err) {

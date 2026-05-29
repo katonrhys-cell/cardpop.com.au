@@ -1,97 +1,73 @@
-
 import { useState, useEffect, useMemo } from 'react';
-import pb from '@/lib/pocketbaseClient.js';
-import { toast } from 'sonner';
+import { supabase } from '@/lib/supabaseClient.js';
 
+// brands, subcategories, productLines no longer exist as separate tables.
+// categories is the single taxonomy table (with parent_id for hierarchy).
 export function useProductSelectors(initialValues = {}) {
-  const [brands, setBrands] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [subcategories, setSubcategories] = useState([]);
-  const [productLines, setProductLines] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [categories, setCategories]   = useState([]);
+  const [loading, setLoading]         = useState(true);
 
-  const [selectedBrand, setSelectedBrand] = useState(initialValues.brandId || '');
-  const [selectedCategory, setSelectedCategory] = useState(initialValues.categoryId || '');
+  const [selectedCategory,    setSelectedCategory]    = useState(initialValues.categoryId    || '');
   const [selectedSubcategory, setSelectedSubcategory] = useState(initialValues.subcategoryId || '');
-  const [selectedProductLine, setSelectedProductLine] = useState(initialValues.productLineId || '');
+  const [selectedBrand,       setSelectedBrand]       = useState(initialValues.brandId       || '');
+  const [selectedProductLine, setSelectedProductLine] = useState(initialValues.productLineId  || '');
 
   useEffect(() => {
-    if (initialValues.brandId) setSelectedBrand(initialValues.brandId);
-    if (initialValues.categoryId) setSelectedCategory(initialValues.categoryId);
+    if (initialValues.brandId)       setSelectedBrand(initialValues.brandId);
+    if (initialValues.categoryId)    setSelectedCategory(initialValues.categoryId);
     if (initialValues.subcategoryId) setSelectedSubcategory(initialValues.subcategoryId);
     if (initialValues.productLineId) setSelectedProductLine(initialValues.productLineId);
   }, [initialValues.brandId, initialValues.categoryId, initialValues.subcategoryId, initialValues.productLineId]);
 
   useEffect(() => {
-    let isMounted = true;
-    const fetchData = async () => {
-      try {
-        const [brandsRes, categoriesRes, subcategoriesRes, productLinesRes] = await Promise.all([
-          pb.collection('brands').getFullList({ sort: 'name', $autoCancel: false }),
-          pb.collection('categories').getFullList({ sort: 'name', $autoCancel: false }),
-          pb.collection('subcategories').getFullList({ sort: 'name', $autoCancel: false }),
-          pb.collection('productLines').getFullList({ sort: 'name', $autoCancel: false })
-        ]);
-        
-        if (isMounted) {
-          setBrands(brandsRes);
-          setCategories(categoriesRes);
-          setSubcategories(subcategoriesRes);
-          setProductLines(productLinesRes);
-        }
-      } catch (error) {
-        console.error('Failed to fetch product selectors data:', error);
-        console.error('Error details:', error.data);
-        if (isMounted) {
-          toast.error(`Failed to load taxonomy data: ${error.message}`);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+    let mounted = true;
+    (async () => {
+      const { data } = await supabase
+        .from('categories')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order');
+      if (mounted) {
+        setCategories(data ?? []);
+        setLoading(false);
       }
-    };
-    fetchData();
-    return () => { isMounted = false; };
+    })();
+    return () => { mounted = false; };
   }, []);
 
-  const filteredSubcategories = useMemo(() => {
-    if (!selectedCategory) return [];
-    return subcategories.filter(sub => sub.parentCategory === selectedCategory);
-  }, [subcategories, selectedCategory]);
-
-  const filteredProductLines = useMemo(() => {
-    if (!selectedBrand) return [];
-    return productLines.filter(pl => pl.brand === selectedBrand);
-  }, [productLines, selectedBrand]);
-
-  const handleSetBrand = (brandId) => {
-    setSelectedBrand(brandId);
-    setSelectedProductLine('');
-  };
+  // Sub-categories are top-level categories with parent_id set
+  const subcategories = useMemo(
+    () => categories.filter(c => c.parent_id === selectedCategory),
+    [categories, selectedCategory]
+  );
 
   const handleSetCategory = (categoryId) => {
     setSelectedCategory(categoryId);
     setSelectedSubcategory('');
   };
 
+  const handleSetBrand = (brandId) => {
+    setSelectedBrand(brandId);
+    setSelectedProductLine('');
+  };
+
   return {
-    brands,
+    brands:                [],          // no longer a separate table
     categories,
     subcategories,
-    productLines,
-    filteredSubcategories,
-    filteredProductLines,
+    productLines:          [],          // no longer a separate table
+    filteredSubcategories: subcategories,
+    filteredProductLines:  [],
     selectedBrand,
     selectedCategory,
     selectedSubcategory,
     selectedProductLine,
-    setBrand: handleSetBrand,
-    setCategory: handleSetCategory,
-    setSubcategory: setSelectedSubcategory,
-    setProductLine: setSelectedProductLine,
-    clearSubcategory: () => setSelectedSubcategory(''),
-    clearProductLine: () => setSelectedProductLine(''),
-    loading
+    setBrand:        handleSetBrand,
+    setCategory:     handleSetCategory,
+    setSubcategory:  setSelectedSubcategory,
+    setProductLine:  setSelectedProductLine,
+    clearSubcategory:  () => setSelectedSubcategory(''),
+    clearProductLine:  () => setSelectedProductLine(''),
+    loading,
   };
 }

@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 import { useAdmin } from '@/contexts/AdminContext.jsx';
 import { useDebounce } from '@/hooks/useDebounce.js';
@@ -36,30 +36,24 @@ const UserManagementPage = () => {
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      let filterStr = [];
-      
-      if (debouncedSearch) {
-        filterStr.push(`(email ~ "${debouncedSearch}" || name ~ "${debouncedSearch}" || username ~ "${debouncedSearch}")`);
-      }
-      
-      if (statusFilter === 'active') filterStr.push(`is_active != false`);
-      if (statusFilter === 'inactive') filterStr.push(`is_active = false`);
-      
-      if (verificationFilter === 'verified') filterStr.push(`verified = true`);
-      if (verificationFilter === 'unverified') filterStr.push(`verified = false`);
+      let query = supabase.from('profiles').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range((page - 1) * 20, page * 20 - 1);
 
-      const records = await pb.collection('users').getList(page, 20, {
-        sort: '-created',
-        filter: filterStr.join(' && '),
-        $autoCancel: false
-      });
-      
-      setUsers(records.items);
-      setTotalPages(records.totalPages);
-      setTotalItems(records.totalItems);
-      
-      // Fetch counts for these specific users asynchronously to not block render
-      fetchRelatedCounts(records.items);
+      if (debouncedSearch) {
+        query = query.or(`email.ilike.%${debouncedSearch}%,display_name.ilike.%${debouncedSearch}%,username.ilike.%${debouncedSearch}%`);
+      }
+      if (statusFilter === 'active') query = query.eq('is_active', true);
+      if (statusFilter === 'inactive') query = query.eq('is_active', false);
+      if (verificationFilter === 'verified') query = query.eq('is_verified', true);
+      if (verificationFilter === 'unverified') query = query.eq('is_verified', false);
+
+      const { data: records, count, error } = await query;
+      if (error) throw error;
+
+      setUsers(records ?? []);
+      setTotalPages(Math.ceil((count ?? 0) / 20));
+      setTotalItems(count ?? 0);
+
+      fetchRelatedCounts(records ?? []);
       
     } catch (error) {
       console.error("Error fetching users:", error);
@@ -87,14 +81,11 @@ const UserManagementPage = () => {
       try {
         // Using getList with limit 1 just to get totalItems efficiently
         const [vaultRes, ordersRes] = await Promise.all([
-          pb.collection('user_vaults').getList(1, 1, { filter: `user_id = "${u.id}"`, $autoCancel: false }),
-          pb.collection('orders').getList(1, 1, { filter: `buyer_id = "${u.id}" || seller_id = "${u.id}"`, $autoCancel: false })
+          supabase.from('vault_items').select('id', { count: 'exact', head: true }).eq('owner_id', u.id),
+          supabase.from('orders').select('id', { count: 'exact', head: true }).or(`buyer_id.eq.${u.id},seller_id.eq.${u.id}`),
         ]);
-        
-        newCounts[u.id] = {
-          vault: vaultRes.totalItems,
-          orders: ordersRes.totalItems
-        };
+
+        newCounts[u.id] = { vault: vaultRes.count ?? 0, orders: ordersRes.count ?? 0 };
       } catch (e) {
         newCounts[u.id] = { vault: 0, orders: 0 };
       }
@@ -105,7 +96,8 @@ const UserManagementPage = () => {
 
   const handleRoleChange = async (userId, newRole) => {
     try {
-      await pb.collection('users').update(userId, { role: newRole }, { $autoCancel: false });
+      const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+      if (error) throw error;
       toast.success(`User role updated to ${newRole}`);
       logAdminAction('update_user_role', { userId, role: newRole });
       setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
@@ -117,7 +109,8 @@ const UserManagementPage = () => {
   const handleSuspend = async (userId, currentStatus) => {
     try {
       const newStatus = currentStatus === false ? true : false;
-      await pb.collection('users').update(userId, { is_active: newStatus }, { $autoCancel: false });
+      const { error } = await supabase.from('profiles').update({ is_active: newStatus }).eq('id', userId);
+      if (error) throw error;
       toast.success(`User account ${newStatus ? 'reactivated' : 'suspended'}.`);
       setUsers(users.map(u => u.id === userId ? { ...u, is_active: newStatus } : u));
     } catch (error) {

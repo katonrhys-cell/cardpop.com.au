@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Star, ShieldCheck, MapPin, Calendar, ExternalLink, ShieldAlert, Package, MessageSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -24,58 +24,67 @@ const PublicSellerProfilePage = () => {
     const fetchSellerData = async () => {
       try {
         setLoading(true);
-        // Fetch user data
-        const userData = await pb.collection('users').getOne(userId, { $autoCancel: false });
-        
-        // If not public, we shouldn't show it unless they are the owner (which this page doesn't check natively, but let's respect is_public)
+
+        // Fetch user profile
+        const { data: userData, error: userError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+
+        if (userError) throw userError;
+
         if (userData.is_public === false) {
           throw new Error('This profile is private.');
         }
 
         // Fetch Vault listings (public ones)
-        const vaultRes = await pb.collection('user_vaults').getList(1, 20, {
-          filter: `user_id = "${userId}" && is_public = true && listing_type != "Private"`,
-          sort: '-created',
-          expand: 'user_id',
-          $autoCancel: false
-        });
+        const { data: vaultData } = await supabase
+          .from('vault_items')
+          .select('*')
+          .eq('owner_id', userId)
+          .eq('is_public', true)
+          .neq('listing_type', 'Private')
+          .order('created_at', { ascending: false })
+          .limit(20);
 
         // Fetch Marketplace listings
-        const marketplaceRes = await pb.collection('listings').getList(1, 20, {
-          filter: `seller = "${userId}" && status = "active"`,
-          sort: '-created',
-          expand: 'seller',
-          $autoCancel: false
-        });
+        const { data: marketplaceData } = await supabase
+          .from('listings')
+          .select('*')
+          .eq('seller_id', userId)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(20);
 
         // Fetch Reviews
-        const reviewsRes = await pb.collection('reviews').getList(1, 100, {
-          filter: `reviewee = "${userId}"`,
-          $autoCancel: false
-        });
+        const { data: reviewsData, count: reviewsCount } = await supabase
+          .from('reviews')
+          .select('*', { count: 'exact' })
+          .eq('recipient_id', userId);
 
         if (!isMounted) return;
 
         setSeller(userData);
-        
+
         // Combine listings
         const combined = [
-          ...vaultRes.items.map(item => ({ ...item, _type: 'vault' })),
-          ...marketplaceRes.items.map(item => ({ ...item, _type: 'marketplace' }))
-        ].sort((a, b) => new Date(b.created) - new Date(a.created));
-        
+          ...(vaultData || []).map(item => ({ ...item, _type: 'vault' })),
+          ...(marketplaceData || []).map(item => ({ ...item, _type: 'marketplace' }))
+        ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
         setListings(combined);
 
         // Calculate stats
-        const totalReviews = reviewsRes.totalItems;
-        const avgRating = totalReviews > 0 
-          ? reviewsRes.items.reduce((acc, curr) => acc + curr.rating, 0) / totalReviews 
+        const totalReviews = reviewsCount || 0;
+        const avgRating = totalReviews > 0
+          ? (reviewsData || []).reduce((acc, curr) => acc + curr.rating, 0) / totalReviews
           : (userData.rating || 0);
 
         setStats({
           totalListings: combined.length,
           averageRating: avgRating,
-          totalReviews: totalReviews || (userData.reviewsCount || 0)
+          totalReviews: totalReviews || (userData.reviews_count || 0)
         });
 
       } catch (err) {
@@ -118,8 +127,12 @@ const PublicSellerProfilePage = () => {
     );
   }
 
-  const avatarUrl = seller.profile_photo_or_character ? pb.files.getUrl(seller, seller.profile_photo_or_character) : null;
-  const isVerified = seller.is_verified === 'true';
+  const avatarUrl = seller.profile_photo_or_character
+    ? (seller.profile_photo_or_character.startsWith('http')
+        ? seller.profile_photo_or_character
+        : supabase.storage.from('vault-images').getPublicUrl(seller.profile_photo_or_character).data.publicUrl)
+    : null;
+  const isVerified = seller.is_admin === true || seller.is_verified === true || seller.is_verified === 'true';
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -171,10 +184,10 @@ const PublicSellerProfilePage = () => {
                     <span>{seller.location}</span>
                   </div>
                 )}
-                {seller.created && (
+                {seller.created_at && (
                   <div className="flex items-center gap-1.5">
                     <Calendar className="w-4 h-4" />
-                    <span>Member since {new Date(seller.created).getFullYear()}</span>
+                    <span>Member since {new Date(seller.created_at).getFullYear()}</span>
                   </div>
                 )}
                 <div className="flex items-center gap-1.5">

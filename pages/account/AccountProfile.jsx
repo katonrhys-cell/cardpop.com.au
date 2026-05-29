@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { Save, Upload, Trash2, Eye, ShieldCheck, ShieldAlert } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -85,29 +85,33 @@ const AccountProfile = () => {
     setLoading(true);
 
     try {
-      const data = new FormData();
-      data.append('display_name', formData.display_name.trim());
-      data.append('bio', formData.bio.trim());
-      data.append('looking_for', formData.looking_for.trim());
-      data.append('location', formData.location.trim());
-      data.append('is_public', formData.is_public);
-      
+      let avatar_url = currentUser?.avatar_url ?? null;
+
+      if (avatarFile) {
+        const ext = avatarFile.name.split('.').pop();
+        const path = `avatars/${currentUser.id}.${ext}`;
+        const { error: uploadErr } = await supabase.storage.from('avatars').upload(path, avatarFile, { upsert: true });
+        if (!uploadErr) avatar_url = supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
+      } else if (removeAvatar) {
+        avatar_url = null;
+      }
+
       const socials = {};
       if (formData.social_twitter) socials.twitter = formData.social_twitter.trim();
       if (formData.social_instagram) socials.instagram = formData.social_instagram.trim();
-      data.append('social_links', JSON.stringify(socials));
 
-      if (avatarFile) {
-        data.append('profile_photo', avatarFile);
-      } else if (removeAvatar) {
-        data.append('profile_photo', '');
-      }
+      const { error: updateErr } = await supabase.from('profiles').update({
+        display_name: formData.display_name,
+        bio_text: formData.bio,
+        looking_for: formData.looking_for,
+        location_city: formData.location,
+        is_public: formData.is_public,
+        social_links: socials,
+        avatar_url,
+      }).eq('id', currentUser.id);
 
-      await pb.collection('users').update(currentUser.id, data, { $autoCancel: false });
-      
-      // Update local auth store context to reflect changes immediately
-      await pb.collection('users').authRefresh({ $autoCancel: false });
-      
+      if (updateErr) throw updateErr;
+
       setAvatarFile(null);
       setRemoveAvatar(false);
       toast.success('Profile updated successfully!');
@@ -119,7 +123,7 @@ const AccountProfile = () => {
     }
   };
 
-  const currentPhotoUrl = currentUser?.profile_photo ? pb.files.getUrl(currentUser, currentUser.profile_photo) : null;
+  const currentPhotoUrl = currentUser?.avatar_url ?? null;
   const isVerified = currentUser?.is_verified === 'true' || currentUser?.verified;
 
   return (

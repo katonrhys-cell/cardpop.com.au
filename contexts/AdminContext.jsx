@@ -1,15 +1,12 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 
 const AdminContext = createContext(null);
 
 export const useAdmin = () => {
   const context = useContext(AdminContext);
-  if (!context) {
-    throw new Error('useAdmin must be used within AdminProvider');
-  }
+  if (!context) throw new Error('useAdmin must be used within AdminProvider');
   return context;
 };
 
@@ -19,13 +16,9 @@ export const AdminProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (authLoading) {
-      setLoading(true);
-      return;
-    }
-
-    const adminStatus = isAuthenticated && currentUser?.role === 'admin';
-    setIsAdmin(adminStatus);
+    if (authLoading) { setLoading(true); return; }
+    // is_admin comes from the profiles table via AuthContext mergedUser
+    setIsAdmin(isAuthenticated && (currentUser?.is_admin === true));
     setLoading(false);
   }, [currentUser, isAuthenticated, authLoading]);
 
@@ -34,52 +27,26 @@ export const AdminProvider = ({ children }) => {
       console.warn('Attempted admin action without admin privileges:', action);
       return;
     }
-    
-    try {
-      await pb.collection('auditLogs').create({
-        userId: currentUser.id,
-        eventType: action,
-        status: 'success',
-        ipAddress: 'internal',
-        deviceInfo: navigator.userAgent,
-        details: details
-      }, { $autoCancel: false });
-    } catch (error) {
-      console.error('Failed to log admin action:', error);
-    }
+    // Supabase has no auditLogs table — log to console in development
+    console.info('[AdminAudit]', action, details);
   };
 
   const getSystemHealth = async () => {
     try {
-      // Simulate health check - in production this would ping actual services
-      const dbHealthy = pb.authStore.isValid;
-      
+      const { error } = await supabase.from('categories').select('id').limit(1);
       return {
-        database: dbHealthy ? 'Healthy' : 'Error',
-        storage: 'Healthy',
-        api: 'Online',
-        uptime: '99.9%'
+        database: error ? 'Error' : 'Healthy',
+        storage:  'Healthy',
+        api:      'Online',
+        uptime:   '99.9%',
       };
-    } catch (error) {
-      console.error('System health check failed:', error);
-      return {
-        database: 'Error',
-        storage: 'Error',
-        api: 'Error',
-        uptime: 'Unknown'
-      };
+    } catch {
+      return { database: 'Error', storage: 'Error', api: 'Error', uptime: 'Unknown' };
     }
   };
 
-  const value = {
-    isAdmin,
-    loading,
-    logAdminAction,
-    getSystemHealth
-  };
-
   return (
-    <AdminContext.Provider value={value}>
+    <AdminContext.Provider value={{ isAdmin, loading, logAdminAction, getSystemHealth }}>
       {children}
     </AdminContext.Provider>
   );

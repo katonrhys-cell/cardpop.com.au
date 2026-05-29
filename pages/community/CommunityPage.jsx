@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
-import pb from '@/lib/pocketbaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import { MessageSquare, Users, Store, ExternalLink, ShieldCheck } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -18,29 +18,31 @@ const CommunityPage = () => {
   const [loadingRetailers, setLoadingRetailers] = useState(true);
 
   useEffect(() => {
-    pb.collection('community_content').getList(1, 20, {
-      filter: 'contentType="discussion"',
-      sort: '-created',
-      $autoCancel: false,
-    })
-      .then(res => setDiscussions(res.items))
+    supabase
+      .from('posts')
+      .select('*')
+      .eq('post_type', 'text')
+      .order('created_at', { ascending: false })
+      .limit(20)
+      .then(({ data }) => setDiscussions(data || []))
       .catch(console.error)
       .finally(() => setLoadingDiscussions(false));
 
-    pb.collection('public_profiles').getList(1, 50, {
-      sort: '-created',
-      $autoCancel: false,
-    })
-      .then(res => setProfiles(res.items))
+    supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50)
+      .then(({ data }) => setProfiles(data || []))
       .catch(console.error)
       .finally(() => setLoadingProfiles(false));
 
-    pb.collection('retailers').getFullList({
-      filter: 'isActive=true',
-      sort: 'brandName',
-      $autoCancel: false,
-    })
-      .then(res => setRetailers(res))
+    supabase
+      .from('business_profiles')
+      .select('*')
+      .eq('is_active', true)
+      .order('brand_name', { ascending: true })
+      .then(({ data }) => setRetailers(data || []))
       .catch(console.error)
       .finally(() => setLoadingRetailers(false));
   }, []);
@@ -124,9 +126,7 @@ const CommunityPage = () => {
             ) : profiles.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {profiles.map(profile => {
-                  const avatarUrl = profile.profile_photo_or_character
-                    ? pb.files.getUrl(profile, profile.profile_photo_or_character)
-                    : null;
+                  const avatarUrl = profile.avatar_url || profile.profile_photo_or_character || null;
                   return (
                     <div key={profile.id} className="bg-card border border-border p-5 rounded-2xl flex flex-col gap-3">
                       <div className="flex items-center gap-3">
@@ -183,10 +183,10 @@ const CommunityPage = () => {
                 {retailers.map(retailer => (
                   <div key={retailer.id} className="bg-card border border-border p-5 rounded-2xl flex flex-col gap-3">
                     <div className="flex items-center gap-3">
-                      {retailer.logoUrl ? (
+                      {retailer.logo_url ? (
                         <img
-                          src={retailer.logoUrl}
-                          alt={retailer.brandName}
+                          src={retailer.logo_url}
+                          alt={retailer.brand_name}
                           className="h-12 w-12 rounded-xl object-cover border border-border flex-shrink-0"
                         />
                       ) : (
@@ -195,7 +195,7 @@ const CommunityPage = () => {
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold truncate">{retailer.brandName}</p>
+                        <p className="font-semibold truncate">{retailer.brand_name}</p>
                         {retailer.category && (
                           <Badge variant="outline" className="text-xs mt-0.5">{retailer.category}</Badge>
                         )}
@@ -204,12 +204,12 @@ const CommunityPage = () => {
                     <p className="text-sm text-muted-foreground line-clamp-2">
                       {retailer.description || 'Authorized CardPop partner.'}
                     </p>
-                    {retailer.affiliateLink && (
+                    {retailer.affiliate_link && (
                       <Button
                         variant="outline"
                         size="sm"
                         className="mt-auto gap-1.5"
-                        onClick={() => window.open(retailer.affiliateLink, '_blank')}
+                        onClick={() => window.open(retailer.affiliate_link, '_blank')}
                       >
                         <ExternalLink className="w-3.5 h-3.5" /> Visit Store
                       </Button>

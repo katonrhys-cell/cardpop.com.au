@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, Search, Activity } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import ResearchExportButton from '@/components/ResearchExportButton.jsx';
 
 const ProductResearchModal = ({ isOpen, onClose, cardName }) => {
@@ -21,19 +21,18 @@ const ProductResearchModal = ({ isOpen, onClose, cardName }) => {
     setLoading(true);
     setError(null);
     try {
-      // Fetch recent completed transactions from the platform
-      const response = await pb.collection('transactions').getList(1, 12, {
-        filter: `status="Completed"`,
-        sort: '-created',
-        expand: 'cardIds',
-        $autoCancel: false
-      });
-      
-      // In a real scenario, we would filter by cardName. 
-      // Since transactions link to cards, we filter the expanded cards.
-      const relevantSales = response.items.filter(t => {
-        if (!t.expand?.cardIds) return false;
-        return t.expand.cardIds.some(c => c.cardName?.toLowerCase().includes(name.toLowerCase()));
+      // Fetch recent completed orders from the platform
+      const { data: items } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false })
+        .limit(12);
+
+      // Filter by cardName where possible
+      const relevantSales = (items || []).filter(t => {
+        const title = (t.title || t.card_name || t.item_title || '').toLowerCase();
+        return title.includes(name.toLowerCase());
       });
 
       setSales(relevantSales);
@@ -88,7 +87,7 @@ const ProductResearchModal = ({ isOpen, onClose, cardName }) => {
               {sales.map((sale) => (
                 <div key={sale.id} className="p-5 bg-card border border-border rounded-xl shadow-sm">
                   <div className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1">
-                    {new Date(sale.created).toLocaleDateString()}
+                    {new Date(sale.created_at).toLocaleDateString()}
                   </div>
                   <div className="text-2xl font-extrabold text-foreground mb-2">
                     ${sale.transactionValue?.toFixed(2)}

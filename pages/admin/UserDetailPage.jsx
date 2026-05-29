@@ -12,7 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useUserDetails } from '@/hooks/useUserDetails.js';
 import UserStatsCard from '@/components/admin/UserStatsCard.jsx';
 import UserActionsModal from '@/components/admin/UserActionsModal.jsx';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 
 /**
  * DATA RELATIONSHIPS DOCUMENTATION:

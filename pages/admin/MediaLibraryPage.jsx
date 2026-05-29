@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 
 const MediaLibraryPage = () => {
@@ -30,11 +30,9 @@ const MediaLibraryPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const records = await pb.collection('media').getList(1, 50, {
-        sort: '-created',
-        $autoCancel: false
-      });
-      if (isMounted.current) setMedia(records.items);
+      const { data, error } = await supabase.from('media_assets').select('*').order('created_at', { ascending: false }).limit(50);
+      if (error) throw error;
+      if (isMounted.current) setMedia(data ?? []);
     } catch (err) {
       console.error("Error fetching media:", err);
       if (isMounted.current) setError(err.message || "Failed to load media library.");
@@ -74,14 +72,20 @@ const MediaLibraryPage = () => {
 
     setIsUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('image', selectedFile);
-      formData.append('filename', uploadData.filename.trim());
-      formData.append('description', uploadData.description.trim());
-      formData.append('uploadedBy', currentUser?.id);
+      const ext = selectedFile.name.split('.').pop();
+      const path = `media/${Date.now()}-${uploadData.filename.trim().replace(/\s+/g, '_')}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('media').upload(path, selectedFile);
+      if (upErr) throw upErr;
+      const publicUrl = supabase.storage.from('media').getPublicUrl(path).data.publicUrl;
 
-      const record = await pb.collection('media').create(formData, { $autoCancel: false });
-      
+      const { data: record, error: insertErr } = await supabase.from('media_assets').insert({
+        filename: uploadData.filename.trim(),
+        description: uploadData.description.trim(),
+        file_url: publicUrl,
+        uploaded_by: currentUser?.id,
+      }).select().single();
+      if (insertErr) throw insertErr;
+
       toast.success("Media uploaded successfully.");
       if (isMounted.current) {
         setMedia([record, ...media]);
@@ -101,7 +105,8 @@ const MediaLibraryPage = () => {
     if (!window.confirm("Are you sure you want to delete this image? This action cannot be undone.")) return;
     
     try {
-      await pb.collection('media').delete(id, { $autoCancel: false });
+      const { error } = await supabase.from('media_assets').delete().eq('id', id);
+      if (error) throw error;
       toast.success("Media deleted successfully.");
       setMedia(media.filter(m => m.id !== id));
     } catch (err) {

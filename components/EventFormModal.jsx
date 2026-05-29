@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, UploadCloud, X, Wand2, Trash2 } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 
 const INITIAL_FORM_STATE = {
@@ -114,8 +114,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved }) => {
         status: event.status || 'active',
       });
       
-      if (event.image) {
-        setImagePreview(pb.files.getUrl(event, event.image));
+      if (event.image_url || event.image) {
+        setImagePreview(event.image_url || event.image);
       } else {
         setImagePreview(null);
       }
@@ -250,18 +250,30 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved }) => {
       
       submitData.append('description', fullDescription.trim());
 
-      // File upload logic
+      // Build plain object from submitData
+      const eventData = {};
+      submitData.forEach((value, key) => { eventData[key] = value; });
+
+      // File upload logic — upload image to Supabase Storage if provided
       if (imageFile) {
-        submitData.append('image', imageFile);
-      } else if (removeExistingImage && event?.image) {
-        submitData.append('image', '');
+        const ext = imageFile.name.split('.').pop();
+        const path = `events/${Date.now()}.${ext}`;
+        const { error: uploadError } = await supabase.storage.from('vault-images').upload(path, imageFile);
+        if (!uploadError) {
+          eventData.image_url = supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
+        }
+      } else if (removeExistingImage) {
+        eventData.image_url = null;
       }
+      delete eventData.image;
 
       if (event?.id) {
-        await pb.collection('events').update(event.id, submitData, { $autoCancel: false });
+        const { error } = await supabase.from('events').update(eventData).eq('id', event.id);
+        if (error) throw error;
         toast.success("Event updated successfully");
       } else {
-        await pb.collection('events').create(submitData, { $autoCancel: false });
+        const { error } = await supabase.from('events').insert(eventData);
+        if (error) throw error;
         toast.success("Event created successfully");
       }
       

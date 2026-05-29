@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, User, MapPin, Mail, Calendar, ShieldCheck, ShieldAlert, Lock, Unlock, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,7 +39,7 @@ const UserDetailModal = ({ user, isOpen, onClose, onUserUpdate }) => {
           return;
       }
 
-      await pb.collection('users').update(user.id, data, { $autoCancel: false });
+      await supabase.from('profiles').update(data).eq('id', user.id);
       toast.success(`User successfully ${actionType}d.`);
       if (onUserUpdate) onUserUpdate();
     } catch (error) {
@@ -76,10 +76,10 @@ const UserDetailModal = ({ user, isOpen, onClose, onUserUpdate }) => {
           <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-center mb-6">
             <div className="relative shrink-0">
               {user.avatar ? (
-                <img 
-                  src={pb.files.getUrl(user, user.avatar)} 
-                  alt={user.name || user.email} 
-                  className="w-24 h-24 rounded-2xl object-cover shadow-sm border border-border" 
+                <img
+                  src={user.avatar_url || user.avatar}
+                  alt={user.name || user.email}
+                  className="w-24 h-24 rounded-2xl object-cover shadow-sm border border-border"
                 />
               ) : (
                 <div className="w-24 h-24 rounded-2xl bg-muted border border-border flex items-center justify-center shadow-sm">
@@ -134,7 +134,7 @@ const UserDetailModal = ({ user, isOpen, onClose, onUserUpdate }) => {
                 <Calendar className="w-4 h-4" />
                 <span className="text-xs font-semibold uppercase tracking-wider">Member Since</span>
               </div>
-              <p className="font-medium">{formatDate(user.created)}</p>
+              <p className="font-medium">{formatDate(user.created_at)}</p>
             </div>
             <div className="p-4 rounded-xl bg-muted/30 border border-border/50">
               <div className="flex items-center gap-2 text-muted-foreground mb-1">

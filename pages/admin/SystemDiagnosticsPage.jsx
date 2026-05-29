@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { Activity, Database, Server, CheckCircle2, XCircle, AlertCircle, RefreshCw, ShieldCheck } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import apiServerClient from '@/lib/apiServerClient.js';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -10,14 +10,11 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 
-const COLLECTIONS_TO_CHECK = [
-  'users', 'cards', 'products', 'messages', 'reviews', 'tradeRequests', 
-  'transactions', 'officialCatalog', 'cardListings', 'retailers', 'auditLogs', 
-  'loginAttempts', 'passwordResetTokens', 'securityAlerts', 'featuredCards', 
-  'featuredSellers', 'events', 'csvFiles', 'listings', 'importHistory', 
-  'marketplaceStructure', 'accountContent', 'shop_products', 'marketplace_listings', 
-  'market_data', 'grading_guides', 'community_content', 'blog_articles', 
-  'media', 'articles', 'trade_requests', 'categories', 'subcategories'
+const TABLES_TO_CHECK = [
+  'profiles', 'vault_items', 'vault_images', 'listings', 'orders', 'order_items',
+  'reviews', 'trades', 'messages', 'conversations', 'events', 'event_attendees',
+  'categories', 'grading_companies', 'grading_scales', 'notifications',
+  'shipping_addresses', 'blog_posts', 'market_data', 'media_assets', 'disputes',
 ];
 
 const SystemDiagnosticsPage = () => {
@@ -25,7 +22,7 @@ const SystemDiagnosticsPage = () => {
   const [lastRun, setLastRun] = useState(null);
   
   const [systemStatus, setSystemStatus] = useState({
-    pocketbase: { status: 'idle', message: '', latency: 0 },
+    supabase: { status: 'idle', message: '', latency: 0 },
     apiServer: { status: 'idle', message: '', latency: 0 },
   });
 
@@ -35,25 +32,25 @@ const SystemDiagnosticsPage = () => {
     setIsChecking(true);
     setCollectionResults([]);
     
-    // 1. Check PocketBase Core Connection
+    // 1. Check Supabase Core Connection
     const pbStartTime = performance.now();
     try {
-      await pb.health.check({ $autoCancel: false });
+      const { error } = await supabase.from('profiles').select('id').limit(1);
       setSystemStatus(prev => ({
         ...prev,
-        pocketbase: { 
-          status: 'success', 
-          message: 'Connected successfully', 
-          latency: Math.round(performance.now() - pbStartTime) 
+        supabase: {
+          status: error ? 'error' : 'success',
+          message: error ? (error.message || 'Query failed') : 'Connected successfully',
+          latency: Math.round(performance.now() - pbStartTime),
         }
       }));
     } catch (err) {
       setSystemStatus(prev => ({
         ...prev,
-        pocketbase: { 
-          status: 'error', 
-          message: err.message || 'Connection failed', 
-          latency: Math.round(performance.now() - pbStartTime) 
+        supabase: {
+          status: 'error',
+          message: err.message || 'Connection failed',
+          latency: Math.round(performance.now() - pbStartTime),
         }
       }));
     }
@@ -83,28 +80,20 @@ const SystemDiagnosticsPage = () => {
       }));
     }
 
-    // 3. Check Collections
+    // 3. Check Tables
     const results = [];
-    for (const collection of COLLECTIONS_TO_CHECK) {
+    for (const table of TABLES_TO_CHECK) {
       try {
-        // Attempt to fetch 1 record to verify existence and access
-        await pb.collection(collection).getList(1, 1, { $autoCancel: false });
+        const { error } = await supabase.from(table).select('id').limit(1);
+        const isForbidden = error?.code === '42501' || error?.message?.includes('permission');
         results.push({
-          name: collection,
-          status: 'success',
-          message: 'Accessible'
+          name: table,
+          status: error ? (isForbidden ? 'warning' : 'error') : 'success',
+          message: error ? (isForbidden ? 'RLS protected (expected)' : error.message) : 'Accessible',
         });
       } catch (err) {
-        // 403 means it exists but we don't have permission (expected for some collections)
-        // 404 means it doesn't exist
-        const isForbidden = err.status === 403;
-        results.push({
-          name: collection,
-          status: isForbidden ? 'warning' : 'error',
-          message: isForbidden ? 'Access Forbidden (Expected based on rules)' : (err.message || 'Not Found / Error')
-        });
+        results.push({ name: table, status: 'error', message: err.message || 'Error' });
       }
-      // Update state incrementally for UI feedback
       setCollectionResults([...results]);
     }
 
@@ -161,9 +150,9 @@ const SystemDiagnosticsPage = () => {
             <CardTitle className="flex items-center justify-between text-lg">
               <div className="flex items-center gap-2">
                 <Database className="w-5 h-5 text-primary" />
-                PocketBase Database
+                Supabase Database
               </div>
-              <StatusIcon status={systemStatus.pocketbase.status} />
+              <StatusIcon status={systemStatus.supabase.status} />
             </CardTitle>
             <CardDescription>Primary data store and authentication</CardDescription>
           </CardHeader>
@@ -171,17 +160,17 @@ const SystemDiagnosticsPage = () => {
             <div className="flex flex-col gap-2">
               <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground font-medium">Status</span>
-                <Badge variant={systemStatus.pocketbase.status === 'success' ? 'default' : 'destructive'} className="font-bold">
-                  {systemStatus.pocketbase.status.toUpperCase()}
+                <Badge variant={systemStatus.supabase.status === 'success' ? 'default' : 'destructive'} className="font-bold">
+                  {systemStatus.supabase.status.toUpperCase()}
                 </Badge>
               </div>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground font-medium">Latency</span>
-                <span className="font-mono">{systemStatus.pocketbase.latency}ms</span>
+                <span className="font-mono">{systemStatus.supabase.latency}ms</span>
               </div>
               <div className="flex justify-between items-center text-sm">
                 <span className="text-muted-foreground font-medium">Details</span>
-                <span className="text-foreground truncate max-w-[200px]">{systemStatus.pocketbase.message || '-'}</span>
+                <span className="text-foreground truncate max-w-[200px]">{systemStatus.supabase.message || '-'}</span>
               </div>
             </div>
           </CardContent>
@@ -229,7 +218,7 @@ const SystemDiagnosticsPage = () => {
                 Collection Accessibility Audit
               </CardTitle>
               <CardDescription className="mt-1">
-                Verifying existence and access rules for {COLLECTIONS_TO_CHECK.length} required collections.
+                Verifying existence and access rules for {TABLES_TO_CHECK.length} required collections.
               </CardDescription>
             </div>
             {lastRun && (
@@ -268,7 +257,7 @@ const SystemDiagnosticsPage = () => {
               )}
               
               {/* Pending items that haven't been checked yet */}
-              {isChecking && COLLECTIONS_TO_CHECK.slice(collectionResults.length).map((collection, idx) => (
+              {isChecking && TABLES_TO_CHECK.slice(collectionResults.length).map((collection, idx) => (
                 <div key={`pending-${idx}`} className="flex items-center justify-between p-4 opacity-50">
                   <div className="flex items-center gap-3">
                     <Activity className="w-5 h-5 text-muted-foreground animate-pulse" />

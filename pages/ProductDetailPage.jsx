@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { canViewVaultProduct } from '@/utils/vaultSecurityUtils.js';
 import { useCart } from '@/hooks/useCart.jsx';
@@ -44,16 +44,21 @@ const ProductDetailPage = () => {
       }
       try {
         setLoading(true);
-        const collectionName = source === 'shop' ? 'shop_products' : 'user_vaults';
-        const data = await pb.collection(collectionName).getOne(id, { $autoCancel: false });
-        
+        const table = source === 'shop' ? 'listings' : 'vault_items';
+        const { data, error: fetchError } = await supabase
+          .from(table)
+          .select('*, seller:profiles!seller_id(*)')
+          .eq('id', id)
+          .single();
+
+        if (fetchError) throw fetchError;
         if (!isMounted) return;
 
         // Security check for Vault Products
         if (source === 'vault') {
           const userRole = isAdmin ? 'admin' : 'user';
-          const isAuthorized = canViewVaultProduct(currentUser?.id, data.user_id, data.is_public, userRole);
-          
+          const isAuthorized = canViewVaultProduct(currentUser?.id, data.owner_id, data.is_public, userRole);
+
           if (!isAuthorized) {
             setError('403 Forbidden: You do not have permission to view this private vault item.');
             setLoading(false);
@@ -66,10 +71,12 @@ const ProductDetailPage = () => {
         // Fetch seller details
         if (source === 'shop') {
           setSeller({ business_name: 'CardPop Official Store', is_verified: true, type: 'official' });
-        } else if (data.user_id) {
+        } else if (data.seller) {
+          setSeller({ business_name: data.seller.username || data.seller.full_name || 'Community Member', is_verified: false, type: 'user' });
+        } else if (data.owner_id) {
           try {
-            const user = await pb.collection('users').getOne(data.user_id, { $autoCancel: false });
-            setSeller({ business_name: user.username || user.name || 'Community Member', is_verified: false, type: 'user' });
+            const { data: user } = await supabase.from('profiles').select('*').eq('id', data.owner_id).single();
+            setSeller({ business_name: user?.username || user?.full_name || 'Community Member', is_verified: false, type: 'user' });
           } catch (e) {
             setSeller({ business_name: 'Community Member', is_verified: false, type: 'user' });
           }
@@ -92,7 +99,7 @@ const ProductDetailPage = () => {
       id: product.id,
       title: product.name,
       price: priceInCents / 100,
-      image: product.images?.[0] ? pb.files.getUrl(product, product.images[0]) : null
+      image: product.images?.[0] || null
     };
     const cartVariant = {
       id: product.id,

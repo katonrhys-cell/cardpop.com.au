@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { useCategory } from '@/contexts/CategoryContext.jsx';
 import { getCategoryBySlug, getBreadcrumbs } from '@/utils/categoryUtils.js';
 import { generateMetaTitle, generateMetaDescription } from '@/utils/seoUtils.js';
@@ -27,23 +27,25 @@ const ShopCategoryPage = () => {
     const fetchProducts = async () => {
       setLoading(true);
       try {
-        const filters = [];
-        
-        if (category) filters.push(`categoryId = "${category.id}"`);
-        if (subcategory) filters.push(`subcategoryId = "${subcategory.id}"`);
-        if (productType) filters.push(`productTypeId = "${productType.id}"`);
-        
-        const filterStr = filters.length > 0 ? filters.join(' && ') : '';
-        
-        const result = await pb.collection('shop_products').getList(page, 16, {
-          filter: filterStr,
-          sort: '-created',
-          $autoCancel: false
-        });
-        
-        setProducts(result.items);
-        setTotalPages(result.totalPages);
-        setTotalItems(result.totalItems);
+        const perPage = 16;
+        const from = (page - 1) * perPage;
+
+        let query = supabase
+          .from('listings')
+          .select('*', { count: 'exact' })
+          .order('created_at', { ascending: false })
+          .range(from, from + perPage - 1);
+
+        if (category) query = query.eq('category_id', category.id);
+        if (subcategory) query = query.eq('subcategory_id', subcategory.id);
+        // productTypeId has no direct mapping; omitted
+
+        const { data, count, error } = await query;
+        if (error) throw error;
+
+        setProducts(data || []);
+        setTotalItems(count || 0);
+        setTotalPages(Math.ceil((count || 0) / perPage));
       } catch (error) {
         console.error("Error fetching shop products:", error);
       } finally {

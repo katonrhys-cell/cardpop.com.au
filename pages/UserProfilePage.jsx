@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { Calendar, Save, Edit3, X, ShieldAlert, Upload, Trash2 } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,16 +35,22 @@ const UserProfilePage = () => {
     const fetchProfile = async () => {
       if (!currentUser) return;
       try {
-        const p = await pb.collection('public_profiles').getFirstListItem(`user_id="${currentUser.id}"`, { $autoCancel: false });
+        const { data: p, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', currentUser.id)
+          .maybeSingle();
+
         if (isMounted) {
-          setProfile(p);
-          setFormData({
-            display_name: p.display_name || '',
-            bio: p.bio || ''
-          });
+          setProfile(p || null);
+          if (p) {
+            setFormData({
+              display_name: p.display_name || '',
+              bio: p.bio || ''
+            });
+          }
         }
       } catch (err) {
-        // If 404, it means the public profile doesn't exist yet
         if (isMounted) {
           setProfile(null);
         }
@@ -96,26 +102,46 @@ const UserProfilePage = () => {
 
     setSaving(true);
     try {
-      const data = new FormData();
-      data.append('user_id', currentUser.id);
-      data.append('display_name', formData.display_name.trim());
-      data.append('bio', formData.bio.trim());
-      
+      const updatePayload = {
+        id: currentUser.id,
+        display_name: formData.display_name.trim(),
+        bio: formData.bio.trim(),
+        updated_at: new Date().toISOString()
+      };
+
       if (avatarFile) {
-        data.append('profile_photo_or_character', avatarFile);
+        const fileExt = avatarFile.name.split('.').pop();
+        const filePath = `avatars/${currentUser.id}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('vault-images')
+          .upload(filePath, avatarFile, { upsert: true });
+        if (uploadError) throw uploadError;
+        updatePayload.profile_photo_or_character = filePath;
       } else if (removeAvatar) {
-        data.append('profile_photo_or_character', '');
+        updatePayload.profile_photo_or_character = null;
       }
 
       let updatedProfile;
       if (profile) {
-        updatedProfile = await pb.collection('public_profiles').update(profile.id, data, { $autoCancel: false });
+        const { data, error } = await supabase
+          .from('profiles')
+          .update(updatePayload)
+          .eq('id', currentUser.id)
+          .select()
+          .single();
+        if (error) throw error;
+        updatedProfile = data;
       } else {
-        // Set default is_verified
-        data.append('is_verified', 'false');
-        updatedProfile = await pb.collection('public_profiles').create(data, { $autoCancel: false });
+        updatePayload.is_verified = false;
+        const { data, error } = await supabase
+          .from('profiles')
+          .insert(updatePayload)
+          .select()
+          .single();
+        if (error) throw error;
+        updatedProfile = data;
       }
-      
+
       setProfile(updatedProfile);
       setIsEditing(false);
       setRemoveAvatar(false);
@@ -139,7 +165,11 @@ const UserProfilePage = () => {
 
   // Generate fallback UI if public profile doesn't exist
   const isProfileEmpty = !profile && !isEditing;
-  const currentPhotoUrl = profile?.profile_photo_or_character ? pb.files.getUrl(profile, profile.profile_photo_or_character) : null;
+  const currentPhotoUrl = profile?.profile_photo_or_character
+    ? (profile.profile_photo_or_character.startsWith('http')
+        ? profile.profile_photo_or_character
+        : supabase.storage.from('vault-images').getPublicUrl(profile.profile_photo_or_character).data.publicUrl)
+    : null;
 
   return (
     <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-8 md:py-16 font-sans">
@@ -269,13 +299,13 @@ const UserProfilePage = () => {
                   <div className="bg-muted/30 p-5 rounded-2xl border border-border shadow-sm">
                     <h3 className="font-bold text-foreground mb-4 uppercase text-xs tracking-wider">Collector Stats</h3>
                     <div className="space-y-4">
-                      {profile?.created && (
+                      {profile?.created_at && (
                         <div className="flex justify-between items-center">
                           <div className="flex items-center gap-2 text-muted-foreground font-medium text-sm">
                             <Calendar className="w-4 h-4" /> Joined
                           </div>
                           <span className="font-bold text-foreground text-sm">
-                            {new Date(profile.created).toLocaleDateString()}
+                            {new Date(profile.created_at).toLocaleDateString()}
                           </span>
                         </div>
                       )}

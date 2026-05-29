@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Helmet } from 'react-helmet';
 import { useSearchParams, Link } from 'react-router-dom';
-import pb from '@/lib/pocketbaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import {
   ArrowLeft, TrendingUp, TrendingDown, Activity, DollarSign, BarChart3,
   Clock, ExternalLink, ShoppingCart, ArrowUpRight, ArrowDownRight,
@@ -189,14 +189,13 @@ const CardAnalyticsPage = () => {
 
   useEffect(() => {
     const term = cardName.split(' ')[0].replace(/"/g, '');
-    const opts = { $autoCancel: false };
 
     Promise.all([
-      pb.collection('shop_products').getList(1, 6, { filter: `name ~ "${term}"`, sort: 'price', ...opts }).catch(() => ({ items: [] })),
-      pb.collection('user_vaults').getList(1, 6, { filter: `is_public=true && listing_type != "Private" && name ~ "${term}"`, sort: '-created', ...opts }).catch(() => ({ items: [] })),
+      supabase.from('listings').select('*').ilike('title', `%${term}%`).eq('type', 'shop').order('price_aud').limit(6).then(r => r.data ?? []),
+      supabase.from('vault_items').select('*').ilike('card_name', `%${term}%`).not('listing_status', 'eq', 'private').order('created_at', { ascending: false }).limit(6).then(r => r.data ?? []),
     ]).then(([shop, vault]) => {
-      setListings(shop.items.map(i => ({ ...i, _source: 'shop' })));
-      setVaultItems(vault.items.map(i => ({ ...i, _source: 'vault' })));
+      setListings(shop.map(i => ({ ...i, _source: 'shop' })));
+      setVaultItems(vault.map(i => ({ ...i, _source: 'vault' })));
     }).finally(() => setLoadingL(false));
   }, [cardName]);
 

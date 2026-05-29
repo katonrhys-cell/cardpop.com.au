@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Helmet } from 'react-helmet';
 import { CalendarDays } from 'lucide-react';
 import { format } from 'date-fns';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import EventCard from '@/components/EventCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -17,13 +17,14 @@ const CommunityEventsPage = () => {
     const fetchEvents = async () => {
       try {
         setIsLoading(true);
-        const result = await pb.collection('events').getFullList({
-          filter: 'status="active"',
-          sort: 'date',
-          $autoCancel: false,
-        });
+        const { data, error: fetchError } = await supabase
+          .from('events')
+          .select('*')
+          .eq('status', 'approved')
+          .order('start_date', { ascending: true });
+        if (fetchError) throw fetchError;
         if (isMounted) {
-          setEvents(result || []);
+          setEvents(data || []);
           setError(null);
         }
       } catch (err) {
@@ -36,32 +37,36 @@ const CommunityEventsPage = () => {
 
     fetchEvents();
 
-    pb.collection('events').subscribe('*', function (e) {
-      if (e.action === 'create' && e.record.status === 'active') {
-        setEvents(prev => [...prev, e.record].sort((a, b) => new Date(a.date) - new Date(b.date)));
-      } else if (e.action === 'update') {
-        setEvents(prev => {
-          let updatedList = prev.filter(ev => ev.id !== e.record.id);
-          if (e.record.status === 'active') {
-            updatedList.push(e.record);
-          }
-          return updatedList.sort((a, b) => new Date(a.date) - new Date(b.date));
-        });
-      } else if (e.action === 'delete') {
-        setEvents(prev => prev.filter(ev => ev.id !== e.record.id));
-      }
-    });
+    const channel = supabase.channel('community-events-page')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, payload => {
+        if (!isMounted) return;
+        const record = payload.new;
+        if (payload.eventType === 'INSERT' && record.status === 'approved') {
+          setEvents(prev => [...prev, record].sort((a, b) => new Date(a.start_date) - new Date(b.start_date)));
+        } else if (payload.eventType === 'UPDATE') {
+          setEvents(prev => {
+            let updatedList = prev.filter(ev => ev.id !== record.id);
+            if (record.status === 'approved') {
+              updatedList.push(record);
+            }
+            return updatedList.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+          });
+        } else if (payload.eventType === 'DELETE') {
+          setEvents(prev => prev.filter(ev => ev.id !== payload.old.id));
+        }
+      })
+      .subscribe();
 
     return () => {
       isMounted = false;
-      pb.collection('events').unsubscribe('*');
+      supabase.removeChannel(channel);
     };
   }, []);
 
   const groupedEvents = useMemo(() => {
     const groups = {};
     events.forEach(event => {
-      const monthYear = event.date ? format(new Date(event.date), 'MMMM yyyy') : 'TBA';
+      const monthYear = event.start_date ? format(new Date(event.start_date), 'MMMM yyyy') : 'TBA';
       if (!groups[monthYear]) {
         groups[monthYear] = [];
       }

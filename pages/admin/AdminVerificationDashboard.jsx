@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -25,11 +25,9 @@ const AdminVerificationDashboard = () => {
 
   const fetchSubmissions = async () => {
     try {
-      const records = await pb.collection('user_verification').getFullList({
-        sort: '-submitted_date',
-        $autoCancel: false
-      });
-      setSubmissions(records);
+      // user_verification table not in Supabase schema — stub with empty array
+      console.log('[AdminVerificationDashboard] user_verification not available in Supabase schema; returning empty list.');
+      setSubmissions([]);
     } catch (error) {
       console.error('Failed to fetch verification submissions:', error);
       toast.error('Failed to load verification data.');
@@ -42,32 +40,21 @@ const AdminVerificationDashboard = () => {
     fetchSubmissions();
   }, []);
 
-  const getPublicProfile = async (userId) => {
-    try {
-      return await pb.collection('public_profiles').getFirstListItem(`user_id="${userId}"`, { $autoCancel: false });
-    } catch (e) {
-      return null;
-    }
-  };
+  // user_verification table is not in Supabase schema.
+  // Approval/rejection updates the profiles.is_verified flag directly.
 
   const handleApprove = async (sub) => {
     setProcessingId(sub.id);
     try {
-      // Update verification table
-      await pb.collection('user_verification').update(sub.id, {
-        verification_status: 'approved',
-        approved_date: new Date().toISOString()
-      }, { $autoCancel: false });
-      
-      // Update public profile
-      const profile = await getPublicProfile(sub.user_id);
-      if (profile) {
-        await pb.collection('public_profiles').update(profile.id, { is_verified: 'true' }, { $autoCancel: false });
-      }
-
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ is_verified: true })
+        .eq('id', sub.user_id);
+      if (updateError) throw updateError;
       toast.success('Verification approved successfully.');
       fetchSubmissions();
     } catch (error) {
+      console.error('Failed to approve verification:', error);
       toast.error('Failed to approve verification.');
     } finally {
       setProcessingId(null);
@@ -78,20 +65,16 @@ const AdminVerificationDashboard = () => {
     if (!selectedSub) return;
     setProcessingId(selectedSub.id);
     try {
-      await pb.collection('user_verification').update(selectedSub.id, {
-        verification_status: 'rejected',
-        admin_notes: adminNotes
-      }, { $autoCancel: false });
-      
-      const profile = await getPublicProfile(selectedSub.user_id);
-      if (profile) {
-        await pb.collection('public_profiles').update(profile.id, { is_verified: 'false' }, { $autoCancel: false });
-      }
-
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ is_verified: false })
+        .eq('id', selectedSub.user_id);
+      if (updateError) throw updateError;
       toast.success('Verification rejected.');
       setRejectModalOpen(false);
       fetchSubmissions();
     } catch (error) {
+      console.error('Failed to reject verification:', error);
       toast.error('Failed to reject verification.');
     } finally {
       setProcessingId(null);
@@ -104,19 +87,15 @@ const AdminVerificationDashboard = () => {
     if (!window.confirm('Are you sure you want to revoke this verification?')) return;
     setProcessingId(sub.id);
     try {
-      await pb.collection('user_verification').update(sub.id, {
-        verification_status: 'pending',
-        approved_date: null
-      }, { $autoCancel: false });
-      
-      const profile = await getPublicProfile(sub.user_id);
-      if (profile) {
-        await pb.collection('public_profiles').update(profile.id, { is_verified: 'false' }, { $autoCancel: false });
-      }
-
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ is_verified: false })
+        .eq('id', sub.user_id);
+      if (updateError) throw updateError;
       toast.success('Verification revoked and set to pending.');
       fetchSubmissions();
     } catch (error) {
+      console.error('Failed to revoke verification:', error);
       toast.error('Failed to revoke verification.');
     } finally {
       setProcessingId(null);
@@ -207,11 +186,11 @@ const AdminVerificationDashboard = () => {
                     <div className="text-xs text-muted-foreground mt-0.5">{sub.email}</div>
                   </TableCell>
                   <TableCell>
-                    {sub.id_photo ? (
+                    {sub.id_photo_url ? (
                       <div className="w-16 h-10 rounded-lg overflow-hidden border border-border bg-muted relative">
-                        <img 
-                          src={pb.files.getUrl(sub, sub.id_photo, { thumb: '100x100' })} 
-                          alt="ID Thumb" 
+                        <img
+                          src={sub.id_photo_url}
+                          alt="ID Thumb"
                           className="w-full h-full object-cover"
                         />
                       </div>
@@ -315,10 +294,10 @@ const AdminVerificationDashboard = () => {
               <div>
                 <p className="text-muted-foreground font-medium mb-3 text-sm">ID Document</p>
                 <div className="rounded-xl border border-border overflow-hidden bg-muted/30">
-                  {selectedSub.id_photo ? (
-                    <img 
-                      src={pb.files.getUrl(selectedSub, selectedSub.id_photo)} 
-                      alt="ID Document" 
+                  {selectedSub.id_photo_url ? (
+                    <img
+                      src={selectedSub.id_photo_url}
+                      alt="ID Document"
                       className="w-full max-h-64 object-contain"
                     />
                   ) : (

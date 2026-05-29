@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { Helmet } from 'react-helmet';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PackageX, SlidersHorizontal, Search, ShoppingBag } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,7 @@ const ShopPage = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [sort, setSort] = useState('-created');
+  const [sort, setSort] = useState('created_at_desc');
   const [searchTerm, setSearchTerm] = useState('');
   const { addToCart } = useCart();
   const isMounted = useRef(true);
@@ -25,20 +25,25 @@ const ShopPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const filters = ['(visibility = "public" || visibility = "private")'];
+      let query = supabase
+        .from('listings')
+        .select('*')
+        .in('status', ['active', 'For Sale'])
+        .limit(50);
+
       if (searchTerm) {
-        filters.push(`name ~ "${searchTerm.replace(/"/g, '')}"`);
+        query = query.ilike('name', `%${searchTerm.replace(/'/g, '')}%`);
       }
-      
-      const response = await pb.collection('shop_products').getList(1, 50, {
-        filter: filters.join(' && '),
-        sort: sort,
-        $autoCancel: false
-      });
-      
+
+      if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
+      else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
+      else query = query.order('created_at', { ascending: false });
+
+      const { data, error: fetchError } = await query;
+      if (fetchError) throw fetchError;
+
       if (isMounted.current) {
-        // Tag products with their source
-        const taggedItems = response.items.map(p => ({ ...p, source: 'shop' }));
+        const taggedItems = (data || []).map(p => ({ ...p, source: 'shop' }));
         setProducts(taggedItems);
       }
     } catch (err) {
@@ -97,9 +102,9 @@ const ShopPage = () => {
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="-created">Newest Arrivals</SelectItem>
-                <SelectItem value="price">Price: Low to High</SelectItem>
-                <SelectItem value="-price">Price: High to Low</SelectItem>
+                <SelectItem value="created_at_desc">Newest Arrivals</SelectItem>
+                <SelectItem value="price_asc">Price: Low to High</SelectItem>
+                <SelectItem value="price_desc">Price: High to Low</SelectItem>
               </SelectContent>
             </Select>
           </div>

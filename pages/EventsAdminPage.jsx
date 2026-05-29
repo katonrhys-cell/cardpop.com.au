@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Loader2, Wand2 } from 'lucide-react';
 import { format } from 'date-fns';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
@@ -34,11 +34,11 @@ const EventsAdminPage = () => {
   const [isScrapedData, setIsScrapedData] = useState(false);
   
   const [formData, setFormData] = useState({
-    name: '',
+    title: '',
     description: '',
-    date: '',
-    location: '',
-    status: 'active',
+    start_date: '',
+    venue_name: '',
+    status: 'pending_review',
   });
   const [imageFile, setImageFile] = useState(null);
 
@@ -46,29 +46,33 @@ const EventsAdminPage = () => {
   useEffect(() => {
     fetchEvents();
 
-    pb.collection('events').subscribe('*', function (e) {
-      if (e.action === 'create') {
-        setEvents(prev => [e.record, ...prev].sort((a, b) => new Date(b.date) - new Date(a.date)));
-      } else if (e.action === 'update') {
-        setEvents(prev => prev.map(ev => ev.id === e.record.id ? e.record : ev).sort((a, b) => new Date(b.date) - new Date(a.date)));
-      } else if (e.action === 'delete') {
-        setEvents(prev => prev.filter(ev => ev.id !== e.record.id));
-      }
-    });
+    const channel = supabase.channel('events-admin')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, payload => {
+        const record = payload.new;
+        if (payload.eventType === 'INSERT') {
+          setEvents(prev => [record, ...prev].sort((a, b) => new Date(b.start_date) - new Date(a.start_date)));
+        } else if (payload.eventType === 'UPDATE') {
+          setEvents(prev => prev.map(ev => ev.id === record.id ? record : ev).sort((a, b) => new Date(b.start_date) - new Date(a.start_date)));
+        } else if (payload.eventType === 'DELETE') {
+          setEvents(prev => prev.filter(ev => ev.id !== payload.old.id));
+        }
+      })
+      .subscribe();
 
     return () => {
-      pb.collection('events').unsubscribe('*');
+      supabase.removeChannel(channel);
     };
   }, []);
 
   const fetchEvents = async () => {
     setIsLoading(true);
     try {
-      const response = await pb.collection('events').getFullList({
-        sort: '-date',
-        $autoCancel: false,
-      });
-      setEvents(response);
+      const { data, error: fetchError } = await supabase
+        .from('events')
+        .select('*')
+        .order('start_date', { ascending: false });
+      if (fetchError) throw fetchError;
+      setEvents(data || []);
     } catch (err) {
       console.error('Failed to fetch events:', err);
       toast.error('Failed to load events.');
@@ -79,11 +83,11 @@ const EventsAdminPage = () => {
 
   const resetForm = () => {
     setFormData({
-      name: '',
+      title: '',
       description: '',
-      date: '',
-      location: '',
-      status: 'active',
+      start_date: '',
+      venue_name: '',
+      status: 'pending_review',
     });
     setImageFile(null);
     setEditingEventId(null);
@@ -94,10 +98,10 @@ const EventsAdminPage = () => {
     if (event) {
       setEditingEventId(event.id);
       setFormData({
-        name: event.name,
+        title: event.title,
         description: event.description || '',
-        date: event.date ? event.date.split(' ')[0] : '', // Extract YYYY-MM-DD from PB date
-        location: event.location,
+        start_date: event.start_date ? event.start_date.split('T')[0] : '',
+        venue_name: event.venue_name,
         status: event.status,
       });
       setImageFile(null);
@@ -105,11 +109,11 @@ const EventsAdminPage = () => {
     } else if (scrapedData) {
       setEditingEventId(null);
       setFormData({
-        name: scrapedData.name || '',
+        title: scrapedData.name || scrapedData.title || '',
         description: scrapedData.description || '',
-        date: scrapedData.date ? scrapedData.date.split('T')[0] : '',
-        location: scrapedData.location || '',
-        status: 'active',
+        start_date: scrapedData.date ? scrapedData.date.split('T')[0] : '',
+        venue_name: scrapedData.location || scrapedData.venue_name || '',
+        status: 'pending_review',
       });
       setImageFile(null);
       setIsScrapedData(true);
@@ -130,7 +134,7 @@ const EventsAdminPage = () => {
   };
 
   const handleStatusToggle = (checked) => {
-    setFormData(prev => ({ ...prev, status: checked ? 'active' : 'inactive' }));
+    setFormData(prev => ({ ...prev, status: checked ? 'approved' : 'pending_review' }));
   };
 
   const handleFileChange = (e) => {
@@ -141,30 +145,28 @@ const EventsAdminPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.date || !formData.location) {
+    if (!formData.title || !formData.start_date || !formData.venue_name) {
       toast.error('Name, Date, and Location are required.');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const data = new FormData();
-      data.append('name', formData.name);
-      data.append('description', formData.description);
-      data.append('location', formData.location);
-      data.append('status', formData.status);
-      
-      data.append('date', `${formData.date} 12:00:00.000Z`);
-
-      if (imageFile) {
-        data.append('image', imageFile);
-      }
+      const payload = {
+        title: formData.title,
+        description: formData.description,
+        venue_name: formData.venue_name,
+        status: formData.status,
+        start_date: formData.start_date,
+      };
 
       if (editingEventId) {
-        await pb.collection('events').update(editingEventId, data, { $autoCancel: false });
+        const { error: updateError } = await supabase.from('events').update(payload).eq('id', editingEventId);
+        if (updateError) throw updateError;
         toast.success('Event updated successfully.');
       } else {
-        await pb.collection('events').create(data, { $autoCancel: false });
+        const { error: insertError } = await supabase.from('events').insert(payload);
+        if (insertError) throw insertError;
         toast.success('Event created successfully.');
       }
       handleCloseModal();
@@ -177,9 +179,10 @@ const EventsAdminPage = () => {
   };
 
   const handleQuickToggleStatus = async (event, currentStatus) => {
-    const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    const newStatus = currentStatus === 'approved' ? 'pending_review' : 'approved';
     try {
-      await pb.collection('events').update(event.id, { status: newStatus }, { $autoCancel: false });
+      const { error } = await supabase.from('events').update({ status: newStatus }).eq('id', event.id);
+      if (error) throw error;
       toast.success(`Event marked as ${newStatus}.`);
     } catch (err) {
       console.error('Failed to toggle status:', err);
@@ -188,9 +191,10 @@ const EventsAdminPage = () => {
   };
 
   const handleDelete = async (event) => {
-    if (window.confirm(`Are you sure you want to delete "${event.name}"? This action cannot be undone.`)) {
+    if (window.confirm(`Are you sure you want to delete "${event.title}"? This action cannot be undone.`)) {
       try {
-        await pb.collection('events').delete(event.id, { $autoCancel: false });
+        const { error } = await supabase.from('events').delete().eq('id', event.id);
+        if (error) throw error;
         toast.success('Event deleted successfully.');
       } catch (err) {
         console.error('Failed to delete event:', err);
@@ -259,11 +263,11 @@ const EventsAdminPage = () => {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-4">
                           <div className="w-16 h-12 bg-background rounded-lg flex items-center justify-center shrink-0 overflow-hidden border border-border shadow-sm">
-                            {event.image ? (
-                              <img 
-                                src={pb.files.getUrl(event, event.image)} 
-                                alt={event.name} 
-                                className="w-full h-full object-cover" 
+                            {event.image_url ? (
+                              <img
+                                src={event.image_url}
+                                alt={event.title}
+                                className="w-full h-full object-cover"
                               />
                             ) : (
                               <ImageOff className="w-4 h-4 text-muted-foreground/50" />
@@ -271,10 +275,10 @@ const EventsAdminPage = () => {
                           </div>
                           <div>
                             <p className="font-bold text-foreground text-base leading-tight">
-                              {event.name}
+                              {event.title}
                             </p>
                             <p className="text-muted-foreground text-xs mt-1 font-medium md:hidden">
-                              {event.date ? format(new Date(event.date), 'MMM d, yyyy') : 'TBA'}
+                              {event.start_date ? format(new Date(event.start_date), 'MMM d, yyyy') : 'TBA'}
                             </p>
                           </div>
                         </div>
@@ -283,21 +287,21 @@ const EventsAdminPage = () => {
                         <div className="flex flex-col gap-1.5">
                           <span className="flex items-center text-foreground font-medium">
                             <Calendar className="w-4 h-4 mr-2 text-muted-foreground" />
-                            {event.date ? format(new Date(event.date), 'MMMM do, yyyy') : 'TBA'}
+                            {event.start_date ? format(new Date(event.start_date), 'MMMM do, yyyy') : 'TBA'}
                           </span>
                           <span className="flex items-center text-muted-foreground text-xs font-medium">
                             <MapPin className="w-4 h-4 mr-2" />
-                            {event.location}
+                            {event.venue_name}
                           </span>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <Switch 
-                            checked={event.status === 'active'}
+                          <Switch
+                            checked={event.status === 'approved'}
                             onCheckedChange={() => handleQuickToggleStatus(event, event.status)}
                           />
-                          <Badge variant={event.status === 'active' ? 'default' : 'secondary'} className="capitalize font-bold shadow-sm">
+                          <Badge variant={event.status === 'approved' ? 'default' : 'secondary'} className="capitalize font-bold shadow-sm">
                             {event.status}
                           </Badge>
                         </div>
@@ -341,38 +345,38 @@ const EventsAdminPage = () => {
             
             <div className="grid gap-6 py-2 mb-8">
               <div className="grid gap-2">
-                <Label htmlFor="name" className="font-bold">Event Name *</Label>
-                <Input 
-                  id="name" 
-                  name="name" 
-                  value={formData.name} 
-                  onChange={handleInputChange} 
-                  required 
+                <Label htmlFor="title" className="font-bold">Event Name *</Label>
+                <Input
+                  id="title"
+                  name="title"
+                  value={formData.title}
+                  onChange={handleInputChange}
+                  required
                   className="bg-background text-foreground border-border rounded-xl h-11"
                 />
               </div>
 
               <div className="grid sm:grid-cols-2 gap-6">
                 <div className="grid gap-2">
-                  <Label htmlFor="date" className="font-bold">Date *</Label>
-                  <Input 
-                    id="date" 
-                    name="date" 
+                  <Label htmlFor="start_date" className="font-bold">Date *</Label>
+                  <Input
+                    id="start_date"
+                    name="start_date"
                     type="date"
-                    value={formData.date} 
-                    onChange={handleInputChange} 
+                    value={formData.start_date}
+                    onChange={handleInputChange}
                     required
                     className="bg-background text-foreground border-border rounded-xl h-11"
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="location" className="font-bold">Location *</Label>
-                  <Input 
-                    id="location" 
-                    name="location" 
+                  <Label htmlFor="venue_name" className="font-bold">Location *</Label>
+                  <Input
+                    id="venue_name"
+                    name="venue_name"
                     placeholder="e.g. Sydney Convention Centre"
-                    value={formData.location} 
-                    onChange={handleInputChange} 
+                    value={formData.venue_name}
+                    onChange={handleInputChange}
                     required
                     className="bg-background text-foreground border-border rounded-xl h-11"
                   />
@@ -405,13 +409,13 @@ const EventsAdminPage = () => {
               </div>
 
               <div className="flex items-center gap-3 pt-4 border-t border-border mt-2">
-                <Switch 
+                <Switch
                   id="status"
-                  checked={formData.status === 'active'}
+                  checked={formData.status === 'approved'}
                   onCheckedChange={handleStatusToggle}
                 />
                 <Label htmlFor="status" className="font-bold cursor-pointer text-base">
-                  {formData.status === 'active' ? 'Active (Visible to public)' : 'Inactive (Hidden)'}
+                  {formData.status === 'approved' ? 'Approved (Visible to public)' : 'Pending Review (Hidden)'}
                 </Label>
               </div>
             </div>
