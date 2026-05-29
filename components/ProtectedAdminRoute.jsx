@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
@@ -27,9 +27,14 @@ const ProtectedAdminRoute = ({ children }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  useEffect(() => {
+    if (!isAdmin) {
+      toast.error('Access denied. Administrator privileges required.');
+    }
+  }, [isAdmin]);
+
   if (!isAdmin) {
     console.error(`[ProtectedAdminRoute] Access denied. Expected role: 'admin', got: '${currentUser?.role}'`);
-    toast.error('Access denied. Administrator privileges required.');
     return <Navigate to="/" replace />;
   }
 
