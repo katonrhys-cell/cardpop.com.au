@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
-import { BarChart3 } from 'lucide-react';
+import { BarChart3, ArrowLeft } from 'lucide-react';
+import { slugify } from '@/lib/slugify.js';
 
 const MarketDetailPage = () => {
-  const { market } = useParams();
+  const { category, market } = useParams();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -25,7 +26,14 @@ const MarketDetailPage = () => {
   }, [market]);
 
   if (loading) return <div className="container-default section-padding"><Skeleton className="h-[400px] rounded-2xl" /></div>;
-  if (!data) return <div className="container-default section-padding text-center">Market data not found</div>;
+  if (!data) return (
+    <div className="container-default section-padding text-center space-y-4">
+      <p>Market data not found</p>
+      <Link to="/markets" className="text-primary text-sm font-bold hover:underline flex items-center justify-center gap-1">
+        <ArrowLeft className="w-4 h-4" /> Back to Markets
+      </Link>
+    </div>
+  );
 
   return (
     <div className="container-default section-padding min-h-screen">

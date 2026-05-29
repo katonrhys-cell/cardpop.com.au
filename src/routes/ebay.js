@@ -3,6 +3,7 @@ import express from 'express';
 import { callEbayApi } from '../utils/ebayClient.js';
 import { getMarketData, getCardDetails } from '../utils/ebayMarketData.js';
 import { getSalesData, getStatistics } from '../utils/ebaySalesStats.js';
+import { POPULAR_CARDS } from '../utils/ebayPopularCards.js';
 import * as ebayCache from '../utils/ebayCache.js';
 import logger from '../utils/logger.js';
 
@@ -294,109 +295,97 @@ router.get('/statistics', async (req, res) => {
 });
 
 /**
- * GET /ebay/price-estimate
- * Estimate the market value of a card from current eBay AU listings.
- *
- * Query Parameters:
- * - name (required): Card name
- * - set (optional): Set or expansion name
- * - gradingService (optional): PSA | BGS | CGC | None
- * - gradeScore (optional): Numeric grade (e.g. 9.5)
+ * GET /ebay/popular-cards
+ * Returns live eBay AU prices for the curated popular card list.
+ * Each card is looked up via the Browse API search; we sample up to 10 listings
+ * to compute an average price and volume signal.
  *
  * Response:
- * {
- *   "suggested": 45.00,
- *   "median": 45.00,
- *   "average": 47.50,
- *   "low": 30.00,
- *   "high": 65.00,
- *   "count": 12,
- *   "currency": "AUD",
- *   "searchQuery": "Charizard Base Set PSA 9",
- *   "sampleListings": [{ "title", "price", "url" }]
- * }
+ * [
+ *   {
+ *     id, name, set, collection, avgPrice, minPrice, maxPrice,
+ *     volume, listings: [{ title, price, condition, listingUrl, thumbnailUrl }]
+ *   },
+ *   ...
+ * ]
  */
-router.get('/price-estimate', async (req, res) => {
-  const { name, set, gradingService, gradeScore } = req.query;
-
-  if (!name?.trim()) {
-    return res.status(400).json({ error: 'name query parameter is required' });
-  }
-
-  const isGraded = gradingService && gradingService !== 'None';
-
-  // Build a targeted search query
-  const parts = [name.trim()];
-  if (set?.trim() && !isGraded) parts.push(set.trim());
-  if (isGraded) {
-    parts.push(gradingService.trim());
-    if (gradeScore) parts.push(gradeScore.trim());
-  }
-  const searchQuery = parts.join(' ');
-
-  const cacheKey = `price-estimate:${searchQuery.toLowerCase()}`;
-  const cached = ebayCache.get(cacheKey);
+router.get('/popular-cards', async (req, res) => {
+  const CACHE_KEY = 'popular-cards';
+  const cached = ebayCache.get(CACHE_KEY);
   if (cached) {
-    logger.debug(`[EBAY_PRICE_ESTIMATE] Cache hit for: "${searchQuery}"`);
+    logger.info('[POPULAR_CARDS] Returning cached popular cards');
     return res.json(cached);
   }
 
-  logger.info(`[EBAY_PRICE_ESTIMATE] Querying eBay AU for: "${searchQuery}"`);
+  logger.info(`[POPULAR_CARDS] Fetching live prices for ${POPULAR_CARDS.length} popular cards`);
 
-  const params = new URLSearchParams({
-    q: searchQuery,
-    filter: 'buyingOptions:{AUCTION|FIXED_PRICE},itemLocationCountry:AU',
-    limit: '50',
-    sort: 'newlyListed',
+  const results = await Promise.allSettled(
+    POPULAR_CARDS.map(async (card) => {
+      const params = new URLSearchParams({
+        q: card.searchQuery,
+        filter: 'buyingOptions:{AUCTION|FIXED_PRICE},itemLocationCountry:AU',
+        limit: 10,
+        sort: 'newlyListed',
+      });
+
+      const data = await callEbayApi(`/buy/browse/v1/item_summary/search?${params}`);
+      const items = data.itemSummaries || [];
+
+      const prices = items
+        .map(i => parseFloat(i.price?.value || 0))
+        .filter(p => p > 0);
+
+      const avgPrice = prices.length > 0
+        ? Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) / 100
+        : 0;
+
+      const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+      const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+
+      const listings = items.slice(0, 4).map(i => ({
+        title: i.title,
+        price: parseFloat(i.price?.value || 0),
+        condition: i.condition || 'Unknown',
+        listingUrl: i.itemWebUrl || '',
+        thumbnailUrl: i.image?.imageUrl || '',
+      }));
+
+      return {
+        id: card.id,
+        name: card.name,
+        set: card.set,
+        collection: card.collection,
+        avgPrice,
+        minPrice,
+        maxPrice,
+        volume: items.length,
+        listings,
+        liveAt: new Date().toISOString(),
+      };
+    })
+  );
+
+  const output = results.map((r, i) => {
+    if (r.status === 'fulfilled') return r.value;
+    logger.warn(`[POPULAR_CARDS] Failed to fetch "${POPULAR_CARDS[i].name}": ${r.reason?.message}`);
+    // Return card with null prices so the frontend can show a fallback
+    return {
+      id: POPULAR_CARDS[i].id,
+      name: POPULAR_CARDS[i].name,
+      set: POPULAR_CARDS[i].set,
+      collection: POPULAR_CARDS[i].collection,
+      avgPrice: null,
+      minPrice: null,
+      maxPrice: null,
+      volume: 0,
+      listings: [],
+      error: r.reason?.message || 'Failed to fetch',
+    };
   });
 
-  const data = await callEbayApi(`/buy/browse/v1/item_summary/search?${params}`);
-
-  const prices = (data.itemSummaries || [])
-    .map(item => parseFloat(item.price?.value || 0))
-    .filter(p => p > 0)
-    .sort((a, b) => a - b);
-
-  if (!prices.length) {
-    const empty = { suggested: null, median: null, average: null, low: null, high: null, count: 0, currency: 'AUD', searchQuery, sampleListings: [] };
-    ebayCache.set(cacheKey, empty);
-    return res.json(empty);
-  }
-
-  // Trim top and bottom 10% outliers when we have enough data
-  let trimmed = prices;
-  if (prices.length >= 10) {
-    const cut = Math.floor(prices.length * 0.1);
-    trimmed = prices.slice(cut, prices.length - cut);
-  }
-
-  const round = v => Math.round(v * 100) / 100;
-  const median = round(trimmed[Math.floor(trimmed.length / 2)]);
-  const average = round(trimmed.reduce((s, p) => s + p, 0) / trimmed.length);
-  const low = round(trimmed[0]);
-  const high = round(trimmed[trimmed.length - 1]);
-
-  const sampleListings = (data.itemSummaries || []).slice(0, 5).map(item => ({
-    title: item.title,
-    price: parseFloat(item.price?.value || 0),
-    url: item.itemWebUrl || '',
-  }));
-
-  const result = {
-    suggested: median,
-    median,
-    average,
-    low,
-    high,
-    count: prices.length,
-    currency: 'AUD',
-    searchQuery,
-    sampleListings,
-  };
-
-  ebayCache.set(cacheKey, result);
-  logger.info(`[EBAY_PRICE_ESTIMATE] Estimated $${median} AUD (${prices.length} listings) for: "${searchQuery}"`);
-  res.json(result);
+  ebayCache.set(CACHE_KEY, output);
+  logger.info(`[POPULAR_CARDS] Returning ${output.length} popular cards`);
+  res.json(output);
 });
 
 /**

@@ -3,6 +3,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Star, ShieldCheck, Lock, ShoppingCart, ArrowRightLeft, Layers } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { slugify } from '@/lib/slugify.js';
 
 const getStatusBadge = (listingType) => {
   switch (listingType) {
@@ -18,13 +19,15 @@ const VaultListingCard = ({ vaultItem }) => {
   const imgSrc = vaultItem.vault_images?.[0]?.image_url || vaultItem.image_url || null;
   const sellerId = vaultItem.user_id || vaultItem.owner_id;
   const sellerObj = vaultItem.expand?.user_id;
-  
+  const titleSlug = slugify(vaultItem.name || vaultItem.title || 'card');
+  const detailPath = `/product/vault/${vaultItem.id}/${titleSlug}`;
+
   const badgeConfig = getStatusBadge(vaultItem.listing_type);
   const StatusIcon = badgeConfig.icon;
 
   return (
     <div className="group flex flex-col h-full bg-card rounded-2xl border border-border overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
-      <Link to={`/product/vault/${vaultItem.id}`} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
+      <Link to={detailPath} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
         {imgSrc ? (
           <img 
             src={imgSrc} 
@@ -45,7 +48,7 @@ const VaultListingCard = ({ vaultItem }) => {
       </Link>
       
       <div className="p-5 flex flex-col flex-1">
-        <Link to={`/product/vault/${vaultItem.id}`} className="block mb-3">
+        <Link to={detailPath} className="block mb-3">
           <h3 className="font-bold text-base leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors mb-2">
             {vaultItem.name || 'Untitled Vault Item'}
           </h3>
