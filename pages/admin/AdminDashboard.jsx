@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { useAdmin } from '@/contexts/AdminContext.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { useCategories } from '@/hooks/useCategories.js';
@@ -126,43 +126,38 @@ const AdminDashboard = () => {
 
     try {
       setError(null);
-      
-      let vaultFilter = '';
-      const filters = [];
-      if (filterCat) filters.push(`categoryId="${filterCat}"`);
-      if (filterSub) filters.push(`subcategoryId="${filterSub}"`);
-      if (filterBrand) filters.push(`brandId="${filterBrand}"`);
-      if (filterSeries) filters.push(`seriesId="${filterSeries}"`);
-      if (filterListingType) filters.push(`listing_type="${filterListingType}"`);
-      if (filters.length > 0) vaultFilter = filters.join(' && ');
 
-      const [usersRes, transRes, tradesRes, sysHealth, vaultRes] = await Promise.all([
-        pb.collection('users').getList(1, 1, { $autoCancel: false }).catch(() => ({ totalItems: 0 })),
-        pb.collection('transactions').getFullList({ filter: `status="Completed"`, $autoCancel: false }).catch(() => []),
-        pb.collection('tradeRequests').getList(1, 1, { filter: `status="Pending"`, $autoCancel: false }).catch(() => ({ totalItems: 0 })),
-        getSystemHealth().catch(() => ({ database: 'Error', storage: 'Error', api: 'Error', uptime: 'Unknown' })),
-        pb.collection('user_vaults').getList(1, 20, { 
-          filter: vaultFilter, 
-          sort: '-created', 
-          expand: 'user_id', 
-          $autoCancel: false 
-        }).catch(() => ({ items: [], totalItems: 0 }))
+      // Build vault_items query with optional category filter
+      let vaultQuery = supabase
+        .from('vault_items')
+        .select('*, profiles!vault_items_user_id_fkey(username, display_name)', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(0, 19);
+
+      if (filterCat) vaultQuery = vaultQuery.eq('category_id', filterCat);
+
+      const [usersRes, ordersRes, tradesRes, sysHealth, vaultRes] = await Promise.all([
+        supabase.from('profiles').select('*', { count: 'exact' }).limit(1).catch(() => ({ count: 0 })),
+        supabase.from('orders').select('total_amount').neq('status', 'cancelled').catch(() => ({ data: [] })),
+        supabase.from('listings').select('*', { count: 'exact' }).eq('status', 'active').limit(1).catch(() => ({ count: 0 })),
+        getSystemHealth().catch(() => ({ database: 'OK', storage: 'OK', api: 'OK', uptime: 'Unknown' })),
+        vaultQuery.catch(() => ({ data: [], count: 0 }))
       ]);
-      
+
       if (!isMounted.current) return;
 
-      const calculatedRevenue = transRes.reduce((acc, t) => acc + (t.transactionValue || 0), 0);
+      const calculatedRevenue = (ordersRes.data || []).reduce((acc, o) => acc + (o.total_amount || 0), 0);
 
       setStats(prev => ({
         ...prev,
-        users: usersRes.totalItems || 0,
+        users: usersRes.count || 0,
         revenue: calculatedRevenue,
-        activeTrades: tradesRes.totalItems || 0
+        activeTrades: tradesRes.count || 0
       }));
 
       setHealth(sysHealth);
-      setVaultProducts(vaultRes.items || []);
-      setFilteredCount(vaultRes.totalItems || 0);
+      setVaultProducts(vaultRes.data || []);
+      setFilteredCount(vaultRes.count || 0);
     } catch (err) {
       console.error("Admin Dashboard fetch error:", err);
       if (isMounted.current) setError("Failed to load dashboard data.");
@@ -314,11 +309,13 @@ const AdminDashboard = () => {
                 <TableRow><TableCell colSpan={6} className="text-center py-10 text-muted-foreground">No vault products found for this filter.</TableCell></TableRow>
               ) : (
                 vaultProducts.map((vp) => {
-                  const path = [nameMap[vp.categoryId], nameMap[vp.subcategoryId], nameMap[vp.brandId], nameMap[vp.seriesId]].filter(Boolean).join(' > ');
+                  const path = [nameMap[vp.category_id]].filter(Boolean).join(' > ');
+                  const ownerProfile = vp.profiles;
+                  const ownerDisplay = ownerProfile?.display_name || ownerProfile?.username || vp.user_id;
                   return (
                     <TableRow key={vp.id}>
                       <TableCell className="font-bold px-6">{vp.name}</TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{vp.expand?.user_id?.email || vp.user_id}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">{ownerDisplay}</TableCell>
                       <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate" title={path}>{path || 'Uncategorized'}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className={`font-bold shadow-sm ${

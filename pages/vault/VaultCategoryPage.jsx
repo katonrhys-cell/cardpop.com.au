@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import SEOHead from '@/components/SEOHead.jsx';
 import ProductGrid from '@/components/ProductGrid.jsx';
 import PaginationControls from '@/components/PaginationControls.jsx';
@@ -27,50 +27,40 @@ const VaultCategoryPage = () => {
   const [brandOpts, setBrandOpts] = useState([]);
   const [seriesOpts, setSeriesOpts] = useState([]);
 
-  // Load all filter options independently
+  // categories, subcategories, brands, series no longer exist — use empty arrays
   useEffect(() => {
-    const loadFilters = async () => {
-      try {
-        const [cats, subs, brnds, srs] = await Promise.all([
-          pb.collection('categories').getFullList({ sort: 'name', $autoCancel: false }),
-          pb.collection('subcategories').getFullList({ sort: 'name', $autoCancel: false }),
-          pb.collection('brands').getFullList({ sort: 'name', $autoCancel: false }),
-          pb.collection('series').getFullList({ sort: 'name', $autoCancel: false })
-        ]);
-        setCatOpts(cats);
-        setSubOpts(subs);
-        setBrandOpts(brnds);
-        setSeriesOpts(srs);
-      } catch (err) {
-        console.error("Failed to load filter options", err);
-      }
-    };
-    loadFilters();
+    setCatOpts([]);
+    setSubOpts([]);
+    setBrandOpts([]);
+    setSeriesOpts([]);
   }, []);
 
   useEffect(() => {
     const fetchListings = async () => {
       setLoading(true);
       try {
-        const filters = ['is_public = true'];
-        
-        if (filterCat) filters.push(`categoryId = "${filterCat}"`);
-        if (filterSub) filters.push(`subcategoryId = "${filterSub}"`);
-        if (filterBrand) filters.push(`brandId = "${filterBrand}"`);
-        if (filterSeries) filters.push(`seriesId = "${filterSeries}"`);
-        
-        const filterStr = filters.join(' && ');
-        
-        const result = await pb.collection('user_vaults').getList(page, 16, {
-          filter: filterStr,
-          sort: '-created',
-          expand: 'user_id',
-          $autoCancel: false
-        });
-        
-        setListings(result.items);
-        setTotalPages(result.totalPages);
-        setTotalItems(result.totalItems);
+        const perPage = 16;
+        const from = (page - 1) * perPage;
+
+        let query = supabase
+          .from('vault_items')
+          .select('*, profiles:owner_id(name)', { count: 'exact' })
+          .eq('is_public', true)
+          .order('created_at', { ascending: false })
+          .range(from, from + perPage - 1);
+
+        if (filterCat) query = query.eq('category_id', filterCat);
+        if (filterSub) query = query.eq('subcategory_id', filterSub);
+        if (filterBrand) query = query.eq('brand_id', filterBrand);
+        if (filterSeries) query = query.eq('series_id', filterSeries);
+
+        const { data, count, error } = await query;
+
+        if (error) throw error;
+
+        setListings(data || []);
+        setTotalItems(count || 0);
+        setTotalPages(Math.ceil((count || 0) / perPage));
       } catch (error) {
         console.error("Error fetching vault listings:", error);
       } finally {

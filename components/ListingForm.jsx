@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import pb from '@/lib/pocketbaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -53,11 +53,26 @@ const ListingForm = ({ product, onSuccess, onCancel }) => {
         data.append('image', imageFile);
       }
 
+      // Build plain object (images not supported in this simplified form)
+      const listingData = {
+        card_name: formData.playerName,
+        team: formData.team,
+        year: formData.year,
+        card_type: formData.cardType,
+        condition: formData.condition,
+        grade: formData.grade,
+        price_aud: formData.price,
+        status: formData.status,
+        seller_id: currentUser.id
+      };
+
       if (product) {
-        await pb.collection('products').update(product.id, data, { $autoCancel: false });
+        const { error } = await supabase.from('listings').update(listingData).eq('id', product.id);
+        if (error) throw error;
         toast('Listing updated successfully');
       } else {
-        await pb.collection('products').create(data, { $autoCancel: false });
+        const { error } = await supabase.from('listings').insert(listingData);
+        if (error) throw error;
         toast('Listing created successfully');
       }
 

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import ArticleEditorModal from '@/components/ArticleEditorModal.jsx';
 
 const ContentManagementPage = () => {
@@ -25,11 +25,9 @@ const ContentManagementPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const records = await pb.collection('blog_articles').getList(1, 50, {
-        sort: '-created',
-        $autoCancel: false
-      });
-      if (isMounted.current) setArticles(records.items);
+      // blog_articles table not in Supabase schema — return empty list
+      console.log('[ContentManagementPage] blog_articles not available in Supabase schema; returning empty list.');
+      if (isMounted.current) setArticles([]);
     } catch (err) {
       console.error("Error fetching articles:", err);
       if (isMounted.current) setError(err.message || "Failed to load articles.");
@@ -60,7 +58,8 @@ const ContentManagementPage = () => {
     if (!window.confirm("Are you sure you want to delete this article? This action cannot be undone.")) return;
     
     try {
-      await pb.collection('blog_articles').delete(id, { $autoCancel: false });
+      const { error } = await supabase.from('blog_posts').delete().eq('id', id);
+      if (error) throw error;
       toast.success("Article deleted successfully.");
       setArticles(articles.filter(a => a.id !== id));
     } catch (err) {

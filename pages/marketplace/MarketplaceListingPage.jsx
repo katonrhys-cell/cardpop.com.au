@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
-import pb from '@/lib/pocketbaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import { formatCurrency } from '@/api/EcommerceApi';
 import { Button } from '@/components/ui/button';
 import { ShieldCheck, MessageCircle, User } from 'lucide-react';
@@ -15,11 +15,13 @@ const MarketplaceListingPage = () => {
   useEffect(() => {
     const fetchListing = async () => {
       try {
-        const res = await pb.collection('marketplace_listings').getOne(id, {
-          expand: 'seller',
-          $autoCancel: false
-        });
-        setListing(res);
+        const { data, error } = await supabase
+          .from('listings')
+          .select('*, seller:profiles!seller_id(*)')
+          .eq('id', id)
+          .single();
+        if (error) throw error;
+        setListing(data);
       } catch (error) {
         console.error(error);
       } finally {
@@ -40,7 +42,7 @@ const MarketplaceListingPage = () => {
         <div className="w-full lg:w-3/5">
           <div className="bg-secondary/20 rounded-3xl p-4 border border-border aspect-square flex items-center justify-center overflow-hidden">
              {listing.images?.length > 0 ? (
-               <img src={pb.files.getUrl(listing, listing.images[0])} alt={listing.title} className="w-full h-full object-contain mix-blend-multiply" />
+               <img src={listing.images[0]} alt={listing.title} className="w-full h-full object-contain mix-blend-multiply" />
              ) : (
                <div className="text-muted-foreground">No image available</div>
              )}
@@ -60,8 +62,8 @@ const MarketplaceListingPage = () => {
             <h3 className="font-bold mb-4 flex items-center gap-2"><User className="w-5 h-5"/> Seller Information</h3>
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-semibold">{listing.expand?.seller?.name || 'Anonymous User'}</p>
-                <p className="text-sm text-muted-foreground">Joined {new Date(listing.expand?.seller?.created).getFullYear() || 'N/A'}</p>
+                <p className="font-semibold">{listing.seller?.full_name || listing.seller?.username || 'Anonymous User'}</p>
+                <p className="text-sm text-muted-foreground">Joined {listing.seller?.created_at ? new Date(listing.seller.created_at).getFullYear() : 'N/A'}</p>
               </div>
               <Button variant="outline" size="sm">View Profile</Button>
             </div>

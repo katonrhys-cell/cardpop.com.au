@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { ArrowLeft, MapPin, Calendar, ArrowRightLeft, CreditCard, Users, Search, AlertCircle, Loader2 } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -32,98 +32,59 @@ const CardDetailsPage = () => {
         setError(null);
         console.log(`[CardDetailsPage] Product ID from URL params: ${id}`);
 
+        // Try vault_items first, then listings
         let data = null;
-        let collectionUsed = '';
+        let { data: vaultItem } = await supabase
+          .from('vault_items')
+          .select('*, vault_images(*), owner:profiles!owner_id(*)')
+          .eq('id', id)
+          .maybeSingle();
 
-        // Try multiple collections to dynamically find where the product is stored
-        const collectionsToTry = ['cards', 'cardListings', 'shop_products', 'products', 'marketplace_listings'];
-
-        for (const col of collectionsToTry) {
-          try {
-            console.log(`[CardDetailsPage] Querying collection: ${col} for ID: ${id}`);
-            data = await pb.collection(col).getOne(id, { expand: 'owner,seller', $autoCancel: false });
-            collectionUsed = col;
-            console.log(`[CardDetailsPage] Found product in collection: ${col}`);
-            break; // Successfully found, exit loop
-          } catch (err) {
-            console.log(`[CardDetailsPage] Product not found in ${col}.`);
-          }
+        if (vaultItem) {
+          data = vaultItem;
+        } else {
+          const { data: listing } = await supabase
+            .from('listings')
+            .select('*, seller:profiles!seller_id(*)')
+            .eq('id', id)
+            .maybeSingle();
+          data = listing;
         }
 
         if (!isMounted) return;
 
         if (!data) {
-          throw new Error('Product not found in any known collection.');
+          throw new Error('Product not found.');
         }
 
-        console.log(`[CardDetailsPage] Full response data returned:`, data);
+        const imgUrl = data.vault_images?.[0]?.image_url
+          ?? (data.image_url?.startsWith('http') ? data.image_url : null);
 
-        // Map data from various schemas safely
-        const title = data.cardName || data.name || data.title || 'Unknown Card/Product';
-        const description = data.description || '';
-        const rawPrice = data.salePrice || data.askingPrice || data.price || data.estimatedValue || 0;
-        const tradeValue = data.tradeValue || data.estimatedValue || rawPrice;
-        const condition = data.condition || data.gradeCondition || 'Unknown Condition';
-        const collectionType = data.collectionType || data.category || 'Trading Card';
-        
-        // Extract Image URL safely
-        let imgUrl = null;
-        if (data.cardImage && data.cardImage.length > 0) {
-          const firstImage = Array.isArray(data.cardImage) ? data.cardImage[0] : data.cardImage;
-          imgUrl = pb.files.getUrl(data, firstImage);
-        } else if (data.images && data.images.length > 0) {
-          imgUrl = typeof data.images[0] === 'string' && data.images[0].startsWith('http') 
-            ? data.images[0] 
-            : pb.files.getUrl(data, data.images[0]);
-        } else if (data.image) {
-          imgUrl = pb.files.getUrl(data, data.image);
-        }
-
-        // Determine listing availability
-        const isForSale = 
-          data.listingStatus === 'For Sale' || 
-          data.listingStatus === 'For Both' || 
-          data.status === 'active' || 
-          data.marketplaceStatus === 'For Sale' ||
-          collectionUsed === 'shop_products'; // Shop products are always for sale
-
-        const isForTrade = 
-          data.listingStatus === 'For Trade' || 
-          data.listingStatus === 'For Both' || 
-          data.tradeAvailable === true;
+        const isForSale = ['for_sale', 'for_both', 'active'].includes(data.listing_status ?? data.status);
+        const isForTrade = ['for_trade', 'for_both'].includes(data.listing_status ?? '');
 
         setCard({
           ...data,
-          title,
-          description,
-          salePrice: rawPrice,
-          tradeValue,
-          condition,
+          title: data.card_name || data.title || 'Unknown Card',
+          description: data.description || '',
+          salePrice: data.asking_price_aud ?? data.price_aud ?? data.estimated_value_aud ?? 0,
+          tradeValue: data.trade_value_aud ?? data.estimated_value_aud ?? 0,
+          condition: data.condition || 'Unknown',
           image: imgUrl,
           isForSale,
           isForTrade,
-          collectionType,
-          grade: data.grade || data.gradeScore ? `${data.grade || ''} ${data.gradeScore || ''}`.trim() : null
+          collectionType: data.collection_type || data.category || 'Trading Card',
+          grade: data.grade_score ? String(data.grade_score) : null,
         });
 
-        // Resolve owner / seller information
-        if (data.expand?.owner) {
-          setOwner(data.expand.owner);
-        } else if (data.expand?.seller) {
-          setOwner(data.expand.seller);
-        } else if (data.owner) {
-          try {
-            const ownerData = await pb.collection('users').getOne(data.owner, { $autoCancel: false });
-            setOwner(ownerData);
-          } catch (e) {
-            console.log("[CardDetailsPage] Could not fetch owner data directly.");
-          }
-        } else if (data.seller) {
-          try {
-            const sellerData = await pb.collection('users').getOne(data.seller, { $autoCancel: false });
-            setOwner(sellerData);
-          } catch (e) {
-            console.log("[CardDetailsPage] Could not fetch seller data directly.");
+        const ownerProfile = data.owner ?? data.seller;
+        if (ownerProfile) {
+          setOwner(ownerProfile);
+        } else {
+          const ownerId = data.owner_id ?? data.seller_id;
+          if (ownerId) {
+            const { data: profile } = await supabase.from('profiles').select('*').eq('id', ownerId).single();
+            if (isMounted) setOwner(profile);
           }
         }
 

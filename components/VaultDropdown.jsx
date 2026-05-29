@@ -2,7 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, LogOut, Settings, Package, ArrowRightLeft, ShieldAlert, LayoutDashboard, CheckCircle2 } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -64,10 +64,10 @@ const VaultDropdown = ({ isMobile = false }) => {
             >
               <div className="flex items-center gap-3 w-full">
                 <div className="relative h-8 w-8 rounded-full overflow-hidden shrink-0 bg-primary/10 flex items-center justify-center">
-                  {currentUser.avatar ? (
-                    <img 
-                      src={pb.files.getUrl(currentUser, currentUser.avatar)} 
-                      alt={currentUser.name} 
+                  {currentUser.avatar_url ? (
+                    <img
+                      src={currentUser.avatar_url}
+                      alt={currentUser.name}
                       className="h-full w-full object-cover"
                     />
                   ) : (
@@ -86,10 +86,10 @@ const VaultDropdown = ({ isMobile = false }) => {
               className="relative h-10 w-10 rounded-full border border-border/50 bg-background/50 hover:bg-accent"
               onClick={handleClick}
             >
-              {currentUser.avatar ? (
-                <img 
-                  src={pb.files.getUrl(currentUser, currentUser.avatar)} 
-                  alt={currentUser.name} 
+              {currentUser.avatar_url ? (
+                <img
+                  src={currentUser.avatar_url}
+                  alt={currentUser.name}
                   className="h-full w-full rounded-full object-cover"
                 />
               ) : (

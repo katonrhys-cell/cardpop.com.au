@@ -1,4 +1,4 @@
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 
 export const generateSlug = (text) => {
   if (!text) return '';
@@ -13,8 +13,12 @@ export const generateSlug = (text) => {
 
 export const getCategoryHierarchy = async () => {
   try {
-    const result = await pb.collection('marketplaceStructure').getFirstListItem('', { $autoCancel: false });
-    return result;
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .order('sort_order');
+    if (error) throw error;
+    return data || [];
   } catch (err) {
     console.error('Error fetching category hierarchy:', err);
     return null;

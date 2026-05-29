@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
-import pb from '@/lib/pocketbaseClient';
-import { slugify } from '@/lib/slugify.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import {
   TrendingUp, TrendingDown, Search, LineChart, Star, StarOff,
   ArrowUpRight, ArrowDownRight, Activity, DollarSign, BarChart3,
@@ -157,22 +156,9 @@ const MarketsPage = () => {
 
   // ── Fetch live popular card prices on mount ────────────────────────────
   useEffect(() => {
-    let cancelled = false;
-    setLiveLoading(true);
-    fetch(`${API_BASE}/ebay/popular-cards`)
-      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-      .then(data => {
-        if (!cancelled) {
-          setLiveCards(data);
-          setLiveError(false);
-        }
-      })
-      .catch(err => {
-        console.warn('[MarketsPage] popular-cards fetch failed, using demo data:', err.message);
-        if (!cancelled) setLiveError(true);
-      })
-      .finally(() => { if (!cancelled) setLiveLoading(false); });
-    return () => { cancelled = true; };
+    supabase.from('market_data').select('*').limit(20)
+      .then(({ data }) => setMarketData(data ?? []))
+      .catch(() => {});
   }, []);
 
   // ── Transform live cards for the movers table ──────────────────────────

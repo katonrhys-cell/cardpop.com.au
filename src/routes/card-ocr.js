@@ -1,13 +1,13 @@
 import { Router } from 'express';
-import { ContentBlockType, streamOneShot, uploadImagesToPocketBase } from '../api/integrated-ai.js';
+import { ContentBlockType, streamOneShot, uploadImagesToSupabase } from '../api/integrated-ai.js';
 import { CardOCRPrompt } from '../constants/prompts.js';
 import { uploadFiles } from '../middleware/file-upload.js';
 import { integratedAiRateLimit } from '../middleware/integrated-ai-rate-limit.js';
-import { pocketbaseAuth } from '../middleware/pocketbase-auth.js';
+import { supabaseAuth } from '../middleware/pocketbase-auth.js';
 
 const router = Router();
 
-router.use(pocketbaseAuth);
+router.use(supabaseAuth);
 
 router.post('/scan', integratedAiRateLimit, uploadFiles({
 	allowedMimeTypes: [
@@ -21,7 +21,7 @@ router.post('/scan', integratedAiRateLimit, uploadFiles({
 		throw new Error('An image is required for card scanning');
 	}
 
-	const imageUrls = await uploadImagesToPocketBase({ images: req.files });
+	const imageUrls = await uploadImagesToSupabase({ images: req.files });
 
 	const userMessage = [
 		{ type: ContentBlockType.Text, text: 'Analyze this trading card and extract all visible information as JSON.' },

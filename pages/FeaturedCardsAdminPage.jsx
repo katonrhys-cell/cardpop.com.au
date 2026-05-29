@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Helmet } from 'react-helmet';
 import { toast } from 'sonner';
 import { Search, Loader2, ImageOff } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
@@ -23,11 +23,10 @@ const FeaturedCardsAdminPage = () => {
   const fetchCards = async () => {
     setIsLoading(true);
     try {
-      const response = await pb.collection('cards').getFullList({
-        sort: '-created',
-        expand: 'owner',
-        $autoCancel: false,
-      });
+      const { data: response } = await supabase
+        .from('vault_items')
+        .select('*, profiles(name, email)')
+        .order('created_at', { ascending: false });
       setCards(response || []);
     } catch (error) {
       console.error('Error fetching cards:', error);
@@ -39,30 +38,33 @@ const FeaturedCardsAdminPage = () => {
 
   const filteredCards = useMemo(() => {
     return cards.filter(card => {
-      const matchesSearch = !searchQuery || card.cardName?.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCollection = collectionFilter === 'All' || card.collectionType === collectionFilter;
+      const matchesSearch = !searchQuery || (card.card_name || card.cardName)?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCollection = collectionFilter === 'All' || card.collection_type === collectionFilter || card.collectionType === collectionFilter;
       return matchesSearch && matchesCollection;
     });
   }, [cards, searchQuery, collectionFilter]);
 
   const uniqueCollections = useMemo(() => {
-    const collections = new Set(cards.map(c => c.collectionType).filter(Boolean));
+    const collections = new Set(cards.map(c => c.collection_type || c.collectionType).filter(Boolean));
     return ['All', ...Array.from(collections).sort()];
   }, [cards]);
 
   const handleToggleFeatured = async (card) => {
-    if (!window.confirm(`Are you sure you want to ${card.featured ? 'unfeature' : 'feature'} "${card.cardName}"?`)) {
+    if (!window.confirm(`Are you sure you want to ${card.featured ? 'unfeature' : 'feature'} "${card.card_name || card.cardName}"?`)) {
       return;
     }
 
     setProcessingId(card.id);
     try {
-      const updatedCard = await pb.collection('cards').update(card.id, {
-        featured: !card.featured
-      }, { expand: 'owner', $autoCancel: false });
+      const { data: updatedCard } = await supabase
+        .from('vault_items')
+        .update({ featured: !card.featured })
+        .eq('id', card.id)
+        .select()
+        .single();
 
       setCards(prev => prev.map(c => c.id === card.id ? updatedCard : c));
-      toast.success(`${updatedCard.cardName} is now ${updatedCard.featured ? 'featured' : 'unfeatured'}.`);
+      toast.success(`${updatedCard.card_name || updatedCard.cardName} is now ${updatedCard.featured ? 'featured' : 'unfeatured'}.`);
     } catch (error) {
       console.error('Error toggling featured status:', error);
       toast.error('Failed to update card featured status.');
@@ -136,34 +138,34 @@ const FeaturedCardsAdminPage = () => {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-4">
                           <div className="w-12 h-16 bg-background rounded-lg flex items-center justify-center shrink-0 overflow-hidden border border-border shadow-sm">
-                            {card.cardImage?.[0] ? (
-                              <img 
-                                src={pb.files.getUrl(card, card.cardImage[0])} 
-                                alt={card.cardName} 
-                                className="w-full h-full object-cover" 
+                            {card.image_urls?.[0] ? (
+                              <img
+                                src={card.image_urls[0]}
+                                alt={card.card_name || card.cardName}
+                                className="w-full h-full object-cover"
                               />
                             ) : (
                               <ImageOff className="w-4 h-4 text-muted-foreground/50" />
                             )}
                           </div>
                           <div>
-                            <p className="font-bold text-foreground text-base leading-tight max-w-[200px] sm:max-w-xs truncate" title={card.cardName}>
-                              {card.cardName}
+                            <p className="font-bold text-foreground text-base leading-tight max-w-[200px] sm:max-w-xs truncate" title={card.card_name || card.cardName}>
+                              {card.card_name || card.cardName}
                             </p>
                             <p className="text-muted-foreground text-xs mt-1 font-medium">
-                              ${card.estimatedValue?.toFixed(2) || '0.00'} • {card.condition}
+                              ${(card.estimated_value_aud || card.estimatedValue)?.toFixed(2) || '0.00'} • {card.condition}
                             </p>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <Badge variant="secondary" className="whitespace-nowrap bg-background shadow-sm font-bold border border-border">
-                          {card.collectionType}
+                          {card.collection_type || card.collectionType}
                         </Badge>
                       </td>
                       <td className="px-6 py-4 hidden md:table-cell">
                         <p className="text-foreground font-medium truncate max-w-[150px]">
-                          {card.expand?.owner?.name || card.expand?.owner?.email || 'Unknown Owner'}
+                          {card.profiles?.name || card.profiles?.email || 'Unknown Owner'}
                         </p>
                       </td>
                       <td className="px-6 py-4 text-right">

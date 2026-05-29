@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { ShieldCheck, Upload, ArrowRight, ArrowLeft, CheckCircle, Clock } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,12 +36,18 @@ const VerificationSubmissionPage = () => {
     const checkExisting = async () => {
       if (!currentUser) return;
       try {
-        const existingVerification = await pb.collection('user_verification').getFirstListItem(`user_id="${currentUser.id}"`, { $autoCancel: false });
-        if (isMounted && existingVerification) {
-          setExistingStatus(existingVerification.verification_status);
+        // user_verification is stubbed — check profiles table for verification_status
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('verification_status')
+          .eq('id', currentUser.id)
+          .maybeSingle();
+
+        if (isMounted && profileData?.verification_status) {
+          setExistingStatus(profileData.verification_status);
         }
       } catch (err) {
-        // 404 is expected if they haven't submitted yet
+        // silently ignore
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -106,34 +112,49 @@ const VerificationSubmissionPage = () => {
 
     setSubmitting(true);
     try {
-      // 1. Submit Verification Data
-      const verificationData = new FormData();
-      verificationData.append('user_id', currentUser.id);
-      verificationData.append('legal_name', legalName);
-      verificationData.append('address', address);
-      verificationData.append('phone_number', phone);
-      verificationData.append('email', currentUser.email);
-      verificationData.append('id_photo', idPhoto);
-      verificationData.append('verification_status', 'pending');
-      
-      await pb.collection('user_verification').create(verificationData, { $autoCancel: false });
+      // 1. Upload ID photo to storage
+      let idPhotoPath = null;
+      if (idPhoto) {
+        const fileExt = idPhoto.name.split('.').pop();
+        const filePath = `verification/${currentUser.id}/id.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('vault-images')
+          .upload(filePath, idPhoto, { upsert: true });
+        if (uploadError) throw uploadError;
+        idPhotoPath = filePath;
+      }
 
-      // 2. Sync Public Profile Data
-      const profileData = new FormData();
-      profileData.append('user_id', currentUser.id);
-      profileData.append('display_name', displayName);
-      profileData.append('is_verified', 'pending');
+      // 2. Upload profile photo if provided
+      let profilePhotoPath = null;
       if (profilePhoto) {
-        profileData.append('profile_photo_or_character', profilePhoto);
+        const fileExt = profilePhoto.name.split('.').pop();
+        const filePath = `avatars/${currentUser.id}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('vault-images')
+          .upload(filePath, profilePhoto, { upsert: true });
+        if (uploadError) throw uploadError;
+        profilePhotoPath = filePath;
       }
 
-      try {
-        const existingProfile = await pb.collection('public_profiles').getFirstListItem(`user_id="${currentUser.id}"`, { $autoCancel: false });
-        await pb.collection('public_profiles').update(existingProfile.id, profileData, { $autoCancel: false });
-      } catch (err) {
-        // If not found, create new
-        await pb.collection('public_profiles').create(profileData, { $autoCancel: false });
-      }
+      // 3. Update profiles table with verification data and pending status
+      const profileUpdate = {
+        display_name: displayName,
+        legal_name: legalName,
+        address,
+        phone_number: phone,
+        verification_status: 'pending',
+        is_verified: false,
+        updated_at: new Date().toISOString()
+      };
+      if (idPhotoPath) profileUpdate.id_photo = idPhotoPath;
+      if (profilePhotoPath) profileUpdate.profile_photo_or_character = profilePhotoPath;
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update(profileUpdate)
+        .eq('id', currentUser.id);
+
+      if (updateError) throw updateError;
 
       toast.success('Verification request submitted successfully!');
       setExistingStatus('pending');

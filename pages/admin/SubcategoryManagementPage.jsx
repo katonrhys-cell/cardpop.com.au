@@ -14,7 +14,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 
 const SubcategoryManagementPage = () => {
   const navigate = useNavigate();
@@ -45,23 +45,11 @@ const SubcategoryManagementPage = () => {
     setLoading(true);
     console.log('[DEBUG] Fetching subcategories and categories data...');
     try {
-      const [subRes, catRes] = await Promise.all([
-        pb.collection('subcategories').getFullList({
-          sort: '-created',
-          expand: 'parentCategory',
-          $autoCancel: false
-        }),
-        pb.collection('categories').getFullList({
-          sort: '-created',
-          $autoCancel: false
-        })
-      ]);
-      
-      console.log('[DEBUG] Fetched subcategories count:', subRes.length);
-      console.log('[DEBUG] Fetched categories count:', catRes.length);
-      
-      setSubcategories(subRes);
-      setCategories(catRes);
+      const { data: allCats } = await supabase.from('categories').select('*').order('sort_order');
+      const topLevel = (allCats ?? []).filter(c => !c.parent_id);
+      const children = (allCats ?? []).filter(c => c.parent_id);
+      setSubcategories(children.map(c => ({ ...c, parentCategory: c.parent_id })));
+      setCategories(topLevel);
       setError(null);
       if (showToast) toast.success('Data refreshed');
     } catch (err) {
@@ -129,11 +117,7 @@ const SubcategoryManagementPage = () => {
       icon: null
     });
     
-    if (subcategory.icon) {
-      setIconPreview(pb.files.getUrl(subcategory, subcategory.icon));
-    } else {
-      setIconPreview(null);
-    }
+    setIconPreview(subcategory.icon_url ?? null);
     
     setSelectedSubcategory(subcategory);
     setIsModalOpen(true);
@@ -154,20 +138,21 @@ const SubcategoryManagementPage = () => {
     setIsSubmitting(true);
     
     try {
-      const submitData = new FormData();
-      submitData.append('name', formData.name);
-      submitData.append('slug', formData.slug);
-      submitData.append('parentCategory', formData.parentCategory);
-      if (formData.description) submitData.append('description', formData.description);
+      let icon_url = selectedSubcategory?.icon_url ?? null;
       if (formData.icon instanceof File) {
-        submitData.append('icon', formData.icon);
+        const path = `categories/${Date.now()}-icon-${formData.icon.name}`;
+        const { error: upErr } = await supabase.storage.from('categories').upload(path, formData.icon, { upsert: true });
+        if (!upErr) icon_url = supabase.storage.from('categories').getPublicUrl(path).data.publicUrl;
       }
+      const payload = { name: formData.name, slug: formData.slug, description: formData.description, parent_id: formData.parentCategory || null, icon_url };
 
       if (selectedSubcategory) {
-        await pb.collection('subcategories').update(selectedSubcategory.id, submitData, { $autoCancel: false });
+        const { error } = await supabase.from('categories').update(payload).eq('id', selectedSubcategory.id);
+        if (error) throw error;
         toast.success('Subcategory updated successfully');
       } else {
-        await pb.collection('subcategories').create(submitData, { $autoCancel: false });
+        const { error } = await supabase.from('categories').insert(payload);
+        if (error) throw error;
         toast.success('Subcategory created successfully');
       }
       
@@ -187,7 +172,8 @@ const SubcategoryManagementPage = () => {
     
     setIsSubmitting(true);
     try {
-      await pb.collection('subcategories').delete(selectedSubcategory.id, { $autoCancel: false });
+      const { error } = await supabase.from('categories').delete().eq('id', selectedSubcategory.id);
+      if (error) throw error;
       toast.success('Subcategory deleted successfully');
       setIsDeleteDialogOpen(false);
       setSelectedSubcategory(null);
@@ -306,7 +292,7 @@ const SubcategoryManagementPage = () => {
                       <TableCell className="text-center">
                         <div className="w-10 h-10 rounded-xl bg-background border border-border flex items-center justify-center mx-auto overflow-hidden shadow-sm p-1">
                           {subcategory.icon ? (
-                            <img src={pb.files.getUrl(subcategory, subcategory.icon)} alt={subcategory.name} className="w-full h-full object-contain" />
+                            <img src={subcategory.icon_url || subcategory.icon} alt={subcategory.name} className="w-full h-full object-contain" />
                           ) : (
                             <ImageOff className="w-4 h-4 text-muted-foreground opacity-50" />
                           )}

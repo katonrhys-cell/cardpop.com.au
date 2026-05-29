@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import SEOHead from '@/components/SEOHead.jsx';
 
 // Since this is a React app, we render an HTML sitemap for users,
@@ -11,15 +11,17 @@ const SitemapPage = () => {
   useEffect(() => {
     const fetchSitemapData = async () => {
       try {
-        const vaultRes = await pb.collection('cardListings').getList(1, 100, { filter: 'marketplaceStatus != "Private"', $autoCancel: false });
-        const shopRes = await pb.collection('shop_products').getList(1, 100, { $autoCancel: false });
-        
+        const [vaultRes, shopRes] = await Promise.all([
+          supabase.from('vault_items').select('id, card_name').neq('listing_status', 'private').limit(100),
+          supabase.from('listings').select('id, title').eq('type', 'shop').limit(100),
+        ]);
+
         const combined = [
           { label: 'Home', path: '/' },
           { label: 'Vault', path: '/vault' },
           { label: 'Shop', path: '/shop' },
-          ...vaultRes.items.map(i => ({ label: i.cardName || 'Vault Item', path: `/vault/listing/${i.id}` })),
-          ...shopRes.items.map(i => ({ label: i.name || 'Shop Item', path: `/shop/product/${i.id}` }))
+          ...(vaultRes.data ?? []).map(i => ({ label: i.card_name || 'Vault Item', path: `/vault/listing/${i.id}` })),
+          ...(shopRes.data ?? []).map(i => ({ label: i.title || 'Shop Item', path: `/shop/product/${i.id}` })),
         ];
         
         setLinks(combined);

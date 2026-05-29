@@ -34,7 +34,7 @@ const EbayListingCard = ({ listing }) => {
         
         <div className="absolute top-3 left-3 z-10 pointer-events-none">
           <Badge className="bg-white text-black hover:bg-white shadow-md font-bold tracking-tight border border-gray-200">
-            <span className="text-[#E63946]">e</span>
+            <span className="text-[#CE1126]">e</span>
             <span className="text-[#0064d2]">B</span>
             <span className="text-[#f5af02]">a</span>
             <span className="text-[#86b817]">y</span>

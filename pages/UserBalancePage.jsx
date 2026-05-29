@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { Wallet, ArrowDownToLine, Receipt } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
-import pb from '@/lib/pocketbaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
 
 const UserBalancePage = () => {
@@ -12,8 +12,8 @@ const UserBalancePage = () => {
   useEffect(() => {
     const fetchUser = async () => {
       if (currentUser?.id) {
-        const u = await pb.collection('users').getOne(currentUser.id, { $autoCancel: false });
-        setBalance(u.currentBalance || 0);
+        const { data: u } = await supabase.from('profiles').select('wallet_balance_aud').eq('id', currentUser.id).single();
+        setBalance(u?.wallet_balance_aud ?? 0);
       }
     };
     fetchUser();

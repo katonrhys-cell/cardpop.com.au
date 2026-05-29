@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet';
 import { useCart } from '@/hooks/useCart.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 
 import OrderSummary from '@/components/checkout/OrderSummary.jsx';
@@ -49,16 +49,18 @@ const CheckoutPage = () => {
     const initDirectCheckout = async () => {
       if (cardId && source === 'Vault') {
         try {
-          const card = await pb.collection('cards').getOne(cardId, { $autoCancel: false });
-          let imageUrl = null;
-          if (card.cardImage && card.cardImage.length > 0) {
-            imageUrl = pb.files.getUrl(card, card.cardImage[0]);
-          }
+          const { data: card, error } = await supabase
+            .from('vault_items')
+            .select('*, vault_images(*)')
+            .eq('id', cardId)
+            .single();
+          if (error) throw error;
+          const imageUrl = card.vault_images?.[0]?.image_url || null;
           setDirectItem({
             product: {
               id: card.id,
-              title: card.cardName,
-              price: card.salePrice || card.askingPrice || card.estimatedValue,
+              title: card.card_name,
+              price: card.price_aud || card.estimated_value_aud,
               image: imageUrl
             },
             quantity: 1,

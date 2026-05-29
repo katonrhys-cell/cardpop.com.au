@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { Loader2, PackageX } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { formatCurrency } from '@/api/EcommerceApi.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,7 @@ const CategoryPage = () => {
   
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [sortOrder, setSortOrder] = useState('-created');
+  const [sortOrder, setSortOrder] = useState('created_at_desc');
   
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -30,21 +30,26 @@ const CategoryPage = () => {
     const fetchCategoryProducts = async () => {
       setLoading(true);
       try {
-        let filterStr = `category ~ "${categoryNameStr}" && status = "active"`;
-        
-        // Example logic: if subcategory is present, we might filter description or another mapped field if 'subcategory' isn't explicitly in listings schema.
-        // Assuming listings only has 'category', we might have stored "Category > Subcategory" in the category field, or we just rely on primary category.
-        
-        const result = await pb.collection('listings').getList(page, 12, {
-          filter: filterStr,
-          sort: sortOrder,
-          expand: 'seller',
-          $autoCancel: false
-        });
-        
-        setProducts(result.items);
-        setTotalPages(result.totalPages);
-        setTotalItems(result.totalItems);
+        const perPage = 12;
+        const from = (page - 1) * perPage;
+
+        let query = supabase
+          .from('listings')
+          .select('*, seller:profiles!seller_id(*)', { count: 'exact' })
+          .ilike('category', `%${categoryNameStr}%`)
+          .eq('status', 'active')
+          .range(from, from + perPage - 1);
+
+        if (sortOrder === 'price_aud_asc') query = query.order('price_aud', { ascending: true });
+        else if (sortOrder === 'price_aud_desc') query = query.order('price_aud', { ascending: false });
+        else query = query.order('created_at', { ascending: false });
+
+        const { data, count, error } = await query;
+        if (error) throw error;
+
+        setProducts(data || []);
+        setTotalItems(count || 0);
+        setTotalPages(Math.ceil((count || 0) / perPage));
       } catch (error) {
         console.error('Error fetching category products:', error);
       } finally {

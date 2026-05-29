@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
 import { Activity, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import MarketFiltersPanel from '@/components/MarketFiltersPanel.jsx';
 import MarketStatsSection from '@/components/MarketStatsSection.jsx';
 import PriceHistoryChart from '@/components/PriceHistoryChart.jsx';
@@ -39,28 +39,27 @@ const MarketPage = () => {
     setError(null);
     try {
       // Fetch completed transactions
-      const records = await pb.collection('transactions').getFullList({
-        filter: 'status="Completed"',
-        expand: 'cardIds',
-        sort: '-created',
-        $autoCancel: false
-      });
+      const { data: records, error: fetchError } = await supabase
+        .from('market_data')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (fetchError) throw fetchError;
 
       // Apply client-side filters
-      let filtered = records;
+      let filtered = records || [];
       
       if (filters.minPrice && !isNaN(filters.minPrice)) {
-        filtered = filtered.filter(t => t.transactionValue >= parseFloat(filters.minPrice));
+        filtered = filtered.filter(t => t.price >= parseFloat(filters.minPrice));
       }
       if (filters.maxPrice && !isNaN(filters.maxPrice)) {
-        filtered = filtered.filter(t => t.transactionValue <= parseFloat(filters.maxPrice));
+        filtered = filtered.filter(t => t.price <= parseFloat(filters.maxPrice));
       }
       
       // Calculate stats
-      const totalVol = filtered.reduce((sum, t) => sum + (t.transactionValue || 0), 0);
+      const totalVol = filtered.reduce((sum, t) => sum + (t.price || 0), 0);
       const count = filtered.length;
       const avg = count > 0 ? totalVol / count : 0;
-      const highest = count > 0 ? Math.max(...filtered.map(t => t.transactionValue || 0)) : 0;
+      const highest = count > 0 ? Math.max(...filtered.map(t => t.price || 0)) : 0;
 
       setStats({
         totalVolume: totalVol,

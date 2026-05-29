@@ -2,17 +2,14 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Star, ShieldCheck, Tag } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 
 const MarketplaceListingCard = ({ listing }) => {
   const imageUrl = listing.images?.[0];
-  const imgSrc = imageUrl ? pb.files.getUrl(listing, imageUrl) : null;
-  const sellerId = listing.seller;
-  const sellerObj = listing.expand?.seller;
-  const titleSlug = slugify(listing.title || 'card');
-  const detailPath = `/product/marketplace/${listing.id}/${titleSlug}`;
+  const imgSrc = imageUrl && typeof imageUrl === 'string' && imageUrl.startsWith('http') ? imageUrl : null;
+  const sellerId = listing.seller_id || listing.seller;
+  const sellerObj = listing.expand?.seller_id || listing.expand?.seller;
 
   return (
     <div className="group flex flex-col h-full bg-card rounded-2xl border border-border overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
@@ -60,7 +57,7 @@ const MarketplaceListingCard = ({ listing }) => {
             >
               <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
                 {sellerObj?.profile_photo_or_character ? (
-                  <img src={pb.files.getUrl(sellerObj, sellerObj.profile_photo_or_character)} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" />
+                  <img src={sellerObj.profile_photo_or_character} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" />
                 ) : (
                   (sellerObj?.display_name || sellerObj?.name || 'S')[0].toUpperCase()
                 )}

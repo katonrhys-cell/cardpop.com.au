@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link, useParams } from 'react-router-dom';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,7 +40,7 @@ const ImagePlaceholder = () => (
 
 // Large card for Featured Stories (2-col grid)
 const FeaturedCard = ({ article }) => {
-  const imageUrl = article.featuredImage ? pb.files.getUrl(article, article.featuredImage) : null;
+  const imageUrl = article.featured_image_url || null;
   return (
     <Link
       to={`/blog/${article.id}`}
@@ -67,7 +67,7 @@ const FeaturedCard = ({ article }) => {
           </span>
           <span className="flex items-center gap-1.5">
             <Calendar className="w-3.5 h-3.5" />
-            {formatDate(article.created)}
+            {formatDate(article.created_at)}
           </span>
         </div>
       </div>
@@ -77,7 +77,7 @@ const FeaturedCard = ({ article }) => {
 
 // Standard card for the main articles grid (3-col)
 const ArticleCard = ({ article }) => {
-  const imageUrl = article.featuredImage ? pb.files.getUrl(article, article.featuredImage) : null;
+  const imageUrl = article.featured_image_url || null;
   return (
     <Link
       to={`/blog/${article.id}`}
@@ -98,7 +98,7 @@ const ArticleCard = ({ article }) => {
           </span>
           <span className="flex items-center gap-1">
             <Calendar className="w-3 h-3" />
-            {formatDate(article.created)}
+            {formatDate(article.created_at)}
           </span>
         </div>
         <h3 className="font-bold text-lg mb-2 line-clamp-2 group-hover:text-primary transition-colors leading-snug">
@@ -123,11 +123,8 @@ const BlogPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await pb.collection('blog_articles').getList(1, 100, {
-        sort: '-created',
-        $autoCancel: false,
-      });
-      setArticles(res.items);
+      const { data } = await supabase.from('blog_posts').select('*').order('created_at', { ascending: false }).limit(100);
+      setArticles(data ?? []);
     } catch (err) {
       console.error('Error fetching articles:', err);
       setError('Failed to load articles. Please try again later.');

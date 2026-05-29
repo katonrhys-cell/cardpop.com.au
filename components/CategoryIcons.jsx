@@ -5,7 +5,7 @@ import React from 'react';
 export const CaptureSphereIcon = ({ className }) => (
   <svg viewBox="0 0 40 40" fill="none" className={className}>
     <circle cx="20" cy="20" r="18" fill="white"/>
-    <path d="M2 20 A18 18 0 0 0 38 20 Z" fill="#E63946"/>
+    <path d="M2 20 A18 18 0 0 0 38 20 Z" fill="#CE1126"/>
     <circle cx="20" cy="20" r="18" stroke="#1c1c1e" strokeWidth="2" fill="none"/>
     <rect x="2" y="18.5" width="36" height="3" fill="#1c1c1e"/>
     <polygon points="26,20 23,14.8 17,14.8 14,20 17,25.2 23,25.2" fill="white" stroke="#1c1c1e" strokeWidth="1.5"/>

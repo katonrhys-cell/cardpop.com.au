@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Edit, Trash2, Power, History, Image as ImageIcon } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import { formatCurrency } from '@/api/EcommerceApi';
 import ListingEditForm from './ListingEditForm.jsx';
 import ModerationPanel from './ModerationPanel.jsx';
@@ -15,7 +15,7 @@ const ListingDetailModal = ({ isOpen, onClose, listing, onUpdate, onDelete, onSt
 
   if (!listing) return null;
 
-  const imageUrl = listing.image ? pb.files.getUrl(listing, listing.image) : null;
+  const imageUrl = listing.image_url || listing.image || null;
   const isOutOfStock = listing.stockQuantity <= 0;
 
   const handleEditSuccess = (updated) => {
@@ -93,7 +93,7 @@ const ListingDetailModal = ({ isOpen, onClose, listing, onUpdate, onDelete, onSt
                     </div>
                     <div>
                       <p className="text-muted-foreground">Created At</p>
-                      <p className="font-medium">{new Date(listing.created).toLocaleDateString()}</p>
+                      <p className="font-medium">{new Date(listing.created_at).toLocaleDateString()}</p>
                     </div>
                   </div>
                   

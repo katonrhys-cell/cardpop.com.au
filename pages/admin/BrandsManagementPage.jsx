@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 
 const BrandsManagementPage = () => {
   const navigate = useNavigate();
@@ -37,22 +37,11 @@ const BrandsManagementPage = () => {
   const fileInputRef = useRef(null);
 
   const fetchBrands = async (showToast = false) => {
-    setLoading(true);
-    try {
-      const records = await pb.collection('brands').getFullList({
-        sort: '-created',
-        $autoCancel: false
-      });
-      setBrands(records);
-      setError(null);
-      if (showToast) toast.success('Brands refreshed');
-    } catch (err) {
-      console.error("Failed to fetch brands:", err);
-      setError("Failed to load brands from database.");
-      if (showToast) toast.error('Failed to refresh brands');
-    } finally {
-      setLoading(false);
-    }
+    // brands collection has been consolidated into Categories in the new schema.
+    setLoading(false);
+    setBrands([]);
+    setError(null);
+    if (showToast) toast.info('Brands are no longer a separate collection.');
   };
 
   useEffect(() => {
@@ -99,11 +88,7 @@ const BrandsManagementPage = () => {
       logo: null
     });
     
-    if (brand.logo) {
-      setIconPreview(pb.files.getUrl(brand, brand.logo));
-    } else {
-      setIconPreview(null);
-    }
+    setIconPreview(brand.logo_url || null);
     
     setSelectedBrand(brand);
     setIsModalOpen(true);
@@ -132,20 +117,13 @@ const BrandsManagementPage = () => {
         submitData.append('logo', formData.logo);
       }
 
-      if (selectedBrand) {
-        await pb.collection('brands').update(selectedBrand.id, submitData, { $autoCancel: false });
-        toast.success('Brand updated successfully');
-      } else {
-        await pb.collection('brands').create(submitData, { $autoCancel: false });
-        toast.success('Brand created successfully');
-      }
-      
+      // Brands collection removed — no-op
+      toast.info('This taxonomy level has been consolidated into Categories in the new schema.');
       setIsModalOpen(false);
       resetForm();
-      await fetchBrands();
     } catch (err) {
       console.error("Error saving brand:", err);
-      toast.error(err.response?.message || 'Failed to save brand');
+      toast.error(err.message || 'Failed to save brand');
     } finally {
       setIsSubmitting(false);
     }
@@ -156,11 +134,10 @@ const BrandsManagementPage = () => {
     
     setIsSubmitting(true);
     try {
-      await pb.collection('brands').delete(selectedBrand.id, { $autoCancel: false });
-      toast.success('Brand deleted successfully');
+      // Brands collection removed — no-op
+      toast.info('This taxonomy level has been consolidated into Categories in the new schema.');
       setIsDeleteDialogOpen(false);
       setSelectedBrand(null);
-      await fetchBrands();
     } catch (err) {
       console.error("Error deleting brand:", err);
       toast.error('Failed to delete brand. It may be in use.');
@@ -194,6 +171,9 @@ const BrandsManagementPage = () => {
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Brands</h1>
             <p className="text-muted-foreground mt-1">Add and manage card game and sports brands.</p>
+            <p className="text-amber-600 dark:text-amber-400 text-sm font-medium mt-1">
+              This taxonomy level has been consolidated into Categories in the new schema.
+            </p>
           </div>
         </div>
         <div className="flex gap-3 w-full sm:w-auto">
@@ -271,8 +251,8 @@ const BrandsManagementPage = () => {
                     <TableRow key={brand.id} className="group transition-colors hover:bg-muted/30 cursor-pointer" onClick={() => openEditModal(brand)}>
                       <TableCell className="text-center">
                         <div className="w-10 h-10 rounded-xl bg-background border border-border flex items-center justify-center mx-auto overflow-hidden shadow-sm p-1">
-                          {brand.logo ? (
-                            <img src={pb.files.getUrl(brand, brand.logo)} alt={brand.name} className="w-full h-full object-contain" />
+                          {brand.logo_url ? (
+                            <img src={brand.logo_url} alt={brand.name} className="w-full h-full object-contain" />
                           ) : (
                             <ImageOff className="w-4 h-4 text-muted-foreground opacity-50" />
                           )}

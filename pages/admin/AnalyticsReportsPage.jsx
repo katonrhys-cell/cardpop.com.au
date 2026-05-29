@@ -23,7 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 
 const StatCard = ({ title, value, icon: Icon, description, loading }) => (
@@ -71,55 +71,47 @@ const AnalyticsReportsPage = () => {
       setLoading(true);
       setError(null);
       try {
-        // Fetch total counts efficiently using getList(1, 1)
+        // Fetch total counts
         const [
-          usersRes, 
-          productsRes, 
-          eventsRes, 
-          categoriesRes, 
-          brandsRes,
-          ordersListRes
+          usersRes,
+          listingsRes,
+          eventsRes,
+          categoriesRes,
+          ordersCountRes,
+          recentOrdersRes,
+          allOrdersRes,
+          allUsersRes
         ] = await Promise.all([
-          pb.collection('users').getList(1, 1, { $autoCancel: false }),
-          pb.collection('products').getList(1, 1, { $autoCancel: false }),
-          pb.collection('events').getList(1, 1, { $autoCancel: false }),
-          pb.collection('categories').getList(1, 1, { $autoCancel: false }),
-          pb.collection('brands').getList(1, 1, { $autoCancel: false }),
-          pb.collection('orders').getList(1, 10, { sort: '-created', expand: 'buyer_id', $autoCancel: false }).catch(() => ({ items: [], totalItems: 0 }))
+          supabase.from('profiles').select('*', { count: 'exact' }).limit(1).catch(() => ({ count: 0 })),
+          supabase.from('listings').select('*', { count: 'exact' }).limit(1).catch(() => ({ count: 0 })),
+          supabase.from('events').select('*', { count: 'exact' }).limit(1).catch(() => ({ count: 0 })),
+          supabase.from('categories').select('*', { count: 'exact' }).limit(1).catch(() => ({ count: 0 })),
+          supabase.from('orders').select('*', { count: 'exact' }).limit(1).catch(() => ({ count: 0 })),
+          supabase.from('orders').select('*, profiles!orders_buyer_id_fkey(username, display_name)').order('created_at', { ascending: false }).range(0, 9).catch(() => ({ data: [] })),
+          supabase.from('orders').select('total_amount,created_at').neq('status', 'cancelled').catch(() => ({ data: [] })),
+          supabase.from('profiles').select('created_at').catch(() => ({ data: [] }))
         ]);
 
-        // Fetch all orders and users for chart aggregation (in a real app, this would be a backend aggregation endpoint)
-        // For this admin dashboard, we fetch the data to build the charts
-        const allOrders = await pb.collection('orders').getFullList({ 
-          filter: 'status != "cancelled"',
-          fields: 'total_amount,created',
-          $autoCancel: false 
-        }).catch(() => []);
-
-        const allUsers = await pb.collection('users').getFullList({
-          fields: 'created',
-          $autoCancel: false
-        }).catch(() => []);
-
-        const totalRevenue = allOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+        // brands/series/productLines removed — use 0
+        const totalRevenue = (allOrdersRes.data || []).reduce((sum, order) => sum + (order.total_amount || 0), 0);
 
         setStats({
-          users: usersRes.totalItems || 0,
-          products: productsRes.totalItems || 0,
-          events: eventsRes.totalItems || 0,
-          categories: categoriesRes.totalItems || 0,
-          brands: brandsRes.totalItems || 0,
-          orders: ordersListRes.totalItems || 0,
+          users: usersRes.count || 0,
+          products: listingsRes.count || 0,
+          events: eventsRes.count || 0,
+          categories: categoriesRes.count || 0,
+          brands: 0,
+          orders: ordersCountRes.count || 0,
           revenue: totalRevenue
         });
 
-        setRecentOrders(ordersListRes.items || []);
+        setRecentOrders(recentOrdersRes.data || []);
 
         // Build Chart Data (Last 6 Months)
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         const last6Months = [];
         const d = new Date();
-        
+
         for (let i = 5; i >= 0; i--) {
           const d2 = new Date(d.getFullYear(), d.getMonth() - i, 1);
           last6Months.push({
@@ -132,8 +124,8 @@ const AnalyticsReportsPage = () => {
         }
 
         // Aggregate Orders
-        allOrders.forEach(order => {
-          const orderDate = new Date(order.created);
+        (allOrdersRes.data || []).forEach(order => {
+          const orderDate = new Date(order.created_at);
           const bucket = last6Months.find(m => m.month === orderDate.getMonth() && m.year === orderDate.getFullYear());
           if (bucket) {
             bucket.revenue += (order.total_amount || 0);
@@ -141,8 +133,8 @@ const AnalyticsReportsPage = () => {
         });
 
         // Aggregate Users
-        allUsers.forEach(user => {
-          const userDate = new Date(user.created);
+        (allUsersRes.data || []).forEach(user => {
+          const userDate = new Date(user.created_at);
           const bucket = last6Months.find(m => m.month === userDate.getMonth() && m.year === userDate.getFullYear());
           if (bucket) {
             bucket.users += 1;
@@ -368,10 +360,10 @@ const AnalyticsReportsPage = () => {
                   <TableRow key={order.id} className="group hover:bg-muted/40 transition-colors">
                     <TableCell className="font-mono text-xs text-muted-foreground">{order.order_number || order.id}</TableCell>
                     <TableCell className="text-muted-foreground text-sm">
-                      {new Date(order.created).toLocaleDateString()}
+                      {new Date(order.created_at).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="font-medium text-foreground">
-                      {order.expand?.buyer_id?.email || order.buyer_id || 'Unknown User'}
+                      {order.profiles?.display_name || order.profiles?.username || order.buyer_id || 'Unknown User'}
                     </TableCell>
                     <TableCell>
                       <Badge 

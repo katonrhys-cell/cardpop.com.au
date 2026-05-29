@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, User } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
 
 const SellerCard = ({ seller }) => {
@@ -16,13 +16,11 @@ const SellerCard = ({ seller }) => {
   const reviewCount = seller.reviewsCount || 0;
 
   // Format Member Since date
-  const memberSinceDate = seller.created 
-    ? new Date(seller.created).toLocaleDateString('en-US', { year: 'numeric', month: 'long' }) 
+  const memberSinceDate = seller.created_at
+    ? new Date(seller.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
     : 'Unknown';
 
-  const avatarUrl = seller.avatar 
-    ? pb.files.getUrl(seller, seller.avatar) 
-    : null;
+  const avatarUrl = seller.avatar_url || null;
 
   const handleCardClick = (e) => {
     // Prevent navigation if the user is selecting text or explicitly clicking a nested link/button

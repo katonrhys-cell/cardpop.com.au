@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { useAuth } from '@/contexts/AuthContext.jsx';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import apiServerClient from '@/lib/apiServerClient.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -73,14 +73,20 @@ const ProfileCompletionPage = () => {
 
     setSaving(true);
     try {
-      await pb.collection('users').update(currentUser.id, {
-        fullName: formData.fullName,
-        dateOfBirth: formData.dateOfBirth || null,
-        address: formData.address,
-        phoneNumber: formData.phoneNumber,
-        verificationStatus: 'pending'
-      }, { $autoCancel: false });
-      
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: formData.fullName,
+          date_of_birth: formData.dateOfBirth || null,
+          address: formData.address,
+          phone_number: formData.phoneNumber,
+          verification_status: 'pending',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', currentUser.id);
+
+      if (error) throw error;
+
       toast.success('Profile completed! Your verification is now pending review.');
       navigate('/account');
     } catch (error) {

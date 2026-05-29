@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { CalendarDays, Search, MapPin, SlidersHorizontal, X } from 'lucide-react';
 import { format } from 'date-fns';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import EventCard from '@/components/EventCard.jsx';
 import EventDetailModal from '@/components/EventDetailModal.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -38,12 +38,13 @@ const CommunityEventsPage = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await pb.collection('events').getFullList({
-        filter: 'status="active"',
-        sort: 'date',
-        $autoCancel: false,
-      });
-      if (isMounted.current) setEvents(result || []);
+      const { data, error: fetchError } = await supabase
+        .from('events')
+        .select('*')
+        .eq('status', 'approved')
+        .order('start_date', { ascending: true });
+      if (fetchError) throw fetchError;
+      if (isMounted.current) setEvents(data || []);
     } catch (err) {
       console.error('Error fetching events:', err);
       if (isMounted.current) setError('Failed to load events. Please try again.');
@@ -56,24 +57,27 @@ const CommunityEventsPage = () => {
     isMounted.current = true;
     fetchEvents();
 
-    pb.collection('events').subscribe('*', (e) => {
-      if (!isMounted.current) return;
-      if (e.action === 'create' && e.record.status === 'active') {
-        setEvents(prev => [...prev, e.record].sort((a, b) => new Date(a.date) - new Date(b.date)));
-      } else if (e.action === 'update') {
-        setEvents(prev => {
-          const rest = prev.filter(ev => ev.id !== e.record.id);
-          if (e.record.status === 'active') rest.push(e.record);
-          return rest.sort((a, b) => new Date(a.date) - new Date(b.date));
-        });
-      } else if (e.action === 'delete') {
-        setEvents(prev => prev.filter(ev => ev.id !== e.record.id));
-      }
-    });
+    const channel = supabase.channel('community-events-full')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, payload => {
+        if (!isMounted.current) return;
+        const record = payload.new;
+        if (payload.eventType === 'INSERT' && record.status === 'approved') {
+          setEvents(prev => [...prev, record].sort((a, b) => new Date(a.start_date) - new Date(b.start_date)));
+        } else if (payload.eventType === 'UPDATE') {
+          setEvents(prev => {
+            const rest = prev.filter(ev => ev.id !== record.id);
+            if (record.status === 'approved') rest.push(record);
+            return rest.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
+          });
+        } else if (payload.eventType === 'DELETE') {
+          setEvents(prev => prev.filter(ev => ev.id !== payload.old.id));
+        }
+      })
+      .subscribe();
 
     return () => {
       isMounted.current = false;
-      pb.collection('events').unsubscribe('*');
+      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -81,15 +85,15 @@ const CommunityEventsPage = () => {
     return events.filter(e => {
       const term = searchTerm.toLowerCase();
       const matchSearch = !searchTerm ||
-        e.name?.toLowerCase().includes(term) ||
-        e.location?.toLowerCase().includes(term) ||
+        e.title?.toLowerCase().includes(term) ||
+        e.venue_name?.toLowerCase().includes(term) ||
+        e.suburb?.toLowerCase().includes(term) ||
         e.description?.toLowerCase().includes(term);
 
       const matchState = filterState === 'all' || e.state === filterState;
-      const matchType = filterType === 'all' ||
-        e.type === filterType || e.eventType === filterType;
+      const matchType = filterType === 'all' || e.event_type === filterType;
 
-      const eventDate = e.date ? new Date(e.date) : null;
+      const eventDate = e.start_date ? new Date(e.start_date) : null;
       const matchStart = !startDate || !eventDate || eventDate >= new Date(startDate);
       const matchEnd = !endDate || !eventDate || eventDate <= new Date(endDate + 'T23:59:59');
 
@@ -100,7 +104,7 @@ const CommunityEventsPage = () => {
   const groupedEvents = useMemo(() => {
     const groups = {};
     filteredEvents.forEach(event => {
-      const key = event.date ? format(new Date(event.date), 'MMMM yyyy') : 'Date TBA';
+      const key = event.start_date ? format(new Date(event.start_date), 'MMMM yyyy') : 'Date TBA';
       if (!groups[key]) groups[key] = [];
       groups[key].push(event);
     });

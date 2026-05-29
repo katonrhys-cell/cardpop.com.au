@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { Send, MessageSquare, AlertCircle } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,39 +41,29 @@ const MessagingPage = () => {
   useEffect(() => {
     if (!currentUser) return;
     
-    const subscribeToMessages = async () => {
-      try {
-        await pb.collection('messages').subscribe('*', (e) => {
-          if (!isMounted.current) return;
-          
-          if (e.action === 'create') {
-            const isRelevant = e.record.sender === currentUser.id || e.record.recipient === currentUser.id;
-            if (isRelevant) {
-              fetchConversations();
-              
-              if (selectedUserId && (e.record.sender === selectedUserId || e.record.recipient === selectedUserId)) {
-                setMessages(prev => {
-                  if (prev.some(m => m.id === e.record.id)) return prev; // Prevent dups
-                  return [...prev, e.record];
-                });
-                scrollToBottom();
-                
-                // Mark received message as read
-                if (e.record.recipient === currentUser.id) {
-                  pb.collection('messages').update(e.record.id, { isRead: true }, { $autoCancel: false }).catch(console.error);
-                }
-              }
+    const channel = supabase.channel('messaging-page')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+        if (!isMounted.current) return;
+        const record = payload.new;
+        const isRelevant = record.sender_id === currentUser.id || record.recipient_id === currentUser.id;
+        if (isRelevant) {
+          fetchConversations();
+          if (selectedUserId && (record.sender_id === selectedUserId || record.recipient_id === selectedUserId)) {
+            setMessages(prev => {
+              if (prev.some(m => m.id === record.id)) return prev;
+              return [...prev, record];
+            });
+            scrollToBottom();
+            if (record.recipient_id === currentUser.id) {
+              supabase.from('messages').update({ is_read: true }).eq('id', record.id).catch(console.error);
             }
           }
-        });
-      } catch (err) {
-        console.error("Subscription error:", err);
-      }
-    };
-    
-    subscribeToMessages();
+        }
+      })
+      .subscribe();
+
     return () => {
-      pb.collection('messages').unsubscribe('*').catch(() => {});
+      supabase.removeChannel(channel);
     };
   }, [currentUser, selectedUserId]);
 
@@ -85,42 +75,44 @@ const MessagingPage = () => {
 
   const fetchConversations = async () => {
     try {
-      const allMessages = await pb.collection('messages').getList(1, 200, {
-        filter: `sender="${currentUser.id}" || recipient="${currentUser.id}"`,
-        sort: '-created',
-        $autoCancel: false
-      });
+      const { data: allMessages, error: msgError } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`sender_id.eq.${currentUser.id},recipient_id.eq.${currentUser.id}`)
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (msgError) throw msgError;
 
       const convMap = new Map();
-      
-      for (const msg of allMessages.items) {
-        const otherId = msg.sender === currentUser.id ? msg.recipient : msg.sender;
+
+      for (const msg of allMessages || []) {
+        const otherId = msg.sender_id === currentUser.id ? msg.recipient_id : msg.sender_id;
         if (!convMap.has(otherId)) {
           convMap.set(otherId, {
             otherUserId: otherId,
             otherUserName: 'Loading...',
             lastMessage: msg.content,
-            timestamp: msg.created,
-            unreadCount: (msg.recipient === currentUser.id && !msg.isRead) ? 1 : 0
+            timestamp: msg.created_at,
+            unreadCount: (msg.recipient_id === currentUser.id && !msg.is_read) ? 1 : 0
           });
-        } else if (msg.recipient === currentUser.id && !msg.isRead) {
+        } else if (msg.recipient_id === currentUser.id && !msg.is_read) {
           const c = convMap.get(otherId);
           c.unreadCount += 1;
         }
       }
 
-      // Fetch names concurrently
+      // Fetch profiles for display names
       const uniqueIds = Array.from(convMap.keys());
       if (uniqueIds.length > 0) {
-        const users = await pb.collection('users').getList(1, 50, {
-          filter: uniqueIds.map(id => `id="${id}"`).join('||'),
-          $autoCancel: false
-        });
-        
-        users.items.forEach(u => {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, display_name, avatar_url')
+          .in('id', uniqueIds);
+
+        (profiles || []).forEach(u => {
           if (convMap.has(u.id)) {
-            convMap.get(u.id).otherUserName = u.name || 'Anonymous';
-            convMap.get(u.id).avatar = u.avatar ? pb.files.getUrl(u, u.avatar) : null;
+            convMap.get(u.id).otherUserName = u.display_name || 'Anonymous';
+            convMap.get(u.id).avatar = u.avatar_url || null;
           }
         });
       }
@@ -138,23 +130,25 @@ const MessagingPage = () => {
   const loadThread = async (otherId) => {
     setSelectedUserId(otherId);
     try {
-      const msgs = await pb.collection('messages').getList(1, 100, {
-        filter: `(sender="${currentUser.id}" && recipient="${otherId}") || (sender="${otherId}" && recipient="${currentUser.id}")`,
-        sort: 'created',
-        $autoCancel: false
-      });
-      
+      const { data: msgs, error: msgsError } = await supabase
+        .from('messages')
+        .select('*')
+        .or(`and(sender_id.eq.${currentUser.id},recipient_id.eq.${otherId}),and(sender_id.eq.${otherId},recipient_id.eq.${currentUser.id})`)
+        .order('created_at', { ascending: true })
+        .limit(100);
+      if (msgsError) throw msgsError;
+
       if (isMounted.current) {
-        setMessages(msgs.items);
+        setMessages(msgs || []);
         scrollToBottom();
       }
 
       // Mark unread as read
-      const unread = msgs.items.filter(m => m.recipient === currentUser.id && !m.isRead);
-      for (const m of unread) {
-        await pb.collection('messages').update(m.id, { isRead: true }, { $autoCancel: false });
+      const unreadIds = (msgs || []).filter(m => m.recipient_id === currentUser.id && !m.is_read).map(m => m.id);
+      if (unreadIds.length > 0) {
+        await supabase.from('messages').update({ is_read: true }).in('id', unreadIds);
+        fetchConversations();
       }
-      if (unread.length > 0) fetchConversations();
 
     } catch (error) {
       console.error('Error loading thread:', error);
@@ -171,13 +165,19 @@ const MessagingPage = () => {
 
     try {
       const msgData = {
-        sender: currentUser.id,
-        recipient: selectedUserId,
+        sender_id: currentUser.id,
+        recipient_id: selectedUserId,
         content: content,
-        isRead: false,
+        is_read: false,
+        trade_id: null,
       };
 
-      const created = await pb.collection('messages').create(msgData, { $autoCancel: false });
+      const { data: created, error: sendError } = await supabase
+        .from('messages')
+        .insert(msgData)
+        .select()
+        .single();
+      if (sendError) throw sendError;
       // Optimistic append if real-time misses it
       setMessages(prev => {
         if (prev.some(m => m.id === created.id)) return prev;
@@ -293,7 +293,7 @@ const MessagingPage = () => {
               <ScrollArea className="flex-1 p-4 md:p-6 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-muted/20 via-background to-background">
                 <div className="space-y-4 max-w-3xl mx-auto flex flex-col">
                   {messages.map((msg, idx) => {
-                    const isSent = msg.sender === currentUser.id;
+                    const isSent = msg.sender_id === currentUser.id;
                     return (
                       <div key={msg.id || idx} className={`flex ${isSent ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[85%] md:max-w-[70%] rounded-2xl px-5 py-3 shadow-sm ${
@@ -303,7 +303,7 @@ const MessagingPage = () => {
                         }`}>
                           <p className="leading-relaxed text-sm md:text-base whitespace-pre-wrap break-words">{msg.content}</p>
                           <p className={`text-[10px] mt-2 font-medium tracking-wide text-right opacity-70`}>
-                            {new Date(msg.created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>
                       </div>

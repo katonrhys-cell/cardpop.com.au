@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { AlertCircle, ShieldAlert, CheckCircle, Loader2 } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 
 const ModerationPanel = ({ listing, onUpdate }) => {
@@ -13,9 +13,12 @@ const ModerationPanel = ({ listing, onUpdate }) => {
     if (!listing?.id) return;
     setIsSubmitting(true);
     try {
-      const updated = await pb.collection('officialCatalog').update(listing.id, {
-        moderationNotes: notes
-      }, { $autoCancel: false });
+      const { data: updated } = await supabase
+        .from('set_cards')
+        .update({ moderationNotes: notes })
+        .eq('id', listing.id)
+        .select()
+        .single();
       
       toast.success('Moderation notes updated successfully');
       if (onUpdate) onUpdate(updated);
@@ -44,7 +47,12 @@ const ModerationPanel = ({ listing, onUpdate }) => {
         msg = 'Moderation notes cleared';
       }
 
-      const updated = await pb.collection('officialCatalog').update(listing.id, updatedData, { $autoCancel: false });
+      const { data: updated } = await supabase
+        .from('set_cards')
+        .update(updatedData)
+        .eq('id', listing.id)
+        .select()
+        .single();
       toast.success(msg);
       if (onUpdate) onUpdate(updated);
     } catch (error) {

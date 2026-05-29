@@ -22,7 +22,9 @@ module.exports = {
     },
     extend: {
       fontFamily: {
+        // Body: Helvetica Neue (brand spec)
         sans: ["var(--font-sans)", "sans-serif"],
+        // Display / Headings: Syne ExtraBold 800 (brand spec)
         serif: ["var(--font-heading)", "sans-serif"],
         heading: ["var(--font-heading)", "sans-serif"],
       },
@@ -60,15 +62,31 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // ── CardPop Brand Palette ───────────────────────────────────────
         brand: {
-          red: "hsl(var(--brand-red))",
-          blue: "hsl(var(--brand-blue))",
-        }
+          red:        "#CE1126",   // CardPop Red
+          charcoal:   "#1F2937",   // Charcoal
+          silver:     "#C4CED4",   // Soft Silver
+          lightgrey:  "#F5F7FA",   // Light Grey
+          white:      "#FFFFFF",   // Cloud White
+        },
       },
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        // Brand-spec named radii (use these on components)
+        button: "var(--radius-button)",   // 6px
+        input:  "var(--radius-input)",    // 8px
+        card:   "var(--radius-card)",     // 12px
+        pill:   "var(--radius-pill)",     // 999px
+        // shadcn/ui compat aliases
+        lg: "var(--radius)",              // 12px
+        md: "calc(var(--radius) - 4px)", // 8px
+        sm: "calc(var(--radius) - 6px)", // 6px
+      },
+      minHeight: {
+        touch: "44px",   // minimum touch target (brand spec)
+      },
+      minWidth: {
+        touch: "44px",
       },
     },
   },

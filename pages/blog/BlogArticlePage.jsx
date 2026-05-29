@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, FileText } from 'lucide-react';
 
@@ -18,38 +18,18 @@ const BlogArticlePage = () => {
       setLoading(true);
       setError(null);
       try {
-        // Fetch Main Article from 'blog_articles' collection
-        const res = await pb.collection('blog_articles').getOne(id, { $autoCancel: false });
+        const { data: res, error: fetchErr } = await supabase.from('blog_posts').select('*').eq('id', id).single();
+        if (fetchErr) throw fetchErr;
         setArticle(res);
-        
-        // Handle HTML Content from file or fallback to text content
-        if (res.article_document) {
-          try {
-            const docUrl = pb.files.getUrl(res, res.article_document);
-            const docRes = await fetch(docUrl);
-            
-            if (docRes.ok) {
-              const htmlText = await docRes.text();
-              setHtmlContent(htmlText);
-            } else {
-              console.warn("Failed to load document, falling back to content field.");
-              setHtmlContent(res.content || '');
-            }
-          } catch (err) {
-            console.error("Failed to fetch article document HTML:", err);
-            setHtmlContent(res.content || '');
-          }
-        } else {
-          setHtmlContent(res.content || '');
-        }
+        setHtmlContent(res.content_html || res.content || '');
 
-        // Fetch Related Articles (excluding current)
-        const relatedRes = await pb.collection('blog_articles').getList(1, 3, {
-          filter: `id != "${id}"`,
-          sort: '-created',
-          $autoCancel: false
-        });
-        setRelatedArticles(relatedRes.items);
+        const { data: related } = await supabase
+          .from('blog_posts')
+          .select('id, title, featured_image_url, content')
+          .neq('id', id)
+          .order('created_at', { ascending: false })
+          .limit(3);
+        setRelatedArticles(related ?? []);
 
       } catch (err) {
         console.error("Error loading article:", err);
@@ -90,7 +70,7 @@ const BlogArticlePage = () => {
     );
   }
 
-  const imageUrl = article.featuredImage ? pb.files.getUrl(article, article.featuredImage) : null;
+  const imageUrl = article.featured_image_url || null;
 
   return (
     <article className="min-h-[100dvh] bg-background pb-24 overflow-x-hidden">
@@ -138,7 +118,7 @@ const BlogArticlePage = () => {
             <h2 className="text-3xl font-bold mb-10 text-center">More from the Blog</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
               {relatedArticles.map((related) => {
-                const relImg = related.featuredImage ? pb.files.getUrl(related, related.featuredImage) : null;
+                const relImg = related.featured_image_url || null;
                 return (
                   <Link 
                     key={related.id} 

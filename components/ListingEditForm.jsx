@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
-import pb from '@/lib/pocketbaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 
 const TCG_COLLECTIONS = ['Pokemon', 'Magic', 'Yu-Gi-Oh', 'Digimon', 'Riftbound', 'Disney Lorcana', 'One Piece'];
 
@@ -62,11 +62,28 @@ const ListingEditForm = ({ listing, onSuccess, onCancel }) => {
       }
 
       let updated;
+      // Build plain object from FormData
+      const dataObj = {};
+      data.forEach((value, key) => { dataObj[key] = value; });
+
       if (listing?.id) {
-        updated = await pb.collection('officialCatalog').update(listing.id, data, { $autoCancel: false });
+        const { data: updatedData, error } = await supabase
+          .from('set_cards')
+          .update(dataObj)
+          .eq('id', listing.id)
+          .select()
+          .single();
+        if (error) throw error;
+        updated = updatedData;
         toast.success('Listing updated successfully');
       } else {
-        updated = await pb.collection('officialCatalog').create(data, { $autoCancel: false });
+        const { data: createdData, error } = await supabase
+          .from('set_cards')
+          .insert(dataObj)
+          .select()
+          .single();
+        if (error) throw error;
+        updated = createdData;
         toast.success('Listing created successfully');
       }
       

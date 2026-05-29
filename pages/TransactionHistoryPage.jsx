@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { ListOrdered, Filter, ArrowRightLeft, CreditCard } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
-import pb from '@/lib/pocketbaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -16,13 +16,13 @@ const TransactionHistoryPage = () => {
   useEffect(() => {
     const fetchTxs = async () => {
       try {
-        const result = await pb.collection('transactions').getList(1, 100, {
-          filter: `userIds ~ "${currentUser.id}"`,
-          sort: '-created',
-          expand: 'cardIds',
-          $autoCancel: false
-        });
-        setTxs(result.items);
+        const { data } = await supabase
+          .from('orders')
+          .select('*, order_items(*, vault_item:vault_items(card_name))')
+          .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
+          .order('created_at', { ascending: false })
+          .limit(100);
+        setTxs(data ?? []);
       } catch (error) {
         console.error(error);
       } finally {
@@ -32,9 +32,9 @@ const TransactionHistoryPage = () => {
     if (currentUser) fetchTxs();
   }, [currentUser]);
 
-  const filteredTxs = txs.filter(tx => typeFilter === 'All' || tx.type === typeFilter);
+  const filteredTxs = txs.filter(tx => typeFilter === 'All' || tx.order_type === typeFilter.toLowerCase());
 
-  const totalCommissions = txs.reduce((acc, tx) => acc + (tx.commissionAmount || 0), 0);
+  const totalCommissions = txs.reduce((acc, tx) => acc + (tx.platform_fee_aud ?? 0), 0);
 
   return (
     <div className="flex flex-col bg-background font-sans">
@@ -94,25 +94,25 @@ const TransactionHistoryPage = () => {
                 ) : (
                   filteredTxs.map(tx => (
                     <tr key={tx.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
-                      <td className="p-4 tabular-nums text-muted-foreground whitespace-nowrap">{format(new Date(tx.created), 'MMM d, yyyy')}</td>
+                      <td className="p-4 tabular-nums text-muted-foreground whitespace-nowrap">{format(new Date(tx.created_at), 'MMM d, yyyy')}</td>
                       <td className="p-4">
-                        {tx.type === 'Trade' ? (
+                        {tx.order_type === 'trade' ? (
                           <Badge variant="secondary" className="bg-primary/10 text-primary border-none"><ArrowRightLeft className="w-3 h-3 mr-1"/> Trade</Badge>
                         ) : (
                           <Badge variant="secondary" className="bg-accent/20 text-accent-foreground border-none"><CreditCard className="w-3 h-3 mr-1"/> Sale</Badge>
                         )}
                       </td>
                       <td className="p-4">
-                        {tx.expand?.cardIds?.length > 0 ? (
-                          <span className="font-medium">{tx.expand.cardIds.map(c => c.cardName).join(', ')}</span>
+                        {tx.order_items?.length > 0 ? (
+                          <span className="font-medium">{tx.order_items.map(i => i.vault_item?.card_name).filter(Boolean).join(', ')}</span>
                         ) : (
-                          <span className="text-muted-foreground italic">Official Store Purchase</span>
+                          <span className="text-muted-foreground italic">Store Purchase</span>
                         )}
                       </td>
-                      <td className="p-4 text-right font-bold tabular-nums">${tx.transactionValue.toFixed(2)}</td>
-                      <td className="p-4 text-right text-muted-foreground tabular-nums">${(tx.commissionAmount || 0).toFixed(2)}</td>
+                      <td className="p-4 text-right font-bold tabular-nums">${(tx.total_aud ?? 0).toFixed(2)}</td>
+                      <td className="p-4 text-right text-muted-foreground tabular-nums">${(tx.platform_fee_aud ?? 0).toFixed(2)}</td>
                       <td className="p-4">
-                        <Badge variant="outline" className={tx.status === 'Completed' ? 'border-green-500 text-green-600' : 'border-amber-500 text-amber-600'}>
+                        <Badge variant="outline" className={tx.status === 'completed' ? 'border-green-500 text-green-600' : 'border-amber-500 text-amber-600'}>
                           {tx.status}
                         </Badge>
                       </td>

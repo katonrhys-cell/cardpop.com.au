@@ -3,7 +3,7 @@ import { PassThrough, Readable } from 'node:stream';
 import dotenv from 'dotenv';
 import { NodeEnv } from '../constants/common.js';
 import logger from '../utils/logger.js';
-import pocketbaseClient from '../utils/pocketbaseClient.js';
+import { supabase } from '../utils/supabaseClient.js';
 
 dotenv.config();
 
@@ -149,26 +149,31 @@ const SquashableSSEEventTypes = new Set([
  */
 
 /**
- * Uploads images to PocketBase and returns their URLs.
+ * Uploads images to Supabase Storage and returns their public URLs.
  *
- * @param {{ files: Express.Multer.File[] }} params
+ * @param {{ images: Express.Multer.File[] }} params
  * @returns {Promise<string[]>}
  */
-export async function uploadImagesToPocketBase({ images }) {
+export async function uploadImagesToSupabase({ images }) {
 	const uploadPromises = images.map(async (file) => {
-		const formData = new FormData();
-		const blob = new Blob([file.buffer], { type: file.mimetype });
-		formData.append('file', blob, file.originalname);
+		const ext = file.originalname.split('.').pop() || 'jpg';
+		const path = `ocr/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-		const record = await pocketbaseClient.collection('_integratedAiImages').create(formData);
+		const { error } = await supabase.storage.from('ai-images').upload(path, file.buffer, {
+			contentType: file.mimetype,
+			upsert: true,
+		});
+		if (error) throw new Error(`Image upload failed: ${error.message}`);
 
-		const url = pocketbaseClient.files.getURL(record, record.file);
-
-		return url.replace('http://localhost:8090', `https://${process.env.WEBSITE_DOMAIN}/hcgi/platform`);
+		const { data } = supabase.storage.from('ai-images').getPublicUrl(path);
+		return data.publicUrl;
 	});
 
 	return Promise.all(uploadPromises);
 }
+
+// Backward-compatible alias
+export const uploadImagesToPocketBase = uploadImagesToSupabase;
 
 /**
  * One-shot AI call without conversation history or persistence.
@@ -325,18 +330,20 @@ async function parseSSEEvents({ stream }) {
 
 /**
  * @param {{ userId: string, messages: { role: typeof MessageRole[keyof typeof MessageRole], content: string }[] }} params
- * @returns {Promise<object>}
+ * @returns {Promise<void>}
  */
 async function saveMessages({ userId, messages }) {
-	const batch = pocketbaseClient.createBatch();
-
-	messages.map(message => batch.collection('_integratedAiMessages').create({
-		...(userId && { userId }),
-		role: message.role,
-		content: message.content,
-	}));
-
-	await batch.send();
+	try {
+		await supabase.from('ai_messages').insert(
+			messages.map(message => ({
+				...(userId && { user_id: userId }),
+				role: message.role,
+				content: JSON.stringify(message.content),
+			}))
+		);
+	} catch (err) {
+		logger.error('Failed to save AI messages:', err);
+	}
 }
 
 /**
@@ -350,24 +357,30 @@ export async function getHistory({ userId }) {
 		return [];
 	}
 
-	const records = await pocketbaseClient.collection('_integratedAiMessages').getFullList({
-		sort: 'created',
-		...(userId && { filter: pocketbaseClient.filter('userId = {:userId}', { userId }) }),
-	});
+	try {
+		const { data, error } = await supabase.from('ai_messages')
+			.select('*')
+			.eq('user_id', userId)
+			.order('created_at', { ascending: true });
 
-	/** @type {HistoryMessage[]} */
-	const historyMessages = [];
+		if (error || !data) return [];
 
-	for (const record of records) {
-		if (record.role === MessageRole.User) {
-			historyMessages.push(mapUserMessage({ message: record.content }));
-			continue;
+		/** @type {HistoryMessage[]} */
+		const historyMessages = [];
+
+		for (const record of data) {
+			const content = typeof record.content === 'string' ? JSON.parse(record.content) : record.content;
+			if (record.role === MessageRole.User) {
+				historyMessages.push(mapUserMessage({ message: content }));
+				continue;
+			}
+			historyMessages.push(...mapAssistantMessages({ message: content }));
 		}
 
-		historyMessages.push(...mapAssistantMessages({ message: record.content }));
+		return historyMessages;
+	} catch {
+		return [];
 	}
-
-	return historyMessages;
 }
 
 /**

@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Star, ShieldCheck, ImageOff } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/api/EcommerceApi.js';
 
@@ -23,19 +22,16 @@ const FeaturedProductCard = ({ product, seller }) => {
   const priceInCents = Math.round(priceVal * 100);
   const formattedPrice = formatCurrency(priceInCents, null) || `$${(priceInCents / 100).toFixed(2)}`;
 
-  // Handle both officialCatalog (image) and cards collection (cardImage) fields
+  // Handle both vault_items (images) and set_cards (image/cardImage) fields
   let imageUrl = null;
   try {
     if (!imageError) {
-      if (product.images?.length > 0) {
-        imageUrl = pb.files.getUrl(product, product.images[0]);
-      } else if (product.image) {
-        const imgFileName = Array.isArray(product.image) ? product.image[0] : product.image;
-        if (imgFileName) imageUrl = pb.files.getUrl(product, imgFileName);
-      } else if (product.cardImage) {
-        const imgFileName = Array.isArray(product.cardImage) ? product.cardImage[0] : product.cardImage;
-        if (imgFileName) imageUrl = pb.files.getUrl(product, imgFileName);
-      }
+      const pickUrl = (val) => {
+        if (!val) return null;
+        const f = Array.isArray(val) ? val[0] : val;
+        return f && typeof f === 'string' && f.startsWith('http') ? f : null;
+      };
+      imageUrl = pickUrl(product.images) || pickUrl(product.image) || pickUrl(product.cardImage) || null;
     }
   } catch (err) {
     console.warn('Error generating image URL for product:', product.id, err);

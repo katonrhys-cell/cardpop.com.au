@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Loader2, Sparkles, X, CheckCircle2, TrendingUp, ExternalLink } from 'lucide-react';
+import { Loader2, Sparkles, X, CheckCircle2, TrendingUp, ExternalLink, CreditCard } from 'lucide-react';
 
 const FIELD_LABELS = {
   name: 'Card Name',
@@ -19,6 +19,8 @@ const FIELD_LABELS = {
   description: 'Description',
 };
 
+const SCAN_PHASES = ['Identifying card...', 'Extracting data...', 'Verifying fields...'];
+
 const fmt = v => `$${v.toFixed(2)}`;
 
 const CardScanPanel = ({
@@ -30,6 +32,16 @@ const CardScanPanel = ({
   priceData,
   onApplyPrice,
 }) => {
+  const [scanPhase, setScanPhase] = useState(0);
+
+  useEffect(() => {
+    if (!isScanning) { setScanPhase(0); return; }
+    const interval = setInterval(() => {
+      setScanPhase(p => (p + 1) % SCAN_PHASES.length);
+    }, 1400);
+    return () => clearInterval(interval);
+  }, [isScanning]);
+
   const isVisible = isScanning || scanResult || isLookingUp || priceData;
   if (!isVisible) return null;
 
@@ -69,15 +81,62 @@ const CardScanPanel = ({
         </div>
 
         {isScanning && (
-          <div className="space-y-2">
-            {[80, 60, 70, 50, 65, 55].map((w, i) => (
-              <div
-                key={i}
-                className="h-3.5 bg-muted/60 rounded-full animate-pulse"
-                style={{ width: `${w}%` }}
-              />
-            ))}
-          </div>
+          <>
+            <style>{`
+              @keyframes scanBeam {
+                0%, 100% { top: 10px; opacity: 1; }
+                48% { top: calc(100% - 10px); opacity: 1; }
+                50% { top: calc(100% - 10px); opacity: 0.3; }
+              }
+              @keyframes cornerPulse {
+                0%, 100% { opacity: 0.5; }
+                50% { opacity: 1; }
+              }
+              .scan-beam {
+                animation: scanBeam 1.8s ease-in-out infinite;
+                position: absolute;
+                left: 14px;
+                right: 14px;
+                height: 2px;
+                background: linear-gradient(90deg, transparent 0%, hsl(var(--primary)) 30%, hsl(var(--primary)) 70%, transparent 100%);
+                box-shadow: 0 0 6px 2px hsl(var(--primary) / 0.45), 0 0 16px 4px hsl(var(--primary) / 0.2);
+              }
+              .scan-corner {
+                animation: cornerPulse 1.8s ease-in-out infinite;
+              }
+            `}</style>
+            <div className="relative rounded-xl overflow-hidden bg-gradient-to-b from-primary/8 to-muted/20 border border-primary/20 h-44 select-none">
+              {/* Corner markers */}
+              <div className="scan-corner absolute top-2.5 left-2.5 w-5 h-5 border-t-2 border-l-2 border-primary/70 rounded-tl" />
+              <div className="scan-corner absolute top-2.5 right-2.5 w-5 h-5 border-t-2 border-r-2 border-primary/70 rounded-tr" />
+              <div className="scan-corner absolute bottom-2.5 left-2.5 w-5 h-5 border-b-2 border-l-2 border-primary/70 rounded-bl" />
+              <div className="scan-corner absolute bottom-2.5 right-2.5 w-5 h-5 border-b-2 border-r-2 border-primary/70 rounded-br" />
+
+              {/* Card silhouette */}
+              <div className="absolute inset-0 flex items-center justify-center text-primary/8 pointer-events-none">
+                <CreditCard className="w-20 h-20" />
+              </div>
+
+              {/* Laser beam */}
+              <div className="scan-beam" />
+
+              {/* Phase text */}
+              <div className="absolute bottom-3 inset-x-0 flex items-center justify-center gap-1.5">
+                <div className="flex gap-1">
+                  {SCAN_PHASES.map((_, i) => (
+                    <div
+                      key={i}
+                      className="w-1 h-1 rounded-full transition-all duration-300"
+                      style={{ background: i === scanPhase ? 'hsl(var(--primary))' : 'hsl(var(--primary) / 0.25)' }}
+                    />
+                  ))}
+                </div>
+                <span className="text-xs font-semibold text-primary ml-1">
+                  {SCAN_PHASES[scanPhase]}
+                </span>
+              </div>
+            </div>
+          </>
         )}
 
         {!isScanning && scanResult && (

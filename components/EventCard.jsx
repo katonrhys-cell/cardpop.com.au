@@ -3,7 +3,7 @@ import { Calendar, MapPin, Clock, Users, Edit, Trash2, Info } from 'lucide-react
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 
 const EventCard = ({ event, isAdmin, onView, onEdit, onDelete }) => {
@@ -19,9 +19,8 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete }) => {
     minute: '2-digit'
   });
 
-  const imageUrl = event.image 
-    ? pb.files.getUrl(event, event.image) 
-    : 'https://images.unsplash.com/photo-1540317580384-e5d43616b9aa?q=80&w=800&auto=format&fit=crop';
+  const imageUrl = event.image_url || event.image
+    || 'https://images.unsplash.com/photo-1540317580384-e5d43616b9aa?q=80&w=800&auto=format&fit=crop';
 
   const handleRsvp = (e) => {
     e.stopPropagation();

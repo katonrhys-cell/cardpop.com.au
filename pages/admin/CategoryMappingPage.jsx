@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Helmet } from 'react-helmet';
 import { autoMapCategories } from '@/utils/categoryMappingEngine.js';
 import { Button } from '@/components/ui/button';
@@ -17,14 +17,19 @@ const CategoryMappingPage = () => {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      // Very basic aggregate - in real PB you might use a custom endpoint or count queries
-      const unmapped = await pb.collection('cardListings').getList(1, 1, { filter: 'categoryId = "" || categoryId = null', $autoCancel: false });
-      const mapped = await pb.collection('cardListings').getList(1, 1, { filter: 'categoryId != "" && categoryId != null', $autoCancel: false });
-      
+      // cardListings → listings table; category mapped via category_id
+      const [unmappedRes, mappedRes] = await Promise.all([
+        supabase.from('listings').select('*', { count: 'exact' }).is('category_id', null).limit(1),
+        supabase.from('listings').select('*', { count: 'exact' }).not('category_id', 'is', null).limit(1)
+      ]);
+
+      const unmappedCount = unmappedRes.count || 0;
+      const mappedCount = mappedRes.count || 0;
+
       setStats({
-        unmapped: unmapped.totalItems,
-        mapped: mapped.totalItems,
-        total: unmapped.totalItems + mapped.totalItems
+        unmapped: unmappedCount,
+        mapped: mappedCount,
+        total: unmappedCount + mappedCount
       });
     } catch (error) {
       console.error(error);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import SEOHead from '@/components/SEOHead.jsx';
 import ProductGrid from '@/components/ProductGrid.jsx';
 import PaginationControls from '@/components/PaginationControls.jsx';
@@ -21,22 +21,27 @@ const SearchResultsPage = () => {
     const fetchResults = async () => {
       setLoading(true);
       try {
-        let filterStr = 'marketplaceStatus != "Private"';
-        
+        const perPage = 16;
+        const from = (page - 1) * perPage;
+
+        let dbQuery = supabase
+          .from('listings')
+          .select('*', { count: 'exact' })
+          .neq('status', 'Private')
+          .order('created_at', { ascending: false })
+          .range(from, from + perPage - 1);
+
         if (query) {
-          const safeQuery = query.replace(/"/g, '\\"');
-          filterStr += ` && (cardName ~ "${safeQuery}" || description ~ "${safeQuery}")`;
+          const safeQuery = query.replace(/'/g, '');
+          dbQuery = dbQuery.or(`card_name.ilike.%${safeQuery}%,description.ilike.%${safeQuery}%`);
         }
 
-        const res = await pb.collection('cardListings').getList(page, 16, {
-          filter: filterStr,
-          sort: '-created',
-          $autoCancel: false
-        });
-        
-        setResults(res.items);
-        setTotalPages(res.totalPages);
-        setTotalItems(res.totalItems);
+        const { data, count, error } = await dbQuery;
+        if (error) throw error;
+
+        setResults(data || []);
+        setTotalItems(count || 0);
+        setTotalPages(Math.ceil((count || 0) / perPage));
       } catch (error) {
         console.error("Search error:", error);
       } finally {

@@ -3,7 +3,7 @@ import { Store, TrendingUp, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 
 const MarketplaceManagementPage = () => {
@@ -13,12 +13,9 @@ const MarketplaceManagementPage = () => {
   useEffect(() => {
     const fetchListings = async () => {
       try {
-        const records = await pb.collection('marketplace_listings').getList(1, 20, {
-          sort: '-created',
-          expand: 'seller',
-          $autoCancel: false
-        });
-        setListings(records.items);
+        const { data, error } = await supabase.from('listings').select('*, seller:profiles!seller_id(id, display_name, username)').order('created_at', { ascending: false }).limit(20);
+        if (error) throw error;
+        setListings(data ?? []);
       } catch (error) {
         console.error(error);
         toast.error("Failed to load marketplace data.");

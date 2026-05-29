@@ -6,7 +6,7 @@ import {
   Trash2, ImageOff, Lock, ShoppingCart, ArrowRightLeft, Layers, X, Eye, EyeOff
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -55,47 +55,38 @@ const MyVaultPage = () => {
   const isMounted = useRef(true);
 
   // Load all filter options independently
+  // categories, subcategories, brands, series no longer exist — return empty arrays
   useEffect(() => {
-    const loadFilters = async () => {
-      try {
-        const [cats, subs, brnds, srs] = await Promise.all([
-          pb.collection('categories').getFullList({ sort: 'name', $autoCancel: false }),
-          pb.collection('subcategories').getFullList({ sort: 'name', $autoCancel: false }),
-          pb.collection('brands').getFullList({ sort: 'name', $autoCancel: false }),
-          pb.collection('series').getFullList({ sort: 'name', $autoCancel: false })
-        ]);
-        if (isMounted.current) {
-          setCatOpts(cats);
-          setSubOpts(subs);
-          setBrandOpts(brnds);
-          setSeriesOpts(srs);
-        }
-      } catch (err) {
-        console.error("Failed to load filter options", err);
-      }
-    };
-    loadFilters();
+    if (isMounted.current) {
+      setCatOpts([]);
+      setSubOpts([]);
+      setBrandOpts([]);
+      setSeriesOpts([]);
+    }
   }, []);
 
   const fetchVault = useCallback(async () => {
     if (!currentUser?.id) return;
     if (isMounted.current) setLoading(true);
-    
+
     try {
-      let filterStr = `user_id="${currentUser.id}"`;
-      if (filterCat) filterStr += ` && categoryId="${filterCat}"`;
-      if (filterSub) filterStr += ` && subcategoryId="${filterSub}"`;
-      if (filterBrand) filterStr += ` && brandId="${filterBrand}"`;
-      if (filterSeries) filterStr += ` && seriesId="${filterSeries}"`;
-      
-      const response = await pb.collection('user_vaults').getList(1, 100, {
-        filter: filterStr,
-        sort: '-created',
-        $autoCancel: false
-      });
-      
+      let query = supabase
+        .from('vault_items')
+        .select('*')
+        .eq('owner_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (filterCat) query = query.eq('category_id', filterCat);
+      if (filterSub) query = query.eq('subcategory_id', filterSub);
+      if (filterBrand) query = query.eq('brand_id', filterBrand);
+      if (filterSeries) query = query.eq('series_id', filterSeries);
+
+      const { data, error: fetchError } = await query;
+
       if (isMounted.current) {
-        setCards(response.items || []);
+        if (fetchError) throw fetchError;
+        setCards(data || []);
         setError(null);
       }
     } catch (err) {
@@ -122,7 +113,7 @@ const MyVaultPage = () => {
   const handleDelete = async (id) => {
     if(!window.confirm("Delete this card from your vault?")) return;
     try {
-      await pb.collection('user_vaults').delete(id, { $autoCancel: false });
+      await supabase.from('vault_items').delete().eq('id', id);
       toast.success("Card deleted successfully");
       fetchVault();
     } catch (e) {
@@ -138,7 +129,8 @@ const MyVaultPage = () => {
   const renderCard = (card) => {
     let imageUrl = null;
     if (card.images && card.images.length > 0) {
-      imageUrl = pb.files.getUrl(card, card.images[0]);
+      const img = card.images[0];
+      imageUrl = img.startsWith('http') ? img : supabase.storage.from('vault-images').getPublicUrl(img).data.publicUrl;
     }
 
     const badgeConfig = getStatusBadge(card.listing_type);

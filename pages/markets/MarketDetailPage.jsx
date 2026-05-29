@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
-import pb from '@/lib/pocketbaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BarChart3, ArrowLeft } from 'lucide-react';
 import { slugify } from '@/lib/slugify.js';
@@ -14,17 +14,7 @@ const MarketDetailPage = () => {
   useEffect(() => {
     const fetchMarket = async () => {
       try {
-        // Try direct ID lookup first, then fall back to name-slug matching
-        let res = null;
-        try {
-          res = await pb.collection('market_data').getOne(market, { $autoCancel: false });
-        } catch {
-          // market param may be a slug, not a record ID — search by name
-          const list = await pb.collection('market_data').getFullList({
-            $autoCancel: false,
-          });
-          res = list.find(r => slugify(r.marketName || r.name || '') === market) || null;
-        }
+        const { data: res } = await supabase.from('market_data').select('*').eq('id', market).maybeSingle();
         setData(res);
       } catch (error) {
         console.error(error);

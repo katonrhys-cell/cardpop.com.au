@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { Star, MapPin, Calendar, Package, MessageSquare } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -22,36 +22,41 @@ const SellerProfilePage = () => {
 
   const fetchSellerData = async () => {
     try {
-      const sellerData = await pb.collection('users').getOne(sellerId, { $autoCancel: false });
+      const { data: sellerData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', sellerId)
+        .single();
       setSeller(sellerData);
 
-      const productsData = await pb.collection('cards').getList(1, 50, {
-        filter: `owner="${sellerId}" && (listingStatus="For Sale" || listingStatus="For Both" || listingStatus="For Trade")`,
-        sort: '-created',
-        $autoCancel: false
-      });
-      
-      const mappedProducts = productsData.items.map(c => ({
+      const { data: items } = await supabase
+        .from('vault_items')
+        .select('*, vault_images(*)')
+        .eq('owner_id', sellerId)
+        .in('listing_status', ['for_sale', 'for_trade', 'for_both'])
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      const mappedProducts = (items ?? []).map(c => ({
         id: c.id,
         source: 'vault',
-        title: c.cardName || 'Vault Card',
-        collectionType: c.collectionType,
+        title: c.card_name || 'Vault Card',
+        collectionType: c.collection_type,
         condition: c.condition,
-        price: c.askingPrice || c.salePrice || c.estimatedValue || 0,
-        image: c.cardImage && c.cardImage.length > 0 ? c.cardImage[0] : null,
-        collectionId: c.collectionId,
-        sellerName: sellerData.name || 'Vault Collector',
-        ...c
+        price: c.asking_price_aud || c.estimated_value_aud || 0,
+        image: c.vault_images?.[0]?.image_url ?? null,
+        sellerName: sellerData?.display_name || sellerData?.username || 'Vault Collector',
+        ...c,
       }));
       setProducts(mappedProducts);
 
-      const reviewsData = await pb.collection('reviews').getList(1, 10, {
-        filter: `reviewee="${sellerId}"`,
-        sort: '-created',
-        expand: 'reviewer',
-        $autoCancel: false
-      });
-      setReviews(reviewsData.items);
+      const { data: reviewsData } = await supabase
+        .from('reviews')
+        .select('*, reviewer:profiles!reviewer_id(id, username, display_name)')
+        .eq('reviewee_id', sellerId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      setReviews(reviewsData ?? []);
     } catch (error) {
       console.error('Error fetching seller data:', error);
     } finally {
@@ -83,8 +88,8 @@ const SellerProfilePage = () => {
   return (
     <>
       <Helmet>
-        <title>{`${seller.name} - Seller Profile - Card Pop Australia`}</title>
-        <meta name="description" content={`View ${seller.name}'s trading card collection and seller profile.`} />
+        <title>{`${seller.display_name || seller.username} - Seller Profile - Card Pop Australia`}</title>
+        <meta name="description" content={`View ${seller.display_name || seller.username}'s trading card collection and seller profile.`} />
       </Helmet>
       <div className="flex flex-col font-sans bg-background min-h-screen">
         <div className="flex-1 py-12">
@@ -94,34 +99,34 @@ const SellerProfilePage = () => {
                 <div className="flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
                   <div className="w-24 h-24 bg-background rounded-full flex items-center justify-center shrink-0 ring-4 ring-muted border border-border">
                     <span className="text-primary font-serif font-bold text-4xl">
-                      {seller.name?.charAt(0) || 'S'}
+                      {(seller.display_name || seller.username)?.charAt(0) || 'S'}
                     </span>
                   </div>
 
                   <div className="flex-1">
-                    <h1 className="font-serif text-3xl font-bold mb-4 text-foreground">{seller.name}</h1>
+                    <h1 className="font-serif text-3xl font-bold mb-4 text-foreground">{seller.display_name || seller.username}</h1>
                     
                     <div className="flex flex-wrap justify-center md:justify-start gap-4 mb-6">
                       <div className="flex items-center gap-2 text-muted-foreground font-medium">
                         <Star className="h-5 w-5 fill-primary text-primary" />
                         <span>
-                          {seller.rating?.toFixed(1) || 'New Seller'}
-                          {seller.reviewsCount > 0 && ` (${seller.reviewsCount} reviews)`}
+                          {seller.seller_rating?.toFixed(1) || 'New Seller'}
+                          {seller.seller_rating_count > 0 && ` (${seller.seller_rating_count} reviews)`}
                         </span>
                       </div>
                       <div className="flex items-center gap-2 text-muted-foreground font-medium">
                         <MapPin className="h-5 w-5" />
-                        <span>{seller.location || 'Australia'}</span>
+                        <span>{seller.location_city || seller.location || 'Australia'}</span>
                       </div>
                       <div className="flex items-center gap-2 text-muted-foreground font-medium">
                         <Calendar className="h-5 w-5" />
-                        <span>Member since {seller.memberSince ? new Date(seller.memberSince).getFullYear() : 'Unknown'}</span>
+                        <span>Member since {seller.created_at ? new Date(seller.created_at).getFullYear() : 'Unknown'}</span>
                       </div>
                     </div>
 
-                    {seller.bio && (
+                    {seller.bio_text && (
                       <p className="text-muted-foreground leading-relaxed mb-6 font-medium max-w-3xl">
-                        {seller.bio}
+                        {seller.bio_text}
                       </p>
                     )}
 
@@ -180,7 +185,7 @@ const SellerProfilePage = () => {
                         <div className="flex items-start justify-between mb-3">
                           <div>
                             <p className="font-bold text-foreground">
-                              {review.expand?.reviewer?.name || 'Anonymous Collector'}
+                              {review.reviewer?.display_name || review.reviewer?.username || 'Anonymous Collector'}
                             </p>
                             <div className="flex items-center gap-1 mt-1">
                               {[...Array(5)].map((_, i) => (
@@ -196,7 +201,7 @@ const SellerProfilePage = () => {
                             </div>
                           </div>
                           <span className="text-sm text-muted-foreground font-medium">
-                            {new Date(review.created).toLocaleDateString()}
+                            {new Date(review.created_at).toLocaleDateString()}
                           </span>
                         </div>
                         {review.comment && (

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Star, ShieldCheck, UserCircle2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 
 const FeaturedSellersCarousel = () => {
   const [sellers, setSellers] = useState([]);
@@ -14,40 +14,16 @@ const FeaturedSellersCarousel = () => {
     const fetchSellers = async () => {
       try {
         setIsLoading(true);
-        // Try fetching featured sellers
-        const featured = await pb.collection('featuredSellers').getList(1, 4, {
-          filter: 'is_active = true',
-          sort: 'order',
-          $autoCancel: false
-        });
-
+        // featuredSellers has no direct Supabase equivalent — get top sellers by positive_feedback_pct
         let activeSellers = [];
 
-        if (featured.items.length > 0) {
-          const sellerIds = featured.items.map(f => f.seller_id).filter(Boolean);
-          if (sellerIds.length > 0) {
-            const filterStr = sellerIds.map(id => `id="${id}"`).join(' || ');
-            const users = await pb.collection('users').getList(1, 4, {
-              filter: filterStr,
-              $autoCancel: false
-            });
-            
-            activeSellers = featured.items.map(f => {
-              const user = users.items.find(u => u.id === f.seller_id);
-              return user ? { ...user, _featuredOrder: f.order } : null;
-            }).filter(Boolean);
-          }
-        }
-
-        // Fallback if no featured sellers exist: just get top rated users
-        if (activeSellers.length === 0) {
-          const topUsers = await pb.collection('users').getList(1, 4, {
-            sort: '-rating,-reviewsCount',
-            filter: 'reviewsCount > 0',
-            $autoCancel: false
-          });
-          activeSellers = topUsers.items;
-        }
+        const { data: topUsers } = await supabase
+          .from('profiles')
+          .select('*')
+          .gt('total_sales', 0)
+          .order('positive_feedback_pct', { ascending: false })
+          .limit(4);
+        activeSellers = topUsers || [];
 
         if (isMounted) {
           setSellers(activeSellers);
@@ -98,10 +74,10 @@ const FeaturedSellersCarousel = () => {
         >
           <div className="relative mb-5">
             <div className="w-24 h-24 rounded-2xl bg-muted overflow-hidden flex items-center justify-center border-2 border-background shadow-sm group-hover:border-primary/20 transition-colors">
-              {seller.avatar ? (
-                <img 
-                  src={pb.files.getUrl(seller, seller.avatar)} 
-                  alt={seller.name} 
+              {seller.avatar_url ? (
+                <img
+                  src={seller.avatar_url}
+                  alt={seller.name}
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                 />
               ) : (
@@ -123,8 +99,8 @@ const FeaturedSellersCarousel = () => {
           
           <div className="flex items-center justify-center gap-1.5 mb-6">
             <Star className="w-4 h-4 fill-primary text-primary" />
-            <span className="font-bold tabular-nums">{seller.rating || '5.0'}</span>
-            <span className="text-muted-foreground text-sm">({seller.reviewsCount || 0})</span>
+            <span className="font-bold tabular-nums">{seller.positive_feedback_pct || '5.0'}</span>
+            <span className="text-muted-foreground text-sm">({seller.total_sales || 0})</span>
           </div>
           
           <div className="w-full text-center text-sm font-bold text-primary bg-primary/5 py-2.5 rounded-xl group-hover:bg-primary/10 transition-colors">

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
-import pb from '@/lib/pocketbaseClient';
+import { supabase } from '@/lib/supabaseClient.js';
 import { formatCurrency } from '@/api/EcommerceApi';
 import { useCart } from '@/hooks/useCart';
 import { Button } from '@/components/ui/button';
@@ -18,8 +18,9 @@ const ShopProductPage = () => {
   useEffect(() => {
     const fetchProduct = async () => {
       try {
-        const res = await pb.collection('shop_products').getOne(id, { $autoCancel: false });
-        setProduct(res);
+        const { data, error } = await supabase.from('listings').select('*').eq('id', id).single();
+        if (error) throw error;
+        setProduct(data);
       } catch (error) {
         console.error(error);
       } finally {
@@ -54,7 +55,7 @@ const ShopProductPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
         <div className="bg-secondary/30 rounded-3xl p-8 flex items-center justify-center border border-border">
            {product.images?.length > 0 ? (
-             <img src={pb.files.getUrl(product, product.images[0])} alt={product.name} className="w-full max-w-md object-contain mix-blend-multiply" />
+             <img src={product.images[0]} alt={product.name} className="w-full max-w-md object-contain mix-blend-multiply" />
            ) : (
              <div className="text-muted-foreground">No image available</div>
            )}

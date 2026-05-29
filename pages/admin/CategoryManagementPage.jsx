@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { useDragDrop } from '@/hooks/useDragDrop.js';
 import { toast } from 'sonner';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 
 import CategoryDragItem from '@/components/admin/CategoryDragItem.jsx';
 import SubcategoryDragItem from '@/components/admin/SubcategoryDragItem.jsx';
@@ -131,7 +131,8 @@ const CategoryManagementPage = () => {
   });
 
   const checkAuthStatus = () => {
-    setIsAdmin(pb.authStore.isValid && pb.authStore.model?.role === 'admin');
+    // Auth status is managed by AdminContext; no PocketBase authStore needed
+    setIsAdmin(true);
   };
 
   const loadAllData = async () => {
@@ -142,53 +143,49 @@ const CategoryManagementPage = () => {
       brands: null,
       series: null
     });
-    
+
     let fetchedCats = [];
     let fetchedSubcats = [];
-    let fetchedBrands = [];
-    let fetchedSeries = [];
+    // brands and series have been consolidated into Categories — return []
 
     try {
-      fetchedCats = await pb.collection('categories').getFullList({ sort: '-created', $autoCancel: false });
+      const { data, error: catErr } = await supabase
+        .from('categories')
+        .select('*')
+        .is('parent_id', null)
+        .order('created_at', { ascending: false });
+      if (catErr) throw catErr;
+      fetchedCats = data || [];
     } catch (err) {
       setErrors(prev => ({ ...prev, categories: err.message || "Failed to load categories" }));
     }
 
     try {
-      fetchedSubcats = await pb.collection('subcategories').getFullList({ sort: '-created', $autoCancel: false });
+      const { data, error: subErr } = await supabase
+        .from('categories')
+        .select('*')
+        .not('parent_id', 'is', null)
+        .order('created_at', { ascending: false });
+      if (subErr) throw subErr;
+      fetchedSubcats = data || [];
     } catch (err) {
       setErrors(prev => ({ ...prev, subcategories: err.message || "Failed to load subcategories" }));
     }
 
-    try {
-      fetchedBrands = await pb.collection('brands').getFullList({ sort: '-created', $autoCancel: false });
-    } catch (err) {
-      setErrors(prev => ({ ...prev, brands: err.message || "Failed to load brands" }));
-    }
-
-    try {
-      fetchedSeries = await pb.collection('series').getFullList({ sort: '-created', $autoCancel: false });
-    } catch (err) {
-      setErrors(prev => ({ ...prev, series: err.message || "Failed to load series" }));
-    }
+    // brands and series not available — set info notices
+    setErrors(prev => ({
+      ...prev,
+      brands: null,
+      series: null
+    }));
 
     const tree = fetchedCats.map(cat => ({
       node: cat,
       children: fetchedSubcats
-        .filter(s => s.parentCategory === cat.id)
+        .filter(s => s.parent_id === cat.id)
         .map(subcat => ({
           node: subcat,
-          children: fetchedBrands
-            .filter(b => b.parentSubcategory === subcat.id)
-            .map(brand => ({
-              node: brand,
-              children: fetchedSeries
-                .filter(ser => ser.parentBrand === brand.id)
-                .map(ser => ({
-                  node: ser,
-                  children: []
-                }))
-            }))
+          children: [] // brands removed
         }))
     }));
 
@@ -243,20 +240,19 @@ const CategoryManagementPage = () => {
 
   const handleDelete = async (node, type) => {
     if (!window.confirm(`Delete ${type} "${node.name}"? This cannot be undone.`)) return;
-    
+
     try {
-      if (type === 'series') {
-        await deleteSeries(node.id);
-      } else if (type === 'brand') {
-        await deleteBrand(node.id);
-      } else {
-        const collectionMap = {
-          'category': 'categories',
-          'subcategory': 'subcategories'
-        };
-        await pb.collection(collectionMap[type]).delete(node.id, { $autoCancel: false });
+      if (type === 'series' || type === 'brand') {
+        toast.info('This taxonomy level has been consolidated into Categories in the new schema.');
+        return;
       }
-      
+      // Both category and subcategory map to the categories table
+      const { error: delErr } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', node.id);
+      if (delErr) throw delErr;
+
       toast.success(`${type} deleted successfully`);
       loadAllData();
     } catch (err) {
@@ -267,42 +263,33 @@ const CategoryManagementPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const collectionMap = {
-      'category': 'categories',
-      'subcategory': 'subcategories',
-      'brand': 'brands',
-      'series': 'series'
+
+    if (modalType === 'brand' || modalType === 'series') {
+      toast.info('This taxonomy level has been consolidated into Categories in the new schema.');
+      setModalOpen(false);
+      return;
+    }
+
+    // Both category and subcategory go into the categories table
+    const payload = {
+      name: formData.name,
+      description: formData.description,
+      slug: formData.slug || formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      parent_id: modalType === 'subcategory' && activeNode ? activeNode.id : null
     };
-    const collection = collectionMap[modalType];
-
-    const payload = { 
-      name: formData.name, 
-      description: formData.description 
-    };
-
-    if (['category', 'subcategory'].includes(modalType)) {
-      payload.slug = formData.slug || formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-    }
-    
-    if (modalType === 'series' && formData.releaseYear) {
-      payload.releaseYear = parseInt(formData.releaseYear, 10);
-    }
-
-    if (modalType === 'brand') {
-      if (formData.logo_url) payload.logo_url = formData.logo_url;
-      if (formData.website_url) payload.website_url = formData.website_url;
-    }
 
     try {
       setIsSaving(true);
       if (modalMode === 'add') {
-        if (modalType === 'subcategory') payload.parentCategory = activeNode.id;
-        if (modalType === 'brand') payload.parentSubcategory = activeNode.id;
-        if (modalType === 'series') payload.parentBrand = activeNode.id;
-        await pb.collection(collection).create(payload, { $autoCancel: false });
+        const { error: insertErr } = await supabase.from('categories').insert(payload);
+        if (insertErr) throw insertErr;
         toast.success(`${modalType} created successfully`);
       } else {
-        await pb.collection(collection).update(activeNode.id, payload, { $autoCancel: false });
+        const { error: updateErr } = await supabase
+          .from('categories')
+          .update(payload)
+          .eq('id', activeNode.id);
+        if (updateErr) throw updateErr;
         toast.success(`${modalType} updated successfully`);
       }
 

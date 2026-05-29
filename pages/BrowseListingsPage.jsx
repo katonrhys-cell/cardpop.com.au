@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Search, Filter, SlidersHorizontal } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { useCart } from '@/hooks/useCart.jsx';
 import ProductCard from '@/components/ProductCard.jsx';
 import { Button } from '@/components/ui/button';
@@ -19,34 +19,37 @@ const BrowseListingsPage = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState(searchParams.get('category') || 'all');
-  const [sort, setSort] = useState('-created');
+  const [sort, setSort] = useState('created_at_desc');
 
   useEffect(() => {
     const fetchListings = async () => {
       setLoading(true);
       try {
-        const filter = [];
-        
+        let query = supabase
+          .from('listings')
+          .select('*, vault_item:vault_items(*, vault_images(*), categories(*)), seller:profiles!seller_id(*)')
+          .or('status.eq.active,status.eq.For Sale')
+          .limit(24);
+
         if (searchParams.get('q')) {
-          const q = searchParams.get('q').replace(/"/g, '');
-          filter.push(`name ~ "${q}"`);
+          const q = searchParams.get('q').replace(/'/g, '');
+          query = query.ilike('name', `%${q}%`);
         }
-        
+
         if (category && category !== 'all') {
-          filter.push(`collectionType = "${category}" || category = "${category}"`);
+          query = query.eq('category', category);
         }
-        
-        filter.push('(marketplaceStatus = "For Sale" || marketplaceStatus = "For Both" || visibility = "public")');
 
-        const filterString = filter.join(' && ');
+        const sortAsc = sort === 'price_asc';
+        const sortDesc = sort === 'price_desc';
+        if (sortAsc) query = query.order('price_aud', { ascending: true });
+        else if (sortDesc) query = query.order('price_aud', { ascending: false });
+        else query = query.order('created_at', { ascending: false });
 
-        const response = await pb.collection('shop_products').getList(1, 24, {
-          filter: filterString,
-          sort: sort,
-          $autoCancel: false
-        });
-        
-        setProducts(response.items || []);
+        const { data, error } = await query;
+        if (error) throw error;
+
+        setProducts(data || []);
       } catch (error) {
         console.error('Error fetching products:', error);
         toast.error('Failed to load listings');
@@ -72,7 +75,7 @@ const BrowseListingsPage = () => {
       id: product.id,
       title: product.name,
       price: priceInCents / 100,
-      image: product.images?.[0] ? pb.files.getUrl(product, product.images[0]) : null
+      image: product.images?.[0] || product.vault_item?.vault_images?.[0]?.image_url || null
     };
 
     const cartVariant = {
@@ -140,9 +143,9 @@ const BrowseListingsPage = () => {
                       <SelectValue placeholder="Sort by" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="-created">Newest First</SelectItem>
-                      <SelectItem value="price">Price: Low to High</SelectItem>
-                      <SelectItem value="-price">Price: High to Low</SelectItem>
+                      <SelectItem value="created_at_desc">Newest First</SelectItem>
+                      <SelectItem value="price_asc">Price: Low to High</SelectItem>
+                      <SelectItem value="price_desc">Price: High to Low</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { useAuth } from '@/contexts/AuthContext.jsx';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Package, DollarSign, Star, TrendingUp, AlertCircle, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,56 +30,37 @@ const SellerDashboard = () => {
     try {
       setError(null);
       
-      const [
-        productsRes,
-        salesRes,
-        reviewsRes,
-        revenueRes,
-        cardsRes
-      ] = await Promise.all([
-        // 1. Total products listed
-        pb.collection('shop_products').getList(1, 1, {
-          filter: `seller="${currentUser.id}"`,
-          $autoCancel: false
-        }),
-        // 2. Total sales (completed transactions where user is seller)
-        pb.collection('transactions').getList(1, 1, {
-          filter: `userIds ~ "${currentUser.id}" && type="Sale" && status="Completed"`,
-          $autoCancel: false
-        }),
-        // 3. Average rating
-        pb.collection('reviews').getFullList({
-          filter: `reviewee="${currentUser.id}"`,
-          $autoCancel: false
-        }),
-        // 4. Total revenue
-        pb.collection('transactions').getFullList({
-          filter: `userIds ~ "${currentUser.id}" && type="Sale" && status="Completed"`,
-          $autoCancel: false
-        }),
-        // Active card listings for table
-        pb.collection('cards').getList(1, 50, {
-          filter: `owner="${currentUser.id}" && (listingStatus="For Sale" || listingStatus="For Trade")`,
-          sort: '-updated',
-          $autoCancel: false
-        })
+      const [listingsRes, ordersRes, reviewsRes, cardsRes] = await Promise.all([
+        supabase.from('listings').select('id', { count: 'exact', head: true }).eq('seller_id', currentUser.id),
+        supabase.from('orders').select('total_aud').eq('seller_id', currentUser.id).eq('status', 'completed'),
+        supabase.from('reviews').select('rating').eq('reviewee_id', currentUser.id),
+        supabase.from('vault_items').select('id, card_name, collection_type, listing_status, asking_price_aud').eq('owner_id', currentUser.id).in('listing_status', ['for_sale', 'for_trade']).order('updated_at', { ascending: false }).limit(50),
       ]);
 
       if (!isMounted.current) return;
 
-      const calculatedRevenue = revenueRes.reduce((acc, t) => acc + (t.transactionValue || 0), 0);
-      const calculatedRating = reviewsRes.length > 0 
-        ? (reviewsRes.reduce((acc, r) => acc + (r.rating || 0), 0) / reviewsRes.length).toFixed(1)
+      const orders = ordersRes.data ?? [];
+      const revList = reviewsRes.data ?? [];
+      const calculatedRevenue = orders.reduce((acc, t) => acc + (t.total_aud ?? 0), 0);
+      const calculatedRating = revList.length > 0
+        ? (revList.reduce((acc, r) => acc + (r.rating ?? 0), 0) / revList.length).toFixed(1)
         : '0.0';
 
       setStats({
-        productsListed: productsRes.totalItems || 0,
-        totalSales: salesRes.totalItems || 0,
+        productsListed: listingsRes.count ?? 0,
+        totalSales: orders.length,
         avgRating: calculatedRating,
-        totalRevenue: calculatedRevenue
+        totalRevenue: calculatedRevenue,
       });
-      
-      setCards(cardsRes.items || []);
+
+      const items = cardsRes.data ?? [];
+      setCards(items.map(c => ({
+        ...c,
+        cardName: c.card_name,
+        collectionType: c.collection_type,
+        listingStatus: c.listing_status,
+        askingPrice: c.asking_price_aud,
+      })));
 
     } catch (err) {
       console.error("Failed to fetch seller stats:", err);
@@ -93,26 +74,16 @@ const SellerDashboard = () => {
     isMounted.current = true;
     fetchDashboardData();
 
-    // Realtime updates
-    const setupSubscriptions = async () => {
-      try {
-        await pb.collection('shop_products').subscribe('*', () => { if (isMounted.current) fetchDashboardData(); });
-        await pb.collection('transactions').subscribe('*', () => { if (isMounted.current) fetchDashboardData(); });
-        await pb.collection('reviews').subscribe('*', () => { if (isMounted.current) fetchDashboardData(); });
-        await pb.collection('cards').subscribe('*', () => { if (isMounted.current) fetchDashboardData(); });
-      } catch (err) {
-        console.warn("Seller dashboard subscriptions failed:", err);
-      }
-    };
-
-    setupSubscriptions();
+    const channel = supabase.channel('seller-dashboard')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'listings' }, () => { if (isMounted.current) fetchDashboardData(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { if (isMounted.current) fetchDashboardData(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, () => { if (isMounted.current) fetchDashboardData(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vault_items' }, () => { if (isMounted.current) fetchDashboardData(); })
+      .subscribe();
 
     return () => {
       isMounted.current = false;
-      pb.collection('shop_products').unsubscribe('*').catch(() => {});
-      pb.collection('transactions').unsubscribe('*').catch(() => {});
-      pb.collection('reviews').unsubscribe('*').catch(() => {});
-      pb.collection('cards').unsubscribe('*').catch(() => {});
+      supabase.removeChannel(channel);
     };
   }, [currentUser?.id]);
 

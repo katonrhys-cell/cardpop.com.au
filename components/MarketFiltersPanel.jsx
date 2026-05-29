@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 
 const MarketFiltersPanel = ({ filters, setFilters, onClear }) => {
   const [categories, setCategories] = useState([]);
@@ -24,8 +24,8 @@ const MarketFiltersPanel = ({ filters, setFilters, onClear }) => {
     const fetchCategories = async () => {
       setLoadingCategories(true);
       try {
-        const res = await pb.collection('categories').getFullList({ sort: 'name', $autoCancel: false });
-        if (isMounted) setCategories(res);
+        const { data: res } = await supabase.from('categories').select('*').order('name');
+        if (isMounted) setCategories(res || []);
       } catch (err) {
         console.error("Failed to fetch categories:", err);
       } finally {

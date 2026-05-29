@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Sparkles, ImageOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 
@@ -24,13 +24,14 @@ const FeaturedCardsCarousel = () => {
       setIsLoading(true);
       setError(null);
       try {
-        const response = await pb.collection('cards').getList(1, 20, {
-          filter: 'featured=true',
-          sort: '-updated',
-          $autoCancel: false,
-        });
+        const { data: items } = await supabase
+          .from('vault_items')
+          .select('*')
+          .eq('featured', true)
+          .order('updated_at', { ascending: false })
+          .limit(20);
         if (isMounted) {
-          setCards(response.items || []);
+          setCards(items || []);
         }
       } catch (err) {
         console.error("Failed to fetch featured cards:", err);
@@ -43,27 +44,31 @@ const FeaturedCardsCarousel = () => {
     fetchCards();
 
     // Real-time subscription
-    pb.collection('cards').subscribe('*', function (e) {
-      if (e.action === 'update' || e.action === 'create') {
-        if (e.record.featured) {
-          setCards(prev => {
-            const exists = prev.find(c => c.id === e.record.id);
-            if (exists) {
-              return prev.map(c => c.id === e.record.id ? e.record : c);
-            }
-            return [e.record, ...prev].sort((a, b) => new Date(b.updated) - new Date(a.updated));
-          });
+    const channel = supabase
+      .channel('vault-items-featured')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vault_items' }, (payload) => {
+        if (payload.eventType === 'DELETE') {
+          setCards(prev => prev.filter(c => c.id !== payload.old.id));
         } else {
-          setCards(prev => prev.filter(c => c.id !== e.record.id));
+          const record = payload.new;
+          if (record.featured) {
+            setCards(prev => {
+              const exists = prev.find(c => c.id === record.id);
+              if (exists) {
+                return prev.map(c => c.id === record.id ? record : c);
+              }
+              return [record, ...prev].sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+            });
+          } else {
+            setCards(prev => prev.filter(c => c.id !== record.id));
+          }
         }
-      } else if (e.action === 'delete') {
-        setCards(prev => prev.filter(c => c.id !== e.record.id));
-      }
-    });
+      })
+      .subscribe();
 
     return () => {
       isMounted = false;
-      pb.collection('cards').unsubscribe('*');
+      supabase.removeChannel(channel);
     };
   }, []);
 
@@ -205,7 +210,7 @@ const FeaturedCardsCarousel = () => {
         >
           <AnimatePresence mode="popLayout">
             {cards.map((card) => {
-              const formattedPrice = card.estimatedValue ? `$${Number(card.estimatedValue).toFixed(2)}` : 'Contact for Price';
+              const formattedPrice = card.estimated_value_aud ? `$${Number(card.estimated_value_aud).toFixed(2)}` : 'Contact for Price';
               
               return (
                 <motion.div 
@@ -222,10 +227,10 @@ const FeaturedCardsCarousel = () => {
                     className="group/card bg-card rounded-2xl border border-border shadow-sm hover:shadow-xl hover:-translate-y-2 hover:border-primary/30 transition-all duration-300 overflow-hidden flex flex-col h-full"
                   >
                     <div className="aspect-[4/5] bg-muted/20 p-6 flex items-center justify-center relative overflow-hidden">
-                      {card.cardImage && card.cardImage.length > 0 ? (
-                        <img 
-                          src={pb.files.getUrl(card, card.cardImage[0])} 
-                          alt={card.cardName || 'Trading Card'} 
+                      {card.image_urls && card.image_urls.length > 0 ? (
+                        <img
+                          src={card.image_urls[0]}
+                          alt={card.card_name || card.cardName || 'Trading Card'}
                           className="w-full h-full object-contain drop-shadow-xl group-hover/card:scale-[1.03] transition-transform duration-500"
                         />
                       ) : (
@@ -256,7 +261,7 @@ const FeaturedCardsCarousel = () => {
                         </span>
                       </div>
                       <h3 className="font-bold text-foreground text-lg mb-4 line-clamp-2 leading-tight">
-                        {card.cardName}
+                        {card.card_name || card.cardName}
                       </h3>
                       
                       <div className="mt-auto pt-4 border-t border-border/50 flex items-end justify-between">

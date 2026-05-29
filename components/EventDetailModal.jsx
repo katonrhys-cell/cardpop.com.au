@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, MapPin, Clock, Info } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 
 const EventDetailModal = ({ isOpen, onClose, event }) => {
   if (!event) return null;
@@ -21,9 +21,7 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
     timeZoneName: 'short'
   });
 
-  const imageUrl = event.image 
-    ? pb.files.getUrl(event, event.image) 
-    : null;
+  const imageUrl = event.image_url || event.image || null;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>

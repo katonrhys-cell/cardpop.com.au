@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
 import { toast } from 'sonner';
 import { Search, RefreshCw, AlertTriangle, ShieldCheck, Lock, ChevronLeft, ChevronRight, User, MoreHorizontal, ShieldAlert } from 'lucide-react';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -30,53 +30,51 @@ const AdminUsersPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const buildFilter = useCallback(() => {
-    const filters = [];
-    
-    if (search) {
-      const safeSearch = search.replace(/"/g, '\\"');
-      filters.push(`(email ~ "${safeSearch}" || name ~ "${safeSearch}")`);
-    }
-    
-    if (statusFilter === 'verified') filters.push(`verified = true`);
-    if (statusFilter === 'unverified') filters.push(`verified = false`);
-    if (statusFilter === 'locked') filters.push(`accountLockedUntil > @now`);
-    if (statusFilter === 'admin') filters.push(`role = 'admin'`);
-
-    if (dateFilter !== 'all') {
-      const now = new Date();
-      let pastDate = new Date();
-      
-      if (dateFilter === '7days') pastDate.setDate(now.getDate() - 7);
-      if (dateFilter === '30days') pastDate.setDate(now.getDate() - 30);
-      if (dateFilter === 'thisYear') pastDate.setFullYear(now.getFullYear(), 0, 1);
-      
-      const formattedDate = pastDate.toISOString().replace('T', ' ');
-      filters.push(`created >= "${formattedDate}"`);
-    }
-
-    return filters.join(' && ');
+    return { search, statusFilter, dateFilter };
   }, [search, statusFilter, dateFilter]);
 
   const fetchUsers = useCallback(async (showLoading = true) => {
     if (showLoading) setIsLoading(true);
     setError(null);
     try {
-      const filterString = buildFilter();
-      const result = await pb.collection('users').getList(page, USERS_PER_PAGE, {
-        filter: filterString,
-        sort: '-created',
-        $autoCancel: false,
-      });
-      
-      setUsers(result.items);
-      setTotalItems(result.totalItems);
+      const from = (page - 1) * USERS_PER_PAGE;
+      const to = from + USERS_PER_PAGE - 1;
+
+      let query = supabase
+        .from('profiles')
+        .select('*', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(from, to);
+
+      if (search) {
+        query = query.or(`username.ilike.%${search}%,display_name.ilike.%${search}%`);
+      }
+      if (statusFilter === 'verified') query = query.eq('is_verified', true);
+      if (statusFilter === 'unverified') query = query.eq('is_verified', false);
+      if (statusFilter === 'admin') query = query.eq('is_admin', true);
+      // 'locked' filter has no equivalent in profiles — skip
+
+      if (dateFilter !== 'all') {
+        const now = new Date();
+        let pastDate = new Date();
+        if (dateFilter === '7days') pastDate.setDate(now.getDate() - 7);
+        if (dateFilter === '30days') pastDate.setDate(now.getDate() - 30);
+        if (dateFilter === 'thisYear') pastDate.setFullYear(now.getFullYear(), 0, 1);
+        query = query.gte('created_at', pastDate.toISOString());
+      }
+
+      const { data, count, error: fetchError } = await query;
+      if (fetchError) throw fetchError;
+
+      setUsers(data || []);
+      setTotalItems(count || 0);
     } catch (err) {
       console.error('Error fetching users:', err);
       setError('Failed to load user list. Please try again.');
     } finally {
       if (showLoading) setIsLoading(false);
     }
-  }, [page, buildFilter]);
+  }, [page, search, statusFilter, dateFilter]);
 
   useEffect(() => {
     fetchUsers(true);
@@ -96,17 +94,23 @@ const AdminUsersPage = () => {
   };
 
   const handleRoleChange = async (user, newRole) => {
-    if (!window.confirm(`Are you sure you want to change ${user.email}'s role to ${newRole.toUpperCase()}?`)) {
+    const displayName = user.display_name || user.username || user.id;
+    if (!window.confirm(`Are you sure you want to change ${displayName}'s role to ${newRole.toUpperCase()}?`)) {
       return;
     }
 
     try {
-      await pb.collection('users').update(user.id, { role: newRole }, { $autoCancel: false });
-      toast.success(`Successfully updated role to ${newRole} for ${user.email}`);
+      const isAdmin = newRole === 'admin';
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ is_admin: isAdmin })
+        .eq('id', user.id);
+      if (updateError) throw updateError;
+      toast.success(`Successfully updated role to ${newRole} for ${displayName}`);
       fetchUsers(false);
     } catch (err) {
       console.error('Error updating role:', err);
-      toast.error(err.response?.message || 'Failed to update user role.');
+      toast.error(err.message || 'Failed to update user role.');
     }
   };
 
@@ -125,9 +129,8 @@ const AdminUsersPage = () => {
     }).format(date);
   };
 
-  const isLocked = (user) => {
-    return user.accountLockedUntil && new Date(user.accountLockedUntil) > new Date();
-  };
+  // accountLockedUntil not available in profiles schema; lock detection removed
+  const isLocked = (_user) => false;
 
   return (
     <div className="min-h-screen bg-background text-foreground py-12">
@@ -247,43 +250,38 @@ const AdminUsersPage = () => {
                     >
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          {user.avatar ? (
-                            <img src={pb.files.getUrl(user, user.avatar)} alt={user.name} className="w-9 h-9 rounded-lg object-cover ring-1 ring-border" />
+                          {user.avatar_url ? (
+                            <img src={user.avatar_url} alt={user.display_name} className="w-9 h-9 rounded-lg object-cover ring-1 ring-border" />
                           ) : (
                             <div className="w-9 h-9 rounded-lg bg-background border border-border flex items-center justify-center shrink-0 shadow-sm">
                               <User className="w-4 h-4 text-muted-foreground" />
                             </div>
                           )}
                           <div className="flex flex-col min-w-0">
-                            <span className="font-semibold text-foreground truncate">{user.name || 'Anonymous'}</span>
-                            {user.role === 'admin' && (
+                            <span className="font-semibold text-foreground truncate">{user.display_name || user.username || 'Anonymous'}</span>
+                            {user.is_admin && (
                               <span className="text-[10px] font-bold text-destructive uppercase tracking-wider mt-0.5">Admin</span>
                             )}
                           </div>
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm truncate max-w-[200px] font-medium">
-                        {user.email}
+                        {user.username || user.id}
                       </TableCell>
                       <TableCell className="text-sm text-foreground font-medium">
-                        {formatDate(user.created)}
+                        {formatDate(user.created_at)}
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
-                          {user.verified ? (
+                          {user.is_verified ? (
                             <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-transparent font-bold shadow-sm">Verified</Badge>
                           ) : (
                             <Badge variant="outline" className="text-muted-foreground font-bold bg-background shadow-sm">Unverified</Badge>
                           )}
-                          {isLocked(user) && (
-                            <Badge variant="destructive" className="flex items-center gap-1 font-bold shadow-sm">
-                              <Lock className="w-3 h-3" /> Locked
-                            </Badge>
-                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-right text-sm text-muted-foreground font-medium">
-                        {formatDate(user.lastLoginAt)}
+                        {formatDate(user.join_date)}
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()} className="text-right">
                         <DropdownMenu>
@@ -299,8 +297,8 @@ const AdminUsersPage = () => {
                               View Details
                             </DropdownMenuItem>
                             <DropdownMenuSeparator className="bg-border" />
-                            {user.role === 'admin' ? (
-                              <DropdownMenuItem 
+                            {user.is_admin ? (
+                              <DropdownMenuItem
                                 onClick={() => handleRoleChange(user, 'user')}
                                 className="cursor-pointer text-muted-foreground font-medium"
                               >
@@ -308,7 +306,7 @@ const AdminUsersPage = () => {
                                 Demote to User
                               </DropdownMenuItem>
                             ) : (
-                              <DropdownMenuItem 
+                              <DropdownMenuItem
                                 onClick={() => handleRoleChange(user, 'admin')}
                                 className="cursor-pointer text-destructive focus:text-destructive font-bold"
                               >

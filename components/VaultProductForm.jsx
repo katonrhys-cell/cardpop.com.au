@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
-import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -76,14 +76,14 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
     const initData = async () => {
       setFetchingHierarchy(true);
       try {
-        const [cats, subs, brnds, srs] = await Promise.all([
-          pb.collection('categories').getFullList({ sort: 'name', $autoCancel: false }),
-          pb.collection('subcategories').getFullList({ sort: 'name', $autoCancel: false }),
-          pb.collection('brands').getFullList({ sort: 'name', $autoCancel: false }),
-          pb.collection('series').getFullList({ sort: 'name', $autoCancel: false })
-        ]);
-        setAllCategories(cats);
-        setAllSubcategories(subs);
+        const { data: cats } = await supabase.from('categories').select('*').is('parent_id', null).order('name');
+        const { data: subs } = await supabase.from('categories').select('*').not('parent_id', 'is', null).order('name');
+        // brands and series have no Supabase equivalent — use empty arrays
+        console.warn('[VaultProductForm] brands/series collections have no Supabase equivalent');
+        const brnds = [];
+        const srs = [];
+        setAllCategories(cats || []);
+        setAllSubcategories(subs || []);
         setAllBrands(brnds);
         setAllSeries(srs);
 
@@ -119,7 +119,7 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
           setEnableSeries(!!card.seriesId);
           
           if (card.images && card.images.length > 0) {
-            const urls = card.images.map(img => pb.files.getUrl(card, img));
+            const urls = card.images.map(img => (typeof img === 'string' && img.startsWith('http') ? img : img));
             setPreviewUrls(urls);
             setSelectedFiles(card.images.map(img => ({ isExisting: true, filename: img })));
           }
@@ -297,11 +297,17 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
         submitData.append('images', JSON.stringify(remainingImages));
       }
 
+      // Convert FormData to plain object for Supabase
+      const dataObj = {};
+      submitData.forEach((value, key) => { dataObj[key] = value; });
+
       if (card) {
-        await pb.collection('user_vaults').update(card.id, submitData, { $autoCancel: false });
+        const { error } = await supabase.from('vault_items').update(dataObj).eq('id', card.id);
+        if (error) throw error;
         toast.success('Vault item updated successfully!');
       } else {
-        await pb.collection('user_vaults').create(submitData, { $autoCancel: false });
+        const { error } = await supabase.from('vault_items').insert(dataObj);
+        if (error) throw error;
         toast.success('Card added to your vault!');
       }
       
