@@ -197,7 +197,7 @@ const CardAnalyticsPage = () => {
     }).finally(() => setLoadingL(false));
   }, [cardName]);
 
-  const cardUrl = (c) => `/markets/card?name=${encodeURIComponent(c.name)}&set=${encodeURIComponent(c.set)}&collection=${encodeURIComponent(c.collection)}&price=${c.price}&change=${c.change}`;
+  const cardUrl = (c) => `/analytics/card?name=${encodeURIComponent(c.name)}&set=${encodeURIComponent(c.set)}&collection=${encodeURIComponent(c.collection)}&price=${c.price}&change=${c.change}`;
 
   return (
     <div className="min-h-screen bg-background">
@@ -206,7 +206,7 @@ const CardAnalyticsPage = () => {
       {/* Hero */}
       <section className="bg-card border-b border-border py-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Link to="/markets" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
+          <Link to="/analytics" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
             <ArrowLeft className="w-4 h-4" /> Back to Analytics
           </Link>
 

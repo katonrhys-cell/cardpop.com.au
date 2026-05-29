@@ -29,8 +29,8 @@ const MarketDetailPage = () => {
   if (!data) return (
     <div className="container-default section-padding text-center space-y-4">
       <p>Market data not found</p>
-      <Link to="/markets" className="text-primary text-sm font-bold hover:underline flex items-center justify-center gap-1">
-        <ArrowLeft className="w-4 h-4" /> Back to Markets
+      <Link to="/analytics" className="text-primary text-sm font-bold hover:underline flex items-center justify-center gap-1">
+        <ArrowLeft className="w-4 h-4" /> Back to Analytics
       </Link>
     </div>
   );
