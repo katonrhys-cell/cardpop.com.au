@@ -512,74 +512,53 @@ const CollectionPage = () => {
         </div>
       </section>
 
-      {/* ── ERA / SET BRAND STRIP ─────────────────────────────────────────── */}
+      {/* ── ERA STICKY PILL BAR ──────────────────────────────────────────────── */}
+      {/* top-14 = mobile header height (~56px), lg:top-[6.5rem] = desktop header with both rows (~104px) */}
       {eras && eras.length > 0 && (
-        <>
-          {/* Visual era tiles — full-width horizontal scroll */}
-          <section className="bg-card border-b border-border overflow-hidden">
-            <div className="container mx-auto px-4 sm:px-6 py-5">
-              <p className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground mb-3 px-1">Browse by Set Era</p>
-              <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
-                {eras.map(era => (
-                  <button
-                    key={era.name}
-                    onClick={() => handleEraClick(era.name)}
-                    className={`group flex-shrink-0 relative rounded-2xl overflow-hidden transition-all duration-200 ${
-                      activeEra === era.name ? 'ring-2 ring-offset-2 scale-[1.03]' : 'hover:scale-[1.02]'
-                    }`}
-                    style={activeEra === era.name ? { ringColor: accentHex } : {}}
-                  >
-                    <div className={`bg-gradient-to-br ${era.gradient} px-5 py-4 min-w-[140px] text-left`}>
-                      <p className="text-white font-extrabold text-sm leading-tight">{era.name}</p>
-                      <p className="text-white/70 text-[11px] mt-0.5">{era.years}</p>
-                      {era.hint && (
-                        <p className="text-white/50 text-[10px] mt-1.5 leading-snug line-clamp-2 hidden group-hover:block">
-                          {era.hint}
-                        </p>
-                      )}
-                    </div>
-                    {activeEra === era.name && (
-                      <div className="absolute inset-0 bg-white/10 flex items-center justify-center">
-                        <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow">
-                          <Search className="w-3 h-3 text-gray-700" />
-                        </div>
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </section>
+        <section className="border-b border-border bg-background/95 backdrop-blur-md sticky top-14 lg:top-[6.5rem] z-20 shadow-sm">
+          <div className="container mx-auto px-4 sm:px-6">
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide py-3">
 
-          {/* Sticky filter pills (compact) */}
-          <section className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-20 shadow-sm">
-            <div className="container mx-auto px-4 sm:px-6">
-              <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide py-2">
+              {/* All / reset */}
+              <button
+                onClick={clearFilters}
+                className={`flex-shrink-0 flex flex-col items-center px-4 py-2 rounded-xl transition-all duration-200 min-w-[56px] ${
+                  !activeEra
+                    ? 'bg-foreground text-background shadow-sm'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                }`}
+              >
+                <span className="text-xs font-extrabold leading-tight">All</span>
+                <span className="text-[10px] font-normal leading-tight opacity-70">Eras</span>
+              </button>
+
+              {eras.map(era => (
                 <button
-                  onClick={clearFilters}
-                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 ${
-                    !activeEra ? 'bg-foreground text-background' : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  key={era.name}
+                  onClick={() => handleEraClick(era.name)}
+                  title={era.hint || undefined}
+                  className={`group flex-shrink-0 relative overflow-hidden flex flex-col items-start px-4 py-2 rounded-xl transition-all duration-200 min-w-[100px] ${
+                    activeEra === era.name
+                      ? `bg-gradient-to-r ${era.gradient} text-white shadow-md scale-[1.03]`
+                      : 'bg-muted text-foreground hover:scale-[1.02]'
                   }`}
                 >
-                  All
+                  {/* Subtle gradient tint on inactive pills */}
+                  {activeEra !== era.name && (
+                    <span className={`absolute inset-0 bg-gradient-to-r ${era.gradient} opacity-[0.07] pointer-events-none`} />
+                  )}
+                  <span className="relative text-xs font-extrabold leading-tight">{era.name}</span>
+                  <span className={`relative text-[10px] font-normal leading-tight mt-0.5 ${
+                    activeEra === era.name ? 'text-white/80' : 'text-muted-foreground'
+                  }`}>
+                    {era.years}
+                  </span>
                 </button>
-                {eras.map(era => (
-                  <button
-                    key={era.name}
-                    onClick={() => handleEraClick(era.name)}
-                    className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-bold transition-all duration-200 ${
-                      activeEra === era.name
-                        ? `bg-gradient-to-r ${era.gradient} text-white shadow-sm`
-                        : 'bg-muted text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {era.name}
-                  </button>
-                ))}
-              </div>
+              ))}
+
             </div>
-          </section>
-        </>
+          </div>
+        </section>
       )}
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-16">
