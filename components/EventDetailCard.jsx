@@ -9,22 +9,25 @@ const EventDetailCard = ({ event }) => {
   const isTradeShow = event.type === 'Trade Show';
 
   const handleShare = (platform) => {
-    const url = window.location.href;
-    const text = `Check out ${event.name}`;
+    const url = encodeURIComponent(window.location.href);
+    const text = encodeURIComponent(`Check out ${event.name}!`);
 
-    if (platform === 'Facebook') {
-      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank', 'noopener,noreferrer,width=600,height=400');
-    } else if (platform === 'Twitter') {
-      window.open(`https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer,width=600,height=400');
-    } else if (platform === 'LinkedIn') {
-      window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`, '_blank', 'noopener,noreferrer,width=600,height=400');
-    } else if (platform === 'Link') {
-      navigator.clipboard.writeText(url).then(() => {
-        toast.success('Link copied to clipboard');
+    const shareUrls = {
+      Facebook: `https://www.facebook.com/sharer/sharer.php?u=${url}`,
+      Twitter: `https://twitter.com/intent/tweet?text=${text}&url=${url}`,
+      LinkedIn: `https://www.linkedin.com/sharing/share-offsite/?url=${url}`,
+    };
+
+    if (platform === 'Link') {
+      navigator.clipboard.writeText(window.location.href).then(() => {
+        toast.success('Link copied to clipboard!');
       }).catch(() => {
-        toast.error('Failed to copy link');
+        toast.error('Failed to copy link.');
       });
+      return;
     }
+
+    window.open(shareUrls[platform], '_blank', 'noopener,noreferrer,width=600,height=400');
   };
 
   return (
