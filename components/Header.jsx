@@ -450,8 +450,20 @@ const Header = () => {
                 </SheetHeader>
 
                 <div className="flex-1 overflow-y-auto py-6 px-4">
-                  {/* Mobile Browse Collections */}
-                  <MobileBrowseSection onNavigate={() => setMobileMenuOpen(false)} />
+                  {/* Mobile search */}
+                  <div className="mb-5">
+                    <SearchBar
+                      onSearchChange={handleGlobalSearch}
+                      placeholder="Search cards, sets, sellers..."
+                      className="max-w-full"
+                    />
+                  </div>
+
+                  {/* Mobile Browse Collections — key resets accordion state each time menu opens */}
+                  <MobileBrowseSection
+                    key={String(mobileMenuOpen)}
+                    onNavigate={() => setMobileMenuOpen(false)}
+                  />
 
                   <nav className="flex flex-col gap-1.5 mb-6">
                     {NAV_LINKS.map((link) => {
@@ -460,6 +472,7 @@ const Header = () => {
                         <Link
                           key={link.label}
                           to={link.href}
+                          onClick={() => setMobileMenuOpen(false)}
                           className={`px-4 py-3.5 rounded-xl text-base font-bold transition-colors ${
                             isActive
                               ? 'bg-primary text-primary-foreground shadow-sm'
