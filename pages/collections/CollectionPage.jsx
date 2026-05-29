@@ -513,11 +513,15 @@ const CollectionPage = () => {
       </section>
 
       {/* ── ERA STICKY PILL BAR ──────────────────────────────────────────────── */}
-      {/* top-14 = mobile header height (~56px), lg:top-[6.5rem] = desktop header with both rows (~104px) */}
+      {/* top-[70px] = mobile header (py-3 + h-[44px] icon ≈ 68px + 1px border)  */}
+      {/* lg:top-[120px] = desktop: Row 1 (68px) + Row 2 nav (48px) + border (1px) */}
       {eras && eras.length > 0 && (
-        <section className="border-b border-border bg-background/95 backdrop-blur-md sticky top-14 lg:top-[6.5rem] z-20 shadow-sm">
+        <section className="border-b border-border bg-background/95 backdrop-blur-md sticky top-[70px] lg:top-[120px] z-20 shadow-sm">
           <div className="container mx-auto px-4 sm:px-6">
-            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide py-3">
+            <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground pt-2.5 pb-1.5 px-1">
+              Browse Collections
+            </p>
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-3">
 
               {/* All / reset */}
               <button
@@ -543,7 +547,6 @@ const CollectionPage = () => {
                       : 'bg-muted text-foreground hover:scale-[1.02]'
                   }`}
                 >
-                  {/* Subtle gradient tint on inactive pills */}
                   {activeEra !== era.name && (
                     <span className={`absolute inset-0 bg-gradient-to-r ${era.gradient} opacity-[0.07] pointer-events-none`} />
                   )}
@@ -749,7 +752,7 @@ const CollectionPage = () => {
         )}
 
         {/* ── FULL BROWSE GRID ─────────────────────────────────────────────── */}
-        <section ref={browseGridRef} id="browse-grid">
+        <section ref={browseGridRef} id="browse-grid" className="scroll-mt-[160px] lg:scroll-mt-[220px]">
           <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
             <div>
               <h2 className="text-2xl font-extrabold tracking-tight">Browse {name}</h2>
