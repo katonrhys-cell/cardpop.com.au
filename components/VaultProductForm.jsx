@@ -14,6 +14,7 @@ import { useCardOCR } from '@/hooks/useCardOCR.js';
 import { useEbayPriceLookup } from '@/hooks/useEbayPriceLookup.js';
 import CardScanPanel from '@/components/CardScanPanel.jsx';
 import { COLLECTIONS_LIST } from '@/components/Header.jsx';
+import { VARIANT_GROUPS } from '@/lib/cardVariants.js';
 
 const INITIAL_STATE = {
   name: '',
@@ -35,6 +36,7 @@ const INITIAL_STATE = {
   certificationNumber: '',
   rarity: 'Common',
   cardType: '',
+  cardVariants: [],
   listing_type: 'Private',
   is_public: false,
 };
@@ -106,6 +108,7 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
             certificationNumber: card.certificationNumber || '',
             rarity: card.rarity || 'Common',
             cardType: card.cardType || '',
+            cardVariants: Array.isArray(card.cardVariants) ? card.cardVariants : [],
             listing_type: card.listing_type || 'Private',
             is_public: card.is_public || false,
           });
@@ -231,7 +234,14 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
       // Append basic fields
       Object.entries(formData).forEach(([key, value]) => {
         if (!['categoryId', 'subcategoryId', 'brandId', 'seriesId'].includes(key)) {
-          if (value !== '' && value !== null) {
+          if (key === 'cardVariants') {
+            // Multi-select: append each value separately (or empty string to clear)
+            if (Array.isArray(value) && value.length > 0) {
+              value.forEach(v => submitData.append(key, v));
+            } else {
+              submitData.append(key, '');
+            }
+          } else if (value !== '' && value !== null) {
             if (['price', 'gradeScore', 'stockQuantity', 'releaseYear'].includes(key)) {
               submitData.append(key, Number(value));
             } else if (key === 'is_public') {
@@ -513,6 +523,52 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
               <Label>Card Number</Label>
               <Input value={formData.cardNumber} onChange={(e) => handleInputChange('cardNumber', e.target.value)} placeholder="e.g. 4/102" className="bg-background" />
             </div>
+          </div>
+
+          {/* Card Variants */}
+          <div className="space-y-4 pt-4 border-t border-border mt-6">
+            <div>
+              <h3 className="font-bold text-lg text-foreground">Card Variants / Attributes</h3>
+              <p className="text-sm text-muted-foreground mt-1">Select all that apply — e.g. Rookie Card, Refractor, Holo.</p>
+            </div>
+            {VARIANT_GROUPS.map(group => (
+              <div key={group.label}>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">{group.label}</p>
+                <div className="flex flex-wrap gap-2">
+                  {group.variants.map(variant => {
+                    const active = formData.cardVariants.includes(variant);
+                    return (
+                      <button
+                        key={variant}
+                        type="button"
+                        onClick={() => {
+                          const next = active
+                            ? formData.cardVariants.filter(v => v !== variant)
+                            : [...formData.cardVariants, variant];
+                          handleInputChange('cardVariants', next);
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${
+                          active
+                            ? 'bg-primary text-primary-foreground border-primary'
+                            : 'bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground'
+                        }`}
+                      >
+                        {variant}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            {formData.cardVariants.length > 0 && (
+              <button
+                type="button"
+                onClick={() => handleInputChange('cardVariants', [])}
+                className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+              >
+                Clear selection
+              </button>
+            )}
           </div>
 
           <div className="space-y-5 pt-4 border-t border-border mt-6">

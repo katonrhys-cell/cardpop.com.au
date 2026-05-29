@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import { toast } from 'sonner';
+import { CARD_VARIANTS } from '@/lib/cardVariants.js';
 
 const MarketplacePage = () => {
   const [listings, setListings] = useState([]);
@@ -99,6 +100,7 @@ const MarketplacePage = () => {
     setFilterCat('');
     setFilterSub('');
     setFilterType('All');
+    setFilterVariant('');
   };
 
   const getBreadcrumbPath = () => {

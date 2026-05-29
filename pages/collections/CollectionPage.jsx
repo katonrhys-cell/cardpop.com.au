@@ -16,6 +16,7 @@ import { useCategories } from '@/hooks/useCategories.js';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import { COLLECTION_CONFIGS, resolveCollectionSlug } from '@/data/collectionConfigs.js';
 import { slugify } from '@/lib/slugify.js';
+import { CARD_VARIANTS } from '@/lib/cardVariants.js';
 
 // ─── Hero floating icon animation ───────────────────────────────────────────
 const floatVariants = {
@@ -213,6 +214,7 @@ const CollectionPage = () => {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filterType, setFilterType] = useState('All');
   const [filterCondition, setFilterCondition] = useState('');
+  const [filterVariant, setFilterVariant] = useState('');
   const [filterSort, setFilterSort] = useState('-created');
   const [filterSub, setFilterSub] = useState('');
   const [filterBrand, setFilterBrand] = useState('');
@@ -414,7 +416,7 @@ const CollectionPage = () => {
     } finally {
       if (isMounted.current) setListingsLoading(false);
     }
-  }, [categoryId, filterType, filterCondition, filterSort, filterSub, filterBrand, filterSeries]);
+  }, [categoryId, filterType, filterCondition, filterVariant, filterSort, filterSub, filterBrand, filterSeries]);
 
   useEffect(() => {
     if (categoryId) fetchListings(1);
@@ -423,6 +425,7 @@ const CollectionPage = () => {
   const clearFilters = () => {
     setFilterType('All');
     setFilterCondition('');
+    setFilterVariant('');
     setFilterSort('-created');
     setFilterSub('');
     setFilterBrand('');
@@ -439,7 +442,7 @@ const CollectionPage = () => {
     }
   };
 
-  const hasActiveFilters = filterType !== 'All' || filterCondition || filterSort !== '-created' || filterSub || filterBrand || filterSeries;
+  const hasActiveFilters = filterType !== 'All' || filterCondition || filterVariant || filterSort !== '-created' || filterSub || filterBrand || filterSeries;
 
   if (!config) return null;
 
@@ -807,6 +810,16 @@ const CollectionPage = () => {
                       <SelectItem value="All">All Types</SelectItem>
                       <SelectItem value="For Sale">For Sale</SelectItem>
                       <SelectItem value="For Trade">For Trade</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={filterVariant} onValueChange={setFilterVariant}>
+                    <SelectTrigger className="w-[160px] rounded-xl bg-background border-border font-medium">
+                      <SelectValue placeholder="Card Variant" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">All Variants</SelectItem>
+                      {CARD_VARIANTS.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
                     </SelectContent>
                   </Select>
 

@@ -81,6 +81,7 @@ const AdminDashboard = () => {
   const [filterSub, setFilterSub] = useState('');
   const [filterBrand, setFilterBrand] = useState('');
   const [filterSeries, setFilterSeries] = useState('');
+  const [filterListingType, setFilterListingType] = useState('');
   
   const [catOpts, setCatOpts] = useState([]);
   const [subOpts, setSubOpts] = useState([]);
@@ -170,13 +171,14 @@ const AdminDashboard = () => {
     if (isAdmin) fetchDashboardData();
     else setLoading(false);
     return () => { isMounted.current = false; };
-  }, [isAdmin, getSystemHealth, filterCat, filterSub, filterBrand, filterSeries]);
+  }, [isAdmin, getSystemHealth, filterCat, filterSub, filterBrand, filterSeries, filterListingType]);
 
   const clearFilters = () => {
     setFilterCat('');
     setFilterSub('');
     setFilterBrand('');
     setFilterSeries('');
+    setFilterListingType('');
   };
 
   const handleEditStatus = (product) => {
@@ -250,6 +252,15 @@ const AdminDashboard = () => {
             </div>
             
             <div className="flex flex-wrap gap-2">
+              <Select value={filterListingType} onValueChange={setFilterListingType}>
+                <SelectTrigger className="w-[150px] bg-background text-xs h-9 rounded-lg"><SelectValue placeholder="Listing Status" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="For Sale">For Sale</SelectItem>
+                  <SelectItem value="For Trade">For Trade</SelectItem>
+                  <SelectItem value="For Sale & Trade">For Sale &amp; Trade</SelectItem>
+                  <SelectItem value="Private">Private</SelectItem>
+                </SelectContent>
+              </Select>
               <Select value={filterCat} onValueChange={setFilterCat}>
                 <SelectTrigger className="w-[140px] bg-background text-xs h-9 rounded-lg"><SelectValue placeholder="Category" /></SelectTrigger>
                 <SelectContent>{catOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
@@ -266,14 +277,14 @@ const AdminDashboard = () => {
                 <SelectTrigger className="w-[140px] bg-background text-xs h-9 rounded-lg"><SelectValue placeholder="Series" /></SelectTrigger>
                 <SelectContent>{seriesOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
-              {(filterCat || filterSub || filterBrand || filterSeries) && (
+              {(filterListingType || filterCat || filterSub || filterBrand || filterSeries) && (
                 <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 px-2 text-muted-foreground"><X className="w-4 h-4" /></Button>
               )}
             </div>
           </div>
-          {(filterCat || filterSub || filterBrand || filterSeries) && (
+          {(filterListingType || filterCat || filterSub || filterBrand || filterSeries) && (
              <div className="mt-2 text-sm font-bold text-primary bg-primary/5 inline-block px-3 py-1 rounded-md">
-               {filteredCount} items match this hierarchy filter
+               {filteredCount} item{filteredCount !== 1 ? 's' : ''} match{filteredCount === 1 ? 'es' : ''} current filters
              </div>
           )}
         </CardHeader>
@@ -307,7 +318,12 @@ const AdminDashboard = () => {
                       <TableCell className="text-muted-foreground text-sm">{ownerDisplay}</TableCell>
                       <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate" title={path}>{path || 'Uncategorized'}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="bg-background font-bold shadow-sm">{vp.listing_type}</Badge>
+                        <Badge variant="outline" className={`font-bold shadow-sm ${
+                          vp.listing_type === 'For Sale'          ? 'bg-emerald-500/10 text-emerald-700 border-emerald-300 dark:text-emerald-400' :
+                          vp.listing_type === 'For Trade'         ? 'bg-blue-500/10 text-blue-700 border-blue-300 dark:text-blue-400' :
+                          vp.listing_type === 'For Sale & Trade'  ? 'bg-violet-500/10 text-violet-700 border-violet-300 dark:text-violet-400' :
+                          'bg-muted text-muted-foreground border-border'
+                        }`}>{vp.listing_type}</Badge>
                       </TableCell>
                       <TableCell className="text-right font-medium tabular-nums">${(vp.price || 0).toFixed(2)}</TableCell>
                       <TableCell className="text-right px-6">

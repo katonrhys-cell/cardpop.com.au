@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Star, ShieldCheck, Lock, ShoppingCart, ArrowRightLeft, Layers } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
+import { VARIANT_BADGES } from '@/lib/cardVariants.js';
 
 const getStatusBadge = (listingType) => {
   switch (listingType) {
@@ -24,6 +25,9 @@ const VaultListingCard = ({ vaultItem }) => {
 
   const badgeConfig = getStatusBadge(vaultItem.listing_type);
   const StatusIcon = badgeConfig.icon;
+  const variants = Array.isArray(vaultItem.cardVariants) ? vaultItem.cardVariants : [];
+  const specialBadge = Object.entries(VARIANT_BADGES).find(([key]) => variants.includes(key));
+  const extraVariants = variants.filter(v => !VARIANT_BADGES[v]).slice(0, 2);
 
   return (
     <div className="group flex flex-col h-full bg-card rounded-2xl border border-border overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
@@ -45,6 +49,11 @@ const VaultListingCard = ({ vaultItem }) => {
             <StatusIcon className="w-3 h-3 mr-1.5" /> {vaultItem.listing_type || 'Private'}
           </Badge>
         </div>
+        {specialBadge && (
+          <div className={`absolute top-3 right-3 z-10 px-2 py-0.5 rounded-full text-[11px] font-extrabold shadow ${specialBadge[1].bg} ${specialBadge[1].text}`}>
+            {specialBadge[1].label}
+          </div>
+        )}
       </Link>
       
       <div className="p-5 flex flex-col flex-1">
@@ -74,6 +83,11 @@ const VaultListingCard = ({ vaultItem }) => {
                 Series: {vaultItem.series}
               </Badge>
             )}
+            {variants.slice(0, 3).map(v => (
+              <Badge key={v} variant="outline" className="text-[10px] font-bold border-primary/30 text-primary bg-primary/5">
+                {v}
+              </Badge>
+            ))}
           </div>
         </Link>
         

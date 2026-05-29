@@ -12,13 +12,11 @@
 - [| Shop](/shopproduct): No description available
 - [| User Details](/userdetail): No description available
 - [404 - Page Not Found | CardPop](/notfound): No description available
-- [About Us | CardPop](/about): No description available
+- [About Us | CardPop](/about): CardPop Australia was created to bring the energy of card shows, trade nights, and collector culture into one trusted digital marketplace.
 - [About Us | CardPop Australia](/about): Learn about CardPop Australia
 - [Accessibility | CardPop](/accessibility): No description available
 - [Account Dashboard | CardPop](/accountdashboard): No description available
 - [Add Your First Card | Card Pop](/addyourfirstcard): No description available
-- [Admin - CSV Management | CardPop](/csvmanagement): No description available
-- [Admin - CSV Parser | CardPop](/csvparser): No description available
 - [Admin - Manage Events | CardPop](/eventsadmin): No description available
 - [Admin - Manage Featured Cards | CardPop](/featuredcardsadmin): No description available
 - [All Products | Marketplace](/productlisting): No description available
@@ -36,7 +34,6 @@
 - [Community Hub | CardPop](/community): No description available
 - [Complete Profile | Card Pop](/profilecompletion): No description available
 - [Contact Us | CardPop](/contact): No description available
-- [CSV Import Manager | Admin](/csvimport): No description available
 - [FAQ | CardPop](/faq): No description available
 - [Grading Companies | CardPop](/gradingcompanies): No description available
 - [Grading Hub | CardPop](/grading): No description available
@@ -82,12 +79,12 @@
 - [System Diagnostics | Admin](/systemdiagnostics): No description available
 - [System Diagnostics | Emergency Console](/diagnostics): No description available
 - [Terms of Service | CardPop](/terms): No description available
-- [The Parallel Report | CardPop](/blog): No description available
 - [The Shop | CardPop](/shop): No description available
 - [Trade Requests | CardPop](/traderequests): No description available
 - [Transactions | Card Pop](/transactionhistory): No description available
 - [Transactions | CardPop](/accounttransactions): No description available
 - [Trust & Safety | CardPop](/trustsafety): No description available
+- [Untitled Page](/blog): No description available
 - [Untitled Page](/collection): No description available
 - [User Management | Admin Portal](/usermanagement): No description available
 - [User Profile | Community](/communityuserprofile): No description available
