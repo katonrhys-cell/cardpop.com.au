@@ -47,13 +47,12 @@ const AccountDashboard = () => {
           .from('orders')
           .select('id', { count: 'exact', head: true })
           .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
-          .eq('type', 'Sale')
-          .eq('status', 'Completed'),
+          .eq('status', 'payment_confirmed'),
         supabase
           .from('orders')
-          .select('transaction_value')
+          .select('total_aud')
           .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
-          .eq('status', 'Completed'),
+          .in('status', ['payment_confirmed', 'shipped', 'delivered']),
         supabase
           .from('listings')
           .select('id', { count: 'exact', head: true })
@@ -66,13 +65,13 @@ const AccountDashboard = () => {
         supabase
           .from('trades')
           .select('id', { count: 'exact', head: true })
-          .or(`sender_id.eq.${currentUser.id},recipient_id.eq.${currentUser.id}`)
-          .eq('status', 'Pending')
+          .or(`initiator_id.eq.${currentUser.id},responder_id.eq.${currentUser.id}`)
+          .eq('status', 'pending')
       ]);
 
       if (!isMounted.current) return;
 
-      const totalRevenue = (revenueRes.data || []).reduce((sum, t) => sum + (t.transaction_value || 0), 0);
+      const totalRevenue = (revenueRes.data || []).reduce((sum, t) => sum + (t.total_aud || 0), 0);
 
       setStats({
         salesCount: salesRes.count || 0,
@@ -144,9 +143,9 @@ const AccountDashboard = () => {
     toast.success('Dashboard data refreshed successfully');
   };
 
-  const formattedRevenue = new Intl.NumberFormat('en-US', {
+  const formattedRevenue = new Intl.NumberFormat('en-AU', {
     style: 'currency',
-    currency: 'USD'
+    currency: 'AUD'
   }).format(stats.revenue);
 
   return (
@@ -306,32 +305,30 @@ const AccountDashboard = () => {
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead>Item Name</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Listing Type</TableHead>
-                      <TableHead>Visibility</TableHead>
+                      <TableHead>Card Name</TableHead>
+                      <TableHead>Set</TableHead>
+                      <TableHead>Condition / Grade</TableHead>
+                      <TableHead className="text-right">Est. Value (AUD)</TableHead>
                       <TableHead className="text-right">Added</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {vaultItems.map((item) => (
                       <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.name}</TableCell>
-                        <TableCell>{item.category || 'Uncategorized'}</TableCell>
+                        <TableCell className="font-medium">{item.card_name}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{item.set_name || '—'}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className="capitalize">
-                            {item.listing_type?.replace(/_/g, ' ') || 'Private'}
+                            {item.grading_company && item.grade
+                              ? `${item.grading_company} ${item.grade}`
+                              : item.condition?.replace(/_/g, ' ') || 'Unknown'}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          {item.is_public ? (
-                            <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20">Public</Badge>
-                          ) : (
-                            <Badge variant="secondary" className="bg-muted text-muted-foreground">Private</Badge>
-                          )}
+                        <TableCell className="text-right font-medium">
+                          {item.estimated_value_aud != null ? `$${Number(item.estimated_value_aud).toFixed(2)}` : '—'}
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground text-sm tabular-nums">
-                          {new Date(item.created).toLocaleDateString()}
+                          {new Date(item.created_at).toLocaleDateString('en-AU')}
                         </TableCell>
                       </TableRow>
                     ))}

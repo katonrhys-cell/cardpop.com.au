@@ -4,8 +4,15 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
 
 const ProtectedAdminRoute = ({ children }) => {
-  const { isAuthenticated, currentUser, isAdmin, loading } = useAuth();
+  const { isAuthenticated, isAdmin, loading } = useAuth();
   const location = useLocation();
+
+  // Must be before any conditional returns — Rules of Hooks
+  useEffect(() => {
+    if (!loading && isAuthenticated && !isAdmin) {
+      toast.error('Access denied. Administrator privileges required.');
+    }
+  }, [loading, isAuthenticated, isAdmin]);
 
   if (loading) {
     return (
@@ -15,26 +22,11 @@ const ProtectedAdminRoute = ({ children }) => {
     );
   }
 
-  console.log('[ProtectedAdminRoute] Evaluating admin access:', {
-    isAuthenticated,
-    role: currentUser?.role,
-    isAdminCheck: isAdmin,
-    path: location.pathname
-  });
-
   if (!isAuthenticated) {
-    console.warn('[ProtectedAdminRoute] User not authenticated. Redirecting to login.');
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  useEffect(() => {
-    if (!isAdmin) {
-      toast.error('Access denied. Administrator privileges required.');
-    }
-  }, [isAdmin]);
-
   if (!isAdmin) {
-    console.error(`[ProtectedAdminRoute] Access denied. Expected role: 'admin', got: '${currentUser?.role}'`);
     return <Navigate to="/" replace />;
   }
 
