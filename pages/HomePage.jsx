@@ -77,10 +77,70 @@ const ACTIVITY_FEED = [
 
 // ─── Hero floating card shapes ────────────────────────────────────────────────
 const HERO_CARDS = [
-  { gradient: 'from-yellow-300 via-yellow-400 to-orange-400', rotate: -14, x: -170, y: 30,  delay: 0,    floatY: -12 },
-  { gradient: 'from-purple-400 via-violet-500 to-purple-700', rotate: -5,  x: -55,  y: -15, delay: 0.15, floatY: -16 },
-  { gradient: 'from-sky-400 via-blue-500 to-indigo-600',      rotate: 4,   x: 60,   y: 10,  delay: 0.3,  floatY: -10 },
-  { gradient: 'from-emerald-400 via-teal-500 to-emerald-600', rotate: 14,  x: 170,  y: 35,  delay: 0.45, floatY: -14 },
+  {
+    // 1993 MTG Alpha Black Lotus
+    gradient: 'from-stone-800 via-stone-900 to-black',
+    borderColor: 'border-yellow-600/60',
+    rotate: -14, x: -170, y: 30, delay: 0, floatY: -12,
+    name: 'Black Lotus',
+    set: 'Magic: The Gathering',
+    year: '1993 · Alpha',
+    rarity: 'Artifact',
+    value: '$500,000+',
+    symbol: '✦',
+    symbolColor: 'text-yellow-400',
+    accent: 'from-yellow-700 to-yellow-500',
+    artColor: 'bg-gradient-to-b from-stone-700 to-stone-900',
+    artEmoji: '🌸',
+  },
+  {
+    // 1986 Fleer Michael Jordan #57
+    gradient: 'from-red-800 via-red-900 to-black',
+    borderColor: 'border-red-400/50',
+    rotate: -5, x: -55, y: -15, delay: 0.15, floatY: -16,
+    name: 'Michael Jordan',
+    set: 'Fleer Basketball',
+    year: '1986 · #57 RC',
+    rarity: 'Rookie Card',
+    value: '$738,000',
+    symbol: '★',
+    symbolColor: 'text-red-400',
+    accent: 'from-red-700 to-red-500',
+    artColor: 'bg-gradient-to-b from-red-900 to-black',
+    artEmoji: '🏀',
+  },
+  {
+    // 2018 Bowman Shohei Ohtani Chrome
+    gradient: 'from-blue-800 via-blue-900 to-red-900',
+    borderColor: 'border-blue-300/50',
+    rotate: 4, x: 60, y: 10, delay: 0.3, floatY: -10,
+    name: 'Shohei Ohtani',
+    set: 'Bowman Chrome',
+    year: '2018 · Prospects',
+    rarity: 'Rookie Auto',
+    value: '$200,000+',
+    symbol: '◆',
+    symbolColor: 'text-blue-300',
+    accent: 'from-blue-600 to-red-600',
+    artColor: 'bg-gradient-to-b from-blue-900 to-red-900',
+    artEmoji: '⚾',
+  },
+  {
+    // 1998 Pikachu Illustrator
+    gradient: 'from-yellow-400 via-yellow-500 to-amber-500',
+    borderColor: 'border-yellow-200/70',
+    rotate: 14, x: 170, y: 35, delay: 0.45, floatY: -14,
+    name: 'Pikachu Illustrator',
+    set: 'Pokémon',
+    year: '1998 · CoroCoro',
+    rarity: 'Illustrator Promo',
+    value: '$5,300,000',
+    symbol: '⚡',
+    symbolColor: 'text-yellow-900',
+    accent: 'from-yellow-500 to-amber-400',
+    artColor: 'bg-gradient-to-b from-yellow-300 to-yellow-500',
+    artEmoji: '⚡',
+  },
 ];
 
 // ─── Stat counter item ────────────────────────────────────────────────────────
@@ -161,7 +221,7 @@ const HomePage = () => {
           {HERO_CARDS.map((card, i) => (
             <motion.div
               key={i}
-              className={`absolute w-44 h-60 rounded-2xl bg-gradient-to-br ${card.gradient} shadow-2xl`}
+              className={`absolute w-44 h-60 rounded-2xl bg-gradient-to-br ${card.gradient} shadow-2xl border ${card.borderColor} overflow-hidden`}
               style={{ left: '50%', top: '50%', marginLeft: -88, marginTop: -120 }}
               initial={{ opacity: 0, scale: 0.85, rotate: card.rotate, x: card.x, y: card.y + 40 }}
               animate={{
@@ -182,12 +242,23 @@ const HomePage = () => {
                 },
               }}
             >
-              {/* Subtle card shine */}
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/30 to-transparent" />
-              {/* Card "art" placeholder lines */}
-              <div className="absolute bottom-5 left-5 right-5 space-y-2">
-                <div className="h-2 rounded-full bg-white/25 w-3/4" />
-                <div className="h-1.5 rounded-full bg-white/15 w-1/2" />
+              {/* Shine overlay */}
+              <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-black/20 pointer-events-none z-10" />
+              {/* Card name bar */}
+              <div className={`absolute top-0 left-0 right-0 bg-gradient-to-r ${card.accent} px-2 py-1 flex items-center justify-between`}>
+                <span className="text-[8px] font-black text-white truncate leading-tight">{card.name}</span>
+                <span className={`text-[10px] font-bold ${card.symbolColor}`}>{card.symbol}</span>
+              </div>
+              {/* Art box */}
+              <div className={`absolute top-6 left-2 right-2 h-24 rounded-lg ${card.artColor} flex items-center justify-center shadow-inner`}>
+                <span className="text-4xl drop-shadow-lg">{card.artEmoji}</span>
+              </div>
+              {/* Card info */}
+              <div className="absolute bottom-0 left-0 right-0 px-2 pb-2 pt-1">
+                <div className="text-[7px] font-bold text-white/60 uppercase tracking-wider mb-0.5">{card.rarity}</div>
+                <div className="text-[7px] text-white/50 leading-tight">{card.set}</div>
+                <div className="text-[7px] text-white/40 leading-tight mb-1">{card.year}</div>
+                <div className={`text-[9px] font-black bg-gradient-to-r ${card.accent} bg-clip-text text-transparent`}>{card.value}</div>
               </div>
             </motion.div>
           ))}
