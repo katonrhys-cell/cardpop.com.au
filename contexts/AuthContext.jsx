@@ -83,7 +83,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut({ scope: 'global' });
+    } catch (e) {
+      console.error('[AuthContext] signOut failed:', e);
+    }
     setCurrentUser(null);
     setProfile(null);
     setSession(null);

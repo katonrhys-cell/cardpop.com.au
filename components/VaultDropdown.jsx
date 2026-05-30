@@ -22,8 +22,8 @@ const VaultDropdown = ({ isMobile = false }) => {
   const [isOpen, setIsOpen] = useState(false);
   const timeoutRef = useRef(null);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     setIsOpen(false);
     navigate('/');
   };

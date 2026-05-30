@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -22,9 +21,8 @@ const AccountProfile = () => {
   const [formData, setFormData] = useState({
     display_name: '',
     bio: '',
-    looking_for: '',
-    location: '',
-    is_public: false,
+    location_state: '',
+    location_suburb: '',
     social_twitter: '',
     social_instagram: ''
   });
@@ -39,9 +37,8 @@ const AccountProfile = () => {
       setFormData({
         display_name: currentUser.display_name || currentUser.name || '',
         bio: currentUser.bio || '',
-        looking_for: currentUser.looking_for || '',
-        location: currentUser.location || '',
-        is_public: currentUser.is_public || false,
+        location_state: currentUser.location_state || '',
+        location_suburb: currentUser.location_suburb || '',
         social_twitter: socials.twitter || '',
         social_instagram: socials.instagram || ''
       });
@@ -97,17 +94,11 @@ const AccountProfile = () => {
         avatar_url = null;
       }
 
-      const socials = {};
-      if (formData.social_twitter) socials.twitter = formData.social_twitter.trim();
-      if (formData.social_instagram) socials.instagram = formData.social_instagram.trim();
-
       const { error: updateErr } = await supabase.from('profiles').update({
         display_name: formData.display_name,
-        bio_text: formData.bio,
-        looking_for: formData.looking_for,
-        location_city: formData.location,
-        is_public: formData.is_public,
-        social_links: socials,
+        bio: formData.bio,
+        location_state: formData.location_state,
+        location_suburb: formData.location_suburb,
         avatar_url,
       }).eq('id', currentUser.id);
 
@@ -170,17 +161,15 @@ const AccountProfile = () => {
                   </h2>
                   {isVerified && <ShieldCheck className="w-5 h-5 text-primary" />}
                 </div>
-                <p className="text-sm text-muted-foreground font-medium">{formData.location || 'Location hidden'}</p>
+                <p className="text-sm text-muted-foreground font-medium">
+                  {[formData.location_suburb, formData.location_state].filter(Boolean).join(', ') || 'Location hidden'}
+                </p>
               </div>
             </div>
             <div className="p-8 space-y-6">
               <div>
                 <h3 className="font-bold text-xs uppercase tracking-wider text-muted-foreground mb-2">About</h3>
                 <p className="text-foreground text-sm leading-relaxed">{formData.bio || 'No bio provided.'}</p>
-              </div>
-              <div>
-                <h3 className="font-bold text-xs uppercase tracking-wider text-muted-foreground mb-2">Looking For</h3>
-                <p className="text-foreground text-sm leading-relaxed">{formData.looking_for || 'Not specified.'}</p>
               </div>
             </div>
           </DialogContent>
@@ -190,22 +179,6 @@ const AccountProfile = () => {
       {/* ── Profile form ──────────────────────────────────────────────────── */}
       <form onSubmit={handleSubmit}>
         <Card className="shadow-sm overflow-hidden">
-
-          {/* Visibility toggle */}
-          <div className="p-6 sm:p-8 border-b border-border bg-muted/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <p className="font-bold text-foreground mb-1">Profile Visibility</p>
-              <p className="text-sm text-muted-foreground font-medium">When public, other collectors can view your profile and active listings.</p>
-            </div>
-            <div className="flex items-center gap-3 bg-background border border-border px-4 py-2 rounded-xl shadow-sm shrink-0">
-              <Label htmlFor="is_public" className="font-bold cursor-pointer text-sm">Public</Label>
-              <Switch
-                id="is_public"
-                checked={formData.is_public}
-                onCheckedChange={(v) => setFormData(prev => ({ ...prev, is_public: v }))}
-              />
-            </div>
-          </div>
 
           <CardContent className="p-6 sm:p-8 space-y-8">
 
@@ -273,43 +246,27 @@ const AccountProfile = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="location" className="font-bold text-foreground">Location</Label>
+                  <Label htmlFor="location_suburb" className="font-bold text-foreground">Suburb</Label>
                   <Input
-                    id="location"
-                    name="location"
-                    value={formData.location}
+                    id="location_suburb"
+                    name="location_suburb"
+                    value={formData.location_suburb}
                     onChange={handleChange}
                     className="h-12 rounded-xl font-medium shadow-sm"
-                    placeholder="e.g. Sydney, Australia"
+                    placeholder="e.g. Bondi"
                   />
                 </div>
 
-                <div className="space-y-4 p-5 bg-muted/30 rounded-2xl border border-border shadow-sm">
-                  <h4 className="font-bold text-sm text-foreground uppercase tracking-wider">Social Links</h4>
-                  <div className="space-y-3">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="social_twitter" className="text-xs font-bold text-muted-foreground">Twitter / X Profile URL</Label>
-                      <Input
-                        id="social_twitter"
-                        name="social_twitter"
-                        value={formData.social_twitter}
-                        onChange={handleChange}
-                        className="h-10 rounded-xl text-sm"
-                        placeholder="https://twitter.com/username"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="social_instagram" className="text-xs font-bold text-muted-foreground">Instagram Profile URL</Label>
-                      <Input
-                        id="social_instagram"
-                        name="social_instagram"
-                        value={formData.social_instagram}
-                        onChange={handleChange}
-                        className="h-10 rounded-xl text-sm"
-                        placeholder="https://instagram.com/username"
-                      />
-                    </div>
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="location_state" className="font-bold text-foreground">State</Label>
+                  <Input
+                    id="location_state"
+                    name="location_state"
+                    value={formData.location_state}
+                    onChange={handleChange}
+                    className="h-12 rounded-xl font-medium shadow-sm"
+                    placeholder="e.g. NSW"
+                  />
                 </div>
               </div>
 
@@ -322,20 +279,8 @@ const AccountProfile = () => {
                     name="bio"
                     value={formData.bio}
                     onChange={handleChange}
-                    className="min-h-[140px] resize-none rounded-xl font-medium shadow-sm"
+                    className="min-h-[200px] resize-none rounded-xl font-medium shadow-sm"
                     placeholder="Tell the community about your collection focus..."
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="looking_for" className="font-bold text-foreground">What I'm Looking For</Label>
-                  <Textarea
-                    id="looking_for"
-                    name="looking_for"
-                    value={formData.looking_for}
-                    onChange={handleChange}
-                    className="min-h-[100px] resize-none rounded-xl font-medium shadow-sm"
-                    placeholder="e.g. 1st Edition Charizard, Vintage NBA..."
                   />
                 </div>
               </div>
