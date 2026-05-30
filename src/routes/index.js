@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { loginLimiter, passwordResetLimiter, apiLimiter } from '../middleware/endpoint-rate-limit.js';
+import { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter } from '../middleware/endpoint-rate-limit.js';
 import { verifyTradeAccess } from '../middleware/verifyTradeAccess.js';
 import { authMiddleware } from '../middleware/auth.js';
 import healthCheck from './health-check.js';
@@ -42,8 +42,8 @@ export default () => {
     router.use('/ebay', apiLimiter);
     router.use('/ebay', ebayRouter);
     
-    // Stripe routes with API rate limiting
-    // Note: Stripe checkout and purchase routes bypass email verification
+    // Stripe: high-capacity limiter for the webhook, standard for other endpoints
+    router.use('/stripe/webhook', stripeLimiter);
     router.use('/stripe', apiLimiter);
     router.use('/stripe', stripeRouter);
 

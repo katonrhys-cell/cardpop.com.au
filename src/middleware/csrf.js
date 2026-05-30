@@ -14,6 +14,8 @@ const CSRF_EXEMPT_ROUTES = [
   '/auth/password/reset/verify',
   '/auth/password/reset/complete',
   '/stripe/webhook',
+  '/stripe/create-checkout',
+  '/stripe/session',
 ];
 
 function generateCSRFToken() {
