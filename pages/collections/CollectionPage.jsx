@@ -296,27 +296,17 @@ const CollectionPage = () => {
     else { setSeriesOpts([]); setFilterSeries(''); }
   }, [filterBrand, getSeriesByBrand]);
 
-  // ─── Era click: match against PocketBase brands and auto-filter ───────────
-  // When user selects an era, try to find a matching brand in the first subcategory
+  // ─── Era → subcategory matching ────────────────────────────────────────────
+  // Match era name to a subcategory by name; clear filterSub when era is cleared
   useEffect(() => {
-    if (!activeEra || !categoryId || subOpts.length === 0) return;
-
-    const tryMatchEra = async () => {
-      for (const sub of subOpts) {
-        const brands = await getBrandsBySubcategory(sub.id);
-        const match = brands.find(b => b.name.toLowerCase().includes(activeEra.toLowerCase()) || activeEra.toLowerCase().includes(b.name.toLowerCase()));
-        if (match) {
-          setFilterSub(sub.id);
-          setBrandOpts(brands);
-          setFilterBrand(match.id);
-          return;
-        }
-      }
-      // No match found — just show the hint banner, filters stay unchanged
-    };
-
-    tryMatchEra();
-  }, [activeEra, categoryId, subOpts, getBrandsBySubcategory]);
+    if (!categoryId) return;
+    if (!activeEra) { setFilterSub(''); return; }
+    const era = activeEra.toLowerCase();
+    const match = subOpts.find(sub =>
+      sub.name.toLowerCase().includes(era) || era.includes(sub.name.toLowerCase())
+    );
+    setFilterSub(match ? match.id : '');
+  }, [activeEra, categoryId, subOpts]);
 
   // ─── New Releases ─────────────────────────────────────────────────────────
   useEffect(() => {
