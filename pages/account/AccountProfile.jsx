@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
-import { Save, Upload, Trash2, Eye, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Save, Upload, Trash2, Eye, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
@@ -17,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 const AccountProfile = () => {
   const { currentUser } = useAuth();
   const [loading, setLoading] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     display_name: '',
     bio: '',
@@ -127,28 +128,32 @@ const AccountProfile = () => {
   const isVerified = currentUser?.is_verified === 'true' || currentUser?.verified;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300 pb-12">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 space-y-8 animate-in fade-in duration-300">
       <Helmet>
-        <title>Public Profile Settings | CardPop</title>
+        <title>Public Profile | CardPop</title>
       </Helmet>
 
       <Breadcrumb items={[{ label: 'Account', path: '/account' }, { label: 'Public Profile' }]} />
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      {/* ── Page heading ──────────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
         <div>
-          <h1 className="text-3xl font-serif font-bold text-foreground tracking-tight mb-2">Public Profile</h1>
-          <p className="text-muted-foreground font-medium">Manage how you appear to the community.</p>
+          <h1 className="text-3xl font-bold font-serif mb-2 tracking-tight text-foreground">Public Profile</h1>
+          <p className="text-muted-foreground text-lg font-medium">Manage how you appear to the community.</p>
         </div>
-        
+
         <Dialog>
           <DialogTrigger asChild>
-            <Button variant="outline" className="rounded-xl font-bold shadow-sm h-11">
+            <Button variant="outline" size="sm" className="rounded-xl font-bold shadow-sm h-10 px-4 self-start sm:self-auto">
               <Eye className="w-4 h-4 mr-2" /> Preview Profile
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl bg-background rounded-3xl border-border p-0 overflow-hidden">
-            <div className="bg-[hsl(var(--profile-bg))] p-8 border-b border-[hsl(var(--section-divider))] flex items-center gap-6">
-              <Avatar className="w-24 h-24 rounded-[2rem] border-2 border-card shadow-sm">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Profile Preview</DialogTitle>
+            </DialogHeader>
+            <div className="bg-muted/30 p-8 border-b border-border flex items-center gap-6">
+              <Avatar className="w-24 h-24 rounded-2xl border-2 border-card shadow-sm">
                 {avatarPreview ? (
                   <AvatarImage src={avatarPreview} className="object-cover" />
                 ) : (currentPhotoUrl && !removeAvatar) ? (
@@ -160,8 +165,10 @@ const AccountProfile = () => {
               </Avatar>
               <div>
                 <div className="flex items-center gap-2 mb-1">
-                  <h2 className="text-2xl font-serif font-bold text-foreground">{formData.display_name || 'Anonymous Collector'}</h2>
-                  {isVerified && <ShieldCheck className="w-5 h-5 text-[hsl(var(--verified-badge))]" />}
+                  <h2 className="text-2xl font-bold font-serif tracking-tight text-foreground">
+                    {formData.display_name || 'Anonymous Collector'}
+                  </h2>
+                  {isVerified && <ShieldCheck className="w-5 h-5 text-primary" />}
                 </div>
                 <p className="text-sm text-muted-foreground font-medium">{formData.location || 'Location hidden'}</p>
               </div>
@@ -180,161 +187,174 @@ const AccountProfile = () => {
         </Dialog>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-card border border-border rounded-[2rem] shadow-sm overflow-hidden">
-        
-        {/* Visibility Toggle Section */}
-        <div className="p-6 sm:p-8 border-b border-border bg-muted/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h3 className="text-lg font-bold text-foreground mb-1">Profile Visibility</h3>
-            <p className="text-sm text-muted-foreground font-medium">When public, other collectors can view your profile and active listings.</p>
-          </div>
-          <div className="flex items-center gap-3 bg-background border border-border px-4 py-2 rounded-xl shadow-sm">
-            <Label htmlFor="is_public" className="font-bold cursor-pointer text-sm">Public</Label>
-            <Switch 
-              id="is_public" 
-              checked={formData.is_public}
-              onCheckedChange={(v) => setFormData(prev => ({...prev, is_public: v}))}
-            />
-          </div>
-        </div>
+      {/* ── Profile form ──────────────────────────────────────────────────── */}
+      <form onSubmit={handleSubmit}>
+        <Card className="shadow-sm overflow-hidden">
 
-        <div className="p-6 sm:p-8 space-y-8">
-          
-          {/* Avatar Upload */}
-          <div className="flex flex-col sm:flex-row gap-6 items-start">
-            <div className="relative group shrink-0 flex flex-col items-center">
-              <Avatar className="w-32 h-32 rounded-[2rem] border-2 border-border bg-muted text-foreground">
-                {avatarPreview ? (
-                  <AvatarImage src={avatarPreview} className="object-cover" />
-                ) : (currentPhotoUrl && !removeAvatar) ? (
-                  <AvatarImage src={currentPhotoUrl} className="object-cover" />
-                ) : null}
-                <AvatarFallback className="rounded-[2rem] text-4xl font-bold bg-secondary/30">
-                  {(formData.display_name || currentUser?.email || 'U').charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              
-              <div className="absolute -bottom-3 flex gap-2">
-                <Label htmlFor="avatar-upload" className="bg-foreground text-background p-2 rounded-full shadow-md cursor-pointer hover:scale-105 transition-transform">
-                  <Upload className="w-4 h-4" />
-                  <Input 
-                    id="avatar-upload" 
-                    type="file" 
-                    accept="image/*" 
-                    className="hidden" 
-                    onChange={handleAvatarChange}
+          {/* Visibility toggle */}
+          <div className="p-6 sm:p-8 border-b border-border bg-muted/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <p className="font-bold text-foreground mb-1">Profile Visibility</p>
+              <p className="text-sm text-muted-foreground font-medium">When public, other collectors can view your profile and active listings.</p>
+            </div>
+            <div className="flex items-center gap-3 bg-background border border-border px-4 py-2 rounded-xl shadow-sm shrink-0">
+              <Label htmlFor="is_public" className="font-bold cursor-pointer text-sm">Public</Label>
+              <Switch
+                id="is_public"
+                checked={formData.is_public}
+                onCheckedChange={(v) => setFormData(prev => ({ ...prev, is_public: v }))}
+              />
+            </div>
+          </div>
+
+          <CardContent className="p-6 sm:p-8 space-y-8">
+
+            {/* Avatar upload */}
+            <div className="flex flex-col sm:flex-row gap-6 items-start">
+              <div className="relative group shrink-0 flex flex-col items-center">
+                <Avatar className="w-32 h-32 rounded-2xl border-2 border-border bg-muted text-foreground">
+                  {avatarPreview ? (
+                    <AvatarImage src={avatarPreview} className="object-cover" />
+                  ) : (currentPhotoUrl && !removeAvatar) ? (
+                    <AvatarImage src={currentPhotoUrl} className="object-cover" />
+                  ) : null}
+                  <AvatarFallback className="rounded-2xl text-4xl font-bold bg-muted/50">
+                    {(formData.display_name || currentUser?.email || 'U').charAt(0).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+
+                <div className="absolute -bottom-3 flex gap-2">
+                  <Label htmlFor="avatar-upload" className="bg-foreground text-background p-2 rounded-full shadow-md cursor-pointer hover:scale-105 transition-transform">
+                    <Upload className="w-4 h-4" />
+                    <Input
+                      id="avatar-upload"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAvatarChange}
+                    />
+                  </Label>
+                  {(avatarPreview || (currentPhotoUrl && !removeAvatar)) && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveAvatar}
+                      className="bg-destructive text-destructive-foreground p-2 rounded-full shadow-md cursor-pointer hover:scale-105 transition-transform"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex-1 space-y-1 mt-2">
+                <Label className="font-bold text-foreground">Profile Photo</Label>
+                <p className="text-sm text-muted-foreground font-medium">Recommended 400×400px. JPG, PNG or WEBP. Max 20MB.</p>
+              </div>
+            </div>
+
+            {/* Fields grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t border-border">
+
+              {/* Left column */}
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="display_name" className="font-bold text-foreground">
+                    Display Name <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="display_name"
+                    name="display_name"
+                    value={formData.display_name}
+                    onChange={handleChange}
+                    required
+                    className="h-12 rounded-xl font-medium shadow-sm"
+                    placeholder="e.g. RareCardHunter"
                   />
-                </Label>
-                {(avatarPreview || (currentPhotoUrl && !removeAvatar)) && (
-                  <button 
-                    type="button"
-                    onClick={handleRemoveAvatar}
-                    className="bg-destructive text-destructive-foreground p-2 rounded-full shadow-md cursor-pointer hover:scale-105 transition-transform"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-            
-            <div className="flex-1 space-y-2 mt-2">
-              <Label className="font-bold text-foreground">Profile Photo</Label>
-              <p className="text-sm text-muted-foreground font-medium">Recommended size: 400x400px. JPG, PNG, WEBP. Max 20MB.</p>
-            </div>
-          </div>
+                </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-border">
-            
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="display_name" className="font-bold text-foreground">Display Name <span className="text-destructive">*</span></Label>
-                <Input 
-                  id="display_name" 
-                  name="display_name" 
-                  value={formData.display_name} 
-                  onChange={handleChange} 
-                  required
-                  className="bg-background h-12 rounded-xl text-foreground placeholder:text-muted-foreground font-medium shadow-sm"
-                  placeholder="e.g. RareCardHunter"
-                />
-              </div>
+                <div className="space-y-2">
+                  <Label htmlFor="location" className="font-bold text-foreground">Location</Label>
+                  <Input
+                    id="location"
+                    name="location"
+                    value={formData.location}
+                    onChange={handleChange}
+                    className="h-12 rounded-xl font-medium shadow-sm"
+                    placeholder="e.g. Sydney, Australia"
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="location" className="font-bold text-foreground">Location</Label>
-                <Input 
-                  id="location" 
-                  name="location" 
-                  value={formData.location} 
-                  onChange={handleChange} 
-                  className="bg-background h-12 rounded-xl text-foreground placeholder:text-muted-foreground font-medium shadow-sm"
-                  placeholder="e.g. Sydney, Australia"
-                />
-              </div>
-
-              <div className="space-y-4 p-5 bg-muted/30 rounded-2xl border border-border shadow-sm">
-                <h4 className="font-bold text-sm text-foreground uppercase tracking-wider">Social Links</h4>
-                <div className="space-y-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="social_twitter" className="text-xs font-bold text-muted-foreground">Twitter / X Profile URL</Label>
-                    <Input 
-                      id="social_twitter" 
-                      name="social_twitter" 
-                      value={formData.social_twitter} 
-                      onChange={handleChange} 
-                      className="bg-background h-10 rounded-lg text-foreground placeholder:text-muted-foreground text-sm"
-                      placeholder="https://twitter.com/username"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="social_instagram" className="text-xs font-bold text-muted-foreground">Instagram Profile URL</Label>
-                    <Input 
-                      id="social_instagram" 
-                      name="social_instagram" 
-                      value={formData.social_instagram} 
-                      onChange={handleChange} 
-                      className="bg-background h-10 rounded-lg text-foreground placeholder:text-muted-foreground text-sm"
-                      placeholder="https://instagram.com/username"
-                    />
+                <div className="space-y-4 p-5 bg-muted/30 rounded-2xl border border-border shadow-sm">
+                  <h4 className="font-bold text-sm text-foreground uppercase tracking-wider">Social Links</h4>
+                  <div className="space-y-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="social_twitter" className="text-xs font-bold text-muted-foreground">Twitter / X Profile URL</Label>
+                      <Input
+                        id="social_twitter"
+                        name="social_twitter"
+                        value={formData.social_twitter}
+                        onChange={handleChange}
+                        className="h-10 rounded-xl text-sm"
+                        placeholder="https://twitter.com/username"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="social_instagram" className="text-xs font-bold text-muted-foreground">Instagram Profile URL</Label>
+                      <Input
+                        id="social_instagram"
+                        name="social_instagram"
+                        value={formData.social_instagram}
+                        onChange={handleChange}
+                        className="h-10 rounded-xl text-sm"
+                        placeholder="https://instagram.com/username"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="bio" className="font-bold text-foreground">About Me</Label>
-                <Textarea 
-                  id="bio" 
-                  name="bio" 
-                  value={formData.bio} 
-                  onChange={handleChange} 
-                  className="bg-background min-h-[140px] resize-none rounded-xl text-foreground placeholder:text-muted-foreground font-medium shadow-sm"
-                  placeholder="Tell the community about your collection focus..."
-                />
+              {/* Right column */}
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="bio" className="font-bold text-foreground">About Me</Label>
+                  <Textarea
+                    id="bio"
+                    name="bio"
+                    value={formData.bio}
+                    onChange={handleChange}
+                    className="min-h-[140px] resize-none rounded-xl font-medium shadow-sm"
+                    placeholder="Tell the community about your collection focus..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="looking_for" className="font-bold text-foreground">What I'm Looking For</Label>
+                  <Textarea
+                    id="looking_for"
+                    name="looking_for"
+                    value={formData.looking_for}
+                    onChange={handleChange}
+                    className="min-h-[100px] resize-none rounded-xl font-medium shadow-sm"
+                    placeholder="e.g. 1st Edition Charizard, Vintage NBA..."
+                  />
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="looking_for" className="font-bold text-foreground">What I'm Looking For</Label>
-                <Textarea 
-                  id="looking_for" 
-                  name="looking_for" 
-                  value={formData.looking_for} 
-                  onChange={handleChange} 
-                  className="bg-background min-h-[100px] resize-none rounded-xl text-foreground placeholder:text-muted-foreground font-medium shadow-sm"
-                  placeholder="e.g. 1st Edition Charizard, Vintage NBA..."
-                />
-              </div>
             </div>
-            
+          </CardContent>
+
+          {/* Save footer */}
+          <div className="p-6 border-t border-border bg-muted/10 flex justify-end">
+            <Button
+              type="submit"
+              disabled={loading}
+              className="rounded-xl h-12 px-8 font-bold shadow-md active:scale-95 transition-transform"
+            >
+              {loading ? 'Saving…' : <><Save className="w-4 h-4 mr-2" /> Save Profile</>}
+            </Button>
           </div>
 
-        </div>
-
-        <div className="p-6 border-t border-border bg-muted/10 flex justify-end">
-          <Button type="submit" disabled={loading} className="rounded-xl h-12 px-8 font-bold shadow-md active:scale-95 transition-transform">
-            {loading ? 'Saving...' : <><Save className="w-4 h-4 mr-2" /> Save Profile</>}
-          </Button>
-        </div>
+        </Card>
       </form>
     </div>
   );
