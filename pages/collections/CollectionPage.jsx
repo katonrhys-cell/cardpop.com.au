@@ -174,6 +174,31 @@ const HolyGrailCard = ({ card, accentHex }) => {
   );
 };
 
+// ─── Pikachu outline icon (used for Pokémon Graded Slabs badge) ──────────────
+const PikachuIcon = ({ className }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
+    strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+    {/* Head */}
+    <ellipse cx="12" cy="14.5" rx="7.5" ry="6.5" />
+    {/* Left ear */}
+    <path d="M6.5 9.5 L4.5 3 L10 8" />
+    {/* Right ear */}
+    <path d="M17.5 9.5 L19.5 3 L14 8" />
+    {/* Left eye */}
+    <circle cx="9.5" cy="13" r="1.1" fill="currentColor" stroke="none" />
+    {/* Right eye */}
+    <circle cx="14.5" cy="13" r="1.1" fill="currentColor" stroke="none" />
+    {/* Left cheek */}
+    <circle cx="7.5" cy="16.5" r="1.5" fill="currentColor" stroke="none" opacity="0.45" />
+    {/* Right cheek */}
+    <circle cx="16.5" cy="16.5" r="1.5" fill="currentColor" stroke="none" opacity="0.45" />
+    {/* Smile */}
+    <path d="M10 17.5 Q12 19.5 14 17.5" />
+    {/* Nose */}
+    <circle cx="12" cy="15.5" r="0.5" fill="currentColor" stroke="none" />
+  </svg>
+);
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  COLLECTION PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -185,6 +210,7 @@ const CollectionPage = () => {
   // Resolve config
   const slug = resolveCollectionSlug(rawSlug);
   const config = slug ? COLLECTION_CONFIGS[slug] : null;
+  const GradedIcon = slug === 'pokemon' ? PikachuIcon : Award;
 
   // ─── State ────────────────────────────────────────────────────────────────
   const [categoryId, setCategoryId] = useState(null);
@@ -513,11 +539,15 @@ const CollectionPage = () => {
       </section>
 
       {/* ── ERA STICKY PILL BAR ──────────────────────────────────────────────── */}
-      {/* top-14 = mobile header height (~56px), lg:top-[6.5rem] = desktop header with both rows (~104px) */}
+      {/* top-[70px] = mobile header (py-3 + h-[44px] icon ≈ 68px + 1px border)  */}
+      {/* lg:top-[120px] = desktop: Row 1 (68px) + Row 2 nav (48px) + border (1px) */}
       {eras && eras.length > 0 && (
-        <section className="border-b border-border bg-background/95 backdrop-blur-md sticky top-14 lg:top-[6.5rem] z-20 shadow-sm">
+        <section className="border-b border-border bg-background/95 backdrop-blur-md sticky top-[70px] lg:top-[120px] z-20 shadow-sm">
           <div className="container mx-auto px-4 sm:px-6">
-            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide py-3">
+            <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground pt-2.5 pb-1.5 px-1">
+              Browse Collections
+            </p>
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-3">
 
               {/* All / reset */}
               <button
@@ -543,7 +573,6 @@ const CollectionPage = () => {
                       : 'bg-muted text-foreground hover:scale-[1.02]'
                   }`}
                 >
-                  {/* Subtle gradient tint on inactive pills */}
                   {activeEra !== era.name && (
                     <span className={`absolute inset-0 bg-gradient-to-r ${era.gradient} opacity-[0.07] pointer-events-none`} />
                   )}
@@ -624,7 +653,7 @@ const CollectionPage = () => {
                   className="w-9 h-9 rounded-xl flex items-center justify-center shadow-sm"
                   style={{ background: `linear-gradient(135deg, #F59E0B, #D97706)` }}
                 >
-                  <Award className="w-5 h-5 text-white" />
+                  <GradedIcon className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <h2 className="text-2xl font-extrabold tracking-tight">Graded Slabs</h2>
@@ -649,7 +678,7 @@ const CollectionPage = () => {
                 : gradedListings.length === 0
                   ? (
                     <div className="py-8 text-muted-foreground w-full flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border">
-                      <Award className="w-8 h-8 opacity-30" />
+                      <GradedIcon className="w-8 h-8 opacity-30" />
                       <p className="text-sm">No graded {name} cards listed yet.</p>
                       <p className="text-xs text-muted-foreground/70">List a PSA or BGS slab to appear here.</p>
                     </div>
@@ -749,7 +778,7 @@ const CollectionPage = () => {
         )}
 
         {/* ── FULL BROWSE GRID ─────────────────────────────────────────────── */}
-        <section ref={browseGridRef} id="browse-grid">
+        <section ref={browseGridRef} id="browse-grid" className="scroll-mt-[160px] lg:scroll-mt-[220px]">
           <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
             <div>
               <h2 className="text-2xl font-extrabold tracking-tight">Browse {name}</h2>
