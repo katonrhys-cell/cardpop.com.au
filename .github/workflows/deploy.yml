@@ -38,4 +38,13 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./dist/
           server-dir: /public_html/
-          dangerous-clean-slate: true
+          # Incremental sync: tracks deployed files in a state file so only
+          # changed/new files are uploaded and removed chunks are cleaned up.
+          # Avoids the broken-server risk of dangerous-clean-slate (which deletes
+          # everything before uploading, leaving the site broken if upload fails).
+          state-name: .ftp-deploy-sync-state.json
+          log-level: minimal
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
