@@ -58,7 +58,12 @@ app.use(morgan('combined'));
 app.use(globalRateLimit);
 
 logger.debug(`[MAIN] Configuring body parser with limit: ${BodyLimit} bytes`);
-app.use(express.json({ limit: BodyLimit }));
+// Stripe webhooks need the raw body buffer for signature verification — skip JSON
+// parsing for that path so express.raw() inside the route handler sees the buffer.
+app.use((req, res, next) => {
+	if (req.path === '/stripe/webhook') return next();
+	express.json({ limit: BodyLimit })(req, res, next);
+});
 app.use(express.urlencoded({ extended: true, limit: BodyLimit }));
 
 app.use((err, req, res, next) => {

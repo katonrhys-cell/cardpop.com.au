@@ -376,9 +376,12 @@ const Header = () => {
   const isNavLinkActive = (link) => {
     const pathname = location.pathname;
     if (pathname === link.href) return true;
-    if (link.href !== '/' && pathname.startsWith(link.href + '/')) {
-      const hasMoreSpecificMatch = NAV_LINKS.some(otherLink => 
-        otherLink.href !== link.href && pathname === otherLink.href
+    if (link.href === '/') return false;
+    if (pathname.startsWith(link.href + '/')) {
+      const hasMoreSpecificMatch = NAV_LINKS.some(otherLink =>
+        otherLink.href !== link.href &&
+        otherLink.href.startsWith(link.href + '/') &&
+        (pathname === otherLink.href || pathname.startsWith(otherLink.href + '/'))
       );
       return !hasMoreSpecificMatch;
     }

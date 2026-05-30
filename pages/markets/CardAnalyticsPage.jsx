@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Helmet } from 'react-helmet';
 import { useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
+import apiServerClient from '@/lib/apiServerClient.js';
 import {
   ArrowLeft, TrendingUp, TrendingDown, Activity, DollarSign, BarChart3,
   Clock, ExternalLink, ShoppingCart, ArrowUpRight, ArrowDownRight,
@@ -173,6 +174,10 @@ const CardAnalyticsPage = () => {
   const [vaultItems, setVaultItems] = useState([]);
   const [loadingL, setLoadingL]     = useState(true);
 
+  // Live eBay AU pricing
+  const [liveData, setLiveData]       = useState(null);
+  const [liveLoading, setLiveLoading] = useState(true);
+
   const rng = useMemo(() => makePrng(cardName + cardSet), [cardName, cardSet]);
 
   const change7d  = rawChange;
@@ -196,6 +201,29 @@ const CardAnalyticsPage = () => {
       setVaultItems(vault.map(i => ({ ...i, _source: 'vault' })));
     }).finally(() => setLoadingL(false));
   }, [cardName]);
+
+  // Fetch live eBay AU prices for this card
+  useEffect(() => {
+    if (!cardName || cardName === 'Unknown Card') { setLiveLoading(false); return; }
+    setLiveLoading(true);
+    const query = [cardName, cardSet].filter(Boolean).join(' ');
+    apiServerClient.fetch(`/ebay/search?cardName=${encodeURIComponent(query)}&limit=15`)
+      .then(r => r.json())
+      .then(items => {
+        if (!Array.isArray(items) || items.length === 0) return;
+        const prices = items.map(l => l.price).filter(p => p > 0);
+        if (prices.length === 0) return;
+        setLiveData({
+          listings: items,
+          avgPrice: Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) / 100,
+          minPrice: Math.min(...prices),
+          maxPrice: Math.max(...prices),
+          volume:   items.length,
+        });
+      })
+      .catch(() => {}) // non-critical — fall back to demo data
+      .finally(() => setLiveLoading(false));
+  }, [cardName, cardSet]);
 
   const cardUrl = (c) => `/analytics/card?name=${encodeURIComponent(c.name)}&set=${encodeURIComponent(c.set)}&collection=${encodeURIComponent(c.collection)}&price=${c.price}&change=${c.change}`;
 
@@ -230,9 +258,21 @@ const CardAnalyticsPage = () => {
               <div className="flex flex-wrap gap-2 items-center">
                 {cardColl && <Badge variant="secondary">{cardColl}</Badge>}
                 {cardSet  && <Badge variant="outline">{cardSet}</Badge>}
-                <span className="flex items-center gap-1 text-xs text-amber-500 font-semibold">
-                  <Info className="w-3 h-3" /> Demo data · eBay integration pending
-                </span>
+                {liveData ? (
+                  <span className="flex items-center gap-1 text-xs text-emerald-600 font-semibold">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Live eBay AU · {liveData.volume} active listing{liveData.volume !== 1 ? 's' : ''}
+                  </span>
+                ) : liveLoading ? (
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground font-semibold">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-pulse" />
+                    Fetching live prices…
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-xs text-amber-500 font-semibold">
+                    <Info className="w-3 h-3" /> Demo data · eBay unavailable
+                  </span>
+                )}
               </div>
               <h1 className="text-3xl md:text-4xl font-black leading-tight">{cardName}</h1>
               <div className="flex items-center gap-4 flex-wrap">
@@ -263,11 +303,16 @@ const CardAnalyticsPage = () => {
         {/* Metrics */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {[
-            { label: 'Avg Sold (AUD)',  value: `$${avgSale.toFixed(2)}`,    icon: DollarSign, colored: false },
-            { label: '90-Day High',    value: `$${high90}`,                  icon: TrendingUp, colored: false },
-            { label: '90-Day Low',     value: `$${low90}`,                   icon: TrendingDown, colored: false },
-            { label: '7-Day Change',   value: `${change7d >= 0 ? '+' : ''}${change7d}%`, icon: Activity, colored: true, up: change7d >= 0 },
-            { label: '90-Day Sales',   value: vol90,                          icon: BarChart3, colored: false },
+            { label: liveData ? 'Avg Listed (AUD)' : 'Avg Sold (AUD)',
+              value: `$${(liveData?.avgPrice ?? avgSale).toFixed(2)}`, icon: DollarSign, colored: false },
+            { label: liveData ? 'Highest Listed'  : '90-Day High',
+              value: `$${(liveData?.maxPrice ?? high90).toFixed(2)}`,  icon: TrendingUp, colored: false },
+            { label: liveData ? 'Lowest Listed'   : '90-Day Low',
+              value: `$${(liveData?.minPrice ?? low90).toFixed(2)}`,   icon: TrendingDown, colored: false },
+            { label: '7-Day Change',
+              value: `${change7d >= 0 ? '+' : ''}${change7d}%`,       icon: Activity, colored: true, up: change7d >= 0 },
+            { label: liveData ? 'Active Listings' : '90-Day Sales',
+              value: liveData?.volume ?? vol90,                         icon: BarChart3, colored: false },
           ].map(({ label, value, icon: Icon, colored, up }) => (
             <div key={label} className="bg-card border border-border rounded-2xl p-4 text-center">
               <Icon className="w-4 h-4 text-muted-foreground mx-auto mb-2" />
@@ -299,7 +344,7 @@ const CardAnalyticsPage = () => {
                 <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
                 <YAxis tickFormatter={v => `$${v}`} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} width={52} />
                 <Tooltip content={<CustomTooltip />} />
-                <ReferenceLine y={avgSale} stroke="hsl(var(--primary))" strokeDasharray="4 4" opacity={0.4} label={{ value: 'Avg', fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
+                <ReferenceLine y={liveData?.avgPrice ?? avgSale} stroke="hsl(var(--primary))" strokeDasharray="4 4" opacity={0.4} label={{ value: liveData ? 'Live Avg' : 'Avg', fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} />
                 <Area type="monotone" dataKey="price" stroke="hsl(var(--primary))" strokeWidth={2} fill="url(#cardGrad)" dot={false} activeDot={{ r: 4, fill: 'hsl(var(--primary))' }} />
               </AreaChart>
             </ResponsiveContainer>
@@ -340,36 +385,87 @@ const CardAnalyticsPage = () => {
           </TabsList>
 
           {/* Buy Now */}
-          <TabsContent value="buy">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-bold">Available on CardPop Marketplace</h3>
-              <a href={`https://www.ebay.com.au/sch/i.html?_nkw=${encodeURIComponent(cardName + ' ' + cardSet)}&LH_BIN=1`}
-                target="_blank" rel="noopener noreferrer"
-                className="text-xs text-primary font-semibold flex items-center gap-1 hover:underline">
-                Also search eBay <ExternalLink className="w-3 h-3" />
-              </a>
-            </div>
-            {loadingL ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}
-              </div>
-            ) : listings.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {listings.map(l => <ListingCard key={l.id} listing={l} />)}
-              </div>
-            ) : (
-              <div className="text-center py-14 bg-muted/20 rounded-3xl border border-dashed border-border">
-                <ShoppingCart className="w-10 h-10 text-muted-foreground mx-auto mb-3 opacity-40" />
-                <p className="font-semibold mb-1">No CardPop listings for this card yet</p>
-                <p className="text-sm text-muted-foreground mb-4">Check eBay for available copies.</p>
+          <TabsContent value="buy" className="space-y-8">
+            {/* CardPop marketplace listings */}
+            <div>
+              <div className="mb-4 flex items-center justify-between">
+                <h3 className="font-bold">Available on CardPop Marketplace</h3>
                 <a href={`https://www.ebay.com.au/sch/i.html?_nkw=${encodeURIComponent(cardName + ' ' + cardSet)}&LH_BIN=1`}
-                  target="_blank" rel="noopener noreferrer">
-                  <Button variant="outline" size="sm" className="gap-1.5">
-                    Search eBay Buy Now <ExternalLink className="w-3.5 h-3.5" />
-                  </Button>
+                  target="_blank" rel="noopener noreferrer"
+                  className="text-xs text-primary font-semibold flex items-center gap-1 hover:underline">
+                  Also search eBay <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
-            )}
+              {loadingL ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}
+                </div>
+              ) : listings.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {listings.map(l => <ListingCard key={l.id} listing={l} />)}
+                </div>
+              ) : (
+                <div className="py-8 bg-muted/20 rounded-3xl border border-dashed border-border text-center">
+                  <ShoppingCart className="w-8 h-8 text-muted-foreground mx-auto mb-2 opacity-40" />
+                  <p className="font-semibold mb-1 text-sm">No CardPop listings for this card yet</p>
+                </div>
+              )}
+            </div>
+
+            {/* Live eBay AU listings */}
+            <div>
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold">Live eBay Australia Listings</h3>
+                  {liveData && (
+                    <span className="flex items-center gap-1 text-xs text-emerald-600 font-semibold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+                      Live
+                    </span>
+                  )}
+                </div>
+                <a href={`https://www.ebay.com.au/sch/i.html?_nkw=${encodeURIComponent(cardName + ' ' + cardSet)}&LH_BIN=1`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="text-xs text-primary font-semibold flex items-center gap-1 hover:underline">
+                  See all on eBay <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+              {liveLoading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)}
+                </div>
+              ) : liveData?.listings?.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {liveData.listings.map(l => (
+                    <a key={l.itemId} href={l.listingUrl} target="_blank" rel="noopener noreferrer"
+                      className="flex gap-3 bg-card border border-border rounded-2xl p-4 hover:shadow-md hover:border-primary/40 transition-all">
+                      <div className="w-14 h-18 flex-shrink-0 bg-muted rounded-xl overflow-hidden">
+                        {l.thumbnailUrl
+                          ? <img src={l.thumbnailUrl} alt={l.title} className="w-full h-full object-cover" />
+                          : <div className="w-full h-full flex items-center justify-center text-[10px] text-muted-foreground p-1 text-center">No image</div>}
+                      </div>
+                      <div className="flex-1 min-w-0 flex flex-col justify-between">
+                        <p className="text-xs font-medium text-foreground line-clamp-2 leading-snug">{l.title}</p>
+                        <div className="flex items-end justify-between mt-1">
+                          <p className="text-base font-bold text-primary">${l.price.toFixed(2)}</p>
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-400/10 text-amber-600 border border-amber-400/20">eBay AU</span>
+                        </div>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-10 bg-muted/20 rounded-3xl border border-dashed border-border">
+                  <p className="text-sm text-muted-foreground mb-3">No active eBay AU listings found.</p>
+                  <a href={`https://www.ebay.com.au/sch/i.html?_nkw=${encodeURIComponent(cardName + ' ' + cardSet)}&LH_BIN=1`}
+                    target="_blank" rel="noopener noreferrer">
+                    <Button variant="outline" size="sm" className="gap-1.5">
+                      Search eBay AU <ExternalLink className="w-3.5 h-3.5" />
+                    </Button>
+                  </a>
+                </div>
+              )}
+            </div>
           </TabsContent>
 
           {/* For Trade */}
@@ -401,7 +497,7 @@ const CardAnalyticsPage = () => {
               <div>
                 <h3 className="font-bold">Recent Sold Prices (AUD)</h3>
                 <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-                  <Info className="w-3 h-3" /> Demo preview — powered by eBay sold listings once integrated
+                  <Info className="w-3 h-3" /> Indicative data — eBay sold history requires a seller-level API scope
                 </p>
               </div>
               <a href={`https://www.ebay.com.au/sch/i.html?_nkw=${encodeURIComponent(cardName + ' ' + cardSet)}&LH_Sold=1&LH_Complete=1`}
@@ -430,7 +526,7 @@ const CardAnalyticsPage = () => {
             <div className="mb-4">
               <h3 className="font-bold">Similar Cards from {cardSet || cardColl}</h3>
               <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-                <Info className="w-3 h-3" /> Demo — will reflect live market data once eBay integration is live
+                <Info className="w-3 h-3" /> Generated from set data — search individual cards for live eBay prices
               </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

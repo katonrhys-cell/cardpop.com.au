@@ -124,9 +124,17 @@ const CheckoutPage = () => {
         tax,
         discount,
         total,
-        customerEmail: shippingData.email || currentUser?.email || 'guest@example.com',
+        customerEmail: shippingData.email || currentUser?.email || '',
         successUrl: `${window.location.origin}/checkout-success?session_id={CHECKOUT_SESSION_ID}`,
-        cancelUrl: window.location.href
+        cancelUrl: window.location.href,
+        vaultItemId: cardId || null,
+        shippingAddress: {
+          name:     shippingData.fullName   || shippingData.name     || '',
+          address:  shippingData.address    || shippingData.line1    || '',
+          suburb:   shippingData.suburb     || shippingData.city     || '',
+          state:    shippingData.state      || '',
+          postcode: shippingData.postcode   || shippingData.zip      || '',
+        },
       })
     })
     .then(res => {
