@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
-import { supabase } from '@/lib/supabaseClient.js';
 import {
   TrendingUp, TrendingDown, Search, LineChart, Star, StarOff,
   ArrowUpRight, ArrowDownRight, Activity, DollarSign, BarChart3,
@@ -131,6 +130,9 @@ const InvestmentSignal = ({ change7d, change30d }) => {
   );
 };
 
+const slugify = (str) =>
+  str?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') ?? '';
+
 // ─── Main component ──────────────────────────────────────────────────────────
 
 const API_BASE = '/hcgi/api';
@@ -156,9 +158,11 @@ const MarketsPage = () => {
 
   // ── Fetch live popular card prices on mount ────────────────────────────
   useEffect(() => {
-    supabase.from('market_data').select('*').limit(20)
-      .then(({ data }) => setMarketData(data ?? []))
-      .catch(() => {});
+    fetch(`${API_BASE}/ebay/popular-cards`)
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(cards => setLiveCards(cards.filter(c => !c.error)))
+      .catch(() => setLiveError(true))
+      .finally(() => setLiveLoading(false));
   }, []);
 
   // ── Transform live cards for the movers table ──────────────────────────
