@@ -617,8 +617,8 @@ const Header = () => {
         </div>
 
         {/* ── Row 2: Nav links (desktop only) ── */}
-        <div className="hidden lg:flex items-center justify-center py-1.5">
-          <nav className="flex items-center gap-0.5 xl:gap-1">
+        <div className="hidden lg:flex items-center py-1.5">
+          <nav className="flex items-center justify-between w-full">
             <BrowseDropdown onNavigate={() => setMobileMenuOpen(false)} />
             {NAV_LINKS.map((link) => {
               const isActive = isNavLinkActive(link);
