@@ -367,8 +367,8 @@ const Header = () => {
     }
   };
 
-  const handleMobileLogout = () => {
-    logout();
+  const handleMobileLogout = async () => {
+    await logout();
     setMobileMenuOpen(false);
     navigate('/');
   };
