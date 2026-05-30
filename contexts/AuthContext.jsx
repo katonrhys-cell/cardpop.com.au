@@ -79,7 +79,6 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new Error(error.message);
-    window.location.href = '/account';
     return data;
   };
 
@@ -88,7 +87,6 @@ export const AuthProvider = ({ children }) => {
     setCurrentUser(null);
     setProfile(null);
     setSession(null);
-    window.location.href = '/';
   };
 
   const resendVerificationEmail = async (email) => {
