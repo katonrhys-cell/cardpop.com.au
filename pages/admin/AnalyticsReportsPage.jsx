@@ -82,18 +82,17 @@ const AnalyticsReportsPage = () => {
           allOrdersRes,
           allUsersRes
         ] = await Promise.all([
-          supabase.from('profiles').select('*', { count: 'exact' }).limit(1).catch(() => ({ count: 0 })),
-          supabase.from('listings').select('*', { count: 'exact' }).limit(1).catch(() => ({ count: 0 })),
-          supabase.from('events').select('*', { count: 'exact' }).limit(1).catch(() => ({ count: 0 })),
-          supabase.from('categories').select('*', { count: 'exact' }).limit(1).catch(() => ({ count: 0 })),
-          supabase.from('orders').select('*', { count: 'exact' }).limit(1).catch(() => ({ count: 0 })),
-          supabase.from('orders').select('*, profiles!orders_buyer_id_fkey(username, display_name)').order('created_at', { ascending: false }).range(0, 9).catch(() => ({ data: [] })),
-          supabase.from('orders').select('total_amount,created_at').neq('status', 'cancelled').catch(() => ({ data: [] })),
-          supabase.from('profiles').select('created_at').catch(() => ({ data: [] }))
+          supabase.from('profiles').select('*', { count: 'exact', head: true }),
+          supabase.from('listings').select('*', { count: 'exact', head: true }),
+          supabase.from('events').select('*', { count: 'exact', head: true }),
+          supabase.from('categories').select('*', { count: 'exact', head: true }),
+          supabase.from('orders').select('*', { count: 'exact', head: true }),
+          supabase.from('orders').select('*, profiles!orders_buyer_id_fkey(username, display_name)').order('created_at', { ascending: false }).range(0, 9),
+          supabase.from('orders').select('total_aud,created_at').neq('status', 'cancelled'),
+          supabase.from('profiles').select('created_at')
         ]);
 
-        // brands/series/productLines removed — use 0
-        const totalRevenue = (allOrdersRes.data || []).reduce((sum, order) => sum + (order.total_amount || 0), 0);
+        const totalRevenue = (allOrdersRes.data || []).reduce((sum, order) => sum + (order.total_aud || 0), 0);
 
         setStats({
           users: usersRes.count || 0,
@@ -128,7 +127,7 @@ const AnalyticsReportsPage = () => {
           const orderDate = new Date(order.created_at);
           const bucket = last6Months.find(m => m.month === orderDate.getMonth() && m.year === orderDate.getFullYear());
           if (bucket) {
-            bucket.revenue += (order.total_amount || 0);
+            bucket.revenue += (order.total_aud || 0);
           }
         });
 
@@ -369,7 +368,7 @@ const AnalyticsReportsPage = () => {
                       <Badge 
                         variant="secondary" 
                         className={
-                          order.status === 'delivered' || order.status === 'completed' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                          order.status === 'delivered' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
                           order.status === 'cancelled' ? 'bg-destructive/10 text-destructive' :
                           'bg-primary/10 text-primary'
                         }
@@ -378,7 +377,7 @@ const AnalyticsReportsPage = () => {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right font-medium">
-                      {formatCurrency(order.total_amount || 0)}
+                      {formatCurrency(order.total_aud || 0)}
                     </TableCell>
                   </TableRow>
                 ))

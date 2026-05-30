@@ -47,12 +47,12 @@ const AccountDashboard = () => {
           .from('orders')
           .select('id', { count: 'exact', head: true })
           .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
-          .eq('status', 'payment_confirmed'),
+          .eq('status', 'delivered'),
         supabase
           .from('orders')
           .select('total_aud')
           .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
-          .in('status', ['payment_confirmed', 'shipped', 'delivered']),
+          .eq('status', 'delivered'),
         supabase
           .from('listings')
           .select('id', { count: 'exact', head: true })
@@ -65,7 +65,7 @@ const AccountDashboard = () => {
         supabase
           .from('trades')
           .select('id', { count: 'exact', head: true })
-          .or(`initiator_id.eq.${currentUser.id},responder_id.eq.${currentUser.id}`)
+          .or(`sender_id.eq.${currentUser.id},recipient_id.eq.${currentUser.id}`)
           .eq('status', 'pending')
       ]);
 
@@ -328,7 +328,7 @@ const AccountDashboard = () => {
                           {item.estimated_value_aud != null ? `$${Number(item.estimated_value_aud).toFixed(2)}` : '—'}
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground text-sm tabular-nums">
-                          {new Date(item.created_at).toLocaleDateString('en-AU')}
+                          {new Date(item.created_at).toLocaleDateString()}
                         </TableCell>
                       </TableRow>
                     ))}

@@ -28,9 +28,16 @@ export const AuthProvider = ({ children }) => {
       setSession(session);
       setCurrentUser(session?.user ?? null);
       if (session?.user) {
-        const p = await fetchProfile(session.user.id);
-        setProfile(p);
+        try {
+          const p = await fetchProfile(session.user.id);
+          setProfile(p);
+        } catch (e) {
+          console.error('[AuthContext] fetchProfile failed:', e);
+        }
       }
+      setLoading(false);
+    }).catch((e) => {
+      console.error('[AuthContext] getSession failed:', e);
       setLoading(false);
     });
 
@@ -40,8 +47,12 @@ export const AuthProvider = ({ children }) => {
         setSession(session);
         setCurrentUser(session?.user ?? null);
         if (session?.user) {
-          const p = await fetchProfile(session.user.id);
-          setProfile(p);
+          try {
+            const p = await fetchProfile(session.user.id);
+            setProfile(p);
+          } catch (e) {
+            console.error('[AuthContext] fetchProfile failed:', e);
+          }
         } else {
           setProfile(null);
         }
