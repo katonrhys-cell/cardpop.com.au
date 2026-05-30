@@ -47,13 +47,12 @@ const AccountDashboard = () => {
           .from('orders')
           .select('id', { count: 'exact', head: true })
           .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
-          .eq('type', 'Sale')
-          .eq('status', 'Completed'),
+          .eq('status', 'delivered'),
         supabase
           .from('orders')
-          .select('transaction_value')
+          .select('total_aud')
           .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
-          .eq('status', 'Completed'),
+          .eq('status', 'delivered'),
         supabase
           .from('listings')
           .select('id', { count: 'exact', head: true })
@@ -67,12 +66,12 @@ const AccountDashboard = () => {
           .from('trades')
           .select('id', { count: 'exact', head: true })
           .or(`sender_id.eq.${currentUser.id},recipient_id.eq.${currentUser.id}`)
-          .eq('status', 'Pending')
+          .eq('status', 'pending')
       ]);
 
       if (!isMounted.current) return;
 
-      const totalRevenue = (revenueRes.data || []).reduce((sum, t) => sum + (t.transaction_value || 0), 0);
+      const totalRevenue = (revenueRes.data || []).reduce((sum, t) => sum + (t.total_aud || 0), 0);
 
       setStats({
         salesCount: salesRes.count || 0,
@@ -331,7 +330,7 @@ const AccountDashboard = () => {
                           )}
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground text-sm tabular-nums">
-                          {new Date(item.created).toLocaleDateString()}
+                          {new Date(item.created_at).toLocaleDateString()}
                         </TableCell>
                       </TableRow>
                     ))}
