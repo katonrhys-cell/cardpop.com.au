@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
 
 const AuthContext = createContext();
@@ -10,8 +10,8 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile]         = useState(null);
   const [session, setSession]         = useState(null);
   const [loading, setLoading]         = useState(true);
+  const isMounted = useRef(true);
 
-  // Fetch the public profile row for the signed-in user
   const fetchProfile = async (userId) => {
     if (!userId) return null;
     const { data } = await supabase
@@ -23,44 +23,36 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    // Restore session on mount
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setCurrentUser(session?.user ?? null);
-      if (session?.user) {
-        try {
-          const p = await fetchProfile(session.user.id);
-          setProfile(p);
-        } catch (e) {
-          console.error('[AuthContext] fetchProfile failed:', e);
-        }
-      }
-      setLoading(false);
-    }).catch((e) => {
-      console.error('[AuthContext] getSession failed:', e);
-      setLoading(false);
-    });
+    isMounted.current = true;
 
-    // Listen for auth state changes
+    // onAuthStateChange fires INITIAL_SESSION on mount — no need for getSession().
+    // Using both causes double profile fetches and state races.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session);
-        setCurrentUser(session?.user ?? null);
-        if (session?.user) {
+      async (_event, newSession) => {
+        if (!isMounted.current) return;
+
+        setSession(newSession);
+        setCurrentUser(newSession?.user ?? null);
+
+        if (newSession?.user) {
           try {
-            const p = await fetchProfile(session.user.id);
-            setProfile(p);
+            const p = await fetchProfile(newSession.user.id);
+            if (isMounted.current) setProfile(p);
           } catch (e) {
             console.error('[AuthContext] fetchProfile failed:', e);
           }
         } else {
-          setProfile(null);
+          if (isMounted.current) setProfile(null);
         }
-        setLoading(false);
+
+        if (isMounted.current) setLoading(false);
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted.current = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signup = async (email, password, fullName) => {
@@ -83,11 +75,16 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
+    // Use local scope (default): removes session from localStorage immediately
+    // without requiring a server round-trip. Global scope can fail on network
+    // issues and leave the JWT in localStorage, causing the user to appear
+    // logged back in on the next page refresh.
     try {
-      await supabase.auth.signOut({ scope: 'global' });
+      await supabase.auth.signOut();
     } catch (e) {
       console.error('[AuthContext] signOut failed:', e);
     }
+    // Explicit fallback clears in case onAuthStateChange is delayed
     setCurrentUser(null);
     setProfile(null);
     setSession(null);
@@ -113,11 +110,11 @@ export const AuthProvider = ({ children }) => {
     return true;
   };
 
-  // Profile helpers (kept for compat with components using currentUser.role etc.)
   const isAdmin    = profile?.is_admin    ?? false;
-  const isVerified = currentUser?.email_confirmed_at != null;
+  // Read email_confirmed_at from the raw session user, not from mergedUser,
+  // so that profile fields can never accidentally shadow it.
+  const isVerified = session?.user?.email_confirmed_at != null;
 
-  // Expose a merged user object that components can read like pb's model
   const mergedUser = currentUser
     ? { ...currentUser, ...profile, id: currentUser.id }
     : null;
@@ -135,8 +132,7 @@ export const AuthProvider = ({ children }) => {
     signup,
     login,
     logout,
-    // Legacy no-ops kept so callers don't crash during incremental migration
-    requestOTP:             async () => { throw new Error('OTP auth not supported with Supabase — use email/password.'); },
+    requestOTP:             async () => { throw new Error('OTP auth not supported — use email/password.'); },
     requestMFA:             async () => { throw new Error('Use Supabase MFA.'); },
     loginWithOTP:           async () => { throw new Error('Use Supabase MFA.'); },
     verifyMFACode:          async () => { throw new Error('Use Supabase MFA.'); },
@@ -146,9 +142,9 @@ export const AuthProvider = ({ children }) => {
     resetPassword,
     updatePassword,
     refetchProfile: async () => {
-      if (currentUser?.id) {
-        const p = await fetchProfile(currentUser.id);
-        setProfile(p);
+      if (session?.user?.id) {
+        const p = await fetchProfile(session.user.id);
+        if (isMounted.current) setProfile(p);
       }
     },
   };

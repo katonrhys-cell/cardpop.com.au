@@ -78,10 +78,10 @@ const LoginPage = () => {
           toast.info('Please check your email for the verification code.');
         }, 650);
       } else {
-        // Direct login — brief unlock flash before navigating
+        // Play animation and navigate — don't gate navigate on animation timer
         setLockState('unlocking');
         toast.success('Welcome back!');
-        setTimeout(() => navigate(from, { replace: true }), 500);
+        navigate(from, { replace: true });
       }
     } catch (error) {
       console.error('[LoginPage] Login error:', error);
