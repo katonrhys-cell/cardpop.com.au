@@ -285,4 +285,4 @@ async function getCardDetails(cardId) {
   }
 }
 
-export { getMarketData, getCardDetails };
+export { getMarketData, getCardDetails, parseCondition, extractCardInfo, aggregateCardData, calculateStats };

@@ -378,19 +378,20 @@ router.post('/resend-verification-email', async (req, res) => {
   const trimmedEmail = email.trim().toLowerCase();
   logger.info(`[VERIFICATION] Processing resend-verification-email request for: ${trimmedEmail}`);
 
+  // Find user by email — wrap separately so a missing user returns success (prevents enumeration)
+  let user;
   try {
-    // Find user by email
     logger.debug(`[VERIFICATION] Finding user by email: ${trimmedEmail}`);
-    const user = await pb.collection('users').getFirstListItem(`email = "${trimmedEmail}"`);
+    user = await pb.collection('users').getFirstListItem(`email = "${trimmedEmail}"`);
+  } catch (_findError) {
+    logger.warn(`[VERIFICATION] User not found for email: ${trimmedEmail}`);
+    return res.json({
+      success: true,
+      message: 'If an account exists with this email, a verification email has been sent',
+    });
+  }
 
-    if (!user) {
-      logger.warn(`[VERIFICATION] User not found for email: ${trimmedEmail}`);
-      // Return success to prevent email enumeration
-      return res.json({
-        success: true,
-        message: 'If an account exists with this email, a verification email has been sent',
-      });
-    }
+  try {
 
     // Check if email is already verified
     if (user.emailVerified) {
@@ -531,3 +532,4 @@ router.post('/resend-verification-email', async (req, res) => {
 });
 
 export default router;
+export { storeToken, verifyToken, markTokenAsUsed };

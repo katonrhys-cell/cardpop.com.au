@@ -262,4 +262,4 @@ async function getStatistics(filters) {
   return statistics;
 }
 
-export { getSalesData, getStatistics };
+export { getSalesData, getStatistics, getDateRangeMs, filterSalesByDateRange, filterSalesByCollection, filterSalesByPrice, filterSalesByCondition, buildSalesResponse, calculateStatistics };
