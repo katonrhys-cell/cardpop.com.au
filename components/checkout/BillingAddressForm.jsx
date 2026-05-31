@@ -1,13 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import ShippingAddressForm from './ShippingAddressForm.jsx';
 
-const BillingAddressForm = ({ values = {}, onChange, shippingAddress }) => {
-  const [sameAsShipping, setSameAsShipping] = useState(true);
-
+const BillingAddressForm = ({ values = {}, onChange, shippingAddress, sameAsShipping, onSameAsShippingChange }) => {
   const handleToggle = (checked) => {
-    setSameAsShipping(checked);
+    onSameAsShippingChange?.(checked);
     if (checked) onChange?.(shippingAddress ?? {});
   };
 

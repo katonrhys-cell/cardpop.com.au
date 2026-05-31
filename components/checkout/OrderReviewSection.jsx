@@ -1,14 +1,15 @@
 import React from 'react';
-import { MapPin, CreditCard, Package } from 'lucide-react';
+import { MapPin, CreditCard, Package, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 const AddressBlock = ({ data = {} }) => (
   <div className="text-sm space-y-0.5 text-muted-foreground">
-    <p className="font-medium text-foreground">{data.firstName} {data.lastName}</p>
+    <p className="font-medium text-foreground">{[data.firstName, data.lastName].filter(Boolean).join(' ')}</p>
     <p>{data.address}</p>
-    <p>{data.suburb} {data.state} {data.postcode}</p>
+    <p>{[data.suburb, data.state, data.postcode].filter(Boolean).join(' ')}</p>
   </div>
 );
 
@@ -20,9 +21,11 @@ const OrderReviewSection = ({
   items = [],
   subtotal = 0,
   tax = 0,
+  discount = 0,
   total = 0,
+  processing = false,
   onConfirm,
-  isSubmitting,
+  onBack,
 }) => {
   return (
     <div className="space-y-4">
@@ -59,7 +62,9 @@ const OrderReviewSection = ({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Badge variant="outline" className="capitalize">{paymentMethod ?? '—'}</Badge>
+          <Badge variant="outline" className="capitalize">
+            {paymentMethod === 'card' ? 'Credit / Debit Card' : (paymentMethod ?? '—')}
+          </Badge>
         </CardContent>
       </Card>
 
@@ -71,20 +76,49 @@ const OrderReviewSection = ({
         </CardHeader>
         <CardContent className="space-y-2">
           {items.map((item, i) => (
-            <div key={item.id ?? i} className="flex justify-between text-sm">
-              <span>{item.name ?? 'Card'}</span>
+            <div key={item.id ?? i} className="flex items-center gap-3 text-sm">
+              {item.image && (
+                <img src={item.image} alt={item.name} className="h-10 w-10 rounded object-cover border border-border" />
+              )}
+              <span className="flex-1">{item.name ?? 'Card'}</span>
               <span className="text-muted-foreground">${Number(item.price ?? 0).toFixed(2)}</span>
             </div>
           ))}
           <Separator />
           <div className="flex justify-between text-sm text-muted-foreground">
-            <span>Tax (GST)</span><span>${Number(tax).toFixed(2)}</span>
+            <span>Subtotal</span><span>${Number(subtotal).toFixed(2)}</span>
           </div>
+          {discount > 0 && (
+            <div className="flex justify-between text-sm text-green-600">
+              <span>Discount</span><span>-${Number(discount).toFixed(2)}</span>
+            </div>
+          )}
+          <div className="flex justify-between text-sm text-muted-foreground">
+            <span>Tax (GST 10%)</span><span>${Number(tax).toFixed(2)}</span>
+          </div>
+          <Separator />
           <div className="flex justify-between font-semibold">
             <span>Total (AUD)</span><span>${Number(total).toFixed(2)}</span>
           </div>
         </CardContent>
       </Card>
+
+      <div className="flex justify-between pt-2">
+        {onBack && (
+          <Button variant="outline" onClick={onBack} disabled={processing}>
+            Back
+          </Button>
+        )}
+        {onConfirm && (
+          <Button onClick={onConfirm} disabled={processing} className="ml-auto">
+            {processing ? (
+              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing…</>
+            ) : (
+              'Confirm & Pay'
+            )}
+          </Button>
+        )}
+      </div>
     </div>
   );
 };

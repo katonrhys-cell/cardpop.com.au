@@ -5,11 +5,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 const AU_STATES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'];
 
-const ShippingAddressForm = ({ values = {}, onChange }) => {
+const ShippingAddressForm = ({ values = {}, onChange, showEmail = false }) => {
   const update = (key, value) => onChange?.({ ...values, [key]: value });
 
   return (
     <div className="space-y-4">
+      {showEmail && (
+        <div className="space-y-1">
+          <Label>Email</Label>
+          <Input type="email" value={values.email ?? ''} onChange={e => update('email', e.target.value)} placeholder="you@example.com" />
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label>First Name</Label>
