@@ -4,7 +4,6 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, Sparkles, Loader2 } from 'lucide-react';
 import Header, { COLLECTIONS_LIST } from '@/components/Header.jsx';
 import Footer from '@/components/Footer.jsx';
-import CardListingOptions from '@/components/CardListingOptions.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
@@ -31,14 +30,13 @@ const AddEditCardPage = () => {
   const { analyzeCardImage, isAnalyzing, analysisResult, clearAnalysis } = useCardAnalysis();
 
   const [formData, setFormData] = useState({
-    collectionType: 'Pokemon',
+    collection: 'Pokemon',
     cardName: '',
-    condition: 'Mint',
+    setName: '',
+    condition: 'near_mint',
     estimatedValue: '',
-    description: '',
-    listingStatus: 'Not Listed',
-    tradePrice: '',
-    salePrice: ''
+    notes: '',
+    tradeValue: '',
   });
 
   useEffect(() => {
@@ -60,14 +58,13 @@ const AddEditCardPage = () => {
           }
 
           setFormData({
-            collectionType: card.collectionType || 'Pokemon',
+            collection: card.collection || 'Pokemon',
             cardName: card.card_name || '',
-            condition: card.condition || 'Mint',
+            setName: card.set_name || '',
+            condition: card.condition || 'near_mint',
             estimatedValue: card.estimated_value_aud || '',
-            description: card.description || '',
-            listingStatus: card.listingStatus || 'Not Listed',
-            tradePrice: card.trade_value_locked || '',
-            salePrice: card.price_aud || ''
+            notes: card.notes || '',
+            tradeValue: card.trade_value_aud || '',
           });
 
           if (card.card_image) {
@@ -103,19 +100,20 @@ const AddEditCardPage = () => {
 
   const handleApplyAI = () => {
     if (!analysisResult) return;
+    const conditionMap = { 'Mint': 'mint', 'Near Mint': 'near_mint', 'Excellent': 'excellent', 'Good': 'good', 'Fair': 'light_played', 'Played': 'played', 'Poor': 'poor' };
     setFormData(prev => ({
       ...prev,
       cardName: analysisResult.cardName || prev.cardName,
-      collectionType: analysisResult.mappedType || prev.collectionType,
-      condition: analysisResult.mappedCondition || prev.condition,
+      collection: analysisResult.mappedType || prev.collection,
+      condition: conditionMap[analysisResult.mappedCondition] || prev.condition,
       estimatedValue: analysisResult.estimatedValue ? String(analysisResult.estimatedValue) : prev.estimatedValue,
-      description: [
+      notes: [
         analysisResult.details,
         analysisResult.rarity ? `Rarity: ${analysisResult.rarity}` : '',
         analysisResult.cardType ? `Type: ${analysisResult.cardType}` : '',
         analysisResult.gradeScore ? `Grade: ${analysisResult.gradeScore}` : '',
         analysisResult.gradeCondition ? `Grade Condition: ${analysisResult.gradeCondition}` : ''
-      ].filter(Boolean).join('\n') || prev.description
+      ].filter(Boolean).join('\n') || prev.notes
     }));
     toast.success("Fields auto-filled successfully. Please review and edit as needed.");
     setIsAutoFilled(true);
@@ -128,19 +126,10 @@ const AddEditCardPage = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    
-    if (formData.listingStatus === 'For Trade') {
-      if (!formData.tradePrice || parseFloat(formData.tradePrice) <= 0) {
-        newErrors.tradePrice = "Trade value must be greater than 0";
-      }
+    if (!formData.cardName?.trim()) newErrors.cardName = "Card name is required";
+    if (!formData.estimatedValue || parseFloat(formData.estimatedValue) < 0) {
+      newErrors.estimatedValue = "Enter a valid estimated value";
     }
-    
-    if (formData.listingStatus === 'For Sale') {
-      if (!formData.salePrice || parseFloat(formData.salePrice) <= 0) {
-        newErrors.salePrice = "Sale price must be greater than 0";
-      }
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -173,18 +162,17 @@ const AddEditCardPage = () => {
         cardImagePath = filePath;
       }
 
+      const tradeAud = parseFloat(formData.tradeValue) || 0;
       const payload = {
-        owner_id: currentUser.id,
-        collectionType: formData.collectionType,
-        card_name: formData.cardName,
-        condition: formData.condition,
+        owner_id:            currentUser.id,
+        collection:          formData.collection || null,
+        card_name:           formData.cardName.trim(),
+        set_name:            formData.setName?.trim() || null,
+        condition:           formData.condition,
         estimated_value_aud: parseFloat(formData.estimatedValue) || 0,
-        description: formData.description || null,
-        listingStatus: formData.listingStatus,
-        trade_value_locked: formData.listingStatus === 'For Trade' ? parseFloat(formData.tradePrice) : 0,
-        listedForTrade: formData.listingStatus === 'For Trade',
-        price_aud: formData.listingStatus === 'For Sale' ? parseFloat(formData.salePrice) : 0,
-        listedForSale: formData.listingStatus === 'For Sale',
+        notes:               formData.notes?.trim() || null,
+        trade_value_aud:     tradeAud,
+        trade_value_locked:  tradeAud > 0,
       };
 
       if (cardImagePath) {
@@ -211,11 +199,10 @@ const AddEditCardPage = () => {
               setFormData({
                 ...formData,
                 cardName: '',
-                description: '',
+                setName: '',
+                notes: '',
                 estimatedValue: '',
-                listingStatus: 'Not Listed',
-                tradePrice: '',
-                salePrice: ''
+                tradeValue: '',
               });
               setImageFile(null);
               setImagePreview(null);
@@ -326,18 +313,6 @@ const AddEditCardPage = () => {
                 </div>
               </div>
 
-              <div className="premium-card p-6 bg-card">
-                <h2 className="font-serif text-xl font-bold border-b border-border pb-3 mb-4">Listing Options</h2>
-                <CardListingOptions 
-                  listingStatus={formData.listingStatus}
-                  onListingStatusChange={(val) => setFormData({...formData, listingStatus: val})}
-                  tradePrice={formData.tradePrice}
-                  onTradePriceChange={(val) => setFormData({...formData, tradePrice: val})}
-                  salePrice={formData.salePrice}
-                  onSalePriceChange={(val) => setFormData({...formData, salePrice: val})}
-                  errors={errors}
-                />
-              </div>
             </div>
 
             {/* Right Column: Form Fields */}
@@ -356,7 +331,7 @@ const AddEditCardPage = () => {
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label className="font-bold">Collection Type <span className="text-destructive">*</span></Label>
-                    <Select value={formData.collectionType} onValueChange={v => setFormData({...formData, collectionType: v})}>
+                    <Select value={formData.collection} onValueChange={v => setFormData({...formData, collection: v})}>
                       <SelectTrigger className={`h-12 bg-background text-foreground transition-all ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''}`}>
                         <SelectValue />
                       </SelectTrigger>
@@ -368,13 +343,25 @@ const AddEditCardPage = () => {
                   
                   <div className="space-y-2">
                     <Label htmlFor="cardName" className="font-bold">Card Name <span className="text-destructive">*</span></Label>
-                    <Input 
-                      id="cardName" 
-                      required 
-                      value={formData.cardName} 
-                      onChange={e => setFormData({...formData, cardName: e.target.value})} 
-                      placeholder="e.g. Charizard Base Set" 
-                      className={`h-12 bg-background text-foreground transition-all ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''}`} 
+                    <Input
+                      id="cardName"
+                      required
+                      value={formData.cardName}
+                      onChange={e => setFormData({...formData, cardName: e.target.value})}
+                      placeholder="e.g. Charizard"
+                      className={`h-12 bg-background text-foreground transition-all ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''}`}
+                    />
+                    {errors.cardName && <p className="text-destructive text-xs">{errors.cardName}</p>}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="setName" className="font-bold">Set Name</Label>
+                    <Input
+                      id="setName"
+                      value={formData.setName}
+                      onChange={e => setFormData({...formData, setName: e.target.value})}
+                      placeholder="e.g. Base Set"
+                      className="h-12 bg-background text-foreground"
                     />
                   </div>
 
@@ -385,11 +372,13 @@ const AddEditCardPage = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Mint">Mint</SelectItem>
-                        <SelectItem value="Near Mint">Near Mint</SelectItem>
-                        <SelectItem value="Excellent">Excellent</SelectItem>
-                        <SelectItem value="Good">Good</SelectItem>
-                        <SelectItem value="Fair">Fair</SelectItem>
+                        <SelectItem value="mint">Mint</SelectItem>
+                        <SelectItem value="near_mint">Near Mint</SelectItem>
+                        <SelectItem value="excellent">Excellent</SelectItem>
+                        <SelectItem value="good">Good</SelectItem>
+                        <SelectItem value="light_played">Light Played</SelectItem>
+                        <SelectItem value="played">Played</SelectItem>
+                        <SelectItem value="poor">Poor</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -412,15 +401,33 @@ const AddEditCardPage = () => {
                     </div>
                   </div>
 
+                  <div className="space-y-2">
+                    <Label htmlFor="tradeValue" className="font-bold">Trade Value (AUD)</Label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
+                      <Input
+                        id="tradeValue"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formData.tradeValue}
+                        onChange={e => setFormData({...formData, tradeValue: e.target.value})}
+                        placeholder="0.00"
+                        className="h-12 pl-8 bg-background text-foreground tabular-nums"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">Set a value if you're open to trading this card</p>
+                  </div>
+
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="description" className="font-bold">Notes / Description</Label>
-                    <Textarea 
-                      id="description" 
-                      value={formData.description} 
-                      onChange={e => setFormData({...formData, description: e.target.value})} 
-                      placeholder="Any specific details about the card's condition, history, or unique features..." 
-                      rows={5} 
-                      className={`resize-none bg-background text-foreground transition-all ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''}`} 
+                    <Label htmlFor="notes" className="font-bold">Notes</Label>
+                    <Textarea
+                      id="notes"
+                      value={formData.notes}
+                      onChange={e => setFormData({...formData, notes: e.target.value})}
+                      placeholder="Any specific details about the card's condition, history, or unique features..."
+                      rows={4}
+                      className={`resize-none bg-background text-foreground transition-all ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''}`}
                     />
                   </div>
                 </div>
