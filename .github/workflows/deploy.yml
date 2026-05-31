@@ -38,11 +38,11 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./dist/
           server-dir: /public_html/
-          # Incremental sync: tracks deployed files in a state file so only
-          # changed/new files are uploaded and removed chunks are cleaned up.
-          # Avoids the broken-server risk of dangerous-clean-slate (which deletes
-          # everything before uploading, leaving the site broken if upload fails).
-          state-name: .ftp-deploy-sync-state.json
+          # Hostinger FTP blocks renaming files that start with "." (hidden files).
+          # The incremental state-sync approach uploads via a .in.<file> temp name
+          # then renames — that rename always fails on Hostinger with FTPError 550.
+          # dangerous-clean-slate uploads files directly with no temp rename.
+          dangerous-clean-slate: true
           log-level: minimal
           exclude: |
             **/.git*
