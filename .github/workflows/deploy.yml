@@ -37,14 +37,15 @@ jobs:
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./dist/
-          server-dir: /public_html/
-          # Hostinger FTP blocks renaming files that start with "." (hidden files).
-          # The incremental state-sync approach uploads via a .in.<file> temp name
-          # then renames — that rename always fails on Hostinger with FTPError 550.
-          # dangerous-clean-slate uploads files directly with no temp rename.
+          # Hostinger FTP users are chrooted inside public_html, so ./ is the correct root.
+          # Using /public_html/ resolves to a non-existent absolute path and causes 550 errors.
+          server-dir: ./
+          # dangerous-clean-slate avoids the hidden-file rename limitation on Hostinger FTP
+          # (incremental mode tries to upload as .in.<file> then rename, which fails with 550).
           dangerous-clean-slate: true
           log-level: minimal
           exclude: |
             **/.git*
             **/.git*/**
             **/node_modules/**
+            **/.ftp-deploy-sync-state.json
