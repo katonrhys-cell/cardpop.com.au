@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import { toast } from 'sonner';
-import { CARD_VARIANTS } from '@/lib/cardVariants.js';
 
 const MarketplacePage = () => {
   const [listings, setListings] = useState([]);
@@ -17,8 +16,8 @@ const MarketplacePage = () => {
   const [error, setError] = useState(null);
   
   const [sort, setSort] = useState('created_at_desc');
-  const [filterType, setFilterType] = useState('All'); 
-  
+  const [filterMode, setFilterMode] = useState('All');
+
   // Category Filter States
   const { buildNameMap, getCategories, getSubcategoriesByCategory } = useCategories();
   const [nameMap, setNameMap] = useState({});
@@ -61,16 +60,16 @@ const MarketplacePage = () => {
       if (filterCat) query = query.eq('vault_item.categories.id', filterCat);
       if (filterSub) query = query.eq('category_id', filterSub);
 
-      // filterBrand and filterSeries removed (brands/series tables no longer exist)
-
-      if (filterType === 'For Sale') {
-        query = query.in('status', ['For Sale', 'active']);
-      } else if (filterType === 'For Trade') {
-        query = query.eq('status', 'For Trade');
-      } else if (filterType === 'Both') {
-        query = query.eq('status', 'For Sale & Trade');
-      } else {
-        query = query.in('status', ['For Sale', 'active', 'For Trade', 'For Sale & Trade']);
+      // Filter by listing mode
+      query = query.eq('status', 'active');
+      if (filterMode === 'Auction') {
+        query = query.eq('listing_type', 'auction');
+      } else if (filterMode === 'BuyNow') {
+        query = query.eq('listing_type', 'fixed');
+      } else if (filterMode === 'ForTrade') {
+        query = query.eq('listing_type', 'trade');
+      } else if (filterMode === 'MakeOffer') {
+        query = query.eq('accepts_offers', true);
       }
 
       if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
@@ -88,7 +87,7 @@ const MarketplacePage = () => {
     } finally {
       if (isMounted.current) setLoading(false);
     }
-  }, [sort, filterType, filterCat, filterSub]);
+  }, [sort, filterMode, filterCat, filterSub]);
 
   useEffect(() => {
     isMounted.current = true;
@@ -99,8 +98,7 @@ const MarketplacePage = () => {
   const clearFilters = () => {
     setFilterCat('');
     setFilterSub('');
-    setFilterType('All');
-    setFilterVariant('');
+    setFilterMode('All');
   };
 
   const getBreadcrumbPath = () => {
@@ -140,7 +138,7 @@ const MarketplacePage = () => {
             <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Subcategories" /></SelectTrigger>
             <SelectContent>{subOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
           </Select>
-          {(filterCat || filterSub || filterType !== 'All') && (
+          {(filterCat || filterSub || filterMode !== 'All') && (
             <Button variant="ghost" onClick={clearFilters} className="rounded-xl text-muted-foreground hover:text-foreground ml-auto">
               <X className="w-4 h-4 mr-2" /> Clear All Filters
             </Button>
@@ -155,33 +153,40 @@ const MarketplacePage = () => {
 
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-6 border-b border-border">
           <div className="flex flex-wrap items-center gap-2">
-            <Button 
-              variant={filterType === 'All' ? 'default' : 'outline'} 
-              className={`rounded-full px-5 ${filterType === 'All' ? 'font-bold shadow-md' : 'font-medium bg-background'}`}
-              onClick={() => setFilterType('All')}
+            <Button
+              variant={filterMode === 'All' ? 'default' : 'outline'}
+              className={`rounded-full px-5 ${filterMode === 'All' ? 'font-bold shadow-md' : 'font-medium bg-background'}`}
+              onClick={() => setFilterMode('All')}
             >
               All Listings
             </Button>
-            <Button 
-              variant={filterType === 'For Sale' ? 'default' : 'outline'} 
-              className={`rounded-full px-5 ${filterType === 'For Sale' ? 'bg-[hsl(var(--vault-sale))] hover:bg-[hsl(var(--vault-sale))]/90 text-white font-bold shadow-md border-none' : 'font-medium bg-background hover:text-[hsl(var(--vault-sale))] hover:border-[hsl(var(--vault-sale))]'}`}
-              onClick={() => setFilterType('For Sale')}
+            <Button
+              variant={filterMode === 'Auction' ? 'default' : 'outline'}
+              className={`rounded-full px-5 ${filterMode === 'Auction' ? 'bg-brand-red hover:bg-brand-red/90 text-white font-bold shadow-md border-none' : 'font-medium bg-background hover:text-brand-red hover:border-brand-red'}`}
+              onClick={() => setFilterMode('Auction')}
             >
-              For Sale
+              Auction
             </Button>
-            <Button 
-              variant={filterType === 'For Trade' ? 'default' : 'outline'} 
-              className={`rounded-full px-5 ${filterType === 'For Trade' ? 'bg-[hsl(var(--vault-trade))] hover:bg-[hsl(var(--vault-trade))]/90 text-white font-bold shadow-md border-none' : 'font-medium bg-background hover:text-[hsl(var(--vault-trade))] hover:border-[hsl(var(--vault-trade))]'}`}
-              onClick={() => setFilterType('For Trade')}
+            <Button
+              variant={filterMode === 'BuyNow' ? 'default' : 'outline'}
+              className={`rounded-full px-5 ${filterMode === 'BuyNow' ? 'bg-[hsl(var(--vault-sale))] hover:bg-[hsl(var(--vault-sale))]/90 text-white font-bold shadow-md border-none' : 'font-medium bg-background hover:text-[hsl(var(--vault-sale))] hover:border-[hsl(var(--vault-sale))]'}`}
+              onClick={() => setFilterMode('BuyNow')}
+            >
+              Buy Now
+            </Button>
+            <Button
+              variant={filterMode === 'MakeOffer' ? 'default' : 'outline'}
+              className={`rounded-full px-5 ${filterMode === 'MakeOffer' ? 'bg-brand-blue hover:bg-brand-blue/90 text-white font-bold shadow-md border-none' : 'font-medium bg-background hover:text-brand-blue hover:border-brand-blue'}`}
+              onClick={() => setFilterMode('MakeOffer')}
+            >
+              Make an Offer
+            </Button>
+            <Button
+              variant={filterMode === 'ForTrade' ? 'default' : 'outline'}
+              className={`rounded-full px-5 ${filterMode === 'ForTrade' ? 'bg-[hsl(var(--vault-trade))] hover:bg-[hsl(var(--vault-trade))]/90 text-white font-bold shadow-md border-none' : 'font-medium bg-background hover:text-[hsl(var(--vault-trade))] hover:border-[hsl(var(--vault-trade))]'}`}
+              onClick={() => setFilterMode('ForTrade')}
             >
               For Trade
-            </Button>
-            <Button 
-              variant={filterType === 'Both' ? 'default' : 'outline'} 
-              className={`rounded-full px-5 ${filterType === 'Both' ? 'bg-[hsl(var(--vault-both))] hover:bg-[hsl(var(--vault-both))]/90 text-black font-bold shadow-md border-none' : 'font-medium bg-background hover:text-[hsl(var(--vault-both))] hover:border-[hsl(var(--vault-both))]'}`}
-              onClick={() => setFilterType('Both')}
-            >
-              Sale & Trade
             </Button>
           </div>
           
