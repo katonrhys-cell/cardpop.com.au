@@ -1,73 +1,39 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
-import { 
-  Plus, ShieldCheck, AlertCircle, MoreHorizontal, Edit, 
-  Trash2, ImageOff, Lock, ShoppingCart, ArrowRightLeft, Layers, X, Eye, EyeOff
+import { useNavigate } from 'react-router-dom';
+import {
+  Plus, ShieldCheck, AlertCircle, MoreHorizontal, Edit,
+  Trash2, ImageOff, Lock, ArrowRightLeft, X
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import VaultProductForm from '@/components/VaultProductForm.jsx';
-import VaultListingModal from '@/components/VaultListingModal.jsx';
+import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 
-const getStatusBadge = (listingType) => {
-  switch (listingType) {
-    case 'Private': return { className: 'bg-muted text-muted-foreground', icon: Lock };
-    case 'For Sale': return { className: 'bg-blue-500/10 text-blue-600', icon: ShoppingCart };
-    case 'For Trade': return { className: 'bg-purple-500/10 text-purple-600', icon: ArrowRightLeft };
-    case 'For Sale & Trade': return { className: 'bg-amber-500/10 text-amber-600', icon: Layers };
-    default: return { className: 'bg-muted text-muted-foreground', icon: Lock };
-  }
+const CONDITION_LABELS = {
+  mint: 'Mint', near_mint: 'Near Mint', excellent: 'Excellent',
+  good: 'Good', light_played: 'Light Played', played: 'Played', poor: 'Poor',
 };
 
 const MyVaultPage = () => {
   const { currentUser } = useAuth();
-  
+  const navigate = useNavigate();
+
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  // Modals
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingCard, setEditingCard] = useState(null);
-  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
-  const [statusCard, setStatusCard] = useState(null);
-  
-  // Independent Filters
-  const [filterCat, setFilterCat] = useState('');
-  const [filterSub, setFilterSub] = useState('');
-  const [filterBrand, setFilterBrand] = useState('');
-  const [filterSeries, setFilterSeries] = useState('');
-  
-  // Filter Options Data
-  const [catOpts, setCatOpts] = useState([]);
-  const [subOpts, setSubOpts] = useState([]);
-  const [brandOpts, setBrandOpts] = useState([]);
-  const [seriesOpts, setSeriesOpts] = useState([]);
 
-  const isMounted = useRef(true);
-
-  // Load all filter options independently
-  // categories, subcategories, brands, series no longer exist — return empty arrays
-  useEffect(() => {
-    if (isMounted.current) {
-      setCatOpts([]);
-      setSubOpts([]);
-      setBrandOpts([]);
-      setSeriesOpts([]);
-    }
-  }, []);
+  const [filterCollection, setFilterCollection] = useState('');
 
   const fetchVault = useCallback(async () => {
     if (!currentUser?.id) return;
-    if (isMounted.current) setLoading(true);
+    setLoading(true);
 
     try {
       let query = supabase
@@ -77,43 +43,29 @@ const MyVaultPage = () => {
         .order('created_at', { ascending: false })
         .limit(100);
 
-      if (filterCat) query = query.eq('category_id', filterCat);
-      if (filterSub) query = query.eq('subcategory_id', filterSub);
-      if (filterBrand) query = query.eq('brand_id', filterBrand);
-      if (filterSeries) query = query.eq('series_id', filterSeries);
+      if (filterCollection) query = query.eq('collection', filterCollection);
 
       const { data, error: fetchError } = await query;
-
-      if (isMounted.current) {
-        if (fetchError) throw fetchError;
-        setCards(data || []);
-        setError(null);
-      }
+      if (fetchError) throw fetchError;
+      setCards(data || []);
+      setError(null);
     } catch (err) {
       console.error("Failed to fetch vault:", err);
-      if (isMounted.current) setError(err.message || 'Failed to load vault. Please try again.');
+      setError(err.message || 'Failed to load vault. Please try again.');
     } finally {
-      if (isMounted.current) setLoading(false);
+      setLoading(false);
     }
-  }, [currentUser, filterCat, filterSub, filterBrand, filterSeries]);
+  }, [currentUser, filterCollection]);
 
   useEffect(() => {
-    isMounted.current = true;
     fetchVault();
-    return () => { isMounted.current = false; };
   }, [fetchVault]);
 
-  const clearFilters = () => {
-    setFilterCat('');
-    setFilterSub('');
-    setFilterBrand('');
-    setFilterSeries('');
-  };
-
   const handleDelete = async (id) => {
-    if(!window.confirm("Delete this card from your vault?")) return;
+    if (!window.confirm("Delete this card from your vault?")) return;
     try {
-      await supabase.from('vault_items').delete().eq('id', id);
+      const { error } = await supabase.from('vault_items').delete().eq('id', id);
+      if (error) throw error;
       toast.success("Card deleted successfully");
       fetchVault();
     } catch (e) {
@@ -121,20 +73,15 @@ const MyVaultPage = () => {
     }
   };
 
-  const handleEditClick = (card) => {
-    setEditingCard(card);
-    setIsFormOpen(true);
-  };
-
   const renderCard = (card) => {
     let imageUrl = null;
-    if (card.images && card.images.length > 0) {
-      const img = card.images[0];
-      imageUrl = img.startsWith('http') ? img : supabase.storage.from('vault-images').getPublicUrl(img).data.publicUrl;
+    if (card.card_image) {
+      imageUrl = card.card_image.startsWith('http')
+        ? card.card_image
+        : supabase.storage.from('vault-images').getPublicUrl(card.card_image).data.publicUrl;
     }
 
-    const badgeConfig = getStatusBadge(card.listing_type);
-    const StatusIcon = badgeConfig.icon;
+    const isForTrade = card.trade_value_aud > 0;
 
     return (
       <div key={card.id} className="group bg-card border border-border rounded-2xl overflow-hidden shadow-sm hover:shadow-lg hover:border-primary/40 transition-all duration-300 flex flex-col h-full relative">
@@ -146,13 +93,10 @@ const MyVaultPage = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="rounded-xl w-48">
-              <DropdownMenuItem onClick={() => { setStatusCard(card); setIsStatusModalOpen(true); }} className="cursor-pointer gap-2 font-medium">
-                <Layers className="w-4 h-4 text-primary" /> Manage Listing
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleEditClick(card)} className="cursor-pointer gap-2 font-medium">
+              <DropdownMenuItem onClick={() => navigate(`/vault/edit/${card.id}`)} className="cursor-pointer gap-2 font-medium">
                 <Edit className="w-4 h-4" /> Edit Details
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => handleDelete(card.id)} className="cursor-pointer gap-2 text-destructive focus:text-destructive focus:bg-destructive/10 font-medium">
                 <Trash2 className="w-4 h-4" /> Remove
               </DropdownMenuItem>
@@ -162,7 +106,7 @@ const MyVaultPage = () => {
 
         <div className="aspect-[4/5] bg-muted/40 relative flex items-center justify-center border-b border-border/50 p-4">
           {imageUrl ? (
-            <img src={imageUrl} alt={card.name} className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+            <img src={imageUrl} alt={card.card_name} className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" loading="lazy" />
           ) : (
             <div className="flex flex-col items-center text-muted-foreground opacity-50">
               <ImageOff className="w-10 h-10 mb-2" />
@@ -170,43 +114,43 @@ const MyVaultPage = () => {
             </div>
           )}
           <div className="absolute top-3 left-3 z-10 pointer-events-none flex flex-col gap-1.5 items-start">
-            <Badge className={`shadow-sm font-bold tracking-tight ${badgeConfig.className}`}>
-              <StatusIcon className="w-3 h-3 mr-1.5" />
-              {card.listing_type || 'Private'}
+            <Badge className="bg-muted text-muted-foreground shadow-sm font-bold tracking-tight">
+              <Lock className="w-3 h-3 mr-1.5" /> Private
             </Badge>
-            {card.is_public ? (
-              <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600 shadow-sm font-bold border-emerald-500/20">
-                <Eye className="w-3 h-3 mr-1.5" /> Public
-              </Badge>
-            ) : (
-              <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm text-muted-foreground shadow-sm font-bold border-border/50">
-                <EyeOff className="w-3 h-3 mr-1.5" /> Private
+            {isForTrade && (
+              <Badge className="bg-purple-500/10 text-purple-600 shadow-sm font-bold border-purple-500/20">
+                <ArrowRightLeft className="w-3 h-3 mr-1.5" /> For Trade
               </Badge>
             )}
           </div>
         </div>
-        
+
         <div className="p-4 flex flex-col flex-1">
-          <h3 className="font-bold text-base line-clamp-2 mb-2 leading-tight">{card.name}</h3>
-          
+          <h3 className="font-bold text-base line-clamp-2 mb-1 leading-tight">{card.card_name}</h3>
+          {card.set_name && <p className="text-xs text-muted-foreground mb-2">{card.set_name}</p>}
+
           <div className="flex flex-wrap gap-1.5 mb-3">
-            {card.category && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">Cat: {card.category}</Badge>}
-            {card.subcategory && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">Sub: {card.subcategory}</Badge>}
-            {card.brand && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">Brand: {card.brand}</Badge>}
-            {card.series && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">Series: {card.series}</Badge>}
+            {card.collection && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{card.collection}</Badge>}
+            {card.condition && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{CONDITION_LABELS[card.condition] || card.condition}</Badge>}
+            {card.grading_company && card.grading_company !== 'raw' && (
+              <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground uppercase">{card.grading_company} {card.grade || ''}</Badge>
+            )}
           </div>
-          
+
           <div className="mt-auto pt-3 border-t border-border flex items-end justify-between">
             <div className="flex flex-col">
               <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Est. Value</span>
               <span className="font-extrabold text-lg tabular-nums text-foreground">
-                ${(card.price || 0).toFixed(2)}
+                ${(Number(card.estimated_value_aud) || 0).toFixed(2)}
               </span>
             </div>
-            {card.gradeScore && (
-              <Badge variant="secondary" className="bg-muted text-foreground font-bold">
-                {card.gradingService || 'Grade'} {card.gradeScore}
-              </Badge>
+            {isForTrade && (
+              <div className="flex flex-col items-end">
+                <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Trade Value</span>
+                <span className="font-bold text-sm tabular-nums text-purple-600">
+                  ${(Number(card.trade_value_aud) || 0).toFixed(2)}
+                </span>
+              </div>
             )}
           </div>
         </div>
@@ -217,11 +161,11 @@ const MyVaultPage = () => {
   return (
     <div className="flex flex-col font-sans w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <Helmet><title>My Digital Vault | CardPop</title></Helmet>
-      
+
       <div className="mb-8">
         <h1 className="font-serif text-4xl md:text-5xl font-extrabold mb-4 text-foreground tracking-tight">My Digital Vault</h1>
         <p className="text-lg text-muted-foreground max-w-2xl text-balance">
-          Manage your personal collection securely. Control visibility and list items on the community marketplace.
+          Manage your personal collection securely. Track values and mark cards for trading.
         </p>
       </div>
 
@@ -233,39 +177,27 @@ const MyVaultPage = () => {
           </div>
           <div>
             <h2 className="text-xl font-bold text-foreground mb-1">Add to Your Vault</h2>
-            <p className="text-sm text-muted-foreground">Digitize your collection to track values and easily convert to marketplace listings.</p>
+            <p className="text-sm text-muted-foreground">Digitize your collection to track values and mark cards for trading.</p>
           </div>
         </div>
-        <Button onClick={() => { setEditingCard(null); setIsFormOpen(true); }} className="w-full sm:w-auto rounded-xl font-bold h-12 px-6 shadow-md transition-transform active:scale-[0.98]">
+        <Button onClick={() => navigate('/vault/add')} className="w-full sm:w-auto rounded-xl font-bold h-12 px-6 shadow-md transition-transform active:scale-[0.98]">
           <Plus className="w-5 h-5 mr-2" /> Add New Card
         </Button>
       </div>
 
-      {/* Independent Vault Filtering */}
       <div className="bg-muted/30 border border-border p-4 rounded-2xl mb-8 flex flex-wrap items-center gap-3">
-        <Select value={filterCat} onValueChange={setFilterCat}>
-          <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Categories" /></SelectTrigger>
-          <SelectContent>{catOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-        </Select>
-        
-        <Select value={filterSub} onValueChange={setFilterSub}>
-          <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Subcategories" /></SelectTrigger>
-          <SelectContent>{subOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-        </Select>
-
-        <Select value={filterBrand} onValueChange={setFilterBrand}>
-          <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Brands" /></SelectTrigger>
-          <SelectContent>{brandOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+        <Select value={filterCollection} onValueChange={setFilterCollection}>
+          <SelectTrigger className="w-[200px] bg-background border-border rounded-xl font-medium">
+            <SelectValue placeholder="All Collections" />
+          </SelectTrigger>
+          <SelectContent>
+            {COLLECTIONS_LIST.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+          </SelectContent>
         </Select>
 
-        <Select value={filterSeries} onValueChange={setFilterSeries}>
-          <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Series" /></SelectTrigger>
-          <SelectContent>{seriesOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-        </Select>
-
-        {(filterCat || filterSub || filterBrand || filterSeries) && (
-          <Button variant="ghost" onClick={clearFilters} className="rounded-xl text-muted-foreground hover:text-foreground">
-            <X className="w-4 h-4 mr-2" /> Clear Filters
+        {filterCollection && (
+          <Button variant="ghost" onClick={() => setFilterCollection('')} className="rounded-xl text-muted-foreground hover:text-foreground">
+            <X className="w-4 h-4 mr-2" /> Clear
           </Button>
         )}
       </div>
@@ -293,33 +225,17 @@ const MyVaultPage = () => {
       ) : (
         <div className="py-20 text-center bg-card rounded-[2rem] border border-border shadow-sm">
           <ShieldCheck className="w-16 h-16 text-muted-foreground opacity-30 mx-auto mb-4" />
-          <h3 className="text-xl font-bold mb-2">No matching cards</h3>
-          <p className="text-muted-foreground mb-6">You don't have any cards matching these filters or your vault is empty.</p>
-          <Button onClick={() => { clearFilters(); setIsFormOpen(true); }} className="rounded-xl font-bold">
-            <Plus className="w-4 h-4 mr-2" /> Add Your First Item
+          <h3 className="text-xl font-bold mb-2">
+            {filterCollection ? 'No cards in this collection' : 'Your vault is empty'}
+          </h3>
+          <p className="text-muted-foreground mb-6">
+            {filterCollection ? 'Try clearing the filter to see all your cards.' : "Add your first card to start tracking your collection."}
+          </p>
+          <Button onClick={() => navigate('/vault/add')} className="rounded-xl font-bold">
+            <Plus className="w-4 h-4 mr-2" /> Add Your First Card
           </Button>
         </div>
       )}
-
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 rounded-2xl border-border bg-background">
-          <div className="p-6 md:p-10">
-            <DialogHeader className="mb-8">
-              <DialogTitle className="text-2xl md:text-3xl font-serif font-bold text-foreground">
-                {editingCard ? 'Edit Vault Item' : 'Add to Vault'}
-              </DialogTitle>
-            </DialogHeader>
-            <VaultProductForm card={editingCard} onSuccess={() => { setIsFormOpen(false); fetchVault(); }} onCancel={() => setIsFormOpen(false)} />
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <VaultListingModal 
-        isOpen={isStatusModalOpen} 
-        onClose={() => setIsStatusModalOpen(false)} 
-        product={statusCard} 
-        onUpdate={fetchVault} 
-      />
     </div>
   );
 };
