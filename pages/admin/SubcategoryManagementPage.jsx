@@ -186,11 +186,14 @@ const SubcategoryManagementPage = () => {
     }
   };
 
-  const filteredSubcategories = subcategories.filter(sub => 
-    sub.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    (sub.expand?.parentCategory?.name && sub.expand.parentCategory.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (sub.description && sub.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredSubcategories = subcategories.filter(sub => {
+    const parentName = categories.find(c => c.id === sub.parentCategory)?.name ?? '';
+    return (
+      sub.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      parentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      sub.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  });
 
   return (
     <div className="w-full space-y-6 animate-in fade-in duration-300 py-6 px-4 sm:px-6 md:px-8">
@@ -301,7 +304,7 @@ const SubcategoryManagementPage = () => {
                       <TableCell className="font-medium text-foreground">{subcategory.name}</TableCell>
                       <TableCell>
                         <span className="bg-secondary text-secondary-foreground text-xs font-medium px-2 py-1 rounded-md">
-                          {subcategory.expand?.parentCategory?.name || 'Unknown Category'}
+                          {categories.find(c => c.id === subcategory.parentCategory)?.name || 'Unknown Category'}
                         </span>
                       </TableCell>
                       <TableCell className="hidden md:table-cell text-muted-foreground truncate max-w-xs xl:max-w-md text-sm">

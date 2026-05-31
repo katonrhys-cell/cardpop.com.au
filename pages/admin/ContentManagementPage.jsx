@@ -58,7 +58,7 @@ const ContentManagementPage = () => {
     if (!window.confirm("Are you sure you want to delete this article? This action cannot be undone.")) return;
     
     try {
-      const { error } = await supabase.from('blog_posts').delete().eq('id', id);
+      const { error } = await supabase.from('blog_articles').delete().eq('id', id);
       if (error) throw error;
       toast.success("Article deleted successfully.");
       setArticles(articles.filter(a => a.id !== id));
@@ -178,7 +178,7 @@ const ContentManagementPage = () => {
                         <div className="truncate">{article.author || 'Unknown'}</div>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm tabular-nums hidden xl:table-cell align-top pt-4">
-                        {formatDate(article.created)}
+                        {formatDate(article.created_at)}
                       </TableCell>
                       <TableCell className="text-right align-top pt-3">
                         <div className="flex justify-end items-center gap-2">
