@@ -75,16 +75,19 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    // Use local scope (default): removes session from localStorage immediately
-    // without requiring a server round-trip. Global scope can fail on network
-    // issues and leave the JWT in localStorage, causing the user to appear
-    // logged back in on the next page refresh.
     try {
       await supabase.auth.signOut();
     } catch (e) {
       console.error('[AuthContext] signOut failed:', e);
     }
-    // Explicit fallback clears in case onAuthStateChange is delayed
+    // Belt-and-suspenders: directly wipe all Supabase storage keys.
+    // Covers the edge case where autoRefreshToken writes a new token
+    // just before/after signOut clears the old one.
+    try {
+      Object.keys(localStorage)
+        .filter(k => k.startsWith('sb-'))
+        .forEach(k => localStorage.removeItem(k));
+    } catch (_) { /* localStorage unavailable in some envs */ }
     setCurrentUser(null);
     setProfile(null);
     setSession(null);

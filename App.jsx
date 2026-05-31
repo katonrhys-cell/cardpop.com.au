@@ -30,6 +30,7 @@ const HomePage = lazy(() => import('@/pages/HomePage.jsx'));
 const LoginPage = lazy(() => import('@/pages/LoginPage.jsx'));
 const SignupPage = lazy(() => import('@/pages/SignupPage.jsx'));
 const PasswordResetPage = lazy(() => import('@/pages/PasswordResetPage.jsx'));
+const LogoutPage = lazy(() => import('@/pages/LogoutPage.jsx'));
 const VerificationPendingPage = lazy(() => import('@/pages/VerificationPendingPage.jsx'));
 const ProfileCompletionPage = lazy(() => import('@/pages/ProfileCompletionPage.jsx'));
 const NotFoundPage = lazy(() => import('@/pages/NotFoundPage.jsx'));
@@ -173,6 +174,7 @@ const App = () => {
                         <Route path="/" element={<HomePage />} />
                         
                         {/* Auth */}
+                        <Route path="/logout" element={<LogoutPage />} />
                         <Route path="/login" element={<LoginPage />} />
                         <Route path="/signup" element={<SignupPage />} />
                         <Route path="/reset-password" element={<PasswordResetPage />} />
