@@ -85,8 +85,8 @@ const UserDetailPage = () => {
             <p className="text-muted-foreground mb-4">@{user.username || user.id}</p>
             
             <div className="flex flex-wrap justify-center gap-2 mb-6">
-              <Badge variant="secondary" className="bg-secondary text-secondary-foreground">{user.role || 'user'}</Badge>
-              {user.verified && <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-200">Verified</Badge>}
+              <Badge variant="secondary" className="bg-secondary text-secondary-foreground">{user.community_type || user.user_type || 'collector'}</Badge>
+              {user.is_verified && <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-200">Verified</Badge>}
               {user.is_active === false && <Badge variant="destructive">Suspended</Badge>}
             </div>
 
