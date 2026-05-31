@@ -177,11 +177,14 @@ const ProductLinesManagementPage = () => {
     }
   };
 
-  const filteredLines = productLines.filter(line => 
-    line.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    (line.expand?.brand?.name && line.expand.brand.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (line.description && line.description.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredLines = productLines.filter(line => {
+    const brandName = brands.find(b => b.id === line.brand)?.name ?? '';
+    return (
+      line.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      brandName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      line.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  });
 
   return (
     <div className="w-full space-y-6 animate-in fade-in duration-300 py-6 px-4 sm:px-6 md:px-8">
@@ -292,7 +295,7 @@ const ProductLinesManagementPage = () => {
                       <TableCell className="font-medium text-foreground">{line.name}</TableCell>
                       <TableCell>
                         <span className="bg-secondary text-secondary-foreground text-xs font-medium px-2 py-1 rounded-md">
-                          {line.expand?.brand?.name || 'Unknown Brand'}
+                          {brands.find(b => b.id === line.brand)?.name || 'Unknown Brand'}
                         </span>
                       </TableCell>
                       <TableCell className="hidden lg:table-cell text-muted-foreground truncate max-w-xs xl:max-w-md text-sm">

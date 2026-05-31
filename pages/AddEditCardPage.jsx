@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, Sparkles, Loader2 } from 'lucide-react';
-import Header, { COLLECTIONS_LIST } from '@/components/Header.jsx';
-import Footer from '@/components/Footer.jsx';
+import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
@@ -222,14 +221,13 @@ const AddEditCardPage = () => {
     }
   };
 
-  if (loading) return <div className="min-h-screen pt-32 text-center font-bold flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading...</div>;
+  if (loading) return <div className="pt-32 text-center font-bold flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin mr-2" /> Loading...</div>;
 
   return (
-    <div className="min-h-screen flex flex-col bg-muted/30 font-sans">
+    <div className="bg-muted/30 font-sans">
       <Helmet><title>{isEdit ? 'Edit Card' : 'Add New Card'} | Card Pop</title></Helmet>
-      <Header />
-      
-      <main className="flex-1 max-w-5xl mx-auto px-4 py-8 w-full">
+
+      <div className="max-w-5xl mx-auto px-4 py-8 w-full">
         <nav className="flex items-center text-sm text-muted-foreground mb-6 font-medium">
           <Link to="/vault" className="hover:text-primary transition-colors">Vault</Link>
           <ChevronRight className="w-4 h-4 mx-2 opacity-50" />
@@ -446,8 +444,7 @@ const AddEditCardPage = () => {
             </Button>
           </div>
         </form>
-      </main>
-      <Footer />
+      </div>
     </div>
   );
 };

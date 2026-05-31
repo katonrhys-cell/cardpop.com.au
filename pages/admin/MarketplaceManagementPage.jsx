@@ -70,7 +70,7 @@ const MarketplaceManagementPage = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Title</TableHead>
-                <TableHead>Seller ID</TableHead>
+                <TableHead>Seller</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
@@ -84,13 +84,13 @@ const MarketplaceManagementPage = () => {
               ) : (
                 listings.map(l => (
                   <TableRow key={l.id}>
-                    <TableCell className="font-medium">{l.title}</TableCell>
-                    <TableCell className="text-muted-foreground">{l.seller}</TableCell>
-                    <TableCell>${l.price?.toFixed(2)}</TableCell>
+                    <TableCell className="font-medium">{l.card_name || l.title || '—'}</TableCell>
+                    <TableCell className="text-muted-foreground">{l.seller?.display_name || l.seller?.username || '—'}</TableCell>
+                    <TableCell>{l.price_aud != null ? `$${Number(l.price_aud).toFixed(2)}` : '—'}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{l.status || 'active'}</Badge>
                     </TableCell>
-                    <TableCell>{new Date(l.created).toLocaleDateString()}</TableCell>
+                    <TableCell>{l.created_at ? new Date(l.created_at).toLocaleDateString() : '—'}</TableCell>
                   </TableRow>
                 ))
               )}
