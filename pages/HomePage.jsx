@@ -78,14 +78,15 @@ const ACTIVITY_FEED = [
 // ─── Hero floating card shapes ────────────────────────────────────────────────
 const HERO_CARDS = [
   {
-    // 1993 MTG Alpha Black Lotus
+    // 1993 MTG Alpha Black Lotus — PSA 9 MINT
+    image: '/images/hero-cards/black-lotus-psa9.jpg',
     gradient: 'from-stone-800 via-stone-900 to-black',
     borderColor: 'border-yellow-600/60',
     rotate: -14, x: -170, y: 30, delay: 0, floatY: -12,
     name: 'Black Lotus',
     set: 'Magic: The Gathering',
     year: '1993 · Alpha',
-    rarity: 'Artifact',
+    rarity: 'PSA 9 MINT',
     value: '$500,000+',
     symbol: '✦',
     symbolColor: 'text-yellow-400',
@@ -110,14 +111,15 @@ const HERO_CARDS = [
     artEmoji: '🏀',
   },
   {
-    // 2018 Bowman Shohei Ohtani Chrome
+    // 2018 Topps Chrome Shohei Ohtani Rookie Auto Purple Ref — PSA/DNA Auto 10
+    image: '/images/hero-cards/ohtani-rookie-auto-psa10.jpg',
     gradient: 'from-blue-800 via-blue-900 to-red-900',
     borderColor: 'border-blue-300/50',
     rotate: 4, x: 60, y: 10, delay: 0.3, floatY: -10,
     name: 'Shohei Ohtani',
-    set: 'Bowman Chrome',
-    year: '2018 · Prospects',
-    rarity: 'Rookie Auto',
+    set: 'Topps Chrome',
+    year: '2018 · Rookie Auto',
+    rarity: 'PSA/DNA Auto 10',
     value: '$200,000+',
     symbol: '◆',
     symbolColor: 'text-blue-300',
@@ -126,14 +128,15 @@ const HERO_CARDS = [
     artEmoji: '⚾',
   },
   {
-    // 1998 Pikachu Illustrator
+    // 1998 Pikachu Illustrator — PSA 9 MINT
+    image: '/images/hero-cards/pikachu-illustrator-psa9.jpg',
     gradient: 'from-yellow-400 via-yellow-500 to-amber-500',
     borderColor: 'border-yellow-200/70',
     rotate: 14, x: 170, y: 35, delay: 0.45, floatY: -14,
     name: 'Pikachu Illustrator',
     set: 'Pokémon',
     year: '1998 · CoroCoro',
-    rarity: 'Illustrator Promo',
+    rarity: 'PSA 9 MINT',
     value: '$5,300,000',
     symbol: '⚡',
     symbolColor: 'text-yellow-900',
@@ -244,22 +247,35 @@ const HomePage = () => {
             >
               {/* Shine overlay */}
               <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-black/20 pointer-events-none z-10" />
-              {/* Card name bar */}
-              <div className={`absolute top-0 left-0 right-0 bg-gradient-to-r ${card.accent} px-2 py-1 flex items-center justify-between`}>
-                <span className="text-[8px] font-black text-white truncate leading-tight">{card.name}</span>
-                <span className={`text-[10px] font-bold ${card.symbolColor}`}>{card.symbol}</span>
-              </div>
-              {/* Art box */}
-              <div className={`absolute top-6 left-2 right-2 h-24 rounded-lg ${card.artColor} flex items-center justify-center shadow-inner`}>
-                <span className="text-4xl drop-shadow-lg">{card.artEmoji}</span>
-              </div>
-              {/* Card info */}
-              <div className="absolute bottom-0 left-0 right-0 px-2 pb-2 pt-1">
-                <div className="text-[7px] font-bold text-white/60 uppercase tracking-wider mb-0.5">{card.rarity}</div>
-                <div className="text-[7px] text-white/50 leading-tight">{card.set}</div>
-                <div className="text-[7px] text-white/40 leading-tight mb-1">{card.year}</div>
-                <div className={`text-[9px] font-black bg-gradient-to-r ${card.accent} bg-clip-text text-transparent`}>{card.value}</div>
-              </div>
+
+              {card.image ? (
+                /* Real PSA slab photo */
+                <img
+                  src={card.image}
+                  alt={`${card.name} ${card.rarity}`}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  draggable={false}
+                />
+              ) : (
+                <>
+                  {/* Card name bar */}
+                  <div className={`absolute top-0 left-0 right-0 bg-gradient-to-r ${card.accent} px-2 py-1 flex items-center justify-between`}>
+                    <span className="text-[8px] font-black text-white truncate leading-tight">{card.name}</span>
+                    <span className={`text-[10px] font-bold ${card.symbolColor}`}>{card.symbol}</span>
+                  </div>
+                  {/* Art box */}
+                  <div className={`absolute top-6 left-2 right-2 h-24 rounded-lg ${card.artColor} flex items-center justify-center shadow-inner`}>
+                    <span className="text-4xl drop-shadow-lg">{card.artEmoji}</span>
+                  </div>
+                  {/* Card info */}
+                  <div className="absolute bottom-0 left-0 right-0 px-2 pb-2 pt-1">
+                    <div className="text-[7px] font-bold text-white/60 uppercase tracking-wider mb-0.5">{card.rarity}</div>
+                    <div className="text-[7px] text-white/50 leading-tight">{card.set}</div>
+                    <div className="text-[7px] text-white/40 leading-tight mb-1">{card.year}</div>
+                    <div className={`text-[9px] font-black bg-gradient-to-r ${card.accent} bg-clip-text text-transparent`}>{card.value}</div>
+                  </div>
+                </>
+              )}
             </motion.div>
           ))}
         </div>
