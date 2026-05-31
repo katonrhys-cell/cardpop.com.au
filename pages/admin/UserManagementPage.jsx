@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
-import { Search, MoreHorizontal, Shield, Ban, Mail, ChevronLeft, Users, Filter, X } from 'lucide-react';
+import { Search, MoreHorizontal, Shield, ChevronLeft, Users, X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -39,10 +39,10 @@ const UserManagementPage = () => {
       let query = supabase.from('profiles').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range((page - 1) * 20, page * 20 - 1);
 
       if (debouncedSearch) {
-        query = query.or(`email.ilike.%${debouncedSearch}%,display_name.ilike.%${debouncedSearch}%,username.ilike.%${debouncedSearch}%`);
+        query = query.or(`display_name.ilike.%${debouncedSearch}%,username.ilike.%${debouncedSearch}%`);
       }
-      if (statusFilter === 'active') query = query.eq('is_active', true);
-      if (statusFilter === 'inactive') query = query.eq('is_active', false);
+      if (statusFilter === 'admin') query = query.eq('is_admin', true);
+      if (statusFilter === 'regular') query = query.eq('is_admin', false);
       if (verificationFilter === 'verified') query = query.eq('is_verified', true);
       if (verificationFilter === 'unverified') query = query.eq('is_verified', false);
 
@@ -94,27 +94,15 @@ const UserManagementPage = () => {
     setUserCounts(newCounts);
   };
 
-  const handleRoleChange = async (userId, newRole) => {
+  const handleRoleChange = async (userId, makeAdmin) => {
     try {
-      const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+      const { error } = await supabase.from('profiles').update({ is_admin: makeAdmin }).eq('id', userId);
       if (error) throw error;
-      toast.success(`User role updated to ${newRole}`);
-      logAdminAction('update_user_role', { userId, role: newRole });
-      setUsers(users.map(u => u.id === userId ? { ...u, role: newRole } : u));
+      toast.success(`User ${makeAdmin ? 'granted admin' : 'revoked admin'} access.`);
+      logAdminAction('update_user_admin', { userId, is_admin: makeAdmin });
+      setUsers(users.map(u => u.id === userId ? { ...u, is_admin: makeAdmin } : u));
     } catch (error) {
-      toast.error("Failed to update role.");
-    }
-  };
-
-  const handleSuspend = async (userId, currentStatus) => {
-    try {
-      const newStatus = currentStatus === false ? true : false;
-      const { error } = await supabase.from('profiles').update({ is_active: newStatus }).eq('id', userId);
-      if (error) throw error;
-      toast.success(`User account ${newStatus ? 'reactivated' : 'suspended'}.`);
-      setUsers(users.map(u => u.id === userId ? { ...u, is_active: newStatus } : u));
-    } catch (error) {
-      toast.error("Failed to update account status.");
+      toast.error("Failed to update admin status.");
     }
   };
 
@@ -155,12 +143,12 @@ const UserManagementPage = () => {
           <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-[140px] h-10 rounded-xl bg-background">
-                <SelectValue placeholder="Account Status" />
+                <SelectValue placeholder="Role" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Suspended</SelectItem>
+                <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="admin">Admins</SelectItem>
+                <SelectItem value="regular">Regular Users</SelectItem>
               </SelectContent>
             </Select>
 
@@ -219,18 +207,18 @@ const UserManagementPage = () => {
                   <TableRow key={user.id} className="hover:bg-muted/30 transition-colors">
                     <TableCell>
                       <div className="flex flex-col">
-                        <span className="font-medium text-foreground">{user.name || 'Unnamed'}</span>
-                        <span className="text-xs text-muted-foreground">{user.email}</span>
+                        <span className="font-medium text-foreground">{user.display_name || user.username || 'Unnamed'}</span>
+                        <span className="text-xs text-muted-foreground">@{user.username}</span>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1 items-start">
-                        {user.is_active === false ? (
-                          <Badge variant="destructive" className="text-[10px] px-1.5 py-0">Suspended</Badge>
+                        {user.is_admin ? (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-primary/10 text-primary">Admin</Badge>
                         ) : (
-                          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-200 text-[10px] px-1.5 py-0">Active</Badge>
+                          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-200 text-[10px] px-1.5 py-0">User</Badge>
                         )}
-                        {user.verified && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-blue-500/10 text-blue-600">Verified</Badge>}
+                        {user.is_verified && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-blue-500/10 text-blue-600">Verified</Badge>}
                       </div>
                     </TableCell>
                     <TableCell className="text-center font-medium">
@@ -240,7 +228,7 @@ const UserManagementPage = () => {
                       {userCounts[user.id] ? userCounts[user.id].orders : <span className="text-muted-foreground/50">-</span>}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {new Date(user.created).toLocaleDateString()}
+                      {new Date(user.created_at).toLocaleDateString('en-AU')}
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
@@ -255,15 +243,8 @@ const UserManagementPage = () => {
                           <DropdownMenuItem className="cursor-pointer" onClick={() => navigate(`/admin/users/${user.id}`)}>
                             View Full Profile
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="cursor-pointer" onClick={() => handleRoleChange(user.id, user.role === 'admin' ? 'user' : 'admin')}>
-                            <Shield className="w-4 h-4 mr-2" /> Make {user.role === 'admin' ? 'User' : 'Admin'}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            className={user.is_active === false ? "cursor-pointer" : "text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"}
-                            onClick={() => handleSuspend(user.id, user.is_active)}
-                          >
-                            <Ban className="w-4 h-4 mr-2" /> {user.is_active === false ? 'Reactivate Account' : 'Suspend Account'}
+                          <DropdownMenuItem className="cursor-pointer" onClick={() => handleRoleChange(user.id, !user.is_admin)}>
+                            <Shield className="w-4 h-4 mr-2" /> {user.is_admin ? 'Remove Admin' : 'Make Admin'}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>

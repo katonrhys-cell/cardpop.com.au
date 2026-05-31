@@ -138,7 +138,7 @@ const AdminDashboard = () => {
 
       const [usersRes, ordersRes, tradesRes, sysHealth, vaultRes] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact' }).limit(1).catch(() => ({ count: 0 })),
-        supabase.from('orders').select('total_amount').neq('status', 'cancelled').catch(() => ({ data: [] })),
+        supabase.from('orders').select('total_aud').neq('status', 'cancelled').catch(() => ({ data: [] })),
         supabase.from('listings').select('*', { count: 'exact' }).eq('status', 'active').limit(1).catch(() => ({ count: 0 })),
         getSystemHealth().catch(() => ({ database: 'OK', storage: 'OK', api: 'OK', uptime: 'Unknown' })),
         vaultQuery.catch(() => ({ data: [], count: 0 }))
@@ -146,7 +146,7 @@ const AdminDashboard = () => {
 
       if (!isMounted.current) return;
 
-      const calculatedRevenue = (ordersRes.data || []).reduce((acc, o) => acc + (o.total_amount || 0), 0);
+      const calculatedRevenue = (ordersRes.data || []).reduce((acc, o) => acc + (Number(o.total_aud) || 0), 0);
 
       setStats(prev => ({
         ...prev,
