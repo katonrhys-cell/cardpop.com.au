@@ -4,7 +4,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ShoppingCart, Menu, Shield, MessageSquare, ArrowRightLeft,
   LayoutDashboard, Package, Users, Calendar, FileText, Building2, Layers, CheckCircle,
-  Sun, Moon, ChevronDown, ArrowRight, Layers2, User, LogOut, Settings
+  Sun, Moon, ChevronDown, ArrowRight, Layers2, User, LogOut, Settings,
+  FolderTree, ListOrdered, BarChart3, Store
 } from 'lucide-react';
 import { useDarkMode } from '@/hooks/useDarkMode.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -48,12 +49,17 @@ const NAV_LINKS = [
 const ADMIN_LINKS = [
   { label: 'Dashboard', href: '/admin', icon: LayoutDashboard },
   { label: 'Verification', href: '/admin/verification', icon: CheckCircle },
+  { label: 'Users', href: '/admin/users', icon: Users },
+  { label: 'Orders', href: '/admin/orders', icon: ListOrdered },
+  { label: 'Products', href: '/admin/products', icon: Package },
+  { label: 'Categories', href: '/admin/categories', icon: FolderTree },
   { label: 'Brands', href: '/admin/brands', icon: Building2 },
   { label: 'Product Lines', href: '/admin/product-lines', icon: Layers },
-  { label: 'Products', href: '/admin/products', icon: Package },
-  { label: 'Users', href: '/admin/users', icon: Users },
+  { label: 'Marketplace', href: '/admin/marketplace', icon: Store },
   { label: 'Events', href: '/admin/events', icon: Calendar },
   { label: 'Content', href: '/admin/content', icon: FileText },
+  { label: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
+  { label: 'Settings', href: '/admin/settings', icon: Settings },
 ];
 
 // ─── Category badge used inside the dropdown ──────────────────────────────────

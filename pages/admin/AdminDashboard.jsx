@@ -1,11 +1,12 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Users, Package, DollarSign, Activity, AlertCircle, 
+import {
+  Users, Package, DollarSign, Activity, AlertCircle,
   ArrowUpRight, Server, Database, HardDrive, CheckCircle2,
   FolderTree, RefreshCw, ArrowRightLeft, Calendar,
-  Tags, BarChart3, Building2, Layers, ShieldCheck, Lock, ShoppingCart, Filter, X
+  Tags, BarChart3, Building2, Layers, ShieldCheck, Lock, ShoppingCart, Filter, X,
+  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -238,7 +239,25 @@ const AdminDashboard = () => {
           <ManagementBox title="Product Management" description="Oversee official catalog." icon={Package} link="/admin/products" />
           <ManagementBox title="Brands Management" description="Add game and sports brands." icon={Building2} link="/admin/brands" />
           <ManagementBox title="Category Management" description="Organize top-level categories." icon={FolderTree} link="/admin/categories" />
+          <ManagementBox title="Subcategory Management" description="Manage nested subcategories." icon={Layers2} link="/admin/subcategories" />
+          <ManagementBox title="Product Lines" description="Manage product lines per brand." icon={Layers} link="/admin/product-lines" />
           <ManagementBox title="User Management" description="Review accounts and roles." icon={Users} link="/admin/users" />
+          <ManagementBox title="Order Management" description="Track and manage all orders." icon={ListOrdered} link="/admin/orders" />
+          <ManagementBox title="Verification" description="Review user verification requests." icon={ShieldCheck} link="/admin/verification" />
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        <h2 className="text-2xl font-serif font-bold text-foreground">Content &amp; Platform</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <ManagementBox title="Marketplace" description="Manage marketplace listings." icon={Store} link="/admin/marketplace" />
+          <ManagementBox title="Category Mapping" description="Map categories to collections." icon={Map} link="/admin/category-mapping" />
+          <ManagementBox title="Events Management" description="Create and manage events." icon={Calendar} link="/admin/events" />
+          <ManagementBox title="Content Management" description="Edit blog, pages and articles." icon={FileText} link="/admin/content" />
+          <ManagementBox title="Media Library" description="Upload and manage images." icon={Image} link="/admin/media" />
+          <ManagementBox title="Analytics & Reports" description="View platform analytics." icon={BarChart3} link="/admin/analytics" />
+          <ManagementBox title="System Diagnostics" description="Monitor system health." icon={Wrench} link="/admin/diagnostics" />
+          <ManagementBox title="Admin Settings" description="Configure platform settings." icon={Settings} link="/admin/settings" />
         </div>
       </div>
 
