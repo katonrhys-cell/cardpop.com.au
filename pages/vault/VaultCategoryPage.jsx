@@ -153,9 +153,9 @@ const VaultCategoryPage = () => {
             className={`rounded-full px-5 font-medium ${
               filterMode === mode.value
                 ? mode.value === 'auction'
-                  ? 'bg-brand-red hover:bg-brand-red/90 text-white font-bold shadow-md border-none'
+                  ? 'bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-md border-none'
                   : mode.value === 'fixed'
-                  ? 'bg-[hsl(var(--vault-sale))] hover:bg-[hsl(var(--vault-sale))]/90 text-white font-bold shadow-md border-none'
+                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md border-none'
                   : mode.value === 'offer'
                   ? 'bg-brand-blue hover:bg-brand-blue/90 text-white font-bold shadow-md border-none'
                   : mode.value === 'trade'

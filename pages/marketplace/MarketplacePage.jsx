@@ -161,15 +161,15 @@ const MarketplacePage = () => {
               All Listings
             </Button>
             <Button
-              variant={filterMode === 'Auction' ? 'default' : 'outline'}
-              className={`rounded-full px-5 ${filterMode === 'Auction' ? 'bg-brand-red hover:bg-brand-red/90 text-white font-bold shadow-md border-none' : 'font-medium bg-background hover:text-brand-red hover:border-brand-red'}`}
+              variant="outline"
+              className={`rounded-full px-5 ${filterMode === 'Auction' ? 'bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-md border-none' : 'font-medium bg-background hover:text-orange-500 hover:border-orange-500'}`}
               onClick={() => setFilterMode('Auction')}
             >
               Auction
             </Button>
             <Button
-              variant={filterMode === 'BuyNow' ? 'default' : 'outline'}
-              className={`rounded-full px-5 ${filterMode === 'BuyNow' ? 'bg-[hsl(var(--vault-sale))] hover:bg-[hsl(var(--vault-sale))]/90 text-white font-bold shadow-md border-none' : 'font-medium bg-background hover:text-[hsl(var(--vault-sale))] hover:border-[hsl(var(--vault-sale))]'}`}
+              variant="outline"
+              className={`rounded-full px-5 ${filterMode === 'BuyNow' ? 'bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md border-none' : 'font-medium bg-background hover:text-emerald-600 hover:border-emerald-600'}`}
               onClick={() => setFilterMode('BuyNow')}
             >
               Buy Now
