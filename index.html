@@ -9,21 +9,68 @@
 
     <title>CardPop | Australia's Trading Card Marketplace</title>
     <meta name="description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop — Australia's most trusted trading card platform." />
+    <meta name="keywords" content="trading cards Australia, Pokemon cards Australia, buy sell trade cards, MTG Australia, sports cards Australia, card marketplace" />
+    <meta name="author" content="CardPop" />
+    <link rel="canonical" href="https://cardpop.com.au/" />
 
     <!-- Open Graph (Facebook, Discord, Slack previews) -->
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://cardpop.com.au/" />
     <meta property="og:site_name" content="CardPop" />
     <meta property="og:title" content="CardPop | Australia's Trading Card Marketplace" />
     <meta property="og:description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop — Australia's most trusted trading card platform." />
+    <meta property="og:image" content="https://cardpop.com.au/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:locale" content="en_AU" />
 
     <!-- Twitter / X card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@cardpopau" />
     <meta name="twitter:title" content="CardPop | Australia's Trading Card Marketplace" />
     <meta name="twitter:description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop — Australia's most trusted trading card platform." />
+    <meta name="twitter:image" content="https://cardpop.com.au/og-image.jpg" />
 
     <!-- Favicon — CardPop card-holder icon in brand red -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 68' fill='none'><rect x='17' y='0.5' width='22' height='11' rx='4' stroke='%23CE1126' stroke-width='2.5'/><rect x='20.5' y='3' width='15' height='5' rx='2' fill='%23CE1126' opacity='0.22'/><rect x='1.5' y='9' width='53' height='58' rx='6' stroke='%23CE1126' stroke-width='2.5'/><rect x='8' y='17' width='40' height='43' rx='4' stroke='%23CE1126' stroke-width='2'/><rect x='14' y='23' width='28' height='31' rx='2.5' stroke='%23CE1126' stroke-width='1.5' opacity='0.6'/></svg>" />
+
+    <!-- Structured data: Website with SearchAction -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "CardPop",
+      "url": "https://cardpop.com.au",
+      "description": "Australia's trading card marketplace for Pokémon, Magic: The Gathering, sports cards and more.",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://cardpop.com.au/search?q={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+
+    <!-- Structured data: Organization -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "CardPop",
+      "url": "https://cardpop.com.au",
+      "logo": "https://cardpop.com.au/og-image.jpg",
+      "description": "Australia's most trusted trading card marketplace.",
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "AU"
+      },
+      "sameAs": [
+        "https://twitter.com/cardpopau"
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
