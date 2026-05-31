@@ -27,6 +27,7 @@ const VerificationPendingPage = () => {
     <div className="flex flex-col bg-background font-sans">
       <Helmet>
         <title>Verification Pending | Card Pop</title>
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       
       <div className="flex-1 flex items-center justify-center p-4 py-20 bg-muted/30">

@@ -83,7 +83,7 @@ const PasswordResetPage = () => {
 
   return (
     <div className="flex flex-col bg-background font-sans">
-      <Helmet><title>Recover Account | Card Pop</title></Helmet>
+      <Helmet><title>Recover Account | Card Pop</title><meta name="robots" content="noindex, nofollow" /></Helmet>
       
       <div className="flex-1 flex items-center justify-center p-4 py-20 bg-muted/30">
         <div className="w-full max-w-md premium-card p-8 md:p-10 bg-card">

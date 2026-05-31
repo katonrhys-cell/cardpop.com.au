@@ -1,3 +1,28 @@
 User-agent: *
 Allow: /
+
+# Private / auth pages — no SEO value, protect user data
+Disallow: /login
+Disallow: /signup
+Disallow: /reset-password
+Disallow: /verification-pending
+
+# User account pages — private content
+Disallow: /account
+Disallow: /vault
+Disallow: /my-vault
+Disallow: /vault/add
+Disallow: /vault/edit/
+
+# Admin
+Disallow: /admin
+
+# Checkout / transactional — not indexable
+Disallow: /checkout
+Disallow: /checkout-success
+Disallow: /success
+
+# Internal tooling
+Disallow: /diagnostics
+
 Sitemap: https://cardpop.com.au/sitemap.xml

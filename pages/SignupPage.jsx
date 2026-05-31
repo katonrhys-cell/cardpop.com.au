@@ -89,7 +89,7 @@ const SignupPage = () => {
   if (success) {
     return (
       <div className="flex flex-col bg-background font-sans min-h-[calc(100vh-4rem)]">
-        <Helmet><title>Check Your Email | Card Pop</title></Helmet>
+        <Helmet><title>Check Your Email | Card Pop</title><meta name="robots" content="noindex, nofollow" /></Helmet>
         <div className="flex-1 flex items-center justify-center p-4 py-12 lg:py-20 bg-muted/20">
           <div className="w-full max-w-md bg-card p-8 md:p-10 text-center border border-border rounded-2xl shadow-lg animate-in fade-in zoom-in-95">
             <div className="w-16 h-16 bg-primary/10 mx-auto rounded-2xl flex items-center justify-center mb-6">
@@ -111,7 +111,7 @@ const SignupPage = () => {
 
   return (
     <div className="flex flex-col bg-background font-sans min-h-[calc(100vh-4rem)]">
-      <Helmet><title>Join | Card Pop</title></Helmet>
+      <Helmet><title>Join | Card Pop</title><meta name="robots" content="noindex, nofollow" /></Helmet>
       
       <div className="flex-1 flex items-center justify-center p-4 py-12 lg:py-20 bg-muted/20">
         <div className="w-full max-w-md bg-card p-8 border border-border rounded-2xl shadow-lg">

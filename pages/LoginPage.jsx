@@ -119,6 +119,7 @@ const LoginPage = () => {
     <div className="min-h-[80vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-muted/10">
       <Helmet>
         <title>Log In | CardPop</title>
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
       <div className="w-full max-w-md space-y-6">
