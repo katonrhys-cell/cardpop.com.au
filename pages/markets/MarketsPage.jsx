@@ -269,11 +269,11 @@ const MarketsPage = () => {
     setSearchResult(null);
   };
 
-  const cardUrl = (card) => `/analytics/card?name=${encodeURIComponent(card.name)}&set=${encodeURIComponent(card.set)}&collection=${encodeURIComponent(card.collection)}&price=${card.price}&change=${card.change}`;
+  const cardUrl = (card) => `/analytics/card?name=${encodeURIComponent(card.name)}&set=${encodeURIComponent(card.set ?? '')}&collection=${encodeURIComponent(card.collection ?? '')}&price=${card.price ?? 0}&change=${card.change ?? 0}`;
 
   const MoverRow = ({ card }) => (
     <Link
-      to={`/analytics/${slugify(card.collection)}/${slugify(card.name)}`}
+      to={cardUrl(card)}
       className="flex items-center gap-3 py-3 px-4 hover:bg-muted/30 rounded-xl transition-colors group"
     >
       <div className="flex-1 min-w-0">
