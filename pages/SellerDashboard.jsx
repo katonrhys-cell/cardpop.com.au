@@ -25,8 +25,11 @@ const SellerDashboard = () => {
   const isMounted = useRef(true);
 
   const fetchDashboardData = async () => {
-    if (!currentUser?.id) return;
-    
+    if (!currentUser?.id) {
+      if (isMounted.current) setLoading(false);
+      return;
+    }
+
     try {
       setError(null);
       

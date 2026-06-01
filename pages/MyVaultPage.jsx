@@ -34,7 +34,10 @@ const MyVaultPage = () => {
   const [listingModal, setListingModal] = useState({ open: false, card: null });
 
   const fetchVault = useCallback(async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
 
     try {
