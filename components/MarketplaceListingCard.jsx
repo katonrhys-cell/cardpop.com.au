@@ -6,10 +6,13 @@ import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 
 const MarketplaceListingCard = ({ listing }) => {
-  const imageUrl = listing.images?.[0];
-  const imgSrc = imageUrl && typeof imageUrl === 'string' && imageUrl.startsWith('http') ? imageUrl : null;
-  const sellerId = listing.seller_id || listing.seller;
-  const sellerObj = listing.expand?.seller_id || listing.expand?.seller;
+  const vaultItem = listing.vault_item;
+  const rawImageUrl = vaultItem?.vault_images?.[0]?.image_url || null;
+  const imgSrc = rawImageUrl && typeof rawImageUrl === 'string' && rawImageUrl.startsWith('http') ? rawImageUrl : null;
+  const sellerObj = listing.seller;
+  const sellerId = listing.seller_id || sellerObj?.id;
+  const titleSlug = slugify(vaultItem?.card_name || listing.title || 'card');
+  const detailPath = `/product/marketplace/${listing.id}/${titleSlug}`;
 
   return (
     <div className="group flex flex-col h-full bg-card rounded-2xl border border-border overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
@@ -39,14 +42,14 @@ const MarketplaceListingCard = ({ listing }) => {
             {listing.category || 'Trading Card'}
           </p>
           <h3 className="font-bold text-base leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors">
-            {listing.title || 'Untitled Listing'}
+            {vaultItem?.card_name || listing.title || 'Untitled Listing'}
           </h3>
         </Link>
         
         <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-border">
           <div className="flex items-center justify-between">
             <span className="font-extrabold text-xl tabular-nums text-foreground">
-              ${(listing.price || 0).toFixed(2)}
+              ${(listing.price_aud || 0).toFixed(2)}
             </span>
           </div>
           
@@ -74,7 +77,7 @@ const MarketplaceListingCard = ({ listing }) => {
                 <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
                   <Star className="w-3 h-3 fill-[hsl(var(--rating-color))] text-[hsl(var(--rating-color))]" />
                   <span>{sellerObj?.rating ? sellerObj.rating.toFixed(1) : 'New'}</span>
-                  {sellerObj?.reviewsCount > 0 && <span>({sellerObj.reviewsCount})</span>}
+                  {sellerObj?.reviews_count > 0 && <span>({sellerObj.reviews_count})</span>}
                 </div>
               </div>
             </Link>

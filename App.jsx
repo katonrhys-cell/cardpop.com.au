@@ -111,6 +111,7 @@ const CommunityPage = lazy(() => import('@/pages/community/CommunityPage.jsx'));
 const CommunityEventsPage = lazy(() => import('@/pages/community/CommunityEventsPage.jsx'));
 const EventDetailPage = lazy(() => import('@/pages/EventDetailPage.jsx'));
 const CommunityDiscussionPage = lazy(() => import('@/pages/community/CommunityDiscussionPage.jsx'));
+const WhatnotShowsPage = lazy(() => import('@/pages/community/WhatnotShowsPage.jsx'));
 
 // Admin Dashboard Area
 const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard.jsx'));
@@ -260,6 +261,7 @@ const App = () => {
                         <Route path="/community/events" element={<CommunityEventsPage />} />
                         <Route path="/community/events/:eventId" element={<EventDetailPage />} />
                         <Route path="/community/discussion/:id" element={<CommunityDiscussionPage />} />
+                        <Route path="/community/whatnot" element={<WhatnotShowsPage />} />
                         <Route path="/community/user/:sellerId" element={<SellerProfilePage />} />
                         
                         {/* Search & Misc */}

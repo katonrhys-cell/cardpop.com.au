@@ -57,13 +57,13 @@ const OrderManagementPage = () => {
   };
 
   const filteredOrders = orders.filter(o => {
-    const matchesSearch = o.order_number?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          o.expand?.buyer_id?.email?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = o.order_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          o.buyer?.email?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || o.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
-  const formatCurrency = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val || 0);
+  const formatCurrency = (val) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(val || 0);
 
   return (
     <div className="w-full space-y-6 animate-in fade-in duration-300 py-6 px-4 sm:px-6 md:px-8">
@@ -152,8 +152,8 @@ const OrderManagementPage = () => {
                 filteredOrders.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell className="font-mono text-xs text-muted-foreground">{order.order_number || order.id}</TableCell>
-                    <TableCell className="text-muted-foreground">{new Date(order.created).toLocaleDateString()}</TableCell>
-                    <TableCell className="font-medium text-foreground">{order.expand?.buyer_id?.email || 'Unknown'}</TableCell>
+                    <TableCell className="text-muted-foreground">{order.created_at ? new Date(order.created_at).toLocaleDateString('en-AU') : '—'}</TableCell>
+                    <TableCell className="font-medium text-foreground">{order.buyer?.email || order.buyer?.display_name || 'Unknown'}</TableCell>
                     <TableCell className="tabular-nums font-medium">{formatCurrency(order.total_amount)}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={

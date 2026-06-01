@@ -161,7 +161,7 @@ const SubcategoryManagementPage = () => {
       fetchData();
     } catch (err) {
       console.error('Error saving subcategory:', err);
-      toast.error(err.response?.message || 'Failed to save subcategory');
+      toast.error(err.message || 'Failed to save subcategory');
     } finally {
       setIsSubmitting(false);
     }

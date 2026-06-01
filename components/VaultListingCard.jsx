@@ -19,8 +19,8 @@ const getStatusBadge = (listingType) => {
 const VaultListingCard = ({ vaultItem }) => {
   const imgSrc = vaultItem.vault_images?.[0]?.image_url || vaultItem.image_url || null;
   const sellerId = vaultItem.user_id || vaultItem.owner_id;
-  const sellerObj = vaultItem.expand?.user_id;
-  const titleSlug = slugify(vaultItem.name || vaultItem.title || 'card');
+  const sellerObj = vaultItem.profiles || vaultItem.expand?.user_id || null;
+  const titleSlug = slugify(vaultItem.card_name || vaultItem.name || vaultItem.title || 'card');
   const detailPath = `/product/vault/${vaultItem.id}/${titleSlug}`;
 
   const badgeConfig = getStatusBadge(vaultItem.listing_type);
@@ -34,8 +34,8 @@ const VaultListingCard = ({ vaultItem }) => {
       <Link to={detailPath} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
         {imgSrc ? (
           <img 
-            src={imgSrc} 
-            alt={vaultItem.name || 'Vault Image'} 
+            src={imgSrc}
+            alt={vaultItem.card_name || vaultItem.name || 'Vault Image'}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             loading="lazy"
           />
@@ -59,7 +59,7 @@ const VaultListingCard = ({ vaultItem }) => {
       <div className="p-5 flex flex-col flex-1">
         <Link to={detailPath} className="block mb-3">
           <h3 className="font-bold text-base leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors mb-2">
-            {vaultItem.name || 'Untitled Vault Item'}
+            {vaultItem.card_name || vaultItem.name || 'Untitled Vault Item'}
           </h3>
           
           <div className="flex flex-wrap gap-1.5">
@@ -94,7 +94,7 @@ const VaultListingCard = ({ vaultItem }) => {
         <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-border">
           <div className="flex items-center justify-between">
             <span className="font-extrabold text-xl tabular-nums text-foreground">
-              ${(vaultItem.price || 0).toFixed(2)}
+              ${(vaultItem.estimated_value_aud || 0).toFixed(2)}
             </span>
           </div>
           
@@ -122,7 +122,7 @@ const VaultListingCard = ({ vaultItem }) => {
                 <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
                   <Star className="w-3 h-3 fill-[hsl(var(--rating-color))] text-[hsl(var(--rating-color))]" />
                   <span>{sellerObj?.rating ? sellerObj.rating.toFixed(1) : 'New'}</span>
-                  {sellerObj?.reviewsCount > 0 && <span>({sellerObj.reviewsCount})</span>}
+                  {sellerObj?.reviews_count > 0 && <span>({sellerObj.reviews_count})</span>}
                 </div>
               </div>
             </Link>

@@ -14,6 +14,7 @@ const PasswordResetPage = () => {
   const [email, setEmail] = useState('');
   const [token, setToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const navigate = useNavigate();
 
   const handleRequestReset = async (e) => {
@@ -62,6 +63,14 @@ const PasswordResetPage = () => {
 
   const handleCompleteReset = async (e) => {
     e.preventDefault();
+    if (newPassword.length < 8) {
+      toast.error('Password must be at least 8 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match.');
+      return;
+    }
     setLoading(true);
     try {
       const res = await apiServerClient.fetch('/auth/password/reset/complete', {
@@ -163,17 +172,32 @@ const PasswordResetPage = () => {
               
               <form onSubmit={handleCompleteReset} className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="newPassword" className="font-bold text-xs uppercase tracking-wide">New Secure Password</Label>
-                  <Input 
+                  <Label htmlFor="newPassword" className="font-bold text-xs uppercase tracking-wide">New Password</Label>
+                  <Input
                     id="newPassword"
                     type="password"
-                    required 
+                    required
+                    minLength={8}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="bg-background text-foreground h-12 rounded-xl font-medium border-border focus-visible:ring-primary"
                   />
                 </div>
-                <Button type="submit" className="w-full h-12 rounded-full font-bold shadow-sm bg-primary hover:brightness-110" disabled={loading || !newPassword}>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword" className="font-bold text-xs uppercase tracking-wide">Confirm New Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    required
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className={`bg-background text-foreground h-12 rounded-xl font-medium border-border focus-visible:ring-primary ${confirmPassword && confirmPassword !== newPassword ? 'border-destructive' : ''}`}
+                  />
+                  {confirmPassword && confirmPassword !== newPassword && (
+                    <p className="text-xs text-destructive font-medium">Passwords do not match</p>
+                  )}
+                </div>
+                <Button type="submit" className="w-full h-12 rounded-full font-bold shadow-sm bg-primary hover:brightness-110" disabled={loading || !newPassword || !confirmPassword}>
                   {loading ? 'Updating...' : 'Update Password & Login'}
                 </Button>
               </form>

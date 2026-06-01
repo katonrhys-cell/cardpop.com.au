@@ -150,17 +150,17 @@ const VaultCategoryPage = () => {
           <Button
             key={mode.value}
             variant={filterMode === mode.value ? 'default' : 'outline'}
-            className={`rounded-full px-5 font-medium ${
+            className={`rounded-full px-5 font-bold ${
               filterMode === mode.value
                 ? mode.value === 'auction'
-                  ? 'bg-orange-500 hover:bg-orange-600 text-white font-bold shadow-md border-none'
+                  ? 'bg-brand-charcoal hover:bg-brand-charcoal/90 text-white shadow-md border-none'
                   : mode.value === 'fixed'
-                  ? 'bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-md border-none'
+                  ? 'bg-[hsl(var(--vault-sale))] hover:bg-[hsl(var(--vault-sale))]/90 text-white shadow-md border-none'
                   : mode.value === 'offer'
-                  ? 'bg-brand-blue hover:bg-brand-blue/90 text-white font-bold shadow-md border-none'
+                  ? 'bg-amber-700 hover:bg-amber-800 text-white shadow-md border-none'
                   : mode.value === 'trade'
-                  ? 'bg-[hsl(var(--vault-trade))] hover:bg-[hsl(var(--vault-trade))]/90 text-white font-bold shadow-md border-none'
-                  : 'font-bold shadow-md'
+                  ? 'bg-[hsl(var(--vault-trade))] hover:bg-[hsl(var(--vault-trade))]/90 text-white shadow-md border-none'
+                  : 'text-white shadow-md'
                 : 'bg-background'
             }`}
             onClick={() => { setFilterMode(mode.value); setPage(1); }}
