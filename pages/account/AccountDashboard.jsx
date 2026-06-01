@@ -37,7 +37,10 @@ const AccountDashboard = () => {
   const isMounted = useRef(true);
 
   const fetchStats = useCallback(async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {
+      if (isMounted.current) setStatsLoading(false);
+      return;
+    }
 
     try {
       setStatsError(null);
@@ -89,8 +92,11 @@ const AccountDashboard = () => {
   }, [currentUser?.id]);
 
   const fetchVaultItems = useCallback(async (page = 1) => {
-    if (!currentUser?.id) return;
-    
+    if (!currentUser?.id) {
+      if (isMounted.current) setVaultLoading(false);
+      return;
+    }
+
     try {
       setVaultLoading(true);
       setVaultError(null);

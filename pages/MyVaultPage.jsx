@@ -32,7 +32,10 @@ const MyVaultPage = () => {
   const [filterCollection, setFilterCollection] = useState('');
 
   const fetchVault = useCallback(async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
 
     try {
