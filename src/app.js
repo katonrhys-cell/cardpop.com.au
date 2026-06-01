@@ -60,8 +60,9 @@ app.use(globalRateLimit);
 logger.debug(`[MAIN] Configuring body parser with limit: ${BodyLimit} bytes`);
 // Stripe webhooks need the raw body buffer for signature verification — skip JSON
 // parsing for that path so express.raw() inside the route handler sees the buffer.
+// endsWith handles both /stripe/webhook (dev) and /hcgi/api/stripe/webhook (Hostinger proxy).
 app.use((req, res, next) => {
-	if (req.path === '/stripe/webhook') return next();
+	if (req.path.endsWith('/stripe/webhook')) return next();
 	express.json({ limit: BodyLimit })(req, res, next);
 });
 app.use(express.urlencoded({ extended: true, limit: BodyLimit }));
@@ -76,7 +77,11 @@ app.use((err, req, res, next) => {
 app.use(csrfMiddleware);
 app.use(sessionTimeoutMiddleware);
 
-app.use('/', routes());
+// Mount at / for local dev and at /hcgi/api for Hostinger's reverse proxy (which
+// forwards the full path prefix rather than stripping it before hitting Express).
+const apiRouter = routes();
+app.use('/', apiRouter);
+app.use('/hcgi/api', apiRouter);
 
 app.get('/.well-known/security.txt', (req, res) => {
 	res.type('text/plain').send(`Contact: security@example.com
