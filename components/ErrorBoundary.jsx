@@ -5,11 +5,22 @@ import { Button } from '@/components/ui/button';
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, resetKey: props.resetKey };
   }
 
   static getDerivedStateFromError(error) {
     return { hasError: true, error };
+  }
+
+  // Reset error state when the route changes (resetKey prop changes)
+  static getDerivedStateFromProps(props, state) {
+    if (state.hasError && props.resetKey !== undefined && props.resetKey !== state.resetKey) {
+      return { hasError: false, error: null, resetKey: props.resetKey };
+    }
+    if (props.resetKey !== state.resetKey) {
+      return { resetKey: props.resetKey };
+    }
+    return null;
   }
 
   componentDidCatch(error, errorInfo) {

@@ -1,6 +1,6 @@
 
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { Toaster } from '@/components/ui/sonner';
 
@@ -39,6 +39,12 @@ const NotFoundPage = lazy(() => import('@/pages/NotFoundPage.jsx'));
 const CollectionPage = lazy(() => import('@/pages/collections/CollectionPage.jsx'));
 // Forces CollectionPage to fully remount when the slug changes, resetting all filter/state
 const CollectionRoute = () => { const { collectionSlug } = useParams(); return <CollectionPage key={collectionSlug} />; };
+
+// Resets the error boundary on every route change so a page error doesn't persist to other pages
+const RouteErrorBoundary = ({ children }) => {
+  const { pathname } = useLocation();
+  return <ErrorBoundary resetKey={pathname}>{children}</ErrorBoundary>;
+};
 
 // Marketplace
 const MarketplacePage = lazy(() => import('@/pages/marketplace/MarketplacePage.jsx'));
@@ -169,6 +175,7 @@ const App = () => {
                   <Header />
                   
                   <main className="flex-grow flex flex-col">
+                    <RouteErrorBoundary>
                     <Suspense fallback={<PageLoader />}>
                       <Routes>
                         {/* --- PUBLIC ROUTES --- */}
@@ -310,6 +317,7 @@ const App = () => {
                         <Route path="*" element={<NotFoundPage />} />
                       </Routes>
                     </Suspense>
+                    </RouteErrorBoundary>
                   </main>
                   
                   <Footer />
