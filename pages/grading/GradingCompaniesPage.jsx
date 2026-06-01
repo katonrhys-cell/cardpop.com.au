@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Building2, ArrowLeft, ArrowRight } from 'lucide-react';
@@ -18,7 +18,7 @@ const GradingCompaniesPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Helmet><title>Grading Companies | CardPop</title></Helmet>
+      <SEOHead title="Grading Companies | CardPop" description="Compare professional trading card grading companies. Find out how PSA, BGS, CGC, ACE and SGC grade and authenticate your cards." />
 
       <section className="bg-card border-b border-border py-20 text-center">
         <div className="container-default">

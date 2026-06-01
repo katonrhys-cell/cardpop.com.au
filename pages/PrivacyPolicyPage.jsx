@@ -1,6 +1,6 @@
 
 import React, { useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { 
   Card, 
@@ -222,10 +222,7 @@ const PrivacyPolicyPage = () => {
 
   return (
     <div className="min-h-screen bg-background font-sans flex flex-col">
-      <Helmet>
-        <title>Privacy Policy | CardPop</title>
-        <meta name="description" content="Read CardPop's Privacy Policy to understand how we collect, use, and safeguard your personal information and trading data." />
-      </Helmet>
+      <SEOHead title="Privacy Policy | CardPop" description="CardPop's privacy policy — how we collect, use and protect your personal information on our Australian trading card marketplace." />
 
       {/* Header Section */}
       <section className="bg-card border-b border-border py-16 md:py-24 relative overflow-hidden">

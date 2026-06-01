@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PackageX, SlidersHorizontal, Search, ShoppingBag } from 'lucide-react';
@@ -70,9 +70,7 @@ const ShopPage = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans">
-      <Helmet>
-        <title>The Shop | CardPop</title>
-      </Helmet>
+      <SEOHead title="The Shop | CardPop" description="Shop official CardPop sealed products, singles and accessories. Fast shipping across Australia." />
 
       <section className="bg-card border-b border-border py-20 text-center">
         <div className="container-default">

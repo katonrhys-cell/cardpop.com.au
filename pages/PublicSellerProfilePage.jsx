@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Star, ShieldCheck, MapPin, Calendar, ExternalLink, ShieldAlert, Package, MessageSquare } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -136,9 +136,7 @@ const PublicSellerProfilePage = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <Helmet>
-        <title>{`${seller.display_name || seller.name || 'Seller'} | CardPop Profile`}</title>
-      </Helmet>
+      <SEOHead title={seller ? `${seller.display_name || seller.name || 'Seller'} | CardPop Profile` : 'Seller Profile | CardPop'} description={seller ? `${seller.display_name || seller.name || 'This seller'} is a trading card seller on CardPop Australia.` : 'View seller profile on CardPop'} />
 
       {/* Profile Header Banner */}
       <div className="bg-[hsl(var(--profile-bg))] border-b border-[hsl(var(--section-divider))]">

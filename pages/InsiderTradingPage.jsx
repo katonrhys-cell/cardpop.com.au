@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { ExternalLink, Copy, Edit, Trash, Plus, Store, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
@@ -142,10 +142,7 @@ const InsiderTradingPage = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-background font-sans">
-      <Helmet>
-        <title>Insider Trading | Card Pop Australia</title>
-        <meta name="description" content="Exclusive affiliate partners and insider deals from Card Pop Australia." />
-      </Helmet>
+      <SEOHead title="Insider Trading | CardPop" description="Get insider market intelligence and trading insights for Australian trading card collectors." />
 
       {/* Hero Section */}
       <div className="bg-secondary py-16 relative overflow-hidden">

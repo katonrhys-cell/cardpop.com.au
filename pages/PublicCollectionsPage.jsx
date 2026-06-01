@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Search, ShieldCheck, Users, Info } from 'lucide-react';
 import { COLLECTIONS_LIST, TCG_COLLECTIONS, SPORTS_COLLECTIONS } from '@/components/Header.jsx';
@@ -162,7 +162,7 @@ const PublicCollectionsPage = () => {
 
   return (
     <div className="flex flex-col bg-background font-sans">
-      <Helmet><title>Collections & Marketplace | Card Pop Australia</title></Helmet>
+      <SEOHead title="Collections & Marketplace | CardPop Australia" description="Browse public trading card collections and marketplace listings from Australian collectors." />
       
       <div className="bg-secondary py-12 relative overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 relative z-10">

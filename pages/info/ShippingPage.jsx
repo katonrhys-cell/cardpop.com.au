@@ -1,5 +1,5 @@
 import React from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import InfoPageLayout from '@/components/InfoPageLayout.jsx';
 
 const ShippingPage = () => {
@@ -9,9 +9,7 @@ const ShippingPage = () => {
       description="Everything you need to know about how we deliver your cards safely."
       breadcrumbs={[{ label: 'Shipping' }]}
     >
-      <Helmet>
-        <title>Shipping Information | CardPop</title>
-      </Helmet>
+      <SEOHead title="Shipping Information | CardPop" description="Learn about CardPop's shipping policies, rates and delivery times for Australian orders." />
       
       <h2>Domestic Shipping (Australia)</h2>
       <p>We offer several shipping options within Australia to ensure your cards arrive safely and securely.</p>

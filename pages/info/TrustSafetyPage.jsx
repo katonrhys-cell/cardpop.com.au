@@ -1,5 +1,5 @@
 import React from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { ShieldHalf } from 'lucide-react';
 import InfoPageLayout from '@/components/InfoPageLayout.jsx';
 
@@ -11,10 +11,7 @@ const TrustSafetyPage = () => {
       title="Trust & Safety"
       description="How we protect every buyer and seller in our community."
     >
-      <Helmet>
-        <title>Trust &amp; Safety | CardPop</title>
-        <meta name="description" content="CardPop's trust and safety policies — how we protect buyers and sellers in the community." />
-      </Helmet>
+      <SEOHead title="Trust & Safety | CardPop" description="CardPop's trust and safety policies — how we protect buyers and sellers in the Australian trading card community." />
 
       <h2>Buyer Protection</h2>
       <p>When you purchase on CardPop, your funds are held securely until the item is delivered and verified. If an item doesn't arrive or is significantly not as described, you are covered by our Buyer Protection Guarantee.</p>

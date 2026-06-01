@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -114,7 +114,7 @@ const MarketplacePage = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans pb-20">
-      <Helmet><title>Collector Marketplace | CardPop</title></Helmet>
+      <SEOHead title="Collector Marketplace | CardPop" description="Browse thousands of trading cards listed by Australian collectors. Filter by game, condition, price and more." />
 
       <section className="bg-card border-b border-border py-20 text-center">
         <div className="container-default">

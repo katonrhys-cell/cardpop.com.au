@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { formatCurrency } from '@/api/EcommerceApi';
 import { useCart } from '@/hooks/useCart';
@@ -42,7 +42,7 @@ const ShopProductPage = () => {
 
   return (
     <div className="container-default section-padding min-h-[80vh]">
-      <Helmet><title>{product.name} | Shop</title></Helmet>
+      <SEOHead title={product ? `${product.name} | Shop` : 'Shop | CardPop'} description={product?.description || `Buy ${product?.name || 'this product'} from the CardPop official store. Fast Australian shipping.`} />
       
       <div className="flex items-center gap-2 text-sm text-muted-foreground mb-8">
         <Link to="/shop">Shop</Link>

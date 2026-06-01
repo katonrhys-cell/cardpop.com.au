@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { Loader2, PackageX } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { formatCurrency } from '@/api/EcommerceApi.js';
@@ -62,9 +62,7 @@ const CategoryPage = () => {
 
   return (
     <div className="space-y-6">
-      <Helmet>
-        <title>{`Shop ${categoryNameStr} | Marketplace`}</title>
-      </Helmet>
+      <SEOHead title="Browse by Category | CardPop" description="Browse trading cards by category on CardPop — TCG, sports cards and more." />
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
         <div>

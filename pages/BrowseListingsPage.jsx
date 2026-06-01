@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Search, Filter, SlidersHorizontal } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -95,7 +95,7 @@ const BrowseListingsPage = () => {
 
   return (
     <div className="min-h-screen bg-background py-8 md:py-12">
-      <Helmet><title>Browse Listings | CardPop</title></Helmet>
+      <SEOHead title="Browse Listings | CardPop" description="Browse all trading card listings on CardPop — Pokemon, Magic, Yu-Gi-Oh, sports cards and more." />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">

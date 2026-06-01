@@ -1,5 +1,5 @@
 import React from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { ScrollText } from 'lucide-react';
 import InfoPageLayout from '@/components/InfoPageLayout.jsx';
 
@@ -11,10 +11,7 @@ const TermsPage = () => {
       title="Terms of Service"
       description="The rules and guidelines for using the CardPop platform."
     >
-      <Helmet>
-        <title>Terms of Service | CardPop</title>
-        <meta name="description" content="CardPop's terms of service — the rules and guidelines for using the platform." />
-      </Helmet>
+      <SEOHead title="Terms of Service | CardPop" description="CardPop's terms of service — the rules and guidelines for using the platform." />
 
       <p className="text-sm text-muted-foreground mb-8">Last Updated: May 10, 2026</p>
 

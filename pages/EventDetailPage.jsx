@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { ArrowLeft, CalendarDays } from 'lucide-react';
 import EventDetailCard from '@/components/EventDetailCard.jsx';
 import RelatedEvents from '@/components/RelatedEvents.jsx';
@@ -35,10 +35,7 @@ const EventDetailPage = () => {
 
   return (
     <div className="flex flex-col bg-background font-sans min-h-screen">
-      <Helmet>
-        <title>{event.name} | Card Pop Community</title>
-        <meta name="description" content={event.description.substring(0, 150) + '...'} />
-      </Helmet>
+      <SEOHead title="Event Details | CardPop" description="Find details about this trading card event in Australia — venue, dates, and how to register." />
       
       <div className="flex-1 max-w-6xl mx-auto px-4 py-12 w-full">
         <Button 

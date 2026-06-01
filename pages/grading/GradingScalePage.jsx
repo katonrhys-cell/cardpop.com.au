@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -28,7 +28,7 @@ const GradingScalePage = () => {
 
   return (
     <div className="container-default section-padding min-h-screen max-w-4xl mx-auto">
-      <Helmet><title>{guide.abbreviation || guide.name} Grading Scale | CardPop</title></Helmet>
+      <SEOHead title={`${guide.abbreviation || guide.name} Grading Scale | CardPop`} description={guide.description || `Learn about the ${guide.name} grading scale and how cards are graded and authenticated.`} />
 
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold mb-4">{guide.name} ({guide.abbreviation})</h1>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import InfoPageLayout from '@/components/InfoPageLayout.jsx';
 
 const ReturnsPage = () => {
@@ -9,9 +9,7 @@ const ReturnsPage = () => {
       description="Our policy for returns, refunds, and dispute resolution."
       breadcrumbs={[{ label: 'Returns' }]}
     >
-      <Helmet>
-        <title>Returns Policy | CardPop</title>
-      </Helmet>
+      <SEOHead title="Returns Policy | CardPop" description="CardPop's returns and refund policy — buyer protection and how we handle disputes on the marketplace." />
       
       <h2>Return Policy Overview</h2>
       <p>Due to the volatile nature of trading card markets, all sales are generally considered final. However, we offer buyer protection in specific circumstances.</p>

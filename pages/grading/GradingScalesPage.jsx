@@ -1,5 +1,5 @@
 import React from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { BarChart2, ArrowLeft, ChevronRight } from 'lucide-react';
 
@@ -26,7 +26,7 @@ const gradeColor = (g) => {
 
 const GradingScalesPage = () => (
   <div className="min-h-screen bg-background">
-    <Helmet><title>Grading Scales | CardPop</title></Helmet>
+    <SEOHead title="Grading Scales | CardPop" description="Understand trading card grading scales from 1 to 10. Learn what each grade means and how condition affects your card's value." />
 
     <section className="bg-card border-b border-border py-20 text-center">
       <div className="container-default">

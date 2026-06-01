@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { FileQuestion, Home, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 const NotFoundPage = () => {
   return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 text-center bg-background font-sans">
-      <Helmet><title>404 - Page Not Found | CardPop</title></Helmet>
+      <SEOHead title="Page Not Found | CardPop" description="The page you're looking for doesn't exist. Return to CardPop and continue browsing." />
       
       <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-8 shadow-sm">
         <FileQuestion className="w-12 h-12 text-muted-foreground opacity-50" />

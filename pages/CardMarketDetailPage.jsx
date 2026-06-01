@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { ArrowLeft, TrendingUp, AlertCircle, ShoppingCart, Calendar } from 'lucide-react';
 import { PriceTrendChart } from '@/components/PriceTrendChart.jsx';
 import { GradingBreakdownChart } from '@/components/GradingBreakdownChart.jsx';
@@ -35,9 +35,7 @@ const CardMarketDetailPage = () => {
 
   return (
     <>
-      <Helmet>
-        <title>{data?.card ? `${data.card.name} Market Data` : 'Card Market Details'} - Card Pop</title>
-      </Helmet>
+      <SEOHead title="Card Market Detail | CardPop" description="Detailed market data and price history for this trading card on CardPop." />
 
       <div className="flex flex-col bg-background font-sans">
         

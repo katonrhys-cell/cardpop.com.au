@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { ArrowLeft, MapPin, Calendar, ArrowRightLeft, CreditCard, Users, Search, AlertCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
@@ -147,7 +147,7 @@ const CardDetailsPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background font-sans w-full overflow-x-hidden">
-      <Helmet><title>{`${card.title} | CardPop`}</title></Helmet>
+      <SEOHead title={`${card.title} | CardPop`} description={card.description || `View ${card.title} details, pricing and listings on CardPop Australia.`} />
       
       <main className="flex-1 container-default py-8 md:py-16">
         <Button variant="ghost" className="mb-8 -ml-4 text-muted-foreground hover:text-primary transition-colors font-bold px-4" onClick={() => navigate(-1)}>

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { Layers, DollarSign, Plus, Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -61,9 +61,7 @@ const DigitalVaultPage = () => {
 
   return (
     <div className="flex flex-col font-sans">
-      <Helmet>
-        <title>My Digital Vault | Card Pop Australia</title>
-      </Helmet>
+      <SEOHead title="Digital Vault | CardPop" description="Securely store and manage your trading card collection in your CardPop digital vault." />
       
       <div className="bg-background py-12">
         <div className="container px-4 max-w-7xl">

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { UserCircle } from 'lucide-react';
 
 const CommunityUserProfilePage = () => {
@@ -8,7 +8,7 @@ const CommunityUserProfilePage = () => {
 
   return (
     <div className="container-default section-padding min-h-[70vh]">
-      <Helmet><title>User Profile | Community</title></Helmet>
+      <SEOHead title="User Profile | CardPop Community" description="View this collector's profile, collection and trading history on CardPop." />
       
       <div className="bg-card border border-border p-12 rounded-3xl text-center max-w-2xl mx-auto">
         <UserCircle className="w-24 h-24 text-muted-foreground mx-auto mb-6" />

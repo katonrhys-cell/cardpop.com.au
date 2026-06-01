@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import apiServerClient from '@/lib/apiServerClient.js';
@@ -229,7 +229,7 @@ const CardAnalyticsPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Helmet><title>{cardName} | Card Analytics | CardPop</title></Helmet>
+      <SEOHead title={`${cardName} | Card Analytics | CardPop`} description={`Track price history, market trends and analytics for ${cardName} on CardPop Australia.`} />
 
       {/* Hero */}
       <section className="bg-card border-b border-border py-10">
