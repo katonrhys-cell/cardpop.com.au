@@ -152,7 +152,7 @@ const ProductLinesManagementPage = () => {
       fetchData();
     } catch (err) {
       console.error('Error saving product line:', err);
-      toast.error(err.response?.message || 'Failed to save product line');
+      toast.error(err.message || 'Failed to save product line');
     } finally {
       setIsSubmitting(false);
     }
