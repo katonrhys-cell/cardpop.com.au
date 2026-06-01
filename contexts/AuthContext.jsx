@@ -80,14 +80,17 @@ export const AuthProvider = ({ children }) => {
     } catch (e) {
       console.error('[AuthContext] signOut failed:', e);
     }
-    // Belt-and-suspenders: directly wipe all Supabase storage keys.
+    // Belt-and-suspenders: directly wipe all Supabase storage keys from
+    // sessionStorage (our active store) and localStorage (legacy fallback).
     // Covers the edge case where autoRefreshToken writes a new token
     // just before/after signOut clears the old one.
     try {
-      Object.keys(localStorage)
-        .filter(k => k.startsWith('sb-'))
-        .forEach(k => localStorage.removeItem(k));
-    } catch (_) { /* localStorage unavailable in some envs */ }
+      [sessionStorage, localStorage].forEach(store => {
+        Object.keys(store)
+          .filter(k => k.startsWith('sb-'))
+          .forEach(k => store.removeItem(k));
+      });
+    } catch (_) { /* storage unavailable in some envs */ }
     setCurrentUser(null);
     setProfile(null);
     setSession(null);

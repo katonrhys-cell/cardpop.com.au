@@ -41,13 +41,16 @@ const CardSkeleton = () => (
 
 // ─── Mini listing card for horizontal scroll sections ────────────────────────
 const MiniListingCard = ({ listing, accentHex, badge }) => {
-  const imgSrc = listing.vault_images?.[0]?.image_url || listing.image_url || listing.image || null;
-  const price = listing.price ?? listing.sale_price ?? 0;
-  const title = listing.title ?? listing.cardName ?? listing.name ?? 'Untitled';
+  const imgPath = listing.card_image || listing.vault_images?.[0]?.storage_path || null;
+  const imgSrc = imgPath
+    ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
+    : null;
+  const price = listing.estimated_value_aud ?? listing.price_aud ?? listing.price ?? 0;
+  const title = listing.card_name ?? listing.title ?? listing.name ?? 'Untitled';
   const source = listing.source ?? 'vault';
   const detailPath = `/product/${source}/${listing.id}/${slugify(title)}`;
-  const grade = listing.grade ?? listing.gradeText ?? listing.gradeScore;
-  const gradingCompany = listing.gradingCompany;
+  const grade = listing.grade;
+  const gradingCompany = listing.grading_company;
 
   return (
     <Link
@@ -100,9 +103,12 @@ const MiniListingCard = ({ listing, accentHex, badge }) => {
 
 // ─── Holy grail card (featured picks) ───────────────────────────────────────
 const HolyGrailCard = ({ card, accentHex }) => {
-  const imgSrc = card.vault_images?.[0]?.image_url || card.image_url || card.image || null;
-  const price = card.price ?? card.asking_price_aud ?? card.sale_price ?? 0;
-  const title = card.card_name ?? card.title ?? card.name ?? 'Featured Card';
+  const imgPath = card.card_image || card.vault_images?.[0]?.storage_path || null;
+  const imgSrc = imgPath
+    ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
+    : null;
+  const price = card.estimated_value_aud ?? 0;
+  const title = card.card_name ?? 'Featured Card';
   const sellerName = card.owner?.display_name || card.owner?.username || 'Seller';
   const sellerId = card.owner_id;
   const avatarSrc = card.owner?.avatar_url || null;
@@ -313,19 +319,17 @@ const CollectionPage = () => {
     if (!categoryId) return;
     setNewReleasesLoading(true);
 
-    Promise.allSettled([
-      supabase.from('vault_items').select('*, vault_images(*)').eq('category_id', categoryId).neq('listing_status', 'private').order('created_at', { ascending: false }).limit(8),
-      supabase.from('listings').select('*').eq('category_id', categoryId).eq('type', 'shop').order('created_at', { ascending: false }).limit(8),
-    ]).then(([vaultRes, shopRes]) => {
-      if (!isMounted.current) return;
-      const vaultItems = vaultRes.status === 'fulfilled' ? (vaultRes.value.data ?? []).map(i => ({ ...i, source: 'vault' })) : [];
-      const shopItems = shopRes.status === 'fulfilled' ? (shopRes.value.data ?? []).map(i => ({ ...i, source: 'shop' })) : [];
-      const merged = [...vaultItems, ...shopItems]
-        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-        .slice(0, 10);
-      setNewReleases(merged);
-      setNewReleasesLoading(false);
-    });
+    supabase.from('vault_items')
+      .select('*, vault_images(*)')
+      .eq('category_id', categoryId)
+      .eq('is_public', true)
+      .order('created_at', { ascending: false })
+      .limit(10)
+      .then(({ data }) => {
+        if (!isMounted.current) return;
+        setNewReleases((data ?? []).map(i => ({ ...i, source: 'vault' })));
+        setNewReleasesLoading(false);
+      });
   }, [categoryId]);
 
   // ─── Graded Slabs ─────────────────────────────────────────────────────────
@@ -335,8 +339,9 @@ const CollectionPage = () => {
 
     supabase.from('vault_items').select('*, vault_images(*)')
       .eq('category_id', categoryId)
-      .neq('listing_status', 'private')
-      .not('grade_score', 'is', null)
+      .eq('is_public', true)
+      .not('grade', 'is', null)
+      .neq('grading_company', 'raw')
       .order('created_at', { ascending: false })
       .limit(10)
       .then(({ data }) => {
@@ -356,9 +361,9 @@ const CollectionPage = () => {
 
     supabase.from('vault_items').select('*, vault_images(*)')
       .eq('category_id', categoryId)
-      .neq('listing_status', 'private')
-      .gt('asking_price_aud', 0)
-      .order('asking_price_aud', { ascending: false })
+      .eq('is_public', true)
+      .gt('estimated_value_aud', 0)
+      .order('estimated_value_aud', { ascending: false })
       .limit(8)
       .then(({ data }) => {
         if (!isMounted.current) return;
@@ -375,7 +380,12 @@ const CollectionPage = () => {
     setHolyGrailLoading(true);
     const loadHolyGrail = async () => {
       try {
-        let query = supabase.from('vault_items').select('*, vault_images(*), owner:profiles!owner_id(*)').eq('is_featured', true).neq('listing_status', 'private').limit(6);
+        let query = supabase.from('vault_items')
+          .select('*, vault_images(*), owner:profiles!owner_id(*)')
+          .eq('is_public', true)
+          .gt('estimated_value_aud', 0)
+          .order('estimated_value_aud', { ascending: false })
+          .limit(6);
         if (categoryId) query = query.eq('category_id', categoryId);
         const { data: featured } = await query;
         if (isMounted.current) setHolyGrail((featured ?? []).map(i => ({ ...i, source: 'vault' })));
@@ -397,35 +407,37 @@ const CollectionPage = () => {
     const from = (page - 1) * perPage;
 
     try {
-      let vaultQ = supabase.from('vault_items').select('*, vault_images(*)', { count: 'exact' }).eq('category_id', categoryId).neq('listing_status', 'private').range(from, from + perPage - 1);
-      let shopQ  = supabase.from('listings').select('*', { count: 'exact' }).eq('category_id', categoryId).eq('type', 'shop').range(from, from + perPage - 1);
+      // Query active listings, joining vault_items (inner so only listings with
+      // matching vault items are returned) to apply the category filter.
+      let q = supabase.from('listings')
+        .select(
+          `*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(display_name, username, avatar_url, rating, reviews_count)`,
+          { count: 'exact' }
+        )
+        .eq('status', 'active')
+        .eq('vault_items.category_id', categoryId)
+        .range(from, from + perPage - 1);
 
-      if (filterSub) { vaultQ = vaultQ.eq('subcategory_id', filterSub); shopQ = shopQ.eq('subcategory_id', filterSub); }
-      if (filterCondition) vaultQ = vaultQ.eq('condition', filterCondition);
+      if (filterCondition) q = q.eq('vault_items.condition', filterCondition);
 
       if (filterType === 'For Sale') {
-        vaultQ = vaultQ.in('listing_status', ['for_sale', 'for_both']);
+        q = q.in('listing_type', ['fixed', 'auction']);
       } else if (filterType === 'For Trade') {
-        vaultQ = vaultQ.in('listing_status', ['for_trade', 'for_both']);
-        shopQ = shopQ.eq('id', 'NONE');
+        q = q.eq('listing_type', 'trade');
       }
 
-      if (filterSort === '-created') { vaultQ = vaultQ.order('created_at', { ascending: false }); shopQ = shopQ.order('created_at', { ascending: false }); }
-      else if (filterSort === 'price') { vaultQ = vaultQ.order('asking_price_aud'); shopQ = shopQ.order('price_aud'); }
-      else if (filterSort === '-price') { vaultQ = vaultQ.order('asking_price_aud', { ascending: false }); shopQ = shopQ.order('price_aud', { ascending: false }); }
+      if (filterSort === '-created') { q = q.order('created_at', { ascending: false }); }
+      else if (filterSort === 'price') { q = q.order('price_aud'); }
+      else if (filterSort === '-price') { q = q.order('price_aud', { ascending: false }); }
+      else { q = q.order('created_at', { ascending: false }); }
 
-      const [vaultRes, shopRes] = await Promise.allSettled([vaultQ, shopQ]);
+      const { data, error, count } = await q;
 
       if (!isMounted.current) return;
+      if (error) throw error;
 
-      const vaultItems = vaultRes.status === 'fulfilled' ? (vaultRes.value.data ?? []).map(i => ({ ...i, source: 'vault' })) : [];
-      const shopItems  = shopRes.status === 'fulfilled' ? (shopRes.value.data ?? []).map(i => ({ ...i, source: 'shop' })) : [];
-      const vaultTotal = vaultRes.status === 'fulfilled' ? (vaultRes.value.count ?? 0) : 0;
-      const shopTotal  = shopRes.status === 'fulfilled' ? (shopRes.value.count ?? 0) : 0;
-
-      const merged = [...vaultItems, ...shopItems];
-      setListings(page === 1 ? merged : prev => [...prev, ...merged]);
-      setTotalListings(vaultTotal + shopTotal);
+      setListings(page === 1 ? (data ?? []) : prev => [...prev, ...(data ?? [])]);
+      setTotalListings(count ?? 0);
       setListingsPage(page);
     } catch (err) {
       if (isMounted.current) setListingsError('Failed to load listings. Please try again.');
@@ -827,14 +839,13 @@ const CollectionPage = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">All Conditions</SelectItem>
-                      <SelectItem value="Mint">Mint</SelectItem>
-                      <SelectItem value="Near Mint">Near Mint</SelectItem>
-                      <SelectItem value="Excellent">Excellent</SelectItem>
-                      <SelectItem value="Good">Good</SelectItem>
-                      <SelectItem value="Light Play">Light Play</SelectItem>
-                      <SelectItem value="Moderate Play">Moderate Play</SelectItem>
-                      <SelectItem value="Heavy Play">Heavy Play</SelectItem>
-                      <SelectItem value="Damaged">Damaged</SelectItem>
+                      <SelectItem value="mint">Mint</SelectItem>
+                      <SelectItem value="near_mint">Near Mint</SelectItem>
+                      <SelectItem value="excellent">Excellent</SelectItem>
+                      <SelectItem value="good">Good</SelectItem>
+                      <SelectItem value="light_played">Light Played</SelectItem>
+                      <SelectItem value="played">Played</SelectItem>
+                      <SelectItem value="poor">Poor</SelectItem>
                     </SelectContent>
                   </Select>
 
