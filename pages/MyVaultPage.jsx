@@ -66,10 +66,29 @@ const MyVaultPage = () => {
     fetchVault();
   }, [fetchVault]);
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this card from your vault?")) return;
+  const handleDelete = async (cardId) => {
     try {
-      const { error } = await supabase.from('vault_items').delete().eq('id', id);
+      const { data: activeListing } = await supabase
+        .from('listings')
+        .select('id')
+        .eq('vault_item_id', cardId)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (activeListing) {
+        if (!window.confirm(
+          "This card has an active marketplace listing. Deleting it will also archive that listing. Continue?"
+        )) return;
+        const { error: archiveErr } = await supabase
+          .from('listings')
+          .update({ status: 'archived' })
+          .eq('id', activeListing.id);
+        if (archiveErr) throw archiveErr;
+      } else {
+        if (!window.confirm("Delete this card from your vault?")) return;
+      }
+
+      const { error } = await supabase.from('vault_items').delete().eq('id', cardId);
       if (error) throw error;
       toast.success("Card deleted successfully");
       fetchVault();
