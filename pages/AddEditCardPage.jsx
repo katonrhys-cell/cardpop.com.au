@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, Sparkles, Loader2 } from 'lucide-react';
+import { ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, Sparkles, Loader2, Lock, ShoppingCart, ArrowRightLeft, Layers } from 'lucide-react';
 import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -36,7 +36,43 @@ const AddEditCardPage = () => {
     estimatedValue: '',
     notes: '',
     tradeValue: '',
+    listingType: 'private',
   });
+
+  const LISTING_OPTIONS = [
+    {
+      value: 'private',
+      label: 'Private',
+      description: 'Only visible to you',
+      Icon: Lock,
+      activeClass: 'border-slate-500 bg-slate-500/10 text-slate-700 dark:text-slate-300',
+      iconClass: 'text-slate-500',
+    },
+    {
+      value: 'For Sale',
+      label: 'For Sale',
+      description: 'List with a price',
+      Icon: ShoppingCart,
+      activeClass: 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+      iconClass: 'text-emerald-500',
+    },
+    {
+      value: 'For Trade',
+      label: 'For Trade',
+      description: 'Open to trades',
+      Icon: ArrowRightLeft,
+      activeClass: 'border-violet-500 bg-violet-500/10 text-violet-700 dark:text-violet-400',
+      iconClass: 'text-violet-500',
+    },
+    {
+      value: 'For Sale & Trade',
+      label: 'Sale & Trade',
+      description: 'Both options open',
+      Icon: Layers,
+      activeClass: 'border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-400',
+      iconClass: 'text-amber-500',
+    },
+  ];
 
   useEffect(() => {
     if (isEdit) {
@@ -64,6 +100,7 @@ const AddEditCardPage = () => {
             estimatedValue: card.estimated_value_aud || '',
             notes: card.notes || '',
             tradeValue: card.trade_value_aud || '',
+            listingType: card.listing_type || 'private',
           });
 
           if (card.card_image) {
@@ -162,6 +199,7 @@ const AddEditCardPage = () => {
       }
 
       const tradeAud = parseFloat(formData.tradeValue) || 0;
+      const isPublic = formData.listingType !== 'private';
       const payload = {
         owner_id:            currentUser.id,
         collection:          formData.collection || null,
@@ -172,6 +210,8 @@ const AddEditCardPage = () => {
         notes:               formData.notes?.trim() || null,
         trade_value_aud:     tradeAud,
         trade_value_locked:  tradeAud > 0,
+        listing_type:        isPublic ? formData.listingType : null,
+        is_public:           isPublic,
       };
 
       if (cardImagePath) {
@@ -202,6 +242,7 @@ const AddEditCardPage = () => {
                 notes: '',
                 estimatedValue: '',
                 tradeValue: '',
+                listingType: 'private',
               });
               setImageFile(null);
               setImagePreview(null);
@@ -382,39 +423,22 @@ const AddEditCardPage = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="estimatedValue" className="font-bold">Estimated Value <span className="text-destructive">*</span></Label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
-                      <Input 
-                        id="estimatedValue" 
-                        type="number" 
-                        min="0" 
-                        step="0.01" 
-                        required 
-                        value={formData.estimatedValue} 
-                        onChange={e => setFormData({...formData, estimatedValue: e.target.value})} 
-                        placeholder="0.00" 
-                        className={`h-12 pl-8 bg-background text-foreground tabular-nums transition-all ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''}`} 
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="tradeValue" className="font-bold">Trade Value (AUD)</Label>
+                    <Label htmlFor="estimatedValue" className="font-bold">Estimated Value (AUD) <span className="text-destructive">*</span></Label>
                     <div className="relative">
                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
                       <Input
-                        id="tradeValue"
+                        id="estimatedValue"
                         type="number"
                         min="0"
                         step="0.01"
-                        value={formData.tradeValue}
-                        onChange={e => setFormData({...formData, tradeValue: e.target.value})}
+                        required
+                        value={formData.estimatedValue}
+                        onChange={e => setFormData({...formData, estimatedValue: e.target.value})}
                         placeholder="0.00"
-                        className="h-12 pl-8 bg-background text-foreground tabular-nums"
+                        className={`h-12 pl-8 bg-background text-foreground tabular-nums transition-all ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''}`}
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground">Set a value if you're open to trading this card</p>
+                    <p className="text-xs text-muted-foreground">Market value for your own tracking</p>
                   </div>
 
                   <div className="space-y-2 md:col-span-2">
@@ -429,6 +453,82 @@ const AddEditCardPage = () => {
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* Section 2: Listing Visibility */}
+              <div className="premium-card p-6 bg-card space-y-5">
+                <div>
+                  <h2 className="font-serif text-2xl font-bold border-b border-border pb-4">Listing Visibility</h2>
+                  <p className="text-sm text-muted-foreground mt-3">Choose how this card appears to other collectors.</p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {LISTING_OPTIONS.map(({ value, label, description, Icon, activeClass, iconClass }) => {
+                    const isActive = formData.listingType === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setFormData(f => ({ ...f, listingType: value }))}
+                        className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                          isActive
+                            ? `${activeClass} shadow-sm`
+                            : 'border-border bg-background hover:border-muted-foreground/40 hover:bg-muted/30 text-foreground'
+                        }`}
+                      >
+                        <Icon className={`w-5 h-5 mt-0.5 shrink-0 ${isActive ? iconClass : 'text-muted-foreground'}`} />
+                        <div>
+                          <p className="font-bold text-sm leading-tight">{label}</p>
+                          <p className={`text-xs mt-0.5 ${isActive ? 'opacity-80' : 'text-muted-foreground'}`}>{description}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Conditional price fields */}
+                {(formData.listingType === 'For Sale' || formData.listingType === 'For Sale & Trade') && (
+                  <div className="space-y-2 pt-2 border-t border-border">
+                    <Label htmlFor="listingPrice" className="font-bold flex items-center gap-1.5">
+                      <ShoppingCart className="w-4 h-4 text-emerald-500" /> Asking Price (AUD)
+                    </Label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
+                      <input
+                        id="listingPrice"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formData.estimatedValue}
+                        onChange={e => setFormData(f => ({ ...f, estimatedValue: e.target.value }))}
+                        placeholder="0.00"
+                        className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background pl-8 tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {(formData.listingType === 'For Trade' || formData.listingType === 'For Sale & Trade') && (
+                  <div className="space-y-2 pt-2 border-t border-border">
+                    <Label htmlFor="tradeValueListing" className="font-bold flex items-center gap-1.5">
+                      <ArrowRightLeft className="w-4 h-4 text-violet-500" /> Trade Value (AUD)
+                    </Label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
+                      <input
+                        id="tradeValueListing"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formData.tradeValue}
+                        onChange={e => setFormData(f => ({ ...f, tradeValue: e.target.value }))}
+                        placeholder="0.00"
+                        className="flex h-12 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background pl-8 tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">The value you'd accept in traded cards</p>
+                  </div>
+                )}
               </div>
 
             </div>
