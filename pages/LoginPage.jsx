@@ -107,6 +107,7 @@ const LoginPage = () => {
       toast.success('Verification successful. Welcome back!');
       navigate(from, { replace: true });
     } catch (error) {
+      setMfaCode('');
       toast.error(error.message || 'Invalid verification code. Please try again.');
     } finally {
       setLoading(false);
