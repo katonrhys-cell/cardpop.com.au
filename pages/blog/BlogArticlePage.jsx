@@ -18,14 +18,15 @@ const BlogArticlePage = () => {
       setLoading(true);
       setError(null);
       try {
-        const { data: res, error: fetchErr } = await supabase.from('blog_posts').select('*').eq('id', id).single();
+        const { data: res, error: fetchErr } = await supabase.from('blog_articles').select('*').eq('id', id).single();
         if (fetchErr) throw fetchErr;
         setArticle(res);
         setHtmlContent(res.content_html || res.content || '');
 
         const { data: related } = await supabase
-          .from('blog_posts')
+          .from('blog_articles')
           .select('id, title, featured_image_url, content')
+          .eq('is_published', true)
           .neq('id', id)
           .order('created_at', { ascending: false })
           .limit(3);
