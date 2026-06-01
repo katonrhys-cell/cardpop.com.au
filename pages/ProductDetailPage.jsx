@@ -44,6 +44,52 @@ const ProductDetailPage = () => {
       }
       try {
         setLoading(true);
+
+        if (source === 'marketplace') {
+          const { data: listing, error: fetchError } = await supabase
+            .from('listings')
+            .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, rating, reviews_count, is_verified)')
+            .eq('id', id)
+            .eq('status', 'active')
+            .single();
+
+          if (fetchError) throw fetchError;
+          if (!isMounted) return;
+
+          const vi = listing.vault_item;
+          const images = [];
+          if (vi?.card_image) images.push(vi.card_image);
+          if (vi?.vault_images?.length) {
+            vi.vault_images.forEach(img => { if (img.storage_path) images.push(img.storage_path); });
+          }
+
+          const listingTypeMap = { fixed: 'For Sale', auction: 'For Sale', trade: 'For Trade', vault: 'Private' };
+
+          setProduct({
+            ...listing,
+            name: vi?.card_name || listing.title || 'Untitled',
+            price: listing.price_aud || 0,
+            description: listing.description || vi?.notes || '',
+            images,
+            condition: vi?.card_condition,
+            grade: vi?.grade,
+            grading_company: vi?.grading_company,
+            category: listing.category,
+            listing_type: listingTypeMap[listing.listing_type] || 'For Sale',
+            owner_id: listing.seller_id,
+          });
+
+          if (listing.seller) {
+            setSeller({
+              id: listing.seller_id,
+              business_name: listing.seller.display_name || listing.seller.username || 'Community Member',
+              is_verified: listing.seller.is_verified || false,
+              type: 'user',
+            });
+          }
+          return;
+        }
+
         const table = source === 'shop' ? 'listings' : 'vault_items';
         const { data, error: fetchError } = await supabase
           .from(table)
@@ -54,11 +100,9 @@ const ProductDetailPage = () => {
         if (fetchError) throw fetchError;
         if (!isMounted) return;
 
-        // Security check for Vault Products
         if (source === 'vault') {
           const userRole = isAdmin ? 'admin' : 'user';
           const isAuthorized = canViewVaultProduct(currentUser?.id, data.owner_id, data.is_public, userRole);
-
           if (!isAuthorized) {
             setError('403 Forbidden: You do not have permission to view this private vault item.');
             setLoading(false);
@@ -68,7 +112,6 @@ const ProductDetailPage = () => {
 
         setProduct(data);
 
-        // Fetch seller details
         if (source === 'shop') {
           setSeller({ business_name: 'CardPop Official Store', is_verified: true, type: 'official' });
         } else if (data.seller) {
@@ -149,7 +192,7 @@ const ProductDetailPage = () => {
           <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-6">
             {error?.includes('403') ? <Lock className="w-8 h-8 text-muted-foreground" /> : <PackageX className="w-8 h-8 text-muted-foreground" />}
           </div>
-          <h2 className="text-2xl font-bold mb-2 text-foreground">Access Restricted</h2>
+          <h2 className="text-2xl font-bold mb-2 text-foreground">{error?.includes('403') ? 'Access Restricted' : 'Not Found'}</h2>
           <p className="text-muted-foreground mb-8 leading-relaxed text-balance">
             {error || "This item could not be found or has been removed."}
           </p>
