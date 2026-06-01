@@ -30,25 +30,6 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
-      - name: Deploy to Hostinger via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./dist/
-          # Hostinger FTP users are chrooted inside public_html, so ./ is the correct root.
-          # Using /public_html/ resolves to a non-existent absolute path and causes 550 errors.
-          server-dir: ./
-          # dangerous-clean-slate avoids the hidden-file rename limitation on Hostinger FTP
-          # (incremental mode tries to upload as .in.<file> then rename, which fails with 550).
-          dangerous-clean-slate: true
-          log-level: minimal
-          exclude: |
-            **/.git*
-            **/.git*/**
-            **/node_modules/**
-            **/.ftp-deploy-sync-state.json
       - name: Install lftp
         run: sudo apt-get install -y lftp
 
