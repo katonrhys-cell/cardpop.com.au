@@ -33,21 +33,28 @@ const SellerProfilePage = () => {
         .from('vault_items')
         .select('*, vault_images(*)')
         .eq('owner_id', sellerId)
-        .in('listing_status', ['for_sale', 'for_trade', 'for_both'])
+        .in('listing_type', ['fixed', 'trade', 'both'])
+        .eq('is_public', true)
         .order('created_at', { ascending: false })
         .limit(50);
 
-      const mappedProducts = (items ?? []).map(c => ({
+      const mappedProducts = (items ?? []).map(c => {
+        const imgPath = c.card_image || c.vault_images?.[0]?.storage_path || null;
+        const imgSrc = imgPath
+          ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
+          : null;
+        return {
         id: c.id,
         source: 'vault',
         title: c.card_name || 'Vault Card',
-        collectionType: c.collection_type,
+        collectionType: c.collection,
         condition: c.condition,
-        price: c.asking_price_aud || c.estimated_value_aud || 0,
-        image: c.vault_images?.[0]?.image_url ?? null,
+        price: c.estimated_value_aud || 0,
+        image: imgSrc,
         sellerName: sellerData?.display_name || sellerData?.username || 'Vault Collector',
         ...c,
-      }));
+        };
+      });
       setProducts(mappedProducts);
 
       const { data: reviewsData } = await supabase

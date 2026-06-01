@@ -54,11 +54,11 @@ const MarketplacePage = () => {
       // Build listings query (listings table covers shop_products + vault listings)
       let query = supabase
         .from('listings')
-        .select('*, vault_item:vault_items(*, vault_images(*), categories(*)), seller:profiles!seller_id(*)')
+        .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, rating, reviews_count, is_verified)')
         .limit(100);
 
-      if (filterCat) query = query.eq('vault_item.categories.id', filterCat);
-      if (filterSub) query = query.eq('category_id', filterSub);
+      if (filterCat) query = query.eq('vault_items.category_id', filterCat);
+      if (filterSub) query = query.eq('vault_items.category_id', filterSub);
 
       // Filter by listing mode
       query = query.eq('status', 'active');

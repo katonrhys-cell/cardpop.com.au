@@ -37,7 +37,7 @@ const SellerDashboard = () => {
         supabase.from('listings').select('id', { count: 'exact', head: true }).eq('seller_id', currentUser.id),
         supabase.from('orders').select('total_aud').eq('seller_id', currentUser.id).eq('status', 'completed'),
         supabase.from('reviews').select('rating').eq('reviewee_id', currentUser.id),
-        supabase.from('vault_items').select('id, card_name, collection_type, listing_status, asking_price_aud').eq('owner_id', currentUser.id).in('listing_status', ['for_sale', 'for_trade']).order('updated_at', { ascending: false }).limit(50),
+        supabase.from('vault_items').select('id, card_name, collection, listing_type, estimated_value_aud').eq('owner_id', currentUser.id).in('listing_type', ['fixed', 'trade', 'both']).order('updated_at', { ascending: false }).limit(50),
       ]);
 
       if (!isMounted.current) return;
@@ -60,9 +60,9 @@ const SellerDashboard = () => {
       setCards(items.map(c => ({
         ...c,
         cardName: c.card_name,
-        collectionType: c.collection_type,
-        listingStatus: c.listing_status,
-        askingPrice: c.asking_price_aud,
+        collectionType: c.collection,
+        listingStatus: c.listing_type,
+        askingPrice: c.estimated_value_aud,
       })));
 
     } catch (err) {

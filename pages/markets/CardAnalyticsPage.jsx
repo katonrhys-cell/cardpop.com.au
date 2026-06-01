@@ -195,7 +195,7 @@ const CardAnalyticsPage = () => {
 
     Promise.all([
       supabase.from('listings').select('*').ilike('title', `%${term}%`).eq('type', 'shop').order('price_aud').limit(6).then(r => r.data ?? []),
-      supabase.from('vault_items').select('*').ilike('card_name', `%${term}%`).not('listing_status', 'eq', 'private').order('created_at', { ascending: false }).limit(6).then(r => r.data ?? []),
+      supabase.from('vault_items').select('*').ilike('card_name', `%${term}%`).eq('is_public', true).order('created_at', { ascending: false }).limit(6).then(r => r.data ?? []),
     ]).then(([shop, vault]) => {
       setListings(shop.map(i => ({ ...i, _source: 'shop' })));
       setVaultItems(vault.map(i => ({ ...i, _source: 'vault' })));

@@ -12,8 +12,8 @@ const SitemapPage = () => {
     const fetchSitemapData = async () => {
       try {
         const [vaultRes, shopRes] = await Promise.all([
-          supabase.from('vault_items').select('id, card_name').neq('listing_status', 'private').limit(100),
-          supabase.from('listings').select('id, title').eq('type', 'shop').limit(100),
+          supabase.from('vault_items').select('id, card_name').eq('is_public', true).limit(100),
+          supabase.from('listings').select('id, slug, vault_item_id').eq('status', 'active').limit(100),
         ]);
 
         const combined = [

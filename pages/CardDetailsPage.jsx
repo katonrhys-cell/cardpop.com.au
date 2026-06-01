@@ -57,24 +57,26 @@ const CardDetailsPage = () => {
           throw new Error('Product not found.');
         }
 
-        const imgUrl = data.vault_images?.[0]?.image_url
-          ?? (data.image_url?.startsWith('http') ? data.image_url : null);
+        const rawPath = data.vault_images?.[0]?.storage_path ?? data.card_image ?? null;
+        const imgUrl = rawPath
+          ? (rawPath.startsWith('http') ? rawPath : supabase.storage.from('vault-images').getPublicUrl(rawPath).data.publicUrl)
+          : null;
 
-        const isForSale = ['for_sale', 'for_both', 'active'].includes(data.listing_status ?? data.status);
-        const isForTrade = ['for_trade', 'for_both'].includes(data.listing_status ?? '');
+        const isForSale = ['fixed', 'auction', 'both'].includes(data.listing_type) || data.status === 'active';
+        const isForTrade = ['trade', 'both'].includes(data.listing_type ?? '');
 
         setCard({
           ...data,
           title: data.card_name || data.title || 'Unknown Card',
-          description: data.description || '',
-          salePrice: data.asking_price_aud ?? data.price_aud ?? data.estimated_value_aud ?? 0,
+          description: data.notes || data.description || '',
+          salePrice: data.price_aud ?? data.estimated_value_aud ?? 0,
           tradeValue: data.trade_value_aud ?? data.estimated_value_aud ?? 0,
           condition: data.condition || 'Unknown',
           image: imgUrl,
           isForSale,
           isForTrade,
-          collectionType: data.collection_type || data.category || 'Trading Card',
-          grade: data.grade_score ? String(data.grade_score) : null,
+          collectionType: data.collection || data.category || 'Trading Card',
+          grade: data.grade ? String(data.grade) : null,
         });
 
         const ownerProfile = data.owner ?? data.seller;

@@ -71,7 +71,7 @@ const ProductDetailPage = () => {
             price: listing.price_aud || 0,
             description: listing.description || vi?.notes || '',
             images,
-            condition: vi?.card_condition,
+            condition: vi?.condition,
             grade: vi?.grade,
             grading_company: vi?.grading_company,
             category: listing.category,
