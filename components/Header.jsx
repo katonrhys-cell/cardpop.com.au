@@ -5,7 +5,8 @@ import {
   ShoppingCart, Menu, Shield, MessageSquare, ArrowRightLeft,
   LayoutDashboard, Package, Users, Calendar, FileText, Building2, Layers, CheckCircle,
   Sun, Moon, ChevronDown, ArrowRight, Layers2, User, LogOut, Settings,
-  FolderTree, ListOrdered, BarChart3, Store
+  FolderTree, ListOrdered, BarChart3, Store,
+  BookOpen, Globe, Star, Award, TrendingUp, Newspaper
 } from 'lucide-react';
 import { useDarkMode } from '@/hooks/useDarkMode.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -33,6 +34,15 @@ export const SPORTS_COLLECTIONS = [
 ];
 
 export const COLLECTIONS_LIST = [...TCG_COLLECTIONS, ...SPORTS_COLLECTIONS].sort();
+
+const BLOG_CATEGORIES = [
+  { slug: 'australia-focus',  label: 'Australia Focus',   desc: 'Local TCG market and events',         Icon: Globe,     gradient: 'from-green-500 to-emerald-600' },
+  { slug: 'beginner-guides',  label: 'Beginner Guides',   desc: 'Guides for new collectors',           Icon: BookOpen,  gradient: 'from-blue-500 to-indigo-600'   },
+  { slug: 'card-spotlight',   label: 'Card Spotlight',    desc: 'Deep dives into iconic cards',         Icon: Star,      gradient: 'from-yellow-500 to-orange-500' },
+  { slug: 'grading-guides',   label: 'Grading Guides',    desc: 'Grading standards and preparation',   Icon: Award,     gradient: 'from-purple-500 to-violet-600' },
+  { slug: 'investing-value',  label: 'Investing & Value', desc: 'Investment strategies and valuation', Icon: TrendingUp, gradient: 'from-rose-500 to-pink-600'    },
+  { slug: 'news-releases',    label: 'News & Releases',   desc: 'Latest TCG releases and industry news', Icon: Newspaper, gradient: 'from-cyan-500 to-sky-600'  },
+];
 
 const NAV_LINKS = [
   { label: 'Home', href: '/' },
@@ -243,6 +253,112 @@ const BrowseDropdown = ({ onNavigate }) => {
               </div>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Blog mega-dropdown ───────────────────────────────────────────────────────
+const BlogDropdown = ({ onNavigate }) => {
+  const [open, setOpen] = useState(false);
+  const location = useLocation();
+  const timerRef = useRef(null);
+  const isBlogActive = location.pathname.startsWith('/blog');
+
+  const handleMouseEnter = () => { clearTimeout(timerRef.current); setOpen(true); };
+  const handleMouseLeave = () => { timerRef.current = setTimeout(() => setOpen(false), 120); };
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  return (
+    <div className="relative" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        className={`flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+          open || isBlogActive
+            ? 'bg-primary text-primary-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+        }`}
+      >
+        Blog
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-72 bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+          <Link
+            to="/blog"
+            onClick={() => { setOpen(false); onNavigate?.(); }}
+            className="flex items-center justify-between px-5 py-3.5 border-b border-border hover:bg-muted/60 transition-colors group"
+          >
+            <div>
+              <span className="text-sm font-bold text-foreground">The Parallel Report</span>
+              <p className="text-xs text-muted-foreground mt-0.5">All articles and stories</p>
+            </div>
+            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
+          </Link>
+          <div className="p-3 grid gap-0.5">
+            {BLOG_CATEGORIES.map(cat => (
+              <Link
+                key={cat.slug}
+                to={`/blog/category/${cat.slug}`}
+                onClick={() => { setOpen(false); onNavigate?.(); }}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
+              >
+                <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${cat.gradient} shrink-0 shadow-sm`}>
+                  <cat.Icon className="w-4 h-4 text-white" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{cat.label}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{cat.desc}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Mobile blog section (expandable) ────────────────────────────────────────
+const MobileBlogSection = ({ onNavigate }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-4">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-muted transition-colors mb-0.5"
+      >
+        <span className="text-sm font-bold text-foreground flex items-center gap-2">
+          <BookOpen className="w-4 h-4 text-primary" />
+          The Parallel Report
+        </span>
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="flex flex-col gap-0.5 mb-1 pl-2">
+          <Link
+            to="/blog"
+            onClick={onNavigate}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-semibold text-muted-foreground"
+          >
+            All Articles
+          </Link>
+          {BLOG_CATEGORIES.map(cat => (
+            <Link
+              key={cat.slug}
+              to={`/blog/category/${cat.slug}`}
+              onClick={onNavigate}
+              className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
+            >
+              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${cat.gradient} shrink-0`}>
+                <cat.Icon className="w-3.5 h-3.5 text-white" />
+              </span>
+              <span className="text-xs font-semibold text-foreground truncate">{cat.label}</span>
+            </Link>
+          ))}
         </div>
       )}
     </div>
@@ -531,8 +647,14 @@ const Header = () => {
                     onNavigate={() => setMobileMenuOpen(false)}
                   />
 
+                  {/* Mobile Blog categories */}
+                  <MobileBlogSection
+                    key={`blog-${String(mobileMenuOpen)}`}
+                    onNavigate={() => setMobileMenuOpen(false)}
+                  />
+
                   <nav className="flex flex-col gap-1.5 mb-6">
-                    {NAV_LINKS.map((link) => {
+                    {NAV_LINKS.filter(l => l.label !== 'Blog').map((link) => {
                       const isActive = isNavLinkActive(link);
                       return (
                         <Link
@@ -630,6 +752,9 @@ const Header = () => {
           <nav className="flex items-center justify-evenly w-full">
             <BrowseDropdown onNavigate={() => setMobileMenuOpen(false)} />
             {NAV_LINKS.map((link) => {
+              if (link.label === 'Blog') {
+                return <BlogDropdown key="blog" onNavigate={() => setMobileMenuOpen(false)} />;
+              }
               const isActive = isNavLinkActive(link);
               return (
                 <Link
