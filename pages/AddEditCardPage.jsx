@@ -18,7 +18,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSeparator } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { useCardAnalysis } from '@/hooks/useCardAnalysis.js';
+import { useCardOCR } from '@/hooks/useCardOCR.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -64,7 +64,7 @@ const AddEditCardPage = () => {
   const [isAutoFilled, setIsAutoFilled] = useState(false);
   const [categoryId, setCategoryId] = useState(null);
 
-  const { analyzeCardImage, isAnalyzing, analysisResult, clearAnalysis } = useCardAnalysis();
+  const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
 
   const emptyForm = {
     // Card identity
@@ -179,23 +179,27 @@ const AddEditCardPage = () => {
 
   // ─── AI auto-fill ─────────────────────────────────────────────────────────
   const handleApplyAI = () => {
-    if (!analysisResult) return;
+    if (!scanResult) return;
     const conditionMap = {
       'Mint': 'mint', 'Near Mint': 'near_mint', 'Excellent': 'excellent',
-      'Good': 'good', 'Fair': 'light_played', 'Played': 'played', 'Poor': 'poor',
+      'Good': 'good', 'Fair': 'light_played',
     };
+    const gradingCompanyMap = { 'PSA': 'psa', 'BGS': 'bgs', 'CGC': 'cgc' };
     setFormData(prev => ({
       ...prev,
-      cardName:       analysisResult.cardName       || prev.cardName,
-      collection:     analysisResult.mappedType     || prev.collection,
-      condition:      conditionMap[analysisResult.mappedCondition] || prev.condition,
-      estimatedValue: analysisResult.estimatedValue ? String(analysisResult.estimatedValue) : prev.estimatedValue,
-      grade:          analysisResult.gradeScore     ? String(analysisResult.gradeScore) : prev.grade,
-      gradingCompany: analysisResult.gradeScore     ? (prev.gradingCompany === 'raw' ? 'psa' : prev.gradingCompany) : prev.gradingCompany,
+      cardName:       scanResult.name               || prev.cardName,
+      collection:     scanResult.collectionType     || prev.collection,
+      setName:        scanResult.cardSetName        || prev.setName,
+      cardNumber:     scanResult.cardNumber         || prev.cardNumber,
+      year:           scanResult.releaseYear        || prev.year,
+      condition:      conditionMap[scanResult.condition] || prev.condition,
+      grade:          scanResult.gradeScore         || prev.grade,
+      gradingCompany: gradingCompanyMap[scanResult.gradingService] ?? prev.gradingCompany,
+      certNumber:     scanResult.certificationNumber || prev.certNumber,
       notes: [
-        analysisResult.details,
-        analysisResult.rarity     ? `Rarity: ${analysisResult.rarity}` : '',
-        analysisResult.cardType   ? `Type: ${analysisResult.cardType}` : '',
+        scanResult.description,
+        scanResult.rarity   ? `Rarity: ${scanResult.rarity}` : '',
+        scanResult.cardType ? `Type: ${scanResult.cardType}` : '',
       ].filter(Boolean).join('\n') || prev.notes,
     }));
     toast.success('Fields auto-filled successfully. Please review and edit as needed.');
@@ -354,36 +358,36 @@ const AddEditCardPage = () => {
 
                 {/* AI Analysis */}
                 <div className="mt-4">
-                  {!analysisResult && imageFile && (
+                  {!scanResult && imageFile && (
                     <Button
                       type="button"
                       variant="secondary"
-                      onClick={() => analyzeCardImage(imageFile)}
-                      disabled={isAnalyzing}
+                      onClick={() => scanCard(imageFile)}
+                      disabled={isScanning}
                       className="w-full bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20"
                     >
-                      {isAnalyzing
+                      {isScanning
                         ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Analyzing...</>
                         : <><Sparkles className="w-4 h-4 mr-2" /> Analyze with AI</>
                       }
                     </Button>
                   )}
-                  {analysisResult && (
+                  {scanResult && (
                     <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl animate-in fade-in slide-in-from-top-2">
                       <h4 className="font-bold text-sm text-primary mb-3 flex items-center gap-2">
                         <Sparkles className="w-4 h-4" /> AI Analysis Results
                       </h4>
                       <div className="grid grid-cols-2 gap-2 text-sm text-foreground/80 mb-4">
-                        <div className="col-span-2"><strong className="text-foreground">Name:</strong> {analysisResult.cardName || 'N/A'}</div>
-                        <div><strong className="text-foreground">Category:</strong> {analysisResult.mappedType || 'N/A'}</div>
-                        <div><strong className="text-foreground">Condition:</strong> {analysisResult.mappedCondition || 'N/A'}</div>
-                        {analysisResult.estimatedValue && <div><strong className="text-foreground">Est. Value:</strong> ${analysisResult.estimatedValue}</div>}
-                        {analysisResult.gradeScore && <div><strong className="text-foreground">Grade:</strong> {analysisResult.gradeScore}</div>}
-                        {analysisResult.rarity && <div className="col-span-2"><strong className="text-foreground">Rarity:</strong> {analysisResult.rarity}</div>}
+                        <div className="col-span-2"><strong className="text-foreground">Name:</strong> {scanResult.name || 'N/A'}</div>
+                        <div><strong className="text-foreground">Category:</strong> {scanResult.collectionType || 'N/A'}</div>
+                        <div><strong className="text-foreground">Condition:</strong> {scanResult.condition || 'N/A'}</div>
+                        {scanResult.cardSetName && <div><strong className="text-foreground">Set:</strong> {scanResult.cardSetName}</div>}
+                        {scanResult.gradeScore && <div><strong className="text-foreground">Grade:</strong> {scanResult.gradeScore}</div>}
+                        {scanResult.rarity && <div className="col-span-2"><strong className="text-foreground">Rarity:</strong> {scanResult.rarity}</div>}
                       </div>
                       <div className="flex gap-2 pt-3 border-t border-primary/10">
                         <Button type="button" size="sm" onClick={handleApplyAI} className="flex-1 font-semibold">Auto-fill Fields</Button>
-                        <Button type="button" size="sm" variant="outline" onClick={() => { clearAnalysis(); setIsAutoFilled(false); }} className="flex-1">Clear</Button>
+                        <Button type="button" size="sm" variant="outline" onClick={() => { clearScan(); setIsAutoFilled(false); }} className="flex-1">Clear</Button>
                       </div>
                     </div>
                   )}
