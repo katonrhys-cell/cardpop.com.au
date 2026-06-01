@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { CalendarDays, Search, MapPin, SlidersHorizontal, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -126,10 +126,7 @@ const CommunityEventsPage = () => {
 
   return (
     <div className="flex flex-col bg-background font-sans min-h-screen">
-      <Helmet>
-        <title>Community Events | CardPop</title>
-        <meta name="description" content="Find TCG tournaments, card fairs, and collector shows happening across Australia." />
-      </Helmet>
+      <SEOHead title="Community Events | CardPop" description="Find TCG tournaments, card fairs, and collector shows happening across Australia." />
 
       {/* Hero — matches all other main section pages */}
       <section className="bg-card border-b border-border py-20 text-center">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { CalendarDays } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -77,10 +77,7 @@ const CommunityEventsPage = () => {
   
   return (
     <div className="flex flex-col bg-background font-sans min-h-screen">
-      <Helmet>
-        <title>Community Events | Card Pop</title>
-        <meta name="description" content="Discover upcoming trading card events, trade shows, and exhibits across Australia." />
-      </Helmet>
+      <SEOHead title="Community Events | CardPop" description="Find TCG tournaments, card fairs and collector shows happening across Australia." />
       
       <div className="bg-card py-16 relative overflow-hidden border-b border-border shadow-sm">
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1593814681464-eef5af2b0628?auto=format&fit=crop&w=1920&q=80')] opacity-5 mix-blend-overlay bg-cover bg-center" />

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, SlidersHorizontal, PackageX, Package } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -90,10 +90,7 @@ const ShopSealedBoxesPage = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <Helmet>
-        <title>Sealed Boxes | The Shop</title>
-        <meta name="description" content="Shop premium sealed booster boxes and premium collections." />
-      </Helmet>
+      <SEOHead title="Sealed Boxes | CardPop Shop" description="Shop official sealed booster boxes and products. Fast shipping across Australia." />
 
       {/* Header Section */}
       <section className="bg-secondary border-b border-border py-12 px-4 sm:px-6 lg:px-8">

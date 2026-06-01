@@ -1,5 +1,5 @@
 import React from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { ShieldCheck } from 'lucide-react';
 import InfoPageLayout from '@/components/InfoPageLayout.jsx';
 
@@ -11,10 +11,7 @@ const PrivacyPage = () => {
       title="Privacy Policy"
       description="How we collect, use, and protect your personal information."
     >
-      <Helmet>
-        <title>Privacy Policy | CardPop</title>
-        <meta name="description" content="CardPop's privacy policy — how we collect, use, and protect your personal information." />
-      </Helmet>
+      <SEOHead title="Privacy Policy | CardPop" description="CardPop's privacy policy — how we collect, use and protect your personal information." />
 
       <p className="text-sm text-muted-foreground mb-8">Last Updated: May 10, 2026</p>
 

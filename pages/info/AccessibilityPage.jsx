@@ -1,5 +1,5 @@
 import React from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import InfoPageLayout from '@/components/InfoPageLayout.jsx';
 
 const AccessibilityPage = () => {
@@ -9,9 +9,7 @@ const AccessibilityPage = () => {
       description="Our commitment to making CardPop accessible to everyone."
       breadcrumbs={[{ label: 'Accessibility' }]}
     >
-      <Helmet>
-        <title>Accessibility | CardPop</title>
-      </Helmet>
+      <SEOHead title="Accessibility | CardPop" description="CardPop's commitment to making our trading card marketplace accessible to everyone." />
       
       <h2>Our Commitment</h2>
       <p>CardPop is committed to ensuring digital accessibility for people with disabilities. We are continually improving the user experience for everyone and applying the relevant accessibility standards.</p>

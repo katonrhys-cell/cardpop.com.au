@@ -1,5 +1,5 @@
 import React from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { ShieldCheck, Users, Sparkles, ArrowRight, Target, History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,10 +8,7 @@ import { Card } from '@/components/ui/card';
 const AboutPage = () => {
   return (
     <div className="flex flex-col bg-background min-h-screen">
-      <Helmet>
-        <title>About Us | CardPop Australia</title>
-        <meta name="description" content="Learn about CardPop Australia's mission, history, and the team behind the premier trading card marketplace." />
-      </Helmet>
+      <SEOHead title="About CardPop | Australia's Trading Card Marketplace" description="Learn about CardPop — Australia's premier platform for buying, selling and trading Pokemon, Magic and sports cards." />
 
       {/* 1. HERO SECTION */}
       <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 overflow-hidden bg-card border-b border-border shadow-sm">

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BarChart3, ArrowLeft } from 'lucide-react';
@@ -37,7 +37,7 @@ const MarketDetailPage = () => {
 
   return (
     <div className="container-default section-padding min-h-screen">
-      <Helmet><title>{data.marketName} Market Data | CardPop</title></Helmet>
+      <SEOHead title={data ? `${data.marketName} Market Data | CardPop` : 'Market Data | CardPop'} description={data?.description || (data ? `Track ${data.marketName} card prices, trends and analytics on CardPop.` : 'Market analytics on CardPop')} />
       
       <div className="flex items-center gap-4 mb-8">
         <div className="p-4 bg-primary/10 rounded-2xl">

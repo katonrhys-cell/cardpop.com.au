@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { motion, useInView } from 'framer-motion';
 import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, CheckCircle2 } from 'lucide-react';
@@ -184,7 +184,7 @@ const HomePage = () => {
     const fetchHomeData = async () => {
       try {
         const [listingsRes, sellersRes] = await Promise.all([
-          supabase.from('vault_items').select('*, owner:profiles!owner_id(id, display_name, username, avatar_url), vault_images(*)').in('listing_status', ['for_sale', 'for_trade', 'for_both']).order('created_at', { ascending: false }).limit(4),
+          supabase.from('vault_items').select('*, owner:profiles!owner_id(id, display_name, username, avatar_url), vault_images(*)').eq('is_public', true).in('listing_type', ['fixed', 'trade', 'both']).order('created_at', { ascending: false }).limit(4),
           supabase.from('profiles').select('*').eq('is_featured_seller', true).eq('is_active', true).limit(4),
         ]);
 
@@ -205,10 +205,10 @@ const HomePage = () => {
 
   return (
     <div className="min-h-screen bg-background font-sans overflow-hidden">
-      <Helmet>
-        <title>CardPop | Australia's Trading Card Marketplace</title>
-        <meta name="description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop — Australia's most trusted trading card platform." />
-      </Helmet>
+      <SEOHead
+        title="CardPop | Australia's Trading Card Marketplace"
+        description="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop — Australia's most trusted trading card platform."
+      />
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section className="relative min-h-[92dvh] flex items-center justify-center pt-20 pb-32 px-4 sm:px-6 lg:px-8 overflow-hidden">

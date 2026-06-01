@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { CheckCircle, Send } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -46,9 +46,7 @@ const ContactPage = () => {
       description="We're here to help. Send us a message and we'll respond as soon as possible."
       breadcrumbs={[{ label: 'Contact' }]}
     >
-      <Helmet>
-        <title>Contact Us | CardPop</title>
-      </Helmet>
+      <SEOHead title="Contact Us | CardPop" description="Get in touch with the CardPop team. We're here to help with buying, selling, trading and grading questions." />
 
       {submitted ? (
         <div className="text-center py-16 max-w-md mx-auto">

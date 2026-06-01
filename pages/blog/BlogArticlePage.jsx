@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, FileText } from 'lucide-react';
@@ -18,14 +18,15 @@ const BlogArticlePage = () => {
       setLoading(true);
       setError(null);
       try {
-        const { data: res, error: fetchErr } = await supabase.from('blog_posts').select('*').eq('id', id).single();
+        const { data: res, error: fetchErr } = await supabase.from('blog_articles').select('*').eq('id', id).single();
         if (fetchErr) throw fetchErr;
         setArticle(res);
         setHtmlContent(res.content_html || res.content || '');
 
         const { data: related } = await supabase
-          .from('blog_posts')
+          .from('blog_articles')
           .select('id, title, featured_image_url, content')
+          .eq('is_published', true)
           .neq('id', id)
           .order('created_at', { ascending: false })
           .limit(3);
@@ -74,10 +75,11 @@ const BlogArticlePage = () => {
 
   return (
     <article className="min-h-[100dvh] bg-background pb-24 overflow-x-hidden">
-      <Helmet>
-        <title>{`${article.title} | CardPop Blog`}</title>
-        <meta name="description" content={`Read ${article.title} on CardPop Blog.`} />
-      </Helmet>
+      <SEOHead
+        title={`${article.title} | CardPop Blog`}
+        description={article.excerpt || `Read ${article.title} on The Parallel Report — CardPop's trading card blog.`}
+        ogImage={article.featured_image_url || undefined}
+      />
       
       <div className="container-default pt-12 pb-8">
         <Link to="/blog" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors group">

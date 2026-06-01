@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronDown, ChevronRight, Star, ArrowRight, Plus,
@@ -481,10 +481,7 @@ const CollectionPage = () => {
 
   return (
     <>
-      <Helmet>
-        <title>{seoTitle}</title>
-        <meta name="description" content={seoDescription} />
-      </Helmet>
+      <SEOHead title={seoTitle} description={seoDescription} />
 
       {/* ── HERO ──────────────────────────────────────────────────────────── */}
       <section className={`relative overflow-hidden bg-gradient-to-br ${heroGradient} pt-16 pb-20`}>

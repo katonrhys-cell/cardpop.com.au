@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import {
   TrendingUp, TrendingDown, Search, LineChart, Star, StarOff,
@@ -292,7 +292,7 @@ const MarketsPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Helmet><title>Card Market Analytics | CardPop</title></Helmet>
+      <SEOHead title="Card Market Analytics | CardPop" description="Track trading card market prices and trends for Pokemon, Magic: The Gathering, Yu-Gi-Oh and more in Australia." />
 
       {/* Hero */}
       <section className="bg-card border-b border-border py-20 text-center">

@@ -1,11 +1,11 @@
 import React from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { BookOpen, ChevronRight, ArrowLeft } from 'lucide-react';
 
 const WhatIsGradingPage = () => (
   <div className="min-h-screen bg-background">
-    <Helmet><title>What is Card Grading? | CardPop</title></Helmet>
+    <SEOHead title="What is Card Grading? | CardPop" description="Discover what professional card grading is, why it matters, and how it can increase the value of your trading card collection." />
 
     <section className="bg-card border-b border-border py-20 text-center">
       <div className="container-default">

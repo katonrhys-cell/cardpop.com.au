@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { formatCurrency } from '@/api/EcommerceApi';
 import { Button } from '@/components/ui/button';
@@ -36,7 +36,7 @@ const MarketplaceListingPage = () => {
 
   return (
     <div className="container-default section-padding min-h-[80vh]">
-      <Helmet><title>{listing.title} | Marketplace</title></Helmet>
+      <SEOHead title={listing ? `${listing.title} | CardPop Marketplace` : 'CardPop Marketplace'} description={listing?.description || listing?.title || 'View this marketplace listing on CardPop'} />
       
       <div className="flex flex-col lg:flex-row gap-12">
         <div className="w-full lg:w-3/5">

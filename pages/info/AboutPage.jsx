@@ -1,5 +1,5 @@
 import React from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
@@ -39,13 +39,7 @@ const TESTIMONIALS = [
 const AboutPage = () => {
   return (
     <>
-      <Helmet>
-        <title>About Us | CardPop</title>
-        <meta
-          name="description"
-          content="CardPop Australia was created to bring the energy of card shows, trade nights, and collector culture into one trusted digital marketplace."
-        />
-      </Helmet>
+      <SEOHead title="About CardPop | Australia's Trading Card Marketplace" description="Learn about CardPop — Australia's premier platform for buying, selling and trading Pokemon, Magic and sports cards." />
 
       {/* ── Hero ── */}
       <section className="bg-foreground text-background px-6 py-28 md:py-36">

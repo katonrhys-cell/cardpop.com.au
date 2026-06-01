@@ -1,5 +1,5 @@
 import React from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { SearchCheck, BookOpen, BarChart2, Building2, ArrowRight, Store } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -33,7 +33,7 @@ const SECTIONS = [
 
 const GradingPage = () => (
   <div className="min-h-screen bg-background">
-    <Helmet><title>Grading Hub | CardPop</title></Helmet>
+    <SEOHead title="Grading Hub | CardPop" description="Learn everything about professional trading card grading. Compare PSA, BGS, CGC, ACE and SGC grading services in Australia." />
 
     <section className="bg-card border-b border-border py-20 text-center">
       <div className="container-default">

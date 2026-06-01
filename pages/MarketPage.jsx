@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { Activity, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -114,10 +114,7 @@ const MarketPage = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans pb-20">
-      <Helmet>
-        <title>Market Dashboard | CardPop</title>
-        <meta name="description" content="Analyze trading card market trends, sales history, and live eBay data." />
-      </Helmet>
+      <SEOHead title="Card Market | CardPop" description="Track card market prices and trends on CardPop Australia." />
 
       {/* Hero Section */}
       <section className="bg-card border-b border-border py-16 relative overflow-hidden">

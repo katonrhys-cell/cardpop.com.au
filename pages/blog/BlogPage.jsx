@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -123,7 +123,7 @@ const BlogPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await supabase.from('blog_posts').select('*').order('created_at', { ascending: false }).limit(100);
+      const { data } = await supabase.from('blog_articles').select('*').eq('is_published', true).order('created_at', { ascending: false }).limit(100);
       setArticles(data ?? []);
     } catch (err) {
       console.error('Error fetching articles:', err);
@@ -168,7 +168,7 @@ const BlogPage = () => {
 
   return (
     <div className="min-h-[100dvh] bg-background">
-      <Helmet><title>{pageTitle}</title></Helmet>
+      <SEOHead title={pageTitle} description="The Parallel Report — trading card news, guides and insights for Australian collectors." />
 
       {/* ── Hero ── */}
       <section className="bg-card border-b border-border py-20 text-center">

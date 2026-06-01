@@ -1,30 +1,36 @@
 import React from 'react';
 import { Helmet } from 'react-helmet';
 
-const SEOHead = ({ title, description, canonicalUrl, structuredData }) => {
+const SEOHead = ({ title, description, canonicalUrl, ogImage, structuredData }) => {
   const siteName = "CardPop";
-  const defaultTitle = `${siteName} | Premier Trading Card Marketplace`;
-  const defaultDescription = "Buy, sell, and trade authenticated trading cards, collectibles, and TCG accessories on CardPop.";
-  
+  const defaultTitle = `${siteName} | Australia's Trading Card Marketplace | CardPop.online`;
+  const defaultDescription = "Buy, sell, and trade authenticated trading cards in Australia. Browse Pokemon, Magic, Yu-Gi-Oh and more on CardPop.";
+  const resolvedCanonical = canonicalUrl || (typeof window !== 'undefined' ? window.location.href.split('?')[0] : '');
+  const resolvedTitle = title || defaultTitle;
+  const resolvedDesc = description || defaultDescription;
+
   return (
     <Helmet>
-      <title>{title || defaultTitle}</title>
-      <meta name="description" content={description || defaultDescription} />
-      
+      <title>{resolvedTitle}</title>
+      <meta name="description" content={resolvedDesc} />
+
+      {/* Canonical */}
+      {resolvedCanonical && <link rel="canonical" href={resolvedCanonical} />}
+
       {/* Open Graph */}
-      <meta property="og:title" content={title || defaultTitle} />
-      <meta property="og:description" content={description || defaultDescription} />
+      <meta property="og:title" content={resolvedTitle} />
+      <meta property="og:description" content={resolvedDesc} />
       <meta property="og:type" content="website" />
       <meta property="og:site_name" content={siteName} />
-      
+      {resolvedCanonical && <meta property="og:url" content={resolvedCanonical} />}
+      {ogImage && <meta property="og:image" content={ogImage} />}
+
       {/* Twitter */}
       <meta name="twitter:card" content="summary_large_image" />
-      <meta name="twitter:title" content={title || defaultTitle} />
-      <meta name="twitter:description" content={description || defaultDescription} />
-      
-      {/* Canonical URL */}
-      {canonicalUrl && <link rel="canonical" href={canonicalUrl} />}
-      
+      <meta name="twitter:title" content={resolvedTitle} />
+      <meta name="twitter:description" content={resolvedDesc} />
+      {ogImage && <meta name="twitter:image" content={ogImage} />}
+
       {/* Structured Data JSON-LD */}
       {structuredData && (
         <script type="application/ld+json">

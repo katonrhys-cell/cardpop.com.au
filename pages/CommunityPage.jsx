@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Users, AlertCircle } from 'lucide-react';
 import SellerCard from '@/components/SellerCard.jsx';
@@ -36,10 +36,7 @@ const CommunityPage = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-background font-sans">
-      <Helmet>
-        <title>Seller Directory | CardPop Australia</title>
-        <meta name="description" content="Browse our marketplace directory to find trusted, verified trading card sellers across Australia." />
-      </Helmet>
+      <SEOHead title="Community Hub | CardPop" description="Connect with Australian trading card collectors. Join discussions, share your collection and find trade partners." />
 
       {/* Hero Section */}
       <div className="bg-card py-16 relative overflow-hidden border-b border-border shadow-sm">

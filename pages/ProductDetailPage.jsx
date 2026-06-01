@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { canViewVaultProduct } from '@/utils/vaultSecurityUtils.js';
@@ -71,7 +71,7 @@ const ProductDetailPage = () => {
             price: listing.price_aud || 0,
             description: listing.description || vi?.notes || '',
             images,
-            condition: vi?.card_condition,
+            condition: vi?.condition,
             grade: vi?.grade,
             grading_company: vi?.grading_company,
             category: listing.category,
@@ -216,7 +216,11 @@ const ProductDetailPage = () => {
   return (
     <div className="bg-background min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
-        <Helmet><title>{`${product.name} | CardPop`}</title></Helmet>
+        <SEOHead
+          title={`${product.name} | CardPop`}
+          description={product.description || `${product.name} — available on CardPop Australia's trading card marketplace.`}
+          ogImage={product.images?.[0] || undefined}
+        />
 
         <Button variant="link" className="px-0 mb-8 text-muted-foreground hover:text-primary font-medium" onClick={() => navigate(-1)}>
           <ArrowLeft className="w-4 h-4 mr-1.5" /> Back

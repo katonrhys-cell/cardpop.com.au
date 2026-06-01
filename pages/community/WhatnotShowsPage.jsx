@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -196,7 +196,7 @@ const WhatnotShowsPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Helmet><title>Whatnot Shows | CardPop Community</title></Helmet>
+      <SEOHead title="Whatnot Shows | CardPop Community" description="Find live trading card breaks and auctions from Australian sellers on Whatnot. Watch, bid and win." />
 
       {/* ── Hero ── */}
       <section className="bg-card border-b border-border py-16 text-center">

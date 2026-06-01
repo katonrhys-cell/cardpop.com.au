@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { Loader2, PackageX, Plus } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -65,9 +65,7 @@ const ProductListingPage = () => {
 
   return (
     <div className="space-y-6">
-      <Helmet>
-        <title>All Products | Marketplace</title>
-      </Helmet>
+      <SEOHead title="Products | CardPop" description="Browse all products available on the CardPop marketplace — singles, sealed products and more." />
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
         <div>

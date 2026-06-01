@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { ArrowLeft, MapPin, Calendar, ArrowRightLeft, CreditCard, Users, Search, AlertCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
@@ -57,24 +57,26 @@ const CardDetailsPage = () => {
           throw new Error('Product not found.');
         }
 
-        const imgUrl = data.vault_images?.[0]?.image_url
-          ?? (data.image_url?.startsWith('http') ? data.image_url : null);
+        const rawPath = data.vault_images?.[0]?.storage_path ?? data.card_image ?? null;
+        const imgUrl = rawPath
+          ? (rawPath.startsWith('http') ? rawPath : supabase.storage.from('vault-images').getPublicUrl(rawPath).data.publicUrl)
+          : null;
 
-        const isForSale = ['for_sale', 'for_both', 'active'].includes(data.listing_status ?? data.status);
-        const isForTrade = ['for_trade', 'for_both'].includes(data.listing_status ?? '');
+        const isForSale = ['fixed', 'auction', 'both'].includes(data.listing_type) || data.status === 'active';
+        const isForTrade = ['trade', 'both'].includes(data.listing_type ?? '');
 
         setCard({
           ...data,
           title: data.card_name || data.title || 'Unknown Card',
-          description: data.description || '',
-          salePrice: data.asking_price_aud ?? data.price_aud ?? data.estimated_value_aud ?? 0,
+          description: data.notes || data.description || '',
+          salePrice: data.price_aud ?? data.estimated_value_aud ?? 0,
           tradeValue: data.trade_value_aud ?? data.estimated_value_aud ?? 0,
           condition: data.condition || 'Unknown',
           image: imgUrl,
           isForSale,
           isForTrade,
-          collectionType: data.collection_type || data.category || 'Trading Card',
-          grade: data.grade_score ? String(data.grade_score) : null,
+          collectionType: data.collection || data.category || 'Trading Card',
+          grade: data.grade ? String(data.grade) : null,
         });
 
         const ownerProfile = data.owner ?? data.seller;
@@ -147,7 +149,7 @@ const CardDetailsPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background font-sans w-full overflow-x-hidden">
-      <Helmet><title>{`${card.title} | CardPop`}</title></Helmet>
+      <SEOHead title={`${card.title} | CardPop`} description={card.description || `View ${card.title} details, pricing and listings on CardPop Australia.`} />
       
       <main className="flex-1 container-default py-8 md:py-16">
         <Button variant="ghost" className="mb-8 -ml-4 text-muted-foreground hover:text-primary transition-colors font-bold px-4" onClick={() => navigate(-1)}>

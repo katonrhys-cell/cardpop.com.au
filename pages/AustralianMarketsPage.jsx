@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { 
   DollarSign, Activity, BarChart3, Database, 
   TrendingUp, TrendingDown, ShieldCheck, Info
@@ -92,10 +92,7 @@ const AustralianMarketsPage = () => {
 
   return (
     <div className="flex flex-col bg-background font-sans dark">
-      <Helmet>
-        <title>Australian Markets | Card Pop Investment Dashboard</title>
-        <meta name="description" content="Live trading card market data, trends, and recent sales from eBay Australia." />
-      </Helmet>
+      <SEOHead title="Australian Card Markets | CardPop" description="Explore trading card markets across Australia. Find local card shops, events and trading communities near you." />
       
       {/* Hero Section */}
       <section className="bg-secondary py-16 border-b border-border relative overflow-hidden">

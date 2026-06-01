@@ -1,5 +1,5 @@
 import React from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import InfoPageLayout from '@/components/InfoPageLayout.jsx';
 
@@ -10,9 +10,7 @@ const FAQPage = () => {
       description="Find answers to common questions about buying, selling, and vaulting."
       breadcrumbs={[{ label: 'FAQ' }]}
     >
-      <Helmet>
-        <title>FAQ | CardPop</title>
-      </Helmet>
+      <SEOHead title="FAQ | CardPop" description="Frequently asked questions about buying, selling and trading on CardPop Australia." />
       
       <div className="mt-8">
         <Accordion type="single" collapsible className="w-full">

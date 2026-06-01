@@ -19,7 +19,7 @@ const VaultListingDetailPage = () => {
       try {
         const { data: record, error } = await supabase
           .from('listings')
-          .select('*')
+          .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(display_name, username, avatar_url, is_verified)')
           .eq('id', itemId)
           .single();
         if (error) throw error;
@@ -54,17 +54,18 @@ const VaultListingDetailPage = () => {
     return <div className="container-default section-padding text-center py-32"><h2 className="text-2xl font-bold">Listing not found</h2></div>;
   }
 
+  const vi = listing.vault_item;
   const structuredData = generateStructuredData(listing);
-  const title = listing.card_name || 'Card Listing';
-  const price = listing.price_aud || listing.estimated_value_aud || 0;
-  const imageUrl = listing.card_image
-    ? (listing.card_image.startsWith('http') ? listing.card_image : supabase.storage.from('vault-images').getPublicUrl(listing.card_image).data.publicUrl)
+  const title = vi?.card_name || 'Card Listing';
+  const price = listing.price_aud || vi?.estimated_value_aud || 0;
+  const rawPath = vi?.card_image || vi?.vault_images?.[0]?.storage_path || null;
+  const imageUrl = rawPath
+    ? (rawPath.startsWith('http') ? rawPath : supabase.storage.from('vault-images').getPublicUrl(rawPath).data.publicUrl)
     : '/placeholder-card.png';
 
   const breadcrumbs = [
     { label: 'Home', path: '/' },
-    { label: 'Vault', path: '/vault' },
-    { label: listing.category || 'Category', path: `/vault/${listing.categoryId || 'all'}` },
+    { label: 'Marketplace', path: '/marketplace' },
     { label: title, path: '#' }
   ];
 
@@ -90,7 +91,7 @@ const VaultListingDetailPage = () => {
 
         {/* Details */}
         <div className="flex flex-col">
-          <Badge variant="secondary" className="w-fit mb-4">{listing.condition || 'Raw'}</Badge>
+          <Badge variant="secondary" className="w-fit mb-4">{vi?.condition || 'Raw'}</Badge>
           
           <h1 className="text-4xl md:text-5xl font-bold font-heading text-foreground mb-4">
             {title}
@@ -102,9 +103,9 @@ const VaultListingDetailPage = () => {
 
           <div className="bg-card rounded-2xl border border-border p-6 mb-8 space-y-4">
             <h3 className="font-bold text-lg mb-2">Card Details</h3>
-            {listing.card_number && <div className="flex justify-between"><span className="text-muted-foreground">Card Number</span> <span className="font-medium">{listing.card_number}</span></div>}
-            {listing.year && <div className="flex justify-between"><span className="text-muted-foreground">Year</span> <span className="font-medium">{listing.year}</span></div>}
-            {listing.grading_company && <div className="flex justify-between"><span className="text-muted-foreground">Grading</span> <span className="font-medium flex items-center gap-1"><ShieldCheck className="w-4 h-4 text-primary" />{listing.grading_company} {listing.gradeScore}</span></div>}
+            {vi?.card_number && <div className="flex justify-between"><span className="text-muted-foreground">Card Number</span> <span className="font-medium">{vi.card_number}</span></div>}
+            {vi?.year && <div className="flex justify-between"><span className="text-muted-foreground">Year</span> <span className="font-medium">{vi.year}</span></div>}
+            {vi?.grading_company && vi.grading_company !== 'raw' && <div className="flex justify-between"><span className="text-muted-foreground">Grading</span> <span className="font-medium flex items-center gap-1"><ShieldCheck className="w-4 h-4 text-primary" />{vi.grading_company.toUpperCase()} {vi.grade}</span></div>}
           </div>
 
           <div className="mt-auto space-y-4">
