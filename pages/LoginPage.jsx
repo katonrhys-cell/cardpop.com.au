@@ -78,10 +78,10 @@ const LoginPage = () => {
           toast.info('Please check your email for the verification code.');
         }, 650);
       } else {
-        // Direct login — brief unlock flash before navigating
+        // Play animation and navigate — don't gate navigate on animation timer
         setLockState('unlocking');
         toast.success('Welcome back!');
-        setTimeout(() => navigate(from, { replace: true }), 500);
+        navigate(from, { replace: true });
       }
     } catch (error) {
       console.error('[LoginPage] Login error:', error);
@@ -119,6 +119,7 @@ const LoginPage = () => {
     <div className="min-h-[80vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-muted/10">
       <Helmet>
         <title>Log In | CardPop</title>
+        <meta name="robots" content="noindex, nofollow" />
       </Helmet>
 
       <div className="w-full max-w-md space-y-6">

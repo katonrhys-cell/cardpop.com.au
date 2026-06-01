@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Search, Edit, Trash2, FileText, AlertCircle, RefreshCcw, FileCode2 } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, FileText, AlertCircle, RefreshCcw, FileCode2, Globe, EyeOff } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,9 +26,12 @@ const ContentManagementPage = () => {
     setLoading(true);
     setError(null);
     try {
-      // blog_articles table not in Supabase schema — return empty list
-      console.log('[ContentManagementPage] blog_articles not available in Supabase schema; returning empty list.');
-      if (isMounted.current) setArticles([]);
+      const { data, error: fetchErr } = await supabase
+        .from('blog_articles')
+        .select('*, author:profiles!author_id(display_name, username)')
+        .order('created_at', { ascending: false });
+      if (fetchErr) throw fetchErr;
+      if (isMounted.current) setArticles(data ?? []);
     } catch (err) {
       console.error("Error fetching articles:", err);
       if (isMounted.current) setError(err.message || "Failed to load articles.");
@@ -58,7 +62,7 @@ const ContentManagementPage = () => {
     if (!window.confirm("Are you sure you want to delete this article? This action cannot be undone.")) return;
     
     try {
-      const { error } = await supabase.from('blog_posts').delete().eq('id', id);
+      const { error } = await supabase.from('blog_articles').delete().eq('id', id);
       if (error) throw error;
       toast.success("Article deleted successfully.");
       setArticles(articles.filter(a => a.id !== id));
@@ -108,11 +112,12 @@ const ContentManagementPage = () => {
           <Table>
             <TableHeader className="bg-muted/50">
               <TableRow>
-                <TableHead className="font-semibold text-foreground w-[25%]">Title</TableHead>
-                <TableHead className="font-semibold text-foreground w-[30%] hidden md:table-cell">Content Preview</TableHead>
-                <TableHead className="font-semibold text-foreground w-[15%] hidden lg:table-cell">Author</TableHead>
-                <TableHead className="font-semibold text-foreground w-[15%] hidden xl:table-cell">Created</TableHead>
-                <TableHead className="text-right font-semibold text-foreground w-[15%]">Actions</TableHead>
+                <TableHead className="font-semibold text-foreground w-[22%]">Title</TableHead>
+                <TableHead className="font-semibold text-foreground w-[28%] hidden md:table-cell">Content Preview</TableHead>
+                <TableHead className="font-semibold text-foreground w-[12%] hidden lg:table-cell">Author</TableHead>
+                <TableHead className="font-semibold text-foreground w-[10%] hidden xl:table-cell">Created</TableHead>
+                <TableHead className="font-semibold text-foreground w-[10%] hidden sm:table-cell">Status</TableHead>
+                <TableHead className="text-right font-semibold text-foreground w-[18%]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -128,7 +133,7 @@ const ContentManagementPage = () => {
                 ))
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-48 text-center">
+                  <TableCell colSpan={6} className="h-48 text-center">
                     <div className="flex flex-col items-center justify-center text-muted-foreground">
                       <AlertCircle className="w-8 h-8 text-destructive mb-2" />
                       <p className="mb-4 font-medium text-foreground">Failed to load articles</p>
@@ -140,7 +145,7 @@ const ContentManagementPage = () => {
                 </TableRow>
               ) : filteredArticles.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-48 text-center">
+                  <TableCell colSpan={6} className="h-48 text-center">
                     <div className="flex flex-col items-center justify-center text-muted-foreground">
                       <FileText className="w-12 h-12 mb-3 opacity-20" />
                       <p className="font-medium text-foreground text-lg">No articles found</p>
@@ -175,10 +180,21 @@ const ContentManagementPage = () => {
                         <div className="line-clamp-2 text-sm leading-relaxed">{contentPreview}</div>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm hidden lg:table-cell align-top pt-4">
-                        <div className="truncate">{article.author || 'Unknown'}</div>
+                        <div className="truncate">{article.author?.display_name || article.author?.username || 'Unknown'}</div>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm tabular-nums hidden xl:table-cell align-top pt-4">
-                        {formatDate(article.created)}
+                        {formatDate(article.created_at)}
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell align-top pt-4">
+                        {article.is_published ? (
+                          <Badge className="bg-green-500/10 text-green-700 border-green-200 gap-1">
+                            <Globe className="w-3 h-3" /> Published
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-muted-foreground gap-1">
+                            <EyeOff className="w-3 h-3" /> Draft
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-right align-top pt-3">
                         <div className="flex justify-end items-center gap-2">

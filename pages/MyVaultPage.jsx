@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus, ShieldCheck, AlertCircle, MoreHorizontal, Edit,
-  Trash2, ImageOff, Lock, ArrowRightLeft, X
+  Trash2, ImageOff, Lock, ArrowRightLeft, X, ShoppingCart, Layers
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { COLLECTIONS_LIST } from '@/components/Header.jsx';
+import VaultListingModal from '@/components/VaultListingModal.jsx';
 
 const CONDITION_LABELS = {
   mint: 'Mint', near_mint: 'Near Mint', excellent: 'Excellent',
@@ -30,6 +31,7 @@ const MyVaultPage = () => {
   const [error, setError] = useState(null);
 
   const [filterCollection, setFilterCollection] = useState('');
+  const [listingModal, setListingModal] = useState({ open: false, card: null });
 
   const fetchVault = useCallback(async () => {
     if (!currentUser?.id) {
@@ -76,6 +78,19 @@ const MyVaultPage = () => {
     }
   };
 
+  const getListingBadge = (card) => {
+    switch (card.listing_type) {
+      case 'For Sale':
+        return <Badge className="bg-emerald-500/10 text-emerald-700 shadow-sm font-bold border-emerald-500/20"><ShoppingCart className="w-3 h-3 mr-1.5" />For Sale</Badge>;
+      case 'For Trade':
+        return <Badge className="bg-violet-500/10 text-violet-700 shadow-sm font-bold border-violet-500/20"><ArrowRightLeft className="w-3 h-3 mr-1.5" />For Trade</Badge>;
+      case 'For Sale & Trade':
+        return <Badge className="bg-amber-500/10 text-amber-700 shadow-sm font-bold border-amber-500/20"><Layers className="w-3 h-3 mr-1.5" />Sale & Trade</Badge>;
+      default:
+        return <Badge className="bg-muted text-muted-foreground shadow-sm font-bold"><Lock className="w-3 h-3 mr-1.5" />Private</Badge>;
+    }
+  };
+
   const renderCard = (card) => {
     let imageUrl = null;
     if (card.card_image) {
@@ -84,7 +99,7 @@ const MyVaultPage = () => {
         : supabase.storage.from('vault-images').getPublicUrl(card.card_image).data.publicUrl;
     }
 
-    const isForTrade = card.trade_value_aud > 0;
+    const isForTrade = card.listing_type === 'For Trade' || card.listing_type === 'For Sale & Trade';
 
     return (
       <div key={card.id} className="group bg-card border border-border rounded-2xl overflow-hidden shadow-sm hover:shadow-lg hover:border-primary/40 transition-all duration-300 flex flex-col h-full relative">
@@ -95,9 +110,12 @@ const MyVaultPage = () => {
                 <MoreHorizontal className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="rounded-xl w-48">
+            <DropdownMenuContent align="end" className="rounded-xl w-52">
               <DropdownMenuItem onClick={() => navigate(`/vault/edit/${card.id}`)} className="cursor-pointer gap-2 font-medium">
                 <Edit className="w-4 h-4" /> Edit Details
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setListingModal({ open: true, card })} className="cursor-pointer gap-2 font-medium">
+                <ShoppingCart className="w-4 h-4" /> Manage Listing
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => handleDelete(card.id)} className="cursor-pointer gap-2 text-destructive focus:text-destructive focus:bg-destructive/10 font-medium">
@@ -117,14 +135,7 @@ const MyVaultPage = () => {
             </div>
           )}
           <div className="absolute top-3 left-3 z-10 pointer-events-none flex flex-col gap-1.5 items-start">
-            <Badge className="bg-muted text-muted-foreground shadow-sm font-bold tracking-tight">
-              <Lock className="w-3 h-3 mr-1.5" /> Private
-            </Badge>
-            {isForTrade && (
-              <Badge className="bg-purple-500/10 text-purple-600 shadow-sm font-bold border-purple-500/20">
-                <ArrowRightLeft className="w-3 h-3 mr-1.5" /> For Trade
-              </Badge>
-            )}
+            {getListingBadge(card)}
           </div>
         </div>
 
@@ -147,10 +158,10 @@ const MyVaultPage = () => {
                 ${(Number(card.estimated_value_aud) || 0).toFixed(2)}
               </span>
             </div>
-            {isForTrade && (
+            {isForTrade && card.trade_value_aud > 0 && (
               <div className="flex flex-col items-end">
                 <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Trade Value</span>
-                <span className="font-bold text-sm tabular-nums text-purple-600">
+                <span className="font-bold text-sm tabular-nums text-violet-600">
                   ${(Number(card.trade_value_aud) || 0).toFixed(2)}
                 </span>
               </div>
@@ -239,6 +250,13 @@ const MyVaultPage = () => {
           </Button>
         </div>
       )}
+
+      <VaultListingModal
+        isOpen={listingModal.open}
+        onClose={() => setListingModal({ open: false, card: null })}
+        product={listingModal.card}
+        onUpdate={fetchVault}
+      />
     </div>
   );
 };

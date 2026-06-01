@@ -20,7 +20,7 @@ const AccountVault = () => {
           <p className="text-muted-foreground">Manage your digital card collection.</p>
         </div>
         <Button asChild>
-          <Link to="/add-card" className="gap-2">
+          <Link to="/vault/add" className="gap-2">
             <Plus className="w-4 h-4" /> Add Card
           </Link>
         </Button>
@@ -33,7 +33,7 @@ const AccountVault = () => {
           Start building your digital collection by adding your first card.
         </p>
         <Button asChild variant="outline">
-          <Link to="/add-card">Add Your First Card</Link>
+          <Link to="/vault/add">Add Your First Card</Link>
         </Button>
       </div>
     </div>

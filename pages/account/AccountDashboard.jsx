@@ -68,8 +68,8 @@ const AccountDashboard = () => {
         supabase
           .from('trades')
           .select('id', { count: 'exact', head: true })
-          .or(`sender_id.eq.${currentUser.id},recipient_id.eq.${currentUser.id}`)
-          .eq('status', 'pending')
+          .or(`initiator_id.eq.${currentUser.id},responder_id.eq.${currentUser.id}`)
+          .eq('status', 'proposed')
       ]);
 
       if (!isMounted.current) return;

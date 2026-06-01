@@ -85,8 +85,8 @@ const UserDetailPage = () => {
             <p className="text-muted-foreground mb-4">@{user.username || user.id}</p>
             
             <div className="flex flex-wrap justify-center gap-2 mb-6">
-              <Badge variant="secondary" className="bg-secondary text-secondary-foreground">{user.role || 'user'}</Badge>
-              {user.verified && <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-200">Verified</Badge>}
+              <Badge variant="secondary" className="bg-secondary text-secondary-foreground">{user.community_type || user.user_type || 'collector'}</Badge>
+              {user.is_verified && <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-200">Verified</Badge>}
               {user.is_active === false && <Badge variant="destructive">Suspended</Badge>}
             </div>
 
@@ -161,12 +161,12 @@ const UserDetailPage = () => {
                   ) : (
                     vaultProducts.slice(0, 5).map(product => (
                       <TableRow key={product.id}>
-                        <TableCell className="font-medium">{product.name}</TableCell>
-                        <TableCell>{product.category || 'Uncategorized'}</TableCell>
+                        <TableCell className="font-medium">{product.card_name || product.name}</TableCell>
+                        <TableCell>{product.categories?.name || product.collection || 'Uncategorized'}</TableCell>
                         <TableCell>
                           <Badge variant="outline">{product.listing_type || 'Private'}</Badge>
                         </TableCell>
-                        <TableCell className="text-muted-foreground">{new Date(product.created).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-muted-foreground">{product.created_at ? new Date(product.created_at).toLocaleDateString() : '—'}</TableCell>
                       </TableRow>
                     ))
                   )}
@@ -203,7 +203,7 @@ const UserDetailPage = () => {
                     </TableRow>
                   ) : (
                     [...ordersAsBuyer.map(o => ({...o, userRole: 'Buyer'})), ...ordersAsSeller.map(o => ({...o, userRole: 'Seller'}))]
-                      .sort((a, b) => new Date(b.created) - new Date(a.created))
+                      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
                       .slice(0, 5)
                       .map(order => (
                         <TableRow key={order.id}>
@@ -213,11 +213,11 @@ const UserDetailPage = () => {
                               {order.userRole}
                             </Badge>
                           </TableCell>
-                          <TableCell className="font-medium">${order.total_amount?.toFixed(2)}</TableCell>
+                          <TableCell className="font-medium">{order.total_aud != null ? `$${Number(order.total_aud).toFixed(2)}` : '—'}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className="capitalize">{order.status}</Badge>
                           </TableCell>
-                          <TableCell className="text-muted-foreground">{new Date(order.created).toLocaleDateString()}</TableCell>
+                          <TableCell className="text-muted-foreground">{order.created_at ? new Date(order.created_at).toLocaleDateString() : '—'}</TableCell>
                         </TableRow>
                       ))
                   )}
