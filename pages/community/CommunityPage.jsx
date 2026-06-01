@@ -1,8 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import { MessageSquare, Users, Store, ExternalLink, ShieldCheck } from 'lucide-react';
+
+const WhatnotIcon = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" className={className}>
+    <rect width="32" height="32" rx="8" fill="#00C854" />
+    <path
+      d="M5 9l4.5 14 4-9.5 2.5 5.5 2.5-5.5 4 9.5L27 9"
+      stroke="white"
+      strokeWidth="2.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const CommunityPage = () => {
+  const navigate = useNavigate();
   const [discussions, setDiscussions] = useState([]);
   const [profiles, setProfiles] = useState([]);
   const [retailers, setRetailers] = useState([]);
@@ -72,6 +86,9 @@ const CommunityPage = () => {
             </TabsTrigger>
             <TabsTrigger value="retailers" className="flex-1 gap-2">
               <Store className="w-4 h-4" /> Retailers &amp; Suppliers
+            </TabsTrigger>
+            <TabsTrigger value="whatnot" className="flex-1 gap-2" onClick={() => navigate('/community/whatnot')}>
+              <WhatnotIcon className="w-4 h-4" /> Whatnot
             </TabsTrigger>
           </TabsList>
 
