@@ -6,6 +6,15 @@ import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { supabase } from '@/lib/supabaseClient.js';
 
+const GRADE_BADGE = {
+  psa:   'bg-red-600 text-white',
+  bgs:   'bg-blue-700 text-white',
+  cgc:   'bg-green-600 text-white',
+  ace:   'bg-orange-500 text-white',
+  sgc:   'bg-purple-600 text-white',
+  other: 'bg-slate-600 text-white',
+};
+
 const MarketplaceListingCard = ({ listing }) => {
   const vaultItem = listing.vault_item;
   // vault_images stores storage_path; card_image may be a full URL or storage path
@@ -33,11 +42,26 @@ const MarketplaceListingCard = ({ listing }) => {
             No Image
           </div>
         )}
+        {/* Marketplace label — top right */}
         <div className="absolute top-3 right-3 z-10">
           <Badge className="shadow-sm font-bold bg-secondary text-secondary-foreground">
             <Tag className="w-3 h-3 mr-1" /> Marketplace
           </Badge>
         </div>
+
+        {/* Rookie badge — top left */}
+        {vaultItem?.is_rookie && (
+          <div className="absolute top-3 left-3 z-10 px-2 py-1 rounded-md text-[11px] font-extrabold tracking-wide bg-amber-400 text-amber-900 shadow-md">
+            RC
+          </div>
+        )}
+
+        {/* Grade badge — bottom left (only for graded slabs) */}
+        {vaultItem?.grading_company && vaultItem.grading_company !== 'raw' && vaultItem?.grade && (
+          <div className={`absolute bottom-3 left-3 z-10 px-2.5 py-1 rounded-md text-[11px] font-extrabold tracking-wide shadow-lg ${GRADE_BADGE[vaultItem.grading_company] || GRADE_BADGE.other}`}>
+            {vaultItem.grading_company.toUpperCase()} {vaultItem.grade}
+          </div>
+        )}
       </Link>
       
       <div className="p-5 flex flex-col flex-1">
