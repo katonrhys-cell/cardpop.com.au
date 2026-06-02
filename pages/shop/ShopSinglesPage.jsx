@@ -55,7 +55,7 @@ const ShopSinglesPage = () => {
         if (error) throw error;
 
         if (isMounted) {
-          setProducts(data || []);
+          setProducts((data || []).map(p => ({ ...p, source: p.source || 'shop' })));
           setTotalItems(count || 0);
         }
       } catch (err) {
