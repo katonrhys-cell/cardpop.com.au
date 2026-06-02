@@ -71,7 +71,7 @@ const MarketplacePage = () => {
     try {
       let query = supabase
         .from('listings')
-        .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, rating, reviews_count, is_verified)')
+        .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified)')
         .limit(100);
 
       // Use subcategory when selected, otherwise parent category (fixes double-filter bug)

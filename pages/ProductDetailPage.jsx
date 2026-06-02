@@ -48,7 +48,7 @@ const ProductDetailPage = () => {
         if (source === 'marketplace') {
           const { data: listing, error: fetchError } = await supabase
             .from('listings')
-            .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, rating, reviews_count, is_verified)')
+            .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified)')
             .eq('id', id)
             .eq('status', 'active')
             .single();
@@ -127,11 +127,20 @@ const ProductDetailPage = () => {
           }
         }
 
+        if (source === 'shop') {
+          setProduct({
+            ...data,
+            name: data.name || data.title || 'Untitled',
+            price: data.price ?? data.price_aud ?? 0,
+            images: data.images || [],
+          });
+          setSeller({ business_name: 'CardPop Official Store', is_verified: true, type: 'official' });
+          return;
+        }
+
         setProduct(data);
 
-        if (source === 'shop') {
-          setSeller({ business_name: 'CardPop Official Store', is_verified: true, type: 'official' });
-        } else if (source === 'vault' && data.owner) {
+        if (source === 'vault' && data.owner) {
           setSeller({
             id: data.owner_id,
             business_name: data.owner.display_name || data.owner.username || data.owner.full_name || 'Community Member',
