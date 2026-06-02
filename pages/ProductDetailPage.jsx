@@ -91,9 +91,11 @@ const ProductDetailPage = () => {
         }
 
         const table = source === 'shop' ? 'listings' : 'vault_items';
+        // vault_items uses owner_id; listings uses seller_id
+        const profileJoin = source === 'vault' ? 'owner:profiles!owner_id(*)' : 'seller:profiles!seller_id(*)';
         const { data, error: fetchError } = await supabase
           .from(table)
-          .select('*, seller:profiles!seller_id(*)')
+          .select(`*, ${profileJoin}`)
           .eq('id', id)
           .single();
 
@@ -104,8 +106,23 @@ const ProductDetailPage = () => {
           const userRole = isAdmin ? 'admin' : 'user';
           const isAuthorized = canViewVaultProduct(currentUser?.id, data.owner_id, data.is_public, userRole);
           if (!isAuthorized) {
-            setError('403 Forbidden: You do not have permission to view this private vault item.');
-            setLoading(false);
+            // If this vault item has an active marketplace listing, redirect there
+            const { data: activeListing } = await supabase
+              .from('listings')
+              .select('id')
+              .eq('vault_item_id', id)
+              .eq('status', 'active')
+              .maybeSingle();
+
+            if (isMounted && activeListing) {
+              navigate(`/product/marketplace/${activeListing.id}`, { replace: true });
+              return;
+            }
+
+            if (isMounted) {
+              setError('403 Forbidden: You do not have permission to view this private vault item.');
+              setLoading(false);
+            }
             return;
           }
         }
@@ -114,12 +131,17 @@ const ProductDetailPage = () => {
 
         if (source === 'shop') {
           setSeller({ business_name: 'CardPop Official Store', is_verified: true, type: 'official' });
-        } else if (data.seller) {
-          setSeller({ business_name: data.seller.username || data.seller.full_name || 'Community Member', is_verified: false, type: 'user' });
+        } else if (source === 'vault' && data.owner) {
+          setSeller({
+            id: data.owner_id,
+            business_name: data.owner.display_name || data.owner.username || data.owner.full_name || 'Community Member',
+            is_verified: data.owner.is_verified || false,
+            type: 'user',
+          });
         } else if (data.owner_id) {
           try {
             const { data: user } = await supabase.from('profiles').select('*').eq('id', data.owner_id).single();
-            setSeller({ business_name: user?.username || user?.full_name || 'Community Member', is_verified: false, type: 'user' });
+            setSeller({ business_name: user?.display_name || user?.username || user?.full_name || 'Community Member', is_verified: user?.is_verified || false, type: 'user' });
           } catch (e) {
             setSeller({ business_name: 'Community Member', is_verified: false, type: 'user' });
           }
