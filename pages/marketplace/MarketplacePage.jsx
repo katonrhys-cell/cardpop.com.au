@@ -6,6 +6,7 @@ import { useCategories } from '@/hooks/useCategories.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search, RefreshCw, AlertCircle, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import { toast } from 'sonner';
@@ -14,7 +15,7 @@ const MarketplacePage = () => {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
+
   const [sort, setSort] = useState('created_at_desc');
   const [filterMode, setFilterMode] = useState('All');
 
@@ -23,19 +24,36 @@ const MarketplacePage = () => {
   const [nameMap, setNameMap] = useState({});
   const [filterCat, setFilterCat] = useState('');
   const [filterSub, setFilterSub] = useState('');
-
   const [catOpts, setCatOpts] = useState([]);
   const [subOpts, setSubOpts] = useState([]);
 
+  // Search and Price Filter States
+  const [search, setSearch] = useState('');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [debouncedMin, setDebouncedMin] = useState('');
+  const [debouncedMax, setDebouncedMax] = useState('');
+
   const isMounted = useRef(true);
 
-  // Initialize Name Map and Categories
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedMin(minPrice); setDebouncedMax(maxPrice); }, 400);
+    return () => clearTimeout(t);
+  }, [minPrice, maxPrice]);
+
+  // Initialize Name Map and Categories (root categories only)
   useEffect(() => {
     const init = async () => {
       const map = await buildNameMap();
-      if(isMounted.current) setNameMap(map);
-      const rootCats = await getCategories();
-      if(isMounted.current) setCatOpts(rootCats);
+      if (isMounted.current) setNameMap(map);
+      const allCats = await getCategories();
+      if (isMounted.current) setCatOpts(allCats.filter(c => !c.parent_id));
     };
     init();
   }, [buildNameMap, getCategories]);
@@ -51,14 +69,21 @@ const MarketplacePage = () => {
     setLoading(true);
     setError(null);
     try {
-      // Build listings query (listings table covers shop_products + vault listings)
       let query = supabase
         .from('listings')
         .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, rating, reviews_count, is_verified)')
         .limit(100);
 
-      if (filterCat) query = query.eq('vault_items.category_id', filterCat);
-      if (filterSub) query = query.eq('vault_items.category_id', filterSub);
+      // Use subcategory when selected, otherwise parent category (fixes double-filter bug)
+      const activeCat = filterSub || filterCat;
+      if (activeCat) query = query.eq('vault_items.category_id', activeCat);
+
+      // Card name search
+      if (debouncedSearch.trim()) query = query.ilike('vault_items.card_name', `%${debouncedSearch.trim()}%`);
+
+      // Price range
+      if (debouncedMin && !isNaN(debouncedMin)) query = query.gte('price_aud', Number(debouncedMin));
+      if (debouncedMax && !isNaN(debouncedMax)) query = query.lte('price_aud', Number(debouncedMax));
 
       // Filter by listing mode
       query = query.eq('status', 'active');
@@ -87,7 +112,7 @@ const MarketplacePage = () => {
     } finally {
       if (isMounted.current) setLoading(false);
     }
-  }, [sort, filterMode, filterCat, filterSub]);
+  }, [sort, filterMode, filterCat, filterSub, debouncedSearch, debouncedMin, debouncedMax]);
 
   useEffect(() => {
     isMounted.current = true;
@@ -99,18 +124,19 @@ const MarketplacePage = () => {
     setFilterCat('');
     setFilterSub('');
     setFilterMode('All');
+    setSearch('');
+    setMinPrice('');
+    setMaxPrice('');
   };
 
   const getBreadcrumbPath = () => {
-    const parts = [
-      nameMap[filterCat],
-      nameMap[filterSub]
-    ].filter(Boolean);
+    const parts = [nameMap[filterCat], nameMap[filterSub]].filter(Boolean);
     if (parts.length === 0) return null;
     return `Filtering by: ${parts.join(' > ')}`;
   };
 
   const breadcrumbText = getBreadcrumbPath();
+  const hasActiveFilters = filterCat || filterSub || filterMode !== 'All' || search || minPrice || maxPrice;
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans pb-20">
@@ -127,20 +153,51 @@ const MarketplacePage = () => {
       </section>
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 w-full flex-1">
-        
-        {/* Category Filter Panel */}
+
+        {/* Filter Panel */}
         <div className="bg-muted/30 border border-border p-4 rounded-2xl mb-6 flex flex-wrap items-center gap-3">
+          {/* Search */}
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <Input
+              placeholder="Search card name..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-9 h-10 rounded-xl bg-background border-border"
+            />
+          </div>
+          {/* Category */}
           <Select value={filterCat} onValueChange={setFilterCat}>
             <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Categories" /></SelectTrigger>
             <SelectContent>{catOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
           </Select>
+          {/* Subcategory */}
           <Select value={filterSub} onValueChange={setFilterSub} disabled={!filterCat}>
             <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Subcategories" /></SelectTrigger>
             <SelectContent>{subOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
           </Select>
-          {(filterCat || filterSub || filterMode !== 'All') && (
+          {/* Price Range */}
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              placeholder="Min $"
+              value={minPrice}
+              onChange={e => setMinPrice(e.target.value)}
+              className="w-24 h-10 rounded-xl bg-background border-border"
+            />
+            <span className="text-muted-foreground text-sm font-medium">–</span>
+            <Input
+              type="number"
+              placeholder="Max $"
+              value={maxPrice}
+              onChange={e => setMaxPrice(e.target.value)}
+              className="w-24 h-10 rounded-xl bg-background border-border"
+            />
+          </div>
+          {/* Clear */}
+          {hasActiveFilters && (
             <Button variant="ghost" onClick={clearFilters} className="rounded-xl text-muted-foreground hover:text-foreground ml-auto">
-              <X className="w-4 h-4 mr-2" /> Clear All Filters
+              <X className="w-4 h-4 mr-2" /> Clear All
             </Button>
           )}
         </div>
@@ -189,7 +246,7 @@ const MarketplacePage = () => {
               For Trade
             </Button>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => fetchListings(true)} disabled={loading} className="rounded-full h-10 w-10 shrink-0 bg-muted/50 hover:bg-muted">
               <RefreshCw className={`w-4 h-4 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
