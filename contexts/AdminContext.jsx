@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 
@@ -31,7 +31,7 @@ export const AdminProvider = ({ children }) => {
     console.info('[AdminAudit]', action, details);
   };
 
-  const getSystemHealth = async () => {
+  const getSystemHealth = useCallback(async () => {
     try {
       const { error } = await supabase.from('categories').select('id').limit(1);
       return {
@@ -43,7 +43,7 @@ export const AdminProvider = ({ children }) => {
     } catch {
       return { database: 'Error', storage: 'Error', api: 'Error', uptime: 'Unknown' };
     }
-  };
+  }, []);
 
   return (
     <AdminContext.Provider value={{ isAdmin, loading, logAdminAction, getSystemHealth }}>
