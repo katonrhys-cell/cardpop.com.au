@@ -302,17 +302,10 @@ const CollectionPage = () => {
     else { setSeriesOpts([]); setFilterSeries(''); }
   }, [filterBrand, getSeriesByBrand]);
 
-  // ─── Era → subcategory matching ────────────────────────────────────────────
-  // Match era name to a subcategory by name; clear filterSub when era is cleared
+  // Clear subcategory dropdown when an era pill is selected (they're independent filters)
   useEffect(() => {
-    if (!categoryId) return;
-    if (!activeEra) { setFilterSub(''); return; }
-    const era = activeEra.toLowerCase();
-    const match = subOpts.find(sub =>
-      sub.name.toLowerCase().includes(era) || era.includes(sub.name.toLowerCase())
-    );
-    setFilterSub(match ? match.id : '');
-  }, [activeEra, categoryId, subOpts]);
+    if (activeEra) setFilterSub('');
+  }, [activeEra]);
 
   // ─── New Releases ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -411,13 +404,14 @@ const CollectionPage = () => {
       // matching vault items are returned) to apply the category filter.
       let q = supabase.from('listings')
         .select(
-          `*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(display_name, username, avatar_url, rating, reviews_count)`,
+          `*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(display_name, username, avatar_url, is_verified)`,
           { count: 'exact' }
         )
         .eq('status', 'active')
         .eq('vault_items.category_id', categoryId)
         .range(from, from + perPage - 1);
 
+      if (activeEra) q = q.eq('vault_items.set_name', activeEra);
       if (filterCondition) q = q.eq('vault_items.condition', filterCondition);
 
       if (filterType === 'For Sale') {
@@ -444,7 +438,7 @@ const CollectionPage = () => {
     } finally {
       if (isMounted.current) setListingsLoading(false);
     }
-  }, [categoryId, filterType, filterCondition, filterVariant, filterSort, filterSub, filterBrand, filterSeries]);
+  }, [categoryId, activeEra, filterType, filterCondition, filterVariant, filterSort, filterSub, filterBrand, filterSeries]);
 
   useEffect(() => {
     if (categoryId) fetchListings(1);

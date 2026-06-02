@@ -98,6 +98,15 @@ const AddEditCardPage = () => {
 
   const set = (key, val) => setFormData(f => ({ ...f, [key]: val }));
 
+  // Derive era options from the selected collection
+  const eraOpts = (() => {
+    const selected = formData.collection?.toLowerCase();
+    const entry = Object.values(COLLECTION_CONFIGS).find(cfg =>
+      [cfg.name, ...(cfg.categoryAliases ?? [])].some(a => a.toLowerCase() === selected)
+    );
+    return entry?.eras ?? [];
+  })();
+
   // ─── Resolve category_id whenever collection changes ──────────────────────
   useEffect(() => {
     getCategories().then(cats => {
@@ -437,16 +446,33 @@ const AddEditCardPage = () => {
                     {errors.cardName && <p className="text-destructive text-xs">{errors.cardName}</p>}
                   </div>
 
-                  {/* Set Name */}
+                  {/* Era / Set Name */}
                   <div className="space-y-2">
-                    <Label htmlFor="setName" className="font-bold">Set Name</Label>
-                    <Input
-                      id="setName"
-                      value={formData.setName}
-                      onChange={e => set('setName', e.target.value)}
-                      placeholder="e.g. Base Set"
-                      className="h-11 bg-background"
-                    />
+                    <Label className="font-bold">Era / Set Name</Label>
+                    {eraOpts.length > 0 ? (
+                      <Select value={formData.setName} onValueChange={v => set('setName', v)}>
+                        <SelectTrigger className="h-11 bg-background">
+                          <SelectValue placeholder="Select an era or set…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">— Not specified —</SelectItem>
+                          <SelectSeparator />
+                          {eraOpts.map(era => (
+                            <SelectItem key={era.name} value={era.name}>
+                              {era.name}{era.years ? ` (${era.years})` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id="setName"
+                        value={formData.setName}
+                        onChange={e => set('setName', e.target.value)}
+                        placeholder="e.g. Base Set"
+                        className="h-11 bg-background"
+                      />
+                    )}
                   </div>
 
                   {/* Card Number */}
