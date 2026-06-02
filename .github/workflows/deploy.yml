@@ -30,6 +30,11 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
+      - name: Set dist file permissions
+        run: |
+          find ./dist -type f -exec chmod 644 {} \;
+          find ./dist -type d -exec chmod 755 {} \;
+
       - name: Install lftp
         run: sudo apt-get install -y lftp
 
@@ -45,7 +50,5 @@ jobs:
             set ftp:passive-mode yes;
             open -u $FTP_USERNAME,$FTP_PASSWORD ftp://$FTP_SERVER;
             mirror --reverse --delete --verbose --parallel=4 --exclude '.builds' --exclude 'cgi-bin' --exclude 'logs' --exclude 'tmp' ./dist/ /;
-            find / -type f -exec chmod 644 {} \;;
-            find / -type d -exec chmod 755 {} \;;
             quit
           "
