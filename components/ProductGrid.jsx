@@ -30,7 +30,7 @@ const ProductGrid = ({ items, loading, isVault = true }) => {
   return (
     <div className="seo-product-grid">
       {items.map((item) => (
-        <ProductCard key={item.id} item={item} isVault={isVault} />
+        <ProductCard key={item.id} product={{ ...item, source: item.source || (isVault ? 'vault' : 'shop') }} />
       ))}
     </div>
   );
