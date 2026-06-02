@@ -28,7 +28,7 @@ const ContentManagementPage = () => {
     try {
       const { data, error: fetchErr } = await supabase
         .from('blog_articles')
-        .select('*, author:profiles!author_id(display_name, username)')
+        .select('*, author_profile:profiles!author_id(display_name, username)')
         .order('created_at', { ascending: false });
       if (fetchErr) throw fetchErr;
       if (isMounted.current) setArticles(data ?? []);
@@ -180,7 +180,7 @@ const ContentManagementPage = () => {
                         <div className="line-clamp-2 text-sm leading-relaxed">{contentPreview}</div>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm hidden lg:table-cell align-top pt-4">
-                        <div className="truncate">{article.author?.display_name || article.author?.username || 'Unknown'}</div>
+                        <div className="truncate">{article.author || article.author_profile?.display_name || article.author_profile?.username || 'Unknown'}</div>
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm tabular-nums hidden xl:table-cell align-top pt-4">
                         {formatDate(article.created_at)}
