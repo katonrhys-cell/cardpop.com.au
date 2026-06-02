@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Star, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
+import { supabase } from '@/lib/supabaseClient.js';
 
 const GRADE_BADGE = {
   psa:   'bg-red-600 text-white',
@@ -14,9 +15,15 @@ const GRADE_BADGE = {
   other: 'bg-slate-600 text-white',
 };
 
+const resolveImageUrl = (path) => {
+  if (!path || typeof path !== 'string') return null;
+  if (path.startsWith('http')) return path;
+  return supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
+};
+
 const ProductCard = ({ product }) => {
-  const imageUrl = product.images?.[0] || product.cardImage?.[0];
-  const imgSrc = imageUrl && typeof imageUrl === 'string' && imageUrl.startsWith('http') ? imageUrl : null;
+  const rawImg = product.images?.[0] || product.cardImage?.[0] || product.card_image || null;
+  const imgSrc = resolveImageUrl(rawImg);
   const sellerId = product.seller_id || product.seller || product.owner_id || product.owner || product.user_id;
   const sellerObj = product.expand?.seller_id || product.expand?.seller || product.expand?.owner || product.expand?.user_id;
   const titleSlug = slugify(product.name || product.cardName || product.title || 'card');
