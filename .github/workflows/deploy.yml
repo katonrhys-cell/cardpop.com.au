@@ -43,7 +43,9 @@ jobs:
             set ftp:ssl-allow yes;
             set ssl:verify-certificate no;
             set ftp:passive-mode yes;
-            open -u '$FTP_USERNAME','$FTP_PASSWORD' ftp://$FTP_SERVER;
-            mirror --reverse --delete --verbose --no-perms --parallel=4 --exclude '.builds' --exclude 'cgi-bin' --exclude 'logs' --exclude 'tmp' ./dist/ /;
+            open -u $FTP_USERNAME,$FTP_PASSWORD ftp://$FTP_SERVER;
+            mirror --reverse --delete --verbose --parallel=4 --exclude '.builds' --exclude 'cgi-bin' --exclude 'logs' --exclude 'tmp' ./dist/ /;
+            find / -type f -exec chmod 644 {} \;;
+            find / -type d -exec chmod 755 {} \;;
             quit
           "
