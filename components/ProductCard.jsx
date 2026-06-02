@@ -5,11 +5,26 @@ import { Star, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 
+const GRADE_BADGE = {
+  psa:   'bg-red-600 text-white',
+  bgs:   'bg-blue-700 text-white',
+  cgc:   'bg-green-600 text-white',
+  ace:   'bg-orange-500 text-white',
+  sgc:   'bg-purple-600 text-white',
+  other: 'bg-slate-600 text-white',
+};
+
 const ProductCard = ({ product }) => {
   const imageUrl = product.images?.[0] || product.cardImage?.[0];
   const imgSrc = imageUrl && typeof imageUrl === 'string' && imageUrl.startsWith('http') ? imageUrl : null;
   const sellerId = product.seller_id || product.seller || product.owner_id || product.owner || product.user_id;
   const sellerObj = product.expand?.seller_id || product.expand?.seller || product.expand?.owner || product.expand?.user_id;
+  const titleSlug = slugify(product.name || product.cardName || product.title || 'card');
+  const detailPath = product.source
+    ? `/product/${product.source}/${product.id}/${titleSlug}`
+    : `/card-details/${product.id}`;
+  const gradingCompany = product.grading_company || product.gradingCompany || '';
+  const isGraded = gradingCompany && gradingCompany !== 'raw' && product.grade;
 
   return (
     <div className="group flex flex-col h-full bg-card rounded-2xl border border-border overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
@@ -26,10 +41,26 @@ const ProductCard = ({ product }) => {
             No Image
           </div>
         )}
-        {(product.condition || product.grade) && (
-          <div className="absolute top-3 left-3 flex gap-2 z-10">
-            {product.condition && <Badge variant="secondary" className="shadow-sm font-bold backdrop-blur-md bg-background/80">{product.condition}</Badge>}
-            {product.grade && <Badge className="shadow-sm font-bold bg-primary text-primary-foreground">Grade: {product.grade}</Badge>}
+        {/* Rookie badge — top left */}
+        {(product.is_rookie || product.isRookie) && (
+          <div className="absolute top-3 left-3 z-10 px-2 py-1 rounded-md text-[11px] font-extrabold tracking-wide bg-amber-400 text-amber-900 shadow-md">
+            RC
+          </div>
+        )}
+
+        {/* Condition badge — top left (when no rookie) */}
+        {product.condition && !(product.is_rookie || product.isRookie) && (
+          <div className="absolute top-3 left-3 z-10">
+            <Badge variant="secondary" className="shadow-sm font-bold backdrop-blur-md bg-background/80">
+              {product.condition}
+            </Badge>
+          </div>
+        )}
+
+        {/* Grade badge — bottom left (only for graded slabs) */}
+        {isGraded && (
+          <div className={`absolute bottom-3 left-3 z-10 px-2.5 py-1 rounded-md text-[11px] font-extrabold tracking-wide shadow-lg ${GRADE_BADGE[gradingCompany] || GRADE_BADGE.other}`}>
+            {gradingCompany.toUpperCase()} {product.grade}
           </div>
         )}
       </Link>

@@ -77,6 +77,7 @@ const AddEditCardPage = () => {
     // Attributes
     isFoil:         false,
     isSealed:       false,
+    isRookie:       false,
     // Grading
     gradingCompany: 'raw',
     grade:          '',
@@ -138,6 +139,7 @@ const AddEditCardPage = () => {
           variant:        card.variant        || '',
           isFoil:         card.is_foil        ?? false,
           isSealed:       card.is_sealed      ?? false,
+          isRookie:       card.is_rookie      ?? false,
           gradingCompany: card.grading_company || 'raw',
           grade:          card.grade          || '',
           certNumber:     card.cert_number    || '',
@@ -250,6 +252,7 @@ const AddEditCardPage = () => {
         variant:             formData.variant             || null,
         is_foil:             formData.isFoil,
         is_sealed:           formData.isSealed,
+        is_rookie:           formData.isRookie,
         grading_company:     formData.gradingCompany,
         grade:               isGraded ? (formData.grade?.trim() || null) : null,
         cert_number:         isGraded ? (formData.certNumber?.trim() || null) : null,
@@ -523,6 +526,7 @@ const AddEditCardPage = () => {
                       {[
                         { key: 'isFoil',   label: '✨ Foil',          desc: 'Holographic / foil finish' },
                         { key: 'isSealed', label: '📦 Sealed Product', desc: 'Booster, box, or sealed item' },
+                        { key: 'isRookie', label: '🏆 Rookie Card',    desc: 'First-year professional card' },
                       ].map(({ key, label, desc }) => (
                         <button
                           key={key}
