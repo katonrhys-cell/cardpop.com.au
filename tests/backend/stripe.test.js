@@ -17,6 +17,31 @@ const mockStripe = vi.hoisted(() => ({
 }));
 
 vi.mock('stripe', () => ({ default: vi.fn(function () { return mockStripe; }) }));
+// Stripe routes require auth — bypass Supabase token verification in tests
+vi.mock('../../src/middleware/auth.js', () => ({
+  authMiddleware: (req, _res, next) => {
+    req.user = { id: 'user-123', email: 'test@example.com' };
+    next();
+  },
+}));
+vi.mock('../../src/utils/supabaseClient.js', () => {
+  const chain = () => {
+    const q = {};
+    q.select = () => q;
+    q.eq = () => q;
+    q.neq = () => q;
+    q.order = () => q;
+    q.limit = () => q;
+    q.range = () => q;
+    q.update = () => q;
+    q.single = () => Promise.resolve({ data: null, error: null });
+    q.maybeSingle = () => Promise.resolve({ data: null, error: null });
+    q.insert = () => Promise.resolve({ data: null, error: null });
+    return q;
+  };
+  const sb = { from: () => chain(), auth: { getUser: () => Promise.resolve({ data: { user: null }, error: null }) } };
+  return { supabase: sb, default: sb };
+});
 
 import stripeRouter from '../../src/routes/stripe.js';
 

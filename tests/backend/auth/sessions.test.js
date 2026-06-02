@@ -9,6 +9,16 @@ const mockPb = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../src/utils/pocketbaseClient.js', () => ({ default: mockPb }));
+vi.mock('../../../src/middleware/auth.js', () => ({
+  authMiddleware: (req, res, next) => {
+    if (!req.headers.authorization?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing or invalid authorization header' });
+    }
+    req.user = { id: 'user-123', email: 'test@example.com' };
+    next();
+  },
+}));
+vi.mock('../../../src/utils/supabaseClient.js', () => ({ supabase: {}, default: {} }));
 
 import sessionsRouter from '../../../src/routes/auth/sessions.js';
 

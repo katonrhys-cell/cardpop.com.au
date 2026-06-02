@@ -13,6 +13,16 @@ const mockEncrypt = vi.hoisted(() => vi.fn());
 const mockDecrypt = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../src/utils/pocketbaseClient.js', () => ({ default: mockPb }));
+vi.mock('../../../src/middleware/auth.js', () => ({
+  authMiddleware: (req, res, next) => {
+    if (!req.headers.authorization?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing or invalid authorization header' });
+    }
+    req.user = { id: 'user-123', email: 'test@example.com' };
+    next();
+  },
+}));
+vi.mock('../../../src/utils/supabaseClient.js', () => ({ supabase: {}, default: {} }));
 vi.mock('../../../src/utils/otpGenerator.js', () => ({ generateBackupCodes: mockGenerateBackupCodes }));
 vi.mock('../../../src/utils/encryption.js', () => ({ encrypt: mockEncrypt, decrypt: mockDecrypt }));
 vi.mock('../../../src/utils/logger.js', () => ({ default: { info: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
