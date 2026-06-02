@@ -43,7 +43,7 @@ const ShopCategoryPage = () => {
         const { data, count, error } = await query;
         if (error) throw error;
 
-        setProducts(data || []);
+        setProducts((data || []).map(p => ({ ...p, source: p.source || 'shop' })));
         setTotalItems(count || 0);
         setTotalPages(Math.ceil((count || 0) / perPage));
       } catch (error) {
