@@ -12,6 +12,16 @@ const mockParseUserAgent = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../src/utils/pocketbaseClient.js', () => ({ default: mockPb }));
 vi.mock('../../../src/utils/deviceParser.js', () => ({ parseUserAgent: mockParseUserAgent }));
+vi.mock('../../../src/middleware/auth.js', () => ({
+  authMiddleware: (req, res, next) => {
+    if (!req.headers.authorization?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Missing or invalid authorization header' });
+    }
+    req.user = { id: 'user-123', email: 'test@example.com' };
+    next();
+  },
+}));
+vi.mock('../../../src/utils/supabaseClient.js', () => ({ supabase: {}, default: {} }));
 vi.mock('../../../src/utils/logger.js', () => ({ default: { info: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
 
 import devicesRouter from '../../../src/routes/auth/devices.js';
