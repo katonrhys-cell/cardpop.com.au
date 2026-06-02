@@ -5,6 +5,7 @@ import { Star, ShieldCheck, Lock, ShoppingCart, ArrowRightLeft, Layers } from 'l
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { VARIANT_BADGES } from '@/lib/cardVariants.js';
+import { supabase } from '@/lib/supabaseClient.js';
 
 const getStatusBadge = (listingType) => {
   switch (listingType) {
@@ -16,8 +17,15 @@ const getStatusBadge = (listingType) => {
   }
 };
 
+const resolveImageUrl = (path) => {
+  if (!path || typeof path !== 'string') return null;
+  if (path.startsWith('http')) return path;
+  return supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
+};
+
 const VaultListingCard = ({ vaultItem }) => {
-  const imgSrc = vaultItem.vault_images?.[0]?.image_url || vaultItem.image_url || null;
+  const rawImg = vaultItem.vault_images?.[0]?.storage_path || vaultItem.card_image || vaultItem.vault_images?.[0]?.image_url || vaultItem.image_url || null;
+  const imgSrc = resolveImageUrl(rawImg);
   const sellerId = vaultItem.user_id || vaultItem.owner_id;
   const sellerObj = vaultItem.profiles || vaultItem.expand?.user_id || null;
   const titleSlug = slugify(vaultItem.card_name || vaultItem.name || vaultItem.title || 'card');
