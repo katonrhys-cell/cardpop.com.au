@@ -58,7 +58,7 @@ router.post('/send-verification-email', async (req, res) => {
   const { error } = await supabase.auth.admin.generateLink({
     type: 'signup',
     email: user.email,
-    options: { redirectTo: `${process.env.APP_URL || 'https://cardpop.com.au'}/account` },
+    options: { redirectTo: `${process.env.APP_URL || 'https://cardpop.online'}/account` },
   });
 
   if (error) {
@@ -122,7 +122,7 @@ router.get('/verify-email/:token', async (req, res) => {
 
   const tokenData = verifyToken(token.trim());
   if (!tokenData) {
-    return res.redirect(`${process.env.APP_URL || 'https://cardpop.com.au'}/verification-failed`);
+    return res.redirect(`${process.env.APP_URL || 'https://cardpop.online'}/verification-failed`);
   }
 
   const { error } = await supabase
@@ -131,7 +131,7 @@ router.get('/verify-email/:token', async (req, res) => {
     .eq('id', tokenData.userId);
 
   if (error) {
-    return res.redirect(`${process.env.APP_URL || 'https://cardpop.com.au'}/verification-failed`);
+    return res.redirect(`${process.env.APP_URL || 'https://cardpop.online'}/verification-failed`);
   }
 
   markTokenAsUsed(token.trim());
@@ -143,7 +143,7 @@ router.get('/verify-email/:token', async (req, res) => {
     status: 'success',
   }).catch(() => {});
 
-  res.redirect(`${process.env.APP_URL || 'https://cardpop.com.au'}/account?verified=true`);
+  res.redirect(`${process.env.APP_URL || 'https://cardpop.online'}/account?verified=true`);
 });
 
 // POST /resend-verification
@@ -156,7 +156,7 @@ router.post('/resend-verification', async (req, res) => {
   const { error } = await supabase.auth.admin.generateLink({
     type: 'signup',
     email: trimmedEmail,
-    options: { redirectTo: `${process.env.APP_URL || 'https://cardpop.com.au'}/account` },
+    options: { redirectTo: `${process.env.APP_URL || 'https://cardpop.online'}/account` },
   });
 
   // Always return success to prevent email enumeration

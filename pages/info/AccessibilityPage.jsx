@@ -20,7 +20,7 @@ const AccessibilityPage = () => {
       <h2>Feedback</h2>
       <p>We welcome your feedback on the accessibility of CardPop. Please let us know if you encounter accessibility barriers on our platform:</p>
       <ul>
-        <li>Email: accessibility@cardpop.com.au</li>
+        <li>Email: accessibility@cardpop.online</li>
         <li>We try to respond to feedback within 2 business days.</li>
       </ul>
     </InfoPageLayout>
