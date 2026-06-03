@@ -241,6 +241,7 @@ const AdminDashboard = () => {
           <ManagementBox title="Category Management" description="Organize top-level categories." icon={FolderTree} link="/admin/categories" />
           <ManagementBox title="Subcategory Management" description="Manage nested subcategories." icon={Layers2} link="/admin/subcategories" />
           <ManagementBox title="Product Lines" description="Manage product lines per brand." icon={Layers} link="/admin/product-lines" />
+          <ManagementBox title="Collections & Eras" description="Manage eras and sets per collection." icon={Layers} link="/admin/collections" />
           <ManagementBox title="User Management" description="Review accounts and roles." icon={Users} link="/admin/users" />
           <ManagementBox title="Order Management" description="Track and manage all orders." icon={ListOrdered} link="/admin/orders" />
           <ManagementBox title="Verification" description="Review user verification requests." icon={ShieldCheck} link="/admin/verification" />

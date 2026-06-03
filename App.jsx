@@ -139,6 +139,7 @@ const CategoryManagementPage = lazy(() => import('@/pages/admin/CategoryManageme
 const SubcategoryManagementPage = lazy(() => import('@/pages/admin/SubcategoryManagementPage.jsx'));
 const BrandsManagementPage = lazy(() => import('@/pages/admin/BrandsManagementPage.jsx'));
 const ProductLinesManagementPage = lazy(() => import('@/pages/admin/ProductLinesManagementPage.jsx'));
+const CollectionsManagementPage = lazy(() => import('@/pages/admin/CollectionsManagementPage.jsx'));
 
 // Info & Misc Pages
 const SearchResultsPage = lazy(() => import('@/pages/SearchResultsPage.jsx'));
@@ -311,6 +312,7 @@ const App = () => {
                           <Route path="category-mapping" element={<CategoryMappingPage />} />
                           <Route path="verification" element={<AdminVerificationDashboard />} />
                           <Route path="product-lines" element={<ProductLinesManagementPage />} />
+                          <Route path="collections" element={<CollectionsManagementPage />} />
                         </Route>
                         
                         {/* --- CATCH-ALL 404 ROUTE --- */}
