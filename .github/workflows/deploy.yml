@@ -45,6 +45,7 @@ jobs:
           EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
           APP_URL: ${{ secrets.APP_URL }}
           CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
         run: |
           printf 'SUPABASE_URL=%s\n'              "$SUPABASE_URL"              >> .env
           printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' "$SUPABASE_SERVICE_ROLE_KEY" >> .env
@@ -56,6 +57,7 @@ jobs:
           printf 'EBAY_CLIENT_SECRET=%s\n'        "$EBAY_CLIENT_SECRET"        >> .env
           printf 'APP_URL=%s\n'                   "$APP_URL"                   >> .env
           printf 'CORS_ORIGIN=%s\n'               "$CORS_ORIGIN"               >> .env
+          printf 'ENCRYPTION_KEY=%s\n'            "$ENCRYPTION_KEY"            >> .env
 
       - name: Set dist file permissions
         run: |
