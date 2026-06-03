@@ -9,7 +9,7 @@ const SEOHead = ({ title, description, canonicalUrl, ogImage, structuredData }) 
   const resolvedTitle = title || defaultTitle;
   const resolvedDesc = description || defaultDescription;
 
-  const resolvedOgImage = ogImage || '/images/hero/og.jpg';
+  const resolvedOgImage = ogImage || '/og-image.jpg';
 
   return (
     <Helmet>
