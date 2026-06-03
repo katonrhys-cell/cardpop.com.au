@@ -78,72 +78,59 @@ const ACTIVITY_FEED = [
 // ─── Hero floating card shapes ────────────────────────────────────────────────
 const HERO_CARDS = [
   {
-    // 1993 MTG Alpha Black Lotus — PSA 9 MINT
-    image: '/images/hero/black-lotus-2000.jpg',
+    image: '/images/hero/black-lotus-1024.jpg',
     gradient: 'from-stone-800 via-stone-900 to-black',
     borderColor: 'border-yellow-600/60',
-    rotate: -14, x: -170, y: 30, delay: 0, floatY: -12,
+    rotate: -16, x: -200, y: 30, delay: 0, floatY: -12,
     name: 'Black Lotus',
     set: 'Magic: The Gathering',
     year: '1993 · Alpha',
     rarity: 'PSA 9 MINT',
     value: '$500,000+',
-    symbol: '✦',
-    symbolColor: 'text-yellow-400',
-    accent: 'from-yellow-700 to-yellow-500',
-    artColor: 'bg-gradient-to-b from-stone-700 to-stone-900',
-    artEmoji: '🌸',
   },
   {
-    // 1986 Fleer Michael Jordan #57
+    image: '/images/hero/michael-jordan-1024.jpg',
     gradient: 'from-red-800 via-red-900 to-black',
     borderColor: 'border-red-400/50',
-    image: '/images/hero/michael-jordan-2000.jpg',
-    rotate: -5, x: -55, y: -15, delay: 0.15, floatY: -16,
+    rotate: -8, x: -100, y: -15, delay: 0.12, floatY: -16,
     name: 'Michael Jordan',
     set: 'Fleer Basketball',
     year: '1986 · #57 RC',
     rarity: 'Rookie Card',
     value: '$738,000',
-    symbol: '★',
-    symbolColor: 'text-red-400',
-    accent: 'from-red-700 to-red-500',
-    artColor: 'bg-gradient-to-b from-red-900 to-black',
-    artEmoji: '🏀',
   },
   {
-    // 2018 Topps Chrome Shohei Ohtani Rookie Auto Purple Ref — PSA/DNA Auto 10
-    image: '/images/hero/ohtani-rookie-2000.jpg',
+    image: '/images/hero/ohtani-rookie-1024.jpg',
     gradient: 'from-blue-800 via-blue-900 to-red-900',
     borderColor: 'border-blue-300/50',
-    rotate: 4, x: 60, y: 10, delay: 0.3, floatY: -10,
+    rotate: 0, x: 0, y: 10, delay: 0.24, floatY: -10,
     name: 'Shohei Ohtani',
     set: 'Topps Chrome',
     year: '2018 · Rookie Auto',
     rarity: 'PSA/DNA Auto 10',
     value: '$200,000+',
-    symbol: '◆',
-    symbolColor: 'text-blue-300',
-    accent: 'from-blue-600 to-red-600',
-    artColor: 'bg-gradient-to-b from-blue-900 to-red-900',
-    artEmoji: '⚾',
   },
   {
-    // 1998 Pikachu Illustrator — PSA 9 MINT
-    image: '/images/hero/pikachu-illustrator-2000.jpg',
+    image: '/images/hero/lebron-james-1024.jpg',
+    gradient: 'from-purple-800 via-purple-900 to-black',
+    borderColor: 'border-purple-400/50',
+    rotate: 8, x: 100, y: 5, delay: 0.36, floatY: -14,
+    name: 'LeBron James',
+    set: 'Topps Chrome',
+    year: '2003 · #111 RC',
+    rarity: 'Rookie Card',
+    value: '$5,200,000',
+  },
+  {
+    image: '/images/hero/pikachu-illustrator-1024.jpg',
     gradient: 'from-yellow-400 via-yellow-500 to-amber-500',
     borderColor: 'border-yellow-200/70',
-    rotate: 14, x: 170, y: 35, delay: 0.45, floatY: -14,
+    rotate: 16, x: 200, y: 35, delay: 0.48, floatY: -14,
     name: 'Pikachu Illustrator',
     set: 'Pokémon',
     year: '1998 · CoroCoro',
     rarity: 'PSA 9 MINT',
     value: '$5,300,000',
-    symbol: '⚡',
-    symbolColor: 'text-yellow-900',
-    accent: 'from-yellow-500 to-amber-400',
-    artColor: 'bg-gradient-to-b from-yellow-300 to-yellow-500',
-    artEmoji: '⚡',
   },
 ];
 
@@ -221,7 +208,7 @@ const HomePage = () => {
         <div className="absolute bottom-1/4 -right-32 w-[28rem] h-[28rem] bg-blue-500/10 rounded-full blur-3xl -z-10" />
 
         {/* Floating card stack — desktop only */}
-        <div className="absolute right-[6%] xl:right-[10%] top-1/2 -translate-y-1/2 hidden lg:block w-[320px] h-[420px] pointer-events-none select-none">
+        <div className="absolute right-[2%] xl:right-[5%] top-1/2 -translate-y-1/2 hidden lg:block w-[520px] h-[420px] pointer-events-none select-none">
           {HERO_CARDS.map((card, i) => (
             <motion.div
               key={i}
@@ -282,7 +269,7 @@ const HomePage = () => {
         </div>
 
         {/* Hero text — offset left on desktop to make room for cards */}
-        <div className="max-w-5xl mx-auto w-full relative z-10 lg:pr-[340px] xl:pr-[360px]">
+        <div className="max-w-5xl mx-auto w-full relative z-10 lg:pr-[440px] xl:pr-[460px]">
           <motion.div
             initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}

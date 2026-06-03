@@ -131,6 +131,7 @@ const AddEditCardPage = () => {
   useEffect(() => {
     if (!isEdit) return;
     const fetchCard = async () => {
+      if (!currentUser?.id) return;
       try {
         const { data: card, error: fetchError } = await supabase
           .from('vault_items')
@@ -138,7 +139,7 @@ const AddEditCardPage = () => {
           .eq('id', id)
           .single();
         if (fetchError) throw fetchError;
-        if (card.owner_id !== currentUser.id) {
+        if (!currentUser || card.owner_id !== currentUser.id) {
           toast.error('Unauthorized');
           navigate('/vault');
           return;
@@ -179,7 +180,7 @@ const AddEditCardPage = () => {
       }
     };
     fetchCard();
-  }, [id, currentUser.id, navigate, isEdit]);
+  }, [id, currentUser?.id, navigate, isEdit]);
 
   // ─── Image handling ───────────────────────────────────────────────────────
   const handleImageChange = (e) => {
@@ -300,7 +301,7 @@ const AddEditCardPage = () => {
               setImagePreview(null);
               setErrors({});
               setIsAutoFilled(false);
-              clearAnalysis();
+              clearScan();
               window.scrollTo(0, 0);
             },
           },
