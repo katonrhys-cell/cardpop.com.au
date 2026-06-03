@@ -9,6 +9,8 @@ const SEOHead = ({ title, description, canonicalUrl, ogImage, structuredData }) 
   const resolvedTitle = title || defaultTitle;
   const resolvedDesc = description || defaultDescription;
 
+  const resolvedOgImage = ogImage || '/images/hero/og.jpg';
+
   return (
     <Helmet>
       <title>{resolvedTitle}</title>
@@ -23,13 +25,13 @@ const SEOHead = ({ title, description, canonicalUrl, ogImage, structuredData }) 
       <meta property="og:type" content="website" />
       <meta property="og:site_name" content={siteName} />
       {resolvedCanonical && <meta property="og:url" content={resolvedCanonical} />}
-      {ogImage && <meta property="og:image" content={ogImage} />}
+      {resolvedOgImage && <meta property="og:image" content={resolvedOgImage} />}
 
       {/* Twitter */}
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={resolvedTitle} />
       <meta name="twitter:description" content={resolvedDesc} />
-      {ogImage && <meta name="twitter:image" content={ogImage} />}
+      {resolvedOgImage && <meta name="twitter:image" content={resolvedOgImage} />}
 
       {/* Structured Data JSON-LD */}
       {structuredData && (

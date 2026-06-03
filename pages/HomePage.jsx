@@ -79,7 +79,7 @@ const ACTIVITY_FEED = [
 const HERO_CARDS = [
   {
     // 1993 MTG Alpha Black Lotus — PSA 9 MINT
-    image: '/images/hero-cards/black-lotus-psa9.jpg',
+    image: '/images/hero/black-lotus-2000.jpg',
     gradient: 'from-stone-800 via-stone-900 to-black',
     borderColor: 'border-yellow-600/60',
     rotate: -14, x: -170, y: 30, delay: 0, floatY: -12,
@@ -98,6 +98,7 @@ const HERO_CARDS = [
     // 1986 Fleer Michael Jordan #57
     gradient: 'from-red-800 via-red-900 to-black',
     borderColor: 'border-red-400/50',
+    image: '/images/hero/michael-jordan-2000.jpg',
     rotate: -5, x: -55, y: -15, delay: 0.15, floatY: -16,
     name: 'Michael Jordan',
     set: 'Fleer Basketball',
@@ -112,7 +113,7 @@ const HERO_CARDS = [
   },
   {
     // 2018 Topps Chrome Shohei Ohtani Rookie Auto Purple Ref — PSA/DNA Auto 10
-    image: '/images/hero-cards/ohtani-rookie-auto-psa10.jpg',
+    image: '/images/hero/ohtani-rookie-2000.jpg',
     gradient: 'from-blue-800 via-blue-900 to-red-900',
     borderColor: 'border-blue-300/50',
     rotate: 4, x: 60, y: 10, delay: 0.3, floatY: -10,
@@ -129,7 +130,7 @@ const HERO_CARDS = [
   },
   {
     // 1998 Pikachu Illustrator — PSA 9 MINT
-    image: '/images/hero-cards/pikachu-illustrator-psa9.jpg',
+    image: '/images/hero/pikachu-illustrator-2000.jpg',
     gradient: 'from-yellow-400 via-yellow-500 to-amber-500',
     borderColor: 'border-yellow-200/70',
     rotate: 14, x: 170, y: 35, delay: 0.45, floatY: -14,
