@@ -49,10 +49,12 @@ jobs:
             set ftp:ssl-allow yes;
             set ssl:verify-certificate no;
             set ftp:passive-mode yes;
-            set net:timeout 30;
-            set net:max-retries 3;
+            set ftp:use-feat no;
+            set net:timeout 60;
+            set net:max-retries 10;
             set net:reconnect-interval-base 5;
+            set net:reconnect-interval-multiplier 1.5;
             open -u $FTP_USERNAME,$FTP_PASSWORD ftp://$FTP_SERVER;
-            mirror --reverse --parallel=8 --no-perms --exclude '.builds' --exclude 'cgi-bin' --exclude 'logs' --exclude 'tmp' ./dist/ /;
+            mirror --reverse --parallel=4 --no-perms --exclude '.builds' --exclude 'cgi-bin' --exclude 'logs' --exclude 'tmp' ./dist/ /;
             quit
           "
