@@ -87,7 +87,7 @@ const MobileBrowseSection = ({ onNavigate }) => {
 
   const handleCollectionNav = (slug) => {
     navigate(`/collections/${slug}`);
-    onNavigate();
+    // Sheet closes reactively via the location.pathname useEffect in Header
   };
 
   return (

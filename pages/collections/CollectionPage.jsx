@@ -226,6 +226,27 @@ const CollectionPage = () => {
   const [categoryId, setCategoryId] = useState(null);
   const [activeEra, setActiveEra] = useState(null);
 
+  // Reset derived state when slug changes (guards against deferred key-remount)
+  const prevSlugRef = useRef(slug);
+  useEffect(() => {
+    if (prevSlugRef.current !== slug) {
+      prevSlugRef.current = slug;
+      setCategoryId(null);
+      setActiveEra(null);
+      setNewReleases([]);
+      setNewReleasesLoading(true);
+      setHolyGrail([]);
+      setHolyGrailLoading(true);
+      setGradedListings([]);
+      setTrendingListings([]);
+      setListings([]);
+      setListingsLoading(true);
+      setListingsError(null);
+      setListingsPage(1);
+      setTotalListings(0);
+    }
+  }, [slug]);
+
   const [newReleases, setNewReleases] = useState([]);
   const [newReleasesLoading, setNewReleasesLoading] = useState(true);
 
