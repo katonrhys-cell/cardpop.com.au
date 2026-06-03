@@ -9,6 +9,7 @@ import ProductCard from '@/components/ProductCard.jsx';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { toast } from 'sonner';
 
 const BrowseListingsPage = () => {
@@ -20,6 +21,7 @@ const BrowseListingsPage = () => {
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState(searchParams.get('category') || 'all');
   const [sort, setSort] = useState('created_at_desc');
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   useEffect(() => {
     const fetchListings = async () => {
@@ -105,7 +107,13 @@ const BrowseListingsPage = () => {
           </div>
           
           <div className="flex items-center gap-2 w-full md:w-auto">
-            <Button variant="outline" size="icon" className="shrink-0 md:hidden border-border bg-card shadow-sm h-11 w-11">
+            <Button
+              variant="outline"
+              size="icon"
+              className="shrink-0 lg:hidden border-border bg-card shadow-sm h-11 w-11"
+              onClick={() => setMobileFiltersOpen(true)}
+              aria-label="Open filters"
+            >
               <SlidersHorizontal className="h-4 w-4" />
             </Button>
           </div>
@@ -189,6 +197,47 @@ const BrowseListingsPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Mobile filter drawer */}
+      <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
+        <SheetContent side="bottom" className="rounded-t-2xl pb-8">
+          <SheetHeader className="mb-5">
+            <SheetTitle className="flex items-center gap-2 text-lg font-bold">
+              <Filter className="w-4 h-4" /> Filters
+            </SheetTitle>
+          </SheetHeader>
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-foreground">Category</label>
+              <Select value={category} onValueChange={(v) => { handleCategoryChange(v); setMobileFiltersOpen(false); }}>
+                <SelectTrigger className="bg-background border-border">
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="Pokemon">Pokemon</SelectItem>
+                  <SelectItem value="Magic">Magic: The Gathering</SelectItem>
+                  <SelectItem value="Yu-Gi-Oh">Yu-Gi-Oh</SelectItem>
+                  <SelectItem value="Sports">Sports Cards</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-foreground">Sort By</label>
+              <Select value={sort} onValueChange={(v) => { setSort(v); setMobileFiltersOpen(false); }}>
+                <SelectTrigger className="bg-background border-border">
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="created_at_desc">Newest First</SelectItem>
+                  <SelectItem value="price_asc">Price: Low to High</SelectItem>
+                  <SelectItem value="price_desc">Price: High to Low</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

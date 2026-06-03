@@ -490,7 +490,7 @@ const VaultProfilePage = () => {
 
                 <div className="mt-8 pt-6 border-t border-border flex gap-3">
                   <Button asChild className="flex-1 rounded-xl font-bold">
-                    <Link to={`/card/${selectedCard.id}`}>View Full Details</Link>
+                    <Link to={`/product/vault/${selectedCard.id}`}>View Full Details</Link>
                   </Button>
                   <Button variant="outline" onClick={() => setIsCardModalOpen(false)} className="rounded-xl">
                     Close
