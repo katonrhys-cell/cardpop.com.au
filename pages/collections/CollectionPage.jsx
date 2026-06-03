@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import { COLLECTION_CONFIGS, resolveCollectionSlug } from '@/data/collectionConfigs.js';
+import { useCollectionEras } from '@/hooks/useCollectionEras.js';
 import { slugify } from '@/lib/slugify.js';
 import { CARD_VARIANTS } from '@/lib/cardVariants.js';
 
@@ -217,6 +218,9 @@ const CollectionPage = () => {
   const slug = resolveCollectionSlug(rawSlug);
   const config = slug ? COLLECTION_CONFIGS[slug] : null;
   const GradedIcon = slug === 'pokemon' ? PikachuIcon : Award;
+
+  // DB-driven eras (falls back to static config if DB is empty)
+  const { eras } = useCollectionEras(slug);
 
   // ─── State ────────────────────────────────────────────────────────────────
   const [categoryId, setCategoryId] = useState(null);
@@ -468,7 +472,7 @@ const CollectionPage = () => {
 
   if (!config) return null;
 
-  const { Icon, heroGradient, heroTextDark, accentHex, tagline, name, seoTitle, seoDescription, seoIntro, eras, holyGrailLabel, holyGrailDesc, showGradedSection, showTrendingSection } = config;
+  const { Icon, heroGradient, heroTextDark, accentHex, tagline, name, seoTitle, seoDescription, seoIntro, holyGrailLabel, holyGrailDesc, showGradedSection, showTrendingSection } = config;
 
   const textColor = heroTextDark ? 'text-gray-900' : 'text-white';
   const textMuted = heroTextDark ? 'text-gray-700' : 'text-white/80';

@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import { COLLECTION_CONFIGS } from '@/data/collectionConfigs.js';
+import { useCollectionEras } from '@/hooks/useCollectionEras.js';
 import { VARIANT_GROUPS } from '@/lib/cardVariants.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -98,14 +99,17 @@ const AddEditCardPage = () => {
 
   const set = (key, val) => setFormData(f => ({ ...f, [key]: val }));
 
-  // Derive era options from the selected collection
-  const eraOpts = (() => {
+  // Derive collection slug from selected collection name
+  const collectionSlug = (() => {
     const selected = formData.collection?.toLowerCase();
-    const entry = Object.values(COLLECTION_CONFIGS).find(cfg =>
+    const entry = Object.entries(COLLECTION_CONFIGS).find(([, cfg]) =>
       [cfg.name, ...(cfg.categoryAliases ?? [])].some(a => a.toLowerCase() === selected)
     );
-    return entry?.eras ?? [];
+    return entry?.[0] ?? null;
   })();
+
+  // Fetch eras from DB for the selected collection (falls back to static config)
+  const { eras: eraOpts } = useCollectionEras(collectionSlug);
 
   // ─── Resolve category_id whenever collection changes ──────────────────────
   useEffect(() => {
