@@ -30,6 +30,37 @@ jobs:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
+      # ── Generate .env for the backend ──────────────────────────────────────
+      # Secrets are injected via env vars so special characters in values
+      # are handled safely (no heredoc quoting issues).
+      - name: Generate backend .env file
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          PB_SUPERUSER_EMAIL: ${{ secrets.PB_SUPERUSER_EMAIL }}
+          PB_SUPERUSER_PASSWORD: ${{ secrets.PB_SUPERUSER_PASSWORD }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          EBAY_APP_ID: ${{ secrets.EBAY_APP_ID }}
+          EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
+          APP_URL: ${{ secrets.APP_URL }}
+          CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
+        run: |
+          printf 'SUPABASE_URL=%s\n'              "$SUPABASE_URL"              >> .env
+          printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' "$SUPABASE_SERVICE_ROLE_KEY" >> .env
+          printf 'VITE_SUPABASE_URL=%s\n'         "$VITE_SUPABASE_URL"         >> .env
+          printf 'VITE_SUPABASE_ANON_KEY=%s\n'    "$VITE_SUPABASE_ANON_KEY"    >> .env
+          printf 'PB_SUPERUSER_EMAIL=%s\n'        "$PB_SUPERUSER_EMAIL"        >> .env
+          printf 'PB_SUPERUSER_PASSWORD=%s\n'     "$PB_SUPERUSER_PASSWORD"     >> .env
+          printf 'STRIPE_SECRET_KEY=%s\n'         "$STRIPE_SECRET_KEY"         >> .env
+          printf 'STRIPE_WEBHOOK_SECRET=%s\n'     "$STRIPE_WEBHOOK_SECRET"     >> .env
+          printf 'EBAY_APP_ID=%s\n'               "$EBAY_APP_ID"               >> .env
+          printf 'EBAY_CLIENT_SECRET=%s\n'        "$EBAY_CLIENT_SECRET"        >> .env
+          printf 'APP_URL=%s\n'                   "$APP_URL"                   >> .env
+          printf 'CORS_ORIGIN=%s\n'               "$CORS_ORIGIN"               >> .env
+
       - name: Set dist file permissions
         run: |
           find ./dist -type f -exec chmod 644 {} \;
@@ -55,6 +86,7 @@ jobs:
             set net:reconnect-interval-base 5;
             set net:reconnect-interval-multiplier 1.5;
             open -u $FTP_USERNAME,$FTP_PASSWORD ftp://$FTP_SERVER;
+            put .env -o .env;
             mirror --reverse --parallel=4 --no-perms --exclude '.builds' --exclude 'cgi-bin' --exclude 'logs' --exclude 'tmp' ./dist/ /;
             quit
           "
