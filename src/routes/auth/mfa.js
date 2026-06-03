@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
-import pb from '../../utils/pocketbaseClient.js';
+import supabase from '../../utils/supabaseClient.js';
 import { generateOTP } from '../../utils/otpGenerator.js';
 import { encrypt, decrypt } from '../../utils/encryption.js';
 import { authMiddleware } from '../../middleware/auth.js';
@@ -11,85 +11,59 @@ const MFA_CODE_EXPIRY_MS = parseInt(process.env.MFA_CODE_EXPIRY_MS || '600000', 
 
 router.post('/request', async (req, res) => {
   const { userId, email } = req.body;
-
-  if (!userId || !email) {
-    return res.status(400).json({ error: 'userId and email are required' });
-  }
+  if (!userId || !email) return res.status(400).json({ error: 'userId and email are required' });
 
   const otp = generateOTP();
   const expiresAt = new Date(Date.now() + MFA_CODE_EXPIRY_MS).toISOString();
   const mfaId = `mfa_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-
   const encryptedOtp = encrypt({ code: otp, expiresAt });
 
-  const mfaRecord = await pb.collection('mfaSessions').create({
-    userId,
+  const { error } = await supabase.from('mfa_sessions').insert({
+    user_id: userId,
     email,
-    mfaId,
-    encryptedOtp,
-    expiresAt,
+    mfa_id: mfaId,
+    encrypted_otp: encryptedOtp,
+    expires_at: expiresAt,
     verified: false,
   });
 
-  logger.info(`MFA request created for user ${userId}`);
+  if (error) throw error;
 
-  res.json({
-    mfaId: mfaRecord.mfaId,
-    expiresAt,
-    message: 'OTP sent to email',
-  });
+  logger.info(`MFA request created for user ${userId}`);
+  res.json({ mfaId, expiresAt, message: 'OTP sent to email' });
 });
 
 router.post('/verify', async (req, res) => {
   const { mfaId, code } = req.body;
+  if (!mfaId || !code) return res.status(400).json({ error: 'mfaId and code are required' });
+  if (code.length !== 8) return res.status(400).json({ error: 'Code must be 8 digits' });
 
-  if (!mfaId || !code) {
-    return res.status(400).json({ error: 'mfaId and code are required' });
-  }
+  const { data: mfaRecord, error } = await supabase
+    .from('mfa_sessions')
+    .select('*')
+    .eq('mfa_id', mfaId)
+    .single();
 
-  if (code.length !== 8) {
-    return res.status(400).json({ error: 'Code must be 8 digits' });
-  }
+  if (error || !mfaRecord) throw new Error('MFA session not found');
+  if (new Date() > new Date(mfaRecord.expires_at)) throw new Error('MFA code expired');
 
-  const mfaRecord = await pb.collection('mfaSessions').getFirstListItem(`mfaId = "${mfaId}"`);
+  const decrypted = decrypt(mfaRecord.encrypted_otp);
+  if (decrypted.code !== code) throw new Error('Invalid MFA code');
 
-  if (!mfaRecord) {
-    throw new Error('MFA session not found');
-  }
+  await Promise.all([
+    supabase.from('profiles').update({ mfa_enabled: true }).eq('id', mfaRecord.user_id),
+    supabase.from('mfa_sessions').update({ verified: true }).eq('id', mfaRecord.id),
+    supabase.from('audit_logs').insert({
+      user_id: mfaRecord.user_id,
+      event_type: 'mfa_verified',
+      description: 'MFA verification successful',
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent'],
+    }),
+  ]);
 
-  if (new Date() > new Date(mfaRecord.expiresAt)) {
-    throw new Error('MFA code expired');
-  }
-
-  const decrypted = decrypt(mfaRecord.encryptedOtp);
-
-  if (decrypted.code !== code) {
-    throw new Error('Invalid MFA code');
-  }
-
-  const user = await pb.collection('users').getOne(mfaRecord.userId);
-  await pb.collection('users').update(mfaRecord.userId, { mfaEnabled: true });
-
-  await pb.collection('mfaSessions').update(mfaRecord.id, { verified: true });
-
-  await pb.collection('auditLogs').create({
-    userId: mfaRecord.userId,
-    eventType: 'mfa_verified',
-    description: 'MFA verification successful',
-    ipAddress: req.ip,
-    userAgent: req.headers['user-agent'],
-    timestamp: new Date().toISOString(),
-  });
-
-  const authToken = await pb.collection('users').authWithPassword(user.email, user.password);
-
-  logger.info(`MFA verified for user ${mfaRecord.userId}`);
-
-  res.json({
-    success: true,
-    token: authToken.token,
-    user: authToken.record,
-  });
+  logger.info(`MFA verified for user ${mfaRecord.user_id}`);
+  res.json({ success: true, message: 'MFA verified successfully' });
 });
 
 export default router;

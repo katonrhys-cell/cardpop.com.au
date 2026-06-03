@@ -1,26 +1,30 @@
 import 'dotenv/config';
 import express from 'express';
-import pb from '../../utils/pocketbaseClient.js';
+import supabase from '../../utils/supabaseClient.js';
 import { authMiddleware } from '../../middleware/auth.js';
 import logger from '../../utils/logger.js';
 
 const router = express.Router();
 
 router.get('/login-history', authMiddleware, async (req, res) => {
-  const auditLogs = await pb.collection('auditLogs').getFullList({
-    filter: `userId = "${req.user.id}" && eventType = "login"`,
-    sort: '-timestamp',
-    limit: 10,
+  const { data: logs, error } = await supabase
+    .from('audit_logs')
+    .select('created_at, ip_address, user_agent, status')
+    .eq('user_id', req.user.id)
+    .eq('event_type', 'login')
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  if (error) throw error;
+
+  res.json({
+    history: (logs || []).map(log => ({
+      timestamp: log.created_at,
+      ipAddress: log.ip_address,
+      userAgent: log.user_agent,
+      status: log.status || 'success',
+    })),
   });
-
-  const history = auditLogs.map(log => ({
-    timestamp: log.timestamp,
-    ipAddress: log.ipAddress,
-    userAgent: log.userAgent,
-    status: log.status || 'success',
-  }));
-
-  res.json({ history });
 });
 
 export default router;

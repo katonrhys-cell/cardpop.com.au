@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
-import pb from '../../utils/pocketbaseClient.js';
+import supabase from '../../utils/supabaseClient.js';
 import { authMiddleware } from '../../middleware/auth.js';
 import { getDeviceName } from '../../utils/deviceParser.js';
 import logger from '../../utils/logger.js';
@@ -9,44 +9,35 @@ const router = express.Router();
 
 router.post('/create', async (req, res) => {
   const { userId } = req.body;
+  if (!userId) return res.status(400).json({ error: 'userId is required' });
 
-  if (!userId) {
-    return res.status(400).json({ error: 'userId is required' });
-  }
+  const { data: profile, error } = await supabase
+    .from('profiles').select('active_sessions').eq('id', userId).single();
+  if (error) throw error;
 
-  const user = await pb.collection('users').getOne(userId);
   const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
   const deviceName = getDeviceName(req.headers['user-agent'] || '');
-  const ipAddress = req.ip || req.connection.remoteAddress;
+  const ipAddress = req.ip || req.connection?.remoteAddress;
+  const now = new Date().toISOString();
 
-  const newSession = {
-    sessionId,
-    deviceName,
-    ipAddress,
-    createdAt: new Date().toISOString(),
-    lastActivityAt: new Date().toISOString(),
-  };
+  const newSession = { sessionId, deviceName, ipAddress, createdAt: now, lastActivityAt: now };
+  const activeSessions = [...(profile?.active_sessions || []), newSession];
 
-  const activeSessions = user.activeSessions || [];
-  activeSessions.push(newSession);
-
-  await pb.collection('users').update(userId, { activeSessions });
+  const { error: updateError } = await supabase
+    .from('profiles').update({ active_sessions: activeSessions }).eq('id', userId);
+  if (updateError) throw updateError;
 
   logger.info(`Session created for user ${userId}`);
-
-  res.json({
-    sessionId,
-    deviceName,
-    createdAt: newSession.createdAt,
-  });
+  res.json({ sessionId, deviceName, createdAt: now });
 });
 
 router.get('/', authMiddleware, async (req, res) => {
-  const user = await pb.collection('users').getOne(req.user.id);
-  const sessions = user.activeSessions || [];
+  const { data: profile, error } = await supabase
+    .from('profiles').select('active_sessions').eq('id', req.user.id).single();
+  if (error) throw error;
 
   res.json({
-    sessions: sessions.map(s => ({
+    sessions: (profile?.active_sessions || []).map(s => ({
       sessionId: s.sessionId,
       deviceName: s.deviceName,
       ipAddress: s.ipAddress,
@@ -58,73 +49,47 @@ router.get('/', authMiddleware, async (req, res) => {
 
 router.post('/logout-other', authMiddleware, async (req, res) => {
   const { currentSessionId } = req.body;
+  if (!currentSessionId) return res.status(400).json({ error: 'currentSessionId is required' });
 
-  if (!currentSessionId) {
-    return res.status(400).json({ error: 'currentSessionId is required' });
-  }
+  const { data: profile, error } = await supabase
+    .from('profiles').select('active_sessions').eq('id', req.user.id).single();
+  if (error) throw error;
 
-  const user = await pb.collection('users').getOne(req.user.id);
-  const activeSessions = user.activeSessions || [];
-
-  const updatedSessions = activeSessions.filter(s => s.sessionId === currentSessionId);
-
-  await pb.collection('users').update(req.user.id, { activeSessions: updatedSessions });
-
-  // Log the action
-  await pb.collection('auditLogs').create({
-    userId: req.user.id,
-    eventType: 'logout_other_sessions',
+  const updatedSessions = (profile?.active_sessions || []).filter(s => s.sessionId === currentSessionId);
+  await supabase.from('profiles').update({ active_sessions: updatedSessions }).eq('id', req.user.id);
+  await supabase.from('audit_logs').insert({
+    user_id: req.user.id, event_type: 'logout_other_sessions',
     description: 'User logged out all other sessions',
-    ipAddress: req.ip || 'unknown',
-    userAgent: req.headers['user-agent'] || 'unknown',
-    status: 'success',
-    timestamp: new Date().toISOString(),
+    ip_address: req.ip || 'unknown', user_agent: req.headers['user-agent'] || 'unknown', status: 'success',
   });
 
   logger.info(`Logged out other sessions for user ${req.user.id}`);
-
-  res.json({
-    success: true,
-    message: 'All other sessions logged out',
-  });
+  res.json({ success: true, message: 'All other sessions logged out' });
 });
 
 router.delete('/:sessionId', authMiddleware, async (req, res) => {
   const { sessionId } = req.params;
+  if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
 
-  if (!sessionId) {
-    return res.status(400).json({ error: 'sessionId is required' });
-  }
+  const { data: profile, error } = await supabase
+    .from('profiles').select('active_sessions').eq('id', req.user.id).single();
+  if (error) throw error;
 
-  const user = await pb.collection('users').getOne(req.user.id);
-  const activeSessions = user.activeSessions || [];
+  const sessions = profile?.active_sessions || [];
+  const sessionToRevoke = sessions.find(s => s.sessionId === sessionId);
+  if (!sessionToRevoke) return res.status(404).json({ error: 'Session not found' });
 
-  const sessionToRevoke = activeSessions.find(s => s.sessionId === sessionId);
-  if (!sessionToRevoke) {
-    return res.status(404).json({ error: 'Session not found' });
-  }
-
-  const updatedSessions = activeSessions.filter(s => s.sessionId !== sessionId);
-
-  await pb.collection('users').update(req.user.id, { activeSessions: updatedSessions });
-
-  // Log the action
-  await pb.collection('auditLogs').create({
-    userId: req.user.id,
-    eventType: 'session_revoked',
+  await supabase.from('profiles')
+    .update({ active_sessions: sessions.filter(s => s.sessionId !== sessionId) })
+    .eq('id', req.user.id);
+  await supabase.from('audit_logs').insert({
+    user_id: req.user.id, event_type: 'session_revoked',
     description: `Session revoked: ${sessionToRevoke.deviceName}`,
-    ipAddress: req.ip || 'unknown',
-    userAgent: req.headers['user-agent'] || 'unknown',
-    status: 'success',
-    timestamp: new Date().toISOString(),
+    ip_address: req.ip || 'unknown', user_agent: req.headers['user-agent'] || 'unknown', status: 'success',
   });
 
   logger.info(`Session ${sessionId} revoked for user ${req.user.id}`);
-
-  res.json({
-    success: true,
-    message: 'Session revoked',
-  });
+  res.json({ success: true, message: 'Session revoked' });
 });
 
 export default router;

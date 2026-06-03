@@ -1,45 +1,41 @@
 import 'dotenv/config';
-import pb from '../utils/pocketbaseClient.js';
+import supabase from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 
 const SESSION_TIMEOUT_MS = parseInt(process.env.SESSION_TIMEOUT_MS || '1800000', 10);
 
 async function sessionTimeoutMiddleware(req, res, next) {
-  if (!req.user) {
-    return next();
-  }
+  if (!req.user) return next();
 
   try {
     const userId = req.user.id;
-    const user = await pb.collection('users').getOne(userId);
+    const token = req.headers.authorization?.substring(7);
 
-    if (!user.activeSessions || user.activeSessions.length === 0) {
-      return res.status(401).json({ error: 'No active sessions' });
-    }
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('active_sessions')
+      .eq('id', userId)
+      .single();
 
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.substring(7);
+    const sessions = profile?.active_sessions || [];
+    if (sessions.length === 0) return next();
 
-    const currentSession = user.activeSessions.find(s => s.sessionId === token);
+    const currentSession = sessions.find(s => s.sessionId === token);
+    if (!currentSession) return next();
 
-    if (!currentSession) {
-      return res.status(401).json({ error: 'Session not found' });
-    }
-
-    const lastActivityTime = new Date(currentSession.lastActivityAt).getTime();
-    const now = Date.now();
-    const inactiveTime = now - lastActivityTime;
+    const inactiveTime = Date.now() - new Date(currentSession.lastActivityAt).getTime();
 
     if (inactiveTime > SESSION_TIMEOUT_MS) {
-      const updatedSessions = user.activeSessions.filter(s => s.sessionId !== token);
-      await pb.collection('users').update(userId, { activeSessions: updatedSessions });
+      await supabase.from('profiles')
+        .update({ active_sessions: sessions.filter(s => s.sessionId !== token) })
+        .eq('id', userId);
       return res.status(401).json({ error: 'Session expired due to inactivity' });
     }
 
-    const updatedSessions = user.activeSessions.map(s =>
-      s.sessionId === token ? { ...s, lastActivityAt: new Date().toISOString() } : s
-    );
-    await pb.collection('users').update(userId, { activeSessions: updatedSessions });
+    // Update lastActivityAt
+    await supabase.from('profiles')
+      .update({ active_sessions: sessions.map(s => s.sessionId === token ? { ...s, lastActivityAt: new Date().toISOString() } : s) })
+      .eq('id', userId);
 
     next();
   } catch (error) {

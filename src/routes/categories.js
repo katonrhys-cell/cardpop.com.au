@@ -1,376 +1,124 @@
 import 'dotenv/config';
 import express from 'express';
-import pb from '../utils/pocketbaseClient.js';
+import supabase from '../utils/supabaseClient.js';
 import { authMiddleware } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
 
-/**
- * Check if user is admin
- * @param {Object} user - User object from auth
- * @returns {boolean} True if user is admin
- */
-function isAdmin(user) {
-  return user && user.role === 'admin';
-}
-
-/**
- * GET /categories
- * Fetch all categories with pagination
- *
- * Query Parameters:
- * - page (optional): Page number (default: 1)
- * - limit (optional): Items per page (default: 20, max: 100)
- * - sort (optional): Sort field (default: 'name')
- *
- * Response:
- * {
- *   "categories": [
- *     {
- *       "id": "category_id",
- *       "name": "Category Name",
- *       "description": "Category description",
- *       "icon": "icon_url",
- *       "created": "2026-05-08T12:00:00.000Z",
- *       "updated": "2026-05-08T12:00:00.000Z"
- *     }
- *   ],
- *   "total": 100,
- *   "page": 1,
- *   "limit": 20,
- *   "totalPages": 5
- * }
- */
+// GET /categories — list all root categories
 router.get('/', async (req, res) => {
-  const { page = '1', limit = '20', sort = 'name' } = req.query;
-
+  const { page = '1', limit = '50' } = req.query;
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
-  const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
-  const offset = (pageNum - 1) * limitNum;
+  const limitNum = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
+  const from = (pageNum - 1) * limitNum;
 
-  logger.info(`[CATEGORIES] Fetching categories - page: ${pageNum}, limit: ${limitNum}, sort: ${sort}`);
+  const { data: categories, count: total, error } = await supabase
+    .from('categories').select('*', { count: 'exact' }).is('parent_id', null)
+    .order('name').range(from, from + limitNum - 1);
+  if (error) throw error;
 
-  try {
-    // Get total count
-    const allCategories = await pb.collection('categories').getFullList();
-    const total = allCategories.length;
-
-    // Get paginated results
-    const categories = await pb.collection('categories').getList(pageNum, limitNum, {
-      sort: sort === 'name' ? '+name' : sort === '-name' ? '-name' : '+created',
-    });
-
-    logger.info(`[CATEGORIES] Retrieved ${categories.items.length} categories`);
-
-    res.json({
-      categories: categories.items.map(cat => ({
-        id: cat.id,
-        name: cat.name,
-        description: cat.description || '',
-        icon: cat.icon || '',
-        created: cat.created,
-        updated: cat.updated,
-      })),
-      total,
-      page: pageNum,
-      limit: limitNum,
-      totalPages: Math.ceil(total / limitNum),
-    });
-  } catch (error) {
-    logger.error(`[CATEGORIES] Error fetching categories: ${error.message}`);
-    throw error;
-  }
+  res.json({
+    categories: categories || [],
+    total: total || 0,
+    page: pageNum,
+    limit: limitNum,
+    totalPages: Math.ceil((total || 0) / limitNum),
+  });
 });
 
-/**
- * GET /categories/:id
- * Fetch single category by ID
- *
- * Response:
- * {
- *   "id": "category_id",
- *   "name": "Category Name",
- *   "description": "Category description",
- *   "icon": "icon_url",
- *   "created": "2026-05-08T12:00:00.000Z",
- *   "updated": "2026-05-08T12:00:00.000Z"
- * }
- */
+// GET /categories/:id — single category with its subcategories
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
 
-  if (!id || !id.trim()) {
-    return res.status(400).json({ error: 'Category ID is required' });
-  }
+  const { data: category, error } = await supabase
+    .from('categories').select('*').eq('id', id).single();
+  if (error?.code === 'PGRST116') return res.status(404).json({ error: 'Category not found' });
+  if (error) throw error;
 
-  logger.info(`[CATEGORIES] Fetching category: ${id}`);
+  const { data: subcategories } = await supabase
+    .from('categories').select('*').eq('parent_id', id).order('name');
 
-  try {
-    const category = await pb.collection('categories').getOne(id);
-
-    logger.info(`[CATEGORIES] Category found: ${id}`);
-
-    res.json({
-      id: category.id,
-      name: category.name,
-      description: category.description || '',
-      icon: category.icon || '',
-      created: category.created,
-      updated: category.updated,
-    });
-  } catch (error) {
-    if (error.status === 404) {
-      logger.warn(`[CATEGORIES] Category not found: ${id}`);
-      return res.status(404).json({ error: 'Category not found' });
-    }
-    logger.error(`[CATEGORIES] Error fetching category: ${error.message}`);
-    throw error;
-  }
+  res.json({ ...category, subcategories: subcategories || [] });
 });
 
-/**
- * POST /categories
- * Create new category (admin only)
- *
- * Request body:
- * {
- *   "name": "Category Name",
- *   "description": "Category description",
- *   "icon": "icon_url"
- * }
- *
- * Response: Created category object
- */
+// POST /categories — create a new root category (admin only)
 router.post('/', authMiddleware, async (req, res) => {
-  const { name, description, icon } = req.body;
+  const { name, slug, description, logo_url, website_url } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
 
-  // Check admin permission
-  if (!isAdmin(req.user)) {
-    logger.warn(`[CATEGORIES] Unauthorized category creation attempt by user ${req.user.id}`);
-    return res.status(403).json({ error: 'Admin access required' });
-  }
+  const { data: existing } = await supabase
+    .from('categories').select('id').eq('name', name.trim()).is('parent_id', null).maybeSingle();
+  if (existing) return res.status(409).json({ error: 'Category with this name already exists' });
 
-  // Validate required fields
-  if (!name || !name.trim()) {
-    return res.status(400).json({ error: 'Category name is required' });
-  }
+  const { data: category, error } = await supabase.from('categories').insert({
+    name: name.trim(),
+    slug: slug?.trim() || name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    description: description?.trim() || null,
+    logo_url: logo_url?.trim() || null,
+    website_url: website_url?.trim() || null,
+    parent_id: null,
+  }).select().single();
+  if (error) throw error;
 
-  const trimmedName = name.trim();
+  await supabase.from('audit_logs').insert({
+    user_id: req.user.id, event_type: 'category_created',
+    description: `Category created: ${name.trim()}`, metadata: { categoryId: category.id },
+  }).catch(() => {});
 
-  logger.info(`[CATEGORIES] Creating new category: ${trimmedName}`);
-
-  try {
-    // Check if category with same name already exists
-    const existing = await pb.collection('categories').getFullList({
-      filter: `name = "${trimmedName}"`,
-    });
-
-    if (existing.length > 0) {
-      logger.warn(`[CATEGORIES] Category already exists: ${trimmedName}`);
-      return res.status(400).json({ error: 'Category with this name already exists' });
-    }
-
-    // Create category
-    const category = await pb.collection('categories').create({
-      name: trimmedName,
-      description: description || '',
-      icon: icon || '',
-    });
-
-    logger.info(`[CATEGORIES] Category created: ${category.id}`);
-
-    // Log to audit logs
-    try {
-      await pb.collection('auditLogs').create({
-        userId: req.user.id,
-        eventType: 'category_created',
-        description: `Created category: ${trimmedName}`,
-        ipAddress: req.ip || 'unknown',
-        userAgent: req.headers['user-agent'] || 'unknown',
-        status: 'success',
-        timestamp: new Date().toISOString(),
-      });
-    } catch (auditError) {
-      logger.warn(`[CATEGORIES] Failed to create audit log: ${auditError.message}`);
-    }
-
-    res.status(201).json({
-      id: category.id,
-      name: category.name,
-      description: category.description || '',
-      icon: category.icon || '',
-      created: category.created,
-      updated: category.updated,
-    });
-  } catch (error) {
-    logger.error(`[CATEGORIES] Error creating category: ${error.message}`);
-    throw error;
-  }
+  logger.info(`Category created: ${category.id} by user ${req.user.id}`);
+  res.status(201).json(category);
 });
 
-/**
- * PUT /categories/:id
- * Update category (admin only)
- *
- * Request body:
- * {
- *   "name": "Updated Name",
- *   "description": "Updated description",
- *   "icon": "updated_icon_url"
- * }
- *
- * Response: Updated category object
- */
-router.put('/:id', authMiddleware, async (req, res) => {
+// PATCH /categories/:id — update a category (admin only)
+router.patch('/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
-  const { name, description, icon } = req.body;
+  const { name, slug, description, logo_url, website_url } = req.body;
 
-  // Check admin permission
-  if (!isAdmin(req.user)) {
-    logger.warn(`[CATEGORIES] Unauthorized category update attempt by user ${req.user.id}`);
-    return res.status(403).json({ error: 'Admin access required' });
-  }
+  const { error: fetchErr } = await supabase.from('categories').select('id').eq('id', id).single();
+  if (fetchErr?.code === 'PGRST116') return res.status(404).json({ error: 'Category not found' });
+  if (fetchErr) throw fetchErr;
 
-  if (!id || !id.trim()) {
-    return res.status(400).json({ error: 'Category ID is required' });
-  }
+  const updateData = {};
+  if (name?.trim()) updateData.name = name.trim();
+  if (slug?.trim()) updateData.slug = slug.trim();
+  if (description !== undefined) updateData.description = description?.trim() || null;
+  if (logo_url !== undefined) updateData.logo_url = logo_url?.trim() || null;
+  if (website_url !== undefined) updateData.website_url = website_url?.trim() || null;
 
-  logger.info(`[CATEGORIES] Updating category: ${id}`);
+  const { data: updated, error } = await supabase
+    .from('categories').update(updateData).eq('id', id).select().single();
+  if (error) throw error;
 
-  try {
-    // Get existing category
-    const existing = await pb.collection('categories').getOne(id);
+  await supabase.from('audit_logs').insert({
+    user_id: req.user.id, event_type: 'category_updated',
+    description: `Category updated: ${updated.name}`, metadata: { categoryId: id },
+  }).catch(() => {});
 
-    // Prepare update data
-    const updateData = {};
-    if (name !== undefined && name !== null) {
-      const trimmedName = name.trim();
-      if (!trimmedName) {
-        return res.status(400).json({ error: 'Category name cannot be empty' });
-      }
-      updateData.name = trimmedName;
-    }
-    if (description !== undefined) {
-      updateData.description = description || '';
-    }
-    if (icon !== undefined) {
-      updateData.icon = icon || '';
-    }
-
-    // Update category
-    const updated = await pb.collection('categories').update(id, updateData);
-
-    logger.info(`[CATEGORIES] Category updated: ${id}`);
-
-    // Log to audit logs
-    try {
-      await pb.collection('auditLogs').create({
-        userId: req.user.id,
-        eventType: 'category_updated',
-        description: `Updated category: ${updated.name}`,
-        ipAddress: req.ip || 'unknown',
-        userAgent: req.headers['user-agent'] || 'unknown',
-        status: 'success',
-        timestamp: new Date().toISOString(),
-      });
-    } catch (auditError) {
-      logger.warn(`[CATEGORIES] Failed to create audit log: ${auditError.message}`);
-    }
-
-    res.json({
-      id: updated.id,
-      name: updated.name,
-      description: updated.description || '',
-      icon: updated.icon || '',
-      created: updated.created,
-      updated: updated.updated,
-    });
-  } catch (error) {
-    if (error.status === 404) {
-      logger.warn(`[CATEGORIES] Category not found: ${id}`);
-      return res.status(404).json({ error: 'Category not found' });
-    }
-    logger.error(`[CATEGORIES] Error updating category: ${error.message}`);
-    throw error;
-  }
+  logger.info(`Category updated: ${id} by user ${req.user.id}`);
+  res.json(updated);
 });
 
-/**
- * DELETE /categories/:id
- * Delete category (admin only)
- * Checks for dependent subcategories before deletion
- *
- * Response:
- * {
- *   "success": true,
- *   "message": "Category deleted successfully"
- * }
- */
+// DELETE /categories/:id — delete a category and its subcategories (admin only)
 router.delete('/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
 
-  // Check admin permission
-  if (!isAdmin(req.user)) {
-    logger.warn(`[CATEGORIES] Unauthorized category deletion attempt by user ${req.user.id}`);
-    return res.status(403).json({ error: 'Admin access required' });
-  }
+  const { data: category, error: fetchErr } = await supabase
+    .from('categories').select('name').eq('id', id).single();
+  if (fetchErr?.code === 'PGRST116') return res.status(404).json({ error: 'Category not found' });
+  if (fetchErr) throw fetchErr;
 
-  if (!id || !id.trim()) {
-    return res.status(400).json({ error: 'Category ID is required' });
-  }
+  await supabase.from('categories').delete().eq('parent_id', id);
+  const { error } = await supabase.from('categories').delete().eq('id', id);
+  if (error) throw error;
 
-  logger.info(`[CATEGORIES] Deleting category: ${id}`);
+  await supabase.from('audit_logs').insert({
+    user_id: req.user.id, event_type: 'category_deleted',
+    description: `Category deleted: ${category.name}`, metadata: { categoryId: id },
+  }).catch(() => {});
 
-  try {
-    // Get category to delete
-    const category = await pb.collection('categories').getOne(id);
-
-    // Check for dependent subcategories
-    const dependentSubcategories = await pb.collection('subcategories').getFullList({
-      filter: `parentCategory = "${id}"`,
-    });
-
-    if (dependentSubcategories.length > 0) {
-      logger.warn(`[CATEGORIES] Cannot delete category ${id} - has ${dependentSubcategories.length} dependent subcategories`);
-      return res.status(400).json({
-        error: `Cannot delete category with dependent subcategories. Please delete or reassign ${dependentSubcategories.length} subcategories first.`,
-        dependentCount: dependentSubcategories.length,
-      });
-    }
-
-    // Delete category
-    await pb.collection('categories').delete(id);
-
-    logger.info(`[CATEGORIES] Category deleted: ${id}`);
-
-    // Log to audit logs
-    try {
-      await pb.collection('auditLogs').create({
-        userId: req.user.id,
-        eventType: 'category_deleted',
-        description: `Deleted category: ${category.name}`,
-        ipAddress: req.ip || 'unknown',
-        userAgent: req.headers['user-agent'] || 'unknown',
-        status: 'success',
-        timestamp: new Date().toISOString(),
-      });
-    } catch (auditError) {
-      logger.warn(`[CATEGORIES] Failed to create audit log: ${auditError.message}`);
-    }
-
-    res.json({
-      success: true,
-      message: 'Category deleted successfully',
-    });
-  } catch (error) {
-    if (error.status === 404) {
-      logger.warn(`[CATEGORIES] Category not found: ${id}`);
-      return res.status(404).json({ error: 'Category not found' });
-    }
-    logger.error(`[CATEGORIES] Error deleting category: ${error.message}`);
-    throw error;
-  }
+  logger.info(`Category deleted: ${id} by user ${req.user.id}`);
+  res.json({ success: true, message: 'Category deleted' });
 });
 
 export default router;
