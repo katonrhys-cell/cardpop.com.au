@@ -36,7 +36,7 @@ const ContactPage = () => {
     const body = encodeURIComponent(
       `Name: ${fields.name}\nEmail: ${fields.email}\n\nMessage:\n${fields.message}`
     );
-    window.open(`mailto:support@cardpop.com.au?subject=${subject}&body=${body}`);
+    window.open(`mailto:support@cardpop.online?subject=${subject}&body=${body}`);
     setSubmitted(true);
   };
 
@@ -71,7 +71,7 @@ const ContactPage = () => {
             <div className="mt-8 space-y-4">
               <div>
                 <strong className="text-sm font-semibold">Email Support</strong>
-                <p className="text-muted-foreground text-sm mt-1">support@cardpop.com.au</p>
+                <p className="text-muted-foreground text-sm mt-1">support@cardpop.online</p>
               </div>
               <div>
                 <strong className="text-sm font-semibold">Business Hours</strong>

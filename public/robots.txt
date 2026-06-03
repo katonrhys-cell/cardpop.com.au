@@ -25,4 +25,4 @@ Disallow: /success
 # Internal tooling
 Disallow: /diagnostics
 
-Sitemap: https://cardpop.com.au/sitemap.xml
+Sitemap: https://cardpop.online/sitemap.xml
