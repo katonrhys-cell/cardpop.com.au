@@ -85,6 +85,6 @@ jobs:
             set net:reconnect-interval-multiplier 1.5;
             open -u $FTP_USERNAME,$FTP_PASSWORD ftp://$FTP_SERVER;
             put .env -o .env;
-            mirror --reverse --parallel=4 --no-perms --exclude '.builds' --exclude 'cgi-bin' --exclude 'logs' --exclude 'tmp' ./dist/ /;
+            mirror --reverse --parallel=4 --no-perms --exclude '.builds' --exclude 'cgi-bin' --exclude 'logs' --exclude 'tmp' --exclude 'llms.txt' ./dist/ /;
             quit
           "
