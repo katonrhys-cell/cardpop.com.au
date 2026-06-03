@@ -45,7 +45,6 @@ const BLOG_CATEGORIES = [
 ];
 
 const NAV_LINKS = [
-  { label: 'Home', href: '/' },
   { label: 'Shop', href: '/shop' },
   { label: 'Marketplace', href: '/marketplace' },
   { label: 'Analytics', href: '/analytics' },
