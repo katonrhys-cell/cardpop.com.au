@@ -83,6 +83,12 @@ const CategoryBadge = ({ gradient, Icon }) => (
 const MobileBrowseSection = ({ onNavigate }) => {
   const [tcgOpen, setTcgOpen] = useState(false);
   const [sportsOpen, setSportsOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleCollectionNav = (slug) => {
+    navigate(`/collections/${slug}`);
+    onNavigate();
+  };
 
   return (
     <div className="mb-6">
@@ -104,17 +110,16 @@ const MobileBrowseSection = ({ onNavigate }) => {
       {tcgOpen && (
         <div className="grid grid-cols-2 gap-0.5 mb-1 pl-2">
           {TCG_CATEGORY_DATA.map(cat => (
-            <Link
+            <button
               key={cat.name}
-              to={`/collections/${cat.slug}`}
-              onClick={onNavigate}
-              className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
+              onClick={() => handleCollectionNav(cat.slug)}
+              className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors text-left"
             >
               <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${cat.gradient} shrink-0`}>
                 <cat.Icon className="w-3.5 h-3.5" />
               </span>
               <span className="text-xs font-semibold text-foreground truncate">{cat.name}</span>
-            </Link>
+            </button>
           ))}
         </div>
       )}
@@ -133,17 +138,16 @@ const MobileBrowseSection = ({ onNavigate }) => {
       {sportsOpen && (
         <div className="grid grid-cols-2 gap-0.5 mb-1 pl-2">
           {SPORTS_CATEGORY_DATA.map(cat => (
-            <Link
+            <button
               key={cat.name}
-              to={`/collections/${cat.slug}`}
-              onClick={onNavigate}
-              className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
+              onClick={() => handleCollectionNav(cat.slug)}
+              className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors text-left"
             >
               <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${cat.gradient} shrink-0`}>
                 <cat.Icon className="w-3.5 h-3.5" />
               </span>
               <span className="text-xs font-semibold text-foreground truncate">{cat.name}</span>
-            </Link>
+            </button>
           ))}
         </div>
       )}

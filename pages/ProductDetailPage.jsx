@@ -316,7 +316,9 @@ const ProductDetailPage = () => {
                   </div>
                 </div>
                 {!isShop && (
-                  <Button variant="outline" size="sm" className="rounded-full hidden sm:flex">View Profile</Button>
+                  <Button asChild variant="outline" size="sm" className="rounded-full hidden sm:flex">
+                    <Link to={`/seller/${seller.id}`}>View Profile</Link>
+                  </Button>
                 )}
               </div>
             )}
