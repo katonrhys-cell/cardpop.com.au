@@ -41,7 +41,7 @@ const MessagingPage = () => {
   useEffect(() => {
     if (!currentUser) return;
     
-    const channel = supabase.channel('messaging-page')
+    const channel = supabase.channel(`messaging-page-${Date.now()}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
         if (!isMounted.current) return;
         const record = payload.new;

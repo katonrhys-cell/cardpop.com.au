@@ -77,7 +77,7 @@ const SellerDashboard = () => {
     isMounted.current = true;
     fetchDashboardData();
 
-    const channel = supabase.channel('seller-dashboard')
+    const channel = supabase.channel(`seller-dashboard-${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'listings' }, () => { if (isMounted.current) fetchDashboardData(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { if (isMounted.current) fetchDashboardData(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, () => { if (isMounted.current) fetchDashboardData(); })
