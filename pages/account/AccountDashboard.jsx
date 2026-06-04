@@ -127,7 +127,7 @@ const AccountDashboard = () => {
     fetchStats();
     fetchVaultItems(1);
 
-    const channel = supabase.channel('account-dashboard')
+    const channel = supabase.channel(`account-dashboard-${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { if (isMounted.current) fetchStats(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'listings' }, () => { if (isMounted.current) fetchStats(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vault_items' }, () => {
