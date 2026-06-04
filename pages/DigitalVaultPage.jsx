@@ -4,6 +4,7 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { Layers, DollarSign, Plus, Settings } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import CardForm from '@/components/CardForm.jsx';
@@ -12,6 +13,7 @@ import { toast } from 'sonner';
 
 const DigitalVaultPage = () => {
   const { currentUser } = useAuth();
+  const navigate = useNavigate();
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({ totalCards: 0, totalValue: 0, forTrade: 0 });
@@ -142,7 +144,7 @@ const DigitalVaultPage = () => {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {cards.map(card => (
-                <div key={card.id} className="premium-card p-4 flex flex-col">
+                <div key={card.id} className="premium-card p-4 flex flex-col cursor-pointer hover:ring-2 hover:ring-primary transition-all" onClick={() => navigate(`/vault/edit/${card.id}`)}>
                   <div className="aspect-[3/4] bg-muted rounded-xl mb-4 flex items-center justify-center overflow-hidden relative group">
                     {card.images && card.images.length > 0 ? (
                       <img src={card.images[0].startsWith('http') ? card.images[0] : supabase.storage.from('vault-images').getPublicUrl(card.images[0]).data.publicUrl} alt={card.name} className="object-cover w-full h-full" />
@@ -156,7 +158,8 @@ const DigitalVaultPage = () => {
                     <p className="text-primary font-bold">Est: ${card.price}</p>
                     <p>Status: <span className="text-foreground">{card.marketplaceStatus || 'Not Listed'}</span></p>
                   </div>
-                  <div className="mt-auto flex gap-2">
+                  <div className="mt-auto flex gap-2" onClick={e => e.stopPropagation()}>
+                    <Button variant="outline" size="sm" className="flex-1 font-medium" onClick={() => navigate(`/vault/edit/${card.id}`)}>Edit</Button>
                     <Button variant="outline" size="sm" className="flex-1 font-medium" onClick={() => handleDelete(card.id)}>Delete</Button>
                   </div>
                 </div>
