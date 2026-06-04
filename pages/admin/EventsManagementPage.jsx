@@ -41,7 +41,7 @@ const EventsManagementPage = () => {
   useEffect(() => {
     fetchEvents();
 
-    const channel = supabase.channel('events-management')
+    const channel = supabase.channel(`events-management-${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, (payload) => {
         if (payload.eventType === 'INSERT') {
           setEvents(prev => [payload.new, ...prev].sort((a, b) => new Date(b.start_date) - new Date(a.start_date)));

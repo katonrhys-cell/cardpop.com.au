@@ -46,7 +46,7 @@ const EventsAdminPage = () => {
   useEffect(() => {
     fetchEvents();
 
-    const channel = supabase.channel('events-admin')
+    const channel = supabase.channel(`events-admin-${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, payload => {
         const record = payload.new;
         if (payload.eventType === 'INSERT') {

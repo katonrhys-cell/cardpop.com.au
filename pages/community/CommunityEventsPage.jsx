@@ -57,7 +57,7 @@ const CommunityEventsPage = () => {
     isMounted.current = true;
     fetchEvents();
 
-    const channel = supabase.channel('community-events-full')
+    const channel = supabase.channel(`community-events-full-${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, payload => {
         if (!isMounted.current) return;
         const record = payload.new;
