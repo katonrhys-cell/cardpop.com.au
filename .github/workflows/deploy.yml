@@ -74,10 +74,14 @@ jobs:
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
         run: |
-          echo "Testing TCP connection to FTP server on port 21..."
+          echo "Testing port 21 (FTP)..."
           timeout 10 bash -c "echo > /dev/tcp/$FTP_SERVER/21" && echo "Port 21 OPEN" || echo "Port 21 UNREACHABLE"
-          echo "Testing TCP connection on port 22 (SFTP)..."
+          echo "Testing port 22 (SSH/SFTP standard)..."
           timeout 10 bash -c "echo > /dev/tcp/$FTP_SERVER/22" && echo "Port 22 OPEN" || echo "Port 22 UNREACHABLE"
+          echo "Testing port 65002 (Hostinger SSH)..."
+          timeout 10 bash -c "echo > /dev/tcp/$FTP_SERVER/65002" && echo "Port 65002 OPEN" || echo "Port 65002 UNREACHABLE"
+          echo "Testing port 990 (FTPS)..."
+          timeout 10 bash -c "echo > /dev/tcp/$FTP_SERVER/990" && echo "Port 990 OPEN" || echo "Port 990 UNREACHABLE"
 
       - name: Deploy to Hostinger via lftp
         timeout-minutes: 15
