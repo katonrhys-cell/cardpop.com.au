@@ -23,7 +23,7 @@ const DigitalVaultPage = () => {
     setLoading(true);
     try {
       const { data, error: fetchError } = await supabase
-        .from('listings')
+        .from('vault_items')
         .select('*')
         .eq('owner_id', currentUser.id)
         .order('created_at', { ascending: false })
@@ -35,8 +35,8 @@ const DigitalVaultPage = () => {
 
       let val = 0, tradeCount = 0;
       items.forEach(c => {
-        val += c.price_aud || 0;
-        if (c.marketplaceStatus === 'For Trade' || c.marketplaceStatus === 'For Both') tradeCount++;
+        val += c.estimated_value_aud || 0;
+        if (c.listing_type === 'trade' || c.listing_type === 'both') tradeCount++;
       });
       setStats({ totalCards: items.length, totalValue: val, forTrade: tradeCount });
     } catch (error) {
@@ -53,7 +53,7 @@ const DigitalVaultPage = () => {
   const handleDelete = async (id) => {
     if(!window.confirm("Delete this card?")) return;
     try {
-      await supabase.from('listings').delete().eq('id', id);
+      await supabase.from('vault_items').delete().eq('id', id);
       toast.success("Card deleted");
       fetchCards();
     } catch (e) {
@@ -146,17 +146,17 @@ const DigitalVaultPage = () => {
               {cards.map(card => (
                 <div key={card.id} className="premium-card p-4 flex flex-col cursor-pointer hover:ring-2 hover:ring-primary transition-all" onClick={() => navigate(`/vault/edit/${card.id}`)}>
                   <div className="aspect-[3/4] bg-muted rounded-xl mb-4 flex items-center justify-center overflow-hidden relative group">
-                    {card.images && card.images.length > 0 ? (
-                      <img src={card.images[0].startsWith('http') ? card.images[0] : supabase.storage.from('vault-images').getPublicUrl(card.images[0]).data.publicUrl} alt={card.name} className="object-cover w-full h-full" />
+                    {card.card_image ? (
+                      <img src={card.card_image.startsWith('http') ? card.card_image : supabase.storage.from('vault-images').getPublicUrl(card.card_image).data.publicUrl} alt={card.card_name} className="object-cover w-full h-full" />
                     ) : (
                       <span className="text-muted-foreground text-sm font-medium">No Image</span>
                     )}
                   </div>
-                  <h3 className="font-bold text-lg mb-1 truncate">{card.name}</h3>
+                  <h3 className="font-bold text-lg mb-1 truncate">{card.card_name}</h3>
                   <div className="text-sm text-muted-foreground mb-4 space-y-1 font-medium">
-                    <p>{card.collectionType || card.category} • {card.condition}</p>
-                    <p className="text-primary font-bold">Est: ${card.price}</p>
-                    <p>Status: <span className="text-foreground">{card.marketplaceStatus || 'Not Listed'}</span></p>
+                    <p>{card.collection} • {card.condition}</p>
+                    <p className="text-primary font-bold">Est: ${card.estimated_value_aud || 0}</p>
+                    <p>Status: <span className="text-foreground">{card.listing_type === 'private' ? 'Private' : card.listing_type === 'trade' ? 'For Trade' : card.listing_type === 'both' ? 'For Sale & Trade' : 'For Sale'}</span></p>
                   </div>
                   <div className="mt-auto flex gap-2" onClick={e => e.stopPropagation()}>
                     <Button variant="outline" size="sm" className="flex-1 font-medium" onClick={() => navigate(`/vault/edit/${card.id}`)}>Edit</Button>
