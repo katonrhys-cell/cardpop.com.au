@@ -67,6 +67,18 @@ jobs:
       - name: Install lftp
         run: sudo apt-get install -y lftp
 
+      - name: Test FTP connection
+        timeout-minutes: 2
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          echo "Testing TCP connection to FTP server on port 21..."
+          timeout 10 bash -c "echo > /dev/tcp/$FTP_SERVER/21" && echo "Port 21 OPEN" || echo "Port 21 UNREACHABLE"
+          echo "Testing TCP connection on port 22 (SFTP)..."
+          timeout 10 bash -c "echo > /dev/tcp/$FTP_SERVER/22" && echo "Port 22 OPEN" || echo "Port 22 UNREACHABLE"
+
       - name: Deploy to Hostinger via lftp
         timeout-minutes: 15
         env:
@@ -74,17 +86,17 @@ jobs:
           FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
         run: |
-          lftp -c "
+          lftp -d -c "
             set ftp:ssl-allow yes;
             set ssl:verify-certificate no;
             set ftp:passive-mode yes;
             set ftp:use-feat no;
-            set net:timeout 60;
-            set net:max-retries 10;
+            set net:timeout 30;
+            set net:max-retries 3;
             set net:reconnect-interval-base 5;
             set net:reconnect-interval-multiplier 1.5;
             open -u $FTP_USERNAME,$FTP_PASSWORD ftp://$FTP_SERVER;
             put .env -o .env;
             mirror --reverse --parallel=4 --no-perms --exclude '.builds' --exclude 'cgi-bin' --exclude 'logs' --exclude 'tmp' --exclude 'llms.txt' ./dist/ /;
             quit
-          "
+          " 2>&1 | head -200
