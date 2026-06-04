@@ -75,14 +75,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (e) {
-      console.error('[AuthContext] signOut failed:', e);
-    }
-    // Belt-and-suspenders: wipe all Supabase localStorage keys to cover the
-    // edge case where autoRefreshToken writes a new token just before/after
-    // signOut clears the old one.
+    // Clear local state and storage first so UI updates immediately
+    // even if the Supabase signOut network call hangs.
     try {
       Object.keys(localStorage)
         .filter(k => k.startsWith('sb-'))
@@ -91,6 +85,9 @@ export const AuthProvider = ({ children }) => {
     setCurrentUser(null);
     setProfile(null);
     setSession(null);
+    // Fire signOut in background — don't await so a hanging request
+    // doesn't block the user from being logged out locally.
+    supabase.auth.signOut().catch(e => console.error('[AuthContext] signOut failed:', e));
   };
 
   const resendVerificationEmail = async (email) => {
