@@ -144,7 +144,7 @@ const DigitalVaultPage = () => {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {cards.map(card => (
-                <div key={card.id} className="premium-card p-4 flex flex-col cursor-pointer hover:ring-2 hover:ring-primary transition-all" onClick={() => navigate(`/vault/edit/${card.id}`)}>
+                <div key={card.id} className="premium-card p-4 flex flex-col cursor-pointer hover:ring-2 hover:ring-primary transition-all" onClick={() => navigate(`/product/vault/${card.id}`)}>
                   <div className="aspect-[3/4] bg-muted rounded-xl mb-4 flex items-center justify-center overflow-hidden relative group">
                     {card.card_image ? (
                       <img src={card.card_image.startsWith('http') ? card.card_image : supabase.storage.from('vault-images').getPublicUrl(card.card_image).data.publicUrl} alt={card.card_name} className="object-cover w-full h-full" />
