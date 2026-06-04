@@ -64,43 +64,28 @@ jobs:
           find ./dist -type f -exec chmod 644 {} \;
           find ./dist -type d -exec chmod 755 {} \;
 
-      - name: Install lftp
-        run: sudo apt-get install -y lftp
+      - name: Install sshpass
+        run: sudo apt-get install -y sshpass rsync
 
-      - name: Test FTP connection
-        timeout-minutes: 2
-        env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER }}
-          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
-          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
-        run: |
-          echo "Testing port 21 (FTP)..."
-          timeout 10 bash -c "echo > /dev/tcp/$FTP_SERVER/21" && echo "Port 21 OPEN" || echo "Port 21 UNREACHABLE"
-          echo "Testing port 22 (SSH/SFTP standard)..."
-          timeout 10 bash -c "echo > /dev/tcp/$FTP_SERVER/22" && echo "Port 22 OPEN" || echo "Port 22 UNREACHABLE"
-          echo "Testing port 65002 (Hostinger SSH)..."
-          timeout 10 bash -c "echo > /dev/tcp/$FTP_SERVER/65002" && echo "Port 65002 OPEN" || echo "Port 65002 UNREACHABLE"
-          echo "Testing port 990 (FTPS)..."
-          timeout 10 bash -c "echo > /dev/tcp/$FTP_SERVER/990" && echo "Port 990 OPEN" || echo "Port 990 UNREACHABLE"
-
-      - name: Deploy to Hostinger via lftp
+      - name: Deploy to Hostinger via rsync over SSH
         timeout-minutes: 15
         env:
-          FTP_SERVER: ${{ secrets.FTP_SERVER }}
-          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
-          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USERNAME: ${{ secrets.SSH_USERNAME }}
+          SSH_PASSWORD: ${{ secrets.SSH_PASSWORD }}
         run: |
-          lftp -d -c "
-            set ftp:ssl-allow yes;
-            set ssl:verify-certificate no;
-            set ftp:passive-mode yes;
-            set ftp:use-feat no;
-            set net:timeout 30;
-            set net:max-retries 3;
-            set net:reconnect-interval-base 5;
-            set net:reconnect-interval-multiplier 1.5;
-            open -u $FTP_USERNAME,$FTP_PASSWORD ftp://$FTP_SERVER;
-            put .env -o .env;
-            mirror --reverse --parallel=4 --no-perms --exclude '.builds' --exclude 'cgi-bin' --exclude 'logs' --exclude 'tmp' --exclude 'llms.txt' ./dist/ /;
-            quit
-          " 2>&1 | head -200
+          # Disable strict host key checking for CI
+          mkdir -p ~/.ssh
+          echo "StrictHostKeyChecking no" >> ~/.ssh/config
+
+          # Deploy built frontend to public_html
+          sshpass -p "$SSH_PASSWORD" rsync -avz --delete \
+            --exclude '.builds' --exclude 'cgi-bin' --exclude 'logs' \
+            --exclude 'tmp' --exclude 'llms.txt' \
+            -e "ssh -p 65002" \
+            ./dist/ $SSH_USERNAME@$SSH_HOST:~/domains/cardpop.online/public_html/
+
+          # Deploy .env to home directory for the backend
+          sshpass -p "$SSH_PASSWORD" rsync -avz \
+            -e "ssh -p 65002" \
+            .env $SSH_USERNAME@$SSH_HOST:~/.env
