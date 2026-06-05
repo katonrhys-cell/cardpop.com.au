@@ -41,10 +41,10 @@ const VaultListingCard = ({ vaultItem }) => {
     <div className="group flex flex-col h-full bg-card rounded-2xl border border-border overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
       <Link to={detailPath} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
         {imgSrc ? (
-          <img 
+          <img
             src={imgSrc}
             alt={vaultItem.card_name || vaultItem.name || 'Vault Image'}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500 p-2"
             loading="lazy"
           />
         ) : (
