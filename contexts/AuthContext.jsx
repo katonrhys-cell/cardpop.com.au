@@ -25,8 +25,34 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     isMounted.current = true;
 
-    // onAuthStateChange fires INITIAL_SESSION on mount — no need for getSession().
-    // Using both causes double profile fetches and state races.
+    // Hard timeout: if loading is still true after 6s, unblock the UI.
+    // This covers cases where onAuthStateChange never fires (network timeout, etc.).
+    const timeout = setTimeout(() => {
+      if (isMounted.current) setLoading(false);
+    }, 6000);
+
+    // Eagerly resolve the existing session so the dashboard renders immediately
+    // on page load/refresh without waiting for the onAuthStateChange event.
+    supabase.auth.getSession().then(async ({ data: { session: existingSession } }) => {
+      if (!isMounted.current) return;
+      if (existingSession) {
+        setSession(existingSession);
+        setCurrentUser(existingSession.user);
+        try {
+          const p = await fetchProfile(existingSession.user.id);
+          if (isMounted.current) setProfile(p);
+        } catch (e) {
+          console.error('[AuthContext] fetchProfile (getSession) failed:', e);
+        }
+      }
+      if (isMounted.current) {
+        setLoading(false);
+        clearTimeout(timeout);
+      }
+    }).catch(() => {
+      if (isMounted.current) { setLoading(false); clearTimeout(timeout); }
+    });
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, newSession) => {
         if (!isMounted.current) return;
@@ -45,12 +71,13 @@ export const AuthProvider = ({ children }) => {
           if (isMounted.current) setProfile(null);
         }
 
-        if (isMounted.current) setLoading(false);
+        if (isMounted.current) { setLoading(false); clearTimeout(timeout); }
       }
     );
 
     return () => {
       isMounted.current = false;
+      clearTimeout(timeout);
       subscription.unsubscribe();
     };
   }, []);
