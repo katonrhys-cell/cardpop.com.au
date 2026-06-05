@@ -24,12 +24,12 @@ const AccountDashboard = () => {
     vaultItemsCount: 0,
     pendingTrades: 0
   });
-  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(false);
   const [statsError, setStatsError] = useState(null);
-  
+
   // Vault items list state
   const [vaultItems, setVaultItems] = useState([]);
-  const [vaultLoading, setVaultLoading] = useState(true);
+  const [vaultLoading, setVaultLoading] = useState(false);
   const [vaultError, setVaultError] = useState(null);
   const [vaultPage, setVaultPage] = useState(1);
   const [vaultTotalPages, setVaultTotalPages] = useState(1);
@@ -42,6 +42,7 @@ const AccountDashboard = () => {
       return;
     }
 
+    setStatsLoading(true);
     try {
       setStatsError(null);
 
