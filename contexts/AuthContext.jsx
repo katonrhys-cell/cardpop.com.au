@@ -10,6 +10,7 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile]         = useState(null);
   const [session, setSession]         = useState(null);
   const [loading, setLoading]         = useState(true);
+  const [profileLoading, setProfileLoading] = useState(true);
   const isMounted = useRef(true);
 
   const fetchProfile = async (userId) => {
@@ -38,19 +39,19 @@ export const AuthProvider = ({ children }) => {
       if (existingSession) {
         setSession(existingSession);
         setCurrentUser(existingSession.user);
-        // Unblock the UI immediately — profile fetch is supplementary
         if (isMounted.current) { setLoading(false); clearTimeout(timeout); }
         try {
           const p = await fetchProfile(existingSession.user.id);
-          if (isMounted.current) setProfile(p);
+          if (isMounted.current) { setProfile(p); setProfileLoading(false); }
         } catch (e) {
           console.error('[AuthContext] fetchProfile (getSession) failed:', e);
+          if (isMounted.current) setProfileLoading(false);
         }
       } else {
-        if (isMounted.current) { setLoading(false); clearTimeout(timeout); }
+        if (isMounted.current) { setLoading(false); setProfileLoading(false); clearTimeout(timeout); }
       }
     }).catch(() => {
-      if (isMounted.current) { setLoading(false); clearTimeout(timeout); }
+      if (isMounted.current) { setLoading(false); setProfileLoading(false); clearTimeout(timeout); }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -59,19 +60,19 @@ export const AuthProvider = ({ children }) => {
 
         setSession(newSession);
         setCurrentUser(newSession?.user ?? null);
-
-        // Unblock the UI immediately — don't wait for profile fetch
         if (isMounted.current) { setLoading(false); clearTimeout(timeout); }
 
         if (newSession?.user) {
+          if (isMounted.current) setProfileLoading(true);
           try {
             const p = await fetchProfile(newSession.user.id);
-            if (isMounted.current) setProfile(p);
+            if (isMounted.current) { setProfile(p); setProfileLoading(false); }
           } catch (e) {
             console.error('[AuthContext] fetchProfile failed:', e);
+            if (isMounted.current) setProfileLoading(false);
           }
         } else {
-          if (isMounted.current) setProfile(null);
+          if (isMounted.current) { setProfile(null); setProfileLoading(false); }
         }
       }
     );
@@ -157,6 +158,7 @@ export const AuthProvider = ({ children }) => {
     isVerified,
     isEmailVerified: isVerified,
     loading,
+    profileLoading,
     signup,
     login,
     logout,

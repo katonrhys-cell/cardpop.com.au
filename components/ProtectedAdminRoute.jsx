@@ -4,17 +4,17 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
 
 const ProtectedAdminRoute = ({ children }) => {
-  const { isAuthenticated, isAdmin, loading } = useAuth();
+  const { isAuthenticated, isAdmin, loading, profileLoading } = useAuth();
   const location = useLocation();
 
-  // Must be before any conditional returns — Rules of Hooks
   useEffect(() => {
-    if (!loading && isAuthenticated && !isAdmin) {
+    if (!loading && !profileLoading && isAuthenticated && !isAdmin) {
       toast.error('Access denied. Administrator privileges required.');
     }
-  }, [loading, isAuthenticated, isAdmin]);
+  }, [loading, profileLoading, isAuthenticated, isAdmin]);
 
-  if (loading) {
+  // Wait for both auth and profile to resolve before making access decisions
+  if (loading || profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
