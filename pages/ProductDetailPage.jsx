@@ -42,6 +42,7 @@ const ProductDetailPage = () => {
         setLoading(false);
         return;
       }
+      if (isMounted) setError(null);
       try {
         setLoading(true);
 
