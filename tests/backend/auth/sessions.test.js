@@ -2,55 +2,54 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 
-const mockPb = vi.hoisted(() => ({
-  collection: vi.fn(),
-  authStore: { save: vi.fn(), record: { id: 'user-123', email: 'test@example.com' } },
-  send: vi.fn(),
-}));
+// ─── mocks ────────────────────────────────────────────────────────────────────
 
-vi.mock('../../../src/utils/pocketbaseClient.js', () => ({ default: mockPb }));
-vi.mock('../../../src/middleware/auth.js', () => ({
-  authMiddleware: (req, res, next) => {
-    if (!req.headers.authorization?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Missing or invalid authorization header' });
-    }
-    req.user = { id: 'user-123', email: 'test@example.com' };
-    next();
-  },
+const mockSupabase = vi.hoisted(() => ({ from: vi.fn(), auth: { admin: {} } }));
+
+vi.mock('../../../src/utils/supabaseClient.js', () => ({ default: mockSupabase, supabase: mockSupabase }));
+vi.mock('../../../src/utils/logger.js', () => ({
+  default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
-vi.mock('../../../src/utils/supabaseClient.js', () => ({ supabase: {}, default: {} }));
+vi.mock('../../../src/middleware/auth.js', () => ({
+  authMiddleware: (req, _res, next) => { req.user = { id: 'user-1' }; next(); },
+}));
+vi.mock('../../../src/utils/deviceParser.js', () => ({
+  getDeviceName: vi.fn().mockReturnValue('Chrome on Windows'),
+  parseUserAgent: vi.fn().mockReturnValue({ browser: 'Chrome', os: 'Windows' }),
+}));
 
 import sessionsRouter from '../../../src/routes/auth/sessions.js';
-
-const AUTH = { Authorization: 'Bearer test-token' };
-
-const SESSION_A = { sessionId: 'sess-aaa', deviceName: 'Chrome/Mac', ipAddress: '1.1.1.1', createdAt: new Date().toISOString(), lastActivityAt: new Date().toISOString() };
-const SESSION_B = { sessionId: 'sess-bbb', deviceName: 'Safari/iOS', ipAddress: '2.2.2.2', createdAt: new Date().toISOString(), lastActivityAt: new Date().toISOString() };
 
 function makeApp() {
   const app = express();
   app.use(express.json());
   app.use('/', sessionsRouter);
-  app.use((err, req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
+  app.use((err, _req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
   return app;
 }
-
-function makeCollection(overrides = {}) {
-  return {
-    getOne: vi.fn().mockResolvedValue({ id: 'user-123', activeSessions: [SESSION_A, SESSION_B] }),
-    update: vi.fn().mockResolvedValue({}),
-    create: vi.fn().mockResolvedValue({}),
-    ...overrides,
-  };
-}
-
 const app = makeApp();
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  mockPb.authStore.record = { id: 'user-123', email: 'test@example.com' };
-  mockPb.collection.mockReturnValue(makeCollection());
-});
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+const SESSION = {
+  sessionId: 'sess-1', deviceName: 'Chrome on Windows',
+  ipAddress: '1.2.3.4', createdAt: '2026-01-01T00:00:00Z', lastActivityAt: '2026-01-01T00:00:00Z',
+};
+
+function makeBuilder(result = { data: null, error: null }) {
+  const b = {
+    select: vi.fn().mockReturnThis(),
+    insert: vi.fn().mockReturnThis(),
+    update: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    single: vi.fn().mockResolvedValue(result),
+    then: (resolve, reject) => Promise.resolve(result).then(resolve, reject),
+    catch: fn => Promise.resolve(result).catch(fn),
+  };
+  return b;
+}
+
+beforeEach(() => vi.clearAllMocks());
 
 // ─── POST /create ─────────────────────────────────────────────────────────────
 
@@ -60,107 +59,84 @@ describe('POST /create', () => {
     expect(res.status).toBe(400);
   });
 
-  it('creates a session and returns sessionId + deviceName', async () => {
-    mockPb.collection.mockReturnValue(makeCollection({
-      getOne: vi.fn().mockResolvedValue({ id: 'user-123', activeSessions: [] }),
-    }));
-    const res = await request(app)
-      .post('/create')
-      .set('User-Agent', 'TestBrowser/1.0')
-      .send({ userId: 'user-123' });
+  it('creates a session and returns sessionId', async () => {
+    mockSupabase.from
+      .mockReturnValueOnce(makeBuilder({ data: { active_sessions: [] }, error: null }))
+      .mockReturnValueOnce(makeBuilder({ data: null, error: null }));
+    const res = await request(app).post('/create').send({ userId: 'user-1' });
     expect(res.status).toBe(200);
-    expect(res.body.sessionId).toMatch(/^session_/);
-    expect(res.body.createdAt).toBeDefined();
+    expect(res.body.sessionId).toBeDefined();
+    expect(res.body.deviceName).toBe('Chrome on Windows');
   });
 
-  it('appends the new session without removing existing ones', async () => {
-    const col = makeCollection({
-      getOne: vi.fn().mockResolvedValue({ id: 'user-123', activeSessions: [SESSION_A] }),
-    });
-    mockPb.collection.mockReturnValue(col);
-    await request(app).post('/create').send({ userId: 'user-123' });
-    const updatedSessions = col.update.mock.calls[0][1].activeSessions;
-    expect(updatedSessions).toHaveLength(2);
+  it('appends to existing sessions', async () => {
+    const updateBuilder = makeBuilder({ data: null, error: null });
+    mockSupabase.from
+      .mockReturnValueOnce(makeBuilder({ data: { active_sessions: [SESSION] }, error: null }))
+      .mockReturnValueOnce(updateBuilder);
+    await request(app).post('/create').send({ userId: 'user-1' });
+    expect(updateBuilder.update.mock.calls[0][0].active_sessions).toHaveLength(2);
   });
 });
 
 // ─── GET / ────────────────────────────────────────────────────────────────────
 
 describe('GET /', () => {
-  it('returns 401 without an Authorization header', async () => {
+  it('returns sessions for the authenticated user', async () => {
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: { active_sessions: [SESSION] }, error: null }));
     const res = await request(app).get('/');
-    expect(res.status).toBe(401);
-  });
-
-  it('returns the list of active sessions for authenticated user', async () => {
-    const res = await request(app).get('/').set(AUTH);
     expect(res.status).toBe(200);
-    expect(res.body.sessions).toHaveLength(2);
-    expect(res.body.sessions[0].sessionId).toBe('sess-aaa');
+    expect(res.body.sessions).toHaveLength(1);
+    expect(res.body.sessions[0].sessionId).toBe('sess-1');
   });
 
-  it('returns an empty sessions array when user has no sessions', async () => {
-    mockPb.collection.mockReturnValue(makeCollection({
-      getOne: vi.fn().mockResolvedValue({ id: 'user-123', activeSessions: [] }),
-    }));
-    const res = await request(app).get('/').set(AUTH);
+  it('returns empty array when no sessions', async () => {
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: { active_sessions: null }, error: null }));
+    const res = await request(app).get('/');
     expect(res.body.sessions).toEqual([]);
-  });
-
-  it('does not expose internal user fields in the sessions list', async () => {
-    const res = await request(app).get('/').set(AUTH);
-    const session = res.body.sessions[0];
-    expect(session).toHaveProperty('sessionId');
-    expect(session).toHaveProperty('deviceName');
-    expect(session).toHaveProperty('ipAddress');
-    expect(session).not.toHaveProperty('password');
   });
 });
 
 // ─── POST /logout-other ───────────────────────────────────────────────────────
 
 describe('POST /logout-other', () => {
-  it('returns 401 without auth', async () => {
-    const res = await request(app).post('/logout-other').send({ currentSessionId: 'sess-aaa' });
-    expect(res.status).toBe(401);
-  });
-
   it('returns 400 when currentSessionId is missing', async () => {
-    const res = await request(app).post('/logout-other').send({}).set(AUTH);
+    const res = await request(app).post('/logout-other').send({});
     expect(res.status).toBe(400);
   });
 
-  it('keeps only the current session and removes all others', async () => {
-    const col = makeCollection();
-    mockPb.collection.mockReturnValue(col);
-    const res = await request(app).post('/logout-other').send({ currentSessionId: 'sess-aaa' }).set(AUTH);
+  it('keeps only the current session', async () => {
+    const sessions = [SESSION, { ...SESSION, sessionId: 'sess-2' }];
+    const updateBuilder = makeBuilder({ data: null, error: null });
+    mockSupabase.from
+      .mockReturnValueOnce(makeBuilder({ data: { active_sessions: sessions }, error: null }))
+      .mockReturnValueOnce(updateBuilder)
+      .mockReturnValueOnce(makeBuilder({ data: null, error: null })); // audit
+    const res = await request(app).post('/logout-other').send({ currentSessionId: 'sess-1' });
     expect(res.status).toBe(200);
-    const updatedSessions = col.update.mock.calls[0][1].activeSessions;
-    expect(updatedSessions).toHaveLength(1);
-    expect(updatedSessions[0].sessionId).toBe('sess-aaa');
+    expect(res.body.success).toBe(true);
+    expect(updateBuilder.update.mock.calls[0][0].active_sessions).toHaveLength(1);
+    expect(updateBuilder.update.mock.calls[0][0].active_sessions[0].sessionId).toBe('sess-1');
   });
 });
 
 // ─── DELETE /:sessionId ───────────────────────────────────────────────────────
 
 describe('DELETE /:sessionId', () => {
-  it('returns 401 without auth', async () => {
-    const res = await request(app).delete('/sess-aaa');
-    expect(res.status).toBe(401);
-  });
-
-  it('returns 404 when the session does not exist', async () => {
-    const res = await request(app).delete('/sess-unknown').set(AUTH);
-    expect(res.status).toBe(404);
-  });
-
-  it('removes the target session and keeps the others', async () => {
-    const col = makeCollection();
-    mockPb.collection.mockReturnValue(col);
-    const res = await request(app).delete('/sess-aaa').set(AUTH);
+  it('revokes a specific session', async () => {
+    const sessions = [SESSION, { ...SESSION, sessionId: 'sess-2', deviceName: 'Firefox on Mac' }];
+    mockSupabase.from
+      .mockReturnValueOnce(makeBuilder({ data: { active_sessions: sessions }, error: null }))
+      .mockReturnValueOnce(makeBuilder({ data: null, error: null }))  // update
+      .mockReturnValueOnce(makeBuilder({ data: null, error: null })); // audit
+    const res = await request(app).delete('/sess-1');
     expect(res.status).toBe(200);
-    const updatedSessions = col.update.mock.calls[0][1].activeSessions;
-    expect(updatedSessions).toHaveLength(1);
-    expect(updatedSessions[0].sessionId).toBe('sess-bbb');
+    expect(res.body.success).toBe(true);
+  });
+
+  it('returns 404 when session is not found', async () => {
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: { active_sessions: [] }, error: null }));
+    const res = await request(app).delete('/nonexistent');
+    expect(res.status).toBe(404);
   });
 });

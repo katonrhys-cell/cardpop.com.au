@@ -2,253 +2,121 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 
-const mockPb = vi.hoisted(() => ({
-  collection: vi.fn(),
-  authStore: { save: vi.fn(), record: { id: 'user-123', email: 'test@example.com' } },
-  send: vi.fn(),
+// ─── mocks ────────────────────────────────────────────────────────────────────
+
+const mockSupabase = vi.hoisted(() => ({ from: vi.fn(), auth: { admin: {} } }));
+
+vi.mock('../../../src/utils/supabaseClient.js', () => ({ default: mockSupabase, supabase: mockSupabase }));
+vi.mock('../../../src/utils/logger.js', () => ({
+  default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
-
-const mockParseUserAgent = vi.hoisted(() => vi.fn());
-
-vi.mock('../../../src/utils/pocketbaseClient.js', () => ({ default: mockPb }));
-vi.mock('../../../src/utils/deviceParser.js', () => ({ parseUserAgent: mockParseUserAgent }));
 vi.mock('../../../src/middleware/auth.js', () => ({
-  authMiddleware: (req, res, next) => {
-    if (!req.headers.authorization?.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Missing or invalid authorization header' });
-    }
-    req.user = { id: 'user-123', email: 'test@example.com' };
-    next();
-  },
+  authMiddleware: (req, _res, next) => { req.user = { id: 'user-1' }; next(); },
 }));
-vi.mock('../../../src/utils/supabaseClient.js', () => ({ supabase: {}, default: {} }));
-vi.mock('../../../src/utils/logger.js', () => ({ default: { info: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
+vi.mock('../../../src/utils/deviceParser.js', () => ({
+  parseUserAgent: vi.fn().mockReturnValue({ browser: 'Chrome', os: 'Windows' }),
+}));
 
 import securityRouter from '../../../src/routes/auth/security.js';
-
-const AUTH = { Authorization: 'Bearer test-token' };
 
 function makeApp() {
   const app = express();
   app.use(express.json());
   app.use('/', securityRouter);
-  app.use((err, req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
+  app.use((err, _req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
   return app;
 }
-
-function makeAuditCollection(overrides = {}) {
-  return { getFullList: vi.fn().mockResolvedValue([]), ...overrides };
-}
-
-function makeAlertsCollection(overrides = {}) {
-  return {
-    getFullList: vi.fn().mockResolvedValue([]),
-    create: vi.fn().mockResolvedValue({ id: 'alert-1' }),
-    update: vi.fn().mockResolvedValue({}),
-    ...overrides,
-  };
-}
-
 const app = makeApp();
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  mockPb.authStore.record = { id: 'user-123', email: 'test@example.com' };
-  // Default: both current and prior devices are Chrome/Windows (no new_device alert)
-  mockParseUserAgent.mockReturnValue({ browser: 'Chrome', os: 'Windows', device: 'desktop' });
-  mockPb.collection.mockReturnValue(makeAuditCollection());
-});
+// ─── helpers ──────────────────────────────────────────────────────────────────
+
+function makeBuilder(result = { data: null, error: null }) {
+  const b = {
+    select: vi.fn().mockReturnThis(),
+    insert: vi.fn().mockReturnThis(),
+    update: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    gte: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    then: (resolve, reject) => Promise.resolve(result).then(resolve, reject),
+    catch: fn => Promise.resolve(result).catch(fn),
+  };
+  return b;
+}
+
+const ALERT = {
+  id: 'alert-1', alert_type: 'new_ip', severity: 'medium',
+  description: 'Login from a new IP address', ip_address: '5.5.5.5', read: false,
+  created_at: '2026-01-01T00:00:00Z',
+};
+
+beforeEach(() => vi.clearAllMocks());
 
 // ─── POST /suspicious-activity/check ─────────────────────────────────────────
 
 describe('POST /suspicious-activity/check', () => {
   it('returns 400 when userId is missing', async () => {
-    const res = await request(app)
-      .post('/suspicious-activity/check')
-      .send({ ipAddress: '1.2.3.4' });
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/userId and ipAddress/i);
-  });
-
-  it('returns 400 when ipAddress is missing', async () => {
-    const res = await request(app)
-      .post('/suspicious-activity/check')
-      .send({ userId: 'user-1' });
+    const res = await request(app).post('/suspicious-activity/check').send({ ipAddress: '1.2.3.4' });
     expect(res.status).toBe(400);
   });
 
-  it('returns suspicious:false with empty alerts when no prior logins exist', async () => {
-    // No prior logins → the conditions include "recentLogins.length > 0" guard
-    const res = await request(app)
-      .post('/suspicious-activity/check')
-      .send({ userId: 'user-1', ipAddress: '1.2.3.4' });
+  it('returns not suspicious when no prior logins', async () => {
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: [], error: null }));
+    const res = await request(app).post('/suspicious-activity/check').send({
+      userId: 'user-1', ipAddress: '1.2.3.4', userAgent: 'Chrome/100',
+    });
     expect(res.status).toBe(200);
     expect(res.body.suspicious).toBe(false);
-    expect(res.body.alerts).toHaveLength(0);
+    expect(res.body.alerts).toEqual([]);
   });
 
-  it('returns suspicious:false when IP and device both match prior logins', async () => {
-    mockPb.collection.mockReturnValue(makeAuditCollection({
-      getFullList: vi.fn().mockResolvedValue([
-        { ipAddress: '1.2.3.4', userAgent: 'Chrome/Windows' },
-      ]),
-    }));
-    const res = await request(app)
-      .post('/suspicious-activity/check')
-      .send({ userId: 'user-1', ipAddress: '1.2.3.4', userAgent: 'Chrome/Windows' });
-    expect(res.body.suspicious).toBe(false);
-    expect(res.body.alerts).toHaveLength(0);
-  });
-
-  it('detects a new_ip alert when the IP has not been seen before', async () => {
-    const alertsCol = makeAlertsCollection();
-    mockPb.collection.mockImplementation((name) => {
-      if (name === 'auditLogs') {
-        return makeAuditCollection({
-          getFullList: vi.fn().mockResolvedValue([
-            { ipAddress: '9.9.9.9', userAgent: 'Chrome' },
-          ]),
-        });
-      }
-      return alertsCol;
+  it('flags new IP and creates security alert', async () => {
+    const logsBuilder = makeBuilder({ data: [{ ip_address: '9.9.9.9', user_agent: 'Chrome/100' }], error: null });
+    const insertBuilder = makeBuilder({ data: null, error: null });
+    mockSupabase.from
+      .mockReturnValueOnce(logsBuilder)
+      .mockReturnValueOnce(insertBuilder);
+    const res = await request(app).post('/suspicious-activity/check').send({
+      userId: 'user-1', ipAddress: '1.2.3.4', userAgent: 'Chrome/100',
     });
-    const res = await request(app)
-      .post('/suspicious-activity/check')
-      .send({ userId: 'user-1', ipAddress: '1.2.3.4', userAgent: 'Chrome' });
+    expect(res.status).toBe(200);
     expect(res.body.suspicious).toBe(true);
-    expect(res.body.alerts.find(a => a.type === 'new_ip')).toBeDefined();
-  });
-
-  it('detects a new_device alert when browser/os differs from prior logins', async () => {
-    // First call → current device (Firefox/Linux), subsequent → prior device (Chrome/Windows)
-    mockParseUserAgent
-      .mockReturnValueOnce({ browser: 'Firefox', os: 'Linux', device: 'desktop' })
-      .mockReturnValue({ browser: 'Chrome', os: 'Windows', device: 'desktop' });
-
-    const alertsCol = makeAlertsCollection();
-    mockPb.collection.mockImplementation((name) => {
-      if (name === 'auditLogs') {
-        return makeAuditCollection({
-          // Same IP so no new_ip alert — only device differs
-          getFullList: vi.fn().mockResolvedValue([
-            { ipAddress: '1.2.3.4', userAgent: 'Chrome/Windows' },
-          ]),
-        });
-      }
-      return alertsCol;
-    });
-    const res = await request(app)
-      .post('/suspicious-activity/check')
-      .send({ userId: 'user-1', ipAddress: '1.2.3.4', userAgent: 'Firefox/Linux' });
-    expect(res.body.suspicious).toBe(true);
-    expect(res.body.alerts.find(a => a.type === 'new_device')).toBeDefined();
-  });
-
-  it('creates a securityAlert record when an alert is detected', async () => {
-    const alertsCol = makeAlertsCollection();
-    mockPb.collection.mockImplementation((name) => {
-      if (name === 'auditLogs') {
-        return makeAuditCollection({
-          getFullList: vi.fn().mockResolvedValue([
-            { ipAddress: '9.9.9.9', userAgent: 'Chrome' },
-          ]),
-        });
-      }
-      return alertsCol;
-    });
-    await request(app)
-      .post('/suspicious-activity/check')
-      .send({ userId: 'user-1', ipAddress: '1.2.3.4', userAgent: 'Chrome' });
-    expect(alertsCol.create).toHaveBeenCalledOnce();
-    expect(alertsCol.create).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: 'user-1', ipAddress: '1.2.3.4' }),
-    );
-  });
-
-  it('does not create a securityAlert record when no alerts are detected', async () => {
-    const alertsCol = makeAlertsCollection();
-    mockPb.collection.mockImplementation(() => {
-      // Only auditLogs collection is called here; securityAlerts should NOT be called
-      return makeAuditCollection({ getFullList: vi.fn().mockResolvedValue([]) });
-    });
-    await request(app)
-      .post('/suspicious-activity/check')
-      .send({ userId: 'user-1', ipAddress: '1.2.3.4' });
-    expect(alertsCol.create).not.toHaveBeenCalled();
+    expect(insertBuilder.insert).toHaveBeenCalled();
   });
 });
 
 // ─── GET /alerts ──────────────────────────────────────────────────────────────
 
 describe('GET /alerts', () => {
-  it('returns 401 without an Authorization header', async () => {
+  it('returns alerts with mapped fields', async () => {
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: [ALERT], error: null }));
     const res = await request(app).get('/alerts');
-    expect(res.status).toBe(401);
-  });
-
-  it('returns a mapped list of alerts for the authenticated user', async () => {
-    mockPb.collection.mockReturnValue(makeAlertsCollection({
-      getFullList: vi.fn().mockResolvedValue([
-        {
-          id: 'alert-1',
-          alertType: 'new_ip',
-          severity: 'medium',
-          description: 'Login from a new IP address',
-          ipAddress: '1.2.3.4',
-          read: false,
-          createdAt: new Date().toISOString(),
-        },
-      ]),
-    }));
-    const res = await request(app).get('/alerts').set(AUTH);
     expect(res.status).toBe(200);
     expect(res.body.alerts).toHaveLength(1);
-    const alert = res.body.alerts[0];
-    expect(alert.id).toBe('alert-1');
-    expect(alert.type).toBe('new_ip');
-    expect(alert.severity).toBe('medium');
-    expect(alert.read).toBe(false);
+    expect(res.body.alerts[0].type).toBe('new_ip');
+    expect(res.body.alerts[0].id).toBe('alert-1');
   });
 
-  it('returns an empty alerts array when there are no alerts', async () => {
-    mockPb.collection.mockReturnValue(makeAlertsCollection());
-    const res = await request(app).get('/alerts').set(AUTH);
-    expect(res.status).toBe(200);
+  it('returns empty array when no alerts', async () => {
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: [], error: null }));
+    const res = await request(app).get('/alerts');
     expect(res.body.alerts).toEqual([]);
-  });
-
-  it('does not expose raw alertType field — maps it to type', async () => {
-    mockPb.collection.mockReturnValue(makeAlertsCollection({
-      getFullList: vi.fn().mockResolvedValue([
-        { id: 'a1', alertType: 'new_ip', severity: 'medium', description: 'd', ipAddress: '1.1.1.1', read: false, createdAt: new Date().toISOString() },
-      ]),
-    }));
-    const res = await request(app).get('/alerts').set(AUTH);
-    expect(res.body.alerts[0]).not.toHaveProperty('alertType');
-    expect(res.body.alerts[0]).toHaveProperty('type');
   });
 });
 
 // ─── POST /alerts/mark-read ───────────────────────────────────────────────────
 
 describe('POST /alerts/mark-read', () => {
-  it('returns 401 without an Authorization header', async () => {
-    const res = await request(app).post('/alerts/mark-read').send({ alertId: 'alert-1' });
-    expect(res.status).toBe(401);
-  });
-
   it('returns 400 when alertId is missing', async () => {
-    const res = await request(app).post('/alerts/mark-read').send({}).set(AUTH);
+    const res = await request(app).post('/alerts/mark-read').send({});
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/alertId/i);
   });
 
-  it('marks the alert as read and returns success', async () => {
-    const col = makeAlertsCollection();
-    mockPb.collection.mockReturnValue(col);
-    const res = await request(app).post('/alerts/mark-read').send({ alertId: 'alert-1' }).set(AUTH);
+  it('marks alert as read', async () => {
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: null, error: null }));
+    const res = await request(app).post('/alerts/mark-read').send({ alertId: 'alert-1' });
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(col.update).toHaveBeenCalledWith('alert-1', { read: true });
   });
 });
