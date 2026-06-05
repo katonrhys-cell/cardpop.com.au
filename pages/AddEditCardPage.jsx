@@ -131,7 +131,7 @@ const AddEditCardPage = () => {
   useEffect(() => {
     if (!isEdit) return;
     const fetchCard = async () => {
-      if (!currentUser?.id) return;
+      if (!currentUser?.id) { setLoading(false); return; }
       try {
         const { data: card, error: fetchError } = await supabase
           .from('vault_items')

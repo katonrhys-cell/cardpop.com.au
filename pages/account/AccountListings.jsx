@@ -39,7 +39,7 @@ const AccountListings = () => {
   const isMounted = useRef(true);
 
   const fetchListings = useCallback(async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) { setLoading(false); return; }
     setLoading(true);
     setError(null);
     try {

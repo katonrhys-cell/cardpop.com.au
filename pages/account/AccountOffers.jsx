@@ -147,7 +147,7 @@ const AccountOffers = () => {
   const [actionLoading, setActionLoading] = useState(null);
 
   const fetchOffers = useCallback(async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) { setLoading(false); return; }
     setLoading(true);
     try {
       const [receivedRes, sentRes] = await Promise.all([
