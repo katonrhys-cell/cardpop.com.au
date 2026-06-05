@@ -38,16 +38,16 @@ export const AuthProvider = ({ children }) => {
       if (existingSession) {
         setSession(existingSession);
         setCurrentUser(existingSession.user);
+        // Unblock the UI immediately — profile fetch is supplementary
+        if (isMounted.current) { setLoading(false); clearTimeout(timeout); }
         try {
           const p = await fetchProfile(existingSession.user.id);
           if (isMounted.current) setProfile(p);
         } catch (e) {
           console.error('[AuthContext] fetchProfile (getSession) failed:', e);
         }
-      }
-      if (isMounted.current) {
-        setLoading(false);
-        clearTimeout(timeout);
+      } else {
+        if (isMounted.current) { setLoading(false); clearTimeout(timeout); }
       }
     }).catch(() => {
       if (isMounted.current) { setLoading(false); clearTimeout(timeout); }
@@ -60,6 +60,9 @@ export const AuthProvider = ({ children }) => {
         setSession(newSession);
         setCurrentUser(newSession?.user ?? null);
 
+        // Unblock the UI immediately — don't wait for profile fetch
+        if (isMounted.current) { setLoading(false); clearTimeout(timeout); }
+
         if (newSession?.user) {
           try {
             const p = await fetchProfile(newSession.user.id);
@@ -70,8 +73,6 @@ export const AuthProvider = ({ children }) => {
         } else {
           if (isMounted.current) setProfile(null);
         }
-
-        if (isMounted.current) { setLoading(false); clearTimeout(timeout); }
       }
     );
 
