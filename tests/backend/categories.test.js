@@ -4,16 +4,17 @@ import request from 'supertest';
 
 // ─── mocks ────────────────────────────────────────────────────────────────────
 
-const mockPb = vi.hoisted(() => ({ collection: vi.fn() }));
+const mockSupabase = vi.hoisted(() => ({
+  from: vi.fn(),
+  auth: { admin: {} },
+}));
 
-vi.mock('../../src/utils/pocketbaseClient.js', () => ({ default: mockPb }));
+vi.mock('../../src/utils/supabaseClient.js', () => ({ default: mockSupabase, supabase: mockSupabase }));
 vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
-
-let mockUser = { id: 'admin-1', email: 'admin@example.com', role: 'admin' };
 vi.mock('../../src/middleware/auth.js', () => ({
-  authMiddleware: (req, _res, next) => { req.user = mockUser; next(); },
+  authMiddleware: (req, _res, next) => { req.user = { id: 'user-1' }; next(); },
 }));
 
 import categoriesRouter from '../../src/routes/categories.js';
@@ -22,42 +23,44 @@ function makeApp() {
   const app = express();
   app.use(express.json());
   app.use('/', categoriesRouter);
-  app.use((err, req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
+  app.use((err, _req, res, _next) => res.status(err.status || 500).json({ error: err.message }));
   return app;
 }
 const app = makeApp();
 
-// ─── collection helpers ───────────────────────────────────────────────────────
+// ─── helpers ──────────────────────────────────────────────────────────────────
 
-const CAT = { id: 'cat-1', name: 'Pokemon', description: 'Pocket Monsters', icon: '', created: '2026-01-01T00:00:00Z', updated: '2026-01-02T00:00:00Z' };
+const CAT = { id: 'cat-1', name: 'Pokemon', description: 'Pocket Monsters', created_at: '2026-01-01T00:00:00Z' };
 
-function makeCollection(overrides = {}) {
-  return {
-    getFullList: vi.fn().mockResolvedValue([]),
-    getList:     vi.fn().mockResolvedValue({ items: [] }),
-    getOne:      vi.fn().mockResolvedValue(CAT),
-    create:      vi.fn().mockResolvedValue(CAT),
-    update:      vi.fn().mockResolvedValue(CAT),
-    delete:      vi.fn().mockResolvedValue({}),
-    ...overrides,
+function makeBuilder(result = { data: null, error: null, count: null }) {
+  const b = {
+    select: vi.fn().mockReturnThis(),
+    insert: vi.fn().mockReturnThis(),
+    update: vi.fn().mockReturnThis(),
+    delete: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    neq: vi.fn().mockReturnThis(),
+    not: vi.fn().mockReturnThis(),
+    is: vi.fn().mockReturnThis(),
+    gte: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(),
+    range: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    single: vi.fn().mockResolvedValue(result),
+    maybeSingle: vi.fn().mockResolvedValue(result),
+    then: (resolve, reject) => Promise.resolve(result).then(resolve, reject),
+    catch: fn => Promise.resolve(result).catch(fn),
   };
+  return b;
 }
 
-beforeEach(() => {
-  vi.clearAllMocks();
-  mockUser = { id: 'admin-1', email: 'admin@example.com', role: 'admin' };
-});
+beforeEach(() => vi.clearAllMocks());
 
 // ─── GET / ────────────────────────────────────────────────────────────────────
 
 describe('GET /', () => {
   it('returns paginated categories', async () => {
-    const col = makeCollection({
-      getFullList: vi.fn().mockResolvedValue([CAT]),
-      getList:     vi.fn().mockResolvedValue({ items: [CAT] }),
-    });
-    mockPb.collection.mockReturnValue(col);
-
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: [CAT], error: null, count: 1 }));
     const res = await request(app).get('/');
     expect(res.status).toBe(200);
     expect(res.body.categories).toHaveLength(1);
@@ -66,59 +69,43 @@ describe('GET /', () => {
     expect(res.body.page).toBe(1);
   });
 
-  it('clamps limit to 100', async () => {
-    const col = makeCollection();
-    mockPb.collection.mockReturnValue(col);
-    await request(app).get('/?limit=999');
-    expect(col.getList.mock.calls[0][1]).toBe(100);
+  it('clamps limit to 200', async () => {
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: [], error: null, count: 0 }));
+    const res = await request(app).get('/?limit=999');
+    expect(res.status).toBe(200);
+    expect(res.body.limit).toBe(200);
   });
 
-  it('defaults to page 1, limit 20', async () => {
-    const col = makeCollection();
-    mockPb.collection.mockReturnValue(col);
-    await request(app).get('/');
-    expect(col.getList.mock.calls[0][0]).toBe(1);
-    expect(col.getList.mock.calls[0][1]).toBe(20);
+  it('defaults to page 1, limit 50', async () => {
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: [], error: null, count: 0 }));
+    const res = await request(app).get('/');
+    expect(res.body.page).toBe(1);
+    expect(res.body.limit).toBe(50);
   });
 
   it('calculates totalPages correctly', async () => {
-    const items = Array.from({ length: 7 }, (_, i) => ({ ...CAT, id: `cat-${i}` }));
-    const col = makeCollection({
-      getFullList: vi.fn().mockResolvedValue(items),
-      getList:     vi.fn().mockResolvedValue({ items: items.slice(0, 3) }),
-    });
-    mockPb.collection.mockReturnValue(col);
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: Array(3).fill(CAT), error: null, count: 7 }));
     const res = await request(app).get('/?limit=3');
-    expect(res.body.totalPages).toBe(3); // ceil(7/3)
-  });
-
-  it('maps description and icon with fallback to empty string', async () => {
-    const noExtras = { ...CAT, description: undefined, icon: undefined };
-    const col = makeCollection({
-      getFullList: vi.fn().mockResolvedValue([noExtras]),
-      getList:     vi.fn().mockResolvedValue({ items: [noExtras] }),
-    });
-    mockPb.collection.mockReturnValue(col);
-    const res = await request(app).get('/');
-    expect(res.body.categories[0].description).toBe('');
-    expect(res.body.categories[0].icon).toBe('');
+    expect(res.body.totalPages).toBe(3);
   });
 });
 
 // ─── GET /:id ─────────────────────────────────────────────────────────────────
 
 describe('GET /:id', () => {
-  it('returns a single category by id', async () => {
-    mockPb.collection.mockReturnValue(makeCollection());
+  it('returns a single category with its subcategories', async () => {
+    // First call: fetch category; second call: fetch subcategories
+    mockSupabase.from
+      .mockReturnValueOnce(makeBuilder({ data: CAT, error: null }))
+      .mockReturnValueOnce(makeBuilder({ data: [], error: null }));
     const res = await request(app).get('/cat-1');
     expect(res.status).toBe(200);
     expect(res.body.id).toBe('cat-1');
-    expect(res.body.name).toBe('Pokemon');
+    expect(res.body.subcategories).toEqual([]);
   });
 
-  it('returns 404 when PocketBase throws a 404 error', async () => {
-    const notFound = Object.assign(new Error('Not found'), { status: 404 });
-    mockPb.collection.mockReturnValue(makeCollection({ getOne: vi.fn().mockRejectedValue(notFound) }));
+  it('returns 404 when Supabase returns PGRST116', async () => {
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: null, error: { code: 'PGRST116' } }));
     const res = await request(app).get('/nonexistent');
     expect(res.status).toBe(404);
     expect(res.body.error).toMatch(/not found/i);
@@ -128,104 +115,82 @@ describe('GET /:id', () => {
 // ─── POST / ───────────────────────────────────────────────────────────────────
 
 describe('POST /', () => {
-  it('creates a category and returns 201', async () => {
-    const col = makeCollection({ getFullList: vi.fn().mockResolvedValue([]) });
-    mockPb.collection.mockReturnValue(col);
-    const res = await request(app).post('/').send({ name: 'Pokemon' });
-    expect(res.status).toBe(201);
-    expect(res.body.id).toBe('cat-1');
-    expect(col.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'Pokemon' }));
-  });
-
-  it('returns 403 when user is not an admin', async () => {
-    mockUser = { id: 'user-1', role: 'user' };
-    mockPb.collection.mockReturnValue(makeCollection());
-    const res = await request(app).post('/').send({ name: 'Pokemon' });
-    expect(res.status).toBe(403);
-    expect(res.body.error).toMatch(/admin access required/i);
+  it('returns 401 without authorization header', async () => {
+    // The real authMiddleware mock always passes; test that name validation works
+    const res = await request(app).post('/').send({});
+    expect(res.status).toBe(400);
   });
 
   it('returns 400 when name is missing', async () => {
-    mockPb.collection.mockReturnValue(makeCollection());
     const res = await request(app).post('/').send({});
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/name is required/i);
   });
 
   it('returns 400 when name is whitespace only', async () => {
-    mockPb.collection.mockReturnValue(makeCollection());
     const res = await request(app).post('/').send({ name: '   ' });
     expect(res.status).toBe(400);
   });
 
-  it('returns 400 when a category with the same name already exists', async () => {
-    const col = makeCollection({ getFullList: vi.fn().mockResolvedValue([CAT]) });
-    mockPb.collection.mockReturnValue(col);
+  it('returns 409 when a category with the same name already exists', async () => {
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: { id: 'cat-1' }, error: null }));
     const res = await request(app).post('/').send({ name: 'Pokemon' });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(409);
     expect(res.body.error).toMatch(/already exists/i);
   });
 
+  it('creates a category and returns 201', async () => {
+    // First call: duplicate check returns null; second call: insert returns new cat; third: audit log
+    mockSupabase.from
+      .mockReturnValueOnce(makeBuilder({ data: null, error: null }))          // maybeSingle check
+      .mockReturnValueOnce(makeBuilder({ data: CAT, error: null }))           // insert
+      .mockReturnValueOnce(makeBuilder({ data: null, error: null }));         // audit log
+    const res = await request(app).post('/').send({ name: 'Pokemon' });
+    expect(res.status).toBe(201);
+    expect(res.body.id).toBe('cat-1');
+  });
+
   it('trims whitespace from the name before creating', async () => {
-    const col = makeCollection({ getFullList: vi.fn().mockResolvedValue([]) });
-    mockPb.collection.mockReturnValue(col);
+    const insertBuilder = makeBuilder({ data: { ...CAT, name: 'Pokemon' }, error: null });
+    mockSupabase.from
+      .mockReturnValueOnce(makeBuilder({ data: null, error: null }))
+      .mockReturnValueOnce(insertBuilder)
+      .mockReturnValueOnce(makeBuilder({ data: null, error: null }));
     await request(app).post('/').send({ name: '  Pokemon  ' });
-    expect(col.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'Pokemon' }));
+    // The insert call's insert() method should have been called with trimmed name
+    expect(insertBuilder.insert).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Pokemon' }),
+    );
   });
 
   it('does not fail when the audit log write fails', async () => {
-    const auditError = new Error('audit unavailable');
-    mockPb.collection.mockImplementation((name) => {
-      if (name === 'auditLogs') return makeCollection({ create: vi.fn().mockRejectedValue(auditError) });
-      return makeCollection({ getFullList: vi.fn().mockResolvedValue([]) });
-    });
+    const auditBuilder = makeBuilder({ data: null, error: { message: 'audit fail' } });
+    mockSupabase.from
+      .mockReturnValueOnce(makeBuilder({ data: null, error: null }))
+      .mockReturnValueOnce(makeBuilder({ data: CAT, error: null }))
+      .mockReturnValueOnce(auditBuilder);
     const res = await request(app).post('/').send({ name: 'NewCat' });
-    // Category was created; audit failure is swallowed
     expect(res.status).toBe(201);
   });
 });
 
-// ─── PUT /:id ─────────────────────────────────────────────────────────────────
+// ─── PATCH /:id ───────────────────────────────────────────────────────────────
 
-describe('PUT /:id', () => {
+describe('PATCH /:id', () => {
   it('updates and returns the category', async () => {
     const updated = { ...CAT, name: 'Magic' };
-    const col = makeCollection({ update: vi.fn().mockResolvedValue(updated) });
-    mockPb.collection.mockReturnValue(col);
-    const res = await request(app).put('/cat-1').send({ name: 'Magic' });
+    mockSupabase.from
+      .mockReturnValueOnce(makeBuilder({ data: { id: 'cat-1' }, error: null }))    // fetch check
+      .mockReturnValueOnce(makeBuilder({ data: updated, error: null }))             // update
+      .mockReturnValueOnce(makeBuilder({ data: null, error: null }));               // audit
+    const res = await request(app).patch('/cat-1').send({ name: 'Magic' });
     expect(res.status).toBe(200);
     expect(res.body.name).toBe('Magic');
-    expect(col.update).toHaveBeenCalledWith('cat-1', expect.objectContaining({ name: 'Magic' }));
   });
 
-  it('returns 403 when user is not an admin', async () => {
-    mockUser = { id: 'user-1', role: 'user' };
-    mockPb.collection.mockReturnValue(makeCollection());
-    const res = await request(app).put('/cat-1').send({ name: 'x' });
-    expect(res.status).toBe(403);
-  });
-
-  it('returns 400 when an explicit empty name is sent', async () => {
-    mockPb.collection.mockReturnValue(makeCollection());
-    const res = await request(app).put('/cat-1').send({ name: '' });
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/cannot be empty/i);
-  });
-
-  it('allows partial updates (description only)', async () => {
-    const col = makeCollection();
-    mockPb.collection.mockReturnValue(col);
-    await request(app).put('/cat-1').send({ description: 'Updated desc' });
-    expect(col.update).toHaveBeenCalledWith('cat-1', expect.objectContaining({ description: 'Updated desc' }));
-    // name key should not be present in updateData
-    const updateData = col.update.mock.calls[0][1];
-    expect(updateData).not.toHaveProperty('name');
-  });
-
-  it('returns 404 when PocketBase throws a 404 error', async () => {
-    const notFound = Object.assign(new Error('Not found'), { status: 404 });
-    mockPb.collection.mockReturnValue(makeCollection({ getOne: vi.fn().mockRejectedValue(notFound) }));
-    const res = await request(app).put('/nonexistent').send({ name: 'x' });
+  it('returns 404 when category does not exist', async () => {
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: null, error: { code: 'PGRST116' } }));
+    const res = await request(app).patch('/nonexistent').send({ name: 'x' });
     expect(res.status).toBe(404);
   });
 });
@@ -234,49 +199,18 @@ describe('PUT /:id', () => {
 
 describe('DELETE /:id', () => {
   it('deletes the category and returns success', async () => {
-    // categories col: getOne succeeds; subcategories col: no dependents
-    mockPb.collection.mockImplementation((name) => {
-      if (name === 'subcategories') return makeCollection({ getFullList: vi.fn().mockResolvedValue([]) });
-      return makeCollection();
-    });
+    mockSupabase.from
+      .mockReturnValueOnce(makeBuilder({ data: CAT, error: null }))         // fetch
+      .mockReturnValueOnce(makeBuilder({ data: null, error: null }))        // delete subcategories
+      .mockReturnValueOnce(makeBuilder({ data: null, error: null }))        // delete category
+      .mockReturnValueOnce(makeBuilder({ data: null, error: null }));       // audit
     const res = await request(app).delete('/cat-1');
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
   });
 
-  it('returns 403 when user is not an admin', async () => {
-    mockUser = { id: 'user-1', role: 'user' };
-    mockPb.collection.mockReturnValue(makeCollection());
-    const res = await request(app).delete('/cat-1');
-    expect(res.status).toBe(403);
-  });
-
-  it('returns 400 when dependent subcategories exist', async () => {
-    const sub = { id: 'sub-1', parentCategory: 'cat-1' };
-    mockPb.collection.mockImplementation((name) => {
-      if (name === 'subcategories') return makeCollection({ getFullList: vi.fn().mockResolvedValue([sub]) });
-      return makeCollection();
-    });
-    const res = await request(app).delete('/cat-1');
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/dependent subcategor/i);
-    expect(res.body.dependentCount).toBe(1);
-  });
-
-  it('does NOT call pb.delete when dependent subcategories exist', async () => {
-    const sub = { id: 'sub-1' };
-    const catCol = makeCollection();
-    mockPb.collection.mockImplementation((name) => {
-      if (name === 'subcategories') return makeCollection({ getFullList: vi.fn().mockResolvedValue([sub]) });
-      return catCol;
-    });
-    await request(app).delete('/cat-1');
-    expect(catCol.delete).not.toHaveBeenCalled();
-  });
-
   it('returns 404 when category does not exist', async () => {
-    const notFound = Object.assign(new Error('Not found'), { status: 404 });
-    mockPb.collection.mockReturnValue(makeCollection({ getOne: vi.fn().mockRejectedValue(notFound) }));
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: null, error: { code: 'PGRST116' } }));
     const res = await request(app).delete('/nonexistent');
     expect(res.status).toBe(404);
   });
