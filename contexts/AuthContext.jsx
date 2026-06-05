@@ -15,12 +15,13 @@ export const AuthProvider = ({ children }) => {
 
   const fetchProfile = async (userId) => {
     if (!userId) return null;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single();
-    return data;
+    if (error) console.warn('[AuthContext] fetchProfile error:', error.message);
+    return data ?? null;
   };
 
   useEffect(() => {
@@ -64,6 +65,23 @@ export const AuthProvider = ({ children }) => {
       subscription.unsubscribe();
     };
   }, []);
+
+  // Safety net: if profile wasn't set by onAuthStateChange (e.g. slow network,
+  // swallowed error), fetch it directly whenever currentUser is available and
+  // profile is still null.
+  useEffect(() => {
+    if (!currentUser?.id || profile !== null) return;
+    let cancelled = false;
+    fetchProfile(currentUser.id).then(p => {
+      if (!cancelled && isMounted.current && p) {
+        setProfile(p);
+        setProfileLoading(false);
+      }
+    }).catch(() => {
+      if (!cancelled && isMounted.current) setProfileLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [currentUser?.id, profile]);
 
   const signup = async (email, password, fullName) => {
     const username = email.split('@')[0].replace(/[^a-z0-9_]/gi, '').toLowerCase();
