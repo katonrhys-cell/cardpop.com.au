@@ -77,11 +77,11 @@ app.use((err, req, res, next) => {
 app.use(csrfMiddleware);
 app.use(sessionTimeoutMiddleware);
 
-// Mount at / for local dev and at /hcgi/api for Hostinger's reverse proxy (which
-// forwards the full path prefix rather than stripping it before hitting Express).
+// Mount at / for local dev, /hcgi/api for Hostinger, and /api for Vercel.
 const apiRouter = routes();
 app.use('/', apiRouter);
 app.use('/hcgi/api', apiRouter);
+app.use('/api', apiRouter);
 
 app.get('/.well-known/security.txt', (req, res) => {
 	res.type('text/plain').send(`Contact: security@example.com
