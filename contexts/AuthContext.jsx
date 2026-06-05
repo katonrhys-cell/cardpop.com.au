@@ -100,6 +100,12 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new Error(error.message);
+    // Eagerly update session state so ProtectedRoute sees isAuthenticated=true
+    // before onAuthStateChange fires asynchronously.
+    if (data.session) {
+      setSession(data.session);
+      setCurrentUser(data.session.user);
+    }
     return data;
   };
 
