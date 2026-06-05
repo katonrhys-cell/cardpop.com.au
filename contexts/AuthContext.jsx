@@ -26,60 +26,41 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     isMounted.current = true;
 
-    // Hard timeout: if loading is still true after 6s, unblock the UI.
-    // This covers cases where onAuthStateChange never fires (network timeout, etc.).
-    const timeout = setTimeout(() => {
-      if (isMounted.current) setLoading(false);
-    }, 6000);
+    // Hard timeouts to unblock UI if Supabase never responds.
+    const authTimeout    = setTimeout(() => { if (isMounted.current) { setLoading(false); setProfileLoading(false); } }, 6000);
+    const profileTimeout = setTimeout(() => { if (isMounted.current) setProfileLoading(false); }, 8000);
 
-    // Eagerly resolve the existing session so the dashboard renders immediately
-    // on page load/refresh without waiting for the onAuthStateChange event.
-    supabase.auth.getSession().then(async ({ data: { session: existingSession } }) => {
-      if (!isMounted.current) return;
-      if (existingSession) {
-        setSession(existingSession);
-        setCurrentUser(existingSession.user);
-        if (isMounted.current) { setLoading(false); clearTimeout(timeout); }
-        try {
-          const p = await fetchProfile(existingSession.user.id);
-          if (isMounted.current) { setProfile(p); setProfileLoading(false); }
-        } catch (e) {
-          console.error('[AuthContext] fetchProfile (getSession) failed:', e);
-          if (isMounted.current) setProfileLoading(false);
-        }
-      } else {
-        if (isMounted.current) { setLoading(false); setProfileLoading(false); clearTimeout(timeout); }
-      }
-    }).catch(() => {
-      if (isMounted.current) { setLoading(false); setProfileLoading(false); clearTimeout(timeout); }
-    });
-
+    // Rely solely on onAuthStateChange for session state.
+    // Using getSession() concurrently caused a race where a stale null result
+    // would prematurely set profileLoading=false, making isAdmin appear false.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, newSession) => {
         if (!isMounted.current) return;
 
         setSession(newSession);
         setCurrentUser(newSession?.user ?? null);
-        if (isMounted.current) { setLoading(false); clearTimeout(timeout); }
+        clearTimeout(authTimeout);
+        if (isMounted.current) setLoading(false);
 
         if (newSession?.user) {
           if (isMounted.current) setProfileLoading(true);
           try {
             const p = await fetchProfile(newSession.user.id);
-            if (isMounted.current) { setProfile(p); setProfileLoading(false); }
+            if (isMounted.current) { setProfile(p); setProfileLoading(false); clearTimeout(profileTimeout); }
           } catch (e) {
             console.error('[AuthContext] fetchProfile failed:', e);
-            if (isMounted.current) setProfileLoading(false);
+            if (isMounted.current) { setProfileLoading(false); clearTimeout(profileTimeout); }
           }
         } else {
-          if (isMounted.current) { setProfile(null); setProfileLoading(false); }
+          if (isMounted.current) { setProfile(null); setProfileLoading(false); clearTimeout(profileTimeout); }
         }
       }
     );
 
     return () => {
       isMounted.current = false;
-      clearTimeout(timeout);
+      clearTimeout(authTimeout);
+      clearTimeout(profileTimeout);
       subscription.unsubscribe();
     };
   }, []);
