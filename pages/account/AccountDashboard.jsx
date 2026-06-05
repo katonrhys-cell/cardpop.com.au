@@ -140,7 +140,7 @@ const AccountDashboard = () => {
       isMounted.current = false;
       supabase.removeChannel(channel);
     };
-  }, [fetchStats, fetchVaultItems, vaultPage]);
+  }, [fetchStats, fetchVaultItems, vaultPage, currentUser?.id]);
 
   const handleRefresh = () => {
     setStatsLoading(true);
