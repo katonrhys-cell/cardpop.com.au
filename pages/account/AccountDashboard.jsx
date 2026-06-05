@@ -37,12 +37,14 @@ const AccountDashboard = () => {
 
   // ── Stats fetch ───────────────────────────────────────────────────────────
   useEffect(() => {
+    console.log('[Dashboard] stats effect fired, currentUser?.id:', currentUser?.id);
     if (!currentUser?.id) { setStatsLoading(false); return; }
 
     let cancelled = false;
     const uid = currentUser.id;
 
     const run = async () => {
+      console.log('[Dashboard] run() started, cancelled:', cancelled);
       setStatsLoading(true);
       setStatsError(null);
       try {
@@ -58,6 +60,7 @@ const AccountDashboard = () => {
           supabase.from('trades').select('id', { count: 'exact', head: true })
             .or(`initiator_id.eq.${uid},responder_id.eq.${uid}`).eq('status', 'proposed'),
         ]);
+        console.log('[Dashboard] queries done, cancelled:', cancelled, 'errors:', [salesRes.error, listingsRes.error, vaultRes.error, tradesRes.error].filter(Boolean));
         if (cancelled) return;
         const revenue = (revenueRes.data || []).reduce((s, t) => s + (t.total_aud || 0), 0);
         setStats({
@@ -68,15 +71,17 @@ const AccountDashboard = () => {
           pendingTrades:  tradesRes.count   || 0,
         });
       } catch (err) {
+        console.error('[Dashboard] run() catch:', err);
         if (!cancelled) setStatsError('Failed to load live statistics. Please try refreshing.');
       } finally {
+        console.log('[Dashboard] run() finally, cancelled:', cancelled);
         if (!cancelled) setStatsLoading(false);
       }
     };
 
     fetchStatsRef.current = run;
     run();
-    return () => { cancelled = true; };
+    return () => { console.log('[Dashboard] stats effect CLEANUP, setting cancelled=true'); cancelled = true; };
   }, [currentUser?.id]);
 
   // ── Vault items fetch ─────────────────────────────────────────────────────
