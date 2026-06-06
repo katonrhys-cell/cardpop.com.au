@@ -84,6 +84,7 @@ const AccountWallet = lazy(() => import('@/pages/account/AccountWallet.jsx'));
 const AccountWatchlist = lazy(() => import('@/pages/account/AccountWatchlist.jsx'));
 const AccountOffers = lazy(() => import('@/pages/account/AccountOffers.jsx'));
 const AccountNotifications = lazy(() => import('@/pages/account/AccountNotifications.jsx'));
+const AccountNotificationSettings = lazy(() => import('@/pages/account/AccountNotificationSettings.jsx'));
 const AccountReviews = lazy(() => import('@/pages/account/AccountReviews.jsx'));
 const AccountSecurity = lazy(() => import('@/pages/account/AccountSecurity.jsx'));
 
@@ -232,6 +233,7 @@ const App = () => {
                         <Route path="/account/watchlist" element={<ProtectedRoute><AccountWatchlist /></ProtectedRoute>} />
                         <Route path="/account/offers" element={<ProtectedRoute><AccountOffers /></ProtectedRoute>} />
                         <Route path="/account/notifications" element={<ProtectedRoute><AccountNotifications /></ProtectedRoute>} />
+                        <Route path="/account/notification-settings" element={<ProtectedRoute><AccountNotificationSettings /></ProtectedRoute>} />
                         <Route path="/account/reviews" element={<ProtectedRoute><AccountReviews /></ProtectedRoute>} />
                         <Route path="/account/security" element={<ProtectedRoute><AccountSecurity /></ProtectedRoute>} />
                         

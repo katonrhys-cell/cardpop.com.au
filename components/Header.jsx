@@ -19,6 +19,7 @@ import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/co
 import { Badge } from '@/components/ui/badge';
 import VaultDropdown from '@/components/VaultDropdown.jsx';
 import SearchBar from '@/components/SearchBar.jsx';
+import NotificationBell from '@/components/NotificationBell.jsx';
 
 export const TCG_COLLECTIONS = [
   'Pokemon', 'Magic: The Gathering', 'Yu-Gi-Oh', 'Digimon',
@@ -573,6 +574,12 @@ const Header = () => {
                   )}
                 </Link>
               </Button>
+            )}
+
+            {isAuthenticated && (
+              <div className="hidden sm:block">
+                <NotificationBell />
+              </div>
             )}
 
             <Button
