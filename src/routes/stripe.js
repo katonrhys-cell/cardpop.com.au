@@ -454,4 +454,98 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
   }
 });
 
+// ─── POST /refund ────────────────────────────────────────────────────────────
+// Admin-only: processes an approved refund request against Stripe.
+// Calculates retained fee server-side; never trusts client-supplied amounts.
+
+router.post('/refund', authMiddleware, async (req, res) => {
+  try {
+    // Admin check
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', req.user.id)
+      .maybeSingle();
+    if (profile?.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+
+    const { refundId } = req.body;
+    if (!refundId) return res.status(400).json({ error: 'refundId is required' });
+
+    // Load refund + its order
+    const { data: refund, error: rErr } = await supabase
+      .from('refunds')
+      .select('*, order:orders!order_id(stripe_payment_intent_id, total_aud, status, refund_status)')
+      .eq('id', refundId)
+      .maybeSingle();
+
+    if (rErr || !refund) return res.status(404).json({ error: 'Refund not found' });
+    if (refund.status !== 'approved') return res.status(400).json({ error: 'Refund must be in approved state before processing' });
+    if (refund.order?.status === 'refunded') return res.status(400).json({ error: 'Order already refunded' });
+
+    const paymentIntentId = refund.order?.stripe_payment_intent_id;
+    if (!paymentIntentId) return res.status(400).json({ error: 'No Stripe payment intent on this order' });
+
+    // Server-side fee retention calculation
+    const retentionPct = Number(await getPlatformSetting('refund_fee_retention_pct', 50));
+    const totalCommission = Number(refund.commission_aud) + Number(refund.gst_aud);
+    const retainedFee = Math.round(totalCommission * (retentionPct / 100) * 100) / 100;
+    const refundAmount = Math.round((Number(refund.total_paid_aud) - retainedFee) * 100) / 100;
+
+    if (refundAmount <= 0) return res.status(400).json({ error: 'Calculated refund amount is zero or negative' });
+
+    // Issue partial refund via Stripe
+    const stripeRefund = await stripe.refunds.create({
+      payment_intent: paymentIntentId,
+      amount: Math.round(refundAmount * 100), // cents
+      reason: 'requested_by_customer',
+      metadata: { refundId, retainedFee: String(retainedFee), retentionPct: String(retentionPct) },
+    });
+
+    const now = new Date().toISOString();
+
+    // Update refund record
+    await supabase.from('refunds').update({
+      status:           'processed',
+      stripe_refund_id: stripeRefund.id,
+      retained_fee_aud: retainedFee,
+      refund_amount_aud: refundAmount,
+      processed_at:     now,
+    }).eq('id', refundId);
+
+    // Update order status
+    await supabase.from('orders').update({
+      status:        'refunded',
+      refund_status: 'processed',
+    }).eq('id', refund.order_id);
+
+    // Notify buyer
+    if (refund.buyer_id) {
+      await supabase.from('notifications').insert({
+        user_id: refund.buyer_id,
+        type:    'refund_processed',
+        title:   'Refund Processed',
+        body:    `Your refund of $${refundAmount.toFixed(2)} AUD has been issued. Please allow 5-10 business days for it to appear on your statement.`,
+      });
+    }
+
+    // Notify seller
+    if (refund.seller_id) {
+      await supabase.from('notifications').insert({
+        user_id: refund.seller_id,
+        type:    'refund_issued',
+        title:   'Refund Issued on Your Sale',
+        body:    `A refund of $${refundAmount.toFixed(2)} AUD was issued to the buyer. The platform retained $${retainedFee.toFixed(2)} AUD in processing fees.`,
+      });
+    }
+
+    logger.info(`[STRIPE] Refund processed: ${stripeRefund.id} — $${refundAmount} (retained $${retainedFee})`);
+    res.json({ success: true, stripeRefundId: stripeRefund.id, refundAmount, retainedFee });
+
+  } catch (err) {
+    logger.error(`[STRIPE] /refund error: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
+

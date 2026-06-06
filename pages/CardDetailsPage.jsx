@@ -12,6 +12,7 @@ import ImageZoomModal from '@/components/ImageZoomModal.jsx';
 import TradeOfferModal from '@/components/TradeOfferModal.jsx';
 import MakeOfferModal from '@/components/MakeOfferModal.jsx';
 import CheckoutModal from '@/components/CheckoutModal.jsx';
+import RefundPolicyNote from '@/components/RefundPolicyNote.jsx';
 import VerifiedBadge from '@/components/VerifiedBadge.jsx';
 import SellerTierBadge from '@/components/SellerTierBadge.jsx';
 
@@ -297,6 +298,10 @@ const CardDetailsPage = () => {
                       </Button>
                     )}
                   </div>
+                  <div className="pl-2 pt-1">
+                    <RefundPolicyNote variant="compact" />
+                  </div>
+
                   {!isOwner && card.acceptsOffers && (
                     <div className="pl-2 border-t border-border pt-4">
                       <Button

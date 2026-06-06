@@ -6,6 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import { AlertCircle, CreditCard, ShieldCheck, Loader2 } from 'lucide-react';
 import { apiClient } from '@/lib/apiServerClient.js';
 import { toast } from 'sonner';
+import RefundPolicyNote from '@/components/RefundPolicyNote.jsx';
 
 const LineRow = ({ label, value, bold, highlight }) => (
   <div className={`flex justify-between items-center text-sm ${bold ? 'font-bold text-base' : ''} ${highlight ? 'text-primary' : ''}`}>
@@ -123,6 +124,15 @@ const CheckoutModal = ({ isOpen, onClose, listingId, transactionType = 'fixed', 
             <ShieldCheck className="w-4 h-4 shrink-0 text-primary" />
             <span>Secured by Stripe. CardPop Buyer Protection applies to this transaction.</span>
           </div>
+
+          {/* Refund policy disclosure */}
+          {breakdown && (
+            <RefundPolicyNote
+              variant="full"
+              itemPrice={breakdown.itemPrice}
+              commissionAud={breakdown.commissionAud}
+            />
+          )}
         </div>
 
         <div className="flex gap-3 pt-2">
