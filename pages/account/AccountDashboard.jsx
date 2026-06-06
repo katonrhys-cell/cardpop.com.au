@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
-import { Package, List, ArrowRightLeft, DollarSign, ArrowRight, AlertCircle, RefreshCw, PackageOpen } from 'lucide-react';
+import { Package, List, ArrowRightLeft, DollarSign, ArrowRight, AlertCircle, RefreshCw, PackageOpen, Award } from 'lucide-react';
+import SellerTierBadge from '@/components/SellerTierBadge.jsx';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -26,6 +27,7 @@ const AccountDashboard = () => {
   });
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState(null);
+  const [sellerTier, setSellerTier] = useState(null);
   
   // Vault items list state
   const [vaultItems, setVaultItems] = useState([]);
@@ -44,6 +46,9 @@ const AccountDashboard = () => {
 
     try {
       setStatsError(null);
+
+      const tierRes = await supabase.from('profiles').select('seller_tier').eq('id', currentUser.id).single();
+      if (tierRes.data && isMounted.current) setSellerTier(tierRes.data.seller_tier);
 
       const [salesRes, revenueRes, listingsRes, vaultRes, tradesRes] = await Promise.all([
         supabase
@@ -190,7 +195,7 @@ const AccountDashboard = () => {
       )}
 
       {/* Top Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
         <Card className="shadow-sm border-border hover:border-primary/30 transition-colors bg-card h-full flex flex-col">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Revenue</CardTitle>
@@ -261,6 +266,23 @@ const AccountDashboard = () => {
             )}
             <Link to="/trade-requests" className="text-xs font-bold text-primary hover:underline mt-2 inline-block">
               Review requests &rarr;
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-border hover:border-primary/30 transition-colors bg-card h-full flex flex-col">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Seller Tier</CardTitle>
+            <Award className="w-4 h-4 text-amber-500" />
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col justify-end">
+            {statsLoading ? <Skeleton className="h-7 w-28" /> : (
+              sellerTier && sellerTier !== 'none'
+                ? <SellerTierBadge tier={sellerTier} size="sm" />
+                : <span className="text-sm font-bold text-muted-foreground">New Seller</span>
+            )}
+            <Link to="/account/seller-tier" className="text-xs font-bold text-primary hover:underline mt-2 inline-block">
+              View progress &rarr;
             </Link>
           </CardContent>
         </Card>

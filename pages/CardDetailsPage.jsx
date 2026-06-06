@@ -12,6 +12,7 @@ import ImageZoomModal from '@/components/ImageZoomModal.jsx';
 import TradeOfferModal from '@/components/TradeOfferModal.jsx';
 import MakeOfferModal from '@/components/MakeOfferModal.jsx';
 import VerifiedBadge from '@/components/VerifiedBadge.jsx';
+import SellerTierBadge from '@/components/SellerTierBadge.jsx';
 
 const CardDetailsPage = () => {
   const { id } = useParams();
@@ -241,11 +242,14 @@ const CardDetailsPage = () => {
                   {owner?.name?.charAt(0).toUpperCase() || owner?.username?.charAt(0).toUpperCase() || 'S'}
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-bold text-base md:text-lg leading-tight text-foreground">
                       {owner?.name || owner?.display_name || owner?.username || owner?.business_name || 'Anonymous Seller'}
                     </p>
                     {owner?.is_verified && <VerifiedBadge size="md" showLabel />}
+                    {owner?.seller_tier && owner.seller_tier !== 'none' && (
+                      <SellerTierBadge tier={owner.seller_tier} size="sm" />
+                    )}
                   </div>
                   <div className="flex items-center gap-3 text-xs md:text-sm text-muted-foreground mt-1 font-medium">
                     {owner?.location && (
