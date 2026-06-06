@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
-import { ArrowLeft, MapPin, Calendar, ArrowRightLeft, CreditCard, Users, Search, AlertCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, ArrowRightLeft, CreditCard, Users, Search, AlertCircle, Loader2, Tag } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
 import ImageZoomModal from '@/components/ImageZoomModal.jsx';
 import TradeOfferModal from '@/components/TradeOfferModal.jsx';
+import MakeOfferModal from '@/components/MakeOfferModal.jsx';
 
 const CardDetailsPage = () => {
   const { id } = useParams();
@@ -22,6 +23,8 @@ const CardDetailsPage = () => {
   const [error, setError] = useState(null);
   const [isZoomOpen, setIsZoomOpen] = useState(false);
   const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
+  const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
+  const [rawListing, setRawListing] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -64,6 +67,9 @@ const CardDetailsPage = () => {
 
         const isForSale = ['fixed', 'auction', 'both'].includes(data.listing_type) || data.status === 'active';
         const isForTrade = ['trade', 'both'].includes(data.listing_type ?? '');
+        const acceptsOffers = data.accepts_offers ?? false;
+
+        if (isMounted) setRawListing(data);
 
         setCard({
           ...data,
@@ -75,6 +81,7 @@ const CardDetailsPage = () => {
           image: imgUrl,
           isForSale,
           isForTrade,
+          acceptsOffers,
           collectionType: data.collection || data.category || 'Trading Card',
           grade: data.grade ? String(data.grade) : null,
         });
@@ -262,20 +269,33 @@ const CardDetailsPage = () => {
             {/* Pricing & Actions */}
             <div className="grid gap-5 mb-10">
               {card.isForSale && (
-                <div className="bg-card shadow-md p-6 md:p-8 border border-border rounded-3xl flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden group">
+                <div className="bg-card shadow-md p-6 md:p-8 border border-border rounded-3xl flex flex-col gap-5 relative overflow-hidden group">
                   <div className="absolute top-0 left-0 w-1.5 h-full bg-primary" />
-                  <div className="pl-2">
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Buy It Now</p>
-                    <div className="flex items-end gap-3">
+                  <div className="pl-2 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">Buy It Now</p>
                       <p className="text-4xl md:text-5xl font-extrabold tabular-nums text-foreground tracking-tight">
                         ${Number(card.salePrice).toFixed(2)}
                       </p>
                     </div>
+                    {!isOwner && (
+                      <Button size="lg" className="h-14 px-8 font-bold rounded-xl shadow-lg transition-all active:scale-[0.98] w-full md:w-auto text-base">
+                        <CreditCard className="w-5 h-5 mr-2"/> Buy Now
+                      </Button>
+                    )}
                   </div>
-                  {!isOwner && (
-                    <Button size="lg" className="h-14 px-8 font-bold rounded-xl shadow-lg transition-all active:scale-[0.98] w-full md:w-auto text-base">
-                      <CreditCard className="w-5 h-5 mr-2"/> Buy Now
-                    </Button>
+                  {!isOwner && card.acceptsOffers && (
+                    <div className="pl-2 border-t border-border pt-4">
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        className="h-12 px-6 font-bold rounded-xl w-full md:w-auto text-base gap-2 bg-background"
+                        onClick={() => setIsOfferModalOpen(true)}
+                      >
+                        <Tag className="w-4 h-4" /> Make an Offer
+                      </Button>
+                      <p className="text-xs text-muted-foreground mt-2 pl-0.5">Seller is open to offers. Your offer expires in 48 hours.</p>
+                    </div>
                   )}
                 </div>
               )}
@@ -329,10 +349,18 @@ const CardDetailsPage = () => {
       )}
 
       {isTradeModalOpen && (
-        <TradeOfferModal 
-          isOpen={isTradeModalOpen} 
-          onClose={() => setIsTradeModalOpen(false)} 
-          targetCard={card} 
+        <TradeOfferModal
+          isOpen={isTradeModalOpen}
+          onClose={() => setIsTradeModalOpen(false)}
+          targetCard={card}
+        />
+      )}
+
+      {isOfferModalOpen && (
+        <MakeOfferModal
+          isOpen={isOfferModalOpen}
+          onClose={() => setIsOfferModalOpen(false)}
+          listing={rawListing}
         />
       )}
     </div>
