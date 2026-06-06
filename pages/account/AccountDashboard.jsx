@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import { Package, List, ArrowRightLeft, DollarSign, ArrowRight, AlertCircle, RefreshCw, PackageOpen, Award } from 'lucide-react';
@@ -16,14 +16,10 @@ import { toast } from 'sonner';
 
 const AccountDashboard = () => {
   const { currentUser } = useAuth();
-  
-  // Top level stats state
+  const { count: watchlistCount } = useWatchlist();
+
   const [stats, setStats] = useState({
-    salesCount: 0,
-    revenue: 0,
-    listingsCount: 0,
-    vaultItemsCount: 0,
-    pendingTrades: 0
+    salesCount: 0, revenue: 0, listingsCount: 0, vaultItemsCount: 0, pendingTrades: 0
   });
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState(null);
@@ -38,14 +34,18 @@ const AccountDashboard = () => {
   
   const isMounted = useRef(true);
 
-  const fetchStats = useCallback(async () => {
-    if (!currentUser?.id) {
-      if (isMounted.current) setStatsLoading(false);
-      return;
-    }
+  const [vaultItems, setVaultItems]         = useState([]);
+  const [vaultLoading, setVaultLoading]     = useState(false);
+  const [vaultError, setVaultError]         = useState(null);
+  const [vaultPage, setVaultPage]           = useState(1);
+  const [vaultTotalPages, setVaultTotalPages] = useState(1);
 
-    try {
-      setStatsError(null);
+  // Stable refs so realtime callbacks always call the latest fetch without
+  // being in the realtime effect's dep array (which would recreate the channel).
+  const fetchStatsRef     = useRef(null);
+  const fetchVaultRef     = useRef(null);
+  const vaultPageRef      = useRef(1);
+  vaultPageRef.current    = vaultPage;
 
       const tierRes = await supabase.from('profiles').select('seller_tier').eq('id', currentUser.id).single();
       if (tierRes.data && isMounted.current) setSellerTier(tierRes.data.seller_tier);
@@ -77,80 +77,103 @@ const AccountDashboard = () => {
           .eq('status', 'proposed')
       ]);
 
-      if (!isMounted.current) return;
+    let cancelled = false;
+    const uid = currentUser.id;
 
-      const totalRevenue = (revenueRes.data || []).reduce((sum, t) => sum + (t.total_aud || 0), 0);
+    const run = async () => {
+      console.log('[Dashboard] run() started, cancelled:', cancelled);
+      setStatsLoading(true);
+      setStatsError(null);
+      try {
+        const [salesRes, revenueRes, listingsRes, vaultRes, tradesRes] = await Promise.all([
+          supabase.from('orders').select('id', { count: 'exact', head: true })
+            .or(`buyer_id.eq.${uid},seller_id.eq.${uid}`).eq('status', 'delivered'),
+          supabase.from('orders').select('total_aud')
+            .or(`buyer_id.eq.${uid},seller_id.eq.${uid}`).eq('status', 'delivered'),
+          supabase.from('listings').select('id', { count: 'exact', head: true })
+            .eq('seller_id', uid).eq('status', 'active'),
+          supabase.from('vault_items').select('id', { count: 'exact', head: true })
+            .eq('owner_id', uid),
+          supabase.from('trades').select('id', { count: 'exact', head: true })
+            .or(`initiator_id.eq.${uid},responder_id.eq.${uid}`).eq('status', 'proposed'),
+        ]);
+        console.log('[Dashboard] queries done, cancelled:', cancelled, 'errors:', [salesRes.error, listingsRes.error, vaultRes.error, tradesRes.error].filter(Boolean));
+        if (cancelled) return;
+        const revenue = (revenueRes.data || []).reduce((s, t) => s + (t.total_aud || 0), 0);
+        setStats({
+          salesCount:     salesRes.count    || 0,
+          revenue,
+          listingsCount:  listingsRes.count || 0,
+          vaultItemsCount: vaultRes.count   || 0,
+          pendingTrades:  tradesRes.count   || 0,
+        });
+      } catch (err) {
+        console.error('[Dashboard] run() catch:', err);
+        if (!cancelled) setStatsError('Failed to load live statistics. Please try refreshing.');
+      } finally {
+        console.log('[Dashboard] run() finally, cancelled:', cancelled);
+        if (!cancelled) setStatsLoading(false);
+      }
+    };
 
-      setStats({
-        salesCount: salesRes.count || 0,
-        revenue: totalRevenue,
-        listingsCount: listingsRes.count || 0,
-        vaultItemsCount: vaultRes.count || 0,
-        pendingTrades: tradesRes.count || 0
-      });
-    } catch (err) {
-      console.error("Failed to fetch dashboard stats:", err);
-      if (isMounted.current) setStatsError("Failed to load live statistics. Please try refreshing.");
-    } finally {
-      if (isMounted.current) setStatsLoading(false);
-    }
+    fetchStatsRef.current = run;
+    run();
+    return () => { console.log('[Dashboard] stats effect CLEANUP, setting cancelled=true'); cancelled = true; };
   }, [currentUser?.id]);
 
-  const fetchVaultItems = useCallback(async (page = 1) => {
-    if (!currentUser?.id) {
-      if (isMounted.current) setVaultLoading(false);
-      return;
-    }
+  // ── Vault items fetch ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!currentUser?.id) { setVaultLoading(false); return; }
 
-    try {
+    let cancelled = false;
+    const uid = currentUser.id;
+
+    const run = async (page = vaultPage) => {
       setVaultLoading(true);
       setVaultError(null);
-      
-      const from = (page - 1) * 10;
-      const { data: items, count } = await supabase
-        .from('vault_items')
-        .select('*', { count: 'exact' })
-        .eq('owner_id', currentUser.id)
-        .order('created_at', { ascending: false })
-        .range(from, from + 9);
+      try {
+        const from = (page - 1) * 10;
+        const { data: items, count } = await supabase
+          .from('vault_items').select('*', { count: 'exact' })
+          .eq('owner_id', uid)
+          .order('created_at', { ascending: false })
+          .range(from, from + 9);
+        if (cancelled) return;
+        setVaultItems(items ?? []);
+        setVaultPage(page);
+        setVaultTotalPages(Math.ceil((count ?? 0) / 10));
+      } catch (err) {
+        if (!cancelled) setVaultError(err.message || 'Failed to load vault items.');
+      } finally {
+        if (!cancelled) setVaultLoading(false);
+      }
+    };
 
-      if (!isMounted.current) return;
+    fetchVaultRef.current = (page) => run(page ?? vaultPageRef.current);
+    run(vaultPage);
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id, vaultPage]);
 
-      setVaultItems(items ?? []);
-      setVaultPage(page);
-      setVaultTotalPages(Math.ceil((count ?? 0) / 10));
-    } catch (err) {
-      console.error("Failed to fetch vault items:", err);
-      if (isMounted.current) setVaultError(err.message || "Failed to load vault items.");
-    } finally {
-      if (isMounted.current) setVaultLoading(false);
-    }
+  // ── Realtime subscription (stable — never torn down while user is logged in)
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const channel = supabase.channel(`dashboard-rt-${currentUser.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' },
+        () => fetchStatsRef.current?.())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'listings' },
+        () => fetchStatsRef.current?.())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vault_items' },
+        () => { fetchStatsRef.current?.(); fetchVaultRef.current?.(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades' },
+        () => fetchStatsRef.current?.())
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, [currentUser?.id]);
 
-  useEffect(() => {
-    isMounted.current = true;
-    fetchStats();
-    fetchVaultItems(1);
-
-    const channel = supabase.channel(`account-dashboard-${Date.now()}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { if (isMounted.current) fetchStats(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'listings' }, () => { if (isMounted.current) fetchStats(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vault_items' }, () => {
-        if (isMounted.current) { fetchStats(); fetchVaultItems(vaultPage); }
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades' }, () => { if (isMounted.current) fetchStats(); })
-      .subscribe();
-
-    return () => {
-      isMounted.current = false;
-      supabase.removeChannel(channel);
-    };
-  }, [fetchStats, fetchVaultItems, vaultPage, currentUser?.id]);
-
   const handleRefresh = () => {
-    setStatsLoading(true);
-    fetchStats();
-    fetchVaultItems(vaultPage);
+    fetchStatsRef.current?.();
+    fetchVaultRef.current?.();
     toast.success('Dashboard data refreshed successfully');
   };
 
@@ -219,7 +242,7 @@ const AccountDashboard = () => {
             {statsLoading ? <Skeleton className="h-8 w-16" /> : (
               <div className="text-2xl font-extrabold tabular-nums tracking-tight text-foreground">{stats.salesCount}</div>
             )}
-            <Link to="/account/transactions" className="text-xs font-bold text-primary hover:underline mt-2 inline-block">
+            <Link to="/transactions" className="text-xs font-bold text-primary hover:underline mt-2 inline-block">
               View transactions &rarr;
             </Link>
           </CardContent>

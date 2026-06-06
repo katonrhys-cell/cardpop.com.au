@@ -7,6 +7,9 @@ import SellerTierBadge from '@/components/SellerTierBadge.jsx';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { supabase } from '@/lib/supabaseClient.js';
+import { useWatchlist } from '@/hooks/useWatchlist.js';
+import { useAuth } from '@/contexts/AuthContext.jsx';
+import { toast } from 'sonner';
 
 const GRADE_BADGE = {
   psa:   'bg-red-600 text-white',
@@ -18,6 +21,21 @@ const GRADE_BADGE = {
 };
 
 const MarketplaceListingCard = ({ listing }) => {
+  const { isAuthenticated } = useAuth();
+  const { isWatchlisted, toggle } = useWatchlist();
+  const watchlisted = isWatchlisted(listing.id);
+
+  const handleHeart = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isAuthenticated) {
+      toast.error('Sign in to save listings to your watchlist');
+      return;
+    }
+    const added = await toggle(listing.id);
+    toast.success(added ? 'Added to watchlist' : 'Removed from watchlist');
+  };
+
   const vaultItem = listing.vault_item;
   // vault_images stores storage_path; card_image may be a full URL or storage path
   const imgPath = vaultItem?.card_image || vaultItem?.vault_images?.[0]?.storage_path || null;
@@ -64,6 +82,19 @@ const MarketplaceListingCard = ({ listing }) => {
             {vaultItem.grading_company.toUpperCase()} {vaultItem.grade}
           </div>
         )}
+
+        {/* Watchlist heart — bottom right */}
+        <button
+          onClick={handleHeart}
+          aria-label={watchlisted ? 'Remove from watchlist' : 'Add to watchlist'}
+          className={`absolute bottom-3 right-3 z-10 w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all duration-200 ${
+            watchlisted
+              ? 'bg-rose-500 text-white scale-110'
+              : 'bg-background/80 backdrop-blur-sm text-muted-foreground hover:text-rose-500 hover:bg-background'
+          }`}
+        >
+          <Heart className={`w-4 h-4 ${watchlisted ? 'fill-current' : ''}`} />
+        </button>
       </Link>
       
       <div className="p-5 flex flex-col flex-1">

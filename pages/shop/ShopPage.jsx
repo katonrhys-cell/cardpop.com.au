@@ -18,48 +18,48 @@ const ShopPage = () => {
   const [sort, setSort] = useState('created_at_desc');
   const [searchTerm, setSearchTerm] = useState('');
   const { addToCart } = useCart();
-  const isMounted = useRef(true);
-
-  const fetchProducts = async () => {
-    if (!isMounted.current) return;
-    setLoading(true);
-    setError(null);
-    try {
-      let query = supabase
-        .from('listings')
-        .select('*')
-        .in('status', ['active', 'For Sale'])
-        .limit(50);
-
-      if (searchTerm) {
-        query = query.ilike('name', `%${searchTerm.replace(/'/g, '')}%`);
-      }
-
-      if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
-      else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
-      else query = query.order('created_at', { ascending: false });
-
-      const { data, error: fetchError } = await query;
-      if (fetchError) throw fetchError;
-
-      if (isMounted.current) {
-        const taggedItems = (data || []).map(p => ({ ...p, source: 'shop' }));
-        setProducts(taggedItems);
-      }
-    } catch (err) {
-      if (isMounted.current) {
-        setError('Failed to load shop products.');
-        console.error(err);
-      }
-    } finally {
-      if (isMounted.current) setLoading(false);
-    }
-  };
+  const fetchRef = useRef(null);
 
   useEffect(() => {
-    isMounted.current = true;
-    fetchProducts();
-    return () => { isMounted.current = false; };
+    let cancelled = false;
+
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        let query = supabase
+          .from('listings')
+          .select('*')
+          .in('status', ['active', 'For Sale'])
+          .limit(50);
+
+        if (searchTerm) {
+          query = query.ilike('name', `%${searchTerm.replace(/'/g, '')}%`);
+        }
+
+        if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
+        else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
+        else query = query.order('created_at', { ascending: false });
+
+        const { data, error: fetchError } = await query;
+        if (fetchError) throw fetchError;
+
+        if (!cancelled) {
+          setProducts((data || []).map(p => ({ ...p, source: 'shop' })));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError('Failed to load shop products.');
+          console.error(err);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchRef.current = run;
+    run();
+    return () => { cancelled = true; };
   }, [sort, searchTerm]);
 
   const handleAddToCart = (product, variant) => {
@@ -111,7 +111,7 @@ const ShopPage = () => {
         {error ? (
           <div className="text-center py-20 text-destructive bg-destructive/5 rounded-3xl border border-destructive/20">
             <p className="font-bold text-lg">{error}</p>
-            <Button variant="outline" className="mt-4" onClick={fetchProducts}>Retry</Button>
+            <Button variant="outline" className="mt-4" onClick={() => fetchRef.current?.()}>Retry</Button>
           </div>
         ) : loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

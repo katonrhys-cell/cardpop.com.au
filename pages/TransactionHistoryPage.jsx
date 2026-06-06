@@ -29,7 +29,7 @@ const TransactionHistoryPage = () => {
         setLoading(false);
       }
     };
-    if (currentUser) fetchTxs();
+    if (currentUser) fetchTxs(); else setLoading(false);
   }, [currentUser]);
 
   const filteredTxs = txs.filter(tx => typeFilter === 'All' || tx.order_type === typeFilter.toLowerCase());

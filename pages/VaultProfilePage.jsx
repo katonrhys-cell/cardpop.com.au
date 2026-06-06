@@ -39,7 +39,7 @@ const VaultProfilePage = () => {
 
   useEffect(() => {
     const fetchProfileAndCards = async () => {
-      if (!currentUser) return;
+      if (!currentUser) { setLoading(false); return; }
       try {
         const { data: record, error: profileError } = await supabase
           .from('profiles')

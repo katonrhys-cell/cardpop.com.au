@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { ChevronLeft, Save, Settings, Shield, Mail, CreditCard, MessageSquare, LayoutGrid, RefreshCcw, AlertCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -38,33 +38,26 @@ const AdminSettingsPage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const isMounted = useRef(true);
-
-  const fetchSettings = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data, error: fetchErr } = await supabase
-        .from('platform_settings')
-        .select('key, value');
-      if (fetchErr) throw fetchErr;
-      const merged = { ...DEFAULT_SETTINGS };
-      (data ?? []).forEach(({ key, value }) => {
-        merged[key] = value;
-      });
-      if (isMounted.current) setSettings(merged);
-    } catch (err) {
-      if (isMounted.current) setError(err.message || 'Failed to load settings.');
-    } finally {
-      if (isMounted.current) setLoading(false);
-    }
-  };
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
-    isMounted.current = true;
-    fetchSettings();
-    return () => { isMounted.current = false; };
-  }, []);
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+
+    supabase.from('platform_settings').select('key, value').then(({ data, error: fetchErr }) => {
+      if (cancelled) return;
+      if (fetchErr) { setError(fetchErr.message || 'Failed to load settings.'); setLoading(false); return; }
+      const merged = { ...DEFAULT_SETTINGS };
+      (data ?? []).forEach(({ key, value }) => { merged[key] = value; });
+      setSettings(merged);
+      setLoading(false);
+    }).catch(err => {
+      if (!cancelled) { setError(err.message || 'Failed to load settings.'); setLoading(false); }
+    });
+
+    return () => { cancelled = true; };
+  }, [reload]);
 
   const set = (key, value) => setSettings(prev => ({ ...prev, [key]: value }));
 
@@ -100,7 +93,7 @@ const AdminSettingsPage = () => {
       <div className="w-full py-16 text-center max-w-5xl mx-auto">
         <AlertCircle className="w-10 h-10 text-destructive mx-auto mb-3" />
         <p className="text-foreground font-medium mb-4">{error}</p>
-        <Button variant="outline" onClick={fetchSettings} className="gap-2">
+        <Button variant="outline" onClick={() => setReload(r => r + 1)} className="gap-2">
           <RefreshCcw className="w-4 h-4" /> Retry
         </Button>
       </div>

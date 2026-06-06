@@ -26,6 +26,8 @@ const MessagingPage = () => {
     isMounted.current = true;
     if (currentUser) {
       fetchConversations();
+    } else {
+      setLoading(false);
     }
     return () => { isMounted.current = false; };
   }, [currentUser]);
