@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, Sparkles, Loader2,
-  Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star,
+  Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp,
 } from 'lucide-react';
 import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSe
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useCardOCR } from '@/hooks/useCardOCR.js';
+import { useEbayPriceLookup } from '@/hooks/useEbayPriceLookup.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -64,8 +65,10 @@ const AddEditCardPage = () => {
   const [errors, setErrors]         = useState({});
   const [isAutoFilled, setIsAutoFilled] = useState(false);
   const [categoryId, setCategoryId] = useState(null);
+  const [lockedBaseValue, setLockedBaseValue] = useState(null);
 
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
+  const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
 
   const emptyForm = {
     // Card identity
@@ -144,6 +147,7 @@ const AddEditCardPage = () => {
           navigate('/vault');
           return;
         }
+        setLockedBaseValue(card.locked_base_value_aud ?? null);
         setFormData({
           collection:     card.collection     || 'Pokemon',
           cardName:       card.card_name      || '',
@@ -218,6 +222,8 @@ const AddEditCardPage = () => {
         scanResult.cardType ? `Type: ${scanResult.cardType}` : '',
       ].filter(Boolean).join('\n') || prev.notes,
     }));
+    // Trigger eBay price lookup so user gets a market-based suggested value
+    lookupPrice(scanResult);
     toast.success('Fields auto-filled successfully. Please review and edit as needed.');
     setIsAutoFilled(true);
   };
@@ -228,6 +234,14 @@ const AddEditCardPage = () => {
     if (!formData.cardName?.trim()) newErrors.cardName = 'Card name is required';
     if (!formData.estimatedValue || parseFloat(formData.estimatedValue) < 0)
       newErrors.estimatedValue = 'Enter a valid estimated value';
+    if (isEdit && lockedBaseValue !== null) {
+      const ev = parseFloat(formData.estimatedValue) || 0;
+      if (ev < lockedBaseValue)
+        newErrors.estimatedValue = `Cannot be set below the locked base value of $${lockedBaseValue.toFixed(2)}`;
+      const tv = parseFloat(formData.tradeValue) || 0;
+      if (tv > 0 && tv < lockedBaseValue)
+        newErrors.tradeValue = `Trade value cannot be set below the locked base value of $${lockedBaseValue.toFixed(2)}`;
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -655,6 +669,66 @@ const AddEditCardPage = () => {
 
               {/* ── 3. Value & Acquisition ── */}
               <SectionCard title="Value & Acquisition">
+                {/* Locked base value banner (edit mode only) */}
+                {isEdit && lockedBaseValue !== null && (
+                  <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 -mt-1">
+                    <Shield className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-xs font-bold text-amber-700">Locked Base Value: ${lockedBaseValue.toFixed(2)} AUD</p>
+                      <p className="text-xs text-amber-600/80 mt-0.5">
+                        Your listing price and trade value cannot be set below this floor. It protects platform commission from being bypassed.
+                        Contact support to dispute the valuation.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* New card notice */}
+                {!isEdit && (
+                  <div className="flex items-start gap-3 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 -mt-1">
+                    <Shield className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                    <p className="text-xs text-blue-700">
+                      The estimated value you enter will be locked as this card&apos;s <strong>base valuation</strong>. You cannot list or trade the card for less than this amount later.
+                      Use the eBay market data above to set an accurate figure.
+                    </p>
+                  </div>
+                )}
+
+                {/* eBay market price suggestion */}
+                {(isLookingUp || priceData) && (
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                    {isLookingUp ? (
+                      <p className="text-xs font-medium text-emerald-700 flex items-center gap-2">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Looking up eBay market price…
+                      </p>
+                    ) : priceData && (
+                      <>
+                        <p className="text-xs font-bold text-emerald-700 flex items-center gap-1.5 mb-2">
+                          <TrendingUp className="w-3.5 h-3.5" /> eBay AU Market Data ({priceData.count} recent sales)
+                        </p>
+                        <div className="flex gap-3 text-xs text-emerald-800 mb-3">
+                          <span>Avg: <strong>${priceData.avgPrice?.toFixed(2)}</strong></span>
+                          <span>Low: <strong>${priceData.minPrice?.toFixed(2)}</strong></span>
+                          <span>High: <strong>${priceData.maxPrice?.toFixed(2)}</strong></span>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs border-emerald-400 text-emerald-700 hover:bg-emerald-50"
+                          onClick={() => {
+                            set('estimatedValue', String(priceData.avgPrice?.toFixed(2) ?? ''));
+                            clearPrice();
+                            toast.success(`Estimated value set to $${priceData.avgPrice?.toFixed(2)} AUD from eBay data.`);
+                          }}
+                        >
+                          Use eBay average (${priceData.avgPrice?.toFixed(2)})
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                )}
+
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="estimatedValue" className="font-bold">
@@ -665,16 +739,20 @@ const AddEditCardPage = () => {
                       <Input
                         id="estimatedValue"
                         type="number"
-                        min="0"
+                        min={isEdit && lockedBaseValue !== null ? lockedBaseValue : 0}
                         step="0.01"
                         value={formData.estimatedValue}
                         onChange={e => set('estimatedValue', e.target.value)}
                         placeholder="0.00"
-                        className={`h-11 pl-8 bg-background tabular-nums ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''}`}
+                        className={`h-11 pl-8 bg-background tabular-nums ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''} ${errors.estimatedValue ? 'border-destructive' : ''}`}
                       />
                     </div>
                     {errors.estimatedValue && <p className="text-destructive text-xs">{errors.estimatedValue}</p>}
-                    <p className="text-xs text-muted-foreground">Your estimate of current market value</p>
+                    <p className="text-xs text-muted-foreground">
+                      {isEdit && lockedBaseValue !== null
+                        ? `Floor: $${lockedBaseValue.toFixed(2)} — cannot go below this`
+                        : 'Your estimate of current market value — will be locked on save'}
+                    </p>
                   </div>
 
                   <div className="space-y-2">
@@ -790,7 +868,7 @@ const AddEditCardPage = () => {
                       <input
                         id="tradeValueInput"
                         type="number"
-                        min="0"
+                        min={isEdit && lockedBaseValue !== null ? lockedBaseValue : 0}
                         step="0.01"
                         value={formData.tradeValue}
                         onChange={e => set('tradeValue', e.target.value)}
@@ -798,7 +876,11 @@ const AddEditCardPage = () => {
                         className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm pl-8 tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground">The value in traded cards you'd accept</p>
+                    <p className="text-xs text-muted-foreground">
+                      {isEdit && lockedBaseValue !== null
+                        ? `Floor: $${lockedBaseValue.toFixed(2)} — the value in traded cards you'd accept`
+                        : "The value in traded cards you'd accept"}
+                    </p>
                   </div>
                 )}
               </SectionCard>
