@@ -22,27 +22,28 @@ const OrderManagementPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   
-  const isMounted = useRef(true);
-
-  const fetchOrders = async () => {
-    if (!isMounted.current) return;
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.from('orders').select('*, buyer:profiles!buyer_id(id, display_name, username, email), seller:profiles!seller_id(id, display_name, username)').order('created_at', { ascending: false }).limit(100);
-      if (error) throw error;
-      if (isMounted.current) setOrders(data ?? []);
-    } catch (err) {
-      if (isMounted.current) setError(err.message);
-      toast.error("Failed to load orders.");
-    } finally {
-      if (isMounted.current) setLoading(false);
-    }
-  };
+  const fetchRef = useRef(null);
 
   useEffect(() => {
-    isMounted.current = true;
-    fetchOrders();
-    return () => { isMounted.current = false; };
+    let cancelled = false;
+
+    const run = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase.from('orders').select('*, buyer:profiles!buyer_id(id, display_name, username, email), seller:profiles!seller_id(id, display_name, username)').order('created_at', { ascending: false }).limit(100);
+        if (error) throw error;
+        if (!cancelled) setOrders(data ?? []);
+      } catch (err) {
+        if (!cancelled) setError(err.message);
+        toast.error("Failed to load orders.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchRef.current = run;
+    run();
+    return () => { cancelled = true; };
   }, []);
 
   const handleStatusChange = async (id, newStatus) => {

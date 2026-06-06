@@ -15,37 +15,36 @@ const ContentManagementPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const isMounted = useRef(true);
-  
+  const fetchRef = useRef(null);
+
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState(null);
 
-  const fetchArticles = async () => {
-    if (!isMounted.current) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const { data, error: fetchErr } = await supabase
-        .from('blog_articles')
-        .select('*, author_profile:profiles!author_id(display_name, username)')
-        .order('created_at', { ascending: false });
-      if (fetchErr) throw fetchErr;
-      if (isMounted.current) setArticles(data ?? []);
-    } catch (err) {
-      console.error("Error fetching articles:", err);
-      if (isMounted.current) setError(err.message || "Failed to load articles.");
-    } finally {
-      if (isMounted.current) setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    isMounted.current = true;
-    fetchArticles();
-    return () => {
-      isMounted.current = false;
+    let cancelled = false;
+
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data, error: fetchErr } = await supabase
+          .from('blog_articles')
+          .select('*, author_profile:profiles!author_id(display_name, username)')
+          .order('created_at', { ascending: false });
+        if (fetchErr) throw fetchErr;
+        if (!cancelled) setArticles(data ?? []);
+      } catch (err) {
+        console.error("Error fetching articles:", err);
+        if (!cancelled) setError(err.message || "Failed to load articles.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     };
+
+    fetchRef.current = run;
+    run();
+    return () => { cancelled = true; };
   }, []);
 
   const handleCreateNew = () => {
@@ -137,7 +136,7 @@ const ContentManagementPage = () => {
                     <div className="flex flex-col items-center justify-center text-muted-foreground">
                       <AlertCircle className="w-8 h-8 text-destructive mb-2" />
                       <p className="mb-4 font-medium text-foreground">Failed to load articles</p>
-                      <Button variant="outline" onClick={fetchArticles} className="gap-2">
+                      <Button variant="outline" onClick={() => fetchRef.current?.()} className="gap-2">
                         <RefreshCcw className="w-4 h-4" /> Retry Connection
                       </Button>
                     </div>
@@ -232,7 +231,7 @@ const ContentManagementPage = () => {
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         article={selectedArticle}
-        onSave={fetchArticles}
+        onSave={() => fetchRef.current?.()}
       />
     </div>
   );

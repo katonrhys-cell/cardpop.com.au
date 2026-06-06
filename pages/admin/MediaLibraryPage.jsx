@@ -17,7 +17,7 @@ const MediaLibraryPage = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
   const fileInputRef = useRef(null);
-  const isMounted = useRef(true);
+  const fetchRef = useRef(null);
 
   const [uploadData, setUploadData] = useState({
     filename: '',
@@ -25,28 +25,27 @@ const MediaLibraryPage = () => {
   });
   const [selectedFile, setSelectedFile] = useState(null);
 
-  const fetchMedia = async () => {
-    if (!isMounted.current) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const { data, error } = await supabase.from('media_assets').select('*').order('created_at', { ascending: false }).limit(50);
-      if (error) throw error;
-      if (isMounted.current) setMedia(data ?? []);
-    } catch (err) {
-      console.error("Error fetching media:", err);
-      if (isMounted.current) setError(err.message || "Failed to load media library.");
-    } finally {
-      if (isMounted.current) setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    isMounted.current = true;
-    fetchMedia();
-    return () => {
-      isMounted.current = false;
+    let cancelled = false;
+
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data, error } = await supabase.from('media_assets').select('*').order('created_at', { ascending: false }).limit(50);
+        if (error) throw error;
+        if (!cancelled) setMedia(data ?? []);
+      } catch (err) {
+        console.error("Error fetching media:", err);
+        if (!cancelled) setError(err.message || "Failed to load media library.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     };
+
+    fetchRef.current = run;
+    run();
+    return () => { cancelled = true; };
   }, []);
 
   const handleFileChange = (e) => {
@@ -87,17 +86,15 @@ const MediaLibraryPage = () => {
       if (insertErr) throw insertErr;
 
       toast.success("Media uploaded successfully.");
-      if (isMounted.current) {
-        setMedia([record, ...media]);
-        setSelectedFile(null);
-        setUploadData({ filename: '', description: '' });
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      }
+      setMedia([record, ...media]);
+      setSelectedFile(null);
+      setUploadData({ filename: '', description: '' });
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
       console.error("Upload error:", err);
       toast.error(err.message || "Failed to upload media.");
     } finally {
-      if (isMounted.current) setIsUploading(false);
+      setIsUploading(false);
     }
   };
 
@@ -119,9 +116,7 @@ const MediaLibraryPage = () => {
     navigator.clipboard.writeText(url);
     setCopiedId(id);
     toast.success("URL copied to clipboard");
-    setTimeout(() => {
-      if (isMounted.current) setCopiedId(null);
-    }, 2000);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   return (
@@ -205,7 +200,7 @@ const MediaLibraryPage = () => {
           <div className="text-center py-12 bg-card rounded-xl border border-border">
             <AlertCircle className="w-10 h-10 text-destructive mx-auto mb-3" />
             <p className="font-medium text-foreground mb-4">{error}</p>
-            <Button variant="outline" onClick={fetchMedia}><RefreshCcw className="w-4 h-4 mr-2" /> Retry</Button>
+            <Button variant="outline" onClick={() => fetchRef.current?.()}><RefreshCcw className="w-4 h-4 mr-2" /> Retry</Button>
           </div>
         ) : media.length === 0 ? (
           <div className="text-center py-16 bg-card rounded-xl border border-border border-dashed">

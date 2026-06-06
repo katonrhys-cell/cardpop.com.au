@@ -89,15 +89,15 @@ const AdminDashboard = () => {
   const [brandOpts, setBrandOpts] = useState([]);
   const [seriesOpts, setSeriesOpts] = useState([]);
 
-  const isMounted = useRef(true);
+  const fetchRef = useRef(null);
 
   // Init Data and Map
   useEffect(() => {
     const init = async () => {
       const map = await buildNameMap();
-      if(isMounted.current) setNameMap(map);
+      setNameMap(map);
       const rootCats = await getCategories();
-      if(isMounted.current) setCatOpts(rootCats);
+      setCatOpts(rootCats);
     };
     if (isAdmin) init();
   }, [buildNameMap, getCategories, isAdmin]);
@@ -118,60 +118,56 @@ const AdminDashboard = () => {
     else { setSeriesOpts([]); setFilterSeries(''); }
   }, [filterBrand, getSeriesByBrand]);
 
-  const fetchDashboardData = async () => {
-    if (!isAdmin) {
-      setError("Unauthorized access. Administrator privileges required.");
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setError(null);
-
-      // Build vault_items query with optional category filter
-      let vaultQuery = supabase
-        .from('vault_items')
-        .select('*, profiles!vault_items_user_id_fkey(username, display_name)', { count: 'exact' })
-        .order('created_at', { ascending: false })
-        .range(0, 19);
-
-      if (filterCat) vaultQuery = vaultQuery.eq('category_id', filterCat);
-
-      const [usersRes, ordersRes, tradesRes, sysHealth, vaultRes] = await Promise.all([
-        supabase.from('profiles').select('*', { count: 'exact' }).limit(1).catch(() => ({ count: 0 })),
-        supabase.from('orders').select('total_aud').neq('status', 'cancelled').catch(() => ({ data: [] })),
-        supabase.from('listings').select('*', { count: 'exact' }).eq('status', 'active').limit(1).catch(() => ({ count: 0 })),
-        getSystemHealth().catch(() => ({ database: 'OK', storage: 'OK', api: 'OK', uptime: 'Unknown' })),
-        vaultQuery.catch(() => ({ data: [], count: 0 }))
-      ]);
-
-      if (!isMounted.current) return;
-
-      const calculatedRevenue = (ordersRes.data || []).reduce((acc, o) => acc + (Number(o.total_aud) || 0), 0);
-
-      setStats(prev => ({
-        ...prev,
-        users: usersRes.count || 0,
-        revenue: calculatedRevenue,
-        activeTrades: tradesRes.count || 0
-      }));
-
-      setHealth(sysHealth);
-      setVaultProducts(vaultRes.data || []);
-      setFilteredCount(vaultRes.count || 0);
-    } catch (err) {
-      console.error("Admin Dashboard fetch error:", err);
-      if (isMounted.current) setError("Failed to load dashboard data.");
-    } finally {
-      if (isMounted.current) setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    isMounted.current = true;
-    if (isAdmin) fetchDashboardData();
-    else setLoading(false);
-    return () => { isMounted.current = false; };
+    if (!isAdmin) { setLoading(false); return; }
+
+    let cancelled = false;
+
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        let vaultQuery = supabase
+          .from('vault_items')
+          .select('*, profiles!vault_items_user_id_fkey(username, display_name)', { count: 'exact' })
+          .order('created_at', { ascending: false })
+          .range(0, 19);
+
+        if (filterCat) vaultQuery = vaultQuery.eq('category_id', filterCat);
+
+        const [usersRes, ordersRes, tradesRes, sysHealth, vaultRes] = await Promise.all([
+          supabase.from('profiles').select('*', { count: 'exact' }).limit(1).catch(() => ({ count: 0 })),
+          supabase.from('orders').select('total_aud').neq('status', 'cancelled').catch(() => ({ data: [] })),
+          supabase.from('listings').select('*', { count: 'exact' }).eq('status', 'active').limit(1).catch(() => ({ count: 0 })),
+          getSystemHealth().catch(() => ({ database: 'OK', storage: 'OK', api: 'OK', uptime: 'Unknown' })),
+          vaultQuery.catch(() => ({ data: [], count: 0 }))
+        ]);
+
+        if (cancelled) return;
+
+        const calculatedRevenue = (ordersRes.data || []).reduce((acc, o) => acc + (Number(o.total_aud) || 0), 0);
+
+        setStats(prev => ({
+          ...prev,
+          users: usersRes.count || 0,
+          revenue: calculatedRevenue,
+          activeTrades: tradesRes.count || 0
+        }));
+
+        setHealth(sysHealth);
+        setVaultProducts(vaultRes.data || []);
+        setFilteredCount(vaultRes.count || 0);
+      } catch (err) {
+        console.error("Admin Dashboard fetch error:", err);
+        if (!cancelled) setError("Failed to load dashboard data.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchRef.current = run;
+    run();
+    return () => { cancelled = true; };
   }, [isAdmin, getSystemHealth, filterCat, filterSub, filterBrand, filterSeries, filterListingType]);
 
   const clearFilters = () => {
@@ -208,7 +204,7 @@ const AdminDashboard = () => {
           <h1 className="text-3xl font-bold font-serif tracking-tight text-foreground mb-2">Platform Overview</h1>
           <p className="text-muted-foreground text-lg">System metrics and live administrative data.</p>
         </div>
-        <Button variant="outline" onClick={() => { setLoading(true); fetchDashboardData(); }} disabled={loading} className="rounded-xl">
+        <Button variant="outline" onClick={() => fetchRef.current?.()} disabled={loading} className="rounded-xl">
           <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
         </Button>
       </div>
@@ -362,7 +358,7 @@ const AdminDashboard = () => {
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         product={selectedProduct} 
-        onUpdate={() => { setLoading(true); fetchDashboardData(); }}
+        onUpdate={() => fetchRef.current?.()}
       />
     </div>
   );
