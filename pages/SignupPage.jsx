@@ -12,6 +12,7 @@ import { CheckCircle2, Circle, Loader2, MailCheck } from 'lucide-react';
 
 const SignupPage = () => {
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [newsletterOptIn, setNewsletterOptIn] = useState(true);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   
@@ -51,7 +52,15 @@ const SignupPage = () => {
     setLoading(true);
     try {
       const user = await signup(formData.email, formData.password, formData.name);
-      
+
+      if (newsletterOptIn) {
+        apiServerClient.fetch('/newsletter/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: formData.email, firstName: formData.name.split(' ')[0] }),
+        }).catch(() => {});
+      }
+
       try {
         await apiServerClient.fetch('/send-verification-email', {
           method: 'POST',
@@ -177,9 +186,22 @@ const SignupPage = () => {
               </ul>
             </div>
             
-            <Button 
-              type="submit" 
-              className="w-full h-12 font-bold text-base mt-4 transition-all" 
+            <label className="flex items-start gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={newsletterOptIn}
+                onChange={(e) => setNewsletterOptIn(e.target.checked)}
+                disabled={loading}
+                className="mt-0.5 w-4 h-4 rounded border-border accent-primary"
+              />
+              <span className="text-sm text-muted-foreground leading-snug">
+                Subscribe to the CardPop newsletter for market insights, new card releases, and community news.
+              </span>
+            </label>
+
+            <Button
+              type="submit"
+              className="w-full h-12 font-bold text-base mt-4 transition-all"
               disabled={loading || !isFormValid}
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
