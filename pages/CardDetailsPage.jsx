@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import ImageZoomModal from '@/components/ImageZoomModal.jsx';
 import TradeOfferModal from '@/components/TradeOfferModal.jsx';
 import MakeOfferModal from '@/components/MakeOfferModal.jsx';
+import CheckoutModal from '@/components/CheckoutModal.jsx';
 import VerifiedBadge from '@/components/VerifiedBadge.jsx';
 import SellerTierBadge from '@/components/SellerTierBadge.jsx';
 
@@ -26,6 +27,7 @@ const CardDetailsPage = () => {
   const [isZoomOpen, setIsZoomOpen] = useState(false);
   const [isTradeModalOpen, setIsTradeModalOpen] = useState(false);
   const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [rawListing, setRawListing] = useState(null);
 
   useEffect(() => {
@@ -287,7 +289,10 @@ const CardDetailsPage = () => {
                       </p>
                     </div>
                     {!isOwner && (
-                      <Button size="lg" className="h-14 px-8 font-bold rounded-xl shadow-lg transition-all active:scale-[0.98] w-full md:w-auto text-base">
+                      <Button size="lg" className="h-14 px-8 font-bold rounded-xl shadow-lg transition-all active:scale-[0.98] w-full md:w-auto text-base" onClick={() => {
+                        if (!currentUser) { toast.error('Please log in to purchase.'); navigate('/login'); return; }
+                        setIsCheckoutOpen(true);
+                      }}>
                         <CreditCard className="w-5 h-5 mr-2"/> Buy Now
                       </Button>
                     )}
@@ -361,6 +366,16 @@ const CardDetailsPage = () => {
           isOpen={isTradeModalOpen}
           onClose={() => setIsTradeModalOpen(false)}
           targetCard={card}
+        />
+      )}
+
+      {isCheckoutOpen && rawListing && (
+        <CheckoutModal
+          isOpen={isCheckoutOpen}
+          onClose={() => setIsCheckoutOpen(false)}
+          listingId={rawListing.id}
+          transactionType="fixed"
+          cardName={card.title}
         />
       )}
 

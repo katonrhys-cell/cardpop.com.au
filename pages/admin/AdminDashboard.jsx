@@ -245,6 +245,7 @@ const AdminDashboard = () => {
           <ManagementBox title="User Management" description="Review accounts and roles." icon={Users} link="/admin/users" />
           <ManagementBox title="Order Management" description="Track and manage all orders." icon={ListOrdered} link="/admin/orders" />
           <ManagementBox title="Verification" description="Review user verification requests." icon={ShieldCheck} link="/admin/verification" />
+          <ManagementBox title="Commissions & Revenue" description="Manage fee rates and view revenue reports." icon={DollarSign} link="/admin/commissions" />
         </div>
       </div>
 
