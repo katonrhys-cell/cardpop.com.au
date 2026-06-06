@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
 import { List, Plus, RefreshCw, AlertCircle, Trash2, Edit, PackageOpen, ShoppingCart, ArrowRightLeft, Layers } from 'lucide-react';
@@ -36,35 +36,38 @@ const AccountListings = () => {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  const isMounted = useRef(true);
-
-  const fetchListings = useCallback(async () => {
-    if (!currentUser?.id) { setLoading(false); return; }
-    setLoading(true);
-    setError(null);
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('listings')
-        .select('*')
-        .eq('seller_id', currentUser.id)
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (fetchError) throw fetchError;
-      if (isMounted.current) setListings(data ?? []);
-    } catch (err) {
-      console.error('Failed to fetch listings:', err);
-      if (isMounted.current) setError(err.message || 'Failed to load listings.');
-    } finally {
-      if (isMounted.current) setLoading(false);
-    }
-  }, [currentUser?.id]);
+  const fetchRef = useRef(null);
 
   useEffect(() => {
-    isMounted.current = true;
-    fetchListings();
-    return () => { isMounted.current = false; };
-  }, [fetchListings]);
+    if (!currentUser?.id) { setLoading(false); return; }
+    let cancelled = false;
+    const uid = currentUser.id;
+
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data, error: fetchError } = await supabase
+          .from('listings')
+          .select('*')
+          .eq('seller_id', uid)
+          .order('created_at', { ascending: false })
+          .limit(100);
+
+        if (fetchError) throw fetchError;
+        if (!cancelled) setListings(data ?? []);
+      } catch (err) {
+        console.error('Failed to fetch listings:', err);
+        if (!cancelled) setError(err.message || 'Failed to load listings.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchRef.current = run;
+    run();
+    return () => { cancelled = true; };
+  }, [currentUser?.id]);
 
   const handleUpdateStatus = async () => {
     if (!editListing || !newStatus) return;
@@ -77,7 +80,7 @@ const AccountListings = () => {
       if (error) throw error;
       toast.success('Listing status updated');
       setEditListing(null);
-      fetchListings();
+      fetchRef.current?.();
     } catch (err) {
       toast.error(err.message || 'Failed to update status');
     } finally {
@@ -96,7 +99,7 @@ const AccountListings = () => {
       if (error) throw error;
       toast.success('Listing removed');
       setDeleteTarget(null);
-      fetchListings();
+      fetchRef.current?.();
     } catch (err) {
       toast.error(err.message || 'Failed to delete listing');
     } finally {
@@ -123,7 +126,7 @@ const AccountListings = () => {
           <p className="text-muted-foreground">Manage your active items for sale or trade.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchListings} disabled={loading} className="rounded-xl h-10 px-4">
+          <Button variant="outline" onClick={() => fetchRef.current?.()} disabled={loading} className="rounded-xl h-10 px-4">
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </Button>
           <Button asChild className="rounded-xl h-10 px-4 font-bold">
