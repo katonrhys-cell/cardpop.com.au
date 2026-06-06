@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -19,8 +19,6 @@ const ProfileCompletionPage = () => {
   const [verifying, setVerifying] = useState(true);
   const [verificationError, setVerificationError] = useState(null);
   const [saving, setSaving] = useState(false);
-  const isMounted = useRef(true);
-  
   const [formData, setFormData] = useState({
     fullName: '',
     dateOfBirth: '',
@@ -29,7 +27,8 @@ const ProfileCompletionPage = () => {
   });
 
   useEffect(() => {
-    isMounted.current = true;
+    let cancelled = false;
+
     const verifyToken = async () => {
       try {
         const response = await apiServerClient.fetch('/verify-email', {
@@ -43,10 +42,10 @@ const ProfileCompletionPage = () => {
           throw new Error(errorData.error || 'Invalid or expired token');
         }
 
-        if (isMounted.current) setVerifying(false);
+        if (!cancelled) setVerifying(false);
       } catch (err) {
         console.error('Verification error:', err);
-        if (isMounted.current) {
+        if (!cancelled) {
           setVerificationError(err.message);
           setVerifying(false);
         }
@@ -59,7 +58,7 @@ const ProfileCompletionPage = () => {
       setVerificationError('No verification token provided.');
       setVerifying(false);
     }
-    return () => { isMounted.current = false; };
+    return () => { cancelled = true; };
   }, [token]);
 
   const handleSubmit = async (e) => {
