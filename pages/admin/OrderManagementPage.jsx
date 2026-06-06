@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient.js';
-import { apiClient } from '@/lib/apiServerClient.js';
+import { apiServerClient as apiClient } from '@/lib/apiServerClient.js';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 

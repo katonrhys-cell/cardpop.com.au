@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { AlertCircle, CreditCard, ShieldCheck, Loader2 } from 'lucide-react';
-import { apiClient } from '@/lib/apiServerClient.js';
+import { apiServerClient as apiClient } from '@/lib/apiServerClient.js';
 import { toast } from 'sonner';
 import RefundPolicyNote from '@/components/RefundPolicyNote.jsx';
 
