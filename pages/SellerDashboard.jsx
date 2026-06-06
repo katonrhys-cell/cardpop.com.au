@@ -22,70 +22,69 @@ const SellerDashboard = () => {
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const isMounted = useRef(true);
-
-  const fetchDashboardData = async () => {
-    if (!currentUser?.id) {
-      if (isMounted.current) setLoading(false);
-      return;
-    }
-
-    try {
-      setError(null);
-      
-      const [listingsRes, ordersRes, reviewsRes, cardsRes] = await Promise.all([
-        supabase.from('listings').select('id', { count: 'exact', head: true }).eq('seller_id', currentUser.id),
-        supabase.from('orders').select('total_aud').eq('seller_id', currentUser.id).eq('status', 'completed'),
-        supabase.from('reviews').select('rating').eq('reviewee_id', currentUser.id),
-        supabase.from('vault_items').select('id, card_name, collection, listing_type, estimated_value_aud').eq('owner_id', currentUser.id).in('listing_type', ['fixed', 'trade', 'both']).order('updated_at', { ascending: false }).limit(50),
-      ]);
-
-      if (!isMounted.current) return;
-
-      const orders = ordersRes.data ?? [];
-      const revList = reviewsRes.data ?? [];
-      const calculatedRevenue = orders.reduce((acc, t) => acc + (t.total_aud ?? 0), 0);
-      const calculatedRating = revList.length > 0
-        ? (revList.reduce((acc, r) => acc + (r.rating ?? 0), 0) / revList.length).toFixed(1)
-        : '0.0';
-
-      setStats({
-        productsListed: listingsRes.count ?? 0,
-        totalSales: orders.length,
-        avgRating: calculatedRating,
-        totalRevenue: calculatedRevenue,
-      });
-
-      const items = cardsRes.data ?? [];
-      setCards(items.map(c => ({
-        ...c,
-        cardName: c.card_name,
-        collectionType: c.collection,
-        listingStatus: c.listing_type,
-        askingPrice: c.estimated_value_aud,
-      })));
-
-    } catch (err) {
-      console.error("Failed to fetch seller stats:", err);
-      if (isMounted.current) setError("Failed to load seller statistics.");
-    } finally {
-      if (isMounted.current) setLoading(false);
-    }
-  };
+  const fetchRef = useRef(null);
 
   useEffect(() => {
-    isMounted.current = true;
-    fetchDashboardData();
+    if (!currentUser?.id) { setLoading(false); return; }
 
-    const channel = supabase.channel(`seller-dashboard-${Date.now()}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'listings' }, () => { if (isMounted.current) fetchDashboardData(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => { if (isMounted.current) fetchDashboardData(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, () => { if (isMounted.current) fetchDashboardData(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vault_items' }, () => { if (isMounted.current) fetchDashboardData(); })
+    let cancelled = false;
+    const uid = currentUser.id;
+
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [listingsRes, ordersRes, reviewsRes, cardsRes] = await Promise.all([
+          supabase.from('listings').select('id', { count: 'exact', head: true }).eq('seller_id', uid),
+          supabase.from('orders').select('total_aud').eq('seller_id', uid).eq('status', 'completed'),
+          supabase.from('reviews').select('rating').eq('reviewee_id', uid),
+          supabase.from('vault_items').select('id, card_name, collection, listing_type, estimated_value_aud').eq('owner_id', uid).in('listing_type', ['fixed', 'trade', 'both']).order('updated_at', { ascending: false }).limit(50),
+        ]);
+
+        if (cancelled) return;
+
+        const orders = ordersRes.data ?? [];
+        const revList = reviewsRes.data ?? [];
+        const calculatedRevenue = orders.reduce((acc, t) => acc + (t.total_aud ?? 0), 0);
+        const calculatedRating = revList.length > 0
+          ? (revList.reduce((acc, r) => acc + (r.rating ?? 0), 0) / revList.length).toFixed(1)
+          : '0.0';
+
+        setStats({
+          productsListed: listingsRes.count ?? 0,
+          totalSales: orders.length,
+          avgRating: calculatedRating,
+          totalRevenue: calculatedRevenue,
+        });
+
+        const items = cardsRes.data ?? [];
+        setCards(items.map(c => ({
+          ...c,
+          cardName: c.card_name,
+          collectionType: c.collection,
+          listingStatus: c.listing_type,
+          askingPrice: c.estimated_value_aud,
+        })));
+      } catch (err) {
+        console.error("Failed to fetch seller stats:", err);
+        if (!cancelled) setError("Failed to load seller statistics.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchRef.current = run;
+    run();
+
+    const channel = supabase.channel(`seller-dashboard-${uid}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'listings' }, () => fetchRef.current?.())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchRef.current?.())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reviews' }, () => fetchRef.current?.())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vault_items' }, () => fetchRef.current?.())
       .subscribe();
 
     return () => {
-      isMounted.current = false;
+      cancelled = true;
       supabase.removeChannel(channel);
     };
   }, [currentUser?.id]);
@@ -109,7 +108,7 @@ const SellerDashboard = () => {
             </div>
             <Button 
               variant="outline" 
-              onClick={() => { setLoading(true); fetchDashboardData(); toast.success('Stats refreshed'); }}
+              onClick={() => { fetchRef.current?.(); toast.success('Stats refreshed'); }}
               disabled={loading}
               className="rounded-xl shadow-sm self-start sm:self-auto h-11 px-6"
             >
