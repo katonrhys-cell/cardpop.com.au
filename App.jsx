@@ -84,8 +84,12 @@ const AccountWallet = lazy(() => import('@/pages/account/AccountWallet.jsx'));
 const AccountWatchlist = lazy(() => import('@/pages/account/AccountWatchlist.jsx'));
 const AccountOffers = lazy(() => import('@/pages/account/AccountOffers.jsx'));
 const AccountNotifications = lazy(() => import('@/pages/account/AccountNotifications.jsx'));
+const AccountNotificationSettings = lazy(() => import('@/pages/account/AccountNotificationSettings.jsx'));
 const AccountReviews = lazy(() => import('@/pages/account/AccountReviews.jsx'));
 const AccountSecurity = lazy(() => import('@/pages/account/AccountSecurity.jsx'));
+const AccountVerification = lazy(() => import('@/pages/account/AccountVerification.jsx'));
+const AccountSellerTier = lazy(() => import('@/pages/account/AccountSellerTier.jsx'));
+const AccountOrders = lazy(() => import('@/pages/account/AccountOrders.jsx'));
 
 // Vault & Trading
 const MyVaultPage = lazy(() => import('@/pages/MyVaultPage.jsx'));
@@ -135,6 +139,7 @@ const MediaLibraryPage = lazy(() => import('@/pages/admin/MediaLibraryPage.jsx')
 const MarketplaceManagementPage = lazy(() => import('@/pages/admin/MarketplaceManagementPage.jsx'));
 const CategoryMappingPage = lazy(() => import('@/pages/admin/CategoryMappingPage.jsx'));
 const AdminVerificationDashboard = lazy(() => import('@/pages/admin/AdminVerificationDashboard.jsx'));
+const CommissionSettingsPage = lazy(() => import('@/pages/admin/CommissionSettingsPage.jsx'));
 const CategoryManagementPage = lazy(() => import('@/pages/admin/CategoryManagementPage.jsx'));
 const SubcategoryManagementPage = lazy(() => import('@/pages/admin/SubcategoryManagementPage.jsx'));
 const BrandsManagementPage = lazy(() => import('@/pages/admin/BrandsManagementPage.jsx'));
@@ -232,8 +237,12 @@ const App = () => {
                         <Route path="/account/watchlist" element={<ProtectedRoute><AccountWatchlist /></ProtectedRoute>} />
                         <Route path="/account/offers" element={<ProtectedRoute><AccountOffers /></ProtectedRoute>} />
                         <Route path="/account/notifications" element={<ProtectedRoute><AccountNotifications /></ProtectedRoute>} />
+                        <Route path="/account/notification-settings" element={<ProtectedRoute><AccountNotificationSettings /></ProtectedRoute>} />
                         <Route path="/account/reviews" element={<ProtectedRoute><AccountReviews /></ProtectedRoute>} />
                         <Route path="/account/security" element={<ProtectedRoute><AccountSecurity /></ProtectedRoute>} />
+                        <Route path="/account/verification" element={<ProtectedRoute><AccountVerification /></ProtectedRoute>} />
+                        <Route path="/account/seller-tier" element={<ProtectedRoute><AccountSellerTier /></ProtectedRoute>} />
+                        <Route path="/account/orders" element={<ProtectedRoute><AccountOrders /></ProtectedRoute>} />
                         
                         {/* Vault & Trading */}
                         <Route path="/vault" element={<ProtectedRoute><MyVaultPage /></ProtectedRoute>} />
@@ -311,6 +320,7 @@ const App = () => {
                           <Route path="marketplace" element={<MarketplaceManagementPage />} />
                           <Route path="category-mapping" element={<CategoryMappingPage />} />
                           <Route path="verification" element={<AdminVerificationDashboard />} />
+                          <Route path="commissions" element={<CommissionSettingsPage />} />
                           <Route path="product-lines" element={<ProductLinesManagementPage />} />
                           <Route path="collections" element={<CollectionsManagementPage />} />
                         </Route>

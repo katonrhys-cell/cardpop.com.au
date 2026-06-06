@@ -64,8 +64,15 @@ const MarketplacePage = () => {
     else { setSubOpts([]); setFilterSub(''); }
   }, [filterCat, getSubcategoriesByCategory]);
 
-  useEffect(() => {
-    let cancelled = false;
+  const fetchListings = useCallback(async (showToast = false) => {
+    if (!isMounted.current) return;
+    setLoading(true);
+    setError(null);
+    try {
+      let query = supabase
+        .from('listings')
+        .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
+        .limit(100);
 
     const run = async (showToast = false) => {
       setLoading(true);

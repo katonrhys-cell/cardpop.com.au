@@ -12,8 +12,8 @@
 - [Category Hierarchy | Admin](/categorymanagement): No description available
 - [Category Mapping Tools | Admin](/categorymapping): No description available
 - [Check Your Email | Card Pop](/signup): No description available
+- [Commission Settings | CardPop Admin](/commissionsettings): No description available
 - [Complete Profile | Card Pop](/profilecompletion): No description available
-- [Identity Verification | Admin Dashboard](/adminverificationdashboard): No description available
 - [Log In | CardPop](/login): No description available
 - [Manage Events | Admin Portal](/eventsadmin): No description available
 - [Manage Events | Admin Portal](/eventsmanagement): No description available
@@ -22,11 +22,11 @@
 - [My Digital Vault | CardPop](/myvault): No description available
 - [My Listings | CardPop](/accountlistings): No description available
 - [My Vault | CardPop](/accountvault): No description available
+- [Notification Settings | CardPop](/accountnotificationsettings): No description available
 - [Notifications | CardPop](/accountnotifications): No description available
 - [Offers | CardPop](/accountoffers): No description available
 - [Official Shop Management | Admin](/productmanagement): No description available
 - [Order Confirmed | Card Pop](/checkoutsuccess): No description available
-- [Order Management | Admin](/ordermanagement): No description available
 - [Platform Settings | Admin](/adminsettings): No description available
 - [Product Lines Management | Admin Portal](/productlinesmanagement): No description available
 - [Public Profile | CardPop](/userprofile): No description available
@@ -37,6 +37,7 @@
 - [Security Settings | Card Pop](/securitysettings): No description available
 - [Security Settings | CardPop](/accountsecurity): No description available
 - [Seller Dashboard | CardPop](/sellerdashboard): No description available
+- [Seller Tier | CardPop](/accountsellertier): No description available
 - [Subcategory Management | Admin Portal](/subcategorymanagement): No description available
 - [System Diagnostics | Admin](/systemdiagnostics): No description available
 - [System Diagnostics | Emergency Console](/diagnostics): No description available
@@ -45,6 +46,7 @@
 - [Transactions | CardPop](/accounttransactions): No description available
 - [User Management | Admin Portal](/usermanagement): No description available
 - [Vault Profile | CardPop](/vaultprofile): No description available
+- [Verification Management | Admin](/adminverificationdashboard): No description available
 - [Verification Pending | Card Pop](/verificationpending): No description available
 - [Verification Status | CardPop](/verificationsubmission): No description available
 - [Wallet | CardPop](/accountwallet): No description available

@@ -1,7 +1,9 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Star, ShieldCheck, Tag, Heart } from 'lucide-react';
+import { Star, Tag } from 'lucide-react';
+import VerifiedBadge from '@/components/VerifiedBadge.jsx';
+import SellerTierBadge from '@/components/SellerTierBadge.jsx';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -125,12 +127,13 @@ const MarketplaceListingCard = ({ listing }) => {
                 )}
               </div>
               <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-sm font-bold text-foreground truncate group-hover/seller:text-primary transition-colors">
                     {sellerObj?.display_name || sellerObj?.username || 'Community Seller'}
                   </span>
-                  {sellerObj?.is_verified && (
-                    <ShieldCheck className="w-3.5 h-3.5 text-[hsl(var(--verified-badge))] shrink-0" />
+                  {sellerObj?.is_verified && <VerifiedBadge size="sm" />}
+                  {sellerObj?.seller_tier && sellerObj.seller_tier !== 'none' && (
+                    <SellerTierBadge tier={sellerObj.seller_tier} size="xs" />
                   )}
                 </div>
                 <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
