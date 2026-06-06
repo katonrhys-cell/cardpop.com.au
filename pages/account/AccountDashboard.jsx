@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
-import { Package, List, ArrowRightLeft, DollarSign, ArrowRight, AlertCircle, RefreshCw, PackageOpen } from 'lucide-react';
+import { Package, List, ArrowRightLeft, DollarSign, ArrowRight, AlertCircle, RefreshCw, PackageOpen, Heart } from 'lucide-react';
+import { useWatchlist } from '@/hooks/useWatchlist.js';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,6 +16,7 @@ import { toast } from 'sonner';
 
 const AccountDashboard = () => {
   const { currentUser } = useAuth();
+  const { count: watchlistCount } = useWatchlist();
 
   const [stats, setStats] = useState({
     salesCount: 0, revenue: 0, listingsCount: 0, vaultItemsCount: 0, pendingTrades: 0
@@ -205,7 +207,7 @@ const AccountDashboard = () => {
             {statsLoading ? <Skeleton className="h-8 w-16" /> : (
               <div className="text-2xl font-extrabold tabular-nums tracking-tight text-foreground">{stats.salesCount}</div>
             )}
-            <Link to="/account/transactions" className="text-xs font-bold text-primary hover:underline mt-2 inline-block">
+            <Link to="/transactions" className="text-xs font-bold text-primary hover:underline mt-2 inline-block">
               View transactions &rarr;
             </Link>
           </CardContent>
@@ -252,6 +254,19 @@ const AccountDashboard = () => {
             )}
             <Link to="/trade-requests" className="text-xs font-bold text-primary hover:underline mt-2 inline-block">
               Review requests &rarr;
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-border hover:border-primary/30 transition-colors bg-card h-full flex flex-col">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Watchlist</CardTitle>
+            <Heart className="w-4 h-4 text-rose-500" />
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col justify-end">
+            <div className="text-2xl font-extrabold tabular-nums tracking-tight text-foreground">{watchlistCount}</div>
+            <Link to="/account/watchlist" className="text-xs font-bold text-primary hover:underline mt-2 inline-block">
+              View watchlist &rarr;
             </Link>
           </CardContent>
         </Card>
