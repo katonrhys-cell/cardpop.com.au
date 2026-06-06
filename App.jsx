@@ -87,6 +87,7 @@ const AccountNotifications = lazy(() => import('@/pages/account/AccountNotificat
 const AccountNotificationSettings = lazy(() => import('@/pages/account/AccountNotificationSettings.jsx'));
 const AccountReviews = lazy(() => import('@/pages/account/AccountReviews.jsx'));
 const AccountSecurity = lazy(() => import('@/pages/account/AccountSecurity.jsx'));
+const AccountVerification = lazy(() => import('@/pages/account/AccountVerification.jsx'));
 
 // Vault & Trading
 const MyVaultPage = lazy(() => import('@/pages/MyVaultPage.jsx'));
@@ -236,6 +237,7 @@ const App = () => {
                         <Route path="/account/notification-settings" element={<ProtectedRoute><AccountNotificationSettings /></ProtectedRoute>} />
                         <Route path="/account/reviews" element={<ProtectedRoute><AccountReviews /></ProtectedRoute>} />
                         <Route path="/account/security" element={<ProtectedRoute><AccountSecurity /></ProtectedRoute>} />
+                        <Route path="/account/verification" element={<ProtectedRoute><AccountVerification /></ProtectedRoute>} />
                         
                         {/* Vault & Trading */}
                         <Route path="/vault" element={<ProtectedRoute><MyVaultPage /></ProtectedRoute>} />
