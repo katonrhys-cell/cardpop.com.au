@@ -191,25 +191,32 @@ const CardAnalyticsPage = () => {
   const similarCards = useMemo(() => genSimilar(cardName, cardSet, cardColl, makePrng(cardName + 'sim')), [cardName, cardSet, cardColl]);
 
   useEffect(() => {
+    let cancelled = false;
     const term = cardName.split(' ')[0].replace(/"/g, '');
 
     Promise.all([
       supabase.from('listings').select('*').ilike('title', `%${term}%`).eq('type', 'shop').order('price_aud').limit(6).then(r => r.data ?? []),
       supabase.from('vault_items').select('*').ilike('card_name', `%${term}%`).eq('is_public', true).order('created_at', { ascending: false }).limit(6).then(r => r.data ?? []),
     ]).then(([shop, vault]) => {
-      setListings(shop.map(i => ({ ...i, _source: 'shop' })));
-      setVaultItems(vault.map(i => ({ ...i, _source: 'vault' })));
-    }).finally(() => setLoadingL(false));
+      if (!cancelled) {
+        setListings(shop.map(i => ({ ...i, _source: 'shop' })));
+        setVaultItems(vault.map(i => ({ ...i, _source: 'vault' })));
+      }
+    }).finally(() => { if (!cancelled) setLoadingL(false); });
+
+    return () => { cancelled = true; };
   }, [cardName]);
 
   // Fetch live eBay AU prices for this card
   useEffect(() => {
     if (!cardName || cardName === 'Unknown Card') { setLiveLoading(false); return; }
+    let cancelled = false;
     setLiveLoading(true);
     const query = [cardName, cardSet].filter(Boolean).join(' ');
     apiServerClient.fetch(`/ebay/search?cardName=${encodeURIComponent(query)}&limit=15`)
       .then(r => r.json())
       .then(items => {
+        if (cancelled) return;
         if (!Array.isArray(items) || items.length === 0) return;
         const prices = items.map(l => l.price).filter(p => p > 0);
         if (prices.length === 0) return;
@@ -221,8 +228,9 @@ const CardAnalyticsPage = () => {
           volume:   items.length,
         });
       })
-      .catch(() => {}) // non-critical — fall back to demo data
-      .finally(() => setLiveLoading(false));
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLiveLoading(false); });
+    return () => { cancelled = true; };
   }, [cardName, cardSet]);
 
   const cardUrl = (c) => `/analytics/card?name=${encodeURIComponent(c.name)}&set=${encodeURIComponent(c.set)}&collection=${encodeURIComponent(c.collection)}&price=${c.price}&change=${c.change}`;
