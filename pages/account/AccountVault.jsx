@@ -80,9 +80,9 @@ const AccountVault = () => {
       if (!confirmed) return;
 
       if (activeListing) {
-        await supabase.from('listings').update({ status: 'archived' }).eq('id', activeListing.id);
+        await supabase.from('listings').update({ status: 'archived' }).eq('id', activeListing.id).eq('seller_id', currentUser.id);
       }
-      const { error } = await supabase.from('vault_items').delete().eq('id', cardId);
+      const { error } = await supabase.from('vault_items').delete().eq('id', cardId).eq('owner_id', currentUser.id);
       if (error) throw error;
       toast.success('Card deleted');
       fetchVault();
