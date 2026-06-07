@@ -158,11 +158,13 @@ const MarketsPage = () => {
 
   // ── Fetch live popular card prices on mount ────────────────────────────
   useEffect(() => {
+    let cancelled = false;
     fetch(`${API_BASE}/ebay/popular-cards`)
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-      .then(cards => setLiveCards(cards.filter(c => !c.error)))
-      .catch(() => setLiveError(true))
-      .finally(() => setLiveLoading(false));
+      .then(cards => { if (!cancelled) setLiveCards(cards.filter(c => !c.error)); })
+      .catch(() => { if (!cancelled) setLiveError(true); })
+      .finally(() => { if (!cancelled) setLiveLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   // ── Transform live cards for the movers table ──────────────────────────

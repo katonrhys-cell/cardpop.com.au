@@ -109,8 +109,11 @@ export const AuthProvider = ({ children }) => {
     if (profileData?.mfa_enabled) {
       const res = await fetch('/hcgi/api/auth/mfa/request', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: data.user.id, email: data.user.email }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${data.session.access_token}`,
+        },
+        body: JSON.stringify({ email: data.user.email }),
       });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));

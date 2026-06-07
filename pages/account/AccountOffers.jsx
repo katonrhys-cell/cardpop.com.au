@@ -242,7 +242,8 @@ const AccountOffers = () => {
         counter_amount_aud: amt,
         counter_message: counterMessage.trim() || null,
         updated_at: new Date().toISOString(),
-      }).eq('id', counterOffer.id);
+      }).eq('id', counterOffer.id)
+        .eq('seller_id', currentUser.id);
       if (error) throw error;
       toast.success('Counter offer sent!');
       setCounterOffer(null);

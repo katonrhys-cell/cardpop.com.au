@@ -299,7 +299,7 @@ const AddEditCardPage = () => {
       if (cardImagePath) payload.card_image = cardImagePath;
 
       if (isEdit) {
-        const { error } = await supabase.from('vault_items').update(payload).eq('id', id);
+        const { error } = await supabase.from('vault_items').update(payload).eq('id', id).eq('owner_id', currentUser.id);
         if (error) throw error;
         toast.success('Card updated successfully!');
         navigate('/vault');
