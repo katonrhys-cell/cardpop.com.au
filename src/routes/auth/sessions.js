@@ -7,9 +7,8 @@ import logger from '../../utils/logger.js';
 
 const router = express.Router();
 
-router.post('/create', async (req, res) => {
-  const { userId } = req.body;
-  if (!userId) return res.status(400).json({ error: 'userId is required' });
+router.post('/create', authMiddleware, async (req, res) => {
+  const userId = req.user.id;
 
   const { data: profile, error } = await supabase
     .from('profiles').select('active_sessions').eq('id', userId).single();
