@@ -41,7 +41,6 @@
 - [Subcategory Management | Admin Portal](/subcategorymanagement): No description available
 - [System Diagnostics | Admin](/systemdiagnostics): No description available
 - [System Diagnostics | Emergency Console](/diagnostics): No description available
-- [Trade Requests | CardPop](/traderequests): No description available
 - [Transactions | Card Pop](/transactionhistory): No description available
 - [Transactions | CardPop](/accounttransactions): No description available
 - [User Management | Admin Portal](/usermanagement): No description available
