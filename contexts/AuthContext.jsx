@@ -99,6 +99,32 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new Error(error.message);
+
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('mfa_enabled')
+      .eq('id', data.user.id)
+      .single();
+
+    if (profileData?.mfa_enabled) {
+      const res = await fetch('/hcgi/api/auth/mfa/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: data.user.id, email: data.user.email }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || 'Failed to send MFA code');
+      }
+      const mfaResult = await res.json();
+      // Set session eagerly — MFA is a UI gate; backend APIs are already protected by Supabase JWT.
+      if (data.session) {
+        setSession(data.session);
+        setCurrentUser(data.session.user);
+      }
+      return { requiresMfa: true, mfaId: mfaResult.mfaId };
+    }
+
     // Eagerly update session state so ProtectedRoute sees isAuthenticated=true
     // before onAuthStateChange fires asynchronously.
     if (data.session) {
@@ -170,7 +196,18 @@ export const AuthProvider = ({ children }) => {
     requestOTP:             async () => { throw new Error('OTP auth not supported — use email/password.'); },
     requestMFA:             async () => { throw new Error('Use Supabase MFA.'); },
     loginWithOTP:           async () => { throw new Error('Use Supabase MFA.'); },
-    verifyMFACode:          async () => { throw new Error('Use Supabase MFA.'); },
+    verifyMFACode:          async (mfaId, _otpId, code) => {
+      const res = await fetch('/hcgi/api/auth/mfa/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mfaId, code }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || 'MFA verification failed');
+      }
+      return res.json();
+    },
     enableMFA:              async () => {},
     disableMFA:             async () => {},
     resendVerificationEmail,
