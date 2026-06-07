@@ -76,7 +76,8 @@ const AccountListings = () => {
       const { error } = await supabase
         .from('listings')
         .update({ status: newStatus })
-        .eq('id', editListing.id);
+        .eq('id', editListing.id)
+        .eq('seller_id', currentUser.id);
       if (error) throw error;
       toast.success('Listing status updated');
       setEditListing(null);
@@ -95,7 +96,8 @@ const AccountListings = () => {
       const { error } = await supabase
         .from('listings')
         .delete()
-        .eq('id', deleteTarget.id);
+        .eq('id', deleteTarget.id)
+        .eq('seller_id', currentUser.id);
       if (error) throw error;
       toast.success('Listing removed');
       setDeleteTarget(null);
