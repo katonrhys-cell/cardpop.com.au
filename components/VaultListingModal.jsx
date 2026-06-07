@@ -128,12 +128,13 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
           listed_at: new Date().toISOString(),
         };
 
-        // Check if a listing already exists for this vault item
+        // Check if an active/non-archived listing already exists for this vault item
         const { data: existing } = await supabase
           .from('listings')
           .select('id')
           .eq('vault_item_id', product.id)
-          .single();
+          .neq('status', 'archived')
+          .maybeSingle();
 
         if (existing) {
           const { error: updateErr } = await supabase
