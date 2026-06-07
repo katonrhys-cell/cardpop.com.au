@@ -32,33 +32,37 @@ const CommunityPage = () => {
   const [loadingRetailers, setLoadingRetailers] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     supabase
       .from('posts')
       .select('*')
       .eq('post_type', 'text')
       .order('created_at', { ascending: false })
       .limit(20)
-      .then(({ data }) => setDiscussions(data || []))
+      .then(({ data }) => { if (!cancelled) setDiscussions(data || []); })
       .catch(console.error)
-      .finally(() => setLoadingDiscussions(false));
+      .finally(() => { if (!cancelled) setLoadingDiscussions(false); });
 
     supabase
       .from('profiles')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(50)
-      .then(({ data }) => setProfiles(data || []))
+      .then(({ data }) => { if (!cancelled) setProfiles(data || []); })
       .catch(console.error)
-      .finally(() => setLoadingProfiles(false));
+      .finally(() => { if (!cancelled) setLoadingProfiles(false); });
 
     supabase
       .from('business_profiles')
       .select('*')
       .eq('is_active', true)
       .order('brand_name', { ascending: true })
-      .then(({ data }) => setRetailers(data || []))
+      .then(({ data }) => { if (!cancelled) setRetailers(data || []); })
       .catch(console.error)
-      .finally(() => setLoadingRetailers(false));
+      .finally(() => { if (!cancelled) setLoadingRetailers(false); });
+
+    return () => { cancelled = true; };
   }, []);
 
   return (
