@@ -302,7 +302,7 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
       submitData.forEach((value, key) => { dataObj[key] = value; });
 
       if (card) {
-        const { error } = await supabase.from('vault_items').update(dataObj).eq('id', card.id);
+        const { error } = await supabase.from('vault_items').update(dataObj).eq('id', card.id).eq('owner_id', currentUser.id);
         if (error) throw error;
         toast.success('Vault item updated successfully!');
       } else {

@@ -113,7 +113,7 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
           is_public: selected.isPublic,
           ...(selected.needsTrade ? { trade_value_aud: Number(price) || product.trade_value_aud } : {}),
         })
-        .eq('id', product.id);
+        .eq('id', product.id).eq('owner_id', currentUser.id);
       if (vaultErr) throw vaultErr;
 
       if (selected.isPublic) {
@@ -140,7 +140,7 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
           const { error: updateErr } = await supabase
             .from('listings')
             .update(listingPayload)
-            .eq('id', existing.id);
+            .eq('id', existing.id).eq('seller_id', currentUser.id);
           if (updateErr) throw updateErr;
         } else {
           const { error: insertErr } = await supabase
@@ -153,7 +153,7 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
         await supabase
           .from('listings')
           .update({ status: 'archived' })
-          .eq('vault_item_id', product.id);
+          .eq('vault_item_id', product.id).eq('seller_id', currentUser.id);
       }
 
       toast.success(`Card updated: ${selected.label}`);
