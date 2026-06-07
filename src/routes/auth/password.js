@@ -43,8 +43,7 @@ router.post('/reset/request', async (req, res) => {
     logger.warn(`Password reset failed for ${trimmedEmail}: ${error.message}`);
   } else {
     // Audit log (best-effort)
-    const { data: users } = await supabase.auth.admin.listUsers();
-    const user = users?.users?.find(u => u.email === trimmedEmail);
+    const { data: { user } } = await supabase.auth.admin.getUserByEmail(trimmedEmail);
     if (user) {
       await supabase.from('audit_logs').insert({
         user_id: user.id,
