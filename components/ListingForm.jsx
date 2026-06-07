@@ -67,7 +67,7 @@ const ListingForm = ({ product, onSuccess, onCancel }) => {
       };
 
       if (product) {
-        const { error } = await supabase.from('listings').update(listingData).eq('id', product.id);
+        const { error } = await supabase.from('listings').update(listingData).eq('id', product.id).eq('seller_id', currentUser.id);
         if (error) throw error;
         toast('Listing updated successfully');
       } else {
