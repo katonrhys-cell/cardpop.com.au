@@ -9,9 +9,10 @@ import logger from '../../utils/logger.js';
 const router = express.Router();
 const MFA_CODE_EXPIRY_MS = parseInt(process.env.MFA_CODE_EXPIRY_MS || '600000', 10);
 
-router.post('/request', async (req, res) => {
-  const { userId, email } = req.body;
-  if (!userId || !email) return res.status(400).json({ error: 'userId and email are required' });
+router.post('/request', authMiddleware, async (req, res) => {
+  const { email } = req.body;
+  const userId = req.user.id;
+  if (!email) return res.status(400).json({ error: 'email is required' });
 
   const otp = generateOTP();
   const expiresAt = new Date(Date.now() + MFA_CODE_EXPIRY_MS).toISOString();
