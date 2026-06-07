@@ -50,7 +50,7 @@ router.post('/verify', async (req, res) => {
   const decrypted = decrypt(mfaRecord.encrypted_otp);
   if (decrypted.code !== code) throw new Error('Invalid MFA code');
 
-  await Promise.all([
+  const [profileResult, mfaResult] = await Promise.all([
     supabase.from('profiles').update({ mfa_enabled: true }).eq('id', mfaRecord.user_id),
     supabase.from('mfa_sessions').update({ verified: true }).eq('id', mfaRecord.id),
     supabase.from('audit_logs').insert({
@@ -59,8 +59,11 @@ router.post('/verify', async (req, res) => {
       description: 'MFA verification successful',
       ip_address: req.ip,
       user_agent: req.headers['user-agent'],
-    }),
+    }).catch(() => {}),
   ]);
+
+  if (profileResult.error) throw profileResult.error;
+  if (mfaResult.error) throw mfaResult.error;
 
   logger.info(`MFA verified for user ${mfaRecord.user_id}`);
   res.json({ success: true, message: 'MFA verified successfully' });
