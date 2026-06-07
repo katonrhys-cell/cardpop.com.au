@@ -78,7 +78,7 @@ const RefundDialog = ({ order, onClose, onSuccess }) => {
       await supabase.from('orders').update({
         refund_status:        'requested',
         refund_requested_at:  new Date().toISOString(),
-      }).eq('id', order.id);
+      }).eq('id', order.id).eq('buyer_id', currentUser.id);
 
       // Notify seller
       if (order.seller_id) {
