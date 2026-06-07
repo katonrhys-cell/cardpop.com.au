@@ -53,18 +53,18 @@ export const CartProvider = ({ children }) => {
   const addToCart = useCallback((product, variant = product.variants?.[0] || product, quantity = 1, availableQuantity = 999) => {
     return new Promise((resolve, reject) => {
       const itemId = variant?.id || product.id;
-      
-      if (variant?.manage_inventory) {
-        const existingItem = cartItems.find(item => (item.variant?.id || item.product.id) === itemId);
-        const currentCartQuantity = existingItem ? existingItem.quantity : 0;
-        if ((currentCartQuantity + quantity) > availableQuantity) {
-          const error = new Error(`Not enough stock for ${product.title || product.name}. Only ${availableQuantity} left.`);
-          reject(error);
-          return;
-        }
-      }
+      let inventoryError = null;
 
       setCartItems(prevItems => {
+        if (variant?.manage_inventory) {
+          const existingItem = prevItems.find(item => (item.variant?.id || item.product.id) === itemId);
+          const currentCartQuantity = existingItem ? existingItem.quantity : 0;
+          if ((currentCartQuantity + quantity) > availableQuantity) {
+            inventoryError = new Error(`Not enough stock for ${product.title || product.name}. Only ${availableQuantity} left.`);
+            return prevItems;
+          }
+        }
+
         const existingItem = prevItems.find(item => (item.variant?.id || item.product.id) === itemId);
         if (existingItem) {
           return prevItems.map(item =>
@@ -75,11 +75,16 @@ export const CartProvider = ({ children }) => {
         }
         return [...prevItems, { product, variant, quantity }];
       });
-      
-      setIsCartOpen(true); // Auto-open cart on add
+
+      if (inventoryError) {
+        reject(inventoryError);
+        return;
+      }
+
+      setIsCartOpen(true);
       resolve();
     });
-  }, [cartItems]);
+  }, []);
 
   const removeFromCart = useCallback((itemId) => {
     setCartItems(prevItems => prevItems.filter(item => (item.variant?.id || item.product.id) !== itemId));
