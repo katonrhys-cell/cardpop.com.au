@@ -13,6 +13,7 @@ import eventScraperRouter from './event-scraper.js';
 import categoriesRouter from './categories.js';
 import subcategoriesRouter from './subcategories.js';
 import vaultRouter from './vault.js';
+import newsletterRouter from './newsletter.js';
 
 const router = Router();
 
@@ -58,6 +59,10 @@ export default () => {
     // Vault security routes with API rate limiting
     router.use('/vault', apiLimiter);
     router.use('/vault', vaultRouter);
+
+    // Newsletter (Kit.com) subscription — no auth required
+    router.use('/newsletter', apiLimiter);
+    router.use('/newsletter', newsletterRouter);
 
     // Trade routes with email verification middleware
     // Apply auth middleware first, then trade access verification
