@@ -16,7 +16,6 @@ import { toast } from 'sonner';
 
 const AccountDashboard = () => {
   const { currentUser } = useAuth();
-  const { count: watchlistCount } = useWatchlist();
 
   const [stats, setStats] = useState({
     salesCount: 0, revenue: 0, listingsCount: 0, vaultItemsCount: 0, pendingTrades: 0
@@ -24,101 +23,76 @@ const AccountDashboard = () => {
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState(null);
   const [sellerTier, setSellerTier] = useState(null);
-  
-  // Vault items list state
-  const [vaultItems, setVaultItems] = useState([]);
-  const [vaultLoading, setVaultLoading] = useState(true);
-  const [vaultError, setVaultError] = useState(null);
-  const [vaultPage, setVaultPage] = useState(1);
-  const [vaultTotalPages, setVaultTotalPages] = useState(1);
-  
-  const isMounted = useRef(true);
 
-  const [vaultItems, setVaultItems]         = useState([]);
-  const [vaultLoading, setVaultLoading]     = useState(false);
-  const [vaultError, setVaultError]         = useState(null);
-  const [vaultPage, setVaultPage]           = useState(1);
+  const [vaultItems, setVaultItems]           = useState([]);
+  const [vaultLoading, setVaultLoading]       = useState(false);
+  const [vaultError, setVaultError]           = useState(null);
+  const [vaultPage, setVaultPage]             = useState(1);
   const [vaultTotalPages, setVaultTotalPages] = useState(1);
 
   // Stable refs so realtime callbacks always call the latest fetch without
   // being in the realtime effect's dep array (which would recreate the channel).
-  const fetchStatsRef     = useRef(null);
-  const fetchVaultRef     = useRef(null);
-  const vaultPageRef      = useRef(1);
-  vaultPageRef.current    = vaultPage;
+  const fetchStatsRef  = useRef(null);
+  const fetchVaultRef  = useRef(null);
+  const vaultPageRef   = useRef(1);
+  vaultPageRef.current = vaultPage;
 
-      const tierRes = await supabase.from('profiles').select('seller_tier').eq('id', currentUser.id).single();
-      if (tierRes.data && isMounted.current) setSellerTier(tierRes.data.seller_tier);
-
-      const [salesRes, revenueRes, listingsRes, vaultRes, tradesRes] = await Promise.all([
-        supabase
-          .from('orders')
-          .select('id', { count: 'exact', head: true })
-          .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
-          .eq('status', 'delivered'),
-        supabase
-          .from('orders')
-          .select('total_aud')
-          .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
-          .eq('status', 'delivered'),
-        supabase
-          .from('listings')
-          .select('id', { count: 'exact', head: true })
-          .eq('seller_id', currentUser.id)
-          .eq('status', 'active'),
-        supabase
-          .from('vault_items')
-          .select('id', { count: 'exact', head: true })
-          .eq('owner_id', currentUser.id),
-        supabase
-          .from('trades')
-          .select('id', { count: 'exact', head: true })
-          .or(`initiator_id.eq.${currentUser.id},responder_id.eq.${currentUser.id}`)
-          .eq('status', 'proposed')
-      ]);
+  // ── Stats fetch ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!currentUser?.id) { setStatsLoading(false); return; }
 
     let cancelled = false;
-    const uid = currentUser.id;
 
     const run = async () => {
-      console.log('[Dashboard] run() started, cancelled:', cancelled);
       setStatsLoading(true);
       setStatsError(null);
+
+      // Fetch seller tier independently — a missing profile row must not block stats
+      supabase.from('profiles').select('seller_tier').eq('id', currentUser.id).maybeSingle()
+        .then(({ data }) => { if (!cancelled && data) setSellerTier(data.seller_tier); });
+
       try {
         const [salesRes, revenueRes, listingsRes, vaultRes, tradesRes] = await Promise.all([
           supabase.from('orders').select('id', { count: 'exact', head: true })
-            .or(`buyer_id.eq.${uid},seller_id.eq.${uid}`).eq('status', 'delivered'),
+            .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
+            .in('status', ['delivered', 'completed']),
           supabase.from('orders').select('total_aud')
-            .or(`buyer_id.eq.${uid},seller_id.eq.${uid}`).eq('status', 'delivered'),
+            .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
+            .in('status', ['delivered', 'completed']),
           supabase.from('listings').select('id', { count: 'exact', head: true })
-            .eq('seller_id', uid).eq('status', 'active'),
+            .eq('seller_id', currentUser.id).eq('status', 'active').neq('listing_type', 'vault'),
           supabase.from('vault_items').select('id', { count: 'exact', head: true })
-            .eq('owner_id', uid),
+            .eq('owner_id', currentUser.id),
           supabase.from('trades').select('id', { count: 'exact', head: true })
-            .or(`initiator_id.eq.${uid},responder_id.eq.${uid}`).eq('status', 'proposed'),
+            .or(`initiator_id.eq.${currentUser.id},responder_id.eq.${currentUser.id}`)
+            .eq('status', 'proposed'),
         ]);
-        console.log('[Dashboard] queries done, cancelled:', cancelled, 'errors:', [salesRes.error, listingsRes.error, vaultRes.error, tradesRes.error].filter(Boolean));
+
         if (cancelled) return;
+
+        // Log individual errors without crashing the whole dashboard
+        [salesRes, revenueRes, listingsRes, vaultRes, tradesRes].forEach((r, i) => {
+          if (r.error) console.warn(`[Dashboard] query ${i} error:`, r.error.message);
+        });
+
         const revenue = (revenueRes.data || []).reduce((s, t) => s + (t.total_aud || 0), 0);
         setStats({
-          salesCount:     salesRes.count    || 0,
+          salesCount:      salesRes.count    || 0,
           revenue,
-          listingsCount:  listingsRes.count || 0,
-          vaultItemsCount: vaultRes.count   || 0,
-          pendingTrades:  tradesRes.count   || 0,
+          listingsCount:   listingsRes.count  || 0,
+          vaultItemsCount: vaultRes.count    || 0,
+          pendingTrades:   tradesRes.count   || 0,
         });
       } catch (err) {
-        console.error('[Dashboard] run() catch:', err);
         if (!cancelled) setStatsError('Failed to load live statistics. Please try refreshing.');
       } finally {
-        console.log('[Dashboard] run() finally, cancelled:', cancelled);
         if (!cancelled) setStatsLoading(false);
       }
     };
 
     fetchStatsRef.current = run;
     run();
-    return () => { console.log('[Dashboard] stats effect CLEANUP, setting cancelled=true'); cancelled = true; };
+    return () => { cancelled = true; };
   }, [currentUser?.id]);
 
   // ── Vault items fetch ─────────────────────────────────────────────────────
@@ -195,10 +169,10 @@ const AccountDashboard = () => {
           <h1 className="text-3xl font-bold font-serif mb-2 tracking-tight text-foreground">Dashboard</h1>
           <p className="text-muted-foreground text-lg font-medium">Welcome back! Here's your live account overview.</p>
         </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={handleRefresh} 
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
           disabled={statsLoading || vaultLoading}
           className="rounded-xl shadow-sm self-start sm:self-auto h-10 px-4 font-bold transition-transform active:scale-95"
         >
@@ -320,7 +294,7 @@ const AccountDashboard = () => {
               <p className="text-sm text-muted-foreground mt-1">Manage your synced collection</p>
             </div>
             {vaultError && (
-              <Button variant="outline" size="sm" onClick={() => fetchVaultItems(vaultPage)} disabled={vaultLoading}>
+              <Button variant="outline" size="sm" onClick={() => fetchVaultRef.current?.(vaultPage)} disabled={vaultLoading}>
                 Retry
               </Button>
             )}
@@ -394,19 +368,19 @@ const AccountDashboard = () => {
                 Page {vaultPage} of {vaultTotalPages}
               </span>
               <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  disabled={vaultPage === 1 || vaultLoading} 
-                  onClick={() => fetchVaultItems(vaultPage - 1)}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={vaultPage === 1 || vaultLoading}
+                  onClick={() => fetchVaultRef.current?.(vaultPage - 1)}
                 >
                   Previous
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  disabled={vaultPage === vaultTotalPages || vaultLoading} 
-                  onClick={() => fetchVaultItems(vaultPage + 1)}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={vaultPage === vaultTotalPages || vaultLoading}
+                  onClick={() => fetchVaultRef.current?.(vaultPage + 1)}
                 >
                   Next
                 </Button>
