@@ -79,7 +79,8 @@ const AccountListings = () => {
       const { error } = await supabase
         .from('listings')
         .update({ status: newStatus, accepts_offers: acceptsOffers })
-        .eq('id', editListing.id);
+        .eq('id', editListing.id)
+        .eq('seller_id', currentUser.id);
       if (error) throw error;
       toast.success('Listing status updated');
       setEditListing(null);
