@@ -166,7 +166,7 @@ const WhatnotShowsPage = () => {
     if (!window.confirm('Remove this show listing?')) return;
     setDeletingId(id);
     try {
-      const { error } = await supabase.from('whatnot_shows').delete().eq('id', id);
+      const { error } = await supabase.from('whatnot_shows').delete().eq('id', id).eq('user_id', currentUser.id);
       if (error) throw error;
       toast.success('Show removed.');
       setShows(prev => prev.filter(s => s.id !== id));
