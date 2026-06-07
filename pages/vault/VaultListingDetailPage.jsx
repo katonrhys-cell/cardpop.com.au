@@ -13,8 +13,10 @@ const VaultListingDetailPage = () => {
   const { itemId } = useParams();
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchListing = async () => {
       try {
         const { data: record, error } = await supabase
@@ -23,14 +25,15 @@ const VaultListingDetailPage = () => {
           .eq('id', itemId)
           .single();
         if (error) throw error;
-        setListing(record);
+        if (!cancelled) setListing(record);
       } catch (err) {
-        console.error("Error fetching listing:", err);
+        if (!cancelled) setError(err.message || 'Failed to load listing');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchListing();
+    return () => { cancelled = true; };
   }, [itemId]);
 
   if (loading) {
@@ -46,6 +49,15 @@ const VaultListingDetailPage = () => {
             <Skeleton className="h-12 w-full" />
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container-default section-padding text-center py-32">
+        <p className="text-destructive font-medium mb-4">{error}</p>
+        <Button variant="outline" onClick={() => window.location.reload()}>Try Again</Button>
       </div>
     );
   }

@@ -36,6 +36,8 @@ const MarketplacePage = () => {
   const [debouncedMax, setDebouncedMax] = useState('');
 
   const fetchRef = useRef(null);
+  const isMounted = useRef(true);
+  useEffect(() => { return () => { isMounted.current = false; }; }, []);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400);

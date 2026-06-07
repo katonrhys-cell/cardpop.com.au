@@ -98,7 +98,8 @@ const AccountListings = () => {
       const { error } = await supabase
         .from('listings')
         .delete()
-        .eq('id', deleteTarget.id);
+        .eq('id', deleteTarget.id)
+        .eq('seller_id', currentUser.id);
       if (error) throw error;
       toast.success('Listing removed');
       setDeleteTarget(null);

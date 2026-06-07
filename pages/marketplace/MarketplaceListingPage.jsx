@@ -11,8 +11,10 @@ const MarketplaceListingPage = () => {
   const { id } = useParams();
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchListing = async () => {
       try {
         const { data, error } = await supabase
@@ -21,17 +23,24 @@ const MarketplaceListingPage = () => {
           .eq('id', id)
           .single();
         if (error) throw error;
-        setListing(data);
-      } catch (error) {
-        console.error(error);
+        if (!cancelled) setListing(data);
+      } catch (err) {
+        if (!cancelled) setError(err.message || 'Failed to load listing');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchListing();
+    return () => { cancelled = true; };
   }, [id]);
 
   if (loading) return <div className="container-default section-padding"><Skeleton className="h-[600px] rounded-2xl" /></div>;
+  if (error) return (
+    <div className="container-default section-padding text-center">
+      <p className="text-destructive font-medium mb-4">{error}</p>
+      <Button variant="outline" onClick={() => window.location.reload()}>Try Again</Button>
+    </div>
+  );
   if (!listing) return <div className="container-default section-padding text-center">Listing not found</div>;
 
   return (

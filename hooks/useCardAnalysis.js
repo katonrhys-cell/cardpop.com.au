@@ -41,6 +41,11 @@ Respond ONLY with valid JSON containing these exact keys:
     if (isAnalyzing && !isStreaming && messages.length > 0) {
       const lastMsg = messages[messages.length - 1];
       
+      if (lastMsg.role !== 'assistant') {
+        setIsAnalyzing(false);
+        return;
+      }
+
       if (lastMsg.role === 'assistant') {
         if (!lastMsg.content) {
           toast.error('AI returned an empty response.');

@@ -31,30 +31,39 @@ export function useCardOCR() {
       let fullContent = '';
       let completed = false;
 
-      while (!completed) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      try {
+        while (!completed) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-        buffer += decoder.decode(value, { stream: true });
-        const events = buffer.split('\n\n');
-        buffer = events.pop() || '';
+          buffer += decoder.decode(value, { stream: true });
+          const events = buffer.split('\n\n');
+          buffer = events.pop() || '';
 
-        for (const event of events) {
-          if (!event.trim()) continue;
+          for (const event of events) {
+            if (!event.trim()) continue;
 
-          const lines = event.split('\n');
-          let eventData = '';
-          for (const line of lines) {
-            if (line.startsWith('data: ')) eventData += line.slice(6);
+            const lines = event.split('\n');
+            let eventData = '';
+            for (const line of lines) {
+              if (line.startsWith('data: ')) eventData += line.slice(6);
+            }
+            if (!eventData) continue;
+
+            let parsed;
+            try {
+              parsed = JSON.parse(eventData);
+            } catch {
+              throw new Error('Received malformed data from scan service');
+            }
+
+            if (parsed.type === SSEEventType.Error) throw new Error(parsed.data.content);
+            if (parsed.type === SSEEventType.Completed) { completed = true; break; }
+            if (parsed.type === SSEEventType.Content) fullContent += parsed.data.content;
           }
-          if (!eventData) continue;
-
-          const parsed = JSON.parse(eventData);
-
-          if (parsed.type === SSEEventType.Error) throw new Error(parsed.data.content);
-          if (parsed.type === SSEEventType.Completed) { completed = true; break; }
-          if (parsed.type === SSEEventType.Content) fullContent += parsed.data.content;
         }
+      } finally {
+        reader.cancel();
       }
 
       const jsonMatch = fullContent.match(/\{[\s\S]*\}/);

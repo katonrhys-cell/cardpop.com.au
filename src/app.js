@@ -84,10 +84,10 @@ app.use('/hcgi/api', apiRouter);
 app.use('/api', apiRouter);
 
 app.get('/.well-known/security.txt', (req, res) => {
-	res.type('text/plain').send(`Contact: security@example.com
+	res.type('text/plain').send(`Contact: mailto:support@cardpop.com.au
 Expires: ${new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()}
 Preferred-Languages: en
-Canonical: https://example.com/.well-known/security.txt
+Canonical: https://cardpop.online/.well-known/security.txt
 `);
 });
 
