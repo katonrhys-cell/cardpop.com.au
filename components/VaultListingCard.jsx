@@ -46,6 +46,9 @@ const VaultListingCard = ({ vaultItem }) => {
             alt={vaultItem.card_name || vaultItem.name || 'Vault Image'}
             className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500 p-2"
             loading="lazy"
+            decoding="async"
+            width="400"
+            height="500"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm font-medium">
@@ -113,7 +116,7 @@ const VaultListingCard = ({ vaultItem }) => {
             >
               <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
                 {sellerObj?.avatar_url ? (
-                  <img src={sellerObj.avatar_url} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" />
+                  <img src={sellerObj.avatar_url} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" width="32" height="32" decoding="async" />
                 ) : (
                   (sellerObj?.display_name || sellerObj?.name || 'U')[0].toUpperCase()
                 )}

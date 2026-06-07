@@ -416,7 +416,7 @@ const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout })
 };
 
 const Header = () => {
-  const { isAuthenticated, currentUser, isAdmin, logout, isVerified } = useAuth();
+  const { isAuthenticated, currentUser, isAdmin, logout, isVerified, loading: authLoading } = useAuth();
   const { cartItems, setIsCartOpen } = useCart();
   const location = useLocation();
   const navigate = useNavigate();
@@ -541,7 +541,7 @@ const Header = () => {
           {/* Spacer pushes all action icons to the right edge */}
           <div className="flex-1" />
 
-            {isAdmin && (
+            {!authLoading && isAdmin && (
               <Button asChild variant="ghost" size="sm" className="hidden xl:flex gap-2 text-[hsl(var(--admin-warning,24.6_95%_53.1%))] hover:text-[hsl(var(--admin-warning,24.6_95%_53.1%))] hover:bg-[hsl(var(--admin-warning,24.6_95%_53.1%))]/10 rounded-xl">
                 <Link to="/admin">
                   <Shield className="w-4 h-4" />
@@ -550,7 +550,7 @@ const Header = () => {
               </Button>
             )}
 
-            {isAuthenticated && (
+            {!authLoading && isAuthenticated && (
               <Button asChild variant="ghost" size="icon" className="hidden sm:flex relative rounded-xl hover:bg-muted">
                 <Link to="/trade-requests">
                   <ArrowRightLeft className="h-5 w-5" />
@@ -563,7 +563,7 @@ const Header = () => {
               </Button>
             )}
 
-            {isAuthenticated && (
+            {!authLoading && isAuthenticated && (
               <Button asChild variant="ghost" size="icon" className="hidden sm:flex relative rounded-xl hover:bg-muted">
                 <Link to="/messaging">
                   <MessageSquare className="h-5 w-5" />
@@ -576,7 +576,7 @@ const Header = () => {
               </Button>
             )}
 
-            {isAuthenticated && (
+            {!authLoading && isAuthenticated && (
               <div className="hidden sm:block">
                 <NotificationBell />
               </div>
@@ -608,7 +608,9 @@ const Header = () => {
             </Button>
 
             <div className="hidden md:flex items-center gap-2 shrink-0">
-              {isAuthenticated ? (
+              {authLoading ? (
+                <div className="h-9 w-28 rounded-xl bg-muted animate-pulse" aria-hidden="true" />
+              ) : isAuthenticated ? (
                 <VaultDropdown isMobile={false} />
               ) : (
                 <>
