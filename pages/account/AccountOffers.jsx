@@ -87,7 +87,7 @@ const OfferCard = ({ offer, perspective, onAction, actionLoading }) => {
                 size="sm"
                 className="rounded-xl font-bold bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5"
                 disabled={!!actionLoading}
-                onClick={() => onAction(offer.id, 'accepted')}
+                onClick={() => onAction(offer.id, 'accepted', perspective)}
               >
                 {actionLoading === `${offer.id}_accept`
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -99,7 +99,7 @@ const OfferCard = ({ offer, perspective, onAction, actionLoading }) => {
                 variant="outline"
                 className="rounded-xl font-bold text-destructive border-destructive/30 hover:bg-destructive/10 gap-1.5"
                 disabled={!!actionLoading}
-                onClick={() => onAction(offer.id, 'declined')}
+                onClick={() => onAction(offer.id, 'declined', perspective)}
               >
                 {actionLoading === `${offer.id}_decline`
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -113,7 +113,7 @@ const OfferCard = ({ offer, perspective, onAction, actionLoading }) => {
               variant="outline"
               className="rounded-xl font-bold gap-1.5"
               disabled={!!actionLoading}
-              onClick={() => onAction(offer.id, 'withdrawn')}
+              onClick={() => onAction(offer.id, 'withdrawn', perspective)}
             >
               {actionLoading === `${offer.id}_withdraw`
                 ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -183,7 +183,7 @@ const AccountOffers = () => {
 
   useEffect(() => { fetchOffers(); }, [fetchOffers]);
 
-  const handleAction = async (offerId, newStatus) => {
+  const handleAction = async (offerId, newStatus, perspective) => {
     const keyMap = { accepted: 'accept', declined: 'decline', withdrawn: 'withdraw' };
     setActionLoading(`${offerId}_${keyMap[newStatus]}`);
     try {
@@ -191,7 +191,12 @@ const AccountOffers = () => {
       if (newStatus === 'accepted' || newStatus === 'declined') {
         updateData.responded_at = new Date().toISOString();
       }
-      const { error } = await supabase.from('offers').update(updateData).eq('id', offerId);
+      const ownerColumn = perspective === 'received' ? 'seller_id' : 'buyer_id';
+      const { error } = await supabase
+        .from('offers')
+        .update(updateData)
+        .eq('id', offerId)
+        .eq(ownerColumn, currentUser.id);
       if (error) throw error;
       const messages = { accepted: 'Offer accepted!', declined: 'Offer declined.', withdrawn: 'Offer withdrawn.' };
       toast.success(messages[newStatus]);
