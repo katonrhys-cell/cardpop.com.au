@@ -17,6 +17,10 @@ router.post('/stream', integratedAiRateLimit, uploadFiles({
 	],
 	fieldName: 'images',
 }), async (req, res) => {
+	if (!req.userId) {
+		return res.status(401).json({ error: 'Authentication required' });
+	}
+
 	const { message } = req.body;
 
 	if (!message) {
