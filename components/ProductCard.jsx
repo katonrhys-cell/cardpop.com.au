@@ -37,11 +37,14 @@ const ProductCard = ({ product }) => {
     <div className="group flex flex-col h-full bg-card rounded-2xl border border-border overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
       <Link to={detailPath} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
         {imgSrc ? (
-          <img 
-            src={imgSrc} 
-            alt={product.name || product.cardName || 'Product Image'} 
+          <img
+            src={imgSrc}
+            alt={product.name || product.cardName || 'Product Image'}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             loading="lazy"
+            decoding="async"
+            width="400"
+            height="500"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm font-medium">
@@ -96,7 +99,7 @@ const ProductCard = ({ product }) => {
             >
               <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
                 {sellerObj?.profile_photo_or_character ? (
-                  <img src={sellerObj.profile_photo_or_character} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" />
+                  <img src={sellerObj.profile_photo_or_character} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" width="32" height="32" decoding="async" />
                 ) : (
                   (sellerObj?.display_name || sellerObj?.name || 'S')[0].toUpperCase()
                 )}
