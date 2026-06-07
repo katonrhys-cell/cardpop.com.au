@@ -27,7 +27,12 @@ router.post('/stream', integratedAiRateLimit, uploadFiles({
 		throw new Error('message is required');
 	}
 
-	const parsedMessage = JSON.parse(message);
+	let parsedMessage;
+	try {
+		parsedMessage = JSON.parse(message);
+	} catch {
+		return res.status(400).json({ error: 'message must be a valid JSON array' });
+	}
 
 	if (req.files?.length > 0) {
 		const imageUrls = await uploadImagesToPocketBase({ images: req.files });
