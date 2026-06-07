@@ -7,9 +7,10 @@ import logger from '../../utils/logger.js';
 
 const router = express.Router();
 
-router.post('/suspicious-activity/check', async (req, res) => {
-  const { userId, ipAddress, userAgent } = req.body;
-  if (!userId || !ipAddress) return res.status(400).json({ error: 'userId and ipAddress are required' });
+router.post('/suspicious-activity/check', authMiddleware, async (req, res) => {
+  const userId = req.user.id;
+  const ipAddress = req.ip || req.connection?.remoteAddress || 'unknown';
+  const userAgent = req.headers['user-agent'] || '';
 
   const { data: recentLogins } = await supabase
     .from('audit_logs')
