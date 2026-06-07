@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
-import { Loader2, Lock, ShoppingCart, ArrowRightLeft, Layers, DollarSign } from 'lucide-react';
+import { Loader2, Lock, ShoppingCart, ArrowRightLeft, Layers, DollarSign, Shield } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -80,12 +80,27 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
     }
   };
 
+  const lockedBaseValue = product?.locked_base_value_aud ?? null;
+
   const handleConfirm = async () => {
     if (!product || !selected) return;
 
     if (selected.needsPrice && (!price || isNaN(Number(price)) || Number(price) <= 0)) {
       toast.error('Please enter a valid sale price.');
       return;
+    }
+
+    if (selected.needsPrice && lockedBaseValue !== null && Number(price) < lockedBaseValue) {
+      toast.error(`Price cannot be below the locked base value of $${lockedBaseValue.toFixed(2)} AUD.`);
+      return;
+    }
+
+    if (selected.needsTrade && lockedBaseValue !== null) {
+      const tv = Number(price);
+      if (tv > 0 && tv < lockedBaseValue) {
+        toast.error(`Trade value cannot be below the locked base value of $${lockedBaseValue.toFixed(2)} AUD.`);
+        return;
+      }
     }
 
     setLoading(true);
@@ -113,12 +128,13 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
           listed_at: new Date().toISOString(),
         };
 
-        // Check if a listing already exists for this vault item
+        // Check if an active/non-archived listing already exists for this vault item
         const { data: existing } = await supabase
           .from('listings')
           .select('id')
           .eq('vault_item_id', product.id)
-          .single();
+          .neq('status', 'archived')
+          .maybeSingle();
 
         if (existing) {
           const { error: updateErr } = await supabase
@@ -177,6 +193,16 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
             </Badge>
           </div>
 
+          {lockedBaseValue !== null && (
+            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25">
+              <Shield className="w-4 h-4 text-amber-600 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-amber-700">Locked Base Value: ${lockedBaseValue.toFixed(2)} AUD</p>
+                <p className="text-xs text-amber-600/80">Your listing price cannot be set below this floor.</p>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             {OPTIONS.map((opt) => {
               const Icon = opt.icon;
@@ -200,19 +226,29 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
             <div className="space-y-4 border border-border rounded-xl p-4 bg-muted/20">
               {selected.needsPrice && (
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-semibold">Sale Price (AUD) *</Label>
+                  <Label className="text-sm font-semibold">
+                    Sale Price (AUD) *
+                    {lockedBaseValue !== null && (
+                      <span className="ml-2 text-xs font-normal text-amber-600">min ${lockedBaseValue.toFixed(2)}</span>
+                    )}
+                  </Label>
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       type="number"
-                      min="0.01"
+                      min={lockedBaseValue !== null ? lockedBaseValue : 0.01}
                       step="0.01"
                       value={price}
                       onChange={e => setPrice(e.target.value)}
-                      placeholder="0.00"
-                      className="pl-9 bg-background"
+                      placeholder={lockedBaseValue !== null ? lockedBaseValue.toFixed(2) : '0.00'}
+                      className={`pl-9 bg-background ${lockedBaseValue !== null && Number(price) < lockedBaseValue && price !== '' ? 'border-destructive' : ''}`}
                     />
                   </div>
+                  {lockedBaseValue !== null && price !== '' && Number(price) < lockedBaseValue && (
+                    <p className="text-destructive text-xs flex items-center gap-1">
+                      <Shield className="w-3 h-3" /> Price is below the locked base value of ${lockedBaseValue.toFixed(2)}
+                    </p>
+                  )}
                 </div>
               )}
               {selected.needsTrade && (

@@ -133,4 +133,41 @@ router.get('/:id', async (req, res) => {
   });
 });
 
+// PATCH /vault/:id/base-value — admin-only: adjust a card's locked base value
+router.patch('/:id/base-value', authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  const { newValue, reason } = req.body;
+
+  const isAdmin = req.user.app_metadata?.is_admin
+    || req.user.user_metadata?.is_admin
+    || false;
+
+  if (!isAdmin) {
+    return res.status(403).json({ error: 'Only administrators can adjust locked base values.' });
+  }
+
+  if (!newValue || isNaN(Number(newValue)) || Number(newValue) < 0) {
+    return res.status(400).json({ error: 'A valid newValue (number >= 0) is required.' });
+  }
+
+  // Use service-role client to bypass RLS on the protected column
+  const { data, error } = await supabase
+    .from('vault_items')
+    .update({
+      locked_base_value_aud: Number(newValue),
+      base_value_source: 'admin',
+      base_value_set_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select('id, card_name, locked_base_value_aud')
+    .single();
+
+  if (error?.code === 'PGRST116') return res.status(404).json({ error: 'Card not found.' });
+  if (error) throw error;
+
+  logger.info(`[VAULT] Admin ${req.user.id} set locked base value for card ${id} to ${newValue}. Reason: ${reason || 'none'}`);
+
+  res.json({ success: true, card: data, reason: reason || null });
+});
+
 export default router;

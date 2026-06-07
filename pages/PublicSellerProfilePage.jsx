@@ -4,6 +4,8 @@ import { useParams, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Star, ShieldCheck, MapPin, Calendar, ExternalLink, ShieldAlert, Package, MessageSquare } from 'lucide-react';
+import SellerTierBadge from '@/components/SellerTierBadge.jsx';
+import VerifiedBadge from '@/components/VerifiedBadge.jsx';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -167,7 +169,10 @@ const PublicSellerProfilePage = () => {
                 <h1 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
                   {seller.display_name || seller.name || 'Community Member'}
                 </h1>
-                {isVerified && <Badge className="bg-[hsl(var(--verified-badge))] hover:bg-[hsl(var(--verified-badge))]/90 font-bold border-none shadow-sm text-white">Verified</Badge>}
+                {isVerified && <VerifiedBadge size="md" showLabel />}
+                {seller.seller_tier && seller.seller_tier !== 'none' && (
+                  <SellerTierBadge tier={seller.seller_tier} size="md" />
+                )}
               </div>
 
               <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-6 gap-y-2 text-sm font-medium text-muted-foreground mb-6">
@@ -236,17 +241,41 @@ const PublicSellerProfilePage = () => {
             )}
           </div>
           
-          <div className="bg-card rounded-[2rem] border border-border p-6 shadow-sm">
-            <h3 className="font-bold text-foreground mb-4 uppercase text-xs tracking-wider">Seller Stats</h3>
-            <div className="space-y-4 text-sm font-medium">
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Response Time</span>
-                <span className="text-foreground">~2 hrs</span>
+          {/* Trust & Reputation card */}
+          <div className="bg-card rounded-[2rem] border border-border p-6 shadow-sm space-y-4">
+            <h3 className="font-bold text-foreground uppercase text-xs tracking-wider">Trust &amp; Reputation</h3>
+
+            {seller.seller_tier && seller.seller_tier !== 'none' && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Seller Tier</span>
+                <SellerTierBadge tier={seller.seller_tier} size="sm" />
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Total Transactions</span>
-                <span className="text-foreground">{seller.inventoryCount || stats.totalListings * 3}</span>
+            )}
+
+            {isVerified && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Identity</span>
+                <VerifiedBadge size="sm" showLabel />
               </div>
+            )}
+
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Rating</span>
+              <span className="font-bold text-foreground">
+                {stats.averageRating > 0 ? `${stats.averageRating.toFixed(1)} / 5` : 'New seller'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Reviews</span>
+              <span className="font-bold text-foreground">{stats.totalReviews}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Completed Sales</span>
+              <span className="font-bold text-foreground">{seller.total_sales ?? 0}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Purchases</span>
+              <span className="font-bold text-foreground">{seller.total_purchases ?? 0}</span>
             </div>
           </div>
         </div>

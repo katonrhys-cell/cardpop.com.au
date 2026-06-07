@@ -51,13 +51,15 @@ const MarketplacePage = () => {
 
   // Initialize Name Map and Categories (root categories only)
   useEffect(() => {
+    let active = true;
     const init = async () => {
       const map = await buildNameMap();
-      if (isMounted.current) setNameMap(map);
+      if (active) setNameMap(map);
       const allCats = await getCategories();
-      if (isMounted.current) setCatOpts(allCats.filter(c => !c.parent_id));
+      if (active) setCatOpts(allCats.filter(c => !c.parent_id));
     };
     init();
+    return () => { active = false; };
   }, [buildNameMap, getCategories]);
 
   // Cascading Dropdown Handlers
@@ -66,6 +68,7 @@ const MarketplacePage = () => {
     else { setSubOpts([]); setFilterSub(''); }
   }, [filterCat, getSubcategoriesByCategory]);
 
+  // Main listings fetch
   useEffect(() => {
     let cancelled = false;
 
@@ -75,7 +78,7 @@ const MarketplacePage = () => {
       try {
         let query = supabase
           .from('listings')
-          .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified)')
+          .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
           .limit(100);
 
         const activeCat = filterSub || filterCat;
@@ -84,11 +87,18 @@ const MarketplacePage = () => {
         if (debouncedMin && !isNaN(debouncedMin)) query = query.gte('price_aud', Number(debouncedMin));
         if (debouncedMax && !isNaN(debouncedMax)) query = query.lte('price_aud', Number(debouncedMax));
 
-        query = query.eq('status', 'active');
-        if (filterMode === 'Auction') query = query.eq('listing_type', 'auction');
-        else if (filterMode === 'BuyNow') query = query.eq('listing_type', 'fixed');
-        else if (filterMode === 'ForTrade') query = query.eq('listing_type', 'trade');
-        else if (filterMode === 'MakeOffer') query = query.eq('accepts_offers', true);
+        // Always exclude vault-only (private) listings from the public marketplace
+        query = query.eq('status', 'active').neq('listing_type', 'vault');
+
+        if (filterMode === 'Auction') {
+          query = query.eq('listing_type', 'auction');
+        } else if (filterMode === 'BuyNow') {
+          query = query.eq('listing_type', 'fixed');
+        } else if (filterMode === 'ForTrade') {
+          query = query.eq('listing_type', 'trade');
+        } else if (filterMode === 'MakeOffer') {
+          query = query.eq('accepts_offers', true);
+        }
 
         if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
         else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });

@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 const InfoPageLayout = ({ title, description, eyebrow, icon: Icon, children, relatedLinks = [] }) => {
   return (
@@ -10,15 +11,11 @@ const InfoPageLayout = ({ title, description, eyebrow, icon: Icon, children, rel
       {/* ── Hero header ── */}
       <section className="bg-card border-b border-border py-20 text-center">
         <div className="container-default">
-          {Icon && (
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
-              <Icon className="w-8 h-8 text-primary" />
-            </div>
-          )}
+          {Icon && <Icon className="w-12 h-12 text-primary mx-auto mb-6" />}
           {eyebrow && (
-            <span className="inline-block text-primary text-[0.7rem] font-bold tracking-[0.16em] uppercase mb-4">
+            <Badge variant="outline" className="mb-4 text-xs font-semibold tracking-widest uppercase border-primary/40 text-primary px-3 py-1">
               {eyebrow}
-            </span>
+            </Badge>
           )}
           <h1 className="text-4xl md:text-5xl font-bold mb-4">{title}</h1>
           {description && (
@@ -39,9 +36,7 @@ const InfoPageLayout = ({ title, description, eyebrow, icon: Icon, children, rel
       {/* ── Contact CTA ── */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
         <section className="bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 border border-primary/20 rounded-3xl p-10 text-center">
-          <div className="w-14 h-14 rounded-2xl bg-primary/15 flex items-center justify-center mx-auto mb-5">
-            <MessageCircle className="w-7 h-7 text-primary" />
-          </div>
+          <MessageCircle className="w-12 h-12 text-primary mx-auto mb-5" />
           <h2 className="text-2xl font-bold mb-3">Still have questions?</h2>
           <p className="text-muted-foreground max-w-md mx-auto mb-7 leading-relaxed">
             Our support team is here to help. Reach out and we'll get back to you as soon as possible.

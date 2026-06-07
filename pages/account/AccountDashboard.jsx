@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
-import { Package, List, ArrowRightLeft, DollarSign, ArrowRight, AlertCircle, RefreshCw, PackageOpen, Heart } from 'lucide-react';
-import { useWatchlist } from '@/hooks/useWatchlist.js';
+import { Package, List, ArrowRightLeft, DollarSign, ArrowRight, AlertCircle, RefreshCw, PackageOpen, Award } from 'lucide-react';
+import SellerTierBadge from '@/components/SellerTierBadge.jsx';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,74 +16,83 @@ import { toast } from 'sonner';
 
 const AccountDashboard = () => {
   const { currentUser } = useAuth();
-  const { count: watchlistCount } = useWatchlist();
 
   const [stats, setStats] = useState({
     salesCount: 0, revenue: 0, listingsCount: 0, vaultItemsCount: 0, pendingTrades: 0
   });
-  const [statsLoading, setStatsLoading] = useState(false);
-  const [statsError, setStatsError]     = useState(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState(null);
+  const [sellerTier, setSellerTier] = useState(null);
 
-  const [vaultItems, setVaultItems]         = useState([]);
-  const [vaultLoading, setVaultLoading]     = useState(false);
-  const [vaultError, setVaultError]         = useState(null);
-  const [vaultPage, setVaultPage]           = useState(1);
+  const [vaultItems, setVaultItems]           = useState([]);
+  const [vaultLoading, setVaultLoading]       = useState(false);
+  const [vaultError, setVaultError]           = useState(null);
+  const [vaultPage, setVaultPage]             = useState(1);
   const [vaultTotalPages, setVaultTotalPages] = useState(1);
 
   // Stable refs so realtime callbacks always call the latest fetch without
   // being in the realtime effect's dep array (which would recreate the channel).
-  const fetchStatsRef     = useRef(null);
-  const fetchVaultRef     = useRef(null);
-  const vaultPageRef      = useRef(1);
-  vaultPageRef.current    = vaultPage;
+  const fetchStatsRef  = useRef(null);
+  const fetchVaultRef  = useRef(null);
+  const vaultPageRef   = useRef(1);
+  vaultPageRef.current = vaultPage;
 
   // ── Stats fetch ───────────────────────────────────────────────────────────
   useEffect(() => {
-    console.log('[Dashboard] stats effect fired, currentUser?.id:', currentUser?.id);
     if (!currentUser?.id) { setStatsLoading(false); return; }
 
     let cancelled = false;
-    const uid = currentUser.id;
 
     const run = async () => {
-      console.log('[Dashboard] run() started, cancelled:', cancelled);
       setStatsLoading(true);
       setStatsError(null);
+
+      // Fetch seller tier independently — a missing profile row must not block stats
+      supabase.from('profiles').select('seller_tier').eq('id', currentUser.id).maybeSingle()
+        .then(({ data }) => { if (!cancelled && data) setSellerTier(data.seller_tier); });
+
       try {
         const [salesRes, revenueRes, listingsRes, vaultRes, tradesRes] = await Promise.all([
           supabase.from('orders').select('id', { count: 'exact', head: true })
-            .or(`buyer_id.eq.${uid},seller_id.eq.${uid}`).eq('status', 'delivered'),
+            .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
+            .in('status', ['delivered', 'completed']),
           supabase.from('orders').select('total_aud')
-            .or(`buyer_id.eq.${uid},seller_id.eq.${uid}`).eq('status', 'delivered'),
+            .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
+            .in('status', ['delivered', 'completed']),
           supabase.from('listings').select('id', { count: 'exact', head: true })
-            .eq('seller_id', uid).eq('status', 'active'),
+            .eq('seller_id', currentUser.id).eq('status', 'active').neq('listing_type', 'vault'),
           supabase.from('vault_items').select('id', { count: 'exact', head: true })
-            .eq('owner_id', uid),
+            .eq('owner_id', currentUser.id),
           supabase.from('trades').select('id', { count: 'exact', head: true })
-            .or(`initiator_id.eq.${uid},responder_id.eq.${uid}`).eq('status', 'proposed'),
+            .or(`initiator_id.eq.${currentUser.id},responder_id.eq.${currentUser.id}`)
+            .eq('status', 'proposed'),
         ]);
-        console.log('[Dashboard] queries done, cancelled:', cancelled, 'errors:', [salesRes.error, listingsRes.error, vaultRes.error, tradesRes.error].filter(Boolean));
+
         if (cancelled) return;
+
+        // Log individual errors without crashing the whole dashboard
+        [salesRes, revenueRes, listingsRes, vaultRes, tradesRes].forEach((r, i) => {
+          if (r.error) console.warn(`[Dashboard] query ${i} error:`, r.error.message);
+        });
+
         const revenue = (revenueRes.data || []).reduce((s, t) => s + (t.total_aud || 0), 0);
         setStats({
-          salesCount:     salesRes.count    || 0,
+          salesCount:      salesRes.count    || 0,
           revenue,
-          listingsCount:  listingsRes.count || 0,
-          vaultItemsCount: vaultRes.count   || 0,
-          pendingTrades:  tradesRes.count   || 0,
+          listingsCount:   listingsRes.count  || 0,
+          vaultItemsCount: vaultRes.count    || 0,
+          pendingTrades:   tradesRes.count   || 0,
         });
       } catch (err) {
-        console.error('[Dashboard] run() catch:', err);
         if (!cancelled) setStatsError('Failed to load live statistics. Please try refreshing.');
       } finally {
-        console.log('[Dashboard] run() finally, cancelled:', cancelled);
         if (!cancelled) setStatsLoading(false);
       }
     };
 
     fetchStatsRef.current = run;
     run();
-    return () => { console.log('[Dashboard] stats effect CLEANUP, setting cancelled=true'); cancelled = true; };
+    return () => { cancelled = true; };
   }, [currentUser?.id]);
 
   // ── Vault items fetch ─────────────────────────────────────────────────────
@@ -160,10 +169,10 @@ const AccountDashboard = () => {
           <h1 className="text-3xl font-bold font-serif mb-2 tracking-tight text-foreground">Dashboard</h1>
           <p className="text-muted-foreground text-lg font-medium">Welcome back! Here's your live account overview.</p>
         </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={handleRefresh} 
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
           disabled={statsLoading || vaultLoading}
           className="rounded-xl shadow-sm self-start sm:self-auto h-10 px-4 font-bold transition-transform active:scale-95"
         >
@@ -183,7 +192,7 @@ const AccountDashboard = () => {
       )}
 
       {/* Top Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
         <Card className="shadow-sm border-border hover:border-primary/30 transition-colors bg-card h-full flex flex-col">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Revenue</CardTitle>
@@ -260,13 +269,17 @@ const AccountDashboard = () => {
 
         <Card className="shadow-sm border-border hover:border-primary/30 transition-colors bg-card h-full flex flex-col">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Watchlist</CardTitle>
-            <Heart className="w-4 h-4 text-rose-500" />
+            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Seller Tier</CardTitle>
+            <Award className="w-4 h-4 text-amber-500" />
           </CardHeader>
           <CardContent className="flex-1 flex flex-col justify-end">
-            <div className="text-2xl font-extrabold tabular-nums tracking-tight text-foreground">{watchlistCount}</div>
-            <Link to="/account/watchlist" className="text-xs font-bold text-primary hover:underline mt-2 inline-block">
-              View watchlist &rarr;
+            {statsLoading ? <Skeleton className="h-7 w-28" /> : (
+              sellerTier && sellerTier !== 'none'
+                ? <SellerTierBadge tier={sellerTier} size="sm" />
+                : <span className="text-sm font-bold text-muted-foreground">New Seller</span>
+            )}
+            <Link to="/account/seller-tier" className="text-xs font-bold text-primary hover:underline mt-2 inline-block">
+              View progress &rarr;
             </Link>
           </CardContent>
         </Card>
@@ -281,7 +294,7 @@ const AccountDashboard = () => {
               <p className="text-sm text-muted-foreground mt-1">Manage your synced collection</p>
             </div>
             {vaultError && (
-              <Button variant="outline" size="sm" onClick={() => fetchVaultItems(vaultPage)} disabled={vaultLoading}>
+              <Button variant="outline" size="sm" onClick={() => fetchVaultRef.current?.(vaultPage)} disabled={vaultLoading}>
                 Retry
               </Button>
             )}
@@ -355,19 +368,19 @@ const AccountDashboard = () => {
                 Page {vaultPage} of {vaultTotalPages}
               </span>
               <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  disabled={vaultPage === 1 || vaultLoading} 
-                  onClick={() => fetchVaultItems(vaultPage - 1)}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={vaultPage === 1 || vaultLoading}
+                  onClick={() => fetchVaultRef.current?.(vaultPage - 1)}
                 >
                   Previous
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  disabled={vaultPage === vaultTotalPages || vaultLoading} 
-                  onClick={() => fetchVaultItems(vaultPage + 1)}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={vaultPage === vaultTotalPages || vaultLoading}
+                  onClick={() => fetchVaultRef.current?.(vaultPage + 1)}
                 >
                   Next
                 </Button>
@@ -391,6 +404,12 @@ const AccountDashboard = () => {
             <Button asChild variant="outline" className="w-full justify-between h-14 rounded-xl border-border hover:bg-primary/5 hover:text-primary transition-colors shadow-sm">
               <Link to="/account/profile">
                 <span className="font-bold text-foreground">Edit Public Profile</span>
+                <ArrowRight className="w-5 h-5 text-muted-foreground" />
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="w-full justify-between h-14 rounded-xl border-border hover:bg-primary/5 hover:text-primary transition-colors shadow-sm">
+              <Link to="/account/orders">
+                <span className="font-bold text-foreground">My Orders</span>
                 <ArrowRight className="w-5 h-5 text-muted-foreground" />
               </Link>
             </Button>
