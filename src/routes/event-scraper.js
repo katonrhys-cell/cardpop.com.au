@@ -4,6 +4,7 @@ import logger from '../utils/logger.js';
 import { stream } from '../api/integrated-ai.js';
 import { EventScraperPrompt } from '../constants/prompts.js';
 import supabase from '../utils/supabaseClient.js';
+import { authMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
 const AI_PROCESSING_TIMEOUT = 60000;
@@ -186,7 +187,7 @@ function formatSSEEvent(data) {
   }
 }
 
-router.post('/scrape-event-url', async (req, res) => {
+router.post('/scrape-event-url', authMiddleware, async (req, res) => {
   logger.info('[EVENT_SCRAPER] Received scrape-event-url request');
 
   const url = req.body?.url;
@@ -205,7 +206,7 @@ router.post('/scrape-event-url', async (req, res) => {
   res.json({ success: true, content: textContent });
 });
 
-router.post('/extract-event-from-content', async (req, res) => {
+router.post('/extract-event-from-content', authMiddleware, async (req, res) => {
   logger.info('[EVENT_SCRAPER] Received extract-event-from-content request');
 
   const content = req.body?.content;
@@ -316,7 +317,8 @@ router.post('/extract-event-from-content', async (req, res) => {
   });
 });
 
-router.post('/create-event-from-data', async (req, res) => {
+router.post('/create-event-from-data', authMiddleware, async (req, res) => {
+  if (!req.user.app_metadata?.is_admin) return res.status(403).json({ error: 'Admin access required' });
   logger.info('[EVENT_SCRAPER] Received create-event-from-data request');
 
   if (!req.body?.eventData) {
