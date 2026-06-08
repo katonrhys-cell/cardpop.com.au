@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useCardOCR } from '@/hooks/useCardOCR.js';
 import { useEbayPriceLookup } from '@/hooks/useEbayPriceLookup.js';
+import { useCardSight, mapCardSightToFormFields } from '@/hooks/useCardSight.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -69,6 +70,7 @@ const AddEditCardPage = () => {
 
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
+  const { identify: cardSightIdentify, isIdentifying, result: cardSightResult, clearResult: clearCardSight } = useCardSight();
 
   const emptyForm = {
     // Card identity
@@ -195,6 +197,8 @@ const AddEditCardPage = () => {
     const reader = new FileReader();
     reader.onloadend = () => setImagePreview(reader.result);
     reader.readAsDataURL(file);
+    // Run CardSight AI identification in the background as soon as image is selected
+    cardSightIdentify(file);
   };
 
   // ─── AI auto-fill ─────────────────────────────────────────────────────────
@@ -294,6 +298,14 @@ const AddEditCardPage = () => {
         trade_value_locked:  tradeAud > 0,
         listing_type:        isPublic ? formData.listingType : null,
         is_public:           isPublic,
+        // Persist CardSight ID if we got an exact match during this session
+        ...(cardSightResult?.exactMatch && cardSightResult?.card?.id
+          ? {
+              cardsight_card_id: cardSightResult.card.id,
+              cardsight_set_id:  cardSightResult.card.setId ?? null,
+              cardsight_identified_at: new Date().toISOString(),
+            }
+          : {}),
       };
 
       if (cardImagePath) payload.card_image = cardImagePath;
@@ -388,7 +400,7 @@ const AddEditCardPage = () => {
                 </div>
 
                 {/* AI Analysis */}
-                <div className="mt-4">
+                <div className="mt-4 space-y-3">
                   {!scanResult && imageFile && (
                     <Button
                       type="button"
@@ -403,6 +415,65 @@ const AddEditCardPage = () => {
                       }
                     </Button>
                   )}
+
+                  {/* CardSight AI identification result */}
+                  {(isIdentifying || cardSightResult) && (
+                    <div className={`p-3 rounded-xl border animate-in fade-in ${cardSightResult?.identified ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-muted/30 border-border'}`}>
+                      {isIdentifying ? (
+                        <p className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                          <Loader2 className="w-3 h-3 animate-spin" /> CardSight AI identifying card…
+                        </p>
+                      ) : cardSightResult?.identified ? (
+                        <>
+                          <p className="text-xs font-bold text-emerald-700 mb-2 flex items-center gap-1.5">
+                            <TrendingUp className="w-3.5 h-3.5" />
+                            CardSight AI — {cardSightResult.exactMatch ? 'Exact Match' : 'Set Match'} ({cardSightResult.confidence})
+                          </p>
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-foreground/80 mb-3">
+                            {cardSightResult.card?.name && <div className="col-span-2"><strong className="text-foreground">Card:</strong> {cardSightResult.card.name}</div>}
+                            {cardSightResult.card?.setName && <div><strong className="text-foreground">Set:</strong> {cardSightResult.card.setName}</div>}
+                            {cardSightResult.card?.year && <div><strong className="text-foreground">Year:</strong> {cardSightResult.card.year}</div>}
+                            {cardSightResult.card?.cardNumber && <div><strong className="text-foreground">No:</strong> {cardSightResult.card.cardNumber}</div>}
+                            {cardSightResult.card?.manufacturer && <div><strong className="text-foreground">Brand:</strong> {cardSightResult.card.manufacturer}</div>}
+                            {cardSightResult.grading && <div className="col-span-2"><strong className="text-foreground">Graded:</strong> {cardSightResult.grading.company} {cardSightResult.grading.grade}</div>}
+                            {cardSightResult.parallel && <div className="col-span-2"><strong className="text-foreground">Parallel:</strong> {cardSightResult.parallel.name ?? 'Yes'}</div>}
+                          </div>
+                          {cardSightResult.pricing && (
+                            <div className="text-xs text-emerald-800 bg-emerald-500/10 rounded-lg px-2.5 py-2 mb-3">
+                              <strong>Market Pricing</strong> ({cardSightResult.pricing.salesCount} sales) —
+                              Avg: <strong>${cardSightResult.pricing.avgPrice?.toFixed(2)}</strong> &nbsp;
+                              Low: ${cardSightResult.pricing.minPrice?.toFixed(2)} &nbsp;
+                              High: ${cardSightResult.pricing.maxPrice?.toFixed(2)}
+                            </div>
+                          )}
+                          <div className="flex gap-2 pt-2 border-t border-emerald-500/10">
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="flex-1 font-semibold text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                              onClick={() => {
+                                const fields = mapCardSightToFormFields(cardSightResult);
+                                setFormData(prev => ({ ...prev, ...fields }));
+                                if (cardSightResult.pricing?.avgPrice) {
+                                  set('estimatedValue', String(cardSightResult.pricing.avgPrice.toFixed(2)));
+                                }
+                                setIsAutoFilled(true);
+                                toast.success('Card details filled from CardSight catalog.');
+                              }}
+                            >
+                              Apply Catalog Data
+                            </Button>
+                            <Button type="button" size="sm" variant="outline" className="text-xs" onClick={clearCardSight}>
+                              Dismiss
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">CardSight: card not found in catalog.</p>
+                      )}
+                    </div>
+                  )}
+
                   {scanResult && (
                     <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl animate-in fade-in slide-in-from-top-2">
                       <h4 className="font-bold text-sm text-primary mb-3 flex items-center gap-2">

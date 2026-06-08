@@ -7,7 +7,7 @@ import { generateStructuredData } from '@/utils/seoUtils.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingCart, ShieldCheck } from 'lucide-react';
+import { ShoppingCart, ShieldCheck, BarChart3 } from 'lucide-react';
 
 const VaultListingDetailPage = () => {
   const { itemId } = useParams();
@@ -115,6 +115,13 @@ const VaultListingDetailPage = () => {
             <Button size="lg" variant="outline" className="w-full h-14 text-lg font-bold">
               Make Offer
             </Button>
+            {/* Analytics link — passes cardsight_card_id if available for real market data */}
+            <Link
+              to={`/analytics/card?name=${encodeURIComponent(vi?.card_name || title)}&set=${encodeURIComponent(vi?.set_name || '')}&collection=${encodeURIComponent(vi?.collection || '')}&price=${price}${vi?.cardsight_card_id ? `&cardsight_id=${vi.cardsight_card_id}` : ''}`}
+              className="flex items-center justify-center gap-2 w-full h-11 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+            >
+              <BarChart3 className="w-4 h-4" /> View Market Analytics
+            </Link>
           </div>
         </div>
       </div>

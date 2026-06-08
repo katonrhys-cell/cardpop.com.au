@@ -13,6 +13,7 @@ import eventScraperRouter from './event-scraper.js';
 import categoriesRouter from './categories.js';
 import subcategoriesRouter from './subcategories.js';
 import vaultRouter from './vault.js';
+import cardSightRouter from './cardsight.js';
 
 const router = Router();
 
@@ -28,6 +29,10 @@ export default () => {
 
     // Card OCR routes with rate limiting
     router.use('/card-ocr', cardOcrRouter);
+
+    // CardSight AI identification, catalog, and pricing routes
+    router.use('/cardsight', apiLimiter);
+    router.use('/cardsight', cardSightRouter);
     
     // Event scraper routes with API rate limiting
     router.use('/event-scraper', apiLimiter);
