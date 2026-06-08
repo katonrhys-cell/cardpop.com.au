@@ -16,6 +16,7 @@ const TradeOfferModal = ({ isOpen, onClose, targetCard }) => {
 
   useEffect(() => {
     if (isOpen && currentUser && targetCard) {
+      let cancelled = false;
       const fetchEligibleCards = async () => {
         setLoading(true);
         try {
@@ -36,17 +37,20 @@ const TradeOfferModal = ({ isOpen, onClose, targetCard }) => {
 
           const busyCardIds = (pendingTrades || []).flatMap(t => [t.initiator_listing_id, t.responder_listing_id]);
           const available = (cards || []).filter(c => !busyCardIds.includes(c.id));
-          
-          setMyCards(available);
+
+          if (!cancelled) setMyCards(available);
         } catch (error) {
-          console.error(error);
-          toast.error("Failed to load your vault inventory.");
+          if (!cancelled) {
+            console.error(error);
+            toast.error("Failed to load your vault inventory.");
+          }
         } finally {
-          setLoading(false);
+          if (!cancelled) setLoading(false);
         }
       };
       fetchEligibleCards();
       setSelectedCard(null);
+      return () => { cancelled = true; };
     }
   }, [isOpen, currentUser, targetCard]);
 
