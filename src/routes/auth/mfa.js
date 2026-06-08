@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import crypto from 'crypto';
 import express from 'express';
 import supabase from '../../utils/supabaseClient.js';
 import { generateOTP } from '../../utils/otpGenerator.js';
@@ -17,7 +18,7 @@ router.post('/request', authMiddleware, async (req, res) => {
 
   const otp = generateOTP();
   const expiresAt = new Date(Date.now() + MFA_CODE_EXPIRY_MS).toISOString();
-  const mfaId = `mfa_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  const mfaId = `mfa_${crypto.randomBytes(16).toString('hex')}`;
   const encryptedOtp = encrypt({ code: otp, expiresAt });
 
   const { error } = await supabase.from('mfa_sessions').insert({

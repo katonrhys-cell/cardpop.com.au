@@ -358,6 +358,14 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         const configId        = meta.configId || null;
         const amountCents     = session.amount_total || 0;
 
+        // Reconcile: Stripe's authoritative amount_total must match what we expected.
+        // Mismatch signals metadata corruption or a replay attack — reject the order.
+        const expectedTotalCents = Math.round((itemPrice + commissionAud + gstAud) * 100);
+        if (Math.abs(amountCents - expectedTotalCents) > 2) {
+          logger.error(`[STRIPE] Amount mismatch for session ${session.id}: Stripe=${amountCents}¢ expected=${expectedTotalCents}¢ — order rejected`);
+          break;
+        }
+
         const paymentIntentId = typeof session.payment_intent === 'string'
           ? session.payment_intent
           : (session.payment_intent?.id ?? null);
