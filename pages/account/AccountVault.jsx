@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 import VaultListingModal from '@/components/VaultListingModal.jsx';
+import PSAPopPanel from '@/components/PSAPopPanel.jsx';
 
 const CONDITION_LABELS = {
   mint: 'Mint', near_mint: 'Near Mint', excellent: 'Excellent',
@@ -40,6 +41,7 @@ const AccountVault = () => {
   const navigate = useNavigate();
 
   const [cards, setCards] = useState([]);
+  const [psaMap, setPsaMap] = useState({});   // cardsight_card_id → raw_data
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filterCollection, setFilterCollection] = useState('');
@@ -60,6 +62,21 @@ const AccountVault = () => {
       const { data, error: fetchError } = await query;
       if (fetchError) throw fetchError;
       setCards(data || []);
+
+      // Batch-fetch PSA population for all identified cards
+      const csIds = [...new Set((data || []).map(c => c.cardsight_card_id).filter(Boolean))];
+      if (csIds.length > 0) {
+        supabase
+          .from('card_market_valuations')
+          .select('card_id, raw_data')
+          .in('card_id', csIds)
+          .eq('source', 'psa')
+          .then(({ data: popRows }) => {
+            if (popRows) {
+              setPsaMap(Object.fromEntries(popRows.map(r => [r.card_id, r.raw_data])));
+            }
+          });
+      }
     } catch (err) {
       setError(err.message || 'Failed to load vault.');
     } finally {
@@ -93,6 +110,7 @@ const AccountVault = () => {
   };
 
   const renderCard = (card) => {
+    const psaRaw = card.cardsight_card_id ? psaMap[card.cardsight_card_id] ?? null : null;
     let imageUrl = null;
     if (card.card_image) {
       imageUrl = card.card_image.startsWith('http')
@@ -157,6 +175,7 @@ const AccountVault = () => {
             {card.grading_company && card.grading_company !== 'raw' && (
               <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground uppercase">{card.grading_company} {card.grade || ''}</Badge>
             )}
+            <PSAPopPanel rawData={psaRaw} compact />
           </div>
 
           <div className="mt-auto pt-3 border-t border-border flex items-end justify-between">

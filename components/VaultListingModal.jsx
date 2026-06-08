@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
-import { Loader2, Lock, ShoppingCart, ArrowRightLeft, Layers, DollarSign, Shield } from 'lucide-react';
+import { Loader2, Lock, ShoppingCart, ArrowRightLeft, Layers, DollarSign, TrendingUp } from 'lucide-react';
+import PriceRangeIndicator from '@/components/PriceRangeIndicator.jsx';
 import {
   Dialog,
   DialogContent,
@@ -66,11 +67,24 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
   const [price, setPrice] = useState('');
   const [tradeWants, setTradeWants] = useState('');
   const [loading, setLoading] = useState(false);
+  const [priceRange, setPriceRange] = useState(null);
 
   const handleOpen = () => {
     setSelected(null);
     setPrice(product?.estimated_value_aud ? String(product.estimated_value_aud) : '');
     setTradeWants('');
+    setPriceRange(null);
+
+    // Fetch price range from DB if we have a CardSight card ID
+    const csId = product?.cardsight_card_id;
+    if (csId) {
+      supabase
+        .from('card_price_ranges')
+        .select('*')
+        .eq('card_id', csId)
+        .maybeSingle()
+        .then(({ data }) => { if (data) setPriceRange(data); });
+    }
   };
 
   const handleSelect = (opt) => {
@@ -82,6 +96,10 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
 
   const lockedBaseValue = product?.locked_base_value_aud ?? null;
 
+  // Effective minimum = max(locked base, market floor (low * 50%))
+  const marketFloor = priceRange?.floor_aud ?? null;
+  const effectiveFloor = Math.max(lockedBaseValue ?? 0, marketFloor ?? 0) || null;
+
   const handleConfirm = async () => {
     if (!product || !selected) return;
 
@@ -90,15 +108,15 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
       return;
     }
 
-    if (selected.needsPrice && lockedBaseValue !== null && Number(price) < lockedBaseValue) {
-      toast.error(`Price cannot be below the locked base value of $${lockedBaseValue.toFixed(2)} AUD.`);
+    if (selected.needsPrice && effectiveFloor !== null && Number(price) < effectiveFloor) {
+      toast.error(`Price cannot be set below $${effectiveFloor.toFixed(2)} AUD (market minimum floor).`);
       return;
     }
 
-    if (selected.needsTrade && lockedBaseValue !== null) {
+    if (selected.needsTrade && effectiveFloor !== null) {
       const tv = Number(price);
-      if (tv > 0 && tv < lockedBaseValue) {
-        toast.error(`Trade value cannot be below the locked base value of $${lockedBaseValue.toFixed(2)} AUD.`);
+      if (tv > 0 && tv < effectiveFloor) {
+        toast.error(`Trade value cannot be set below $${effectiveFloor.toFixed(2)} AUD (market minimum floor).`);
         return;
       }
     }
@@ -193,15 +211,23 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
             </Badge>
           </div>
 
-          {lockedBaseValue !== null && (
-            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25">
-              <Shield className="w-4 h-4 text-amber-600 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-amber-700">Locked Base Value: ${lockedBaseValue.toFixed(2)} AUD</p>
-                <p className="text-xs text-amber-600/80">Your listing price cannot be set below this floor.</p>
+          {/* Price range indicator */}
+          {priceRange && (
+            <div className="p-3 rounded-xl bg-muted/30 border border-border space-y-2">
+              <div className="flex items-center gap-1.5 mb-1">
+                <TrendingUp className="w-3.5 h-3.5 text-primary" />
+                <p className="text-xs font-bold text-foreground">Market Price Range</p>
+                <span className="text-[10px] text-muted-foreground ml-auto">
+                  {priceRange.sources_used?.join(' · ')}
+                </span>
               </div>
+              <PriceRangeIndicator
+                range={priceRange}
+                currentPrice={price !== '' && !isNaN(Number(price)) ? Number(price) : null}
+              />
             </div>
           )}
+
 
           <div className="space-y-2">
             {OPTIONS.map((opt) => {
@@ -226,29 +252,19 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
             <div className="space-y-4 border border-border rounded-xl p-4 bg-muted/20">
               {selected.needsPrice && (
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-semibold">
-                    Sale Price (AUD) *
-                    {lockedBaseValue !== null && (
-                      <span className="ml-2 text-xs font-normal text-amber-600">min ${lockedBaseValue.toFixed(2)}</span>
-                    )}
-                  </Label>
+                  <Label className="text-sm font-semibold">Sale Price (AUD) *</Label>
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       type="number"
-                      min={lockedBaseValue !== null ? lockedBaseValue : 0.01}
+                      min={effectiveFloor ?? 0.01}
                       step="0.01"
                       value={price}
                       onChange={e => setPrice(e.target.value)}
-                      placeholder={lockedBaseValue !== null ? lockedBaseValue.toFixed(2) : '0.00'}
-                      className={`pl-9 bg-background ${lockedBaseValue !== null && Number(price) < lockedBaseValue && price !== '' ? 'border-destructive' : ''}`}
+                      placeholder={effectiveFloor != null ? effectiveFloor.toFixed(2) : '0.00'}
+                      className={`pl-9 bg-background ${effectiveFloor !== null && price !== '' && Number(price) < effectiveFloor ? 'border-destructive' : ''}`}
                     />
                   </div>
-                  {lockedBaseValue !== null && price !== '' && Number(price) < lockedBaseValue && (
-                    <p className="text-destructive text-xs flex items-center gap-1">
-                      <Shield className="w-3 h-3" /> Price is below the locked base value of ${lockedBaseValue.toFixed(2)}
-                    </p>
-                  )}
                 </div>
               )}
               {selected.needsTrade && (
