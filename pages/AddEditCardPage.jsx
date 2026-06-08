@@ -21,6 +21,8 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useCardOCR } from '@/hooks/useCardOCR.js';
 import { useEbayPriceLookup } from '@/hooks/useEbayPriceLookup.js';
+import { useCardSight, mapCardSightToFormFields } from '@/hooks/useCardSight.js';
+import PSAPopPanel from '@/components/PSAPopPanel.jsx';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -66,9 +68,11 @@ const AddEditCardPage = () => {
   const [isAutoFilled, setIsAutoFilled] = useState(false);
   const [categoryId, setCategoryId] = useState(null);
   const [lockedBaseValue, setLockedBaseValue] = useState(null);
+  const [psaPopData, setPsaPopData] = useState(null);
 
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
+  const { identify: cardSightIdentify, isIdentifying, result: cardSightResult, clearResult: clearCardSight } = useCardSight();
 
   const emptyForm = {
     // Card identity
@@ -148,6 +152,18 @@ const AddEditCardPage = () => {
           return;
         }
         setLockedBaseValue(card.locked_base_value_aud ?? null);
+
+        // Fetch PSA population data if the card has a CardSight ID
+        if (card.cardsight_card_id) {
+          supabase
+            .from('card_market_valuations')
+            .select('raw_data')
+            .eq('card_id', card.cardsight_card_id)
+            .eq('source', 'psa')
+            .maybeSingle()
+            .then(({ data }) => { if (data?.raw_data) setPsaPopData(data.raw_data); });
+        }
+
         setFormData({
           collection:     card.collection     || 'Pokemon',
           cardName:       card.card_name      || '',
@@ -195,6 +211,8 @@ const AddEditCardPage = () => {
     const reader = new FileReader();
     reader.onloadend = () => setImagePreview(reader.result);
     reader.readAsDataURL(file);
+    // Run CardSight AI identification in the background as soon as image is selected
+    cardSightIdentify(file);
   };
 
   // ─── AI auto-fill ─────────────────────────────────────────────────────────
@@ -292,14 +310,22 @@ const AddEditCardPage = () => {
         notes:               formData.notes?.trim()       || null,
         trade_value_aud:     tradeAud,
         trade_value_locked:  tradeAud > 0,
-        listing_type:        isPublic ? formData.listingType : null,
+        listing_type:        isPublic ? formData.listingType : 'Private',
         is_public:           isPublic,
+        // Persist CardSight ID if we got an exact match during this session
+        ...(cardSightResult?.exactMatch && cardSightResult?.card?.id
+          ? {
+              cardsight_card_id: cardSightResult.card.id,
+              cardsight_set_id:  cardSightResult.card.setId ?? null,
+              cardsight_identified_at: new Date().toISOString(),
+            }
+          : {}),
       };
 
       if (cardImagePath) payload.card_image = cardImagePath;
 
       if (isEdit) {
-        const { error } = await supabase.from('vault_items').update(payload).eq('id', id);
+        const { error } = await supabase.from('vault_items').update(payload).eq('id', id).eq('owner_id', currentUser.id);
         if (error) throw error;
         toast.success('Card updated successfully!');
         navigate('/vault');
@@ -388,7 +414,7 @@ const AddEditCardPage = () => {
                 </div>
 
                 {/* AI Analysis */}
-                <div className="mt-4">
+                <div className="mt-4 space-y-3">
                   {!scanResult && imageFile && (
                     <Button
                       type="button"
@@ -403,6 +429,65 @@ const AddEditCardPage = () => {
                       }
                     </Button>
                   )}
+
+                  {/* CardSight AI identification result */}
+                  {(isIdentifying || cardSightResult) && (
+                    <div className={`p-3 rounded-xl border animate-in fade-in ${cardSightResult?.identified ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-muted/30 border-border'}`}>
+                      {isIdentifying ? (
+                        <p className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                          <Loader2 className="w-3 h-3 animate-spin" /> CardSight AI identifying card…
+                        </p>
+                      ) : cardSightResult?.identified ? (
+                        <>
+                          <p className="text-xs font-bold text-emerald-700 mb-2 flex items-center gap-1.5">
+                            <TrendingUp className="w-3.5 h-3.5" />
+                            CardSight AI — {cardSightResult.exactMatch ? 'Exact Match' : 'Set Match'} ({cardSightResult.confidence})
+                          </p>
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-foreground/80 mb-3">
+                            {cardSightResult.card?.name && <div className="col-span-2"><strong className="text-foreground">Card:</strong> {cardSightResult.card.name}</div>}
+                            {cardSightResult.card?.setName && <div><strong className="text-foreground">Set:</strong> {cardSightResult.card.setName}</div>}
+                            {cardSightResult.card?.year && <div><strong className="text-foreground">Year:</strong> {cardSightResult.card.year}</div>}
+                            {cardSightResult.card?.cardNumber && <div><strong className="text-foreground">No:</strong> {cardSightResult.card.cardNumber}</div>}
+                            {cardSightResult.card?.manufacturer && <div><strong className="text-foreground">Brand:</strong> {cardSightResult.card.manufacturer}</div>}
+                            {cardSightResult.grading && <div className="col-span-2"><strong className="text-foreground">Graded:</strong> {cardSightResult.grading.company} {cardSightResult.grading.grade}</div>}
+                            {cardSightResult.parallel && <div className="col-span-2"><strong className="text-foreground">Parallel:</strong> {cardSightResult.parallel.name ?? 'Yes'}</div>}
+                          </div>
+                          {cardSightResult.pricing && (
+                            <div className="text-xs text-emerald-800 bg-emerald-500/10 rounded-lg px-2.5 py-2 mb-3">
+                              <strong>Market Pricing</strong> ({cardSightResult.pricing.salesCount} sales) —
+                              Avg: <strong>${cardSightResult.pricing.avgPrice?.toFixed(2)}</strong> &nbsp;
+                              Low: ${cardSightResult.pricing.minPrice?.toFixed(2)} &nbsp;
+                              High: ${cardSightResult.pricing.maxPrice?.toFixed(2)}
+                            </div>
+                          )}
+                          <div className="flex gap-2 pt-2 border-t border-emerald-500/10">
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="flex-1 font-semibold text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                              onClick={() => {
+                                const fields = mapCardSightToFormFields(cardSightResult);
+                                setFormData(prev => ({ ...prev, ...fields }));
+                                if (cardSightResult.pricing?.avgPrice) {
+                                  set('estimatedValue', String(cardSightResult.pricing.avgPrice.toFixed(2)));
+                                }
+                                setIsAutoFilled(true);
+                                toast.success('Card details filled from CardSight catalog.');
+                              }}
+                            >
+                              Apply Catalog Data
+                            </Button>
+                            <Button type="button" size="sm" variant="outline" className="text-xs" onClick={clearCardSight}>
+                              Dismiss
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">CardSight: card not found in catalog.</p>
+                      )}
+                    </div>
+                  )}
+
                   {scanResult && (
                     <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl animate-in fade-in slide-in-from-top-2">
                       <h4 className="font-bold text-sm text-primary mb-3 flex items-center gap-2">
@@ -469,12 +554,12 @@ const AddEditCardPage = () => {
                   <div className="space-y-2">
                     <Label className="font-bold">Era / Set Name</Label>
                     {eraOpts.length > 0 ? (
-                      <Select value={formData.setName} onValueChange={v => set('setName', v)}>
+                      <Select value={formData.setName || '__none__'} onValueChange={v => set('setName', v === '__none__' ? '' : v)}>
                         <SelectTrigger className="h-11 bg-background">
                           <SelectValue placeholder="Select an era or set…" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">— Not specified —</SelectItem>
+                          <SelectItem value="__none__">— Not specified —</SelectItem>
                           <SelectSeparator />
                           {eraOpts.map(era => (
                             <SelectItem key={era.name} value={era.name}>
@@ -524,12 +609,12 @@ const AddEditCardPage = () => {
                   {/* Variant */}
                   <div className="space-y-2">
                     <Label className="font-bold">Card Variant / Finish</Label>
-                    <Select value={formData.variant} onValueChange={v => set('variant', v)}>
+                    <Select value={formData.variant || '__none__'} onValueChange={v => set('variant', v === '__none__' ? '' : v)}>
                       <SelectTrigger className="h-11 bg-background">
                         <SelectValue placeholder="Select variant…" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No variant</SelectItem>
+                        <SelectItem value="__none__">No variant</SelectItem>
                         {VARIANT_GROUPS.map((group, gi) => (
                           <React.Fragment key={group.label}>
                             {gi > 0 && <SelectSeparator />}
@@ -666,6 +751,14 @@ const AddEditCardPage = () => {
                   )}
                 </div>
               </SectionCard>
+
+              {/* PSA population panel — only shown when we have a CardSight match */}
+              {isEdit && (
+                <div className="premium-card p-6 bg-card space-y-3">
+                  <h2 className="font-serif text-xl font-bold border-b border-border pb-3">PSA Population</h2>
+                  <PSAPopPanel rawData={psaPopData} />
+                </div>
+              )}
 
               {/* ── 3. Value & Acquisition ── */}
               <SectionCard title="Value & Acquisition">

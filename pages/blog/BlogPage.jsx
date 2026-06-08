@@ -119,21 +119,24 @@ const BlogPage = () => {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const fetchArticles = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { data } = await supabase.from('blog_articles').select('*').eq('is_published', true).order('created_at', { ascending: false }).limit(100);
-      setArticles(data ?? []);
-    } catch (err) {
-      console.error('Error fetching articles:', err);
-      setError('Failed to load articles. Please try again later.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchArticles(); }, []);
+  useEffect(() => {
+    let cancelled = false;
+    const fetchArticles = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data } = await supabase.from('blog_articles').select('*').eq('is_published', true).order('created_at', { ascending: false }).limit(100);
+        if (!cancelled) setArticles(data ?? []);
+      } catch (err) {
+        console.error('Error fetching articles:', err);
+        if (!cancelled) setError('Failed to load articles. Please try again later.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    fetchArticles();
+    return () => { cancelled = true; };
+  }, []);
 
   // Articles for the Featured Stories strip (only on the main blog page, no search/category filter)
   const featuredArticles = useMemo(

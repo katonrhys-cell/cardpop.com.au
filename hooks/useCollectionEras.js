@@ -31,6 +31,12 @@ export function useCollectionEras(collectionSlug) {
           setEras(COLLECTION_CONFIGS[collectionSlug]?.eras ?? []);
         }
         setLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setEras(COLLECTION_CONFIGS[collectionSlug]?.eras ?? []);
+          setLoading(false);
+        }
       });
 
     return () => { cancelled = true; };

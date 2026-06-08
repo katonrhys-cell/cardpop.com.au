@@ -15,6 +15,8 @@ import categoriesRouter from './categories.js';
 import subcategoriesRouter from './subcategories.js';
 import vaultRouter from './vault.js';
 import newsletterRouter from './newsletter.js';
+import cardSightRouter from './cardsight.js';
+import marketDataRouter from './market-data.js';
 
 const router = Router();
 
@@ -30,6 +32,10 @@ export default () => {
 
     // Card OCR routes with rate limiting
     router.use('/card-ocr', cardOcrRouter);
+
+    // CardSight AI identification, catalog, and pricing routes
+    router.use('/cardsight', apiLimiter);
+    router.use('/cardsight', cardSightRouter);
     
     // Event scraper routes with API rate limiting
     router.use('/event-scraper', apiLimiter);
@@ -68,6 +74,10 @@ export default () => {
     // Newsletter (Kit.com) subscription — no auth required
     router.use('/newsletter', apiLimiter);
     router.use('/newsletter', newsletterRouter);
+
+    // Market data — persisted CardSight + eBay + PSA valuations
+    router.use('/market-data', apiLimiter);
+    router.use('/market-data', marketDataRouter);
 
     // Trade routes with email verification middleware
     // Apply auth middleware first, then trade access verification

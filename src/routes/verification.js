@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import supabase from '../utils/supabaseClient.js';
+import { authMiddleware } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -12,11 +13,8 @@ router.get('/googlee177016f79225570.html', (_req, res) => {
 });
 
 // POST /send-verification-email
-router.post('/send-verification-email', async (req, res) => {
-  const { userId } = req.body;
-  if (!userId?.trim()) return res.status(400).json({ error: 'userId is required' });
-
-  const trimmedUserId = userId.trim();
+router.post('/send-verification-email', authMiddleware, async (req, res) => {
+  const trimmedUserId = req.user.id;
   logger.info(`[VERIFICATION] Sending verification email for user ${trimmedUserId}`);
 
   // Fetch user from Supabase auth

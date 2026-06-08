@@ -85,7 +85,8 @@ export function useTradeRequests() {
       const { error } = await supabase
         .from('trades')
         .update({ status: 'accepted' })
-        .eq('id', trade.id);
+        .eq('id', trade.id)
+        .eq('responder_id', currentUser?.id);
       if (error) throw error;
 
       // Decline any other pending trades involving same listings
@@ -110,7 +111,8 @@ export function useTradeRequests() {
       const { error } = await supabase
         .from('trades')
         .update({ status: 'cancelled' })
-        .eq('id', tradeId);
+        .eq('id', tradeId)
+        .or(`responder_id.eq.${currentUser?.id},initiator_id.eq.${currentUser?.id}`);
       if (error) throw error;
       toast.success('Trade request declined.');
       return true;

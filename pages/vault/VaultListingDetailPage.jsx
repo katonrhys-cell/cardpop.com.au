@@ -7,11 +7,13 @@ import { generateStructuredData } from '@/utils/seoUtils.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ShoppingCart, ShieldCheck } from 'lucide-react';
+import { ShoppingCart, ShieldCheck, BarChart3 } from 'lucide-react';
+import PSAPopPanel from '@/components/PSAPopPanel.jsx';
 
 const VaultListingDetailPage = () => {
   const { itemId } = useParams();
   const [listing, setListing] = useState(null);
+  const [psaData, setPsaData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -25,7 +27,21 @@ const VaultListingDetailPage = () => {
           .eq('id', itemId)
           .single();
         if (error) throw error;
-        if (!cancelled) setListing(record);
+        if (!cancelled) {
+          setListing(record);
+
+          // Fetch PSA population data if the card has been identified via CardSight
+          const csId = record?.vault_item?.cardsight_card_id;
+          if (csId) {
+            supabase
+              .from('card_market_valuations')
+              .select('raw_data')
+              .eq('card_id', csId)
+              .eq('source', 'psa')
+              .maybeSingle()
+              .then(({ data }) => { if (data?.raw_data) setPsaData(data.raw_data); });
+          }
+        }
       } catch (err) {
         if (!cancelled) setError(err.message || 'Failed to load listing');
       } finally {
@@ -118,6 +134,13 @@ const VaultListingDetailPage = () => {
             {vi?.card_number && <div className="flex justify-between"><span className="text-muted-foreground">Card Number</span> <span className="font-medium">{vi.card_number}</span></div>}
             {vi?.year && <div className="flex justify-between"><span className="text-muted-foreground">Year</span> <span className="font-medium">{vi.year}</span></div>}
             {vi?.grading_company && vi.grading_company !== 'raw' && <div className="flex justify-between"><span className="text-muted-foreground">Grading</span> <span className="font-medium flex items-center gap-1"><ShieldCheck className="w-4 h-4 text-primary" />{vi.grading_company.toUpperCase()} {vi.grade}</span></div>}
+
+            {/* PSA population data — shown when available, blank otherwise */}
+            {vi?.cardsight_card_id && (
+              <div className="pt-4 border-t border-border">
+                <PSAPopPanel rawData={psaData} />
+              </div>
+            )}
           </div>
 
           <div className="mt-auto space-y-4">
@@ -127,6 +150,13 @@ const VaultListingDetailPage = () => {
             <Button size="lg" variant="outline" className="w-full h-14 text-lg font-bold">
               Make Offer
             </Button>
+            {/* Analytics link — passes cardsight_card_id if available for real market data */}
+            <Link
+              to={`/analytics/card?name=${encodeURIComponent(vi?.card_name || title)}&set=${encodeURIComponent(vi?.set_name || '')}&collection=${encodeURIComponent(vi?.collection || '')}&price=${price}${vi?.cardsight_card_id ? `&cardsight_id=${vi.cardsight_card_id}` : ''}`}
+              className="flex items-center justify-center gap-2 w-full h-11 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:text-foreground hover:border-primary/40 transition-colors"
+            >
+              <BarChart3 className="w-4 h-4" /> View Market Analytics
+            </Link>
           </div>
         </div>
       </div>

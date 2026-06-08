@@ -11,6 +11,7 @@ const CommunityDiscussionPage = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchDisc = async () => {
       try {
         const { data, error: fetchError } = await supabase
@@ -19,14 +20,15 @@ const CommunityDiscussionPage = () => {
           .eq('id', id)
           .single();
         if (fetchError) throw fetchError;
-        setDiscussion(data);
+        if (!cancelled) setDiscussion(data);
       } catch (error) {
         console.error(error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchDisc();
+    return () => { cancelled = true; };
   }, [id]);
 
   if (loading) return <div className="container-default section-padding"><Skeleton className="h-[400px] rounded-2xl" /></div>;
