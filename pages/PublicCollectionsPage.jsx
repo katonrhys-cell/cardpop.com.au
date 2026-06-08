@@ -31,10 +31,8 @@ const PublicCollectionsPage = () => {
   const [listingTypeFilter, setListingTypeFilter] = useState('Both'); // Vault, Store, Both
 
   useEffect(() => {
-    fetchItems();
-  }, []);
-
-  const fetchItems = async () => {
+    let cancelled = false;
+    const fetchItems = async () => {
     setLoading(true);
     setError(null);
     try {
@@ -117,15 +115,20 @@ const PublicCollectionsPage = () => {
         combined = combined.concat(vaultRes.value.data.map(processVaultItem));
       }
       
-      setItems(combined.sort((a, b) => b.price - a.price));
+      if (!cancelled) setItems(combined.sort((a, b) => b.price - a.price));
     } catch (err) {
       console.error('[PublicCollectionsPage] Error processing unified collections items:', err);
-      setError('Failed to load collections. Please check your connection and try again.');
-      toast.error('Failed to load collections');
+      if (!cancelled) {
+        setError('Failed to load collections. Please check your connection and try again.');
+        toast.error('Failed to load collections');
+      }
     } finally {
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     }
-  };
+    };
+    fetchItems();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleCollectionChange = (val) => {
     setCollectionFilter(val);

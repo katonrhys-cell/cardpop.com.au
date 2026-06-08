@@ -55,7 +55,8 @@ router.post('/logout-other', authMiddleware, async (req, res) => {
   if (error) throw error;
 
   const updatedSessions = (profile?.active_sessions || []).filter(s => s.sessionId === currentSessionId);
-  await supabase.from('profiles').update({ active_sessions: updatedSessions }).eq('id', req.user.id);
+  const { error: logoutErr } = await supabase.from('profiles').update({ active_sessions: updatedSessions }).eq('id', req.user.id);
+  if (logoutErr) throw logoutErr;
   await supabase.from('audit_logs').insert({
     user_id: req.user.id, event_type: 'logout_other_sessions',
     description: 'User logged out all other sessions',
@@ -78,9 +79,10 @@ router.delete('/:sessionId', authMiddleware, async (req, res) => {
   const sessionToRevoke = sessions.find(s => s.sessionId === sessionId);
   if (!sessionToRevoke) return res.status(404).json({ error: 'Session not found' });
 
-  await supabase.from('profiles')
+  const { error: revokeErr } = await supabase.from('profiles')
     .update({ active_sessions: sessions.filter(s => s.sessionId !== sessionId) })
     .eq('id', req.user.id);
+  if (revokeErr) throw revokeErr;
   await supabase.from('audit_logs').insert({
     user_id: req.user.id, event_type: 'session_revoked',
     description: `Session revoked: ${sessionToRevoke.deviceName}`,

@@ -168,10 +168,11 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
         }
       } else {
         // Going private — archive any existing listing
-        await supabase
+        const { error: archiveErr } = await supabase
           .from('listings')
           .update({ status: 'archived' })
           .eq('vault_item_id', product.id).eq('seller_id', currentUser.id);
+        if (archiveErr) throw archiveErr;
       }
 
       toast.success(`Card updated: ${selected.label}`);

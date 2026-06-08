@@ -137,8 +137,9 @@ const AddEditCardPage = () => {
   // ─── Load existing card when editing ─────────────────────────────────────
   useEffect(() => {
     if (!isEdit) return;
+    let cancelled = false;
     const fetchCard = async () => {
-      if (!currentUser?.id) { setLoading(false); return; }
+      if (!currentUser?.id) { if (!cancelled) setLoading(false); return; }
       try {
         const { data: card, error: fetchError } = await supabase
           .from('vault_items')
@@ -146,6 +147,7 @@ const AddEditCardPage = () => {
           .eq('id', id)
           .single();
         if (fetchError) throw fetchError;
+        if (cancelled) return;
         if (!currentUser || card.owner_id !== currentUser.id) {
           toast.error('Unauthorized');
           navigate('/vault');
@@ -190,16 +192,19 @@ const AddEditCardPage = () => {
           const imgUrl = card.card_image.startsWith('http')
             ? card.card_image
             : supabase.storage.from('vault-images').getPublicUrl(card.card_image).data.publicUrl;
-          setImagePreview(imgUrl);
+          if (!cancelled) setImagePreview(imgUrl);
         }
       } catch {
-        toast.error('Failed to load card');
-        navigate('/vault');
+        if (!cancelled) {
+          toast.error('Failed to load card');
+          navigate('/vault');
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchCard();
+    return () => { cancelled = true; };
   }, [id, currentUser?.id, navigate, isEdit]);
 
   // ─── Image handling ───────────────────────────────────────────────────────

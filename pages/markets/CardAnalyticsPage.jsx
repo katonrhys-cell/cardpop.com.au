@@ -213,7 +213,7 @@ const CardAnalyticsPage = () => {
         setListings(shop.map(i => ({ ...i, _source: 'shop' })));
         setVaultItems(vault.map(i => ({ ...i, _source: 'vault' })));
       }
-    }).finally(() => { if (!cancelled) setLoadingL(false); });
+    }).catch(() => {}).finally(() => { if (!cancelled) setLoadingL(false); });
 
     return () => { cancelled = true; };
   }, [cardName]);
