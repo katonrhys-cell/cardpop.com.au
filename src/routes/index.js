@@ -4,6 +4,7 @@ import { verifyTradeAccess } from '../middleware/verifyTradeAccess.js';
 import { authMiddleware } from '../middleware/auth.js';
 import healthCheck from './health-check.js';
 import ebayRouter from './ebay.js';
+import cardsightRouter from './cardsight.js';
 import authRouter from './auth/index.js';
 import stripeRouter from './stripe.js';
 import verificationRouter from './verification.js';
@@ -42,6 +43,10 @@ export default () => {
     // eBay routes with API rate limiting
     router.use('/ebay', apiLimiter);
     router.use('/ebay', ebayRouter);
+
+    // CardSight routes with API rate limiting
+    router.use('/cardsight', apiLimiter);
+    router.use('/cardsight', cardsightRouter);
     
     // Stripe: high-capacity limiter for the webhook, standard for other endpoints
     router.use('/stripe/webhook', stripeLimiter);
