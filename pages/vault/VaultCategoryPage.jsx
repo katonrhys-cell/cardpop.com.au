@@ -29,6 +29,7 @@ const VaultCategoryPage = () => {
   const [filterBrand, setFilterBrand] = useState('');
   const [filterSeries, setFilterSeries] = useState('');
   const [filterMode, setFilterMode] = useState('All');
+  const [filterRookie, setFilterRookie] = useState(false);
   
   // Filter Options Data
   const [catOpts, setCatOpts] = useState([]);
@@ -85,6 +86,7 @@ const VaultCategoryPage = () => {
             .range(from, from + perPage - 1);
 
           if (filterCat) query = query.eq('category_id', filterCat);
+          if (filterRookie) query = query.contains('cardVariants', ['Rookie Card (RC)']);
 
           const { data, count, error } = await query;
           if (error) throw error;
@@ -100,6 +102,7 @@ const VaultCategoryPage = () => {
             .range(from, from + perPage - 1);
 
           if (filterCat) query = query.eq('category_id', filterCat);
+          if (filterRookie) query = query.contains('cardVariants', ['Rookie Card (RC)']);
 
           const { data, count, error } = await query;
           if (error) throw error;
@@ -116,7 +119,7 @@ const VaultCategoryPage = () => {
     };
 
     fetchListings();
-  }, [filterCat, filterSub, filterBrand, filterSeries, filterMode, page]);
+  }, [filterCat, filterSub, filterBrand, filterSeries, filterMode, filterRookie, page]);
 
   const clearFilters = () => {
     setFilterCat('');
@@ -124,6 +127,7 @@ const VaultCategoryPage = () => {
     setFilterBrand('');
     setFilterSeries('');
     setFilterMode('All');
+    setFilterRookie(false);
     setPage(1);
   };
 
@@ -168,6 +172,13 @@ const VaultCategoryPage = () => {
             {mode.label}
           </Button>
         ))}
+        <Button
+          variant="outline"
+          className={`rounded-full px-5 font-bold ${filterRookie ? 'bg-amber-400 text-amber-900 shadow-md border-none hover:bg-amber-400' : 'bg-background hover:text-amber-700 hover:border-amber-400'}`}
+          onClick={() => { setFilterRookie(r => !r); setPage(1); }}
+        >
+          🏅 Rookie Cards
+        </Button>
       </div>
 
       {/* Category Filters */}
@@ -177,7 +188,7 @@ const VaultCategoryPage = () => {
           <SelectContent>{catOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
         </Select>
 
-        {(filterCat || filterSub || filterBrand || filterSeries || filterMode !== 'All') && (
+        {(filterCat || filterSub || filterBrand || filterSeries || filterMode !== 'All' || filterRookie) && (
           <Button variant="ghost" onClick={clearFilters} className="rounded-xl text-muted-foreground hover:text-foreground ml-auto">
             <X className="w-4 h-4 mr-2" /> Clear Filters
           </Button>

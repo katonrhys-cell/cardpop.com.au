@@ -297,9 +297,11 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
         submitData.append('images', JSON.stringify(remainingImages));
       }
 
-      // Convert FormData to plain object for Supabase
+      // Convert FormData to plain object for Supabase (last-write-wins for scalars)
       const dataObj = {};
       submitData.forEach((value, key) => { dataObj[key] = value; });
+      // cardVariants must stay as an array so the database can filter by containment
+      dataObj.cardVariants = formData.cardVariants;
 
       if (card) {
         const { error } = await supabase.from('vault_items').update(dataObj).eq('id', card.id).eq('owner_id', currentUser.id);
