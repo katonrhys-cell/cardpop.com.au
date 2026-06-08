@@ -292,7 +292,7 @@ const AddEditCardPage = () => {
         notes:               formData.notes?.trim()       || null,
         trade_value_aud:     tradeAud,
         trade_value_locked:  tradeAud > 0,
-        listing_type:        isPublic ? formData.listingType : null,
+        listing_type:        isPublic ? formData.listingType : 'Private',
         is_public:           isPublic,
       };
 
@@ -469,12 +469,12 @@ const AddEditCardPage = () => {
                   <div className="space-y-2">
                     <Label className="font-bold">Era / Set Name</Label>
                     {eraOpts.length > 0 ? (
-                      <Select value={formData.setName} onValueChange={v => set('setName', v)}>
+                      <Select value={formData.setName || '__none__'} onValueChange={v => set('setName', v === '__none__' ? '' : v)}>
                         <SelectTrigger className="h-11 bg-background">
                           <SelectValue placeholder="Select an era or set…" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">— Not specified —</SelectItem>
+                          <SelectItem value="__none__">— Not specified —</SelectItem>
                           <SelectSeparator />
                           {eraOpts.map(era => (
                             <SelectItem key={era.name} value={era.name}>
@@ -524,12 +524,12 @@ const AddEditCardPage = () => {
                   {/* Variant */}
                   <div className="space-y-2">
                     <Label className="font-bold">Card Variant / Finish</Label>
-                    <Select value={formData.variant} onValueChange={v => set('variant', v)}>
+                    <Select value={formData.variant || '__none__'} onValueChange={v => set('variant', v === '__none__' ? '' : v)}>
                       <SelectTrigger className="h-11 bg-background">
                         <SelectValue placeholder="Select variant…" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No variant</SelectItem>
+                        <SelectItem value="__none__">No variant</SelectItem>
                         {VARIANT_GROUPS.map((group, gi) => (
                           <React.Fragment key={group.label}>
                             {gi > 0 && <SelectSeparator />}
