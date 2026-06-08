@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
-import { Loader2, Lock, ShoppingCart, ArrowRightLeft, Layers, DollarSign, Shield, TrendingUp } from 'lucide-react';
+import { Loader2, Lock, ShoppingCart, ArrowRightLeft, Layers, DollarSign, TrendingUp } from 'lucide-react';
 import PriceRangeIndicator from '@/components/PriceRangeIndicator.jsx';
 import {
   Dialog,
@@ -227,23 +227,6 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
             </div>
           )}
 
-          {effectiveFloor !== null && (
-            <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/25">
-              <Shield className="w-4 h-4 text-amber-600 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-amber-700">
-                  Minimum Listing: ${effectiveFloor.toFixed(2)} AUD
-                </p>
-                <p className="text-xs text-amber-600/80">
-                  {marketFloor && lockedBaseValue
-                    ? `Market floor $${marketFloor.toFixed(2)} · Base value $${lockedBaseValue.toFixed(2)}`
-                    : marketFloor
-                    ? `50% below market low — commission integrity floor`
-                    : `Locked base value at time of upload`}
-                </p>
-              </div>
-            </div>
-          )}
 
           <div className="space-y-2">
             {OPTIONS.map((opt) => {
@@ -268,12 +251,7 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
             <div className="space-y-4 border border-border rounded-xl p-4 bg-muted/20">
               {selected.needsPrice && (
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-semibold">
-                    Sale Price (AUD) *
-                    {effectiveFloor !== null && (
-                      <span className="ml-2 text-xs font-normal text-amber-600">min ${effectiveFloor.toFixed(2)}</span>
-                    )}
-                  </Label>
+                  <Label className="text-sm font-semibold">Sale Price (AUD) *</Label>
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
@@ -286,11 +264,6 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
                       className={`pl-9 bg-background ${effectiveFloor !== null && price !== '' && Number(price) < effectiveFloor ? 'border-destructive' : ''}`}
                     />
                   </div>
-                  {effectiveFloor !== null && price !== '' && Number(price) < effectiveFloor && (
-                    <p className="text-destructive text-xs flex items-center gap-1">
-                      <Shield className="w-3 h-3" /> Below minimum floor of ${effectiveFloor.toFixed(2)} AUD
-                    </p>
-                  )}
                 </div>
               )}
               {selected.needsTrade && (

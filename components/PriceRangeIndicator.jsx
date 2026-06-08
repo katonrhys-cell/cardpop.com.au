@@ -11,43 +11,37 @@ const PriceRangeIndicator = ({ range, currentPrice, className }) => {
   const { floor_aud, low_aud, avg_aud, high_aud } = range;
 
   // Scale slightly beyond the extremes so markers don't sit at the very edge
-  const scaleMin = floor_aud * 0.85;
+  const scaleMin = low_aud * 0.75;
   const scaleMax = high_aud * 1.12;
   const span = scaleMax - scaleMin;
 
   const pos = (v) =>
     span > 0 ? Math.max(0, Math.min(100, ((v - scaleMin) / span) * 100)) : 0;
 
-  const floorPos = pos(floor_aud);
-  const lowPos   = pos(low_aud);
-  const avgPos   = pos(avg_aud);
-  const highPos  = pos(high_aud);
-  const pPos     = currentPrice != null ? pos(currentPrice) : null;
+  const lowPos  = pos(low_aud);
+  const avgPos  = pos(avg_aud);
+  const highPos = pos(high_aud);
+  const pPos    = currentPrice != null ? pos(currentPrice) : null;
 
-  const isBelowFloor = currentPrice != null && currentPrice < floor_aud;
-  const isBelowLow   = currentPrice != null && currentPrice >= floor_aud && currentPrice < low_aud;
-  const isInRange    = currentPrice != null && currentPrice >= low_aud && currentPrice <= high_aud;
-  const isAboveHigh  = currentPrice != null && currentPrice > high_aud;
+  const isBelowLow  = currentPrice != null && currentPrice < low_aud;
+  const isInRange   = currentPrice != null && currentPrice >= low_aud && currentPrice <= high_aud;
+  const isAboveHigh = currentPrice != null && currentPrice > high_aud;
 
-  const priceColor = isBelowFloor ? 'bg-destructive' :
-                     isBelowLow   ? 'bg-amber-400'   :
-                     isAboveHigh  ? 'bg-primary'      : 'bg-emerald-500';
+  const priceColor = isBelowLow  ? 'bg-amber-400' :
+                     isAboveHigh ? 'bg-primary'    : 'bg-emerald-500';
 
-  const statusText = isBelowFloor ? `Below listing floor — minimum is $${floor_aud.toFixed(2)} AUD`  :
-                     isBelowLow   ? 'Below market low — discounted pricing'                            :
-                     isAboveHigh  ? 'Above market high — premium pricing'                              :
-                     isInRange    ? 'Within typical market range'                                       : null;
+  const statusText = isBelowLow  ? 'Below market low — discounted pricing' :
+                     isAboveHigh ? 'Above market high — premium pricing'    :
+                     isInRange   ? 'Within typical market range'             : null;
 
-  const statusColor = isBelowFloor ? 'text-destructive' :
-                      isBelowLow   ? 'text-amber-600'   :
-                      isAboveHigh  ? 'text-primary'      :
-                      isInRange    ? 'text-emerald-600'  : '';
+  const statusColor = isBelowLow  ? 'text-amber-600'  :
+                      isAboveHigh ? 'text-primary'     :
+                      isInRange   ? 'text-emerald-600' : '';
 
   return (
     <div className={cn('space-y-3', className)}>
       {/* Labels */}
-      <div className="grid grid-cols-4 text-center text-[10px] font-bold uppercase tracking-wide">
-        <span className="text-destructive">Floor</span>
+      <div className="grid grid-cols-3 text-center text-[10px] font-bold uppercase tracking-wide">
         <span className="text-amber-600">Low</span>
         <span className="text-emerald-600">Average</span>
         <span className="text-primary">High</span>
@@ -55,14 +49,9 @@ const PriceRangeIndicator = ({ range, currentPrice, className }) => {
 
       {/* Bar */}
       <div className="relative h-4 rounded-full bg-muted select-none">
-        {/* Below-floor zone */}
-        <div
-          className="absolute inset-y-0 left-0 rounded-l-full bg-destructive/25"
-          style={{ width: `${floorPos}%` }}
-        />
         {/* Low→Avg zone */}
         <div
-          className="absolute inset-y-0 bg-amber-400/30"
+          className="absolute inset-y-0 rounded-l-full bg-amber-400/30"
           style={{ left: `${lowPos}%`, width: `${Math.max(0, avgPos - lowPos)}%` }}
         />
         {/* Avg→High zone */}
@@ -73,10 +62,9 @@ const PriceRangeIndicator = ({ range, currentPrice, className }) => {
 
         {/* Fixed tick markers */}
         {[
-          { p: floorPos, color: 'bg-destructive/70', label: `$${floor_aud.toFixed(0)}` },
-          { p: lowPos,   color: 'bg-amber-500',      label: `$${low_aud.toFixed(0)}`   },
-          { p: avgPos,   color: 'bg-emerald-500',    label: `$${avg_aud.toFixed(0)}`   },
-          { p: highPos,  color: 'bg-primary',        label: `$${high_aud.toFixed(0)}`  },
+          { p: lowPos,  color: 'bg-amber-500',   label: `$${low_aud.toFixed(0)}`  },
+          { p: avgPos,  color: 'bg-emerald-500',  label: `$${avg_aud.toFixed(0)}`  },
+          { p: highPos, color: 'bg-primary',      label: `$${high_aud.toFixed(0)}` },
         ].map(({ p, color, label }) => (
           <div
             key={label}
@@ -95,8 +83,7 @@ const PriceRangeIndicator = ({ range, currentPrice, className }) => {
       </div>
 
       {/* Price labels row */}
-      <div className="grid grid-cols-4 text-center text-xs font-semibold">
-        <span className="text-destructive">${floor_aud.toFixed(2)}</span>
+      <div className="grid grid-cols-3 text-center text-xs font-semibold">
         <span className="text-amber-600">${low_aud.toFixed(2)}</span>
         <span className="text-emerald-600">${avg_aud.toFixed(2)}</span>
         <span className="text-primary">${high_aud.toFixed(2)}</span>

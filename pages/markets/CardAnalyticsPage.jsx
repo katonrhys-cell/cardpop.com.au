@@ -6,7 +6,7 @@ import apiServerClient from '@/lib/apiServerClient.js';
 import {
   ArrowLeft, TrendingUp, TrendingDown, Activity, DollarSign, BarChart3,
   Clock, ExternalLink, ShoppingCart, ArrowUpRight, ArrowDownRight,
-  RefreshCw, Star, Info, ChevronRight, ShieldCheck, Shield,
+  RefreshCw, Star, Info, ChevronRight, ShieldCheck,
 } from 'lucide-react';
 import PriceRangeIndicator from '@/components/PriceRangeIndicator.jsx';
 import { Badge } from '@/components/ui/badge';
@@ -395,7 +395,7 @@ const CardAnalyticsPage = () => {
         {priceRange && (
           <div className="rounded-2xl border border-border bg-card p-5">
             <div className="flex items-center gap-2 mb-4">
-              <Shield className="w-4 h-4 text-amber-600" />
+              <BarChart3 className="w-4 h-4 text-primary" />
               <h3 className="font-bold text-sm">Market Price Range</h3>
               <span className="text-xs text-muted-foreground ml-auto">
                 {priceRange.sources_used?.join(' · ')}
@@ -403,14 +403,6 @@ const CardAnalyticsPage = () => {
               </span>
             </div>
             <PriceRangeIndicator range={priceRange} />
-            <div className="mt-4 pt-3 border-t border-border flex items-start gap-2">
-              <Shield className="w-3.5 h-3.5 text-amber-600 mt-0.5 shrink-0" />
-              <p className="text-xs text-muted-foreground">
-                Listings on CardPop cannot be set more than 50% below the market low
-                (minimum <strong className="text-foreground">${priceRange.floor_aud?.toFixed(2)} AUD</strong>).
-                This protects sellers and ensures market integrity.
-              </p>
-            </div>
           </div>
         )}
 
