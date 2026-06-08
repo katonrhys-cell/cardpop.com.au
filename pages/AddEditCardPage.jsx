@@ -162,13 +162,13 @@ const AddEditCardPage = () => {
           grade:          card.grade          || '',
           certNumber:     card.cert_number    || '',
           condition:      card.condition      || 'near_mint',
-          estimatedValue: card.estimated_value_aud ? String(card.estimated_value_aud) : '',
-          purchasePrice:  card.purchase_price_aud ? String(card.purchase_price_aud) : '',
+          estimatedValue: card.estimated_value_aud != null ? String(card.estimated_value_aud) : '',
+          purchasePrice:  card.purchase_price_aud != null ? String(card.purchase_price_aud) : '',
           acquiredDate:   card.acquired_date  || '',
           acquiredFrom:   card.acquired_from  || '',
           notes:          card.notes          || '',
-          tradeValue:     card.trade_value_aud ? String(card.trade_value_aud) : '',
-          listingType:    card.listing_type   || 'private',
+          tradeValue:     card.trade_value_aud != null ? String(card.trade_value_aud) : '',
+          listingType:    (!card.listing_type || card.listing_type === 'Private') ? 'private' : card.listing_type,
         });
         if (card.card_image) {
           const imgUrl = card.card_image.startsWith('http')
