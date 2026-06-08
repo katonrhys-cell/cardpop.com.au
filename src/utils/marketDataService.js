@@ -224,13 +224,17 @@ export async function getPriceRange(cardId) {
  * floor_aud = low_aud * 0.50 — the absolute minimum listing price.
  */
 export async function computePriceRange(cardId, cardName, setName) {
-  // Pull valuations from DB (already stored by refreshCardMarketData)
-  const [csRow, ebayRow, cardpopRows, soldRows] = await Promise.all([
+  // Pull valuations from DB — use allSettled so a single query failure doesn't abort the whole range
+  const [csResult, ebayResult, cardpopResult, soldResult] = await Promise.allSettled([
     supabase.from('card_market_valuations').select('market_value,raw_data').eq('card_id', cardId).eq('source', 'cardsight').maybeSingle().then(r => r.data),
     supabase.from('card_market_valuations').select('market_value,raw_data').eq('card_id', cardId).eq('source', 'ebay_au').maybeSingle().then(r => r.data),
     supabase.from('completed_sales').select('sale_price').eq('card_id', cardId).gte('sale_date', new Date(Date.now() - 90 * 86400 * 1000).toISOString()).then(r => r.data ?? []),
     supabase.from('market_sold_listings').select('sold_price_aud').eq('card_id', cardId).not('sold_price_aud', 'is', null).order('sold_at', { ascending: false }).limit(100).then(r => r.data ?? []),
   ]);
+  const csRow       = csResult.status       === 'fulfilled' ? csResult.value       : null;
+  const ebayRow     = ebayResult.status     === 'fulfilled' ? ebayResult.value     : null;
+  const cardpopRows = cardpopResult.status  === 'fulfilled' ? (cardpopResult.value  ?? []) : [];
+  const soldRows    = soldResult.status     === 'fulfilled' ? (soldResult.value     ?? []) : [];
 
   const allPrices  = [];
   const sourcesUsed = [];

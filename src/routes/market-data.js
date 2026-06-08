@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { supabaseAuth } from '../middleware/pocketbase-auth.js';
+import { authMiddleware } from '../middleware/auth.js';
 import { refreshCardMarketData, getStoredMarketData, getPriceRange } from '../utils/marketDataService.js';
 import supabase from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
@@ -49,11 +49,11 @@ router.get('/card/:cardId', async (req, res) => {
 
 // ─── POST /market-data/refresh (auth required) ────────────────────────────────
 // Manually trigger a full refresh for a card. Accepts { cardId, cardName, setName }.
-router.post('/refresh', supabaseAuth, async (req, res) => {
+router.post('/refresh', authMiddleware, async (req, res) => {
   const { cardId, cardName, setName } = req.body ?? {};
   if (!cardId?.trim()) return res.status(400).json({ error: 'cardId is required' });
 
-  logger.info(`[MARKET_DATA_ROUTE] Manual refresh: ${cardId} by user ${req.user?.id}`);
+  logger.info(`[MARKET_DATA_ROUTE] Manual refresh: ${cardId} by user ${req.user.id}`);
 
   try {
     const result = await refreshCardMarketData({ cardId, cardName, setName });

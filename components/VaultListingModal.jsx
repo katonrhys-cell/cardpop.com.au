@@ -109,14 +109,14 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
     }
 
     if (selected.needsPrice && effectiveFloor !== null && Number(price) < effectiveFloor) {
-      toast.error(`Price cannot be set below $${effectiveFloor.toFixed(2)} AUD (market minimum floor).`);
+      toast.error('This price is below the minimum allowed for this listing. Please enter a higher amount.');
       return;
     }
 
     if (selected.needsTrade && effectiveFloor !== null) {
       const tv = Number(price);
       if (tv > 0 && tv < effectiveFloor) {
-        toast.error(`Trade value cannot be set below $${effectiveFloor.toFixed(2)} AUD (market minimum floor).`);
+        toast.error('This trade value is below the minimum allowed for this listing. Please enter a higher amount.');
         return;
       }
     }
@@ -257,11 +257,11 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       type="number"
-                      min={effectiveFloor ?? 0.01}
+                      min={0.01}
                       step="0.01"
                       value={price}
                       onChange={e => setPrice(e.target.value)}
-                      placeholder={effectiveFloor != null ? effectiveFloor.toFixed(2) : '0.00'}
+                      placeholder={product?.estimated_value_aud ? String(product.estimated_value_aud) : '0.00'}
                       className={`pl-9 bg-background ${effectiveFloor !== null && price !== '' && Number(price) < effectiveFloor ? 'border-destructive' : ''}`}
                     />
                   </div>
