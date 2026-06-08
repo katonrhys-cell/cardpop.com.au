@@ -42,7 +42,7 @@ router.post('/scan', integratedAiRateLimit, uploadFiles({
 	res.setHeader('Connection', 'keep-alive');
 	res.setHeader('X-Accel-Buffering', 'no');
 
-	sseStream.pipe(res, { end: false });
+	sseStream.pipe(res);
 
 	res.on('close', () => sseStream.destroy());
 });
