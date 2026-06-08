@@ -66,10 +66,11 @@ const AccountNotificationSettings = () => {
     if (!currentUser?.id) { setLoading(false); return; }
     let cancelled = false;
     const run = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('notification_preferences')
         .select('type, in_app, email')
         .eq('user_id', currentUser.id);
+      if (error) throw error;
       if (!cancelled) {
         const map = {};
         (data || []).forEach(r => { map[r.type] = { in_app: r.in_app, email: r.email }; });

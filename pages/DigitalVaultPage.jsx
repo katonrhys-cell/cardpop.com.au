@@ -53,7 +53,7 @@ const DigitalVaultPage = () => {
   const handleDelete = async (id) => {
     if(!window.confirm("Delete this card?")) return;
     try {
-      await supabase.from('vault_items').delete().eq('id', id);
+      await supabase.from('vault_items').delete().eq('id', id).eq('owner_id', currentUser.id);
       toast.success("Card deleted");
       fetchCards();
     } catch (e) {
