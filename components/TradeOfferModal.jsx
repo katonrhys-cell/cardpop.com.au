@@ -20,17 +20,19 @@ const TradeOfferModal = ({ isOpen, onClose, targetCard }) => {
         setLoading(true);
         try {
           // Fetch user's vault items
-          const { data: cards } = await supabase
+          const { data: cards, error: cardsErr } = await supabase
             .from('vault_items')
             .select('*')
             .eq('owner_id', currentUser.id);
+          if (cardsErr) throw cardsErr;
 
           // Fetch pending trades to filter out busy cards
-          const { data: pendingTrades } = await supabase
+          const { data: pendingTrades, error: tradesErr } = await supabase
             .from('trades')
             .select('initiator_listing_id, responder_listing_id')
             .or(`initiator_id.eq.${currentUser.id},responder_id.eq.${currentUser.id}`)
             .eq('status', 'pending');
+          if (tradesErr) throw tradesErr;
 
           const busyCardIds = (pendingTrades || []).flatMap(t => [t.initiator_listing_id, t.responder_listing_id]);
           const available = (cards || []).filter(c => !busyCardIds.includes(c.id));
