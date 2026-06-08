@@ -18,6 +18,7 @@ const MarketplacePage = () => {
 
   const [sort, setSort] = useState('created_at_desc');
   const [filterMode, setFilterMode] = useState('All');
+  const [filterRookie, setFilterRookie] = useState(false);
 
   // Category Filter States
   const { buildNameMap, getCategories, getSubcategoriesByCategory } = useCategories();
@@ -100,6 +101,8 @@ const MarketplacePage = () => {
           query = query.eq('accepts_offers', true);
         }
 
+        if (filterRookie) query = query.contains('vault_items.cardVariants', ['Rookie Card (RC)']);
+
         if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
         else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
         else query = query.order('created_at', { ascending: false });
@@ -120,12 +123,13 @@ const MarketplacePage = () => {
     fetchRef.current = run;
     run();
     return () => { cancelled = true; };
-  }, [sort, filterMode, filterCat, filterSub, debouncedSearch, debouncedMin, debouncedMax]);
+  }, [sort, filterMode, filterCat, filterSub, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
 
   const clearFilters = () => {
     setFilterCat('');
     setFilterSub('');
     setFilterMode('All');
+    setFilterRookie(false);
     setSearch('');
     setMinPrice('');
     setMaxPrice('');
@@ -138,7 +142,7 @@ const MarketplacePage = () => {
   };
 
   const breadcrumbText = getBreadcrumbPath();
-  const hasActiveFilters = filterCat || filterSub || filterMode !== 'All' || search || minPrice || maxPrice;
+  const hasActiveFilters = filterCat || filterSub || filterMode !== 'All' || filterRookie || search || minPrice || maxPrice;
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans pb-20">
@@ -246,6 +250,13 @@ const MarketplacePage = () => {
               onClick={() => setFilterMode('ForTrade')}
             >
               For Trade
+            </Button>
+            <Button
+              variant="outline"
+              className={`rounded-full px-5 font-bold ${filterRookie ? 'bg-amber-400 text-amber-900 shadow-md border-none hover:bg-amber-400' : 'bg-background hover:text-amber-700 hover:border-amber-400'}`}
+              onClick={() => setFilterRookie(r => !r)}
+            >
+              🏅 Rookie Cards
             </Button>
           </div>
 

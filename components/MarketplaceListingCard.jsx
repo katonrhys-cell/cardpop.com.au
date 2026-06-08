@@ -6,6 +6,7 @@ import VerifiedBadge from '@/components/VerifiedBadge.jsx';
 import SellerTierBadge from '@/components/SellerTierBadge.jsx';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
+import { VARIANT_BADGES } from '@/lib/cardVariants.js';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useWatchlist } from '@/hooks/useWatchlist.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -42,13 +43,21 @@ const MarketplaceListingCard = ({ listing }) => {
   const imgSrc = imgPath
     ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
     : null;
+
+  const rawVariants = vaultItem?.cardVariants;
+  const variants = Array.isArray(rawVariants) ? rawVariants : (rawVariants ? [rawVariants] : []);
+  const specialBadge = Object.entries(VARIANT_BADGES).find(([key]) => variants.includes(key));
+  const borderClass = specialBadge
+    ? `${specialBadge[1].border} ${specialBadge[1].glow}`
+    : 'border border-border';
+
   const sellerObj = listing.seller;
   const sellerId = listing.seller_id || sellerObj?.id;
   const titleSlug = slugify(vaultItem?.card_name || listing.title || 'card');
   const detailPath = `/product/marketplace/${listing.id}/${titleSlug}`;
 
   return (
-    <div className="group flex flex-col h-full bg-card rounded-2xl border border-border overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+    <div className={`group flex flex-col h-full bg-card rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 ${borderClass}`}>
       <Link to={detailPath} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
         {imgSrc ? (
           <img
@@ -65,17 +74,17 @@ const MarketplaceListingCard = ({ listing }) => {
             No Image
           </div>
         )}
-        {/* Marketplace label — top right */}
-        <div className="absolute top-3 right-3 z-10">
+        {/* Marketplace label — top left */}
+        <div className="absolute top-3 left-3 z-10">
           <Badge className="shadow-sm font-bold bg-secondary text-secondary-foreground">
             <Tag className="w-3 h-3 mr-1" /> Marketplace
           </Badge>
         </div>
 
-        {/* Rookie badge — top left */}
-        {vaultItem?.is_rookie && (
-          <div className="absolute top-3 left-3 z-10 px-2 py-1 rounded-md text-[11px] font-extrabold tracking-wide bg-amber-400 text-amber-900 shadow-md">
-            RC
+        {/* Special variant badge (RC, Auto, 1st Ed) — top right */}
+        {specialBadge && (
+          <div className={`absolute top-3 right-3 z-10 px-2.5 py-1 rounded-full text-[11px] font-extrabold tracking-wide shadow-md ${specialBadge[1].bg} ${specialBadge[1].text}`}>
+            {specialBadge[1].label}
           </div>
         )}
 
