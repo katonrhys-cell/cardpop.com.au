@@ -64,7 +64,7 @@ const MarketplacePage = () => {
 
   // Cascading Dropdown Handlers
   useEffect(() => {
-    if (filterCat) getSubcategoriesByCategory(filterCat).then(setSubOpts);
+    if (filterCat) getSubcategoriesByCategory(filterCat).then(setSubOpts).catch(() => setSubOpts([]));
     else { setSubOpts([]); setFilterSub(''); }
   }, [filterCat, getSubcategoriesByCategory]);
 
