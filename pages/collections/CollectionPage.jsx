@@ -303,7 +303,7 @@ const CollectionPage = () => {
       const aliases = [config.name, ...(config.categoryAliases ?? [])].map(a => a.toLowerCase());
       const match = cats.find(c => aliases.includes(c.name.toLowerCase()));
       if (match) setCategoryId(match.id);
-    });
+    }).catch(() => {});
 
     return () => { isMounted.current = false; };
   }, [config, getCategories]);
@@ -313,17 +313,17 @@ const CollectionPage = () => {
     if (categoryId) {
       getSubcategoriesByCategory(categoryId).then(subs => {
         if (isMounted.current) setSubOpts(subs);
-      });
+      }).catch(() => {});
     }
   }, [categoryId, getSubcategoriesByCategory]);
 
   useEffect(() => {
-    if (filterSub) getBrandsBySubcategory(filterSub).then(b => { if (isMounted.current) setBrandOpts(b); });
+    if (filterSub) getBrandsBySubcategory(filterSub).then(b => { if (isMounted.current) setBrandOpts(b); }).catch(() => {});
     else { setBrandOpts([]); setFilterBrand(''); }
   }, [filterSub, getBrandsBySubcategory]);
 
   useEffect(() => {
-    if (filterBrand) getSeriesByBrand(filterBrand).then(s => { if (isMounted.current) setSeriesOpts(s); });
+    if (filterBrand) getSeriesByBrand(filterBrand).then(s => { if (isMounted.current) setSeriesOpts(s); }).catch(() => {});
     else { setSeriesOpts([]); setFilterSeries(''); }
   }, [filterBrand, getSeriesByBrand]);
 
@@ -347,7 +347,8 @@ const CollectionPage = () => {
         if (!isMounted.current) return;
         setNewReleases((data ?? []).map(i => ({ ...i, source: 'vault' })));
         setNewReleasesLoading(false);
-      });
+      })
+      .catch(() => { if (isMounted.current) setNewReleasesLoading(false); });
   }, [categoryId]);
 
   // ─── Graded Slabs ─────────────────────────────────────────────────────────
