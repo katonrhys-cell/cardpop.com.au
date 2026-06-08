@@ -6,8 +6,9 @@ import apiServerClient from '@/lib/apiServerClient.js';
 import {
   ArrowLeft, TrendingUp, TrendingDown, Activity, DollarSign, BarChart3,
   Clock, ExternalLink, ShoppingCart, ArrowUpRight, ArrowDownRight,
-  RefreshCw, Star, Info, ChevronRight, ShieldCheck,
+  RefreshCw, Star, Info, ChevronRight, ShieldCheck, Shield,
 } from 'lucide-react';
+import PriceRangeIndicator from '@/components/PriceRangeIndicator.jsx';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -186,6 +187,7 @@ const CardAnalyticsPage = () => {
 
   // Stored market valuations from DB (CardSight, eBay, PSA)
   const [storedVal, setStoredVal]       = useState(null);
+  const [priceRange, setPriceRange]     = useState(null);
 
   const rng = useMemo(() => makePrng(cardName + cardSet), [cardName, cardSet]);
 
@@ -222,7 +224,14 @@ const CardAnalyticsPage = () => {
     ]).then(([pricing, market, stored]) => {
       if (pricing.status === 'fulfilled' && pricing.value) setCsData(pricing.value);
       if (market.status === 'fulfilled' && market.value)   setCsMarket(market.value);
-      if (stored.status === 'fulfilled' && stored.value)   setStoredVal(stored.value?.valuations ?? null);
+      if (stored.status === 'fulfilled' && stored.value) {
+        setStoredVal(stored.value?.valuations ?? null);
+      }
+      // Also fetch price range from DB
+      apiServerClient.fetch(`/market-data/price-range/${cardsightId}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(r => { if (r) setPriceRange(r); })
+        .catch(() => {});
     }).finally(() => setCsLoading(false));
   }, [cardsightId]);
 
@@ -379,6 +388,29 @@ const CardAnalyticsPage = () => {
                 )}
               </>
             )}
+          </div>
+        )}
+
+        {/* Price range panel — Low / Avg / High / Floor */}
+        {priceRange && (
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Shield className="w-4 h-4 text-amber-600" />
+              <h3 className="font-bold text-sm">Market Price Range</h3>
+              <span className="text-xs text-muted-foreground ml-auto">
+                {priceRange.sources_used?.join(' · ')}
+                {priceRange.source_count ? ` · ${priceRange.source_count} data points` : ''}
+              </span>
+            </div>
+            <PriceRangeIndicator range={priceRange} />
+            <div className="mt-4 pt-3 border-t border-border flex items-start gap-2">
+              <Shield className="w-3.5 h-3.5 text-amber-600 mt-0.5 shrink-0" />
+              <p className="text-xs text-muted-foreground">
+                Listings on CardPop cannot be set more than 50% below the market low
+                (minimum <strong className="text-foreground">${priceRange.floor_aud?.toFixed(2)} AUD</strong>).
+                This protects sellers and ensures market integrity.
+              </p>
+            </div>
           </div>
         )}
 

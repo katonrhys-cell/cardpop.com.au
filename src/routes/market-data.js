@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { supabaseAuth } from '../middleware/pocketbase-auth.js';
-import { refreshCardMarketData, getStoredMarketData } from '../utils/marketDataService.js';
+import { refreshCardMarketData, getStoredMarketData, getPriceRange } from '../utils/marketDataService.js';
 import supabase from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 
@@ -62,6 +62,39 @@ router.post('/refresh', supabaseAuth, async (req, res) => {
   } catch (err) {
     logger.error(`[MARKET_DATA_ROUTE] POST /refresh: ${err.message}`);
     res.status(500).json({ error: 'Refresh failed.' });
+  }
+});
+
+// ─── GET /market-data/price-range/:cardId ────────────────────────────────────
+// Returns the computed Low / Avg / High / Floor range for a card.
+// 404 if no range has been computed yet (triggers a background refresh).
+router.get('/price-range/:cardId', async (req, res) => {
+  const { cardId } = req.params;
+  try {
+    const range = await getPriceRange(cardId);
+
+    if (!range) {
+      // Trigger background refresh so data exists on next poll
+      const { data: vi } = await supabase
+        .from('vault_items')
+        .select('card_name, set_name')
+        .eq('cardsight_card_id', cardId)
+        .limit(1)
+        .maybeSingle();
+
+      refreshCardMarketData({
+        cardId,
+        cardName: vi?.card_name ?? null,
+        setName:  vi?.set_name  ?? null,
+      }).catch(err => logger.error(`[MARKET_DATA_ROUTE] price-range refresh: ${err.message}`));
+
+      return res.status(404).json({ error: 'Price range not yet computed. Refresh triggered.' });
+    }
+
+    res.json(range);
+  } catch (err) {
+    logger.error(`[MARKET_DATA_ROUTE] GET /price-range/${cardId}: ${err.message}`);
+    res.status(500).json({ error: 'Failed to retrieve price range.' });
   }
 });
 
