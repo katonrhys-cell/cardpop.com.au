@@ -217,7 +217,7 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
     e.preventDefault();
     
     if (!formData.name.trim()) return toast.error('Card Name is required');
-    if (formData.price === '' || isNaN(Number(formData.price))) return toast.error('A valid Price is required');
+    if (!formData.price || !Number.isInteger(Number(formData.price)) || Number(formData.price) < 0) return toast.error('Price must be a whole number (e.g. 5 not 5.99)');
     if (!formData.listing_type) return toast.error('Listing Type is required');
     
     const expectedPublic = formData.listing_type !== 'Private';
@@ -359,8 +359,9 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
         isLookingUp={isLookingUp}
         priceData={priceData}
         onApplyPrice={(price) => {
-          handleInputChange('price', String(price));
-          toast.success(`Price set to $${price.toFixed(2)} AUD from eBay estimate.`);
+          const rounded = Math.round(price);
+          handleInputChange('price', String(rounded));
+          toast.success(`Price set to $${rounded} AUD from eBay estimate.`);
         }}
       />
 
@@ -448,7 +449,7 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Estimated Value / Price <span className="text-destructive">*</span></Label>
-              <Input required type="number" step="0.01" value={formData.price} onChange={(e) => handleInputChange('price', e.target.value)} placeholder="0.00" className="bg-background tabular-nums" />
+              <Input required type="number" step="1" min="0" value={formData.price} onChange={(e) => handleInputChange('price', e.target.value)} placeholder="0" className="bg-background tabular-nums" />
             </div>
             <div className="space-y-2">
               <Label>Stock Quantity</Label>
