@@ -14,6 +14,7 @@ import { uploadFiles } from '../middleware/file-upload.js';
 import { supabaseAuth } from '../middleware/pocketbase-auth.js';
 import { integratedAiRateLimit } from '../middleware/integrated-ai-rate-limit.js';
 import supabase from '../utils/supabaseClient.js';
+import { refreshCardMarketData } from '../utils/marketDataService.js';
 import logger from '../utils/logger.js';
 
 const router = Router();
@@ -105,6 +106,13 @@ router.post(
       }
 
       logger.info(`[CARDSIGHT] Identified card ${cardId} (${response.card.name}) confidence=${best.confidence}`);
+
+      // Background: persist market valuations for this card (CardSight + eBay + PSA)
+      refreshCardMarketData({
+        cardId,
+        cardName: response.card.name  ?? null,
+        setName:  response.card.setName ?? null,
+      }).catch(err => logger.warn(`[CARDSIGHT] Background market refresh failed: ${err.message}`));
 
       // Optionally persist cardsight_card_id to a vault_item if caller passes one
       const vaultItemId = req.body?.vault_item_id;

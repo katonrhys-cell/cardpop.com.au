@@ -14,6 +14,7 @@ import categoriesRouter from './categories.js';
 import subcategoriesRouter from './subcategories.js';
 import vaultRouter from './vault.js';
 import cardSightRouter from './cardsight.js';
+import marketDataRouter from './market-data.js';
 
 const router = Router();
 
@@ -63,6 +64,10 @@ export default () => {
     // Vault security routes with API rate limiting
     router.use('/vault', apiLimiter);
     router.use('/vault', vaultRouter);
+
+    // Market data — persisted CardSight + eBay + PSA valuations
+    router.use('/market-data', apiLimiter);
+    router.use('/market-data', marketDataRouter);
 
     // Trade routes with email verification middleware
     // Apply auth middleware first, then trade access verification

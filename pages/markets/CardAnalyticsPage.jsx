@@ -184,6 +184,9 @@ const CardAnalyticsPage = () => {
   const [csMarket, setCsMarket]         = useState(null);
   const [csLoading, setCsLoading]       = useState(false);
 
+  // Stored market valuations from DB (CardSight, eBay, PSA)
+  const [storedVal, setStoredVal]       = useState(null);
+
   const rng = useMemo(() => makePrng(cardName + cardSet), [cardName, cardSet]);
 
   const change7d  = rawChange;
@@ -208,16 +211,18 @@ const CardAnalyticsPage = () => {
     }).finally(() => setLoadingL(false));
   }, [cardName]);
 
-  // Fetch CardSight AI real pricing + marketplace data when cardsight_id is available
+  // Fetch CardSight AI real pricing + marketplace data + stored valuations
   useEffect(() => {
     if (!cardsightId) return;
     setCsLoading(true);
     Promise.allSettled([
       apiServerClient.fetch(`/cardsight/pricing/${cardsightId}`).then(r => r.ok ? r.json() : null),
       apiServerClient.fetch(`/cardsight/marketplace/${cardsightId}`).then(r => r.ok ? r.json() : null),
-    ]).then(([pricing, market]) => {
+      apiServerClient.fetch(`/market-data/card/${cardsightId}`).then(r => r.ok ? r.json() : null),
+    ]).then(([pricing, market, stored]) => {
       if (pricing.status === 'fulfilled' && pricing.value) setCsData(pricing.value);
       if (market.status === 'fulfilled' && market.value)   setCsMarket(market.value);
+      if (stored.status === 'fulfilled' && stored.value)   setStoredVal(stored.value?.valuations ?? null);
     }).finally(() => setCsLoading(false));
   }, [cardsightId]);
 
@@ -374,6 +379,44 @@ const CardAnalyticsPage = () => {
                 )}
               </>
             )}
+          </div>
+        )}
+
+        {/* Stored market valuations panel */}
+        {storedVal && Object.keys(storedVal).length > 0 && (
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <h3 className="font-bold text-sm mb-4 flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-primary" /> Market Valuations — All Sources
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {['cardsight', 'ebay_au', 'psa'].map(src => {
+                const v = storedVal[src];
+                if (!src) return null;
+                const labels = { cardsight: 'CardSight AI', ebay_au: 'eBay AU', psa: 'PSA Population' };
+                const colors = { cardsight: 'text-violet-600', ebay_au: 'text-amber-600', psa: 'text-blue-600' };
+                return (
+                  <div key={src} className="bg-muted/30 rounded-xl p-4 space-y-2">
+                    <p className={`text-xs font-bold uppercase tracking-wide ${colors[src]}`}>{labels[src]}</p>
+                    {v ? (
+                      <>
+                        <p className="text-2xl font-black">
+                          {v.market_value != null ? `$${parseFloat(v.market_value).toFixed(2)}` : '—'}
+                        </p>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>Confidence</span>
+                          <span className="font-semibold">{v.confidence_score != null ? `${v.confidence_score}%` : '—'}</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">
+                          Updated {v.last_updated ? new Date(v.last_updated).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) : '—'}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No data yet</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
