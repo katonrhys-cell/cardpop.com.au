@@ -18,6 +18,7 @@ const SearchResultsPage = () => {
   const [totalItems, setTotalItems] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchResults = async () => {
       setLoading(true);
       try {
@@ -39,17 +40,20 @@ const SearchResultsPage = () => {
         const { data, count, error } = await dbQuery;
         if (error) throw error;
 
-        setResults(data || []);
-        setTotalItems(count || 0);
-        setTotalPages(Math.ceil((count || 0) / perPage));
+        if (!cancelled) {
+          setResults(data || []);
+          setTotalItems(count || 0);
+          setTotalPages(Math.ceil((count || 0) / perPage));
+        }
       } catch (error) {
         console.error("Search error:", error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchResults();
+    return () => { cancelled = true; };
   }, [query, page]);
 
   return (

@@ -282,7 +282,7 @@ const AccountOrders = () => {
     setLoading(false);
   }, [currentUser?.id]);
 
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => { fetchOrders().catch(() => {}); }, [fetchOrders]);
 
   const filtered = statusFilter === 'all'
     ? orders
