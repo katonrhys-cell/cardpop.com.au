@@ -5,14 +5,11 @@ dotenv.config();
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://odoglvswwymyjuwlonkf.supabase.co';
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.warn(
-    '[supabaseClient] WARNING: SUPABASE_URL and/or SUPABASE_SERVICE_ROLE_KEY are not set. ' +
-    'Backend auth and storage features will not work until these are added to your .env file.'
-  );
+if (!supabaseServiceKey) {
+  throw new Error('FATAL: SUPABASE_SERVICE_ROLE_KEY is not set. The backend cannot start without it.');
 }
 
-const supabase = createClient(supabaseUrl ?? 'https://placeholder.supabase.co', supabaseServiceKey ?? 'placeholder', {
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 

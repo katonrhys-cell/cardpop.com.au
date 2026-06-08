@@ -4,6 +4,7 @@ import supabase from '../../utils/supabaseClient.js';
 import { generateOTP } from '../../utils/otpGenerator.js';
 import { encrypt, decrypt } from '../../utils/encryption.js';
 import { authMiddleware } from '../../middleware/auth.js';
+import { mfaLimiter } from '../../middleware/endpoint-rate-limit.js';
 import logger from '../../utils/logger.js';
 
 const router = express.Router();
@@ -34,7 +35,7 @@ router.post('/request', authMiddleware, async (req, res) => {
   res.json({ mfaId, expiresAt, message: 'OTP sent to email' });
 });
 
-router.post('/verify', async (req, res) => {
+router.post('/verify', authMiddleware, mfaLimiter, async (req, res) => {
   const { mfaId, code } = req.body;
   if (!mfaId || !code) return res.status(400).json({ error: 'mfaId and code are required' });
   if (code.length !== 8) return res.status(400).json({ error: 'Code must be 8 digits' });

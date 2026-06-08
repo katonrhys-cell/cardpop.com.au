@@ -74,4 +74,22 @@ const stripeLimiter = rateLimit({
 	},
 });
 
-export { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter };
+// MFA verify rate limiter: 5 attempts per 15 minutes per IP
+// Prevents brute-forcing 8-digit OTP codes across any mfaId
+const mfaLimiter = rateLimit({
+	windowMs: 15 * 60 * 1000,
+	max: 5,
+	standardHeaders: true,
+	legacyHeaders: false,
+	keyGenerator: (req) => ipKeyGenerator(req),
+	handler: (req, res) => {
+		const clientIp = ipKeyGenerator(req);
+		logger.warn(`[RATE_LIMIT] MFA verify rate limit exceeded for IP: ${clientIp}`);
+		res.status(429).json({
+			error: 'Too many verification attempts, please try again later',
+			retryAfter: req.rateLimit.resetTime,
+		});
+	},
+});
+
+export { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, mfaLimiter };

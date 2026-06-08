@@ -460,13 +460,10 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
 router.post('/refund', authMiddleware, async (req, res) => {
   try {
-    // Admin check
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', req.user.id)
-      .maybeSingle();
-    if (profile?.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+    // Admin check — use JWT app_metadata (server-controlled), never trust user_metadata or profile rows
+    if (req.user.app_metadata?.is_admin !== true) {
+      return res.status(403).json({ error: 'Admin only' });
+    }
 
     const { refundId } = req.body;
     if (!refundId) return res.status(400).json({ error: 'refundId is required' });
