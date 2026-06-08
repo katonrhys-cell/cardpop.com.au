@@ -75,10 +75,11 @@ const RefundDialog = ({ order, onClose, onSuccess }) => {
       if (error) throw error;
 
       // Mark order refund_status
-      await supabase.from('orders').update({
+      const { error: refundStatusErr } = await supabase.from('orders').update({
         refund_status:        'requested',
         refund_requested_at:  new Date().toISOString(),
       }).eq('id', order.id).eq('buyer_id', currentUser.id);
+      if (refundStatusErr) throw refundStatusErr;
 
       // Notify seller
       if (order.seller_id) {

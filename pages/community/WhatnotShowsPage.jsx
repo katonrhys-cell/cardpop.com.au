@@ -65,17 +65,20 @@ const WhatnotShowsPage = () => {
   // Fetch current user's profile to auto-populate seller info
   useEffect(() => {
     if (!currentUser?.id) return;
+    let cancelled = false;
     supabase
       .from('profiles')
       .select('id, display_name, username, avatar_url, profile_photo_or_character, rating, reviews_count')
       .eq('id', currentUser.id)
       .single()
       .then(({ data }) => {
-        if (data) {
+        if (!cancelled && data) {
           setUserProfile(data);
           setForm(f => ({ ...f, seller_name: data.display_name || data.username || '' }));
         }
-      });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [currentUser?.id]);
 
   const fetchShows = useCallback(async () => {

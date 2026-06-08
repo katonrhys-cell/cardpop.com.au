@@ -38,6 +38,7 @@ const VaultProfilePage = () => {
   const fileInputRef = useRef(null);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchProfileAndCards = async () => {
       if (!currentUser) { setLoading(false); return; }
       try {
@@ -49,6 +50,7 @@ const VaultProfilePage = () => {
 
         if (profileError) throw profileError;
 
+        if (cancelled) return;
         setProfile(record);
         setFormData({
           name: record.name || '',
@@ -71,17 +73,18 @@ const VaultProfilePage = () => {
           .order('created_at', { ascending: false })
           .limit(12);
 
-        setVaultCards(cardsData || []);
+        if (!cancelled) setVaultCards(cardsData || []);
 
       } catch (error) {
         console.error('Error fetching profile data:', error);
-        toast.error('Failed to load profile data.');
+        if (!cancelled) toast.error('Failed to load profile data.');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchProfileAndCards();
+    return () => { cancelled = true; };
   }, [currentUser]);
 
   const handleInputChange = (e) => {
