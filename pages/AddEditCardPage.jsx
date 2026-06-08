@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { useCardOCR } from '@/hooks/useCardOCR.js';
 import { useEbayPriceLookup } from '@/hooks/useEbayPriceLookup.js';
 import { useCardSight, mapCardSightToFormFields } from '@/hooks/useCardSight.js';
+import PSAPopPanel from '@/components/PSAPopPanel.jsx';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -67,6 +68,7 @@ const AddEditCardPage = () => {
   const [isAutoFilled, setIsAutoFilled] = useState(false);
   const [categoryId, setCategoryId] = useState(null);
   const [lockedBaseValue, setLockedBaseValue] = useState(null);
+  const [psaPopData, setPsaPopData] = useState(null);
 
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
@@ -150,6 +152,18 @@ const AddEditCardPage = () => {
           return;
         }
         setLockedBaseValue(card.locked_base_value_aud ?? null);
+
+        // Fetch PSA population data if the card has a CardSight ID
+        if (card.cardsight_card_id) {
+          supabase
+            .from('card_market_valuations')
+            .select('raw_data')
+            .eq('card_id', card.cardsight_card_id)
+            .eq('source', 'psa')
+            .maybeSingle()
+            .then(({ data }) => { if (data?.raw_data) setPsaPopData(data.raw_data); });
+        }
+
         setFormData({
           collection:     card.collection     || 'Pokemon',
           cardName:       card.card_name      || '',
@@ -737,6 +751,14 @@ const AddEditCardPage = () => {
                   )}
                 </div>
               </SectionCard>
+
+              {/* PSA population panel — only shown when we have a CardSight match */}
+              {isEdit && (
+                <div className="premium-card p-6 bg-card space-y-3">
+                  <h2 className="font-serif text-xl font-bold border-b border-border pb-3">PSA Population</h2>
+                  <PSAPopPanel rawData={psaPopData} />
+                </div>
+              )}
 
               {/* ── 3. Value & Acquisition ── */}
               <SectionCard title="Value & Acquisition">
