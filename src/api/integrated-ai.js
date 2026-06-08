@@ -206,7 +206,17 @@ export async function streamOneShot({ systemPrompt, userMessage }) {
 	}
 
 	const passThrough = new PassThrough();
-	Readable.fromWeb(response.body).pipe(passThrough);
+	const readable = Readable.fromWeb(response.body);
+
+	readable.pipe(passThrough, { end: false });
+	readable.on('end', () => {
+		passThrough.end(`data: ${JSON.stringify({ type: SSEEventType.Completed, data: { content: '[COMPLETED]' } })}\n\n`);
+	});
+	readable.on('error', (err) => {
+		passThrough.push(`data: ${JSON.stringify({ type: SSEEventType.Error, data: { content: err.message } })}\n\n`);
+		passThrough.end();
+	});
+
 	return passThrough;
 }
 
