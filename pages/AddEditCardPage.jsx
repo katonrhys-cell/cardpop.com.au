@@ -23,6 +23,7 @@ import { useCardOCR } from '@/hooks/useCardOCR.js';
 import { useEbayPriceLookup } from '@/hooks/useEbayPriceLookup.js';
 import { useCardSight, mapCardSightToFormFields } from '@/hooks/useCardSight.js';
 import PSAPopPanel from '@/components/PSAPopPanel.jsx';
+import { useCardsightPricing } from '@/hooks/useCardsightPricing.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -73,6 +74,7 @@ const AddEditCardPage = () => {
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
   const { identify: cardSightIdentify, isIdentifying, result: cardSightResult, clearResult: clearCardSight } = useCardSight();
+  const { fetchPricingById, fetchPricingByName, isLoadingCsPrice, csPrice, clearCsPrice } = useCardsightPricing();
 
   const emptyForm = {
     // Card identity
@@ -471,6 +473,9 @@ const AddEditCardPage = () => {
                                 if (cardSightResult.pricing?.avgPrice) {
                                   set('estimatedValue', String(cardSightResult.pricing.avgPrice.toFixed(2)));
                                 }
+                                // Fetch separate CardSight pricing panel data
+                                if (cardSightResult.card?.id) fetchPricingById(cardSightResult.card.id);
+                                else if (cardSightResult.card?.name) fetchPricingByName(cardSightResult.card.name);
                                 setIsAutoFilled(true);
                                 toast.success('Card details filled from CardSight catalog.');
                               }}
@@ -819,6 +824,48 @@ const AddEditCardPage = () => {
                         </Button>
                       </>
                     )}
+                  </div>
+                )}
+
+                {/* CardSight market price */}
+                {(isLoadingCsPrice || csPrice) && (
+                  <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                    {isLoadingCsPrice ? (
+                      <p className="text-xs font-medium text-blue-700 dark:text-blue-400 flex items-center gap-2">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Fetching CardSight pricing…
+                      </p>
+                    ) : csPrice && (() => {
+                      const avg = csPrice.avg_price ?? csPrice.average_price ?? csPrice.mean_price;
+                      const min = csPrice.min_price ?? csPrice.minimum_price;
+                      const max = csPrice.max_price ?? csPrice.maximum_price;
+                      const count = csPrice.count ?? csPrice.total_count ?? csPrice.total;
+                      if (!avg) return null;
+                      return (
+                        <>
+                          <p className="text-xs font-bold text-blue-700 dark:text-blue-400 flex items-center gap-1.5 mb-2">
+                            <Shield className="w-3.5 h-3.5" /> CardSight Market Data{count ? ` (${count} sales)` : ''}
+                          </p>
+                          <div className="flex gap-3 text-xs text-blue-800 dark:text-blue-300 mb-3">
+                            <span>Avg: <strong>${Number(avg).toFixed(2)}</strong></span>
+                            {min != null && <span>Low: <strong>${Number(min).toFixed(2)}</strong></span>}
+                            {max != null && <span>High: <strong>${Number(max).toFixed(2)}</strong></span>}
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs border-blue-400 text-blue-700 hover:bg-blue-50 dark:text-blue-400"
+                            onClick={() => {
+                              set('estimatedValue', String(Number(avg).toFixed(2)));
+                              clearCsPrice();
+                              toast.success(`Estimated value set to $${Number(avg).toFixed(2)} AUD from CardSight data.`);
+                            }}
+                          >
+                            Use CardSight average (${Number(avg).toFixed(2)})
+                          </Button>
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
 
