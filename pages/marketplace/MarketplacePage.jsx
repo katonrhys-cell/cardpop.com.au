@@ -3,6 +3,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCategories } from '@/hooks/useCategories.js';
+import { useCollectionEras } from '@/hooks/useCollectionEras.js';
+import { COLLECTION_CONFIGS } from '@/data/collectionConfigs.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search, RefreshCw, AlertCircle, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,6 +12,17 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import { toast } from 'sonner';
+
+// Map a DB category name to a collection config slug (e.g. "Pokémon" → "pokemon")
+function resolveEraSlug(categoryName) {
+  if (!categoryName) return null;
+  const lower = categoryName.toLowerCase();
+  for (const [slug, cfg] of Object.entries(COLLECTION_CONFIGS)) {
+    const aliases = [cfg.name, ...(cfg.categoryAliases ?? [])].map(a => a.toLowerCase());
+    if (aliases.includes(lower)) return slug;
+  }
+  return null;
+}
 
 const MarketplacePage = () => {
   const [listings, setListings] = useState([]);
@@ -25,8 +38,26 @@ const MarketplacePage = () => {
   const [nameMap, setNameMap] = useState({});
   const [filterCat, setFilterCat] = useState('');
   const [filterSub, setFilterSub] = useState('');
+  const [filterEra, setFilterEra] = useState('');
   const [catOpts, setCatOpts] = useState([]);
   const [subOpts, setSubOpts] = useState([]);
+
+  // Resolve the matching collection config slug so we can show eras in the filter
+  const [eraSlug, setEraSlug] = useState(null);
+  const { eras: categoryEras } = useCollectionEras(eraSlug);
+
+  // When the selected category changes, try to map it to a collection config
+  useEffect(() => {
+    if (!filterCat) {
+      setEraSlug(null);
+      setFilterEra('');
+      return;
+    }
+    const catName = catOpts.find(c => c.id === filterCat)?.name;
+    const slug = resolveEraSlug(catName);
+    setEraSlug(slug);
+    setFilterEra('');
+  }, [filterCat, catOpts]);
 
   // Search and Price Filter States
   const [search, setSearch] = useState('');
@@ -102,6 +133,7 @@ const MarketplacePage = () => {
         }
 
         if (filterRookie) query = query.contains('vault_items.cardVariants', ['Rookie Card (RC)']);
+        if (filterEra) query = query.eq('vault_items.set_name', filterEra);
 
         if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
         else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
@@ -123,11 +155,12 @@ const MarketplacePage = () => {
     fetchRef.current = run;
     run();
     return () => { cancelled = true; };
-  }, [sort, filterMode, filterCat, filterSub, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
+  }, [sort, filterMode, filterCat, filterSub, filterEra, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
 
   const clearFilters = () => {
     setFilterCat('');
     setFilterSub('');
+    setFilterEra('');
     setFilterMode('All');
     setFilterRookie(false);
     setSearch('');
@@ -136,13 +169,13 @@ const MarketplacePage = () => {
   };
 
   const getBreadcrumbPath = () => {
-    const parts = [nameMap[filterCat], nameMap[filterSub]].filter(Boolean);
+    const parts = [nameMap[filterCat], filterEra || nameMap[filterSub]].filter(Boolean);
     if (parts.length === 0) return null;
     return `Filtering by: ${parts.join(' > ')}`;
   };
 
   const breadcrumbText = getBreadcrumbPath();
-  const hasActiveFilters = filterCat || filterSub || filterMode !== 'All' || filterRookie || search || minPrice || maxPrice;
+  const hasActiveFilters = filterCat || filterSub || filterEra || filterMode !== 'All' || filterRookie || search || minPrice || maxPrice;
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans pb-20">
@@ -177,11 +210,27 @@ const MarketplacePage = () => {
             <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Categories" /></SelectTrigger>
             <SelectContent>{catOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
           </Select>
-          {/* Subcategory */}
-          <Select value={filterSub} onValueChange={setFilterSub} disabled={!filterCat}>
-            <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Subcategories" /></SelectTrigger>
-            <SelectContent>{subOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-          </Select>
+          {/* Set / Era (when category maps to a known collection) or Subcategory */}
+          {categoryEras.length > 0 ? (
+            <Select value={filterEra} onValueChange={setFilterEra}>
+              <SelectTrigger className="w-[200px] bg-background border-border rounded-xl font-medium">
+                <SelectValue placeholder="All Sets / Eras" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Sets / Eras</SelectItem>
+                {categoryEras.map(era => (
+                  <SelectItem key={era.name} value={era.name}>
+                    {era.name}{era.years ? ` (${era.years})` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Select value={filterSub} onValueChange={setFilterSub} disabled={!filterCat}>
+              <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Subcategories" /></SelectTrigger>
+              <SelectContent>{subOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+            </Select>
+          )}
           {/* Price Range */}
           <div className="flex items-center gap-2">
             <Input
