@@ -315,7 +315,7 @@ export const SPORTS_CATEGORY_DATA = [
   { slug: 'nhl',       name: 'NHL',       gradient: 'from-slate-700 to-blue-900',    Icon: HockeyIcon             },
 ];
 
-// 9 tiles shown on the homepage browse grid
+// All categories shown on the homepage browse carousel
 export const HOMEPAGE_CATEGORIES = [
   TCG_CATEGORY_DATA[0], // Pokémon
   TCG_CATEGORY_DATA[1], // Magic: TG
@@ -326,4 +326,19 @@ export const HOMEPAGE_CATEGORIES = [
   TCG_CATEGORY_DATA[6], // Digimon
   SPORTS_CATEGORY_DATA[0], // NBA
   SPORTS_CATEGORY_DATA[2], // NFL
+  TCG_CATEGORY_DATA[7], // Final Fantasy
+  TCG_CATEGORY_DATA[8], // Riftbound
+  TCG_CATEGORY_DATA[9], // TMNT
+  SPORTS_CATEGORY_DATA[1], // NBL
+  SPORTS_CATEGORY_DATA[3], // Baseball
+  SPORTS_CATEGORY_DATA[4], // Cricket
+  SPORTS_CATEGORY_DATA[5], // NRL
+  SPORTS_CATEGORY_DATA[6], // AFL
+  SPORTS_CATEGORY_DATA[7], // Formula 1
+  SPORTS_CATEGORY_DATA[8], // Golf
+  SPORTS_CATEGORY_DATA[9], // Soccer
+  SPORTS_CATEGORY_DATA[10], // Tennis
+  SPORTS_CATEGORY_DATA[11], // Wrestling
+  SPORTS_CATEGORY_DATA[12], // UFC
+  SPORTS_CATEGORY_DATA[13], // NHL
 ];
