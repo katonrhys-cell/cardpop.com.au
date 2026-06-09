@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
+import * as Sentry from '@sentry/node';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -12,6 +13,12 @@ import { sessionTimeoutMiddleware } from './middleware/sessionTimeout.js';
 import { secureHeadersMiddleware } from './middleware/secureHeaders.js';
 import logger from './utils/logger.js';
 import { BodyLimit } from './constants/common.js';
+
+Sentry.init({
+	dsn: process.env.SENTRY_DSN || 'https://6477807dc7f2422d3cf0eacd260645b3@o4511534905884672.ingest.us.sentry.io/4511534929543168',
+	tracesSampleRate: 0.2,
+	environment: process.env.NODE_ENV || 'production',
+});
 
 const app = express();
 
@@ -89,6 +96,7 @@ Canonical: https://cardpop.online/.well-known/security.txt
 `);
 });
 
+Sentry.setupExpressErrorHandler(app);
 app.use(errorMiddleware);
 
 app.use((req, res) => {
