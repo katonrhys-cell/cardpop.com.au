@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { CalendarDays, Search, MapPin, SlidersHorizontal, X } from 'lucide-react';
 import { format } from 'date-fns';
@@ -325,10 +326,11 @@ const CommunityEventsPage = () => {
             <h2 className="text-2xl font-bold mb-4">Running a Card Event?</h2>
             <p className="text-muted-foreground leading-relaxed">
               Organising a card show, tournament or trade night in Australia? List it on CardPop for
-              free and reach thousands of collectors. Submitted events are reviewed before they appear
-              on the calendar. <a href="/contact" className="text-primary font-semibold hover:underline">Contact us</a> to
-              get your event listed, or explore the <a href="/marketplace" className="text-primary font-semibold hover:underline">CardPop marketplace</a> to
-              buy and sell between shows.
+              free and reach thousands of collectors. Sign in and submit your event
+              from <Link to="/account/events" className="text-primary font-semibold hover:underline">My Events</Link> in
+              your account — every submission is reviewed before it appears on the calendar. Between
+              shows, explore the <Link to="/marketplace" className="text-primary font-semibold hover:underline">CardPop marketplace</Link> to
+              buy and sell.
             </p>
           </div>
         </div>
