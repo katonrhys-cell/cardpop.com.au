@@ -1,0 +1,41 @@
+version: 2
+updates:
+  # ── npm dependencies ──────────────────────────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Australia/Sydney"
+    open-pull-requests-limit: 10
+    # Group minor and patch bumps into one PR per week to reduce noise.
+    # Major version bumps always get their own PR for manual review.
+    groups:
+      minor-and-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # crypto-js is kept intentionally for legacy decrypt compatibility —
+      # do not auto-upgrade until the migration to Node.js crypto is complete.
+      - dependency-name: "crypto-js"
+        update-types: ["version-update:semver-major"]
+    labels:
+      - "dependencies"
+      - "security"
+
+  # ── GitHub Actions ────────────────────────────────────────────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Australia/Sydney"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ci"

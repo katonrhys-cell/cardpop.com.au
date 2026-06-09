@@ -15,10 +15,11 @@ import { TCG_CATEGORY_DATA, SPORTS_CATEGORY_DATA } from '@/components/CategoryIc
 import { useCart } from '@/hooks/useCart.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import VaultDropdown from '@/components/VaultDropdown.jsx';
 import SearchBar from '@/components/SearchBar.jsx';
+import NotificationBell from '@/components/NotificationBell.jsx';
 
 export const TCG_COLLECTIONS = [
   'Pokemon', 'Magic: The Gathering', 'Yu-Gi-Oh', 'Digimon',
@@ -86,7 +87,7 @@ const MobileBrowseSection = ({ onNavigate }) => {
 
   const handleCollectionNav = (slug) => {
     navigate(`/collections/${slug}`);
-    // Sheet closes reactively via the location.pathname useEffect in Header
+    onNavigate?.();
   };
 
   return (
@@ -109,16 +110,17 @@ const MobileBrowseSection = ({ onNavigate }) => {
       {tcgOpen && (
         <div className="grid grid-cols-2 gap-0.5 mb-1 pl-2">
           {TCG_CATEGORY_DATA.map(cat => (
-            <button
-              key={cat.name}
-              onClick={() => handleCollectionNav(cat.slug)}
-              className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors text-left"
-            >
-              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${cat.gradient} shrink-0`}>
-                <cat.Icon className="w-3.5 h-3.5" />
-              </span>
-              <span className="text-xs font-semibold text-foreground truncate">{cat.name}</span>
-            </button>
+            <SheetClose key={cat.name} asChild>
+              <button
+                onClick={() => handleCollectionNav(cat.slug)}
+                className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors text-left"
+              >
+                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${cat.gradient} shrink-0`}>
+                  <cat.Icon className="w-3.5 h-3.5" />
+                </span>
+                <span className="text-xs font-semibold text-foreground truncate">{cat.name}</span>
+              </button>
+            </SheetClose>
           ))}
         </div>
       )}
@@ -137,16 +139,17 @@ const MobileBrowseSection = ({ onNavigate }) => {
       {sportsOpen && (
         <div className="grid grid-cols-2 gap-0.5 mb-1 pl-2">
           {SPORTS_CATEGORY_DATA.map(cat => (
-            <button
-              key={cat.name}
-              onClick={() => handleCollectionNav(cat.slug)}
-              className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors text-left"
-            >
-              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${cat.gradient} shrink-0`}>
-                <cat.Icon className="w-3.5 h-3.5" />
-              </span>
-              <span className="text-xs font-semibold text-foreground truncate">{cat.name}</span>
-            </button>
+            <SheetClose key={cat.name} asChild>
+              <button
+                onClick={() => handleCollectionNav(cat.slug)}
+                className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors text-left"
+              >
+                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${cat.gradient} shrink-0`}>
+                  <cat.Icon className="w-3.5 h-3.5" />
+                </span>
+                <span className="text-xs font-semibold text-foreground truncate">{cat.name}</span>
+              </button>
+            </SheetClose>
           ))}
         </div>
       )}
@@ -342,25 +345,28 @@ const MobileBlogSection = ({ onNavigate }) => {
       </button>
       {open && (
         <div className="flex flex-col gap-0.5 mb-1 pl-2">
-          <Link
-            to="/blog"
-            onClick={onNavigate}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-semibold text-muted-foreground"
-          >
-            All Articles
-          </Link>
-          {BLOG_CATEGORIES.map(cat => (
+          <SheetClose asChild>
             <Link
-              key={cat.slug}
-              to={`/blog/category/${cat.slug}`}
+              to="/blog"
               onClick={onNavigate}
-              className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-semibold text-muted-foreground"
             >
-              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${cat.gradient} shrink-0`}>
-                <cat.Icon className="w-3.5 h-3.5 text-white" />
-              </span>
-              <span className="text-xs font-semibold text-foreground truncate">{cat.label}</span>
+              All Articles
             </Link>
+          </SheetClose>
+          {BLOG_CATEGORIES.map(cat => (
+            <SheetClose key={cat.slug} asChild>
+              <Link
+                to={`/blog/category/${cat.slug}`}
+                onClick={onNavigate}
+                className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
+              >
+                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${cat.gradient} shrink-0`}>
+                  <cat.Icon className="w-3.5 h-3.5 text-white" />
+                </span>
+                <span className="text-xs font-semibold text-foreground truncate">{cat.label}</span>
+              </Link>
+            </SheetClose>
           ))}
         </div>
       )}
@@ -393,21 +399,31 @@ const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout })
       </button>
       {expanded && (
         <div className="mt-1 flex flex-col gap-0.5 pl-2">
-          <Link to="/account" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
-            <LayoutDashboard className="w-4 h-4" /> Dashboard
-          </Link>
-          <Link to="/my-vault" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
-            <Package className="w-4 h-4" /> My Vault
-          </Link>
-          <Link to="/trade-requests" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
-            <ArrowRightLeft className="w-4 h-4" /> Trade Requests
-          </Link>
-          <Link to="/account/profile" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
-            <Settings className="w-4 h-4" /> Account Settings
-          </Link>
-          <button onClick={onLogout} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-destructive/10 text-destructive transition-colors text-sm font-medium w-full text-left">
-            <LogOut className="w-4 h-4" /> Log out
-          </button>
+          <SheetClose asChild>
+            <Link to="/account" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
+              <LayoutDashboard className="w-4 h-4" /> Dashboard
+            </Link>
+          </SheetClose>
+          <SheetClose asChild>
+            <Link to="/my-vault" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
+              <Package className="w-4 h-4" /> My Vault
+            </Link>
+          </SheetClose>
+          <SheetClose asChild>
+            <Link to="/trade-requests" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
+              <ArrowRightLeft className="w-4 h-4" /> Trade Requests
+            </Link>
+          </SheetClose>
+          <SheetClose asChild>
+            <Link to="/account/profile" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
+              <Settings className="w-4 h-4" /> Account Settings
+            </Link>
+          </SheetClose>
+          <SheetClose asChild>
+            <button onClick={onLogout} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-destructive/10 text-destructive transition-colors text-sm font-medium w-full text-left">
+              <LogOut className="w-4 h-4" /> Log out
+            </button>
+          </SheetClose>
         </div>
       )}
     </div>
@@ -415,7 +431,7 @@ const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout })
 };
 
 const Header = () => {
-  const { isAuthenticated, currentUser, isAdmin, logout, isVerified } = useAuth();
+  const { isAuthenticated, currentUser, isAdmin, logout, isVerified, loading: authLoading } = useAuth();
   const { cartItems, setIsCartOpen } = useCart();
   const location = useLocation();
   const navigate = useNavigate();
@@ -540,7 +556,7 @@ const Header = () => {
           {/* Spacer pushes all action icons to the right edge */}
           <div className="flex-1" />
 
-            {isAdmin && (
+            {!authLoading && isAdmin && (
               <Button asChild variant="ghost" size="sm" className="hidden xl:flex gap-2 text-[hsl(var(--admin-warning,24.6_95%_53.1%))] hover:text-[hsl(var(--admin-warning,24.6_95%_53.1%))] hover:bg-[hsl(var(--admin-warning,24.6_95%_53.1%))]/10 rounded-xl">
                 <Link to="/admin">
                   <Shield className="w-4 h-4" />
@@ -549,7 +565,7 @@ const Header = () => {
               </Button>
             )}
 
-            {isAuthenticated && (
+            {!authLoading && isAuthenticated && (
               <Button asChild variant="ghost" size="icon" className="hidden sm:flex relative rounded-xl hover:bg-muted">
                 <Link to="/trade-requests">
                   <ArrowRightLeft className="h-5 w-5" />
@@ -562,7 +578,7 @@ const Header = () => {
               </Button>
             )}
 
-            {isAuthenticated && (
+            {!authLoading && isAuthenticated && (
               <Button asChild variant="ghost" size="icon" className="hidden sm:flex relative rounded-xl hover:bg-muted">
                 <Link to="/messaging">
                   <MessageSquare className="h-5 w-5" />
@@ -573,6 +589,12 @@ const Header = () => {
                   )}
                 </Link>
               </Button>
+            )}
+
+            {!authLoading && isAuthenticated && (
+              <div className="hidden sm:block">
+                <NotificationBell />
+              </div>
             )}
 
             <Button
@@ -601,7 +623,9 @@ const Header = () => {
             </Button>
 
             <div className="hidden md:flex items-center gap-2 shrink-0">
-              {isAuthenticated ? (
+              {authLoading ? (
+                <div className="h-9 w-28 rounded-xl bg-muted animate-pulse" aria-hidden="true" />
+              ) : isAuthenticated ? (
                 <VaultDropdown isMobile={false} />
               ) : (
                 <>
@@ -660,18 +684,19 @@ const Header = () => {
                     {NAV_LINKS.filter(l => l.label !== 'Blog').map((link) => {
                       const isActive = isNavLinkActive(link);
                       return (
-                        <Link
-                          key={link.label}
-                          to={link.href}
-                          onClick={() => setMobileMenuOpen(false)}
-                          className={`px-4 py-3.5 rounded-xl text-base font-bold transition-colors ${
-                            isActive
-                              ? 'bg-primary text-primary-foreground shadow-sm'
-                              : 'text-foreground hover:bg-muted'
-                          }`}
-                        >
-                          {link.label}
-                        </Link>
+                        <SheetClose key={link.label} asChild>
+                          <Link
+                            to={link.href}
+                            onClick={() => setMobileMenuOpen(false)}
+                            className={`px-4 py-3.5 rounded-xl text-base font-bold transition-colors ${
+                              isActive
+                                ? 'bg-primary text-primary-foreground shadow-sm'
+                                : 'text-foreground hover:bg-muted'
+                            }`}
+                          >
+                            {link.label}
+                          </Link>
+                        </SheetClose>
                       );
                     })}
                   </nav>
@@ -684,15 +709,16 @@ const Header = () => {
                       </h4>
                       <nav className="flex flex-col gap-1">
                         {ADMIN_LINKS.map((link) => (
-                          <Link
-                            key={link.label}
-                            to={link.href}
-                            className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-[hsl(var(--admin-warning,24.6_95%_53.1%))] hover:bg-[hsl(var(--admin-warning,24.6_95%_53.1%))]/10 transition-colors"
-                            onClick={() => setMobileMenuOpen(false)}
-                          >
-                            <link.icon className="w-4 h-4" />
-                            {link.label}
-                          </Link>
+                          <SheetClose key={link.label} asChild>
+                            <Link
+                              to={link.href}
+                              className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold text-[hsl(var(--admin-warning,24.6_95%_53.1%))] hover:bg-[hsl(var(--admin-warning,24.6_95%_53.1%))]/10 transition-colors"
+                              onClick={() => setMobileMenuOpen(false)}
+                            >
+                              <link.icon className="w-4 h-4" />
+                              {link.label}
+                            </Link>
+                          </SheetClose>
                         ))}
                       </nav>
                     </div>
@@ -700,19 +726,23 @@ const Header = () => {
 
                   {isAuthenticated && (
                     <div className="grid grid-cols-2 gap-3 mb-8">
-                      <Button asChild variant="outline" className="w-full justify-center rounded-xl h-12 font-bold" onClick={() => setMobileMenuOpen(false)}>
-                        <Link to="/verify-account" className="flex items-center gap-2 text-xs px-1">
-                          <CheckCircle className="w-4 h-4" />
-                          Verify
-                        </Link>
-                      </Button>
-                      <Button asChild variant="outline" className="w-full justify-center rounded-xl h-12 font-bold" onClick={() => setMobileMenuOpen(false)}>
-                        <Link to="/trade-requests" className="flex items-center gap-2 text-xs px-1">
-                          <ArrowRightLeft className="w-4 h-4" />
-                          Trades
-                          {tradeCount > 0 && <Badge className="ml-1 bg-accent text-accent-foreground px-1">{tradeCount}</Badge>}
-                        </Link>
-                      </Button>
+                      <SheetClose asChild>
+                        <Button asChild variant="outline" className="w-full justify-center rounded-xl h-12 font-bold">
+                          <Link to="/verify-account" className="flex items-center gap-2 text-xs px-1">
+                            <CheckCircle className="w-4 h-4" />
+                            Verify
+                          </Link>
+                        </Button>
+                      </SheetClose>
+                      <SheetClose asChild>
+                        <Button asChild variant="outline" className="w-full justify-center rounded-xl h-12 font-bold">
+                          <Link to="/trade-requests" className="flex items-center gap-2 text-xs px-1">
+                            <ArrowRightLeft className="w-4 h-4" />
+                            Trades
+                            {tradeCount > 0 && <Badge className="ml-1 bg-accent text-accent-foreground px-1">{tradeCount}</Badge>}
+                          </Link>
+                        </Button>
+                      </SheetClose>
                     </div>
                   )}
                 </div>
@@ -735,12 +765,16 @@ const Header = () => {
                     />
                   ) : (
                     <div className="flex flex-col gap-3">
-                      <Button asChild variant="default" className="w-full rounded-xl h-12 font-bold tracking-wide text-base shadow-sm">
-                        <Link to="/signup" onClick={() => setMobileMenuOpen(false)}>Join Vault</Link>
-                      </Button>
-                      <Button asChild variant="outline" className="w-full rounded-xl h-12 font-bold text-base">
-                        <Link to="/login" onClick={() => setMobileMenuOpen(false)}>Sign In</Link>
-                      </Button>
+                      <SheetClose asChild>
+                        <Button asChild variant="default" className="w-full rounded-xl h-12 font-bold tracking-wide text-base shadow-sm">
+                          <Link to="/signup">Join Vault</Link>
+                        </Button>
+                      </SheetClose>
+                      <SheetClose asChild>
+                        <Button asChild variant="outline" className="w-full rounded-xl h-12 font-bold text-base">
+                          <Link to="/login">Sign In</Link>
+                        </Button>
+                      </SheetClose>
                     </div>
                   )}
                 </div>

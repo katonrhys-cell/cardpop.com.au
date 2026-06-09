@@ -22,7 +22,10 @@ const CheckoutSuccessPage = () => {
 
     if (sessionId) {
       apiServerClient.fetch(`/stripe/session/${sessionId}`)
-        .then(res => res.json())
+        .then(res => {
+          if (!res.ok) throw new Error(`Failed to load session: ${res.status}`);
+          return res.json();
+        })
         .then(data => {
           setSessionData(data);
           setLoading(false);

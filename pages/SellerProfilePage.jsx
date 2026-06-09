@@ -17,59 +17,62 @@ const SellerProfilePage = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+    const fetchSellerData = async () => {
+      try {
+        const { data: sellerData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', sellerId)
+          .single();
+        if (cancelled) return;
+        setSeller(sellerData);
+
+        const { data: items } = await supabase
+          .from('vault_items')
+          .select('*, vault_images(*)')
+          .eq('owner_id', sellerId)
+          .in('listing_type', ['fixed', 'trade', 'both'])
+          .eq('is_public', true)
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (cancelled) return;
+        const mappedProducts = (items ?? []).map(c => {
+          const imgPath = c.card_image || c.vault_images?.[0]?.storage_path || null;
+          const imgSrc = imgPath
+            ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
+            : null;
+          return {
+          id: c.id,
+          source: 'vault',
+          title: c.card_name || 'Vault Card',
+          collectionType: c.collection,
+          condition: c.condition,
+          price: c.estimated_value_aud || 0,
+          image: imgSrc,
+          sellerName: sellerData?.display_name || sellerData?.username || 'Vault Collector',
+          ...c,
+          };
+        });
+        setProducts(mappedProducts);
+
+        const { data: reviewsData } = await supabase
+          .from('reviews')
+          .select('*, reviewer:profiles!reviewer_id(id, username, display_name)')
+          .eq('reviewee_id', sellerId)
+          .order('created_at', { ascending: false })
+          .limit(10);
+        if (!cancelled) setReviews(reviewsData ?? []);
+      } catch (error) {
+        console.error('Error fetching seller data:', error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
     fetchSellerData();
+    return () => { cancelled = true; };
   }, [sellerId]);
-
-  const fetchSellerData = async () => {
-    try {
-      const { data: sellerData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', sellerId)
-        .single();
-      setSeller(sellerData);
-
-      const { data: items } = await supabase
-        .from('vault_items')
-        .select('*, vault_images(*)')
-        .eq('owner_id', sellerId)
-        .in('listing_type', ['fixed', 'trade', 'both'])
-        .eq('is_public', true)
-        .order('created_at', { ascending: false })
-        .limit(50);
-
-      const mappedProducts = (items ?? []).map(c => {
-        const imgPath = c.card_image || c.vault_images?.[0]?.storage_path || null;
-        const imgSrc = imgPath
-          ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
-          : null;
-        return {
-        id: c.id,
-        source: 'vault',
-        title: c.card_name || 'Vault Card',
-        collectionType: c.collection,
-        condition: c.condition,
-        price: c.estimated_value_aud || 0,
-        image: imgSrc,
-        sellerName: sellerData?.display_name || sellerData?.username || 'Vault Collector',
-        ...c,
-        };
-      });
-      setProducts(mappedProducts);
-
-      const { data: reviewsData } = await supabase
-        .from('reviews')
-        .select('*, reviewer:profiles!reviewer_id(id, username, display_name)')
-        .eq('reviewee_id', sellerId)
-        .order('created_at', { ascending: false })
-        .limit(10);
-      setReviews(reviewsData ?? []);
-    } catch (error) {
-      console.error('Error fetching seller data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (loading) {
     return (

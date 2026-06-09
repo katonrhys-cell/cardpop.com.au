@@ -10,50 +10,78 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile]         = useState(null);
   const [session, setSession]         = useState(null);
   const [loading, setLoading]         = useState(true);
+  const [profileLoading, setProfileLoading] = useState(true);
   const isMounted = useRef(true);
 
   const fetchProfile = async (userId) => {
     if (!userId) return null;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .single();
-    return data;
+    if (error) console.warn('[AuthContext] fetchProfile error:', error.message);
+    return data ?? null;
   };
 
   useEffect(() => {
     isMounted.current = true;
 
-    // onAuthStateChange fires INITIAL_SESSION on mount — no need for getSession().
-    // Using both causes double profile fetches and state races.
+    // Hard timeouts to unblock UI if Supabase never responds.
+    const authTimeout    = setTimeout(() => { if (isMounted.current) { setLoading(false); setProfileLoading(false); } }, 6000);
+    const profileTimeout = setTimeout(() => { if (isMounted.current) setProfileLoading(false); }, 8000);
+
+    // Rely solely on onAuthStateChange for session state.
+    // Using getSession() concurrently caused a race where a stale null result
+    // would prematurely set profileLoading=false, making isAdmin appear false.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, newSession) => {
         if (!isMounted.current) return;
 
         setSession(newSession);
         setCurrentUser(newSession?.user ?? null);
+        clearTimeout(authTimeout);
+        if (isMounted.current) setLoading(false);
 
         if (newSession?.user) {
+          if (isMounted.current) setProfileLoading(true);
           try {
             const p = await fetchProfile(newSession.user.id);
-            if (isMounted.current) setProfile(p);
+            if (isMounted.current) { setProfile(p); setProfileLoading(false); clearTimeout(profileTimeout); }
           } catch (e) {
             console.error('[AuthContext] fetchProfile failed:', e);
+            if (isMounted.current) { setProfileLoading(false); clearTimeout(profileTimeout); }
           }
         } else {
-          if (isMounted.current) setProfile(null);
+          if (isMounted.current) { setProfile(null); setProfileLoading(false); clearTimeout(profileTimeout); }
         }
-
-        if (isMounted.current) setLoading(false);
       }
     );
 
     return () => {
       isMounted.current = false;
+      clearTimeout(authTimeout);
+      clearTimeout(profileTimeout);
       subscription.unsubscribe();
     };
   }, []);
+
+  // Safety net: if profile wasn't set by onAuthStateChange (e.g. slow network,
+  // swallowed error), fetch it directly whenever currentUser is available and
+  // profile is still null.
+  useEffect(() => {
+    if (!currentUser?.id || profile !== null) return;
+    let cancelled = false;
+    fetchProfile(currentUser.id).then(p => {
+      if (!cancelled && isMounted.current && p) {
+        setProfile(p);
+        setProfileLoading(false);
+      }
+    }).catch(() => {
+      if (!cancelled && isMounted.current) setProfileLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [currentUser?.id, profile]);
 
   const signup = async (email, password, fullName) => {
     const username = email.split('@')[0].replace(/[^a-z0-9_]/gi, '').toLowerCase();
@@ -71,6 +99,41 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new Error(error.message);
+
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('mfa_enabled')
+      .eq('id', data.user.id)
+      .single();
+
+    if (profileData?.mfa_enabled) {
+      const res = await fetch('/hcgi/api/auth/mfa/request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${data.session.access_token}`,
+        },
+        body: JSON.stringify({ email: data.user.email }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || 'Failed to send MFA code');
+      }
+      const mfaResult = await res.json();
+      // Set session eagerly — MFA is a UI gate; backend APIs are already protected by Supabase JWT.
+      if (data.session) {
+        setSession(data.session);
+        setCurrentUser(data.session.user);
+      }
+      return { requiresMfa: true, mfaId: mfaResult.mfaId };
+    }
+
+    // Eagerly update session state so ProtectedRoute sees isAuthenticated=true
+    // before onAuthStateChange fires asynchronously.
+    if (data.session) {
+      setSession(data.session);
+      setCurrentUser(data.session.user);
+    }
     return data;
   };
 
@@ -129,13 +192,25 @@ export const AuthProvider = ({ children }) => {
     isVerified,
     isEmailVerified: isVerified,
     loading,
+    profileLoading,
     signup,
     login,
     logout,
     requestOTP:             async () => { throw new Error('OTP auth not supported — use email/password.'); },
     requestMFA:             async () => { throw new Error('Use Supabase MFA.'); },
     loginWithOTP:           async () => { throw new Error('Use Supabase MFA.'); },
-    verifyMFACode:          async () => { throw new Error('Use Supabase MFA.'); },
+    verifyMFACode:          async (mfaId, _otpId, code) => {
+      const res = await fetch('/hcgi/api/auth/mfa/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mfaId, code }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || 'MFA verification failed');
+      }
+      return res.json();
+    },
     enableMFA:              async () => {},
     disableMFA:             async () => {},
     resendVerificationEmail,

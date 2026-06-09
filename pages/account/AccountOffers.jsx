@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
-import { Tag, CheckCircle2, XCircle, Undo2, Clock, Loader2 } from 'lucide-react';
+import { Tag, CheckCircle2, XCircle, Undo2, Clock, Loader2, RefreshCw, DollarSign } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,7 +27,7 @@ const formatCurrency = (val) => `$${(Number(val) || 0).toFixed(2)}`;
 const formatDate = (ts) =>
   ts ? new Date(ts).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
-const OfferCard = ({ offer, perspective, onAction, actionLoading }) => {
+const OfferCard = ({ offer, perspective, onAction, actionLoading, onCounter }) => {
   const isReceived = perspective === 'received';
   const other = isReceived ? offer.buyer : offer.seller;
   const cardName = offer.listing?.vault_item?.card_name || 'Unknown Card';
@@ -87,7 +91,7 @@ const OfferCard = ({ offer, perspective, onAction, actionLoading }) => {
                 size="sm"
                 className="rounded-xl font-bold bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5"
                 disabled={!!actionLoading}
-                onClick={() => onAction(offer.id, 'accepted')}
+                onClick={() => onAction(offer.id, 'accepted', perspective)}
               >
                 {actionLoading === `${offer.id}_accept`
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -97,9 +101,19 @@ const OfferCard = ({ offer, perspective, onAction, actionLoading }) => {
               <Button
                 size="sm"
                 variant="outline"
+                className="rounded-xl font-bold gap-1.5 text-blue-600 border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950"
+                disabled={!!actionLoading}
+                onClick={() => onCounter(offer)}
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Counter
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
                 className="rounded-xl font-bold text-destructive border-destructive/30 hover:bg-destructive/10 gap-1.5"
                 disabled={!!actionLoading}
-                onClick={() => onAction(offer.id, 'declined')}
+                onClick={() => onAction(offer.id, 'declined', perspective)}
               >
                 {actionLoading === `${offer.id}_decline`
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -113,7 +127,7 @@ const OfferCard = ({ offer, perspective, onAction, actionLoading }) => {
               variant="outline"
               className="rounded-xl font-bold gap-1.5"
               disabled={!!actionLoading}
-              onClick={() => onAction(offer.id, 'withdrawn')}
+              onClick={() => onAction(offer.id, 'withdrawn', perspective)}
             >
               {actionLoading === `${offer.id}_withdraw`
                 ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -145,9 +159,13 @@ const AccountOffers = () => {
   const [sent, setSent] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
+  const [counterOffer, setCounterOffer] = useState(null);
+  const [counterAmount, setCounterAmount] = useState('');
+  const [counterMessage, setCounterMessage] = useState('');
+  const [counterSaving, setCounterSaving] = useState(false);
 
   const fetchOffers = useCallback(async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) { setLoading(false); return; }
     setLoading(true);
     try {
       const [receivedRes, sentRes] = await Promise.all([
@@ -183,7 +201,7 @@ const AccountOffers = () => {
 
   useEffect(() => { fetchOffers(); }, [fetchOffers]);
 
-  const handleAction = async (offerId, newStatus) => {
+  const handleAction = async (offerId, newStatus, perspective) => {
     const keyMap = { accepted: 'accept', declined: 'decline', withdrawn: 'withdraw' };
     setActionLoading(`${offerId}_${keyMap[newStatus]}`);
     try {
@@ -191,7 +209,12 @@ const AccountOffers = () => {
       if (newStatus === 'accepted' || newStatus === 'declined') {
         updateData.responded_at = new Date().toISOString();
       }
-      const { error } = await supabase.from('offers').update(updateData).eq('id', offerId);
+      const ownerColumn = perspective === 'received' ? 'seller_id' : 'buyer_id';
+      const { error } = await supabase
+        .from('offers')
+        .update(updateData)
+        .eq('id', offerId)
+        .eq(ownerColumn, currentUser.id);
       if (error) throw error;
       const messages = { accepted: 'Offer accepted!', declined: 'Offer declined.', withdrawn: 'Offer withdrawn.' };
       toast.success(messages[newStatus]);
@@ -200,6 +223,35 @@ const AccountOffers = () => {
       toast.error(err.message || 'Action failed.');
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const openCounter = (offer) => {
+    setCounterOffer(offer);
+    setCounterAmount('');
+    setCounterMessage('');
+  };
+
+  const handleCounter = async () => {
+    const amt = parseFloat(counterAmount);
+    if (!amt || amt <= 0) { toast.error('Enter a valid counter amount'); return; }
+    setCounterSaving(true);
+    try {
+      const { error } = await supabase.from('offers').update({
+        status: 'countered',
+        counter_amount_aud: amt,
+        counter_message: counterMessage.trim() || null,
+        updated_at: new Date().toISOString(),
+      }).eq('id', counterOffer.id)
+        .eq('seller_id', currentUser.id);
+      if (error) throw error;
+      toast.success('Counter offer sent!');
+      setCounterOffer(null);
+      fetchOffers();
+    } catch (err) {
+      toast.error(err.message || 'Failed to send counter offer');
+    } finally {
+      setCounterSaving(false);
     }
   };
 
@@ -223,6 +275,7 @@ const AccountOffers = () => {
             perspective={perspective}
             onAction={handleAction}
             actionLoading={actionLoading}
+            onCounter={openCounter}
           />
         ))}
       </div>
@@ -263,6 +316,60 @@ const AccountOffers = () => {
           {renderList(sent, 'sent')}
         </TabsContent>
       </Tabs>
+      {/* Counter Offer Dialog */}
+      <Dialog open={!!counterOffer} onOpenChange={() => setCounterOffer(null)}>
+        <DialogContent className="sm:max-w-[400px] rounded-2xl p-0 overflow-hidden gap-0">
+          <div className="px-6 pt-6 pb-4 border-b border-border">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <RefreshCw className="w-5 h-5 text-blue-500" /> Send Counter Offer
+              </DialogTitle>
+            </DialogHeader>
+          </div>
+          <div className="px-6 py-5 space-y-4">
+            <div className="p-3 bg-muted/50 rounded-xl text-sm">
+              <p className="text-muted-foreground text-xs mb-1">Buyer's offer</p>
+              <p className="font-extrabold text-lg tabular-nums">{formatCurrency(counterOffer?.amount_aud)}</p>
+              {counterOffer?.listing?.price_aud && (
+                <p className="text-xs text-muted-foreground mt-0.5">Listed at {formatCurrency(counterOffer.listing.price_aud)}</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="counter-amount" className="font-bold text-sm">Your Counter Amount</Label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="counter-amount"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={counterAmount}
+                  onChange={e => setCounterAmount(e.target.value)}
+                  className="pl-8 h-11 rounded-xl font-bold tabular-nums"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="counter-msg" className="font-bold text-sm">Message <span className="font-normal text-muted-foreground">(optional)</span></Label>
+              <Textarea
+                id="counter-msg"
+                placeholder="Explain your counter offer..."
+                value={counterMessage}
+                onChange={e => setCounterMessage(e.target.value)}
+                rows={2}
+                className="rounded-xl resize-none text-sm"
+              />
+            </div>
+          </div>
+          <DialogFooter className="px-6 pb-6 gap-2">
+            <Button variant="outline" onClick={() => setCounterOffer(null)} disabled={counterSaving} className="rounded-xl flex-1">Cancel</Button>
+            <Button onClick={handleCounter} disabled={counterSaving || !counterAmount} className="rounded-xl flex-1 font-bold gap-2">
+              {counterSaving ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</> : <><RefreshCw className="w-4 h-4" /> Send Counter</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

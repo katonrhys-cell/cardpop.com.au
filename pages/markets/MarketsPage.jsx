@@ -158,11 +158,13 @@ const MarketsPage = () => {
 
   // ── Fetch live popular card prices on mount ────────────────────────────
   useEffect(() => {
+    let cancelled = false;
     fetch(`${API_BASE}/ebay/popular-cards`)
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-      .then(cards => setLiveCards(cards.filter(c => !c.error)))
-      .catch(() => setLiveError(true))
-      .finally(() => setLiveLoading(false));
+      .then(cards => { if (!cancelled) setLiveCards(cards.filter(c => !c.error)); })
+      .catch(() => { if (!cancelled) setLiveError(true); })
+      .finally(() => { if (!cancelled) setLiveLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   // ── Transform live cards for the movers table ──────────────────────────
@@ -180,6 +182,7 @@ const MarketsPage = () => {
       volume: c.volume,
       change: null, // historical data needed for real % — shown as "Live" badge
       isLive: true,
+      thumbnailUrl: c.thumbnailUrl || '',
     }));
 
   // ── Real eBay search ───────────────────────────────────────────────────
@@ -276,6 +279,11 @@ const MarketsPage = () => {
       to={cardUrl(card)}
       className="flex items-center gap-3 py-3 px-4 hover:bg-muted/30 rounded-xl transition-colors group"
     >
+      {card.thumbnailUrl ? (
+        <img src={card.thumbnailUrl} alt={card.name} className="w-10 h-12 object-contain rounded shrink-0 bg-muted/30" />
+      ) : (
+        <div className="w-10 h-12 rounded bg-muted/30 shrink-0" />
+      )}
       <div className="flex-1 min-w-0">
         <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">{card.name}</p>
         <p className="text-xs text-muted-foreground truncate">{card.set} · {card.collection}</p>
@@ -458,6 +466,25 @@ const MarketsPage = () => {
                       </p>
                     )}
                   </div>
+
+                  {/* Live eBay listing images */}
+                  {searchResult.rawListings?.some(l => l.thumbnailUrl) && (
+                    <div>
+                      <h3 className="font-semibold mb-3">Live eBay Listings</h3>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {searchResult.rawListings.filter(l => l.thumbnailUrl).slice(0, 8).map((l, i) => (
+                          <a key={i} href={l.listingUrl} target="_blank" rel="noopener noreferrer"
+                            className="flex flex-col rounded-xl border border-border overflow-hidden hover:border-primary/50 transition-colors bg-muted/20">
+                            <img src={l.thumbnailUrl} alt={l.title || 'eBay listing'} className="w-full aspect-[4/5] object-contain bg-white p-1" />
+                            <div className="p-2">
+                              <p className="text-xs font-bold">${l.price?.toFixed(2)}</p>
+                              <p className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">{l.title}</p>
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Recent sales */}
                   <div>

@@ -8,8 +8,8 @@ vi.mock('../../src/utils/logger.js', () => ({
 }));
 
 vi.mock('../../src/middleware/pocketbase-auth.js', () => ({
-  pocketbaseAuth: (req, _res, next) => { req.pocketbaseUserId = 'user-1'; next(); },
-  supabaseAuth: (_req, _res, next) => next(),
+  pocketbaseAuth: (req, _res, next) => { req.userId = 'user-1'; next(); },
+  supabaseAuth: (req, _res, next) => { req.userId = 'user-1'; next(); },
 }));
 
 vi.mock('../../src/middleware/integrated-ai-rate-limit.js', () => ({
@@ -95,7 +95,7 @@ describe('POST /stream', () => {
     );
   });
 
-  it('passes pocketbaseUserId as userId to stream', async () => {
+  it('passes userId to stream', async () => {
     const userMessage = [{ type: 'text', text: 'Hello' }];
     mockStream.mockResolvedValue(makeSseStream());
 

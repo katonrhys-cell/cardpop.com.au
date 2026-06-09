@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -35,7 +35,7 @@ const lockBounceVariants = {
 
 // ─── Login Page ───────────────────────────────────────────────────────────────
 const LoginPage = () => {
-  const { login, verifyMFACode } = useAuth();
+  const { login, verifyMFACode, isAuthenticated, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -52,6 +52,13 @@ const LoginPage = () => {
   const [lockState, setLockState] = useState('locked');
 
   const from = location.state?.from?.pathname || '/account';
+
+  // If user is already authenticated, skip the login page entirely.
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      navigate(from, { replace: true });
+    }
+  }, [authLoading, isAuthenticated, navigate, from]);
 
   const handleLogin = async (e) => {
     e.preventDefault();

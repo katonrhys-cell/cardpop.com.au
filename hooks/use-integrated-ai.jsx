@@ -341,11 +341,11 @@ function useIntegratedAi() {
 				description: err.message,
 			});
 
-			const last = messages.current[messages.current.length - 1];
-			if (last?.role === 'assistant' && !last.content) {
-				messages.current.pop();
-				setMessages([...messages.current]);
-			}
+			setMessages(prev => {
+				const last = prev.at(-1);
+				if (last?.role === 'assistant' && !last.content) return prev.slice(0, -1);
+				return prev;
+			});
 		} finally {
 			abortControllerRef.current = null;
 			setIsStreaming(false);

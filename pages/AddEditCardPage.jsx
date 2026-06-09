@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, Sparkles, Loader2,
-  Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star,
+  Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp,
 } from 'lucide-react';
 import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -20,6 +20,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectSe
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { useCardOCR } from '@/hooks/useCardOCR.js';
+import { useEbayPriceLookup } from '@/hooks/useEbayPriceLookup.js';
+import { useCardSight, mapCardSightToFormFields } from '@/hooks/useCardSight.js';
+import PSAPopPanel from '@/components/PSAPopPanel.jsx';
+import { useCardsightPricing } from '@/hooks/useCardsightPricing.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -64,8 +68,13 @@ const AddEditCardPage = () => {
   const [errors, setErrors]         = useState({});
   const [isAutoFilled, setIsAutoFilled] = useState(false);
   const [categoryId, setCategoryId] = useState(null);
+  const [lockedBaseValue, setLockedBaseValue] = useState(null);
+  const [psaPopData, setPsaPopData] = useState(null);
 
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
+  const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
+  const { identify: cardSightIdentify, isIdentifying, result: cardSightResult, clearResult: clearCardSight } = useCardSight();
+  const { fetchPricingById, fetchPricingByName, isLoadingCsPrice, csPrice, clearCsPrice } = useCardsightPricing();
 
   const emptyForm = {
     // Card identity
@@ -130,8 +139,9 @@ const AddEditCardPage = () => {
   // ─── Load existing card when editing ─────────────────────────────────────
   useEffect(() => {
     if (!isEdit) return;
+    let cancelled = false;
     const fetchCard = async () => {
-      if (!currentUser?.id) return;
+      if (!currentUser?.id) { if (!cancelled) setLoading(false); return; }
       try {
         const { data: card, error: fetchError } = await supabase
           .from('vault_items')
@@ -139,11 +149,25 @@ const AddEditCardPage = () => {
           .eq('id', id)
           .single();
         if (fetchError) throw fetchError;
+        if (cancelled) return;
         if (!currentUser || card.owner_id !== currentUser.id) {
           toast.error('Unauthorized');
           navigate('/vault');
           return;
         }
+        setLockedBaseValue(card.locked_base_value_aud ?? null);
+
+        // Fetch PSA population data if the card has a CardSight ID
+        if (card.cardsight_card_id) {
+          supabase
+            .from('card_market_valuations')
+            .select('raw_data')
+            .eq('card_id', card.cardsight_card_id)
+            .eq('source', 'psa')
+            .maybeSingle()
+            .then(({ data }) => { if (data?.raw_data) setPsaPopData(data.raw_data); });
+        }
+
         setFormData({
           collection:     card.collection     || 'Pokemon',
           cardName:       card.card_name      || '',
@@ -170,16 +194,19 @@ const AddEditCardPage = () => {
           const imgUrl = card.card_image.startsWith('http')
             ? card.card_image
             : supabase.storage.from('vault-images').getPublicUrl(card.card_image).data.publicUrl;
-          setImagePreview(imgUrl);
+          if (!cancelled) setImagePreview(imgUrl);
         }
       } catch {
-        toast.error('Failed to load card');
-        navigate('/vault');
+        if (!cancelled) {
+          toast.error('Failed to load card');
+          navigate('/vault');
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchCard();
+    return () => { cancelled = true; };
   }, [id, currentUser?.id, navigate, isEdit]);
 
   // ─── Image handling ───────────────────────────────────────────────────────
@@ -191,6 +218,8 @@ const AddEditCardPage = () => {
     const reader = new FileReader();
     reader.onloadend = () => setImagePreview(reader.result);
     reader.readAsDataURL(file);
+    // Run CardSight AI identification in the background as soon as image is selected
+    cardSightIdentify(file);
   };
 
   // ─── AI auto-fill ─────────────────────────────────────────────────────────
@@ -218,6 +247,8 @@ const AddEditCardPage = () => {
         scanResult.cardType ? `Type: ${scanResult.cardType}` : '',
       ].filter(Boolean).join('\n') || prev.notes,
     }));
+    // Trigger eBay price lookup so user gets a market-based suggested value
+    lookupPrice(scanResult);
     toast.success('Fields auto-filled successfully. Please review and edit as needed.');
     setIsAutoFilled(true);
   };
@@ -228,6 +259,14 @@ const AddEditCardPage = () => {
     if (!formData.cardName?.trim()) newErrors.cardName = 'Card name is required';
     if (!formData.estimatedValue || parseFloat(formData.estimatedValue) < 0)
       newErrors.estimatedValue = 'Enter a valid estimated value';
+    if (isEdit && lockedBaseValue !== null) {
+      const ev = parseFloat(formData.estimatedValue) || 0;
+      if (ev < lockedBaseValue)
+        newErrors.estimatedValue = `Cannot be set below the locked base value of $${lockedBaseValue.toFixed(2)}`;
+      const tv = parseFloat(formData.tradeValue) || 0;
+      if (tv > 0 && tv < lockedBaseValue)
+        newErrors.tradeValue = `Trade value cannot be set below the locked base value of $${lockedBaseValue.toFixed(2)}`;
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -278,14 +317,22 @@ const AddEditCardPage = () => {
         notes:               formData.notes?.trim()       || null,
         trade_value_aud:     tradeAud,
         trade_value_locked:  tradeAud > 0,
-        listing_type:        isPublic ? formData.listingType : null,
+        listing_type:        isPublic ? formData.listingType : 'Private',
         is_public:           isPublic,
+        // Persist CardSight ID if we got an exact match during this session
+        ...(cardSightResult?.exactMatch && cardSightResult?.card?.id
+          ? {
+              cardsight_card_id: cardSightResult.card.id,
+              cardsight_set_id:  cardSightResult.card.setId ?? null,
+              cardsight_identified_at: new Date().toISOString(),
+            }
+          : {}),
       };
 
       if (cardImagePath) payload.card_image = cardImagePath;
 
       if (isEdit) {
-        const { error } = await supabase.from('vault_items').update(payload).eq('id', id);
+        const { error } = await supabase.from('vault_items').update(payload).eq('id', id).eq('owner_id', currentUser.id);
         if (error) throw error;
         toast.success('Card updated successfully!');
         navigate('/vault');
@@ -374,7 +421,7 @@ const AddEditCardPage = () => {
                 </div>
 
                 {/* AI Analysis */}
-                <div className="mt-4">
+                <div className="mt-4 space-y-3">
                   {!scanResult && imageFile && (
                     <Button
                       type="button"
@@ -389,6 +436,68 @@ const AddEditCardPage = () => {
                       }
                     </Button>
                   )}
+
+                  {/* CardSight AI identification result */}
+                  {(isIdentifying || cardSightResult) && (
+                    <div className={`p-3 rounded-xl border animate-in fade-in ${cardSightResult?.identified ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-muted/30 border-border'}`}>
+                      {isIdentifying ? (
+                        <p className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                          <Loader2 className="w-3 h-3 animate-spin" /> CardSight AI identifying card…
+                        </p>
+                      ) : cardSightResult?.identified ? (
+                        <>
+                          <p className="text-xs font-bold text-emerald-700 mb-2 flex items-center gap-1.5">
+                            <TrendingUp className="w-3.5 h-3.5" />
+                            CardSight AI — {cardSightResult.exactMatch ? 'Exact Match' : 'Set Match'} ({cardSightResult.confidence})
+                          </p>
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-foreground/80 mb-3">
+                            {cardSightResult.card?.name && <div className="col-span-2"><strong className="text-foreground">Card:</strong> {cardSightResult.card.name}</div>}
+                            {cardSightResult.card?.setName && <div><strong className="text-foreground">Set:</strong> {cardSightResult.card.setName}</div>}
+                            {cardSightResult.card?.year && <div><strong className="text-foreground">Year:</strong> {cardSightResult.card.year}</div>}
+                            {cardSightResult.card?.cardNumber && <div><strong className="text-foreground">No:</strong> {cardSightResult.card.cardNumber}</div>}
+                            {cardSightResult.card?.manufacturer && <div><strong className="text-foreground">Brand:</strong> {cardSightResult.card.manufacturer}</div>}
+                            {cardSightResult.grading && <div className="col-span-2"><strong className="text-foreground">Graded:</strong> {cardSightResult.grading.company} {cardSightResult.grading.grade}</div>}
+                            {cardSightResult.parallel && <div className="col-span-2"><strong className="text-foreground">Parallel:</strong> {cardSightResult.parallel.name ?? 'Yes'}</div>}
+                          </div>
+                          {cardSightResult.pricing && (
+                            <div className="text-xs text-emerald-800 bg-emerald-500/10 rounded-lg px-2.5 py-2 mb-3">
+                              <strong>Market Pricing</strong> ({cardSightResult.pricing.salesCount} sales) —
+                              Avg: <strong>${cardSightResult.pricing.avgPrice?.toFixed(2)}</strong> &nbsp;
+                              Low: ${cardSightResult.pricing.minPrice?.toFixed(2)} &nbsp;
+                              High: ${cardSightResult.pricing.maxPrice?.toFixed(2)}
+                            </div>
+                          )}
+                          <div className="flex gap-2 pt-2 border-t border-emerald-500/10">
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="flex-1 font-semibold text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+                              onClick={() => {
+                                const fields = mapCardSightToFormFields(cardSightResult);
+                                setFormData(prev => ({ ...prev, ...fields }));
+                                if (cardSightResult.pricing?.avgPrice) {
+                                  set('estimatedValue', String(cardSightResult.pricing.avgPrice.toFixed(2)));
+                                }
+                                // Fetch separate CardSight pricing panel data
+                                if (cardSightResult.card?.id) fetchPricingById(cardSightResult.card.id);
+                                else if (cardSightResult.card?.name) fetchPricingByName(cardSightResult.card.name);
+                                setIsAutoFilled(true);
+                                toast.success('Card details filled from CardSight catalog.');
+                              }}
+                            >
+                              Apply Catalog Data
+                            </Button>
+                            <Button type="button" size="sm" variant="outline" className="text-xs" onClick={clearCardSight}>
+                              Dismiss
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">CardSight: card not found in catalog.</p>
+                      )}
+                    </div>
+                  )}
+
                   {scanResult && (
                     <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl animate-in fade-in slide-in-from-top-2">
                       <h4 className="font-bold text-sm text-primary mb-3 flex items-center gap-2">
@@ -455,12 +564,12 @@ const AddEditCardPage = () => {
                   <div className="space-y-2">
                     <Label className="font-bold">Era / Set Name</Label>
                     {eraOpts.length > 0 ? (
-                      <Select value={formData.setName} onValueChange={v => set('setName', v)}>
+                      <Select value={formData.setName || '__none__'} onValueChange={v => set('setName', v === '__none__' ? '' : v)}>
                         <SelectTrigger className="h-11 bg-background">
                           <SelectValue placeholder="Select an era or set…" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">— Not specified —</SelectItem>
+                          <SelectItem value="__none__">— Not specified —</SelectItem>
                           <SelectSeparator />
                           {eraOpts.map(era => (
                             <SelectItem key={era.name} value={era.name}>
@@ -510,12 +619,12 @@ const AddEditCardPage = () => {
                   {/* Variant */}
                   <div className="space-y-2">
                     <Label className="font-bold">Card Variant / Finish</Label>
-                    <Select value={formData.variant} onValueChange={v => set('variant', v)}>
+                    <Select value={formData.variant || '__none__'} onValueChange={v => set('variant', v === '__none__' ? '' : v)}>
                       <SelectTrigger className="h-11 bg-background">
                         <SelectValue placeholder="Select variant…" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No variant</SelectItem>
+                        <SelectItem value="__none__">No variant</SelectItem>
                         {VARIANT_GROUPS.map((group, gi) => (
                           <React.Fragment key={group.label}>
                             {gi > 0 && <SelectSeparator />}
@@ -653,8 +762,118 @@ const AddEditCardPage = () => {
                 </div>
               </SectionCard>
 
+              {/* PSA population panel — only shown when we have a CardSight match */}
+              {isEdit && (
+                <div className="premium-card p-6 bg-card space-y-3">
+                  <h2 className="font-serif text-xl font-bold border-b border-border pb-3">PSA Population</h2>
+                  <PSAPopPanel rawData={psaPopData} />
+                </div>
+              )}
+
               {/* ── 3. Value & Acquisition ── */}
               <SectionCard title="Value & Acquisition">
+                {/* Locked base value banner (edit mode only) */}
+                {isEdit && lockedBaseValue !== null && (
+                  <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 -mt-1">
+                    <Shield className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-xs font-bold text-amber-700">Locked Base Value: ${lockedBaseValue.toFixed(2)} AUD</p>
+                      <p className="text-xs text-amber-600/80 mt-0.5">
+                        Your listing price and trade value cannot be set below this floor. It protects platform commission from being bypassed.
+                        Contact support to dispute the valuation.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* New card notice */}
+                {!isEdit && (
+                  <div className="flex items-start gap-3 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 -mt-1">
+                    <Shield className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                    <p className="text-xs text-blue-700">
+                      The estimated value you enter will be locked as this card&apos;s <strong>base valuation</strong>. You cannot list or trade the card for less than this amount later.
+                      Use the eBay market data above to set an accurate figure.
+                    </p>
+                  </div>
+                )}
+
+                {/* eBay market price suggestion */}
+                {(isLookingUp || priceData) && (
+                  <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                    {isLookingUp ? (
+                      <p className="text-xs font-medium text-emerald-700 flex items-center gap-2">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Looking up eBay market price…
+                      </p>
+                    ) : priceData && (
+                      <>
+                        <p className="text-xs font-bold text-emerald-700 flex items-center gap-1.5 mb-2">
+                          <TrendingUp className="w-3.5 h-3.5" /> eBay AU Market Data ({priceData.count} recent sales)
+                        </p>
+                        <div className="flex gap-3 text-xs text-emerald-800 mb-3">
+                          <span>Avg: <strong>${priceData.avgPrice?.toFixed(2)}</strong></span>
+                          <span>Low: <strong>${priceData.minPrice?.toFixed(2)}</strong></span>
+                          <span>High: <strong>${priceData.maxPrice?.toFixed(2)}</strong></span>
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs border-emerald-400 text-emerald-700 hover:bg-emerald-50"
+                          onClick={() => {
+                            set('estimatedValue', String(priceData.avgPrice?.toFixed(2) ?? ''));
+                            clearPrice();
+                            toast.success(`Estimated value set to $${priceData.avgPrice?.toFixed(2)} AUD from eBay data.`);
+                          }}
+                        >
+                          Use eBay average (${priceData.avgPrice?.toFixed(2)})
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* CardSight market price */}
+                {(isLoadingCsPrice || csPrice) && (
+                  <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                    {isLoadingCsPrice ? (
+                      <p className="text-xs font-medium text-blue-700 dark:text-blue-400 flex items-center gap-2">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Fetching CardSight pricing…
+                      </p>
+                    ) : csPrice && (() => {
+                      const avg = csPrice.avg_price ?? csPrice.average_price ?? csPrice.mean_price;
+                      const min = csPrice.min_price ?? csPrice.minimum_price;
+                      const max = csPrice.max_price ?? csPrice.maximum_price;
+                      const count = csPrice.count ?? csPrice.total_count ?? csPrice.total;
+                      if (!avg) return null;
+                      return (
+                        <>
+                          <p className="text-xs font-bold text-blue-700 dark:text-blue-400 flex items-center gap-1.5 mb-2">
+                            <Shield className="w-3.5 h-3.5" /> CardSight Market Data{count ? ` (${count} sales)` : ''}
+                          </p>
+                          <div className="flex gap-3 text-xs text-blue-800 dark:text-blue-300 mb-3">
+                            <span>Avg: <strong>${Number(avg).toFixed(2)}</strong></span>
+                            {min != null && <span>Low: <strong>${Number(min).toFixed(2)}</strong></span>}
+                            {max != null && <span>High: <strong>${Number(max).toFixed(2)}</strong></span>}
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs border-blue-400 text-blue-700 hover:bg-blue-50 dark:text-blue-400"
+                            onClick={() => {
+                              set('estimatedValue', String(Number(avg).toFixed(2)));
+                              clearCsPrice();
+                              toast.success(`Estimated value set to $${Number(avg).toFixed(2)} AUD from CardSight data.`);
+                            }}
+                          >
+                            Use CardSight average (${Number(avg).toFixed(2)})
+                          </Button>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="estimatedValue" className="font-bold">
@@ -665,16 +884,20 @@ const AddEditCardPage = () => {
                       <Input
                         id="estimatedValue"
                         type="number"
-                        min="0"
+                        min={isEdit && lockedBaseValue !== null ? lockedBaseValue : 0}
                         step="0.01"
                         value={formData.estimatedValue}
                         onChange={e => set('estimatedValue', e.target.value)}
                         placeholder="0.00"
-                        className={`h-11 pl-8 bg-background tabular-nums ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''}`}
+                        className={`h-11 pl-8 bg-background tabular-nums ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''} ${errors.estimatedValue ? 'border-destructive' : ''}`}
                       />
                     </div>
                     {errors.estimatedValue && <p className="text-destructive text-xs">{errors.estimatedValue}</p>}
-                    <p className="text-xs text-muted-foreground">Your estimate of current market value</p>
+                    <p className="text-xs text-muted-foreground">
+                      {isEdit && lockedBaseValue !== null
+                        ? `Floor: $${lockedBaseValue.toFixed(2)} — cannot go below this`
+                        : 'Your estimate of current market value — will be locked on save'}
+                    </p>
                   </div>
 
                   <div className="space-y-2">
@@ -790,7 +1013,7 @@ const AddEditCardPage = () => {
                       <input
                         id="tradeValueInput"
                         type="number"
-                        min="0"
+                        min={isEdit && lockedBaseValue !== null ? lockedBaseValue : 0}
                         step="0.01"
                         value={formData.tradeValue}
                         onChange={e => set('tradeValue', e.target.value)}
@@ -798,7 +1021,11 @@ const AddEditCardPage = () => {
                         className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm pl-8 tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground">The value in traded cards you'd accept</p>
+                    <p className="text-xs text-muted-foreground">
+                      {isEdit && lockedBaseValue !== null
+                        ? `Floor: $${lockedBaseValue.toFixed(2)} — the value in traded cards you'd accept`
+                        : "The value in traded cards you'd accept"}
+                    </p>
                   </div>
                 )}
               </SectionCard>

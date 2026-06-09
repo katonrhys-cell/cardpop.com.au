@@ -42,6 +42,7 @@ router.get('/:id', async (req, res) => {
 
 // POST /subcategories — create under a parent (admin only)
 router.post('/', authMiddleware, async (req, res) => {
+  if (!req.user.app_metadata?.is_admin) return res.status(403).json({ error: 'Admin access required' });
   const { name, slug, description, parentId } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
   if (!parentId) return res.status(400).json({ error: 'parentId is required' });
@@ -74,6 +75,7 @@ router.post('/', authMiddleware, async (req, res) => {
 
 // PATCH /subcategories/:id — update (admin only)
 router.patch('/:id', authMiddleware, async (req, res) => {
+  if (!req.user.app_metadata?.is_admin) return res.status(403).json({ error: 'Admin access required' });
   const { id } = req.params;
   const { name, slug, description, parentId } = req.body;
 
@@ -102,6 +104,7 @@ router.patch('/:id', authMiddleware, async (req, res) => {
 
 // DELETE /subcategories/:id — delete (admin only)
 router.delete('/:id', authMiddleware, async (req, res) => {
+  if (!req.user.app_metadata?.is_admin) return res.status(403).json({ error: 'Admin access required' });
   const { id } = req.params;
 
   const { data: sub, error: fetchErr } = await supabase

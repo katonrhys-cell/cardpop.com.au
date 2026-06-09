@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Twitter, Instagram, Facebook, Youtube } from 'lucide-react';
 import CardPopLogo from '@/components/CardPopLogo.jsx';
+import NewsletterSignup from '@/components/NewsletterSignup.jsx';
 
 const DiscordIcon = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -29,6 +30,12 @@ const Footer = () => {
             <p className="text-muted-foreground text-sm max-w-sm leading-relaxed mb-6">
               The premier destination for collecting, trading, and analyzing trading cards and sports memorabilia.
             </p>
+
+            {/* Newsletter signup */}
+            <div className="mb-6">
+              <p className="text-sm font-bold uppercase tracking-wider mb-3">Stay in the Loop</p>
+              <NewsletterSignup />
+            </div>
 
             {/* Social icons */}
             <div className="flex items-center gap-3">

@@ -39,6 +39,7 @@ const CheckoutPage = () => {
   const [paymentMethod, setPaymentMethod] = useState('card');
 
   useEffect(() => {
+    let cancelled = false;
     const initDirectCheckout = async () => {
       if (cardId && source === 'Vault') {
         try {
@@ -47,7 +48,7 @@ const CheckoutPage = () => {
           const imageUrl = images[0]
             ? pb.getFileUrl(images[0], images[0].image)
             : null;
-          setDirectItem({
+          if (!cancelled) setDirectItem({
             product: {
               id: card.id,
               title: card.card_name,
@@ -58,14 +59,17 @@ const CheckoutPage = () => {
             variant: null,
           });
         } catch {
-          toast.error('Item not found or unavailable');
-          navigate('/browse');
+          if (!cancelled) {
+            toast.error('Item not found or unavailable');
+            navigate('/browse');
+          }
         }
       }
-      setInitializing(false);
+      if (!cancelled) setInitializing(false);
     };
 
     initDirectCheckout();
+    return () => { cancelled = true; };
   }, [cardId, source, navigate]);
 
   const checkoutItems = directItem ? [directItem] : cartItems;

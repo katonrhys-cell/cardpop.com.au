@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import DOMPurify from 'dompurify';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,12 +16,14 @@ const BlogArticlePage = () => {
   const [relatedArticles, setRelatedArticles] = useState([]);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchArticleData = async () => {
       setLoading(true);
       setError(null);
       try {
         const { data: res, error: fetchErr } = await supabase.from('blog_articles').select('*').eq('id', id).single();
         if (fetchErr) throw fetchErr;
+        if (cancelled) return;
         setArticle(res);
         setHtmlContent(res.content_html || res.content || '');
 
@@ -31,17 +34,18 @@ const BlogArticlePage = () => {
           .neq('id', id)
           .order('created_at', { ascending: false })
           .limit(3);
-        setRelatedArticles(related ?? []);
+        if (!cancelled) setRelatedArticles(related ?? []);
 
       } catch (err) {
         console.error("Error loading article:", err);
-        setError("Article not found or unavailable.");
+        if (!cancelled) setError("Article not found or unavailable.");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchArticleData();
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    return () => { cancelled = true; };
   }, [id]);
 
   if (loading) {
@@ -117,7 +121,7 @@ const BlogArticlePage = () => {
         {htmlContent ? (
           <div 
             className="article-content w-full max-w-4xl mx-auto prose prose-neutral dark:prose-invert px-4"
-            dangerouslySetInnerHTML={{ __html: htmlContent }} 
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(htmlContent) }}
           />
         ) : (
           <div className="container-default max-w-6xl mx-auto">

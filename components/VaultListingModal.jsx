@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
-import { Loader2, Lock, ShoppingCart, ArrowRightLeft, Layers, DollarSign } from 'lucide-react';
+import { Loader2, Lock, ShoppingCart, ArrowRightLeft, Layers, DollarSign, TrendingUp } from 'lucide-react';
+import PriceRangeIndicator from '@/components/PriceRangeIndicator.jsx';
 import {
   Dialog,
   DialogContent,
@@ -66,11 +67,24 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
   const [price, setPrice] = useState('');
   const [tradeWants, setTradeWants] = useState('');
   const [loading, setLoading] = useState(false);
+  const [priceRange, setPriceRange] = useState(null);
 
   const handleOpen = () => {
     setSelected(null);
     setPrice(product?.estimated_value_aud ? String(product.estimated_value_aud) : '');
     setTradeWants('');
+    setPriceRange(null);
+
+    // Fetch price range from DB if we have a CardSight card ID
+    const csId = product?.cardsight_card_id;
+    if (csId) {
+      supabase
+        .from('card_price_ranges')
+        .select('*')
+        .eq('card_id', csId)
+        .maybeSingle()
+        .then(({ data }) => { if (data) setPriceRange(data); });
+    }
   };
 
   const handleSelect = (opt) => {
@@ -80,12 +94,31 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
     }
   };
 
+  const lockedBaseValue = product?.locked_base_value_aud ?? null;
+
+  // Effective minimum = max(locked base, market floor (low * 50%))
+  const marketFloor = priceRange?.floor_aud ?? null;
+  const effectiveFloor = Math.max(lockedBaseValue ?? 0, marketFloor ?? 0) || null;
+
   const handleConfirm = async () => {
     if (!product || !selected) return;
 
     if (selected.needsPrice && (!price || isNaN(Number(price)) || Number(price) <= 0)) {
       toast.error('Please enter a valid sale price.');
       return;
+    }
+
+    if (selected.needsPrice && effectiveFloor !== null && Number(price) < effectiveFloor) {
+      toast.error('This price is below the minimum allowed for this listing. Please enter a higher amount.');
+      return;
+    }
+
+    if (selected.needsTrade && effectiveFloor !== null) {
+      const tv = Number(price);
+      if (tv > 0 && tv < effectiveFloor) {
+        toast.error('This trade value is below the minimum allowed for this listing. Please enter a higher amount.');
+        return;
+      }
     }
 
     setLoading(true);
@@ -98,7 +131,7 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
           is_public: selected.isPublic,
           ...(selected.needsTrade ? { trade_value_aud: Number(price) || product.trade_value_aud } : {}),
         })
-        .eq('id', product.id);
+        .eq('id', product.id).eq('owner_id', currentUser.id);
       if (vaultErr) throw vaultErr;
 
       if (selected.isPublic) {
@@ -113,18 +146,19 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
           listed_at: new Date().toISOString(),
         };
 
-        // Check if a listing already exists for this vault item
+        // Check if an active/non-archived listing already exists for this vault item
         const { data: existing } = await supabase
           .from('listings')
           .select('id')
           .eq('vault_item_id', product.id)
-          .single();
+          .neq('status', 'archived')
+          .maybeSingle();
 
         if (existing) {
           const { error: updateErr } = await supabase
             .from('listings')
             .update(listingPayload)
-            .eq('id', existing.id);
+            .eq('id', existing.id).eq('seller_id', currentUser.id);
           if (updateErr) throw updateErr;
         } else {
           const { error: insertErr } = await supabase
@@ -134,10 +168,11 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
         }
       } else {
         // Going private — archive any existing listing
-        await supabase
+        const { error: archiveErr } = await supabase
           .from('listings')
           .update({ status: 'archived' })
-          .eq('vault_item_id', product.id);
+          .eq('vault_item_id', product.id).eq('seller_id', currentUser.id);
+        if (archiveErr) throw archiveErr;
       }
 
       toast.success(`Card updated: ${selected.label}`);
@@ -177,6 +212,24 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
             </Badge>
           </div>
 
+          {/* Price range indicator */}
+          {priceRange && (
+            <div className="p-3 rounded-xl bg-muted/30 border border-border space-y-2">
+              <div className="flex items-center gap-1.5 mb-1">
+                <TrendingUp className="w-3.5 h-3.5 text-primary" />
+                <p className="text-xs font-bold text-foreground">Market Price Range</p>
+                <span className="text-[10px] text-muted-foreground ml-auto">
+                  {priceRange.sources_used?.join(' · ')}
+                </span>
+              </div>
+              <PriceRangeIndicator
+                range={priceRange}
+                currentPrice={price !== '' && !isNaN(Number(price)) ? Number(price) : null}
+              />
+            </div>
+          )}
+
+
           <div className="space-y-2">
             {OPTIONS.map((opt) => {
               const Icon = opt.icon;
@@ -205,12 +258,12 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
                     <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       type="number"
-                      min="0.01"
+                      min={0.01}
                       step="0.01"
                       value={price}
                       onChange={e => setPrice(e.target.value)}
-                      placeholder="0.00"
-                      className="pl-9 bg-background"
+                      placeholder={product?.estimated_value_aud ? String(product.estimated_value_aud) : '0.00'}
+                      className={`pl-9 bg-background ${effectiveFloor !== null && price !== '' && Number(price) < effectiveFloor ? 'border-destructive' : ''}`}
                     />
                   </div>
                 </div>

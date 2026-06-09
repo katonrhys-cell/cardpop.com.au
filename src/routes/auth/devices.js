@@ -8,6 +8,8 @@ import logger from '../../utils/logger.js';
 const router = express.Router();
 
 router.get('/', authMiddleware, async (req, res) => {
+  const { currentSessionId } = req.query;
+
   const { data: profile, error } = await supabase
     .from('profiles').select('active_sessions').eq('id', req.user.id).single();
   if (error) throw error;
@@ -22,7 +24,7 @@ router.get('/', authMiddleware, async (req, res) => {
       ipAddress: session.ipAddress,
       createdAt: session.createdAt,
       lastActivityAt: session.lastActivityAt,
-      isCurrent: false,
+      isCurrent: !!currentSessionId && session.sessionId === currentSessionId,
     };
   });
 

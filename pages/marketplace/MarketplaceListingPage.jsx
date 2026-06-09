@@ -4,15 +4,20 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { formatCurrency } from '@/api/EcommerceApi';
 import { Button } from '@/components/ui/button';
-import { ShieldCheck, MessageCircle, User } from 'lucide-react';
+import { ShieldCheck, MessageCircle, User, TrendingUp, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import apiServerClient from '@/lib/apiServerClient.js';
 
 const MarketplaceListingPage = () => {
   const { id } = useParams();
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [csPrice, setCsPrice] = useState(null);
+  const [csPriceLoading, setCsPriceLoading] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchListing = async () => {
       try {
         const { data, error } = await supabase
@@ -21,17 +26,54 @@ const MarketplaceListingPage = () => {
           .eq('id', id)
           .single();
         if (error) throw error;
-        setListing(data);
-      } catch (error) {
-        console.error(error);
+        if (!cancelled) setListing(data);
+      } catch (err) {
+        if (!cancelled) setError(err.message || 'Failed to load listing');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchListing();
+    return () => { cancelled = true; };
   }, [id]);
 
+  // Fetch CardSight pricing once listing title is known
+  useEffect(() => {
+    if (!listing?.title) return;
+    let cancelled = false;
+    const fetchCsPrice = async () => {
+      setCsPriceLoading(true);
+      try {
+        const acRes = await apiServerClient.fetch(
+          `/cardsight/autocomplete?q=${encodeURIComponent(listing.title)}&take=1`
+        );
+        if (!acRes.ok || cancelled) return;
+        const acData = await acRes.json();
+        const cardId = acData?.results?.[0]?.id ?? acData?.[0]?.id ?? acData?.data?.[0]?.id;
+        if (!cardId || cancelled) return;
+        const prRes = await apiServerClient.fetch(
+          `/cardsight/pricing/${cardId}?period=30d&listing_type=sold`
+        );
+        if (!prRes.ok || cancelled) return;
+        const prData = await prRes.json();
+        if (!cancelled) setCsPrice(prData);
+      } catch {
+        // non-critical
+      } finally {
+        if (!cancelled) setCsPriceLoading(false);
+      }
+    };
+    fetchCsPrice();
+    return () => { cancelled = true; };
+  }, [listing?.title]);
+
   if (loading) return <div className="container-default section-padding"><Skeleton className="h-[600px] rounded-2xl" /></div>;
+  if (error) return (
+    <div className="container-default section-padding text-center">
+      <p className="text-destructive font-medium mb-4">{error}</p>
+      <Button variant="outline" onClick={() => window.location.reload()}>Try Again</Button>
+    </div>
+  );
   if (!listing) return <div className="container-default section-padding text-center">Listing not found</div>;
 
   return (
@@ -83,6 +125,58 @@ const MarketplaceListingPage = () => {
                <span className="font-medium text-emerald-600 flex items-center gap-1"><ShieldCheck className="w-4 h-4"/> Covered</span>
              </div>
           </div>
+
+          {/* CardSight market price reference */}
+          {(csPriceLoading || csPrice) && (
+            <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-4 mb-6">
+              <h3 className="font-bold text-sm text-blue-700 dark:text-blue-400 flex items-center gap-2 mb-3">
+                <TrendingUp className="w-4 h-4" /> Market Price Reference
+              </h3>
+              {csPriceLoading ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Loading market data…
+                </div>
+              ) : (() => {
+                const avg = csPrice.avg_price ?? csPrice.average_price ?? csPrice.mean_price;
+                const min = csPrice.min_price ?? csPrice.minimum_price;
+                const max = csPrice.max_price ?? csPrice.maximum_price;
+                const count = csPrice.count ?? csPrice.total_count ?? csPrice.total;
+                if (!avg) return <p className="text-xs text-muted-foreground">No pricing data available.</p>;
+                const listingPrice = listing.price ?? 0;
+                const diff = avg > 0 ? (((listingPrice - avg) / avg) * 100).toFixed(0) : null;
+                return (
+                  <div className="space-y-2">
+                    <div className="flex gap-4 text-sm">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-0.5">30-day avg sold</p>
+                        <p className="font-bold text-blue-700 dark:text-blue-400">${Number(avg).toFixed(2)}</p>
+                      </div>
+                      {min != null && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-0.5">Low</p>
+                          <p className="font-semibold">${Number(min).toFixed(2)}</p>
+                        </div>
+                      )}
+                      {max != null && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-0.5">High</p>
+                          <p className="font-semibold">${Number(max).toFixed(2)}</p>
+                        </div>
+                      )}
+                    </div>
+                    {diff !== null && (
+                      <p className={`text-xs font-medium ${Number(diff) <= 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                        {Number(diff) <= 0
+                          ? `${Math.abs(diff)}% below market average — good value`
+                          : `${diff}% above market average`}
+                      </p>
+                    )}
+                    {count != null && <p className="text-xs text-muted-foreground">Based on {count} completed sales · powered by CardSight</p>}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
 
           <div className="mt-auto flex flex-col gap-3">
             <Button size="lg" className="w-full text-lg h-14 radius-btn">Buy Now</Button>

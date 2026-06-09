@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { Link } from 'react-router-dom';
-import { List, Plus, RefreshCw, AlertCircle, Trash2, Edit, PackageOpen, ShoppingCart, ArrowRightLeft, Layers } from 'lucide-react';
+import { List, Plus, RefreshCw, AlertCircle, Trash2, Edit, PackageOpen, ShoppingCart, ArrowRightLeft, Layers, Tag } from 'lucide-react';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
@@ -32,39 +34,43 @@ const AccountListings = () => {
 
   const [editListing, setEditListing] = useState(null);
   const [newStatus, setNewStatus] = useState('');
+  const [acceptsOffers, setAcceptsOffers] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  const isMounted = useRef(true);
-
-  const fetchListings = useCallback(async () => {
-    if (!currentUser?.id) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('listings')
-        .select('*')
-        .eq('seller_id', currentUser.id)
-        .order('created_at', { ascending: false })
-        .limit(100);
-
-      if (fetchError) throw fetchError;
-      if (isMounted.current) setListings(data ?? []);
-    } catch (err) {
-      console.error('Failed to fetch listings:', err);
-      if (isMounted.current) setError(err.message || 'Failed to load listings.');
-    } finally {
-      if (isMounted.current) setLoading(false);
-    }
-  }, [currentUser?.id]);
+  const fetchRef = useRef(null);
 
   useEffect(() => {
-    isMounted.current = true;
-    fetchListings();
-    return () => { isMounted.current = false; };
-  }, [fetchListings]);
+    if (!currentUser?.id) { setLoading(false); return; }
+    let cancelled = false;
+    const uid = currentUser.id;
+
+    const run = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data, error: fetchError } = await supabase
+          .from('listings')
+          .select('*')
+          .eq('seller_id', uid)
+          .order('created_at', { ascending: false })
+          .limit(100);
+
+        if (fetchError) throw fetchError;
+        if (!cancelled) setListings(data ?? []);
+      } catch (err) {
+        console.error('Failed to fetch listings:', err);
+        if (!cancelled) setError(err.message || 'Failed to load listings.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchRef.current = run;
+    run();
+    return () => { cancelled = true; };
+  }, [currentUser?.id]);
 
   const handleUpdateStatus = async () => {
     if (!editListing || !newStatus) return;
@@ -72,12 +78,13 @@ const AccountListings = () => {
     try {
       const { error } = await supabase
         .from('listings')
-        .update({ status: newStatus })
-        .eq('id', editListing.id);
+        .update({ status: newStatus, accepts_offers: acceptsOffers })
+        .eq('id', editListing.id)
+        .eq('seller_id', currentUser.id);
       if (error) throw error;
       toast.success('Listing status updated');
       setEditListing(null);
-      fetchListings();
+      fetchRef.current?.();
     } catch (err) {
       toast.error(err.message || 'Failed to update status');
     } finally {
@@ -92,11 +99,12 @@ const AccountListings = () => {
       const { error } = await supabase
         .from('listings')
         .delete()
-        .eq('id', deleteTarget.id);
+        .eq('id', deleteTarget.id)
+        .eq('seller_id', currentUser.id);
       if (error) throw error;
       toast.success('Listing removed');
       setDeleteTarget(null);
-      fetchListings();
+      fetchRef.current?.();
     } catch (err) {
       toast.error(err.message || 'Failed to delete listing');
     } finally {
@@ -107,6 +115,7 @@ const AccountListings = () => {
   const openEdit = (listing) => {
     setEditListing(listing);
     setNewStatus(listing.status ?? 'For Sale');
+    setAcceptsOffers(listing.accepts_offers ?? false);
   };
 
   return (
@@ -123,7 +132,7 @@ const AccountListings = () => {
           <p className="text-muted-foreground">Manage your active items for sale or trade.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchListings} disabled={loading} className="rounded-xl h-10 px-4">
+          <Button variant="outline" onClick={() => fetchRef.current?.()} disabled={loading} className="rounded-xl h-10 px-4">
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </Button>
           <Button asChild className="rounded-xl h-10 px-4 font-bold">
@@ -195,10 +204,17 @@ const AccountListings = () => {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={`font-bold text-xs ${cfg.className}`}>
-                          <StatusIcon className="w-3 h-3 mr-1.5 inline-block" />
-                          {cfg.label}
-                        </Badge>
+                        <div className="flex flex-col gap-1">
+                          <Badge variant="outline" className={`font-bold text-xs w-fit ${cfg.className}`}>
+                            <StatusIcon className="w-3 h-3 mr-1.5 inline-block" />
+                            {cfg.label}
+                          </Badge>
+                          {listing.accepts_offers && (
+                            <Badge variant="outline" className="font-bold text-xs w-fit bg-primary/5 text-primary border-primary/30">
+                              <Tag className="w-3 h-3 mr-1 inline-block" /> Offers On
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="tabular-nums font-medium">
                         {listing.price_aud != null ? `$${Number(listing.price_aud).toFixed(2)}` : '—'}
@@ -237,7 +253,7 @@ const AccountListings = () => {
               Change visibility for <span className="font-bold text-foreground">{editListing?.card_name || editListing?.title}</span>.
             </DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+          <div className="py-4 space-y-4">
             <Select value={newStatus} onValueChange={setNewStatus}>
               <SelectTrigger className="h-12 rounded-xl bg-background">
                 <SelectValue placeholder="Select status" />
@@ -249,10 +265,24 @@ const AccountListings = () => {
                 <SelectItem value="Sold">Sold (mark as completed)</SelectItem>
               </SelectContent>
             </Select>
+            <div className="flex items-center justify-between p-4 bg-muted/50 rounded-xl border border-border">
+              <div className="flex items-start gap-3">
+                <Tag className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <div>
+                  <Label className="font-bold text-sm cursor-pointer" htmlFor="accepts-offers-toggle">Accept Offers</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">Allow buyers to make cash offers below your asking price</p>
+                </div>
+              </div>
+              <Switch
+                id="accepts-offers-toggle"
+                checked={acceptsOffers}
+                onCheckedChange={setAcceptsOffers}
+              />
+            </div>
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setEditListing(null)} disabled={saving} className="rounded-xl">Cancel</Button>
-            <Button onClick={handleUpdateStatus} disabled={saving || newStatus === editListing?.status} className="rounded-xl font-bold">
+            <Button onClick={handleUpdateStatus} disabled={saving} className="rounded-xl font-bold">
               {saving ? 'Saving...' : 'Update Status'}
             </Button>
           </DialogFooter>

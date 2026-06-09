@@ -4,6 +4,7 @@ import { verifyTradeAccess } from '../middleware/verifyTradeAccess.js';
 import { authMiddleware } from '../middleware/auth.js';
 import healthCheck from './health-check.js';
 import ebayRouter from './ebay.js';
+import cardsightRouter from './cardsight.js';
 import authRouter from './auth/index.js';
 import stripeRouter from './stripe.js';
 import verificationRouter from './verification.js';
@@ -20,6 +21,9 @@ import buyerProtectionRouter from './buyer-protection.js';
 import wishlistRouter from './wishlist.js';
 import recommendationsRouter from './recommendations.js';
 import priceHistoryRouter from './price-history.js';
+import newsletterRouter from './newsletter.js';
+import cardSightRouter from './cardsight.js';
+import marketDataRouter from './market-data.js';
 
 const router = Router();
 
@@ -35,6 +39,10 @@ export default () => {
 
     // Card OCR routes with rate limiting
     router.use('/card-ocr', cardOcrRouter);
+
+    // CardSight AI identification, catalog, and pricing routes
+    router.use('/cardsight', apiLimiter);
+    router.use('/cardsight', cardSightRouter);
     
     // Event scraper routes with API rate limiting
     router.use('/event-scraper', apiLimiter);
@@ -48,6 +56,10 @@ export default () => {
     // eBay routes with API rate limiting
     router.use('/ebay', apiLimiter);
     router.use('/ebay', ebayRouter);
+
+    // CardSight routes with API rate limiting
+    router.use('/cardsight', apiLimiter);
+    router.use('/cardsight', cardsightRouter);
     
     // Stripe: high-capacity limiter for the webhook, standard for other endpoints
     router.use('/stripe/webhook', stripeLimiter);
@@ -65,30 +77,6 @@ export default () => {
     // Vault security routes with API rate limiting
     router.use('/vault', apiLimiter);
     router.use('/vault', vaultRouter);
-
-    // Sitemap routes - no rate limiting, no auth required (public)
-    router.use('/sitemap', sitemapRouter);
-
-    // Search suggestions - no rate limiting, no auth required (public)
-    router.use('/search-suggestions', searchSuggestionsRouter);
-
-    // Seller ratings - API rate limiting, auth required for writing
-    router.use('/seller-ratings', apiLimiter);
-    router.use('/seller-ratings', sellerRatingsRouter);
-
-    // Buyer protection - API rate limiting, auth required
-    router.use('/buyer-protection', apiLimiter);
-    router.use('/buyer-protection', buyerProtectionRouter);
-
-    // Wishlist - API rate limiting, auth required
-    router.use('/wishlist', apiLimiter);
-    router.use('/wishlist', wishlistRouter);
-
-    // Recommendations - no rate limiting, auth optional
-    router.use('/recommendations', recommendationsRouter);
-
-    // Price history - no rate limiting, auth optional
-    router.use('/price-history', priceHistoryRouter);
 
     // Trade routes with email verification middleware
     // Apply auth middleware first, then trade access verification

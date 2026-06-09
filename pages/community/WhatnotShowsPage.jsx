@@ -65,17 +65,20 @@ const WhatnotShowsPage = () => {
   // Fetch current user's profile to auto-populate seller info
   useEffect(() => {
     if (!currentUser?.id) return;
+    let cancelled = false;
     supabase
       .from('profiles')
       .select('id, display_name, username, avatar_url, profile_photo_or_character, rating, reviews_count')
       .eq('id', currentUser.id)
       .single()
       .then(({ data }) => {
-        if (data) {
+        if (!cancelled && data) {
           setUserProfile(data);
           setForm(f => ({ ...f, seller_name: data.display_name || data.username || '' }));
         }
-      });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [currentUser?.id]);
 
   const fetchShows = useCallback(async () => {
@@ -166,7 +169,7 @@ const WhatnotShowsPage = () => {
     if (!window.confirm('Remove this show listing?')) return;
     setDeletingId(id);
     try {
-      const { error } = await supabase.from('whatnot_shows').delete().eq('id', id);
+      const { error } = await supabase.from('whatnot_shows').delete().eq('id', id).eq('user_id', currentUser.id);
       if (error) throw error;
       toast.success('Show removed.');
       setShows(prev => prev.filter(s => s.id !== id));

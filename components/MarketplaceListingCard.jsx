@@ -1,9 +1,12 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Star, ShieldCheck, Tag } from 'lucide-react';
+import { Star, Tag, Heart } from 'lucide-react';
+import VerifiedBadge from '@/components/VerifiedBadge.jsx';
+import SellerTierBadge from '@/components/SellerTierBadge.jsx';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
+import { VARIANT_BADGES } from '@/lib/cardVariants.js';
 import { supabase } from '@/lib/supabaseClient.js';
 import SellerRatingDisplay from '@/components/SellerRatingDisplay.jsx';
 import WishlistButton from '@/components/WishlistButton.jsx';
@@ -18,26 +21,52 @@ const GRADE_BADGE = {
 };
 
 const MarketplaceListingCard = ({ listing }) => {
+  const { isAuthenticated } = useAuth();
+  const { isWatchlisted, toggle } = useWatchlist();
+  const watchlisted = isWatchlisted(listing.id);
+
+  const handleHeart = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isAuthenticated) {
+      toast.error('Sign in to save listings to your watchlist');
+      return;
+    }
+    const added = await toggle(listing.id);
+    toast.success(added ? 'Added to watchlist' : 'Removed from watchlist');
+  };
+
   const vaultItem = listing.vault_item;
   // vault_images stores storage_path; card_image may be a full URL or storage path
   const imgPath = vaultItem?.card_image || vaultItem?.vault_images?.[0]?.storage_path || null;
   const imgSrc = imgPath
     ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
     : null;
+
+  const rawVariants = vaultItem?.cardVariants;
+  const variants = Array.isArray(rawVariants) ? rawVariants : (rawVariants ? [rawVariants] : []);
+  const specialBadge = Object.entries(VARIANT_BADGES).find(([key]) => variants.includes(key));
+  const borderClass = specialBadge
+    ? `${specialBadge[1].border} ${specialBadge[1].glow}`
+    : 'border border-border';
+
   const sellerObj = listing.seller;
   const sellerId = listing.seller_id || sellerObj?.id;
   const titleSlug = slugify(vaultItem?.card_name || listing.title || 'card');
   const detailPath = `/product/marketplace/${listing.id}/${titleSlug}`;
 
   return (
-    <div className="group flex flex-col h-full bg-card rounded-2xl border border-border overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+    <div className={`group flex flex-col h-full bg-card rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 ${borderClass}`}>
       <Link to={detailPath} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
         {imgSrc ? (
-          <img 
-            src={imgSrc} 
-            alt={listing.title || 'Listing Image'} 
+          <img
+            src={imgSrc}
+            alt={listing.title || 'Listing Image'}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             loading="lazy"
+            decoding="async"
+            width="400"
+            height="500"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm font-medium">
@@ -52,10 +81,10 @@ const MarketplaceListingCard = ({ listing }) => {
           <WishlistButton itemId={listing.id} itemType="listing" className="bg-white/90 backdrop-blur-sm shadow-sm" />
         </div>
 
-        {/* Rookie badge — top left */}
-        {vaultItem?.is_rookie && (
-          <div className="absolute top-3 left-3 z-10 px-2 py-1 rounded-md text-[11px] font-extrabold tracking-wide bg-amber-400 text-amber-900 shadow-md">
-            RC
+        {/* Special variant badge (RC, Auto, 1st Ed) — top right */}
+        {specialBadge && (
+          <div className={`absolute top-3 right-3 z-10 px-2.5 py-1 rounded-full text-[11px] font-extrabold tracking-wide shadow-md ${specialBadge[1].bg} ${specialBadge[1].text}`}>
+            {specialBadge[1].label}
           </div>
         )}
 
@@ -65,6 +94,19 @@ const MarketplaceListingCard = ({ listing }) => {
             {vaultItem.grading_company.toUpperCase()} {vaultItem.grade}
           </div>
         )}
+
+        {/* Watchlist heart — bottom right */}
+        <button
+          onClick={handleHeart}
+          aria-label={watchlisted ? 'Remove from watchlist' : 'Add to watchlist'}
+          className={`absolute bottom-3 right-3 z-10 w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all duration-200 ${
+            watchlisted
+              ? 'bg-rose-500 text-white scale-110'
+              : 'bg-background/80 backdrop-blur-sm text-muted-foreground hover:text-rose-500 hover:bg-background'
+          }`}
+        >
+          <Heart className={`w-4 h-4 ${watchlisted ? 'fill-current' : ''}`} />
+        </button>
       </Link>
       
       <div className="p-5 flex flex-col flex-1">
@@ -91,18 +133,19 @@ const MarketplaceListingCard = ({ listing }) => {
             >
               <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
                 {sellerObj?.avatar_url ? (
-                  <img src={sellerObj.avatar_url} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" />
+                  <img src={sellerObj.avatar_url} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" width="32" height="32" decoding="async" />
                 ) : (
                   (sellerObj?.display_name || sellerObj?.username || 'S')[0].toUpperCase()
                 )}
               </div>
               <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-sm font-bold text-foreground truncate group-hover/seller:text-primary transition-colors">
                     {sellerObj?.display_name || sellerObj?.username || 'Community Seller'}
                   </span>
-                  {sellerObj?.is_verified && (
-                    <ShieldCheck className="w-3.5 h-3.5 text-[hsl(var(--verified-badge))] shrink-0" />
+                  {sellerObj?.is_verified && <VerifiedBadge size="sm" />}
+                  {sellerObj?.seller_tier && sellerObj.seller_tier !== 'none' && (
+                    <SellerTierBadge tier={sellerObj.seller_tier} size="xs" />
                   )}
                 </div>
                 <SellerRatingDisplay sellerId={sellerId} compact={true} />

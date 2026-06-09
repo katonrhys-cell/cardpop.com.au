@@ -310,7 +310,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved }) => {
         tags:                formData.tags.length ? formData.tags : null,
         source_url:          formData.source_url.trim() || null,
         // Organiser FK
-        ...(currentUser?.id && !event?.id && { organiser_id: currentUser.id }),
+        ...(currentUser?.id && { organiser_id: currentUser.id }),
       };
 
       if (event?.id) {

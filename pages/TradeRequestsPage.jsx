@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import SEOHead from '@/components/SEOHead.jsx';
 import { ArrowRightLeft, ShieldAlert, Clock, Inbox, Send } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { useTradeRequests } from '@/hooks/useTradeRequests.js';
@@ -58,17 +58,32 @@ const TradeRequestsPage = () => {
 
   if (!isVerified) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 px-4 bg-card rounded-[2rem] border border-border shadow-sm text-center min-h-[60vh] max-w-3xl mx-auto my-12">
-        <div className="w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center mb-6">
-          <ShieldAlert className="w-10 h-10 text-destructive" />
+      <div className="min-h-screen bg-background flex flex-col">
+        <SEOHead title="Trade Requests | CardPop" description="Manage your incoming and outgoing trade requests on CardPop." />
+        <section className="bg-card border-b border-border py-20 text-center">
+          <div className="container-default">
+            <ArrowRightLeft className="w-12 h-12 text-primary mx-auto mb-6" />
+            <Badge variant="outline" className="mb-4 text-xs font-semibold tracking-widest uppercase border-primary/40 text-primary px-3 py-1">
+              P2P Trading
+            </Badge>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">Trade Requests</h1>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Manage your incoming offers, sent requests, and view your completed transaction history.
+            </p>
+          </div>
+        </section>
+        <div className="flex flex-col items-center justify-center py-20 px-4 text-center flex-1">
+          <div className="w-20 h-20 bg-destructive/10 rounded-full flex items-center justify-center mb-6">
+            <ShieldAlert className="w-10 h-10 text-destructive" />
+          </div>
+          <h2 className="text-3xl font-serif font-bold mb-4 tracking-tight">Verification Required</h2>
+          <p className="text-lg text-muted-foreground mb-8 max-w-md mx-auto text-balance">
+            You must verify your email address to access trading features, initiate offers, and view your trade history.
+          </p>
+          <Button className="rounded-xl font-bold px-8 h-12 text-base shadow-sm" onClick={() => toast.info('Verification email sent')}>
+            Resend Verification Email
+          </Button>
         </div>
-        <h2 className="text-3xl font-serif font-bold mb-4 tracking-tight">Verification Required</h2>
-        <p className="text-lg text-muted-foreground mb-8 max-w-md mx-auto text-balance">
-          You must verify your email address to access trading features, initiate offers, and view your trade history.
-        </p>
-        <Button className="rounded-xl font-bold px-8 h-12 text-base shadow-sm" onClick={() => toast.info('Verification email sent')}>
-          Resend Verification Email
-        </Button>
       </div>
     );
   }
@@ -89,21 +104,24 @@ const TradeRequestsPage = () => {
   );
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-16 font-sans">
-      <Helmet><title>Trade Requests | CardPop</title></Helmet>
-      
-      <div className="mb-10 text-center sm:text-left">
-        <h1 className="font-serif text-3xl md:text-5xl font-extrabold mb-4 flex items-center justify-center sm:justify-start gap-4 text-foreground tracking-tight text-balance">
-          <div className="bg-primary/10 p-3 rounded-2xl hidden sm:block">
-            <ArrowRightLeft className="w-8 h-8 text-primary"/>
-          </div>
-          Trade Requests
-        </h1>
-        <p className="text-lg text-muted-foreground max-w-2xl sm:ml-[4.5rem]">
-          Manage your incoming offers, sent requests, and view your completed transaction history.
-        </p>
-      </div>
+    <div className="min-h-screen bg-background flex flex-col">
+      <SEOHead title="Trade Requests | CardPop" description="Manage your incoming and outgoing trade requests on CardPop." />
 
+      {/* Hero */}
+      <section className="bg-card border-b border-border py-20 text-center">
+        <div className="container-default">
+          <ArrowRightLeft className="w-12 h-12 text-primary mx-auto mb-6" />
+          <Badge variant="outline" className="mb-4 text-xs font-semibold tracking-widest uppercase border-primary/40 text-primary px-3 py-1">
+            P2P Trading
+          </Badge>
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">Trade Requests</h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Manage your incoming offers, sent requests, and view your completed transaction history.
+          </p>
+        </div>
+      </section>
+
+      <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-16 flex-1">
       {fetching || loading ? (
         <div className="space-y-6">
           <Skeleton className="h-14 w-full md:w-[400px] rounded-xl" />
@@ -179,6 +197,7 @@ const TradeRequestsPage = () => {
           </TabsContent>
         </Tabs>
       )}
+      </div>
     </div>
   );
 };

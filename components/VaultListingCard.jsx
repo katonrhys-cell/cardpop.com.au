@@ -33,19 +33,26 @@ const VaultListingCard = ({ vaultItem }) => {
 
   const badgeConfig = getStatusBadge(vaultItem.listing_type);
   const StatusIcon = badgeConfig.icon;
-  const variants = Array.isArray(vaultItem.cardVariants) ? vaultItem.cardVariants : [];
+  const rawVariants = vaultItem.cardVariants;
+  const variants = Array.isArray(rawVariants) ? rawVariants : (rawVariants ? [rawVariants] : []);
   const specialBadge = Object.entries(VARIANT_BADGES).find(([key]) => variants.includes(key));
   const extraVariants = variants.filter(v => !VARIANT_BADGES[v]).slice(0, 2);
+  const borderClass = specialBadge
+    ? `${specialBadge[1].border} ${specialBadge[1].glow}`
+    : 'border border-border';
 
   return (
-    <div className="group flex flex-col h-full bg-card rounded-2xl border border-border overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+    <div className={`group flex flex-col h-full bg-card rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 ${borderClass}`}>
       <Link to={detailPath} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
         {imgSrc ? (
-          <img 
+          <img
             src={imgSrc}
             alt={vaultItem.card_name || vaultItem.name || 'Vault Image'}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500 p-2"
             loading="lazy"
+            decoding="async"
+            width="400"
+            height="500"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm font-medium">
@@ -113,7 +120,7 @@ const VaultListingCard = ({ vaultItem }) => {
             >
               <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
                 {sellerObj?.avatar_url ? (
-                  <img src={sellerObj.avatar_url} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" />
+                  <img src={sellerObj.avatar_url} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" width="32" height="32" decoding="async" />
                 ) : (
                   (sellerObj?.display_name || sellerObj?.name || 'U')[0].toUpperCase()
                 )}

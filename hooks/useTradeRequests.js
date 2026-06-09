@@ -42,8 +42,9 @@ export function useTradeRequests() {
   }, [currentUser]);
 
   const getMyTradesReceived = useCallback(async () => {
+    if (!currentUser) return [];
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('trades')
       .select(`
         *,
@@ -51,17 +52,18 @@ export function useTradeRequests() {
         initiator_listing:listings!initiator_listing_id(*, vault_item:vault_items(*, vault_images(*))),
         responder_listing:listings!responder_listing_id(*, vault_item:vault_items(*, vault_images(*)))
       `)
-      .eq('responder_id', currentUser?.id)
+      .eq('responder_id', currentUser.id)
       .eq('status', 'proposed')
       .order('created_at', { ascending: false });
     setLoading(false);
+    if (error) { console.error('Error fetching received trades:', error); return []; }
     return data ?? [];
   }, [currentUser]);
 
   const getTradeHistory = useCallback(async () => {
     if (!currentUser) return [];
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('trades')
       .select(`
         *,
@@ -74,6 +76,7 @@ export function useTradeRequests() {
       .not('status', 'eq', 'proposed')
       .order('updated_at', { ascending: false });
     setLoading(false);
+    if (error) { console.error('Error fetching trade history:', error); return []; }
     return data ?? [];
   }, [currentUser]);
 
@@ -82,7 +85,8 @@ export function useTradeRequests() {
       const { error } = await supabase
         .from('trades')
         .update({ status: 'accepted' })
-        .eq('id', trade.id);
+        .eq('id', trade.id)
+        .eq('responder_id', currentUser?.id);
       if (error) throw error;
 
       // Decline any other pending trades involving same listings
@@ -107,7 +111,8 @@ export function useTradeRequests() {
       const { error } = await supabase
         .from('trades')
         .update({ status: 'cancelled' })
-        .eq('id', tradeId);
+        .eq('id', tradeId)
+        .or(`responder_id.eq.${currentUser?.id},initiator_id.eq.${currentUser?.id}`);
       if (error) throw error;
       toast.success('Trade request declined.');
       return true;

@@ -9,7 +9,6 @@ import routes from './routes/index.js';
 import { errorMiddleware } from './middleware/error.js';
 import { globalRateLimit } from './middleware/global-rate-limit.js';
 import { sessionTimeoutMiddleware } from './middleware/sessionTimeout.js';
-import { csrfMiddleware } from './middleware/csrf.js';
 import { secureHeadersMiddleware } from './middleware/secureHeaders.js';
 import logger from './utils/logger.js';
 import { BodyLimit } from './constants/common.js';
@@ -74,7 +73,6 @@ app.use((err, req, res, next) => {
 	next();
 });
 
-app.use(csrfMiddleware);
 app.use(sessionTimeoutMiddleware);
 
 // Mount at / for local dev, /hcgi/api for Hostinger, and /api for Vercel.
@@ -84,10 +82,10 @@ app.use('/hcgi/api', apiRouter);
 app.use('/api', apiRouter);
 
 app.get('/.well-known/security.txt', (req, res) => {
-	res.type('text/plain').send(`Contact: security@example.com
+	res.type('text/plain').send(`Contact: mailto:support@cardpop.com.au
 Expires: ${new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()}
 Preferred-Languages: en
-Canonical: https://example.com/.well-known/security.txt
+Canonical: https://cardpop.online/.well-known/security.txt
 `);
 });
 

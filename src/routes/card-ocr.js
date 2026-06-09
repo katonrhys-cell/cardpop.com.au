@@ -17,6 +17,10 @@ router.post('/scan', integratedAiRateLimit, uploadFiles({
 	],
 	fieldName: 'images',
 }), async (req, res) => {
+	if (!req.userId) {
+		return res.status(401).json({ error: 'Authentication required' });
+	}
+
 	if (!req.files?.length) {
 		throw new Error('An image is required for card scanning');
 	}
@@ -38,7 +42,7 @@ router.post('/scan', integratedAiRateLimit, uploadFiles({
 	res.setHeader('Connection', 'keep-alive');
 	res.setHeader('X-Accel-Buffering', 'no');
 
-	sseStream.pipe(res, { end: false });
+	sseStream.pipe(res);
 
 	res.on('close', () => sseStream.destroy());
 });

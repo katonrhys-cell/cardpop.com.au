@@ -1,8 +1,10 @@
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCategories } from '@/hooks/useCategories.js';
+import { useCollectionEras } from '@/hooks/useCollectionEras.js';
+import { COLLECTION_CONFIGS } from '@/data/collectionConfigs.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search, RefreshCw, AlertCircle, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,6 +13,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import { toast } from 'sonner';
 
+// Map a DB category name to a collection config slug (e.g. "Pokémon" → "pokemon")
+function resolveEraSlug(categoryName) {
+  if (!categoryName) return null;
+  const lower = categoryName.toLowerCase();
+  for (const [slug, cfg] of Object.entries(COLLECTION_CONFIGS)) {
+    const aliases = [cfg.name, ...(cfg.categoryAliases ?? [])].map(a => a.toLowerCase());
+    if (aliases.includes(lower)) return slug;
+  }
+  return null;
+}
+
 const MarketplacePage = () => {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,14 +31,33 @@ const MarketplacePage = () => {
 
   const [sort, setSort] = useState('created_at_desc');
   const [filterMode, setFilterMode] = useState('All');
+  const [filterRookie, setFilterRookie] = useState(false);
 
   // Category Filter States
   const { buildNameMap, getCategories, getSubcategoriesByCategory } = useCategories();
   const [nameMap, setNameMap] = useState({});
   const [filterCat, setFilterCat] = useState('');
   const [filterSub, setFilterSub] = useState('');
+  const [filterEra, setFilterEra] = useState('');
   const [catOpts, setCatOpts] = useState([]);
   const [subOpts, setSubOpts] = useState([]);
+
+  // Resolve the matching collection config slug so we can show eras in the filter
+  const [eraSlug, setEraSlug] = useState(null);
+  const { eras: categoryEras } = useCollectionEras(eraSlug);
+
+  // When the selected category changes, try to map it to a collection config
+  useEffect(() => {
+    if (!filterCat) {
+      setEraSlug(null);
+      setFilterEra('');
+      return;
+    }
+    const catName = catOpts.find(c => c.id === filterCat)?.name;
+    const slug = resolveEraSlug(catName);
+    setEraSlug(slug);
+    setFilterEra('');
+  }, [filterCat, catOpts]);
 
   // Search and Price Filter States
   const [search, setSearch] = useState('');
@@ -35,7 +67,9 @@ const MarketplacePage = () => {
   const [debouncedMin, setDebouncedMin] = useState('');
   const [debouncedMax, setDebouncedMax] = useState('');
 
+  const fetchRef = useRef(null);
   const isMounted = useRef(true);
+  useEffect(() => { return () => { isMounted.current = false; }; }, []);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400);
@@ -49,94 +83,99 @@ const MarketplacePage = () => {
 
   // Initialize Name Map and Categories (root categories only)
   useEffect(() => {
+    let active = true;
     const init = async () => {
       const map = await buildNameMap();
-      if (isMounted.current) setNameMap(map);
+      if (active) setNameMap(map);
       const allCats = await getCategories();
-      if (isMounted.current) setCatOpts(allCats.filter(c => !c.parent_id));
+      if (active) setCatOpts(allCats.filter(c => !c.parent_id));
     };
     init();
+    return () => { active = false; };
   }, [buildNameMap, getCategories]);
 
   // Cascading Dropdown Handlers
   useEffect(() => {
-    if (filterCat) getSubcategoriesByCategory(filterCat).then(setSubOpts);
+    if (filterCat) getSubcategoriesByCategory(filterCat).then(setSubOpts).catch(() => setSubOpts([]));
     else { setSubOpts([]); setFilterSub(''); }
   }, [filterCat, getSubcategoriesByCategory]);
 
-  const fetchListings = useCallback(async (showToast = false) => {
-    if (!isMounted.current) return;
-    setLoading(true);
-    setError(null);
-    try {
-      let query = supabase
-        .from('listings')
-        .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified)')
-        .limit(100);
-
-      // Use subcategory when selected, otherwise parent category (fixes double-filter bug)
-      const activeCat = filterSub || filterCat;
-      if (activeCat) query = query.eq('vault_items.category_id', activeCat);
-
-      // Card name search
-      if (debouncedSearch.trim()) query = query.ilike('vault_items.card_name', `%${debouncedSearch.trim()}%`);
-
-      // Price range
-      if (debouncedMin && !isNaN(debouncedMin)) query = query.gte('price_aud', Number(debouncedMin));
-      if (debouncedMax && !isNaN(debouncedMax)) query = query.lte('price_aud', Number(debouncedMax));
-
-      // Filter by listing mode
-      query = query.eq('status', 'active');
-      if (filterMode === 'Auction') {
-        query = query.eq('listing_type', 'auction');
-      } else if (filterMode === 'BuyNow') {
-        query = query.eq('listing_type', 'fixed');
-      } else if (filterMode === 'ForTrade') {
-        query = query.eq('listing_type', 'trade');
-      } else if (filterMode === 'MakeOffer') {
-        query = query.eq('accepts_offers', true);
-      }
-
-      if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
-      else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
-      else query = query.order('created_at', { ascending: false });
-
-      const { data, error: fetchError } = await query;
-      if (!isMounted.current) return;
-      if (fetchError) throw fetchError;
-
-      setListings(data || []);
-      if (showToast) toast.success('Marketplace data refreshed');
-    } catch (err) {
-      if (isMounted.current) setError(err.message || 'Failed to load marketplace listings.');
-    } finally {
-      if (isMounted.current) setLoading(false);
-    }
-  }, [sort, filterMode, filterCat, filterSub, debouncedSearch, debouncedMin, debouncedMax]);
-
+  // Main listings fetch
   useEffect(() => {
-    isMounted.current = true;
-    fetchListings();
-    return () => { isMounted.current = false; };
-  }, [fetchListings]);
+    let cancelled = false;
+
+    const run = async (showToast = false) => {
+      setLoading(true);
+      setError(null);
+      try {
+        let query = supabase
+          .from('listings')
+          .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
+          .limit(100);
+
+        const activeCat = filterSub || filterCat;
+        if (activeCat) query = query.eq('vault_items.category_id', activeCat);
+        if (debouncedSearch.trim()) query = query.ilike('vault_items.card_name', `%${debouncedSearch.trim()}%`);
+        if (debouncedMin && !isNaN(debouncedMin)) query = query.gte('price_aud', Number(debouncedMin));
+        if (debouncedMax && !isNaN(debouncedMax)) query = query.lte('price_aud', Number(debouncedMax));
+
+        // Always exclude vault-only (private) listings from the public marketplace
+        query = query.eq('status', 'active').neq('listing_type', 'vault');
+
+        if (filterMode === 'Auction') {
+          query = query.eq('listing_type', 'auction');
+        } else if (filterMode === 'BuyNow') {
+          query = query.eq('listing_type', 'fixed');
+        } else if (filterMode === 'ForTrade') {
+          query = query.eq('listing_type', 'trade');
+        } else if (filterMode === 'MakeOffer') {
+          query = query.eq('accepts_offers', true);
+        }
+
+        if (filterRookie) query = query.contains('vault_items.cardVariants', ['Rookie Card (RC)']);
+        if (filterEra) query = query.eq('vault_items.set_name', filterEra);
+
+        if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
+        else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
+        else query = query.order('created_at', { ascending: false });
+
+        const { data, error: fetchError } = await query;
+        if (cancelled) return;
+        if (fetchError) throw fetchError;
+
+        setListings(data || []);
+        if (showToast) toast.success('Marketplace data refreshed');
+      } catch (err) {
+        if (!cancelled) setError(err.message || 'Failed to load marketplace listings.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchRef.current = run;
+    run();
+    return () => { cancelled = true; };
+  }, [sort, filterMode, filterCat, filterSub, filterEra, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
 
   const clearFilters = () => {
     setFilterCat('');
     setFilterSub('');
+    setFilterEra('');
     setFilterMode('All');
+    setFilterRookie(false);
     setSearch('');
     setMinPrice('');
     setMaxPrice('');
   };
 
   const getBreadcrumbPath = () => {
-    const parts = [nameMap[filterCat], nameMap[filterSub]].filter(Boolean);
+    const parts = [nameMap[filterCat], filterEra || nameMap[filterSub]].filter(Boolean);
     if (parts.length === 0) return null;
     return `Filtering by: ${parts.join(' > ')}`;
   };
 
   const breadcrumbText = getBreadcrumbPath();
-  const hasActiveFilters = filterCat || filterSub || filterMode !== 'All' || search || minPrice || maxPrice;
+  const hasActiveFilters = filterCat || filterSub || filterEra || filterMode !== 'All' || filterRookie || search || minPrice || maxPrice;
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans pb-20">
@@ -171,11 +210,27 @@ const MarketplacePage = () => {
             <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Categories" /></SelectTrigger>
             <SelectContent>{catOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
           </Select>
-          {/* Subcategory */}
-          <Select value={filterSub} onValueChange={setFilterSub} disabled={!filterCat}>
-            <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Subcategories" /></SelectTrigger>
-            <SelectContent>{subOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-          </Select>
+          {/* Set / Era (when category maps to a known collection) or Subcategory */}
+          {categoryEras.length > 0 ? (
+            <Select value={filterEra} onValueChange={setFilterEra}>
+              <SelectTrigger className="w-[200px] bg-background border-border rounded-xl font-medium">
+                <SelectValue placeholder="All Sets / Eras" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Sets / Eras</SelectItem>
+                {categoryEras.map(era => (
+                  <SelectItem key={era.name} value={era.name}>
+                    {era.name}{era.years ? ` (${era.years})` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Select value={filterSub} onValueChange={setFilterSub} disabled={!filterCat}>
+              <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Subcategories" /></SelectTrigger>
+              <SelectContent>{subOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+            </Select>
+          )}
           {/* Price Range */}
           <div className="flex items-center gap-2">
             <Input
@@ -245,10 +300,17 @@ const MarketplacePage = () => {
             >
               For Trade
             </Button>
+            <Button
+              variant="outline"
+              className={`rounded-full px-5 font-bold ${filterRookie ? 'bg-amber-400 text-amber-900 shadow-md border-none hover:bg-amber-400' : 'bg-background hover:text-amber-700 hover:border-amber-400'}`}
+              onClick={() => setFilterRookie(r => !r)}
+            >
+              🏅 Rookie Cards
+            </Button>
           </div>
 
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => fetchListings(true)} disabled={loading} className="rounded-full h-10 w-10 shrink-0 bg-muted/50 hover:bg-muted">
+            <Button variant="ghost" size="icon" onClick={() => fetchRef.current?.(true)} disabled={loading} className="rounded-full h-10 w-10 shrink-0 bg-muted/50 hover:bg-muted">
               <RefreshCw className={`w-4 h-4 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
             </Button>
             <Select value={sort} onValueChange={setSort}>
@@ -269,7 +331,7 @@ const MarketplacePage = () => {
             <AlertCircle className="w-12 h-12 mb-4" />
             <h3 className="text-xl font-bold mb-2">Connection Error</h3>
             <p className="mb-6 opacity-80">{error}</p>
-            <Button onClick={() => fetchListings(true)} className="rounded-xl font-bold">Try Again</Button>
+            <Button onClick={() => fetchRef.current?.(true)} className="rounded-xl font-bold">Try Again</Button>
           </div>
         ) : loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

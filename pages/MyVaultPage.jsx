@@ -82,13 +82,14 @@ const MyVaultPage = () => {
         const { error: archiveErr } = await supabase
           .from('listings')
           .update({ status: 'archived' })
-          .eq('id', activeListing.id);
+          .eq('id', activeListing.id)
+          .eq('seller_id', currentUser.id);
         if (archiveErr) throw archiveErr;
       } else {
         if (!window.confirm("Delete this card from your vault?")) return;
       }
 
-      const { error } = await supabase.from('vault_items').delete().eq('id', cardId);
+      const { error } = await supabase.from('vault_items').delete().eq('id', cardId).eq('owner_id', currentUser.id);
       if (error) throw error;
       toast.success("Card deleted successfully");
       fetchVault();
@@ -164,6 +165,9 @@ const MyVaultPage = () => {
 
           <div className="flex flex-wrap gap-1.5 mb-3">
             {card.collection && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{card.collection}</Badge>}
+            {card.year && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{card.year}</Badge>}
+            {card.card_number && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">#{card.card_number}</Badge>}
+            {card.variant && <Badge variant="secondary" className="text-[10px] font-medium bg-violet-500/10 text-violet-700 border border-violet-200/50">{card.variant}</Badge>}
             {card.condition && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{CONDITION_LABELS[card.condition] || card.condition}</Badge>}
             {card.grading_company && card.grading_company !== 'raw' && (
               <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground uppercase">{card.grading_company} {card.grade || ''}</Badge>

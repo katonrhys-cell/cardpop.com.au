@@ -16,18 +16,20 @@ const ShopProductPage = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchProduct = async () => {
       try {
         const { data, error } = await supabase.from('listings').select('*').eq('id', id).single();
         if (error) throw error;
-        setProduct(data);
+        if (!cancelled) setProduct(data);
       } catch (error) {
         console.error(error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchProduct();
+    return () => { cancelled = true; };
   }, [id]);
 
   const handleAddToCart = () => {
