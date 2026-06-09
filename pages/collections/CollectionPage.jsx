@@ -563,10 +563,7 @@ const CollectionPage = () => {
       {eras && eras.length > 0 && (
         <section className="border-b border-border bg-background/95 backdrop-blur-md sticky top-[70px] lg:top-[120px] z-20 shadow-sm">
           <div className="container mx-auto px-4 sm:px-6">
-            <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground pt-2.5 pb-1.5 px-1">
-              Browse Collections
-            </p>
-            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-3">
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide py-3">
 
               {/* All / reset */}
               <button
