@@ -2,12 +2,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Star, Tag, Heart } from 'lucide-react';
+import { toast } from 'sonner';
 import VerifiedBadge from '@/components/VerifiedBadge.jsx';
 import SellerTierBadge from '@/components/SellerTierBadge.jsx';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { VARIANT_BADGES } from '@/lib/cardVariants.js';
 import { supabase } from '@/lib/supabaseClient.js';
+import { useAuth } from '@/contexts/AuthContext.jsx';
+import { useWatchlist } from '@/hooks/useWatchlist.js';
 import SellerRatingDisplay from '@/components/SellerRatingDisplay.jsx';
 import WishlistButton from '@/components/WishlistButton.jsx';
 
