@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -226,7 +226,12 @@ const CollectionPage = () => {
   const [categoryId, setCategoryId] = useState(null);
   const [activeEra, setActiveEra] = useState(null);
 
-  // Reset derived state when slug changes (guards against deferred key-remount)
+  // Scroll to top immediately when slug changes (fires before paint, catches both remount and re-render cases)
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [rawSlug]);
+
+  // Reset ALL derived state when slug changes (guards against deferred key-remount in concurrent mode)
   const prevSlugRef = useRef(slug);
   useEffect(() => {
     if (prevSlugRef.current !== slug) {
@@ -244,6 +249,15 @@ const CollectionPage = () => {
       setListingsError(null);
       setListingsPage(1);
       setTotalListings(0);
+      setSeoExpanded(false);
+      setFiltersOpen(false);
+      setFilterType('All');
+      setFilterCondition('');
+      setFilterVariant('');
+      setFilterSort('-created');
+      setFilterSub('');
+      setFilterBrand('');
+      setFilterSeries('');
     }
   }, [slug]);
 
@@ -281,7 +295,6 @@ const CollectionPage = () => {
   const [brandOpts, setBrandOpts] = useState([]);
   const [seriesOpts, setSeriesOpts] = useState([]);
 
-  const isMounted = useRef(true);
   const { getCategories, getSubcategoriesByCategory, getBrandsBySubcategory, getSeriesByBrand } = useCategories();
 
   const LISTINGS_PER_PAGE = 24;
@@ -293,38 +306,43 @@ const CollectionPage = () => {
     }
   }, [rawSlug, config, navigate]);
 
-  // ─── Resolve PocketBase categoryId ───────────────────────────────────────
+  // ─── Resolve categoryId from DB ───────────────────────────────────────────
   useEffect(() => {
     if (!config) return;
-    isMounted.current = true;
+    let cancelled = false;
 
     getCategories().then(cats => {
-      if (!isMounted.current) return;
+      if (cancelled) return;
       const aliases = [config.name, ...(config.categoryAliases ?? [])].map(a => a.toLowerCase());
       const match = cats.find(c => aliases.includes(c.name.toLowerCase()));
       if (match) setCategoryId(match.id);
     });
 
-    return () => { isMounted.current = false; };
+    return () => { cancelled = true; };
   }, [config, getCategories]);
 
   // ─── Load subcategory cascade ─────────────────────────────────────────────
   useEffect(() => {
-    if (categoryId) {
-      getSubcategoriesByCategory(categoryId).then(subs => {
-        if (isMounted.current) setSubOpts(subs);
-      });
-    }
+    if (!categoryId) return;
+    let cancelled = false;
+    getSubcategoriesByCategory(categoryId).then(subs => {
+      if (!cancelled) setSubOpts(subs);
+    });
+    return () => { cancelled = true; };
   }, [categoryId, getSubcategoriesByCategory]);
 
   useEffect(() => {
-    if (filterSub) getBrandsBySubcategory(filterSub).then(b => { if (isMounted.current) setBrandOpts(b); });
-    else { setBrandOpts([]); setFilterBrand(''); }
+    if (!filterSub) { setBrandOpts([]); setFilterBrand(''); return; }
+    let cancelled = false;
+    getBrandsBySubcategory(filterSub).then(b => { if (!cancelled) setBrandOpts(b); });
+    return () => { cancelled = true; };
   }, [filterSub, getBrandsBySubcategory]);
 
   useEffect(() => {
-    if (filterBrand) getSeriesByBrand(filterBrand).then(s => { if (isMounted.current) setSeriesOpts(s); });
-    else { setSeriesOpts([]); setFilterSeries(''); }
+    if (!filterBrand) { setSeriesOpts([]); setFilterSeries(''); return; }
+    let cancelled = false;
+    getSeriesByBrand(filterBrand).then(s => { if (!cancelled) setSeriesOpts(s); });
+    return () => { cancelled = true; };
   }, [filterBrand, getSeriesByBrand]);
 
   // Clear subcategory dropdown when an era pill is selected (they're independent filters)
@@ -335,6 +353,7 @@ const CollectionPage = () => {
   // ─── New Releases ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!categoryId) return;
+    let cancelled = false;
     setNewReleasesLoading(true);
 
     supabase.from('vault_items')
@@ -344,15 +363,18 @@ const CollectionPage = () => {
       .order('created_at', { ascending: false })
       .limit(10)
       .then(({ data }) => {
-        if (!isMounted.current) return;
+        if (cancelled) return;
         setNewReleases((data ?? []).map(i => ({ ...i, source: 'vault' })));
         setNewReleasesLoading(false);
       });
+
+    return () => { cancelled = true; };
   }, [categoryId]);
 
   // ─── Graded Slabs ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!categoryId || !config?.showGradedSection) return;
+    let cancelled = false;
     setGradedLoading(true);
 
     supabase.from('vault_items').select('*, vault_images(*)')
@@ -363,18 +385,21 @@ const CollectionPage = () => {
       .order('created_at', { ascending: false })
       .limit(10)
       .then(({ data }) => {
-        if (!isMounted.current) return;
+        if (cancelled) return;
         setGradedListings((data ?? []).map(i => ({ ...i, source: 'vault' })));
       }).catch(() => {
-        if (isMounted.current) setGradedListings([]);
+        if (!cancelled) setGradedListings([]);
       }).finally(() => {
-        if (isMounted.current) setGradedLoading(false);
+        if (!cancelled) setGradedLoading(false);
       });
+
+    return () => { cancelled = true; };
   }, [categoryId, config]);
 
   // ─── Trending (highest-priced listings = premium market signal) ───────────
   useEffect(() => {
     if (!categoryId || !config?.showTrendingSection) return;
+    let cancelled = false;
     setTrendingLoading(true);
 
     supabase.from('vault_items').select('*, vault_images(*)')
@@ -384,17 +409,20 @@ const CollectionPage = () => {
       .order('estimated_value_aud', { ascending: false })
       .limit(8)
       .then(({ data }) => {
-        if (!isMounted.current) return;
+        if (cancelled) return;
         setTrendingListings((data ?? []).map(i => ({ ...i, source: 'vault' })));
       }).catch(() => {
-        if (isMounted.current) setTrendingListings([]);
+        if (!cancelled) setTrendingListings([]);
       }).finally(() => {
-        if (isMounted.current) setTrendingLoading(false);
+        if (!cancelled) setTrendingLoading(false);
       });
+
+    return () => { cancelled = true; };
   }, [categoryId, config]);
 
   // ─── Holy Grail (featured picks) ─────────────────────────────────────────
   useEffect(() => {
+    let cancelled = false;
     setHolyGrailLoading(true);
     const loadHolyGrail = async () => {
       try {
@@ -406,14 +434,15 @@ const CollectionPage = () => {
           .limit(6);
         if (categoryId) query = query.eq('category_id', categoryId);
         const { data: featured } = await query;
-        if (isMounted.current) setHolyGrail((featured ?? []).map(i => ({ ...i, source: 'vault' })));
+        if (!cancelled) setHolyGrail((featured ?? []).map(i => ({ ...i, source: 'vault' })));
       } catch {
-        if (isMounted.current) setHolyGrail([]);
+        if (!cancelled) setHolyGrail([]);
       } finally {
-        if (isMounted.current) setHolyGrailLoading(false);
+        if (!cancelled) setHolyGrailLoading(false);
       }
     };
     loadHolyGrail();
+    return () => { cancelled = true; };
   }, [categoryId]);
 
   // ─── Main Browse Grid ─────────────────────────────────────────────────────
