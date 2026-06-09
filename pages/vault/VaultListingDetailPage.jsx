@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabaseClient.js';
 import SEOHead from '@/components/SEOHead.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import { generateStructuredData } from '@/utils/seoUtils.js';
+import { addToRecentlyViewed } from '@/utils/recentlyViewed.js';
+import BuyerProtection from '@/components/BuyerProtection.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +26,17 @@ const VaultListingDetailPage = () => {
           .single();
         if (error) throw error;
         setListing(record);
+        
+        // Track recently viewed
+        if (record) {
+          addToRecentlyViewed({
+            id: record.id,
+            title: record.vault_item?.card_name || record.title,
+            image: record.vault_item?.vault_images?.[0]?.url,
+            price: record.price_aud,
+            type: 'listing'
+          });
+        }
       } catch (err) {
         console.error("Error fetching listing:", err);
       } finally {
@@ -107,6 +120,8 @@ const VaultListingDetailPage = () => {
             {vi?.year && <div className="flex justify-between"><span className="text-muted-foreground">Year</span> <span className="font-medium">{vi.year}</span></div>}
             {vi?.grading_company && vi.grading_company !== 'raw' && <div className="flex justify-between"><span className="text-muted-foreground">Grading</span> <span className="font-medium flex items-center gap-1"><ShieldCheck className="w-4 h-4 text-primary" />{vi.grading_company.toUpperCase()} {vi.grade}</span></div>}
           </div>
+
+          <BuyerProtection className="mb-8" />
 
           <div className="mt-auto space-y-4">
             <Button size="lg" className="w-full h-14 text-lg font-bold gap-2">

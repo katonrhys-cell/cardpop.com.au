@@ -7,6 +7,25 @@
     <meta name="theme-color" content="#CE1126" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#1F2937" media="(prefers-color-scheme: dark)" />
 
+    <!-- Hreflang tags for international SEO -->
+    <link rel="alternate" hreflang="en-au" href="https://cardpop.online/" />
+    <link rel="alternate" hreflang="en" href="https://cardpop.online/" />
+    <link rel="alternate" hreflang="x-default" href="https://cardpop.online/" />
+
+    <!-- Core Web Vitals optimization -->
+    <link rel="preconnect" href="https://cardpop.online" />
+    <link rel="dns-prefetch" href="https://cardpop.online" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="/og-image.jpg" as="image" type="image/jpeg" />
+    
+    <!-- Prevent CLS with explicit dimensions -->
+    <style>
+      img { max-width: 100%; height: auto; }
+    </style>
+
     <title>CardPop | Australia's Trading Card Marketplace</title>
     <meta name="description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop — Australia's most trusted trading card platform." />
     <meta name="keywords" content="trading cards Australia, Pokemon cards Australia, buy sell trade cards, MTG Australia, sports cards Australia, card marketplace" />
@@ -69,6 +88,43 @@
       "sameAs": [
         "https://twitter.com/cardpopau"
       ]
+    }
+    </script>
+
+    <!-- Structured data: LocalBusiness for Australia -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "LocalBusiness",
+      "name": "CardPop",
+      "description": "Australia's most trusted trading card marketplace for Pokémon, Magic: The Gathering, sports cards and more.",
+      "url": "https://cardpop.online",
+      "telephone": "+61-400-000-000",
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "AU",
+        "addressRegion": "Australia"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": "-25.2744",
+        "longitude": "133.7751"
+      },
+      "openingHoursSpecification": {
+        "@type": "OpeningHoursSpecification",
+        "dayOfWeek": [
+          "Monday",
+          "Tuesday",
+          "Wednesday",
+          "Thursday",
+          "Friday",
+          "Saturday",
+          "Sunday"
+        ],
+        "opens": "00:00",
+        "closes": "23:59"
+      },
+      "priceRange": "$$"
     }
     </script>
   </head>

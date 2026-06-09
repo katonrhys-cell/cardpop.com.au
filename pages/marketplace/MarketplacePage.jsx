@@ -297,6 +297,46 @@ const MarketplacePage = () => {
             <p className="text-muted-foreground max-w-sm text-center mb-8">
               There are currently no items matching your filter criteria.
             </p>
+            
+            {/* Smart Suggestions */}
+            <div className="flex flex-col items-center gap-4 mb-8">
+              <p className="text-sm font-medium text-muted-foreground">Try these suggestions:</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setSearch(''); setFilterCat(''); setFilterSub(''); setFilterMode('All'); }}
+                  className="rounded-full"
+                >
+                  Clear All Filters
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setSearch('Charizard'); }}
+                  className="rounded-full"
+                >
+                  Charizard
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setSearch('Pikachu'); }}
+                  className="rounded-full"
+                >
+                  Pikachu
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setSearch('Black Lotus'); }}
+                  className="rounded-full"
+                >
+                  Black Lotus
+                </Button>
+              </div>
+            </div>
+
             <Button onClick={clearFilters} variant="outline" className="rounded-xl font-bold">
               View All Listings
             </Button>

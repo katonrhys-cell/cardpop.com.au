@@ -4,6 +4,7 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, FileText } from 'lucide-react';
+import { generateBlogPostingSchema } from '@/utils/seoUtils.js';
 
 const BlogArticlePage = () => {
   const { id } = useParams();
@@ -73,12 +74,23 @@ const BlogArticlePage = () => {
 
   const imageUrl = article.featured_image_url || null;
 
+  // Generate blog posting structured data
+  const blogStructuredData = generateBlogPostingSchema({
+    title: article.title,
+    image: article.featured_image_url,
+    author: article.author || 'CardPop Team',
+    publishedAt: article.created_at,
+    updated: article.updated_at,
+    excerpt: article.excerpt
+  });
+
   return (
     <article className="min-h-[100dvh] bg-background pb-24 overflow-x-hidden">
       <SEOHead
         title={`${article.title} | CardPop Blog`}
         description={article.excerpt || `Read ${article.title} on The Parallel Report — CardPop's trading card blog.`}
         ogImage={article.featured_image_url || undefined}
+        structuredData={blogStructuredData}
       />
       
       <div className="container-default pt-12 pb-8">

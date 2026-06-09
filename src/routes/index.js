@@ -13,6 +13,13 @@ import eventScraperRouter from './event-scraper.js';
 import categoriesRouter from './categories.js';
 import subcategoriesRouter from './subcategories.js';
 import vaultRouter from './vault.js';
+import sitemapRouter from './sitemap.js';
+import searchSuggestionsRouter from './search-suggestions.js';
+import sellerRatingsRouter from './seller-ratings.js';
+import buyerProtectionRouter from './buyer-protection.js';
+import wishlistRouter from './wishlist.js';
+import recommendationsRouter from './recommendations.js';
+import priceHistoryRouter from './price-history.js';
 
 const router = Router();
 
@@ -58,6 +65,30 @@ export default () => {
     // Vault security routes with API rate limiting
     router.use('/vault', apiLimiter);
     router.use('/vault', vaultRouter);
+
+    // Sitemap routes - no rate limiting, no auth required (public)
+    router.use('/sitemap', sitemapRouter);
+
+    // Search suggestions - no rate limiting, no auth required (public)
+    router.use('/search-suggestions', searchSuggestionsRouter);
+
+    // Seller ratings - API rate limiting, auth required for writing
+    router.use('/seller-ratings', apiLimiter);
+    router.use('/seller-ratings', sellerRatingsRouter);
+
+    // Buyer protection - API rate limiting, auth required
+    router.use('/buyer-protection', apiLimiter);
+    router.use('/buyer-protection', buyerProtectionRouter);
+
+    // Wishlist - API rate limiting, auth required
+    router.use('/wishlist', apiLimiter);
+    router.use('/wishlist', wishlistRouter);
+
+    // Recommendations - no rate limiting, auth optional
+    router.use('/recommendations', recommendationsRouter);
+
+    // Price history - no rate limiting, auth optional
+    router.use('/price-history', priceHistoryRouter);
 
     // Trade routes with email verification middleware
     // Apply auth middleware first, then trade access verification

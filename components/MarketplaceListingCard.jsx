@@ -5,6 +5,8 @@ import { Star, ShieldCheck, Tag } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { supabase } from '@/lib/supabaseClient.js';
+import SellerRatingDisplay from '@/components/SellerRatingDisplay.jsx';
+import WishlistButton from '@/components/WishlistButton.jsx';
 
 const GRADE_BADGE = {
   psa:   'bg-red-600 text-white',
@@ -43,10 +45,11 @@ const MarketplaceListingCard = ({ listing }) => {
           </div>
         )}
         {/* Marketplace label — top right */}
-        <div className="absolute top-3 right-3 z-10">
+        <div className="absolute top-3 right-3 z-10 flex gap-2">
           <Badge className="shadow-sm font-bold bg-secondary text-secondary-foreground">
             <Tag className="w-3 h-3 mr-1" /> Marketplace
           </Badge>
+          <WishlistButton itemId={listing.id} itemType="listing" className="bg-white/90 backdrop-blur-sm shadow-sm" />
         </div>
 
         {/* Rookie badge — top left */}
@@ -102,11 +105,7 @@ const MarketplaceListingCard = ({ listing }) => {
                     <ShieldCheck className="w-3.5 h-3.5 text-[hsl(var(--verified-badge))] shrink-0" />
                   )}
                 </div>
-                <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                  <Star className="w-3 h-3 fill-[hsl(var(--rating-color))] text-[hsl(var(--rating-color))]" />
-                  <span>{sellerObj?.rating ? sellerObj.rating.toFixed(1) : 'New'}</span>
-                  {sellerObj?.reviews_count > 0 && <span>({sellerObj.reviews_count})</span>}
-                </div>
+                <SellerRatingDisplay sellerId={sellerId} compact={true} />
               </div>
             </Link>
           )}
