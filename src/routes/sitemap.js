@@ -1,13 +1,7 @@
 import { Router } from 'express';
-import { createClient } from '@supabase/supabase-js';
+import supabase from '../utils/supabaseClient.js';
 
 const router = Router();
-
-// Initialize Supabase client for backend
-const supabase = createClient(
-  process.env.SUPABASE_URL || 'http://localhost:8000',
-  process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_KEY
-);
 
 // Generate sitemap for products
 router.get('/products', async (req, res) => {
