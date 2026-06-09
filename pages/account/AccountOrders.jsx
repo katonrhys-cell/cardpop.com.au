@@ -271,17 +271,18 @@ const AccountOrders = () => {
   const fetchOrders = useCallback(async () => {
     if (!currentUser?.id) return;
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('orders')
       .select('*, seller:profiles!seller_id(id, display_name, username), listing:listings!listing_id(vault_item:vault_items!inner(card_name))')
       .eq('buyer_id', currentUser.id)
       .order('created_at', { ascending: false })
       .limit(100);
+    if (error) throw error;
     setOrders(data || []);
     setLoading(false);
   }, [currentUser?.id]);
 
-  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+  useEffect(() => { fetchOrders().catch(() => {}); }, [fetchOrders]);
 
   const filtered = statusFilter === 'all'
     ? orders

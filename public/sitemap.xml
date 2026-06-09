@@ -3,25 +3,25 @@
 
   <!-- Core pages -->
   <url>
-    <loc>https://cardpop.com.au/</loc>
+    <loc>https://cardpop.online/</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://cardpop.com.au/marketplace</loc>
+    <loc>https://cardpop.online/marketplace</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://cardpop.com.au/browse</loc>
+    <loc>https://cardpop.online/browse</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://cardpop.com.au/search</loc>
+    <loc>https://cardpop.online/search</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -29,19 +29,19 @@
 
   <!-- Shop -->
   <url>
-    <loc>https://cardpop.com.au/shop</loc>
+    <loc>https://cardpop.online/shop</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://cardpop.com.au/shop/sealed-boxes</loc>
+    <loc>https://cardpop.online/shop/sealed-boxes</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://cardpop.com.au/shop/singles</loc>
+    <loc>https://cardpop.online/shop/singles</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
@@ -49,19 +49,19 @@
 
   <!-- Markets & Analytics -->
   <url>
-    <loc>https://cardpop.com.au/markets</loc>
+    <loc>https://cardpop.online/markets</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://cardpop.com.au/australian-markets</loc>
+    <loc>https://cardpop.online/australian-markets</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://cardpop.com.au/insider-trading</loc>
+    <loc>https://cardpop.online/insider-trading</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
@@ -69,7 +69,7 @@
 
   <!-- Grading -->
   <url>
-    <loc>https://cardpop.com.au/grading</loc>
+    <loc>https://cardpop.online/grading</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
@@ -77,13 +77,13 @@
 
   <!-- Community -->
   <url>
-    <loc>https://cardpop.com.au/community</loc>
+    <loc>https://cardpop.online/community</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://cardpop.com.au/community/events</loc>
+    <loc>https://cardpop.online/community/events</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
@@ -91,7 +91,7 @@
 
   <!-- Blog -->
   <url>
-    <loc>https://cardpop.com.au/blog</loc>
+    <loc>https://cardpop.online/blog</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
@@ -99,19 +99,19 @@
 
   <!-- Info / Company -->
   <url>
-    <loc>https://cardpop.com.au/about</loc>
+    <loc>https://cardpop.online/about</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://cardpop.com.au/contact</loc>
+    <loc>https://cardpop.online/contact</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://cardpop.com.au/faq</loc>
+    <loc>https://cardpop.online/faq</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
@@ -119,37 +119,37 @@
 
   <!-- Legal / Policy -->
   <url>
-    <loc>https://cardpop.com.au/privacy-policy</loc>
+    <loc>https://cardpop.online/privacy-policy</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://cardpop.com.au/terms</loc>
+    <loc>https://cardpop.online/terms</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://cardpop.com.au/returns</loc>
+    <loc>https://cardpop.online/returns</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://cardpop.com.au/shipping</loc>
+    <loc>https://cardpop.online/shipping</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://cardpop.com.au/trust-safety</loc>
+    <loc>https://cardpop.online/trust-safety</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.4</priority>
   </url>
   <url>
-    <loc>https://cardpop.com.au/accessibility</loc>
+    <loc>https://cardpop.online/accessibility</loc>
     <lastmod>2026-05-31</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>

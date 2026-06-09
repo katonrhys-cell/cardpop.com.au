@@ -10,17 +10,19 @@ const GradingScalePage = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchGuide = async () => {
       try {
         const { data } = await supabase.from('grading_companies').select('*').or(`slug.eq.${scale},id.eq.${scale}`).maybeSingle();
-        setGuide(data);
+        if (!cancelled) setGuide(data);
       } catch (error) {
         console.error(error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchGuide();
+    return () => { cancelled = true; };
   }, [scale]);
 
   if (loading) return <div className="container-default section-padding"><Skeleton className="h-[400px] rounded-2xl" /></div>;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -213,7 +213,7 @@ const CardAnalyticsPage = () => {
         setListings(shop.map(i => ({ ...i, _source: 'shop' })));
         setVaultItems(vault.map(i => ({ ...i, _source: 'vault' })));
       }
-    }).finally(() => { if (!cancelled) setLoadingL(false); });
+    }).catch(() => {}).finally(() => { if (!cancelled) setLoadingL(false); });
 
     return () => { cancelled = true; };
   }, [cardName]);
@@ -265,6 +265,36 @@ const CardAnalyticsPage = () => {
       .finally(() => { if (!cancelled) setLiveLoading(false); });
     return () => { cancelled = true; };
   }, [cardName, cardSet]);
+
+  // Fetch CardSight completed sales for this card
+  useEffect(() => {
+    if (!cardName || cardName === 'Unknown Card') { setCsLoading(false); return; }
+    let cancelled = false;
+    const run = async () => {
+      setCsLoading(true);
+      try {
+        const acRes = await apiServerClient.fetch(
+          `/cardsight/autocomplete?q=${encodeURIComponent(cardName)}&take=1`
+        );
+        if (!acRes.ok || cancelled) return;
+        const acData = await acRes.json();
+        const cardId = acData?.results?.[0]?.id ?? acData?.[0]?.id ?? acData?.data?.[0]?.id;
+        if (!cardId || cancelled) return;
+        const prRes = await apiServerClient.fetch(
+          `/cardsight/pricing/${cardId}?period=30d&listing_type=sold`
+        );
+        if (!prRes.ok || cancelled) return;
+        const prData = await prRes.json();
+        if (!cancelled) setCsData(prData);
+      } catch {
+        // non-critical
+      } finally {
+        if (!cancelled) setCsLoading(false);
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [cardName]);
 
   const cardUrl = (c) => `/analytics/card?name=${encodeURIComponent(c.name)}&set=${encodeURIComponent(c.set)}&collection=${encodeURIComponent(c.collection)}&price=${c.price}&change=${c.change}`;
 
@@ -473,6 +503,51 @@ const CardAnalyticsPage = () => {
             </div>
           ))}
         </div>
+
+        {/* CardSight completed sales data */}
+        {(csLoading || csData) && (() => {
+          if (csLoading) {
+            return (
+              <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-4 flex items-center gap-2 text-xs text-muted-foreground">
+                <Activity className="w-3.5 h-3.5 animate-pulse text-blue-500" />
+                Loading CardSight market data…
+              </div>
+            );
+          }
+          const avg = csData.avg_price ?? csData.average_price ?? csData.mean_price;
+          const min = csData.min_price ?? csData.minimum_price;
+          const max = csData.max_price ?? csData.maximum_price;
+          const count = csData.count ?? csData.total_count ?? csData.total;
+          if (!avg) return null;
+          return (
+            <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-bold flex items-center gap-2 text-blue-700 dark:text-blue-400">
+                  <ShieldCheck className="w-4 h-4" /> CardSight · 30-Day Completed Sales
+                </h2>
+                {count != null && <span className="text-xs text-muted-foreground">{count} sales</span>}
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">${Number(avg).toFixed(2)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Average Sold</p>
+                </div>
+                {min != null && (
+                  <div className="text-center">
+                    <p className="text-2xl font-bold">${Number(min).toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Lowest Sold</p>
+                  </div>
+                )}
+                {max != null && (
+                  <div className="text-center">
+                    <p className="text-2xl font-bold">${Number(max).toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Highest Sold</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Chart + Signal */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

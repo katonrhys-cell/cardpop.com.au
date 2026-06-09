@@ -1,122 +1,189 @@
 import { Router } from 'express';
-import { authMiddleware } from '../middleware/auth.js';
-import { refreshCardMarketData, getStoredMarketData, getPriceRange } from '../utils/marketDataService.js';
 import supabase from '../utils/supabaseClient.js';
-import logger from '../utils/logger.js';
 
 const router = Router();
 
-// ─── GET /market-data/card/:cardId ────────────────────────────────────────────
-// Returns stored valuations + sold history for a CardSight card ID.
-// If data is stale (> 24 h) or missing, triggers a background refresh.
-router.get('/card/:cardId', async (req, res) => {
-  const { cardId } = req.params;
-  if (!cardId?.trim()) return res.status(400).json({ error: 'cardId is required' });
-
+// Get market data for a card
+router.get('/:cardName', async (req, res) => {
   try {
-    const stored = await getStoredMarketData(cardId);
-    const hasData = Object.keys(stored.valuations).length > 0;
+    const { cardName } = req.params;
+    const { source } = req.query;
 
-    // Determine if any valuation is stale (older than 24 h)
-    const staleThreshold = Date.now() - 24 * 60 * 60 * 1000;
-    const isStale = !hasData || Object.values(stored.valuations).some(
-      v => !v.last_updated || new Date(v.last_updated).getTime() < staleThreshold
-    );
-
-    if (isStale) {
-      // Pull card meta from vault_items if available for a richer query
-      const { data: vi } = await supabase
-        .from('vault_items')
-        .select('card_name, set_name')
-        .eq('cardsight_card_id', cardId)
-        .limit(1)
-        .maybeSingle();
-
-      // Background refresh — don't block the response
-      refreshCardMarketData({
-        cardId,
-        cardName: vi?.card_name ?? null,
-        setName:  vi?.set_name  ?? null,
-      }).catch(err => logger.error(`[MARKET_DATA_ROUTE] Background refresh failed: ${err.message}`));
-    }
-
-    res.json({ cardId, ...stored, refreshing: isStale });
-  } catch (err) {
-    logger.error(`[MARKET_DATA_ROUTE] GET /card/${cardId}: ${err.message}`);
-    res.status(500).json({ error: 'Failed to retrieve market data.' });
-  }
-});
-
-// ─── POST /market-data/refresh (auth required) ────────────────────────────────
-// Manually trigger a full refresh for a card. Accepts { cardId, cardName, setName }.
-router.post('/refresh', authMiddleware, async (req, res) => {
-  const { cardId, cardName, setName } = req.body ?? {};
-  if (!cardId?.trim()) return res.status(400).json({ error: 'cardId is required' });
-
-  logger.info(`[MARKET_DATA_ROUTE] Manual refresh: ${cardId} by user ${req.user.id}`);
-
-  try {
-    const result = await refreshCardMarketData({ cardId, cardName, setName });
-    const stored = await getStoredMarketData(cardId);
-    res.json({ cardId, ...stored, refreshResult: result });
-  } catch (err) {
-    logger.error(`[MARKET_DATA_ROUTE] POST /refresh: ${err.message}`);
-    res.status(500).json({ error: 'Refresh failed.' });
-  }
-});
-
-// ─── GET /market-data/price-range/:cardId ────────────────────────────────────
-// Returns the computed Low / Avg / High / Floor range for a card.
-// 404 if no range has been computed yet (triggers a background refresh).
-router.get('/price-range/:cardId', async (req, res) => {
-  const { cardId } = req.params;
-  try {
-    const range = await getPriceRange(cardId);
-
-    if (!range) {
-      // Trigger background refresh so data exists on next poll
-      const { data: vi } = await supabase
-        .from('vault_items')
-        .select('card_name, set_name')
-        .eq('cardsight_card_id', cardId)
-        .limit(1)
-        .maybeSingle();
-
-      refreshCardMarketData({
-        cardId,
-        cardName: vi?.card_name ?? null,
-        setName:  vi?.set_name  ?? null,
-      }).catch(err => logger.error(`[MARKET_DATA_ROUTE] price-range refresh: ${err.message}`));
-
-      return res.status(404).json({ error: 'Price range not yet computed. Refresh triggered.' });
-    }
-
-    res.json(range);
-  } catch (err) {
-    logger.error(`[MARKET_DATA_ROUTE] GET /price-range/${cardId}: ${err.message}`);
-    res.status(500).json({ error: 'Failed to retrieve price range.' });
-  }
-});
-
-// ─── GET /market-data/sold/:cardId ────────────────────────────────────────────
-// Returns recent sold listing records for charting.
-router.get('/sold/:cardId', async (req, res) => {
-  const { cardId } = req.params;
-  const limit = Math.min(200, parseInt(req.query.limit ?? '50', 10));
-
-  try {
-    const { data, error } = await supabase
-      .from('market_sold_listings')
+    let query = supabase
+      .from('market_data')
       .select('*')
-      .eq('card_id', cardId)
-      .order('sold_at', { ascending: false })
-      .limit(limit);
+      .ilike('card_name', `%${cardName}%`)
+      .order('recorded_at', { ascending: false })
+      .limit(20);
+
+    if (source) {
+      query = query.eq('source', source);
+    }
+
+    const { data: marketData, error } = await query;
 
     if (error) throw error;
-    res.json(data ?? []);
-  } catch (err) {
-    logger.error(`[MARKET_DATA_ROUTE] GET /sold/${cardId}: ${err.message}`);
-    res.status(500).json({ error: 'Failed to retrieve sold listings.' });
+
+    // Aggregate data by source
+    const aggregated = {};
+    marketData?.forEach(item => {
+      if (!aggregated[item.source]) {
+        aggregated[item.source] = {
+          source: item.source,
+          prices: [],
+          latest: null
+        };
+      }
+      aggregated[item.source].prices.push({
+        market_price: item.market_price,
+        low_price: item.low_price,
+        mid_price: item.mid_price,
+        high_price: item.high_price,
+        recorded_at: item.recorded_at
+      });
+      
+      // Keep the latest entry
+      if (!aggregated[item.source].latest || new Date(item.recorded_at) > new Date(aggregated[item.source].latest.recorded_at)) {
+        aggregated[item.source].latest = item;
+      }
+    });
+
+    res.json({
+      data: Object.values(aggregated),
+      sources: Object.keys(aggregated)
+    });
+  } catch (error) {
+    console.error('Error fetching market data:', error);
+    res.status(500).json({ error: 'Failed to fetch market data' });
+  }
+});
+
+// Record market data (for automated imports)
+router.post('/', async (req, res) => {
+  try {
+    const { card_name, set_name, source, market_price, low_price, mid_price, high_price, currency = 'USD' } = req.body;
+
+    if (!card_name || !source || !market_price) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const { data: marketData, error } = await supabase
+      .from('market_data')
+      .insert({
+        card_name,
+        set_name: set_name || null,
+        source,
+        market_price: parseFloat(market_price),
+        low_price: low_price ? parseFloat(low_price) : null,
+        mid_price: mid_price ? parseFloat(mid_price) : null,
+        high_price: high_price ? parseFloat(high_price) : null,
+        currency
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(201).json(marketData);
+  } catch (error) {
+    console.error('Error recording market data:', error);
+    res.status(500).json({ error: 'Failed to record market data' });
+  }
+});
+
+// Get market price comparison across sources
+router.get('/compare/:cardName', async (req, res) => {
+  try {
+    const { cardName } = req.params;
+
+    // Get latest market data from all sources
+    const { data: allData, error } = await supabase
+      .from('market_data')
+      .select('*')
+      .ilike('card_name', `%${cardName}%`)
+      .order('recorded_at', { ascending: false })
+      .limit(100);
+
+    if (error) throw error;
+
+    // Group by source and get latest from each
+    const latestBySource = {};
+    allData?.forEach(item => {
+      if (!latestBySource[item.source] || new Date(item.recorded_at) > new Date(latestBySource[item.source].recorded_at)) {
+        latestBySource[item.source] = item;
+      }
+    });
+
+    // Calculate average market price
+    const sources = Object.values(latestBySource);
+    const avgPrice = sources.length > 0 
+      ? (sources.reduce((sum, item) => sum + (item.market_price || 0), 0) / sources.length).toFixed(2)
+      : null;
+
+    // Convert to AUD (simplified conversion)
+    const audRate = 1.5; // Example conversion rate
+    const avgPriceAud = avgPrice ? (avgPrice * audRate).toFixed(2) : null;
+
+    res.json({
+      comparison: sources,
+      averagePrice: avgPrice,
+      averagePriceAud: avgPriceAud,
+      sources: Object.keys(latestBySource)
+    });
+  } catch (error) {
+    console.error('Error comparing market prices:', error);
+    res.status(500).json({ error: 'Failed to compare market prices' });
+  }
+});
+
+// Get trending cards (by market data volume)
+router.get('/trending/limit/:limit', async (req, res) => {
+  try {
+    const { limit } = req.params;
+    const limitNum = parseInt(limit) || 10;
+
+    // Get cards with most recent market data updates
+    const { data: trending, error } = await supabase
+      .from('market_data')
+      .select('card_name, set_name, market_price, source, recorded_at')
+      .order('recorded_at', { ascending: false })
+      .limit(limitNum * 5); // Get more to account for duplicates
+
+    if (error) throw error;
+
+    // Group by card name and count occurrences
+    const cardCounts = {};
+    trending?.forEach(item => {
+      const key = `${item.card_name}-${item.set_name || ''}`;
+      if (!cardCounts[key]) {
+        cardCounts[key] = {
+          card_name: item.card_name,
+          set_name: item.set_name,
+          count: 0,
+          avg_price: 0,
+          latest_price: item.market_price,
+          sources: new Set()
+        };
+      }
+      cardCounts[key].count++;
+      cardCounts[key].avg_price += item.market_price;
+      cardCounts[key].sources.add(item.source);
+    });
+
+    // Calculate averages and sort by count
+    const sortedCards = Object.values(cardCounts)
+      .map(card => ({
+        ...card,
+        avg_price: (card.avg_price / card.count).toFixed(2),
+        sources: Array.from(card.sources)
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limitNum);
+
+    res.json(sortedCards);
+  } catch (error) {
+    console.error('Error fetching trending cards:', error);
+    res.status(500).json({ error: 'Failed to fetch trending cards' });
   }
 });
 

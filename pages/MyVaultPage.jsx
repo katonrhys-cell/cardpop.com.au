@@ -82,13 +82,14 @@ const MyVaultPage = () => {
         const { error: archiveErr } = await supabase
           .from('listings')
           .update({ status: 'archived' })
-          .eq('id', activeListing.id);
+          .eq('id', activeListing.id)
+          .eq('seller_id', currentUser.id);
         if (archiveErr) throw archiveErr;
       } else {
         if (!window.confirm("Delete this card from your vault?")) return;
       }
 
-      const { error } = await supabase.from('vault_items').delete().eq('id', cardId);
+      const { error } = await supabase.from('vault_items').delete().eq('id', cardId).eq('owner_id', currentUser.id);
       if (error) throw error;
       toast.success("Card deleted successfully");
       fetchVault();

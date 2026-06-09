@@ -73,19 +73,19 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
 
   // Initial Load & Populate
   useEffect(() => {
+    let cancelled = false;
     const initData = async () => {
       setFetchingHierarchy(true);
       try {
         const { data: cats } = await supabase.from('categories').select('*').is('parent_id', null).order('name');
         const { data: subs } = await supabase.from('categories').select('*').not('parent_id', 'is', null).order('name');
+        if (cancelled) return;
         // brands and series have no Supabase equivalent — use empty arrays
         console.warn('[VaultProductForm] brands/series collections have no Supabase equivalent');
-        const brnds = [];
-        const srs = [];
         setAllCategories(cats || []);
         setAllSubcategories(subs || []);
-        setAllBrands(brnds);
-        setAllSeries(srs);
+        setAllBrands([]);
+        setAllSeries([]);
 
         if (card) {
           setFormData({
@@ -117,7 +117,7 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
           setEnableSub(!!card.subcategoryId);
           setEnableBrand(!!card.brandId);
           setEnableSeries(!!card.seriesId);
-          
+
           if (card.images && card.images.length > 0) {
             const urls = card.images.map(img => (typeof img === 'string' && img.startsWith('http') ? img : img));
             setPreviewUrls(urls);
@@ -136,10 +136,11 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
       } catch (err) {
         console.error("Failed to load hierarchy data", err);
       } finally {
-        setFetchingHierarchy(false);
+        if (!cancelled) setFetchingHierarchy(false);
       }
     };
     initData();
+    return () => { cancelled = true; };
   }, [card]);
 
   // Auto-sync is_public based on listing_type
@@ -297,9 +298,11 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
         submitData.append('images', JSON.stringify(remainingImages));
       }
 
-      // Convert FormData to plain object for Supabase
+      // Convert FormData to plain object for Supabase (last-write-wins for scalars)
       const dataObj = {};
       submitData.forEach((value, key) => { dataObj[key] = value; });
+      // cardVariants must stay as an array so the database can filter by containment
+      dataObj.cardVariants = formData.cardVariants;
 
       if (card) {
         const { error } = await supabase.from('vault_items').update(dataObj).eq('id', card.id).eq('owner_id', currentUser.id);

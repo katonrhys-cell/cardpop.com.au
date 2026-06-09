@@ -1,9 +1,11 @@
 import 'dotenv/config';
+import crypto from 'crypto';
 import express from 'express';
 import supabase from '../../utils/supabaseClient.js';
 import { generateOTP } from '../../utils/otpGenerator.js';
 import { encrypt, decrypt } from '../../utils/encryption.js';
 import { authMiddleware } from '../../middleware/auth.js';
+import { mfaLimiter } from '../../middleware/endpoint-rate-limit.js';
 import logger from '../../utils/logger.js';
 
 const router = express.Router();
@@ -16,7 +18,7 @@ router.post('/request', authMiddleware, async (req, res) => {
 
   const otp = generateOTP();
   const expiresAt = new Date(Date.now() + MFA_CODE_EXPIRY_MS).toISOString();
-  const mfaId = `mfa_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  const mfaId = `mfa_${crypto.randomBytes(16).toString('hex')}`;
   const encryptedOtp = encrypt({ code: otp, expiresAt });
 
   const { error } = await supabase.from('mfa_sessions').insert({
@@ -34,7 +36,7 @@ router.post('/request', authMiddleware, async (req, res) => {
   res.json({ mfaId, expiresAt, message: 'OTP sent to email' });
 });
 
-router.post('/verify', async (req, res) => {
+router.post('/verify', authMiddleware, mfaLimiter, async (req, res) => {
   const { mfaId, code } = req.body;
   if (!mfaId || !code) return res.status(400).json({ error: 'mfaId and code are required' });
   if (code.length !== 8) return res.status(400).json({ error: 'Code must be 8 digits' });

@@ -4,6 +4,7 @@ import { verifyTradeAccess } from '../middleware/verifyTradeAccess.js';
 import { authMiddleware } from '../middleware/auth.js';
 import healthCheck from './health-check.js';
 import ebayRouter from './ebay.js';
+import cardsightRouter from './cardsight.js';
 import authRouter from './auth/index.js';
 import stripeRouter from './stripe.js';
 import verificationRouter from './verification.js';
@@ -13,6 +14,13 @@ import eventScraperRouter from './event-scraper.js';
 import categoriesRouter from './categories.js';
 import subcategoriesRouter from './subcategories.js';
 import vaultRouter from './vault.js';
+import sitemapRouter from './sitemap.js';
+import searchSuggestionsRouter from './search-suggestions.js';
+import sellerRatingsRouter from './seller-ratings.js';
+import buyerProtectionRouter from './buyer-protection.js';
+import wishlistRouter from './wishlist.js';
+import recommendationsRouter from './recommendations.js';
+import priceHistoryRouter from './price-history.js';
 import newsletterRouter from './newsletter.js';
 import cardSightRouter from './cardsight.js';
 import marketDataRouter from './market-data.js';
@@ -48,6 +56,10 @@ export default () => {
     // eBay routes with API rate limiting
     router.use('/ebay', apiLimiter);
     router.use('/ebay', ebayRouter);
+
+    // CardSight routes with API rate limiting
+    router.use('/cardsight', apiLimiter);
+    router.use('/cardsight', cardsightRouter);
     
     // Stripe: high-capacity limiter for the webhook, standard for other endpoints
     router.use('/stripe/webhook', stripeLimiter);
@@ -65,14 +77,6 @@ export default () => {
     // Vault security routes with API rate limiting
     router.use('/vault', apiLimiter);
     router.use('/vault', vaultRouter);
-
-    // Newsletter (Kit.com) subscription — no auth required
-    router.use('/newsletter', apiLimiter);
-    router.use('/newsletter', newsletterRouter);
-
-    // Market data — persisted CardSight + eBay + PSA valuations
-    router.use('/market-data', apiLimiter);
-    router.use('/market-data', marketDataRouter);
 
     // Trade routes with email verification middleware
     // Apply auth middleware first, then trade access verification

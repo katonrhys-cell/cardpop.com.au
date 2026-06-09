@@ -68,12 +68,23 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
   const [tradeWants, setTradeWants] = useState('');
   const [loading, setLoading] = useState(false);
   const [priceRange, setPriceRange] = useState(null);
+  const [hasActiveListing, setHasActiveListing] = useState(false);
 
   const handleOpen = () => {
     setSelected(null);
     setPrice(product?.estimated_value_aud ? String(product.estimated_value_aud) : '');
     setTradeWants('');
     setPriceRange(null);
+    setHasActiveListing(false);
+
+    // Check if an active listing row actually exists (guards against orphaned vault_items state)
+    supabase
+      .from('listings')
+      .select('id')
+      .eq('vault_item_id', product.id)
+      .neq('status', 'archived')
+      .maybeSingle()
+      .then(({ data }) => { setHasActiveListing(!!data); });
 
     // Fetch price range from DB if we have a CardSight card ID
     const csId = product?.cardsight_card_id;
@@ -168,10 +179,11 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
         }
       } else {
         // Going private — archive any existing listing
-        await supabase
+        const { error: archiveErr } = await supabase
           .from('listings')
           .update({ status: 'archived' })
           .eq('vault_item_id', product.id).eq('seller_id', currentUser.id);
+        if (archiveErr) throw archiveErr;
       }
 
       toast.success(`Card updated: ${selected.label}`);
@@ -239,7 +251,7 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
                   variant="outline"
                   className={`w-full justify-start h-11 rounded-xl font-medium transition-colors ${opt.className} ${isActive ? 'ring-2 ring-primary' : ''}`}
                   onClick={() => handleSelect(opt)}
-                  disabled={loading || product.listing_type === opt.key}
+                  disabled={loading || (product.listing_type === opt.key && hasActiveListing)}
                 >
                   <Icon className="w-4 h-4 mr-3 shrink-0" />
                   {opt.label}

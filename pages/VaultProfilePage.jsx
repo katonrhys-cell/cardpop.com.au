@@ -66,12 +66,13 @@ const VaultProfilePage = () => {
         }
 
         // Fetch user's vault cards
-        const { data: cardsData } = await supabase
+        const { data: cardsData, error: cardsErr } = await supabase
           .from('vault_items')
           .select('*')
           .eq('owner_id', currentUser.id)
           .order('created_at', { ascending: false })
           .limit(12);
+        if (cardsErr) throw cardsErr;
 
         if (!cancelled) setVaultCards(cardsData || []);
 

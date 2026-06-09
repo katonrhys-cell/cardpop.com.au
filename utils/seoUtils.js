@@ -30,7 +30,7 @@ export const generateMetaDescription = (category, itemCount = 0, priceRange = nu
 export const generateStructuredData = (product, categoryPath = null) => {
   if (!product) return null;
 
-  return {
+  const baseData = {
     "@context": "https://schema.org/",
     "@type": "Product",
     "name": product.title || product.cardName || product.name,
@@ -40,7 +40,7 @@ export const generateStructuredData = (product, categoryPath = null) => {
     "offers": {
       "@type": "Offer",
       "url": typeof window !== 'undefined' ? window.location.href : '',
-      "priceCurrency": product.currency || "USD",
+      "priceCurrency": product.currency || "AUD",
       "price": product.price || product.askingPrice || product.estimatedValue,
       "itemCondition": product.condition ? `https://schema.org/${product.condition.replace(/\s+/g, '')}Condition` : "https://schema.org/UsedCondition",
       "availability": "https://schema.org/InStock",
@@ -50,12 +50,130 @@ export const generateStructuredData = (product, categoryPath = null) => {
       }
     }
   };
+
+  // Add aggregate rating if available
+  if (product.rating || product.averageRating) {
+    baseData.aggregateRating = {
+      "@type": "AggregateRating",
+      "ratingValue": product.rating || product.averageRating,
+      "reviewCount": product.reviewCount || product.totalReviews || 1,
+      "bestRating": "5",
+      "worstRating": "1"
+    };
+  }
+
+  // Add reviews if available
+  if (product.reviews && product.reviews.length > 0) {
+    baseData.review = product.reviews.map(review => ({
+      "@type": "Review",
+      "author": {
+        "@type": "Person",
+        "name": review.author || review.username || "Anonymous"
+      },
+      "reviewRating": {
+        "@type": "Rating",
+        "ratingValue": review.rating,
+        "bestRating": "5",
+        "worstRating": "1"
+      },
+      "reviewBody": review.text || review.comment || ""
+    }));
+  }
+
+  return baseData;
+};
+
+export const generateBreadcrumbStructuredData = (breadcrumbs) => {
+  if (!breadcrumbs || breadcrumbs.length === 0) return null;
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": breadcrumbs.map((crumb, index) => ({
+      "@type": "ListItem",
+      "position": index + 1,
+      "name": crumb.name,
+      "item": crumb.url
+    }))
+  };
+};
+
+export const generateFAQStructuredData = (faqs) => {
+  if (!faqs || faqs.length === 0) return null;
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": faqs.map(faq => ({
+      "@type": "Question",
+      "name": faq.question,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": faq.answer
+      }
+    }))
+  };
+};
+
+export const generateLocalBusinessSchema = () => {
+  return {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    "name": "CardPop",
+    "description": "Australia's most trusted trading card marketplace for Pokémon, Magic: The Gathering, sports cards and more.",
+    "url": "https://cardpop.online",
+    "telephone": "+61-400-000-000",
+    "address": {
+      "@type": "PostalAddress",
+      "addressCountry": "AU",
+      "addressRegion": "Australia"
+    },
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": "-25.2744",
+      "longitude": "133.7751"
+    },
+    "openingHoursSpecification": {
+      "@type": "OpeningHoursSpecification",
+      "dayOfWeek": [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday"
+      ],
+      "opens": "00:00",
+      "closes": "23:59"
+    },
+    "priceRange": "$$"
+  };
+};
+
+export const generateBlogPostingSchema = (blogPost) => {
+  if (!blogPost) return null;
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "headline": blogPost.title,
+    "image": blogPost.image || blogPost.featuredImage,
+    "author": {
+      "@type": "Person",
+      "name": blogPost.author || "CardPop Team"
+    },
+    "datePublished": blogPost.publishedAt || blogPost.created,
+    "dateModified": blogPost.updated,
+    "description": blogPost.excerpt || blogPost.description,
+    "url": typeof window !== 'undefined' ? window.location.href : ''
+  };
 };
 
 export const generateSitemap = (listings, products) => {
   // A helper function to generate XML strings. 
   // In a real frontend app, this is often handled by a serverless function, but we can generate text.
-  const baseUrl = "https://cardpop.example.com";
+  const baseUrl = "https://cardpop.online";
   let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
   
   xml += `  <url>\n    <loc>${baseUrl}/</loc>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>\n`;

@@ -10,9 +10,11 @@ const router = express.Router();
 const PASSWORD_RESET_EXPIRY_MS = parseInt(process.env.PASSWORD_RESET_EXPIRY_MS || '900000', 10);
 
 // Anon client used only for verifying current password during /change
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
+  || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kb2dsdnN3d3lteWp1d2xvbmtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3OTQ5NTgsImV4cCI6MjA5NDM3MDk1OH0.R5fwR42iKIEsfx1iA-fjk4YPLCH3mcmoIKkosEy6g1I';
 const anonClient = createClient(
   process.env.SUPABASE_URL || 'https://odoglvswwymyjuwlonkf.supabase.co',
-  process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || ''
+  SUPABASE_ANON_KEY
 );
 
 // Validate password strength (no auth required)

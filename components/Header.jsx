@@ -439,6 +439,13 @@ const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [tradeCount, setTradeCount] = useState(0);
+
+  // Read cached session from localStorage so the skeleton matches the expected auth state,
+  // preventing a layout shift when auth resolves and replaces the wrong-sized placeholder.
+  const [optimisticAuth] = useState(() => {
+    try { return !!localStorage.getItem('sb-odoglvswwymyjuwlonkf-auth-token'); }
+    catch { return false; }
+  });
   const { isDark, toggle: toggleDarkMode } = useDarkMode();
 
   useEffect(() => {
@@ -624,7 +631,16 @@ const Header = () => {
 
             <div className="hidden md:flex items-center gap-2 shrink-0">
               {authLoading ? (
-                <div className="h-9 w-28 rounded-xl bg-muted animate-pulse" aria-hidden="true" />
+                optimisticAuth ? (
+                  // Matches the VaultDropdown's h-10 w-10 circular avatar button
+                  <div className="h-10 w-10 rounded-full bg-muted animate-pulse" aria-hidden="true" />
+                ) : (
+                  // Matches Login (xl only) + Join Vault button exact widths
+                  <div className="flex items-center gap-2" aria-hidden="true">
+                    <div className="h-9 w-[57px] rounded-xl bg-muted animate-pulse hidden xl:block" />
+                    <div className="h-9 w-[84px] rounded-xl bg-muted animate-pulse" />
+                  </div>
+                )
               ) : isAuthenticated ? (
                 <VaultDropdown isMobile={false} />
               ) : (
@@ -652,9 +668,11 @@ const Header = () => {
               <SheetContent side="right" className="w-[85vw] sm:w-[350px] p-0 flex flex-col border-l border-border bg-background">
                 <SheetHeader className="p-6 border-b border-border text-left bg-muted/30 shrink-0">
                   <SheetTitle asChild>
-                    <span className="text-2xl">
-                      <CardPopLogo variant="full" iconClassName="w-7 h-[34px]" />
-                    </span>
+                    <SheetClose asChild>
+                      <Link to="/" className="text-2xl inline-block" onClick={() => setMobileMenuOpen(false)}>
+                        <CardPopLogo variant="full" iconClassName="w-7 h-[34px]" />
+                      </Link>
+                    </SheetClose>
                   </SheetTitle>
                 </SheetHeader>
 

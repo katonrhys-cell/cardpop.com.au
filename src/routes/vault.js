@@ -138,9 +138,7 @@ router.patch('/:id/base-value', authMiddleware, async (req, res) => {
   const { id } = req.params;
   const { newValue, reason } = req.body;
 
-  const isAdmin = req.user.app_metadata?.is_admin
-    || req.user.user_metadata?.is_admin
-    || false;
+  const isAdmin = req.user.app_metadata?.is_admin === true;
 
   if (!isAdmin) {
     return res.status(403).json({ error: 'Only administrators can adjust locked base values.' });
