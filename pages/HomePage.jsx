@@ -18,7 +18,7 @@ const useCountUp = (end, inView, isDecimal = false) => {
   useEffect(() => {
     if (!inView) return;
     let frame = 0;
-    const totalFrames = 90;
+    const totalFrames = 45;
     const timer = setInterval(() => {
       frame++;
       const progress = frame / totalFrames;
