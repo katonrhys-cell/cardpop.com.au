@@ -11,8 +11,14 @@ import { useCart } from '@/hooks/useCart.jsx';
 import { initializeCheckout, formatCurrency } from '@/api/EcommerceApi.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabaseClient.js';
 
-const ShoppingCart = () => {
+const resolveImg = (path) => {
+  if (!path || typeof path !== 'string') return null;
+  if (path.startsWith('http')) return path;
+  return supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
+};
+
   const { cartItems, isCartOpen, setIsCartOpen, removeFromCart, updateQuantity, getCartTotal } = useCart();
   const { currentUser } = useAuth();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
@@ -101,28 +107,46 @@ const ShoppingCart = () => {
                   const itemId = item.variant?.id || item.product.id;
                   const priceInCents = item.variant?.sale_price_in_cents || item.variant?.price_in_cents || (item.product.price ? item.product.price * 100 : 0);
                   const formattedPrice = formatCurrency(priceInCents, item.variant?.currency_info) || `$${(priceInCents / 100).toFixed(2)}`;
-                  const imageUrl = item.variant?.image_url || item.product.image || item.product.images?.[0]?.url || 'https://images.unsplash.com/photo-1613771404784-3a5686aa2be3?auto=format&fit=crop&w=200&q=80';
+                  const rawImg = item.variant?.image_url || item.product.image || item.product.images?.[0] || null;
+                  const imageUrl = resolveImg(rawImg);
+
+                  // Build structured card label: year · name · set · grade
+                  const p = item.product;
+                  const year = p.year || p.card_year || null;
+                  const set = p.set || p.card_set || p.era || p.collection || null;
+                  const gradingCompany = p.grading_company || p.gradingCompany || null;
+                  const grade = p.grade || null;
+                  const gradeLabel = gradingCompany && grade && gradingCompany !== 'raw'
+                    ? `${gradingCompany.toUpperCase()} ${grade}`
+                    : (grade ? `Grade ${grade}` : null);
 
                   return (
                     <div key={itemId} className="flex gap-4 group">
                       <div className="w-20 h-24 rounded-xl overflow-hidden bg-muted border border-border shrink-0">
-                        <img 
-                          src={imageUrl} 
-                          alt={item.product.title} 
-                          className="w-full h-full object-cover"
-                        />
+                        {imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            alt={p.title || p.name || 'Card'}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs font-medium">
+                            No Image
+                          </div>
+                        )}
                       </div>
-                      
+
                       <div className="flex-1 flex flex-col justify-between py-1">
                         <div className="flex justify-between items-start gap-2">
                           <div>
+                            {year && <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">{year}</p>}
                             <h4 className="font-bold text-foreground line-clamp-2 leading-tight">
-                              {item.product.title}
+                              {p.title || p.name}
                             </h4>
-                            {item.variant?.title && item.variant.title !== 'Default Title' && (
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {item.variant.title}
-                              </p>
+                            {set && <p className="text-xs text-muted-foreground mt-0.5">{set}</p>}
+                            {gradeLabel && <p className="text-xs font-semibold text-primary mt-0.5">{gradeLabel}</p>}
+                            {!year && !set && !gradeLabel && item.variant?.title && item.variant.title !== 'Default Title' && (
+                              <p className="text-sm text-muted-foreground mt-1">{item.variant.title}</p>
                             )}
                           </div>
                           <Button 
