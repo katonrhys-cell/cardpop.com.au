@@ -281,7 +281,7 @@ const HomePage = () => {
                 <img
                   src={card.image}
                   alt={`${card.name} ${card.rarity}`}
-                  className="absolute inset-0 w-full h-full object-cover"
+                  className="absolute inset-0 w-full h-full object-contain p-1"
                   draggable={false}
                 />
               )}
