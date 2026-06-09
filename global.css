@@ -1,3 +1,24 @@
+/* ── Hero card show animations ──────────────────────────────────────────── */
+@keyframes holo {
+  0%, 100% { background-position: 0% 0%; opacity: 0.55; }
+  50%       { background-position: 100% 100%; opacity: 0.8; }
+}
+
+@keyframes spotlight-drift {
+  0%, 100% { transform: rotate(-10deg) translateX(0); }
+  50%       { transform: rotate(-10deg) translateX(24px); }
+}
+
+@keyframes spotlight-drift-r {
+  0%, 100% { transform: rotate(9deg) translateX(0); }
+  50%       { transform: rotate(9deg) translateX(-20px); }
+}
+
+@keyframes price-ticker {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
 /* CardPop Australia — brand body font: Helvetica Neue */
 body {
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;

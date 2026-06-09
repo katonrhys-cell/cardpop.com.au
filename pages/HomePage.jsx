@@ -199,112 +199,243 @@ const HomePage = () => {
       />
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section className="relative min-h-[92dvh] flex items-center justify-center pt-20 pb-32 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        {/* Noise texture */}
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-soft-light bg-[url('data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZmlsdGVyIGlkPSJhIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC42NSIgbnVtT2N0YXZlcz0iMyIgc3RpdGNoVGlsZXM9InN0aXRjaCIvPjwvZmlsdGVyPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbHRlcj0idXJsKCNhKSIvPjwvc3ZnPg==')]" />
+      <section className="relative min-h-[92dvh] flex items-center justify-center pt-20 pb-16 px-4 sm:px-6 lg:px-8 overflow-hidden bg-zinc-950">
 
-        {/* Gradient orbs */}
-        <div className="absolute top-1/3 -left-32 w-[32rem] h-[32rem] bg-primary/15 rounded-full blur-3xl -z-10 animate-pulse" />
-        <div className="absolute bottom-1/4 -right-32 w-[28rem] h-[28rem] bg-blue-500/10 rounded-full blur-3xl -z-10" />
+        {/* Stage floor gradient */}
+        <div className="absolute inset-0 bg-gradient-to-b from-zinc-950 via-[#0f0f14] to-zinc-950 pointer-events-none" />
 
-        {/* Floating card stack — desktop only */}
-        <div className="absolute right-[2%] xl:right-[5%] top-1/2 -translate-y-1/2 hidden lg:block w-[520px] h-[420px] pointer-events-none select-none">
+        {/* Subtle grid lines — convention-hall floor feel */}
+        <div
+          className="absolute inset-0 pointer-events-none opacity-[0.025]"
+          style={{
+            backgroundImage: 'linear-gradient(rgba(255,255,255,.15) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.15) 1px, transparent 1px)',
+            backgroundSize: '48px 48px',
+          }}
+        />
+
+        {/* Spotlight beam — left */}
+        <div
+          className="absolute top-0 left-[18%] w-72 h-full pointer-events-none origin-top"
+          style={{
+            background: 'linear-gradient(180deg, rgba(255,220,100,0.12) 0%, transparent 68%)',
+            filter: 'blur(32px)',
+            animation: 'spotlight-drift 8s ease-in-out infinite',
+          }}
+        />
+        {/* Spotlight beam — centre */}
+        <div
+          className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-full pointer-events-none origin-top"
+          style={{
+            background: 'linear-gradient(180deg, rgba(255,255,255,0.06) 0%, transparent 60%)',
+            filter: 'blur(48px)',
+          }}
+        />
+        {/* Spotlight beam — right */}
+        <div
+          className="absolute top-0 right-[15%] w-64 h-full pointer-events-none origin-top"
+          style={{
+            background: 'linear-gradient(180deg, rgba(180,100,255,0.10) 0%, transparent 65%)',
+            filter: 'blur(28px)',
+            animation: 'spotlight-drift-r 10s ease-in-out infinite',
+          }}
+        />
+
+        {/* Atmospheric glows */}
+        <div className="absolute top-1/3 right-[28%] w-[36rem] h-[36rem] bg-primary/8 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-[10%] w-[28rem] h-[28rem] bg-blue-600/8 rounded-full blur-3xl pointer-events-none" />
+
+        {/* ── Floating card stack — desktop only ── */}
+        <div className="absolute right-[1%] xl:right-[4%] top-1/2 -translate-y-1/2 hidden lg:block w-[540px] h-[460px] pointer-events-none select-none">
           {HERO_CARDS.map((card, i) => (
             <motion.div
               key={i}
-              className={`absolute w-44 h-60 rounded-2xl bg-gradient-to-br ${card.gradient} shadow-2xl border ${card.borderColor} overflow-hidden`}
-              style={{ left: '50%', top: '50%', marginLeft: -88, marginTop: -120 }}
-              initial={{ opacity: 0, scale: 0.85, rotate: card.rotate, x: card.x, y: card.y + 40 }}
+              className={`absolute w-44 h-60 rounded-2xl bg-gradient-to-br ${card.gradient} border ${card.borderColor} overflow-hidden`}
+              style={{
+                left: '50%', top: '50%',
+                marginLeft: -88, marginTop: -120,
+                boxShadow: `0 32px 64px -12px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.06), 0 0 48px -8px rgba(200,160,60,0.${15 + i * 3})`,
+              }}
+              initial={{ opacity: 0, scale: 0.8, rotate: card.rotate, x: card.x, y: card.y + 60, rotateY: -25 }}
               animate={{
                 opacity: 1,
                 scale: 1,
                 rotate: card.rotate,
+                rotateY: 0,
                 x: card.x,
                 y: [card.y, card.y + card.floatY, card.y],
               }}
               transition={{
-                opacity: { duration: 0.5, delay: card.delay },
-                scale:   { duration: 0.5, delay: card.delay },
+                opacity:  { duration: 0.6, delay: card.delay },
+                scale:    { duration: 0.6, delay: card.delay },
+                rotateY:  { duration: 0.8, delay: card.delay, ease: 'easeOut' },
                 y: {
                   duration: 3.5 + i * 0.4,
                   repeat: Infinity,
                   ease: 'easeInOut',
-                  delay: card.delay + 0.5,
+                  delay: card.delay + 0.6,
                 },
               }}
             >
-              {/* Shine overlay */}
-              <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-black/20 pointer-events-none z-10" />
-
-              {card.image ? (
-                /* Real PSA slab photo */
+              {/* Card image */}
+              {card.image && (
                 <img
                   src={card.image}
                   alt={`${card.name} ${card.rarity}`}
                   className="absolute inset-0 w-full h-full object-cover"
                   draggable={false}
                 />
-              ) : (
-                <>
-                  {/* Card name bar */}
-                  <div className={`absolute top-0 left-0 right-0 bg-gradient-to-r ${card.accent} px-2 py-1 flex items-center justify-between`}>
-                    <span className="text-[8px] font-black text-white truncate leading-tight">{card.name}</span>
-                    <span className={`text-[10px] font-bold ${card.symbolColor}`}>{card.symbol}</span>
-                  </div>
-                  {/* Art box */}
-                  <div className={`absolute top-6 left-2 right-2 h-24 rounded-lg ${card.artColor} flex items-center justify-center shadow-inner`}>
-                    <span className="text-4xl drop-shadow-lg">{card.artEmoji}</span>
-                  </div>
-                  {/* Card info */}
-                  <div className="absolute bottom-0 left-0 right-0 px-2 pb-2 pt-1">
-                    <div className="text-[7px] font-bold text-white/60 uppercase tracking-wider mb-0.5">{card.rarity}</div>
-                    <div className="text-[7px] text-white/50 leading-tight">{card.set}</div>
-                    <div className="text-[7px] text-white/40 leading-tight mb-1">{card.year}</div>
-                    <div className={`text-[9px] font-black bg-gradient-to-r ${card.accent} bg-clip-text text-transparent`}>{card.value}</div>
-                  </div>
-                </>
               )}
+
+              {/* Holographic shimmer overlay */}
+              <div
+                className="absolute inset-0 z-20 pointer-events-none mix-blend-screen"
+                style={{
+                  background: 'linear-gradient(125deg, transparent 15%, rgba(255,80,180,0.45) 30%, rgba(80,220,255,0.45) 50%, rgba(255,240,80,0.35) 70%, transparent 85%)',
+                  backgroundSize: '300% 300%',
+                  animation: `holo ${3.2 + i * 0.5}s ease-in-out infinite`,
+                }}
+              />
+
+              {/* Edge gloss */}
+              <div className="absolute inset-0 bg-gradient-to-br from-white/25 via-transparent to-black/40 pointer-events-none z-30" />
+
+              {/* Price badge — bottom of card */}
+              <div className="absolute bottom-0 left-0 right-0 z-40 px-2 pb-2 pt-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+                <div className="text-[7px] font-bold text-white/50 uppercase tracking-widest mb-0.5">{card.rarity}</div>
+                <div className="text-[8px] font-black text-yellow-300 drop-shadow">{card.value}</div>
+              </div>
             </motion.div>
           ))}
+
+          {/* Reflection / stage glow beneath the cards */}
+          <div
+            className="absolute bottom-0 left-1/2 -translate-x-1/2 w-80 h-24 pointer-events-none"
+            style={{ background: 'radial-gradient(ellipse at center, rgba(200,150,50,0.18) 0%, transparent 75%)' }}
+          />
         </div>
 
-        {/* Hero text — offset left on desktop to make room for cards */}
-        <div className="max-w-5xl mx-auto w-full relative z-10 lg:pr-[440px] xl:pr-[460px]">
+        {/* ── Hero text ── */}
+        <div className="max-w-5xl mx-auto w-full relative z-10 lg:pr-[460px] xl:pr-[480px]">
           <motion.div
-            initial={{ opacity: 0, scale: 0.97 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: 'easeOut' }}
             className="text-center lg:text-left"
           >
-            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-muted text-muted-foreground text-sm font-bold tracking-wide mb-8 border border-border shadow-sm">
-              <Zap className="w-4 h-4 text-primary" />
-              Australia's Trading Card Marketplace
-            </span>
+            {/* LIVE show badge */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.15, duration: 0.5 }}
+              className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-8 border text-sm font-black tracking-wider uppercase"
+              style={{
+                background: 'rgba(220,38,38,0.12)',
+                borderColor: 'rgba(220,38,38,0.35)',
+                color: '#f87171',
+                boxShadow: '0 0 24px rgba(220,38,38,0.2)',
+              }}
+            >
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+              CardPop Live
+              <span className="text-white/30 font-normal">·</span>
+              <span className="text-white/60 font-semibold normal-case tracking-normal">Australia's Card Show</span>
+            </motion.div>
 
-            <h1 className="text-5xl md:text-7xl lg:text-7xl font-extrabold font-serif tracking-tight text-balance mb-8 leading-[1.08]">
-              Buy, Sell &amp; Trade Cards{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-primary/70">
-                Across Australia
+            <h1 className="text-5xl md:text-6xl lg:text-[4.25rem] font-extrabold font-serif tracking-tight text-balance mb-6 leading-[1.06] text-white">
+              The Card Show{' '}
+              <br className="hidden sm:block" />
+              <span
+                className="text-transparent bg-clip-text"
+                style={{ backgroundImage: 'linear-gradient(90deg, #fbbf24 0%, #f87171 45%, #a78bfa 100%)' }}
+              >
+                That Never Closes
               </span>
             </h1>
 
-            <p className="text-lg md:text-xl text-muted-foreground max-w-xl mb-12 leading-relaxed text-balance mx-auto lg:mx-0">
-              The safest place to buy, sell and trade Pokémon, Magic, sports cards and more — with Australian sellers, AUD pricing, and real-time market data.
+            <p className="text-base md:text-lg text-zinc-400 max-w-lg mb-10 leading-relaxed text-balance mx-auto lg:mx-0">
+              Pokémon&nbsp;·&nbsp;MTG&nbsp;·&nbsp;Sports&nbsp;·&nbsp;More — buy, sell and trade with verified Australian collectors. Real prices, AUD only, escrow on every deal.
             </p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
-              <Button asChild size="lg" className="w-full sm:w-auto h-14 px-8 rounded-2xl font-bold text-lg shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5">
+            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-10">
+              <Button
+                asChild
+                size="lg"
+                className="w-full sm:w-auto h-14 px-8 rounded-2xl font-black text-lg transition-all hover:-translate-y-0.5"
+                style={{
+                  background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+                  boxShadow: '0 8px 32px rgba(220,38,38,0.4)',
+                  color: '#fff',
+                  border: 'none',
+                }}
+              >
                 <Link to="/marketplace">
-                  Explore Marketplace <ArrowRight className="ml-2 w-5 h-5" />
+                  Browse the Show <ArrowRight className="ml-2 w-5 h-5" />
                 </Link>
               </Button>
-              <Button asChild variant="outline" size="lg" className="w-full sm:w-auto h-14 px-8 rounded-2xl font-bold text-lg border-2 hover:bg-muted transition-all">
+              <Button
+                asChild
+                variant="outline"
+                size="lg"
+                className="w-full sm:w-auto h-14 px-8 rounded-2xl font-bold text-lg transition-all hover:-translate-y-0.5"
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1.5px solid rgba(255,255,255,0.15)',
+                  color: '#e4e4e7',
+                }}
+              >
                 <Link to="/signup">
-                  Create Free Vault
+                  Open Your Vault
                 </Link>
               </Button>
             </div>
+
+            {/* Trust chips */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5, duration: 0.6 }}
+              className="flex flex-wrap items-center justify-center lg:justify-start gap-3"
+            >
+              {[
+                { icon: <ShieldCheck className="w-3.5 h-3.5" />, label: 'Escrow Protected' },
+                { icon: <Zap className="w-3.5 h-3.5" />, label: 'AUD Pricing' },
+                { icon: <TrendingUp className="w-3.5 h-3.5" />, label: 'Live Market Data' },
+              ].map(({ icon, label }) => (
+                <span
+                  key={label}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: '#a1a1aa' }}
+                >
+                  {icon}{label}
+                </span>
+              ))}
+            </motion.div>
           </motion.div>
+        </div>
+
+        {/* ── Live price ticker strip at hero bottom ── */}
+        <div className="absolute bottom-0 left-0 right-0 overflow-hidden border-t" style={{ borderColor: 'rgba(255,255,255,0.07)', background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(12px)' }}>
+          <div className="py-2.5 relative">
+            {/* Fade edges */}
+            <div className="absolute left-0 top-0 bottom-0 w-16 z-10 pointer-events-none" style={{ background: 'linear-gradient(90deg, rgba(0,0,0,0.8), transparent)' }} />
+            <div className="absolute right-0 top-0 bottom-0 w-16 z-10 pointer-events-none" style={{ background: 'linear-gradient(-90deg, rgba(0,0,0,0.8), transparent)' }} />
+
+            <div
+              className="flex gap-8 w-max"
+              style={{ animation: 'price-ticker 35s linear infinite' }}
+            >
+              {[...ACTIVITY_FEED, ...ACTIVITY_FEED].map((item, i) => (
+                <div key={i} className="flex-shrink-0 flex items-center gap-2 text-xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+                  <span className="font-bold text-zinc-200">{item.user}</span>
+                  <span className="text-zinc-500">{item.action}</span>
+                  <span className="font-black text-yellow-400">{item.price}</span>
+                  <span className="text-zinc-600">{item.time}</span>
+                  <span className="text-zinc-700 mx-2">·</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
