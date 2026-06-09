@@ -40,22 +40,23 @@ const PublicSellerProfilePage = () => {
           throw new Error('This profile is private.');
         }
 
-        // Fetch Vault listings (public ones)
-        const { data: vaultData } = await supabase
-          .from('vault_items')
-          .select('*')
-          .eq('owner_id', userId)
-          .eq('is_public', true)
-          .neq('listing_type', 'Private')
+        // Fetch Marketplace listings (with full vault_item and seller data)
+        const { data: marketplaceData } = await supabase
+          .from('listings')
+          .select('*, vault_item:vault_items(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
+          .eq('seller_id', userId)
+          .eq('status', 'active')
           .order('created_at', { ascending: false })
           .limit(20);
 
-        // Fetch Marketplace listings
-        const { data: marketplaceData } = await supabase
-          .from('listings')
-          .select('*')
-          .eq('seller_id', userId)
-          .eq('status', 'active')
+        // Fetch Vault listings that don't already have an active marketplace listing
+        const listedVaultIds = new Set((marketplaceData || []).map(l => l.vault_item_id).filter(Boolean));
+        const { data: vaultData } = await supabase
+          .from('vault_items')
+          .select('*, vault_images(*), owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
+          .eq('owner_id', userId)
+          .eq('is_public', true)
+          .neq('listing_type', 'Private')
           .order('created_at', { ascending: false })
           .limit(20);
 
@@ -69,9 +70,10 @@ const PublicSellerProfilePage = () => {
 
         setSeller(userData);
 
-        // Combine listings
+        // Combine listings — vault items that already have an active marketplace listing
+        // are excluded to prevent the same card appearing twice
         const combined = [
-          ...(vaultData || []).map(item => ({ ...item, _type: 'vault' })),
+          ...(vaultData || []).filter(item => !listedVaultIds.has(item.id)).map(item => ({ ...item, _type: 'vault' })),
           ...(marketplaceData || []).map(item => ({ ...item, _type: 'marketplace' }))
         ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
