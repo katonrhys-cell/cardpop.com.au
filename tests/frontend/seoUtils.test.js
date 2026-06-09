@@ -173,9 +173,9 @@ describe('generateStructuredData', () => {
     expect(data.offers.itemCondition).toBe('https://schema.org/UsedCondition');
   });
 
-  it('defaults currency to USD', () => {
+  it('defaults currency to AUD', () => {
     const data = generateStructuredData({ title: 'Card', price: 10, condition: 'Good' });
-    expect(data.offers.priceCurrency).toBe('USD');
+    expect(data.offers.priceCurrency).toBe('AUD');
   });
 
   it('uses product currency when provided', () => {
@@ -215,7 +215,7 @@ describe('generateSitemap', () => {
 
   it('includes the homepage URL', () => {
     const xml = generateSitemap([], []);
-    expect(xml).toContain('<loc>https://cardpop.example.com/</loc>');
+    expect(xml).toContain('<loc>https://cardpop.online/</loc>');
   });
 
   it('includes static routes for /vault and /shop', () => {

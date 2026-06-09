@@ -76,9 +76,9 @@ describe('POST /stream', () => {
     expect(res.body.error).toMatch(/message is required/i);
   });
 
-  it('returns 500 when message is not valid JSON', async () => {
+  it('returns 400 when message is not valid JSON', async () => {
     const res = await request(app).post('/stream').send({ message: 'not-valid-json' });
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(400);
   });
 
   it('calls stream with the parsed message and system prompt', async () => {

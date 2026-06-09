@@ -9,6 +9,7 @@ const mockSupabase = vi.hoisted(() => ({
   auth: {
     admin: {
       generateLink: vi.fn().mockResolvedValue({ error: null }),
+      getUserByEmail: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
       listUsers: vi.fn().mockResolvedValue({ data: { users: [] } }),
       updateUserById: vi.fn().mockResolvedValue({ error: null }),
     },
