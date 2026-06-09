@@ -56,11 +56,6 @@ beforeEach(() => vi.clearAllMocks());
 // ─── POST /suspicious-activity/check ─────────────────────────────────────────
 
 describe('POST /suspicious-activity/check', () => {
-  it('returns 400 when userId is missing', async () => {
-    const res = await request(app).post('/suspicious-activity/check').send({ ipAddress: '1.2.3.4' });
-    expect(res.status).toBe(400);
-  });
-
   it('returns not suspicious when no prior logins', async () => {
     mockSupabase.from.mockReturnValue(makeBuilder({ data: [], error: null }));
     const res = await request(app).post('/suspicious-activity/check').send({

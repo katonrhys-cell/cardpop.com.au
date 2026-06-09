@@ -81,7 +81,7 @@ const CommunityPage = () => {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <Tabs defaultValue="forum">
-          <TabsList className="w-full mb-8 h-12">
+          <TabsList className="w-full mb-8 h-12 overflow-x-auto flex-nowrap">
             <TabsTrigger value="forum" className="flex-1 gap-2">
               <MessageSquare className="w-4 h-4" /> Forum
             </TabsTrigger>

@@ -151,9 +151,9 @@ const ProductDetailPage = () => {
         } else if (data.owner_id) {
           try {
             const { data: user } = await supabase.from('profiles').select('*').eq('id', data.owner_id).single();
-            setSeller({ business_name: user?.display_name || user?.username || user?.full_name || 'Community Member', is_verified: user?.is_verified || false, type: 'user' });
+            if (isMounted) setSeller({ business_name: user?.display_name || user?.username || user?.full_name || 'Community Member', is_verified: user?.is_verified || false, type: 'user' });
           } catch (e) {
-            setSeller({ business_name: 'Community Member', is_verified: false, type: 'user' });
+            if (isMounted) setSeller({ business_name: 'Community Member', is_verified: false, type: 'user' });
           }
         }
       } catch (err) {
@@ -174,7 +174,11 @@ const ProductDetailPage = () => {
       id: product.id,
       title: product.name,
       price: priceInCents / 100,
-      image: product.images?.[0] || null
+      image: product.images?.[0] || null,
+      year: product.year || product.card_year || null,
+      set: product.set || product.card_set || product.era || product.collection || null,
+      grading_company: product.grading_company || product.gradingCompany || null,
+      grade: product.grade || null,
     };
     const cartVariant = {
       id: product.id,

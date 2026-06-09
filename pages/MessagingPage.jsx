@@ -57,7 +57,7 @@ const MessagingPage = () => {
             });
             scrollToBottom();
             if (record.recipient_id === currentUser.id) {
-              supabase.from('messages').update({ is_read: true }).eq('id', record.id).catch(console.error);
+              supabase.from('messages').update({ is_read: true }).eq('id', record.id).eq('recipient_id', currentUser.id).catch(console.error);
             }
           }
         }
@@ -148,7 +148,7 @@ const MessagingPage = () => {
       // Mark unread as read
       const unreadIds = (msgs || []).filter(m => m.recipient_id === currentUser.id && !m.is_read).map(m => m.id);
       if (unreadIds.length > 0) {
-        await supabase.from('messages').update({ is_read: true }).in('id', unreadIds);
+        await supabase.from('messages').update({ is_read: true }).in('id', unreadIds).eq('recipient_id', currentUser.id);
         fetchConversations();
       }
 

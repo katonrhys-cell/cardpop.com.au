@@ -5,7 +5,14 @@ import { useCart } from '@/hooks/useCart.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
 import pb from '@/lib/pocketbaseClient.js';
+import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
+
+const resolveImg = (path) => {
+  if (!path || typeof path !== 'string') return null;
+  if (path.startsWith('http')) return path;
+  return supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
+};
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -75,15 +82,28 @@ const CheckoutPage = () => {
   const checkoutItems = directItem ? [directItem] : cartItems;
 
   // Flatten cart items into a display-friendly shape for child components
-  const flatItems = checkoutItems.map(item => ({
-    id: item.product?.id,
-    name: item.product?.title || item.product?.name || 'Card',
-    price: item.variant?.sale_price_in_cents
-      ? item.variant.sale_price_in_cents / 100
-      : item.product?.price || 0,
-    quantity: item.quantity ?? 1,
-    image: item.product?.image || item.product?.thumbnail || null,
-  }));
+  const flatItems = checkoutItems.map(item => {
+    const p = item.product || {};
+    const rawImg = item.variant?.image_url || p.image || p.images?.[0] || p.thumbnail || null;
+    const gradingCompany = p.grading_company || p.gradingCompany || null;
+    const grade = p.grade || null;
+    const gradeLabel = gradingCompany && grade && gradingCompany !== 'raw'
+      ? `${gradingCompany.toUpperCase()} ${grade}`
+      : (grade ? `Grade ${grade}` : null);
+    const year = p.year || p.card_year || null;
+    const set = p.set || p.card_set || p.era || p.collection || null;
+
+    const nameParts = [year, p.title || p.name || 'Card', set, gradeLabel].filter(Boolean);
+    return {
+      id: p.id,
+      name: nameParts.join(' · '),
+      price: item.variant?.sale_price_in_cents
+        ? item.variant.sale_price_in_cents / 100
+        : p.price || 0,
+      quantity: item.quantity ?? 1,
+      image: resolveImg(rawImg),
+    };
+  });
 
   const subtotal = flatItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
   const tax = subtotal * 0.10;

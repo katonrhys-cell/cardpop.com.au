@@ -33,7 +33,7 @@ const app = makeApp();
 
 const ITEM = {
   id: 'item-1', title: 'Charizard', description: 'Rare card', asking_price: 100,
-  user_id: 'user-1', is_public: false, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-02T00:00:00Z',
+  user_id: 'user-1', owner_id: 'user-1', is_public: false, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-02T00:00:00Z',
   profiles: { username: 'trainer1', business_name: null },
 };
 

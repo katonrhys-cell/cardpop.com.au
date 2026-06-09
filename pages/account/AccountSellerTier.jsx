@@ -84,7 +84,8 @@ const AccountSellerTier = () => {
       .select('seller_tier, total_sales, rating, reviews_count, is_verified, verification_status')
       .eq('id', currentUser.id)
       .single()
-      .then(({ data }) => { if (!cancelled) { setProfile(data); setLoading(false); } });
+      .then(({ data }) => { if (!cancelled) { setProfile(data); setLoading(false); } })
+      .catch(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [currentUser?.id]);
 

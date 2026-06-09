@@ -11,6 +11,13 @@ import { useCart } from '@/hooks/useCart.jsx';
 import { initializeCheckout, formatCurrency } from '@/api/EcommerceApi.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
+import { supabase } from '@/lib/supabaseClient.js';
+
+const resolveImg = (path) => {
+  if (!path || typeof path !== 'string') return null;
+  if (path.startsWith('http')) return path;
+  return supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
+};
 
 const ShoppingCart = () => {
   const { cartItems, isCartOpen, setIsCartOpen, removeFromCart, updateQuantity, getCartTotal } = useCart();
@@ -20,7 +27,7 @@ const ShoppingCart = () => {
 
   const handleCheckout = async () => {
     if (cartItems.length === 0) return;
-    
+
     setIsCheckingOut(true);
     try {
       const items = cartItems.map(item => ({
@@ -71,7 +78,7 @@ const ShoppingCart = () => {
         </SheetHeader>
 
         {cartItems.length === 0 ? (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="flex-1 flex flex-col items-center justify-center p-6 text-center"
@@ -83,7 +90,7 @@ const ShoppingCart = () => {
             <p className="text-muted-foreground mb-8 max-w-[250px] leading-relaxed">
               Looks like you haven't added any items to your cart yet. Discover your next great find in our shop.
             </p>
-            <Button 
+            <Button
               onClick={() => {
                 setIsCartOpen(false);
                 navigate('/shop');
@@ -101,45 +108,62 @@ const ShoppingCart = () => {
                   const itemId = item.variant?.id || item.product.id;
                   const priceInCents = item.variant?.sale_price_in_cents || item.variant?.price_in_cents || (item.product.price ? item.product.price * 100 : 0);
                   const formattedPrice = formatCurrency(priceInCents, item.variant?.currency_info) || `$${(priceInCents / 100).toFixed(2)}`;
-                  const imageUrl = item.variant?.image_url || item.product.image || item.product.images?.[0]?.url || 'https://images.unsplash.com/photo-1613771404784-3a5686aa2be3?auto=format&fit=crop&w=200&q=80';
+                  const rawImg = item.variant?.image_url || item.product.image || item.product.images?.[0] || null;
+                  const imageUrl = resolveImg(rawImg);
+
+                  const p = item.product;
+                  const year = p.year || p.card_year || null;
+                  const set = p.set || p.card_set || p.era || p.collection || null;
+                  const gradingCompany = p.grading_company || p.gradingCompany || null;
+                  const grade = p.grade || null;
+                  const gradeLabel = gradingCompany && grade && gradingCompany !== 'raw'
+                    ? `${gradingCompany.toUpperCase()} ${grade}`
+                    : (grade ? `Grade ${grade}` : null);
 
                   return (
                     <div key={itemId} className="flex gap-4 group">
                       <div className="w-20 h-24 rounded-xl overflow-hidden bg-muted border border-border shrink-0">
-                        <img 
-                          src={imageUrl} 
-                          alt={item.product.title} 
-                          className="w-full h-full object-cover"
-                        />
+                        {imageUrl ? (
+                          <img
+                            src={imageUrl}
+                            alt={p.title || p.name || 'Card'}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs font-medium">
+                            No Image
+                          </div>
+                        )}
                       </div>
-                      
+
                       <div className="flex-1 flex flex-col justify-between py-1">
                         <div className="flex justify-between items-start gap-2">
                           <div>
+                            {year && <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">{year}</p>}
                             <h4 className="font-bold text-foreground line-clamp-2 leading-tight">
-                              {item.product.title}
+                              {p.title || p.name}
                             </h4>
-                            {item.variant?.title && item.variant.title !== 'Default Title' && (
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {item.variant.title}
-                              </p>
+                            {set && <p className="text-xs text-muted-foreground mt-0.5">{set}</p>}
+                            {gradeLabel && <p className="text-xs font-semibold text-primary mt-0.5">{gradeLabel}</p>}
+                            {!year && !set && !gradeLabel && item.variant?.title && item.variant.title !== 'Default Title' && (
+                              <p className="text-sm text-muted-foreground mt-1">{item.variant.title}</p>
                             )}
                           </div>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 -mt-1 -mr-2 shrink-0"
                             onClick={() => removeFromCart(itemId)}
                           >
                             <X className="w-4 h-4" />
                           </Button>
                         </div>
-                        
+
                         <div className="flex items-center justify-between mt-4">
                           <div className="flex items-center border border-border rounded-lg bg-background">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               className="h-8 w-8 rounded-none rounded-l-lg"
                               onClick={() => updateQuantity(itemId, item.quantity - 1)}
                             >
@@ -148,9 +172,9 @@ const ShoppingCart = () => {
                             <span className="w-8 text-center text-sm font-bold tabular-nums">
                               {item.quantity}
                             </span>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               className="h-8 w-8 rounded-none rounded-r-lg"
                               onClick={() => updateQuantity(itemId, item.quantity + 1)}
                             >
@@ -184,9 +208,9 @@ const ShoppingCart = () => {
                   <span className="font-bold text-2xl text-foreground tabular-nums">{getCartTotal()}</span>
                 </div>
               </div>
-              
-              <Button 
-                className="w-full h-14 rounded-xl font-bold text-lg shadow-lg shadow-primary/20 transition-all active:scale-[0.98]" 
+
+              <Button
+                className="w-full h-14 rounded-xl font-bold text-lg shadow-lg shadow-primary/20 transition-all active:scale-[0.98]"
                 onClick={handleCheckout}
                 disabled={isCheckingOut || cartItems.length === 0}
               >

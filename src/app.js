@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
+import * as Sentry from '@sentry/node';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -9,10 +10,15 @@ import routes from './routes/index.js';
 import { errorMiddleware } from './middleware/error.js';
 import { globalRateLimit } from './middleware/global-rate-limit.js';
 import { sessionTimeoutMiddleware } from './middleware/sessionTimeout.js';
-import { csrfMiddleware } from './middleware/csrf.js';
 import { secureHeadersMiddleware } from './middleware/secureHeaders.js';
 import logger from './utils/logger.js';
 import { BodyLimit } from './constants/common.js';
+
+Sentry.init({
+	dsn: process.env.SENTRY_DSN || 'https://6477807dc7f2422d3cf0eacd260645b3@o4511534905884672.ingest.us.sentry.io/4511534929543168',
+	tracesSampleRate: 0.2,
+	environment: process.env.NODE_ENV || 'production',
+});
 
 const app = express();
 
@@ -74,7 +80,6 @@ app.use((err, req, res, next) => {
 	next();
 });
 
-app.use(csrfMiddleware);
 app.use(sessionTimeoutMiddleware);
 
 // Mount at / for local dev, /hcgi/api for Hostinger, and /api for Vercel.
@@ -91,6 +96,7 @@ Canonical: https://cardpop.online/.well-known/security.txt
 `);
 });
 
+Sentry.setupExpressErrorHandler(app);
 app.use(errorMiddleware);
 
 app.use((req, res) => {

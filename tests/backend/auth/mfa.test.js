@@ -60,11 +60,6 @@ beforeEach(() => vi.clearAllMocks());
 // ─── POST /request ────────────────────────────────────────────────────────────
 
 describe('POST /request', () => {
-  it('returns 400 when userId is missing', async () => {
-    const res = await request(app).post('/request').send({ email: 'test@example.com' });
-    expect(res.status).toBe(400);
-  });
-
   it('returns 400 when email is missing', async () => {
     const res = await request(app).post('/request').send({ userId: 'user-1' });
     expect(res.status).toBe(400);

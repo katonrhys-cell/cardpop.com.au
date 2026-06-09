@@ -10,10 +10,12 @@ const GradingCompaniesPage = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     supabase.from('grading_companies').select('*').order('name').limit(20)
-      .then(({ data }) => setGuides(data ?? []))
+      .then(({ data }) => { if (!cancelled) setGuides(data ?? []); })
       .catch(console.error)
-      .finally(() => setLoading(false));
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, []);
 
   return (

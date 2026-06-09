@@ -4,6 +4,7 @@ import Stripe from 'stripe';
 import logger from '../utils/logger.js';
 import { supabase } from '../utils/supabaseClient.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { sendOrderConfirmed, sendItemSold, sendRefundProcessed, sendRefundIssued } from '../utils/emailService.js';
 
 const router = express.Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -358,6 +359,14 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         const configId        = meta.configId || null;
         const amountCents     = session.amount_total || 0;
 
+        // Reconcile: Stripe's authoritative amount_total must match what we expected.
+        // Mismatch signals metadata corruption or a replay attack — reject the order.
+        const expectedTotalCents = Math.round((itemPrice + commissionAud + gstAud) * 100);
+        if (Math.abs(amountCents - expectedTotalCents) > 2) {
+          logger.error(`[STRIPE] Amount mismatch for session ${session.id}: Stripe=${amountCents}¢ expected=${expectedTotalCents}¢ — order rejected`);
+          break;
+        }
+
         const paymentIntentId = typeof session.payment_intent === 'string'
           ? session.payment_intent
           : (session.payment_intent?.id ?? null);
@@ -429,6 +438,55 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           });
         }
 
+        // Fetch buyer and seller profiles for transactional emails
+        const [{ data: buyerProfile }, { data: sellerProfile }] = await Promise.all([
+          userId   ? supabase.from('profiles').select('email, display_name').eq('id', userId).maybeSingle()   : { data: null },
+          sellerId ? supabase.from('profiles').select('email, display_name').eq('id', sellerId).maybeSingle() : { data: null },
+        ]);
+
+        // Resolve the card/listing name from metadata or a listing lookup
+        let cardName = meta.cardName || '';
+        if (!cardName && listingId) {
+          const { data: listing } = await supabase
+            .from('listings')
+            .select('title, vault_item:vault_items!vault_item_id(card_name)')
+            .eq('id', listingId)
+            .maybeSingle();
+          cardName = listing?.vault_item?.card_name || listing?.title || 'Trading Card';
+        }
+
+        // Determine the new order id from the insert we just did
+        const { data: newOrder } = await supabase
+          .from('orders')
+          .select('id')
+          .eq('stripe_session_id', session.id)
+          .maybeSingle();
+        const orderId = newOrder?.id;
+
+        if (buyerProfile?.email) {
+          await sendOrderConfirmed({
+            buyerEmail:  buyerProfile.email,
+            buyerName:   buyerProfile.display_name || 'Collector',
+            cardName,
+            itemPrice,
+            total:       amountCents / 100,
+            orderId,
+          });
+        }
+
+        if (sellerProfile?.email) {
+          await sendItemSold({
+            sellerEmail:    sellerProfile.email,
+            sellerName:     sellerProfile.display_name || 'Collector',
+            cardName,
+            itemPrice,
+            commissionAud,
+            gstAud,
+            sellerProceeds,
+            orderId,
+          });
+        }
+
         logger.info(`[STRIPE] Order recorded for session ${session.id} — commission: $${commissionAud} (${commissionPct}%)`);
         break;
       }
@@ -460,13 +518,10 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
 router.post('/refund', authMiddleware, async (req, res) => {
   try {
-    // Admin check
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', req.user.id)
-      .maybeSingle();
-    if (profile?.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+    // Admin check — use JWT app_metadata (server-controlled), never trust user_metadata or profile rows
+    if (req.user.app_metadata?.is_admin !== true) {
+      return res.status(403).json({ error: 'Admin only' });
+    }
 
     const { refundId } = req.body;
     if (!refundId) return res.status(400).json({ error: 'refundId is required' });
@@ -535,6 +590,31 @@ router.post('/refund', authMiddleware, async (req, res) => {
         type:    'refund_issued',
         title:   'Refund Issued on Your Sale',
         body:    `A refund of $${refundAmount.toFixed(2)} AUD was issued to the buyer. The platform retained $${retainedFee.toFixed(2)} AUD in processing fees.`,
+      });
+    }
+
+    // Fetch profiles for transactional emails
+    const [{ data: buyerProfile }, { data: sellerProfile }] = await Promise.all([
+      refund.buyer_id  ? supabase.from('profiles').select('email, display_name').eq('id', refund.buyer_id).maybeSingle()  : { data: null },
+      refund.seller_id ? supabase.from('profiles').select('email, display_name').eq('id', refund.seller_id).maybeSingle() : { data: null },
+    ]);
+
+    if (buyerProfile?.email) {
+      await sendRefundProcessed({
+        buyerEmail:   buyerProfile.email,
+        buyerName:    buyerProfile.display_name || 'Collector',
+        refundAmount,
+        orderId:      refund.order_id,
+      });
+    }
+
+    if (sellerProfile?.email) {
+      await sendRefundIssued({
+        sellerEmail:  sellerProfile.email,
+        sellerName:   sellerProfile.display_name || 'Collector',
+        refundAmount,
+        retainedFee,
+        orderId:      refund.order_id,
       });
     }
 

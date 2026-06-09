@@ -73,19 +73,19 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
 
   // Initial Load & Populate
   useEffect(() => {
+    let cancelled = false;
     const initData = async () => {
       setFetchingHierarchy(true);
       try {
         const { data: cats } = await supabase.from('categories').select('*').is('parent_id', null).order('name');
         const { data: subs } = await supabase.from('categories').select('*').not('parent_id', 'is', null).order('name');
+        if (cancelled) return;
         // brands and series have no Supabase equivalent — use empty arrays
         console.warn('[VaultProductForm] brands/series collections have no Supabase equivalent');
-        const brnds = [];
-        const srs = [];
         setAllCategories(cats || []);
         setAllSubcategories(subs || []);
-        setAllBrands(brnds);
-        setAllSeries(srs);
+        setAllBrands([]);
+        setAllSeries([]);
 
         if (card) {
           setFormData({
@@ -117,7 +117,7 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
           setEnableSub(!!card.subcategoryId);
           setEnableBrand(!!card.brandId);
           setEnableSeries(!!card.seriesId);
-          
+
           if (card.images && card.images.length > 0) {
             const urls = card.images.map(img => (typeof img === 'string' && img.startsWith('http') ? img : img));
             setPreviewUrls(urls);
@@ -136,10 +136,11 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
       } catch (err) {
         console.error("Failed to load hierarchy data", err);
       } finally {
-        setFetchingHierarchy(false);
+        if (!cancelled) setFetchingHierarchy(false);
       }
     };
     initData();
+    return () => { cancelled = true; };
   }, [card]);
 
   // Auto-sync is_public based on listing_type
@@ -217,7 +218,7 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
     e.preventDefault();
     
     if (!formData.name.trim()) return toast.error('Card Name is required');
-    if (formData.price === '' || isNaN(Number(formData.price))) return toast.error('A valid Price is required');
+    if (!formData.price || !Number.isInteger(Number(formData.price)) || Number(formData.price) < 0) return toast.error('Price must be a whole number (e.g. 5 not 5.99)');
     if (!formData.listing_type) return toast.error('Listing Type is required');
     
     const expectedPublic = formData.listing_type !== 'Private';
@@ -297,9 +298,11 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
         submitData.append('images', JSON.stringify(remainingImages));
       }
 
-      // Convert FormData to plain object for Supabase
+      // Convert FormData to plain object for Supabase (last-write-wins for scalars)
       const dataObj = {};
       submitData.forEach((value, key) => { dataObj[key] = value; });
+      // cardVariants must stay as an array so the database can filter by containment
+      dataObj.cardVariants = formData.cardVariants;
 
       if (card) {
         const { error } = await supabase.from('vault_items').update(dataObj).eq('id', card.id).eq('owner_id', currentUser.id);
@@ -359,8 +362,9 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
         isLookingUp={isLookingUp}
         priceData={priceData}
         onApplyPrice={(price) => {
-          handleInputChange('price', String(price));
-          toast.success(`Price set to $${price.toFixed(2)} AUD from eBay estimate.`);
+          const rounded = Math.round(price);
+          handleInputChange('price', String(rounded));
+          toast.success(`Price set to $${rounded} AUD from eBay estimate.`);
         }}
       />
 
@@ -448,7 +452,7 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Estimated Value / Price <span className="text-destructive">*</span></Label>
-              <Input required type="number" step="0.01" value={formData.price} onChange={(e) => handleInputChange('price', e.target.value)} placeholder="0.00" className="bg-background tabular-nums" />
+              <Input required type="number" step="1" min="0" value={formData.price} onChange={(e) => handleInputChange('price', e.target.value)} placeholder="0" className="bg-background tabular-nums" />
             </div>
             <div className="space-y-2">
               <Label>Stock Quantity</Label>

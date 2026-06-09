@@ -3,6 +3,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCategories } from '@/hooks/useCategories.js';
+import { useCollectionEras } from '@/hooks/useCollectionEras.js';
+import { COLLECTION_CONFIGS } from '@/data/collectionConfigs.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search, RefreshCw, AlertCircle, Users, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,6 +13,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import { toast } from 'sonner';
 
+// Map a DB category name to a collection config slug (e.g. "Pokémon" → "pokemon")
+function resolveEraSlug(categoryName) {
+  if (!categoryName) return null;
+  const lower = categoryName.toLowerCase();
+  for (const [slug, cfg] of Object.entries(COLLECTION_CONFIGS)) {
+    const aliases = [cfg.name, ...(cfg.categoryAliases ?? [])].map(a => a.toLowerCase());
+    if (aliases.includes(lower)) return slug;
+  }
+  return null;
+}
+
 const MarketplacePage = () => {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,14 +31,33 @@ const MarketplacePage = () => {
 
   const [sort, setSort] = useState('created_at_desc');
   const [filterMode, setFilterMode] = useState('All');
+  const [filterRookie, setFilterRookie] = useState(false);
 
   // Category Filter States
   const { buildNameMap, getCategories, getSubcategoriesByCategory } = useCategories();
   const [nameMap, setNameMap] = useState({});
   const [filterCat, setFilterCat] = useState('');
   const [filterSub, setFilterSub] = useState('');
+  const [filterEra, setFilterEra] = useState('');
   const [catOpts, setCatOpts] = useState([]);
   const [subOpts, setSubOpts] = useState([]);
+
+  // Resolve the matching collection config slug so we can show eras in the filter
+  const [eraSlug, setEraSlug] = useState(null);
+  const { eras: categoryEras } = useCollectionEras(eraSlug);
+
+  // When the selected category changes, try to map it to a collection config
+  useEffect(() => {
+    if (!filterCat) {
+      setEraSlug(null);
+      setFilterEra('');
+      return;
+    }
+    const catName = catOpts.find(c => c.id === filterCat)?.name;
+    const slug = resolveEraSlug(catName);
+    setEraSlug(slug);
+    setFilterEra('');
+  }, [filterCat, catOpts]);
 
   // Search and Price Filter States
   const [search, setSearch] = useState('');
@@ -64,7 +96,7 @@ const MarketplacePage = () => {
 
   // Cascading Dropdown Handlers
   useEffect(() => {
-    if (filterCat) getSubcategoriesByCategory(filterCat).then(setSubOpts);
+    if (filterCat) getSubcategoriesByCategory(filterCat).then(setSubOpts).catch(() => setSubOpts([]));
     else { setSubOpts([]); setFilterSub(''); }
   }, [filterCat, getSubcategoriesByCategory]);
 
@@ -100,6 +132,9 @@ const MarketplacePage = () => {
           query = query.eq('accepts_offers', true);
         }
 
+        if (filterRookie) query = query.contains('vault_items.cardVariants', ['Rookie Card (RC)']);
+        if (filterEra) query = query.eq('vault_items.set_name', filterEra);
+
         if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
         else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
         else query = query.order('created_at', { ascending: false });
@@ -120,25 +155,27 @@ const MarketplacePage = () => {
     fetchRef.current = run;
     run();
     return () => { cancelled = true; };
-  }, [sort, filterMode, filterCat, filterSub, debouncedSearch, debouncedMin, debouncedMax]);
+  }, [sort, filterMode, filterCat, filterSub, filterEra, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
 
   const clearFilters = () => {
     setFilterCat('');
     setFilterSub('');
+    setFilterEra('');
     setFilterMode('All');
+    setFilterRookie(false);
     setSearch('');
     setMinPrice('');
     setMaxPrice('');
   };
 
   const getBreadcrumbPath = () => {
-    const parts = [nameMap[filterCat], nameMap[filterSub]].filter(Boolean);
+    const parts = [nameMap[filterCat], filterEra || nameMap[filterSub]].filter(Boolean);
     if (parts.length === 0) return null;
     return `Filtering by: ${parts.join(' > ')}`;
   };
 
   const breadcrumbText = getBreadcrumbPath();
-  const hasActiveFilters = filterCat || filterSub || filterMode !== 'All' || search || minPrice || maxPrice;
+  const hasActiveFilters = filterCat || filterSub || filterEra || filterMode !== 'All' || filterRookie || search || minPrice || maxPrice;
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans pb-20">
@@ -173,11 +210,27 @@ const MarketplacePage = () => {
             <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Categories" /></SelectTrigger>
             <SelectContent>{catOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
           </Select>
-          {/* Subcategory */}
-          <Select value={filterSub} onValueChange={setFilterSub} disabled={!filterCat}>
-            <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Subcategories" /></SelectTrigger>
-            <SelectContent>{subOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-          </Select>
+          {/* Set / Era (when category maps to a known collection) or Subcategory */}
+          {categoryEras.length > 0 ? (
+            <Select value={filterEra} onValueChange={setFilterEra}>
+              <SelectTrigger className="w-[200px] bg-background border-border rounded-xl font-medium">
+                <SelectValue placeholder="All Sets / Eras" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">All Sets / Eras</SelectItem>
+                {categoryEras.map(era => (
+                  <SelectItem key={era.name} value={era.name}>
+                    {era.name}{era.years ? ` (${era.years})` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Select value={filterSub} onValueChange={setFilterSub} disabled={!filterCat}>
+              <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Subcategories" /></SelectTrigger>
+              <SelectContent>{subOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+            </Select>
+          )}
           {/* Price Range */}
           <div className="flex items-center gap-2">
             <Input
@@ -247,6 +300,13 @@ const MarketplacePage = () => {
             >
               For Trade
             </Button>
+            <Button
+              variant="outline"
+              className={`rounded-full px-5 font-bold ${filterRookie ? 'bg-amber-400 text-amber-900 shadow-md border-none hover:bg-amber-400' : 'bg-background hover:text-amber-700 hover:border-amber-400'}`}
+              onClick={() => setFilterRookie(r => !r)}
+            >
+              🏅 Rookie Cards
+            </Button>
           </div>
 
           <div className="flex items-center gap-3">
@@ -299,6 +359,46 @@ const MarketplacePage = () => {
             <p className="text-muted-foreground max-w-sm text-center mb-8">
               There are currently no items matching your filter criteria.
             </p>
+            
+            {/* Smart Suggestions */}
+            <div className="flex flex-col items-center gap-4 mb-8">
+              <p className="text-sm font-medium text-muted-foreground">Try these suggestions:</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setSearch(''); setFilterCat(''); setFilterSub(''); setFilterMode('All'); }}
+                  className="rounded-full"
+                >
+                  Clear All Filters
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setSearch('Charizard'); }}
+                  className="rounded-full"
+                >
+                  Charizard
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setSearch('Pikachu'); }}
+                  className="rounded-full"
+                >
+                  Pikachu
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setSearch('Black Lotus'); }}
+                  className="rounded-full"
+                >
+                  Black Lotus
+                </Button>
+              </div>
+            </div>
+
             <Button onClick={clearFilters} variant="outline" className="rounded-xl font-bold">
               View All Listings
             </Button>

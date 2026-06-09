@@ -89,7 +89,8 @@ const AccountProfile = () => {
         const ext = avatarFile.name.split('.').pop();
         const path = `avatars/${currentUser.id}.${ext}`;
         const { error: uploadErr } = await supabase.storage.from('avatars').upload(path, avatarFile, { upsert: true });
-        if (!uploadErr) avatar_url = supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
+        if (uploadErr) throw uploadErr;
+        avatar_url = supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
       } else if (removeAvatar) {
         avatar_url = null;
       }

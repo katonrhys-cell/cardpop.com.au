@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -8,6 +8,7 @@ import {
   Clock, ExternalLink, ShoppingCart, ArrowUpRight, ArrowDownRight,
   RefreshCw, Star, Info, ChevronRight, ShieldCheck,
 } from 'lucide-react';
+import PriceRangeIndicator from '@/components/PriceRangeIndicator.jsx';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -164,11 +165,12 @@ const SOURCES = (name, set) => [
 // ─── Main page ────────────────────────────────────────────────────────────────
 const CardAnalyticsPage = () => {
   const [searchParams] = useSearchParams();
-  const cardName   = searchParams.get('name')       || 'Unknown Card';
-  const cardSet    = searchParams.get('set')        || '';
-  const cardColl   = searchParams.get('collection') || '';
-  const rawPrice   = parseFloat(searchParams.get('price')  || '75');
-  const rawChange  = parseFloat(searchParams.get('change') || '0');
+  const cardName      = searchParams.get('name')          || 'Unknown Card';
+  const cardSet       = searchParams.get('set')           || '';
+  const cardColl      = searchParams.get('collection')    || '';
+  const rawPrice      = parseFloat(searchParams.get('price')  || '75');
+  const rawChange     = parseFloat(searchParams.get('change') || '0');
+  const cardsightId   = searchParams.get('cardsight_id')  || null;
 
   const [listings, setListings]     = useState([]);
   const [vaultItems, setVaultItems] = useState([]);
@@ -177,6 +179,15 @@ const CardAnalyticsPage = () => {
   // Live eBay AU pricing
   const [liveData, setLiveData]       = useState(null);
   const [liveLoading, setLiveLoading] = useState(true);
+
+  // CardSight AI real pricing + marketplace listings
+  const [csData, setCsData]             = useState(null);
+  const [csMarket, setCsMarket]         = useState(null);
+  const [csLoading, setCsLoading]       = useState(false);
+
+  // Stored market valuations from DB (CardSight, eBay, PSA)
+  const [storedVal, setStoredVal]       = useState(null);
+  const [priceRange, setPriceRange]     = useState(null);
 
   const rng = useMemo(() => makePrng(cardName + cardSet), [cardName, cardSet]);
 
@@ -202,10 +213,32 @@ const CardAnalyticsPage = () => {
         setListings(shop.map(i => ({ ...i, _source: 'shop' })));
         setVaultItems(vault.map(i => ({ ...i, _source: 'vault' })));
       }
-    }).finally(() => { if (!cancelled) setLoadingL(false); });
+    }).catch(() => {}).finally(() => { if (!cancelled) setLoadingL(false); });
 
     return () => { cancelled = true; };
   }, [cardName]);
+
+  // Fetch CardSight AI real pricing + marketplace data + stored valuations
+  useEffect(() => {
+    if (!cardsightId) return;
+    setCsLoading(true);
+    Promise.allSettled([
+      apiServerClient.fetch(`/cardsight/pricing/${cardsightId}`).then(r => r.ok ? r.json() : null),
+      apiServerClient.fetch(`/cardsight/marketplace/${cardsightId}`).then(r => r.ok ? r.json() : null),
+      apiServerClient.fetch(`/market-data/card/${cardsightId}`).then(r => r.ok ? r.json() : null),
+    ]).then(([pricing, market, stored]) => {
+      if (pricing.status === 'fulfilled' && pricing.value) setCsData(pricing.value);
+      if (market.status === 'fulfilled' && market.value)   setCsMarket(market.value);
+      if (stored.status === 'fulfilled' && stored.value) {
+        setStoredVal(stored.value?.valuations ?? null);
+      }
+      // Also fetch price range from DB
+      apiServerClient.fetch(`/market-data/price-range/${cardsightId}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(r => { if (r) setPriceRange(r); })
+        .catch(() => {});
+    }).finally(() => setCsLoading(false));
+  }, [cardsightId]);
 
   // Fetch live eBay AU prices for this card
   useEffect(() => {
@@ -232,6 +265,36 @@ const CardAnalyticsPage = () => {
       .finally(() => { if (!cancelled) setLiveLoading(false); });
     return () => { cancelled = true; };
   }, [cardName, cardSet]);
+
+  // Fetch CardSight completed sales for this card
+  useEffect(() => {
+    if (!cardName || cardName === 'Unknown Card') { setCsLoading(false); return; }
+    let cancelled = false;
+    const run = async () => {
+      setCsLoading(true);
+      try {
+        const acRes = await apiServerClient.fetch(
+          `/cardsight/autocomplete?q=${encodeURIComponent(cardName)}&take=1`
+        );
+        if (!acRes.ok || cancelled) return;
+        const acData = await acRes.json();
+        const cardId = acData?.results?.[0]?.id ?? acData?.[0]?.id ?? acData?.data?.[0]?.id;
+        if (!cardId || cancelled) return;
+        const prRes = await apiServerClient.fetch(
+          `/cardsight/pricing/${cardId}?period=30d&listing_type=sold`
+        );
+        if (!prRes.ok || cancelled) return;
+        const prData = await prRes.json();
+        if (!cancelled) setCsData(prData);
+      } catch {
+        // non-critical
+      } finally {
+        if (!cancelled) setCsLoading(false);
+      }
+    };
+    run();
+    return () => { cancelled = true; };
+  }, [cardName]);
 
   const cardUrl = (c) => `/analytics/card?name=${encodeURIComponent(c.name)}&set=${encodeURIComponent(c.set)}&collection=${encodeURIComponent(c.collection)}&price=${c.price}&change=${c.change}`;
 
@@ -266,6 +329,16 @@ const CardAnalyticsPage = () => {
               <div className="flex flex-wrap gap-2 items-center">
                 {cardColl && <Badge variant="secondary">{cardColl}</Badge>}
                 {cardSet  && <Badge variant="outline">{cardSet}</Badge>}
+                {cardsightId && csData ? (
+                  <span className="flex items-center gap-1 text-xs text-violet-600 font-semibold bg-violet-500/10 px-2 py-0.5 rounded-full">
+                    <ShieldCheck className="w-3 h-3" /> CardSight AI Verified · {csData.salesCount ?? '?'} completed sales
+                  </span>
+                ) : cardsightId && csLoading ? (
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground font-semibold">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
+                    CardSight AI pricing…
+                  </span>
+                ) : null}
                 {liveData ? (
                   <span className="flex items-center gap-1 text-xs text-emerald-600 font-semibold">
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -276,11 +349,11 @@ const CardAnalyticsPage = () => {
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-muted-foreground animate-pulse" />
                     Fetching live prices…
                   </span>
-                ) : (
+                ) : !cardsightId ? (
                   <span className="flex items-center gap-1 text-xs text-amber-500 font-semibold">
                     <Info className="w-3 h-3" /> Demo data · eBay unavailable
                   </span>
-                )}
+                ) : null}
               </div>
               <h1 className="text-3xl md:text-4xl font-black leading-tight">{cardName}</h1>
               <div className="flex items-center gap-4 flex-wrap">
@@ -308,19 +381,120 @@ const CardAnalyticsPage = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
+        {/* CardSight AI real pricing panel — shown when cardsight_id is available */}
+        {cardsightId && (csData || csLoading) && (
+          <div className={`rounded-2xl border p-5 ${csData ? 'bg-violet-500/5 border-violet-500/20' : 'bg-muted/30 border-border'}`}>
+            {csLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <RefreshCw className="w-4 h-4 animate-spin" /> Loading CardSight AI market intelligence…
+              </div>
+            ) : csData && (
+              <>
+                <div className="flex items-center gap-2 mb-4">
+                  <ShieldCheck className="w-4 h-4 text-violet-600" />
+                  <h3 className="font-bold text-sm text-violet-700">CardSight AI — Real Completed Sales Data</h3>
+                  {csData.lastSaleDate && (
+                    <span className="text-xs text-muted-foreground ml-auto">Last sale: {new Date(csData.lastSaleDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: '2-digit' })}</span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <p className="text-2xl font-black text-foreground">${csData.avgPrice?.toFixed(2) ?? '—'}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Avg Sold Price</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-black text-emerald-600">${csData.maxPrice?.toFixed(2) ?? '—'}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">High Sale</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-black text-foreground">${csData.minPrice?.toFixed(2) ?? '—'}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Low Sale</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-black text-foreground">{csData.salesCount ?? '—'}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Completed Sales</p>
+                  </div>
+                </div>
+                {csData.lastSalePrice && (
+                  <div className="mt-3 pt-3 border-t border-violet-500/10 flex items-center gap-2">
+                    <Clock className="w-3.5 h-3.5 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground">
+                      Most recent sale: <strong className="text-foreground">${csData.lastSalePrice?.toFixed(2)}</strong>
+                      {csData.currency && csData.currency !== 'AUD' ? ` (${csData.currency})` : ' AUD'}
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Price range panel — Low / Avg / High / Floor */}
+        {priceRange && (
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <BarChart3 className="w-4 h-4 text-primary" />
+              <h3 className="font-bold text-sm">Market Price Range</h3>
+              <span className="text-xs text-muted-foreground ml-auto">
+                {priceRange.sources_used?.join(' · ')}
+                {priceRange.source_count ? ` · ${priceRange.source_count} data points` : ''}
+              </span>
+            </div>
+            <PriceRangeIndicator range={priceRange} />
+          </div>
+        )}
+
+        {/* Stored market valuations panel */}
+        {storedVal && Object.keys(storedVal).length > 0 && (
+          <div className="rounded-2xl border border-border bg-card p-5">
+            <h3 className="font-bold text-sm mb-4 flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-primary" /> Market Valuations — All Sources
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {['cardsight', 'ebay_au', 'psa'].map(src => {
+                const v = storedVal[src];
+                if (!src) return null;
+                const labels = { cardsight: 'CardSight AI', ebay_au: 'eBay AU', psa: 'PSA Population' };
+                const colors = { cardsight: 'text-violet-600', ebay_au: 'text-amber-600', psa: 'text-blue-600' };
+                return (
+                  <div key={src} className="bg-muted/30 rounded-xl p-4 space-y-2">
+                    <p className={`text-xs font-bold uppercase tracking-wide ${colors[src]}`}>{labels[src]}</p>
+                    {v ? (
+                      <>
+                        <p className="text-2xl font-black">
+                          {v.market_value != null ? `$${parseFloat(v.market_value).toFixed(2)}` : '—'}
+                        </p>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>Confidence</span>
+                          <span className="font-semibold">{v.confidence_score != null ? `${v.confidence_score}%` : '—'}</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">
+                          Updated {v.last_updated ? new Date(v.last_updated).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) : '—'}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No data yet</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Metrics */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {[
-            { label: liveData ? 'Avg Listed (AUD)' : 'Avg Sold (AUD)',
-              value: `$${(liveData?.avgPrice ?? avgSale).toFixed(2)}`, icon: DollarSign, colored: false },
-            { label: liveData ? 'Highest Listed'  : '90-Day High',
-              value: `$${(liveData?.maxPrice ?? high90).toFixed(2)}`,  icon: TrendingUp, colored: false },
-            { label: liveData ? 'Lowest Listed'   : '90-Day Low',
-              value: `$${(liveData?.minPrice ?? low90).toFixed(2)}`,   icon: TrendingDown, colored: false },
+            { label: csData ? 'Avg Sold (CardSight)' : liveData ? 'Avg Listed (AUD)' : 'Avg Sold (AUD)',
+              value: `$${(csData?.avgPrice ?? liveData?.avgPrice ?? avgSale).toFixed(2)}`, icon: DollarSign, colored: false },
+            { label: csData ? 'High Sale (CardSight)' : liveData ? 'Highest Listed' : '90-Day High',
+              value: `$${(csData?.maxPrice ?? liveData?.maxPrice ?? high90).toFixed(2)}`,  icon: TrendingUp, colored: false },
+            { label: csData ? 'Low Sale (CardSight)' : liveData ? 'Lowest Listed' : '90-Day Low',
+              value: `$${(csData?.minPrice ?? liveData?.minPrice ?? low90).toFixed(2)}`,   icon: TrendingDown, colored: false },
             { label: '7-Day Change',
               value: `${change7d >= 0 ? '+' : ''}${change7d}%`,       icon: Activity, colored: true, up: change7d >= 0 },
-            { label: liveData ? 'Active Listings' : '90-Day Sales',
-              value: liveData?.volume ?? vol90,                         icon: BarChart3, colored: false },
+            { label: csData ? 'Completed Sales' : liveData ? 'Active Listings' : '90-Day Sales',
+              value: csData?.salesCount ?? liveData?.volume ?? vol90,  icon: BarChart3, colored: false },
           ].map(({ label, value, icon: Icon, colored, up }) => (
             <div key={label} className="bg-card border border-border rounded-2xl p-4 text-center">
               <Icon className="w-4 h-4 text-muted-foreground mx-auto mb-2" />
@@ -329,6 +503,51 @@ const CardAnalyticsPage = () => {
             </div>
           ))}
         </div>
+
+        {/* CardSight completed sales data */}
+        {(csLoading || csData) && (() => {
+          if (csLoading) {
+            return (
+              <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-4 flex items-center gap-2 text-xs text-muted-foreground">
+                <Activity className="w-3.5 h-3.5 animate-pulse text-blue-500" />
+                Loading CardSight market data…
+              </div>
+            );
+          }
+          const avg = csData.avg_price ?? csData.average_price ?? csData.mean_price;
+          const min = csData.min_price ?? csData.minimum_price;
+          const max = csData.max_price ?? csData.maximum_price;
+          const count = csData.count ?? csData.total_count ?? csData.total;
+          if (!avg) return null;
+          return (
+            <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="font-bold flex items-center gap-2 text-blue-700 dark:text-blue-400">
+                  <ShieldCheck className="w-4 h-4" /> CardSight · 30-Day Completed Sales
+                </h2>
+                {count != null && <span className="text-xs text-muted-foreground">{count} sales</span>}
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">${Number(avg).toFixed(2)}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Average Sold</p>
+                </div>
+                {min != null && (
+                  <div className="text-center">
+                    <p className="text-2xl font-bold">${Number(min).toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Lowest Sold</p>
+                  </div>
+                )}
+                {max != null && (
+                  <div className="text-center">
+                    <p className="text-2xl font-bold">${Number(max).toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Highest Sold</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Chart + Signal */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -419,6 +638,50 @@ const CardAnalyticsPage = () => {
                 </div>
               )}
             </div>
+
+            {/* CardSight AI active marketplace listings */}
+            {cardsightId && (csMarket || csLoading) && (
+              <div>
+                <div className="mb-4 flex items-center gap-2">
+                  <h3 className="font-bold">Active Listings — CardSight AI</h3>
+                  <span className="flex items-center gap-1 text-xs text-violet-600 font-semibold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-violet-500 animate-pulse inline-block" />
+                    Live · Multi-platform
+                  </span>
+                </div>
+                {csLoading ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}
+                  </div>
+                ) : csMarket?.listings?.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {csMarket.listings.slice(0, 9).map((l, i) => (
+                      <a key={l.id ?? i} href={l.listingUrl ?? '#'} target="_blank" rel="noopener noreferrer"
+                        className="flex gap-3 bg-card border border-violet-500/20 rounded-2xl p-4 hover:shadow-md hover:border-violet-500/40 transition-all">
+                        {l.imageUrl && (
+                          <div className="w-12 h-16 flex-shrink-0 rounded-xl overflow-hidden bg-muted">
+                            <img src={l.imageUrl} alt={l.title} className="w-full h-full object-cover" />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0 flex flex-col justify-between">
+                          <p className="text-xs font-medium text-foreground line-clamp-2 leading-snug">{l.title ?? 'Marketplace Listing'}</p>
+                          <div className="flex items-end justify-between mt-1">
+                            <p className="text-base font-bold text-violet-700">${(l.price ?? 0).toFixed(2)}</p>
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-600 border border-violet-400/20">
+                              {l.platform ?? 'Market'}
+                            </span>
+                          </div>
+                        </div>
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 bg-muted/20 rounded-3xl border border-dashed border-border">
+                    <p className="text-sm text-muted-foreground">No active CardSight marketplace listings found.</p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Live eBay AU listings */}
             <div>

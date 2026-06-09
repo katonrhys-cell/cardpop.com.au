@@ -10,9 +10,10 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SITE_URL, EVENT_TYPE_LABELS, buildEventListJsonLd } from '@/lib/eventSeo.js';
 
 const AU_STATES = ['NSW', 'VIC', 'QLD', 'SA', 'WA', 'TAS', 'NT', 'ACT'];
-const EVENT_TYPES = ['Tournament', 'Card Fair', 'Trade Show', 'Meetup', 'Convention', 'Expo', 'Other'];
+const EVENT_TYPES = Object.entries(EVENT_TYPE_LABELS).map(([value, label]) => ({ value, label }));
 
 const todayStr = new Date().toISOString().split('T')[0];
 const nextYearStr = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -124,9 +125,22 @@ const CommunityEventsPage = () => {
 
   const dateInputClass = 'flex h-11 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2';
 
+  const structuredData = useMemo(() => {
+    const upcoming = events
+      .filter(e => e.start_date && new Date(e.start_date) >= new Date(todayStr))
+      .slice(0, 25);
+    if (upcoming.length === 0) return null;
+    return buildEventListJsonLd(upcoming);
+  }, [events]);
+
   return (
     <div className="flex flex-col bg-background font-sans min-h-screen">
-      <SEOHead title="Community Events | CardPop" description="Find TCG tournaments, card fairs, and collector shows happening across Australia." />
+      <SEOHead
+        title="Trading Card Shows & TCG Events in Australia 2026 | CardPop"
+        description="Australia's trading card event calendar — card shows, TCG expos, fairs and collector meets in Sydney, Melbourne, Brisbane, Adelaide and Perth. Dates, venues and tickets."
+        canonicalUrl={`${SITE_URL}/community/events`}
+        structuredData={structuredData}
+      />
 
       {/* Hero — matches all other main section pages */}
       <section className="bg-card border-b border-border py-20 text-center">
@@ -190,7 +204,7 @@ const CommunityEventsPage = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  {EVENT_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  {EVENT_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -289,6 +303,36 @@ const CommunityEventsPage = () => {
           </div>
         )}
       </div>
+
+      {/* SEO content */}
+      <section className="border-t border-border bg-card">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 grid gap-10 md:grid-cols-2">
+          <div>
+            <h2 className="text-2xl font-bold mb-4">Find a Card Show Near You</h2>
+            <p className="text-muted-foreground leading-relaxed mb-4">
+              CardPop tracks trading card shows, TCG expos and collector fairs across every Australian
+              state — from major events like TCXPO at Oran Park and the Oz National Trading Card Show
+              at Marvel Stadium, to local fairs in Sydney, Melbourne, Brisbane, Adelaide and Perth.
+              Whether you collect Pokémon, Magic: The Gathering, One Piece, Yu-Gi-Oh! or sports cards
+              (NBA, NRL, AFL, soccer and more), use the filters above to find an event near you.
+            </p>
+            <p className="text-muted-foreground leading-relaxed">
+              Event details can change — always confirm dates, times and ticket prices with the
+              organiser before travelling.
+            </p>
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold mb-4">Running a Card Event?</h2>
+            <p className="text-muted-foreground leading-relaxed">
+              Organising a card show, tournament or trade night in Australia? List it on CardPop for
+              free and reach thousands of collectors. Submitted events are reviewed before they appear
+              on the calendar. <a href="/contact" className="text-primary font-semibold hover:underline">Contact us</a> to
+              get your event listed, or explore the <a href="/marketplace" className="text-primary font-semibold hover:underline">CardPop marketplace</a> to
+              buy and sell between shows.
+            </p>
+          </div>
+        </div>
+      </section>
 
       <EventDetailModal
         isOpen={isDetailOpen}

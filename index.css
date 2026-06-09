@@ -82,7 +82,7 @@
     /* ── Profile Tokens ─────────────────────────────────────────────── */
     --profile-bg:       0 0% 100%;
     --rating-color:     43 96% 56%;
-    --verified-badge:   221 83% 53%;
+    --verified-badge:   160 84% 30%;
     --section-divider:  202 16% 80%;           /* Soft Silver */
 
     /* ── Drag-and-Drop Tokens ───────────────────────────────────────── */
@@ -158,7 +158,7 @@
     /* ── Profile Tokens (Dark) ──────────────────────────────────────── */
     --profile-bg:       215 28% 13%;
     --rating-color:     43 96% 56%;
-    --verified-badge:   221 83% 60%;
+    --verified-badge:   160 84% 45%;
     --section-divider:  215 20% 25%;
 
     /* ── Drag-and-Drop Tokens (Dark) ────────────────────────────────── */

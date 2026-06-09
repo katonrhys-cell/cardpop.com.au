@@ -12,37 +12,35 @@ const ProductResearchModal = ({ isOpen, onClose, cardName }) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (isOpen && cardName) {
-      fetchInternalSalesData(cardName);
-    }
+    if (!isOpen || !cardName) return;
+    let cancelled = false;
+    const fetchInternalSalesData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data: items } = await supabase
+          .from('orders')
+          .select('*')
+          .eq('status', 'completed')
+          .order('created_at', { ascending: false })
+          .limit(12);
+
+        const relevantSales = (items || []).filter(t => {
+          const title = (t.title || t.card_name || t.item_title || '').toLowerCase();
+          return title.includes(cardName.toLowerCase());
+        });
+
+        if (!cancelled) setSales(relevantSales);
+      } catch (err) {
+        console.error('Market research error:', err);
+        if (!cancelled) setError('Could not load market research data at this time.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    fetchInternalSalesData();
+    return () => { cancelled = true; };
   }, [isOpen, cardName]);
-
-  const fetchInternalSalesData = async (name) => {
-    setLoading(true);
-    setError(null);
-    try {
-      // Fetch recent completed orders from the platform
-      const { data: items } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('status', 'completed')
-        .order('created_at', { ascending: false })
-        .limit(12);
-
-      // Filter by cardName where possible
-      const relevantSales = (items || []).filter(t => {
-        const title = (t.title || t.card_name || t.item_title || '').toLowerCase();
-        return title.includes(name.toLowerCase());
-      });
-
-      setSales(relevantSales);
-    } catch (err) {
-      console.error('Market research error:', err);
-      setError('Could not load market research data at this time.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>

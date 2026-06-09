@@ -4,6 +4,7 @@ import { verifyTradeAccess } from '../middleware/verifyTradeAccess.js';
 import { authMiddleware } from '../middleware/auth.js';
 import healthCheck from './health-check.js';
 import ebayRouter from './ebay.js';
+import cardsightRouter from './cardsight.js';
 import authRouter from './auth/index.js';
 import stripeRouter from './stripe.js';
 import verificationRouter from './verification.js';
@@ -13,7 +14,16 @@ import eventScraperRouter from './event-scraper.js';
 import categoriesRouter from './categories.js';
 import subcategoriesRouter from './subcategories.js';
 import vaultRouter from './vault.js';
+import sitemapRouter from './sitemap.js';
+import searchSuggestionsRouter from './search-suggestions.js';
+import sellerRatingsRouter from './seller-ratings.js';
+import buyerProtectionRouter from './buyer-protection.js';
+import wishlistRouter from './wishlist.js';
+import recommendationsRouter from './recommendations.js';
+import priceHistoryRouter from './price-history.js';
 import newsletterRouter from './newsletter.js';
+import cardSightRouter from './cardsight.js';
+import marketDataRouter from './market-data.js';
 
 const router = Router();
 
@@ -29,6 +39,10 @@ export default () => {
 
     // Card OCR routes with rate limiting
     router.use('/card-ocr', cardOcrRouter);
+
+    // CardSight AI identification, catalog, and pricing routes
+    router.use('/cardsight', apiLimiter);
+    router.use('/cardsight', cardSightRouter);
     
     // Event scraper routes with API rate limiting
     router.use('/event-scraper', apiLimiter);
@@ -42,6 +56,10 @@ export default () => {
     // eBay routes with API rate limiting
     router.use('/ebay', apiLimiter);
     router.use('/ebay', ebayRouter);
+
+    // CardSight routes with API rate limiting
+    router.use('/cardsight', apiLimiter);
+    router.use('/cardsight', cardsightRouter);
     
     // Stripe: high-capacity limiter for the webhook, standard for other endpoints
     router.use('/stripe/webhook', stripeLimiter);
@@ -60,8 +78,29 @@ export default () => {
     router.use('/vault', apiLimiter);
     router.use('/vault', vaultRouter);
 
-    // Newsletter (Kit.com) subscription — no auth required
-    router.use('/newsletter', apiLimiter);
+    // Marketplace feature routes with API rate limiting
+    router.use('/seller-ratings', apiLimiter);
+    router.use('/seller-ratings', sellerRatingsRouter);
+
+    router.use('/wishlist', apiLimiter);
+    router.use('/wishlist', wishlistRouter);
+
+    router.use('/recommendations', apiLimiter);
+    router.use('/recommendations', recommendationsRouter);
+
+    router.use('/market-data', apiLimiter);
+    router.use('/market-data', marketDataRouter);
+
+    router.use('/price-history', apiLimiter);
+    router.use('/price-history', priceHistoryRouter);
+
+    router.use('/buyer-protection', apiLimiter);
+    router.use('/buyer-protection', buyerProtectionRouter);
+
+    router.use('/search-suggestions', apiLimiter);
+    router.use('/search-suggestions', searchSuggestionsRouter);
+
+    // Newsletter subscription
     router.use('/newsletter', newsletterRouter);
 
     // Trade routes with email verification middleware
