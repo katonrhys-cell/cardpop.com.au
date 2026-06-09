@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
-import { motion, useInView } from 'framer-motion';
-import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, CheckCircle2 } from 'lucide-react';
+import { motion, useInView, AnimatePresence } from 'framer-motion';
+import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient.js';
 import VaultListingCard from '@/components/VaultListingCard.jsx';
@@ -162,6 +162,28 @@ const HomePage = () => {
   const [featuredCards, setFeaturedCards]     = useState([]);
   const [featuredSellers, setFeaturedSellers] = useState([]);
   const [loading, setLoading]                 = useState(true);
+
+  const [catStart, setCatStart] = useState(0);
+  const [catDir, setCatDir]     = useState(1);
+  const [catVisible, setCatVisible] = useState(3);
+
+  useEffect(() => {
+    const update = () => {
+      if (window.innerWidth >= 1024) setCatVisible(9);
+      else if (window.innerWidth >= 768) setCatVisible(5);
+      else setCatVisible(3);
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  const catTotal = CATEGORIES.length;
+  const goCatNext = () => { setCatDir(1);  setCatStart(i => (i + 1) % catTotal); };
+  const goCatPrev = () => { setCatDir(-1); setCatStart(i => (i - 1 + catTotal) % catTotal); };
+  const visibleCats = Array.from({ length: catVisible }, (_, i) =>
+    CATEGORIES[(catStart + i) % catTotal]
+  );
 
   const statsRef   = useRef(null);
   const statsInView = useInView(statsRef, { once: true, margin: '-80px' });
@@ -463,25 +485,48 @@ const HomePage = () => {
             </Button>
           </div>
 
-          <div className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 sm:overflow-visible sm:pb-0">
-            {CATEGORIES.map((cat, i) => (
-              <motion.div
-                key={cat.name}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: i * 0.05 }}
-                className="flex-shrink-0 snap-start w-32 sm:w-auto"
-              >
-                <Link
-                  to={cat.slug ? `/collections/${cat.slug}` : '/marketplace'}
-                  className={`group flex flex-col items-center justify-center gap-3 p-4 rounded-2xl bg-gradient-to-br ${cat.gradient} aspect-square shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-center leading-tight`}
-                >
-                  <cat.Icon className="w-9 h-9 drop-shadow-sm" />
-                  <span className="text-[11px] font-bold leading-tight text-white drop-shadow-sm">{cat.name}</span>
-                </Link>
-              </motion.div>
-            ))}
+          <div className="relative flex items-center gap-2">
+            <button
+              onClick={goCatPrev}
+              aria-label="Previous categories"
+              className="flex-shrink-0 w-9 h-9 rounded-full bg-background border border-border shadow-sm flex items-center justify-center hover:bg-muted transition-colors z-10"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+
+            <div className="flex-1 overflow-hidden">
+              <div className="flex gap-4">
+                <AnimatePresence mode="popLayout" initial={false}>
+                  {visibleCats.map((cat) => (
+                    <motion.div
+                      key={cat.slug}
+                      layout
+                      initial={{ opacity: 0, x: catDir > 0 ? 60 : -60 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: catDir > 0 ? -60 : 60 }}
+                      transition={{ duration: 0.25, ease: 'easeInOut' }}
+                      style={{ width: `calc((100% - ${(catVisible - 1) * 16}px) / ${catVisible})`, flexShrink: 0 }}
+                    >
+                      <Link
+                        to={cat.slug ? `/collections/${cat.slug}` : '/marketplace'}
+                        className={`group flex flex-col items-center justify-center gap-3 p-4 rounded-2xl bg-gradient-to-br ${cat.gradient} aspect-square shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-center leading-tight`}
+                      >
+                        <cat.Icon className="w-9 h-9 drop-shadow-sm" />
+                        <span className="text-[11px] font-bold leading-tight text-white drop-shadow-sm">{cat.name}</span>
+                      </Link>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            </div>
+
+            <button
+              onClick={goCatNext}
+              aria-label="Next categories"
+              className="flex-shrink-0 w-9 h-9 rounded-full bg-background border border-border shadow-sm flex items-center justify-center hover:bg-muted transition-colors z-10"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </section>
