@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
-import { motion, useInView } from 'framer-motion';
-import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, CheckCircle2 } from 'lucide-react';
+import { motion, useInView, AnimatePresence } from 'framer-motion';
+import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient.js';
 import VaultListingCard from '@/components/VaultListingCard.jsx';
@@ -162,6 +162,16 @@ const HomePage = () => {
   const [featuredCards, setFeaturedCards]     = useState([]);
   const [featuredSellers, setFeaturedSellers] = useState([]);
   const [loading, setLoading]                 = useState(true);
+
+  const [deskStart, setDeskStart] = useState(0);
+  const [deskDir,   setDeskDir]   = useState(1);
+  const DESK_VISIBLE = 8;
+  const total = CATEGORIES.length;
+  const goDeskNext = () => { setDeskDir(1);  setDeskStart(i => (i + 1) % total); };
+  const goDeskPrev = () => { setDeskDir(-1); setDeskStart(i => (i - 1 + total) % total); };
+  const deskCats = Array.from({ length: DESK_VISIBLE }, (_, i) =>
+    CATEGORIES[(deskStart + i) % total]
+  );
 
   const statsRef   = useRef(null);
   const statsInView = useInView(statsRef, { once: true, margin: '-80px' });
@@ -463,7 +473,8 @@ const HomePage = () => {
             </Button>
           </div>
 
-          <div className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-8 sm:overflow-visible sm:pb-0">
+          {/* Mobile: touch swipe through all 24 */}
+          <div className="sm:hidden flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory scrollbar-hide -mx-4 px-4">
             {CATEGORIES.map((cat, i) => (
               <motion.div
                 key={cat.name}
@@ -471,7 +482,7 @@ const HomePage = () => {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.4, delay: Math.min(i, 8) * 0.05 }}
-                className="flex-shrink-0 snap-start w-32 sm:w-auto"
+                className="flex-shrink-0 snap-start w-32"
               >
                 <Link
                   to={cat.slug ? `/collections/${cat.slug}` : '/marketplace'}
@@ -482,6 +493,51 @@ const HomePage = () => {
                 </Link>
               </motion.div>
             ))}
+          </div>
+
+          {/* Desktop: single-row arrow carousel */}
+          <div className="hidden sm:flex items-center gap-3">
+            <button
+              onClick={goDeskPrev}
+              aria-label="Previous categories"
+              className="flex-shrink-0 w-9 h-9 rounded-full bg-background border border-border shadow-sm flex items-center justify-center hover:bg-muted transition-colors"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+
+            <div className="flex-1 overflow-hidden">
+              <div className="flex gap-4">
+                <AnimatePresence mode="popLayout" initial={false}>
+                  {deskCats.map((cat) => (
+                    <motion.div
+                      key={cat.slug}
+                      layout
+                      initial={{ opacity: 0, x: deskDir > 0 ? 50 : -50 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: deskDir > 0 ? -50 : 50 }}
+                      transition={{ duration: 0.22, ease: 'easeInOut' }}
+                      style={{ width: `calc((100% - ${(DESK_VISIBLE - 1) * 16}px) / ${DESK_VISIBLE})`, flexShrink: 0 }}
+                    >
+                      <Link
+                        to={cat.slug ? `/collections/${cat.slug}` : '/marketplace'}
+                        className={`group flex flex-col items-center justify-center gap-3 p-4 rounded-2xl bg-gradient-to-br ${cat.gradient} aspect-square shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-center leading-tight`}
+                      >
+                        <cat.Icon className="w-9 h-9 drop-shadow-sm" />
+                        <span className="text-[11px] font-bold leading-tight text-white drop-shadow-sm">{cat.name}</span>
+                      </Link>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            </div>
+
+            <button
+              onClick={goDeskNext}
+              aria-label="Next categories"
+              className="flex-shrink-0 w-9 h-9 rounded-full bg-background border border-border shadow-sm flex items-center justify-center hover:bg-muted transition-colors"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </section>
