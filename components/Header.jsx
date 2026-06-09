@@ -668,9 +668,11 @@ const Header = () => {
               <SheetContent side="right" className="w-[85vw] sm:w-[350px] p-0 flex flex-col border-l border-border bg-background">
                 <SheetHeader className="p-6 border-b border-border text-left bg-muted/30 shrink-0">
                   <SheetTitle asChild>
-                    <span className="text-2xl">
-                      <CardPopLogo variant="full" iconClassName="w-7 h-[34px]" />
-                    </span>
+                    <SheetClose asChild>
+                      <Link to="/" className="text-2xl inline-block" onClick={() => setMobileMenuOpen(false)}>
+                        <CardPopLogo variant="full" iconClassName="w-7 h-[34px]" />
+                      </Link>
+                    </SheetClose>
                   </SheetTitle>
                 </SheetHeader>
 
