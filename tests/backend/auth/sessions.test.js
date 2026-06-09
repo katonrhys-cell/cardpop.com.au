@@ -54,11 +54,6 @@ beforeEach(() => vi.clearAllMocks());
 // ─── POST /create ─────────────────────────────────────────────────────────────
 
 describe('POST /create', () => {
-  it('returns 400 when userId is missing', async () => {
-    const res = await request(app).post('/create').send({});
-    expect(res.status).toBe(400);
-  });
-
   it('creates a session and returns sessionId', async () => {
     mockSupabase.from
       .mockReturnValueOnce(makeBuilder({ data: { active_sessions: [] }, error: null }))

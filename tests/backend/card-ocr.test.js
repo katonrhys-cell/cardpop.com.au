@@ -8,8 +8,8 @@ vi.mock('../../src/utils/logger.js', () => ({
 }));
 
 vi.mock('../../src/middleware/pocketbase-auth.js', () => ({
-  supabaseAuth: (_req, _res, next) => next(),
-  pocketbaseAuth: (_req, _res, next) => next(),
+  supabaseAuth: (req, _res, next) => { req.userId = 'user-1'; next(); },
+  pocketbaseAuth: (req, _res, next) => { req.userId = 'user-1'; next(); },
 }));
 
 vi.mock('../../src/middleware/integrated-ai-rate-limit.js', () => ({
