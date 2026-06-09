@@ -1,14 +1,8 @@
 import { Router } from 'express';
-import { createClient } from '@supabase/supabase-js';
+import supabase from '../utils/supabaseClient.js';
 import { findBestMatches, getDidYouMean } from '../../utils/fuzzyMatch.js';
 
 const router = Router();
-
-// Initialize Supabase client for backend
-const supabase = createClient(
-  process.env.SUPABASE_URL || 'http://localhost:8000',
-  process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_SERVICE_KEY
-);
 
 // Get search suggestions based on query
 router.get('/', async (req, res) => {
