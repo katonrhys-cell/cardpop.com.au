@@ -14,7 +14,7 @@ router.get('/', async (req, res) => {
 
     const { data: wishlist, error } = await supabase
       .from('wishlists')
-      .select('*, vault_item:vault_items(*, vault_images(*)), product:products(*)')
+      .select('*, vault_item:vault_items(*, vault_images(*))')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
