@@ -111,7 +111,6 @@ Tests are split into two Vitest projects configured in `vitest.config.js`:
 - **Stripe** (`src/routes/stripe.js`): Payment processing and checkout.
 - **Kit.com** (`src/routes/newsletter.js`): Newsletter subscriptions via the Kit v4 API. Requires `KIT_API_KEY` and `KIT_FORM_ID` env vars.
 - **Hostinger Ecommerce API** (`api/EcommerceApi.js`): Shop product catalogue (sealed boxes, singles) — connects to `https://api-ecommerce.hostinger.com`. This is the Hostinger shop product API, unrelated to hosting.
-- **Datadog**: Synthetic test monitoring configured in `.github/workflows/datadog-synthetics.yml`.
 
 ### Deployment
 
