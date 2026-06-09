@@ -199,7 +199,7 @@ const HomePage = () => {
       />
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section className="relative min-h-[92dvh] flex items-center justify-center pt-20 pb-16 px-4 sm:px-6 lg:px-8 overflow-hidden bg-zinc-950">
+      <section className="relative min-h-[92dvh] flex items-start justify-center pt-10 sm:pt-14 pb-16 px-4 sm:px-6 lg:px-8 overflow-hidden bg-zinc-950">
 
         {/* Stage floor gradient */}
         <div className="absolute inset-0 bg-gradient-to-b from-zinc-950 via-[#0f0f14] to-zinc-950 pointer-events-none" />
@@ -341,7 +341,7 @@ const HomePage = () => {
               <span className="text-white/60 font-semibold normal-case tracking-normal">Australia's Card Show</span>
             </motion.div>
 
-            <h1 className="text-5xl md:text-6xl lg:text-[4.25rem] font-extrabold font-serif tracking-tight text-balance mb-6 leading-[1.06] text-white">
+            <h1 className="text-5xl md:text-6xl lg:text-[4.25rem] font-bold font-serif tracking-normal text-balance mb-6 leading-[1.2] text-white">
               The Card Show{' '}
               <br className="hidden sm:block" />
               <span
