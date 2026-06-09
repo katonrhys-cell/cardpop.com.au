@@ -415,6 +415,11 @@ const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout })
             </Link>
           </SheetClose>
           <SheetClose asChild>
+            <Link to="/account/events" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
+              <Calendar className="w-4 h-4" /> My Events
+            </Link>
+          </SheetClose>
+          <SheetClose asChild>
             <Link to="/account/profile" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
               <Settings className="w-4 h-4" /> Account Settings
             </Link>

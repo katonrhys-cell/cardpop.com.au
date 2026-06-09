@@ -20,6 +20,7 @@
 - [Messaging | Card Pop](/messaging): No description available
 - [My Balance | Card Pop](/userbalance): No description available
 - [My Digital Vault | CardPop](/myvault): No description available
+- [My Events | CardPop](/accountevents): No description available
 - [My Listings | CardPop](/accountlistings): No description available
 - [My Vault | CardPop](/accountvault): No description available
 - [Notification Settings | CardPop](/accountnotificationsettings): No description available
