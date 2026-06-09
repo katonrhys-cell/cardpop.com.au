@@ -129,7 +129,7 @@ const AdminDashboard = () => {
       try {
         let vaultQuery = supabase
           .from('vault_items')
-          .select('*, profiles!vault_items_user_id_fkey(username, display_name)', { count: 'exact' })
+          .select('*, profiles!vault_items_owner_id_fkey(username, display_name)', { count: 'exact' })
           .order('created_at', { ascending: false })
           .range(0, 19);
 
@@ -328,10 +328,10 @@ const AdminDashboard = () => {
                 vaultProducts.map((vp) => {
                   const path = [nameMap[vp.category_id]].filter(Boolean).join(' > ');
                   const ownerProfile = vp.profiles;
-                  const ownerDisplay = ownerProfile?.display_name || ownerProfile?.username || vp.user_id;
+                  const ownerDisplay = ownerProfile?.display_name || ownerProfile?.username || vp.owner_id;
                   return (
                     <TableRow key={vp.id}>
-                      <TableCell className="font-bold px-6">{vp.name}</TableCell>
+                      <TableCell className="font-bold px-6">{vp.card_name}</TableCell>
                       <TableCell className="text-muted-foreground text-sm">{ownerDisplay}</TableCell>
                       <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate" title={path}>{path || 'Uncategorized'}</TableCell>
                       <TableCell>
@@ -342,7 +342,7 @@ const AdminDashboard = () => {
                           'bg-muted text-muted-foreground border-border'
                         }`}>{vp.listing_type}</Badge>
                       </TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">${(vp.price || 0).toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-medium tabular-nums">${(Number(vp.estimated_value_aud) || 0).toFixed(2)}</TableCell>
                       <TableCell className="text-right px-6">
                         <Button variant="ghost" size="sm" onClick={() => handleEditStatus(vp)} className="text-xs">Manage Status</Button>
                       </TableCell>
