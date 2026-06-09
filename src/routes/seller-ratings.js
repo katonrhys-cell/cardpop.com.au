@@ -118,8 +118,8 @@ async function updateSellerStats(sellerId) {
       await supabase
         .from('profiles')
         .update({
-          average_rating: parseFloat(average),
-          total_ratings: ratings.length
+          rating: parseFloat(average),
+          reviews_count: ratings.length
         })
         .eq('id', sellerId);
     }

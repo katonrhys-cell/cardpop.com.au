@@ -78,6 +78,31 @@ export default () => {
     router.use('/vault', apiLimiter);
     router.use('/vault', vaultRouter);
 
+    // Marketplace feature routes with API rate limiting
+    router.use('/seller-ratings', apiLimiter);
+    router.use('/seller-ratings', sellerRatingsRouter);
+
+    router.use('/wishlist', apiLimiter);
+    router.use('/wishlist', wishlistRouter);
+
+    router.use('/recommendations', apiLimiter);
+    router.use('/recommendations', recommendationsRouter);
+
+    router.use('/market-data', apiLimiter);
+    router.use('/market-data', marketDataRouter);
+
+    router.use('/price-history', apiLimiter);
+    router.use('/price-history', priceHistoryRouter);
+
+    router.use('/buyer-protection', apiLimiter);
+    router.use('/buyer-protection', buyerProtectionRouter);
+
+    router.use('/search-suggestions', apiLimiter);
+    router.use('/search-suggestions', searchSuggestionsRouter);
+
+    // Newsletter subscription
+    router.use('/newsletter', newsletterRouter);
+
     // Trade routes with email verification middleware
     // Apply auth middleware first, then trade access verification
     // This protects any route containing 'trade' in the path
