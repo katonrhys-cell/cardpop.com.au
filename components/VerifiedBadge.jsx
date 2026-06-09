@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 
 /**
  * VerifiedBadge - shows the CardPop identity-verified badge.
@@ -16,10 +16,10 @@ const VerifiedBadge = ({ size = 'sm', showLabel = false, className = '' }) => {
 
   return (
     <span
-      className={`inline-flex items-center ${s.gap} text-[hsl(var(--verified-badge,209_100%_48%))] ${className}`}
+      className={`inline-flex items-center ${s.gap} text-emerald-700 dark:text-emerald-400 ${className}`}
       title="Identity Verified by CardPop"
     >
-      <ShieldCheck className={`${s.icon} shrink-0`} />
+      <CheckCircle2 className={`${s.icon} shrink-0`} />
       {showLabel && <span className={`${s.text} font-bold`}>Verified</span>}
     </span>
   );
