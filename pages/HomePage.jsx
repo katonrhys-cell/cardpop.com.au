@@ -18,7 +18,7 @@ const useCountUp = (end, inView, isDecimal = false) => {
   useEffect(() => {
     if (!inView) return;
     let frame = 0;
-    const totalFrames = 90;
+    const totalFrames = 45;
     const timer = setInterval(() => {
       frame++;
       const progress = frame / totalFrames;
@@ -470,7 +470,7 @@ const HomePage = () => {
                 initial={{ opacity: 0, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: i * 0.05 }}
+                transition={{ duration: 0.4, delay: Math.min(i, 8) * 0.05 }}
                 className="flex-shrink-0 snap-start w-32 sm:w-auto"
               >
                 <Link
