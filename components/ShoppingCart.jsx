@@ -19,6 +19,7 @@ const resolveImg = (path) => {
   return supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
 };
 
+const ShoppingCart = () => {
   const { cartItems, isCartOpen, setIsCartOpen, removeFromCart, updateQuantity, getCartTotal } = useCart();
   const { currentUser } = useAuth();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
@@ -26,7 +27,7 @@ const resolveImg = (path) => {
 
   const handleCheckout = async () => {
     if (cartItems.length === 0) return;
-    
+
     setIsCheckingOut(true);
     try {
       const items = cartItems.map(item => ({
@@ -77,7 +78,7 @@ const resolveImg = (path) => {
         </SheetHeader>
 
         {cartItems.length === 0 ? (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             className="flex-1 flex flex-col items-center justify-center p-6 text-center"
@@ -89,7 +90,7 @@ const resolveImg = (path) => {
             <p className="text-muted-foreground mb-8 max-w-[250px] leading-relaxed">
               Looks like you haven't added any items to your cart yet. Discover your next great find in our shop.
             </p>
-            <Button 
+            <Button
               onClick={() => {
                 setIsCartOpen(false);
                 navigate('/shop');
@@ -110,7 +111,6 @@ const resolveImg = (path) => {
                   const rawImg = item.variant?.image_url || item.product.image || item.product.images?.[0] || null;
                   const imageUrl = resolveImg(rawImg);
 
-                  // Build structured card label: year · name · set · grade
                   const p = item.product;
                   const year = p.year || p.card_year || null;
                   const set = p.set || p.card_set || p.era || p.collection || null;
@@ -149,21 +149,21 @@ const resolveImg = (path) => {
                               <p className="text-sm text-muted-foreground mt-1">{item.variant.title}</p>
                             )}
                           </div>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 -mt-1 -mr-2 shrink-0"
                             onClick={() => removeFromCart(itemId)}
                           >
                             <X className="w-4 h-4" />
                           </Button>
                         </div>
-                        
+
                         <div className="flex items-center justify-between mt-4">
                           <div className="flex items-center border border-border rounded-lg bg-background">
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               className="h-8 w-8 rounded-none rounded-l-lg"
                               onClick={() => updateQuantity(itemId, item.quantity - 1)}
                             >
@@ -172,9 +172,9 @@ const resolveImg = (path) => {
                             <span className="w-8 text-center text-sm font-bold tabular-nums">
                               {item.quantity}
                             </span>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
+                            <Button
+                              variant="ghost"
+                              size="icon"
                               className="h-8 w-8 rounded-none rounded-r-lg"
                               onClick={() => updateQuantity(itemId, item.quantity + 1)}
                             >
@@ -208,9 +208,9 @@ const resolveImg = (path) => {
                   <span className="font-bold text-2xl text-foreground tabular-nums">{getCartTotal()}</span>
                 </div>
               </div>
-              
-              <Button 
-                className="w-full h-14 rounded-xl font-bold text-lg shadow-lg shadow-primary/20 transition-all active:scale-[0.98]" 
+
+              <Button
+                className="w-full h-14 rounded-xl font-bold text-lg shadow-lg shadow-primary/20 transition-all active:scale-[0.98]"
                 onClick={handleCheckout}
                 disabled={isCheckingOut || cartItems.length === 0}
               >
