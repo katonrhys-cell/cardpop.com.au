@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { slugify } from '@/lib/slugify.js';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -112,6 +113,7 @@ const ShoppingCart = () => {
                   const imageUrl = resolveImg(rawImg);
 
                   const p = item.product;
+                  const productPath = `/product/${p.source || 'marketplace'}/${p.id}/${slugify(p.title || p.name || 'card')}`;
                   const year = p.year || p.card_year || null;
                   const set = p.set || p.card_set || p.era || p.collection || null;
                   const gradingCompany = p.grading_company || p.gradingCompany || null;
@@ -122,7 +124,11 @@ const ShoppingCart = () => {
 
                   return (
                     <div key={itemId} className="flex gap-4 group">
-                      <div className="w-20 h-24 rounded-xl overflow-hidden bg-muted border border-border shrink-0">
+                      <Link
+                        to={productPath}
+                        onClick={() => setIsCartOpen(false)}
+                        className="w-20 h-24 rounded-xl overflow-hidden bg-muted border border-border shrink-0 hover:opacity-90 transition-opacity"
+                      >
                         {imageUrl ? (
                           <img
                             src={imageUrl}
@@ -134,15 +140,17 @@ const ShoppingCart = () => {
                             No Image
                           </div>
                         )}
-                      </div>
+                      </Link>
 
                       <div className="flex-1 flex flex-col justify-between py-1">
                         <div className="flex justify-between items-start gap-2">
                           <div>
                             {year && <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5">{year}</p>}
-                            <h4 className="font-bold text-foreground line-clamp-2 leading-tight">
+                            <Link to={productPath} onClick={() => setIsCartOpen(false)}>
+                            <h4 className="font-bold text-foreground line-clamp-2 leading-tight hover:text-primary transition-colors">
                               {p.title || p.name}
                             </h4>
+                            </Link>
                             {set && <p className="text-xs text-muted-foreground mt-0.5">{set}</p>}
                             {gradeLabel && <p className="text-xs font-semibold text-primary mt-0.5">{gradeLabel}</p>}
                             {!year && !set && !gradeLabel && item.variant?.title && item.variant.title !== 'Default Title' && (

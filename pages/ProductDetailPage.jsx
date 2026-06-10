@@ -76,7 +76,7 @@ const ProductDetailPage = () => {
             grade: vi?.grade,
             grading_company: vi?.grading_company,
             year: vi?.card_year || vi?.year || null,
-            set: vi?.card_set || vi?.era || vi?.collection || null,
+            set: vi?.set_name || vi?.card_set || vi?.era || vi?.collection || null,
             category: listing.category,
             listing_type: listingTypeMap[listing.listing_type] || 'For Sale',
             owner_id: listing.seller_id,
@@ -174,11 +174,12 @@ const ProductDetailPage = () => {
     const priceInCents = Math.round((product.price || 0) * 100);
     const cartProduct = {
       id: product.id,
+      source,
       title: product.name,
       price: priceInCents / 100,
       image: product.images?.[0] || null,
       year: product.year || product.card_year || null,
-      set: product.set || product.card_set || product.era || product.collection || null,
+      set: product.set || product.set_name || product.card_set || product.era || product.collection || null,
       grading_company: product.grading_company || product.gradingCompany || null,
       grade: product.grade || null,
     };
