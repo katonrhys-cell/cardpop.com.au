@@ -160,8 +160,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   const resetPassword = async (email) => {
+    const base = window.location.hostname === 'localhost'
+      ? window.location.origin
+      : 'https://cardpop.com.au';
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/account/reset-password`,
+      redirectTo: `${base}/account/reset-password`,
     });
     if (error) throw new Error(error.message);
     return true;
