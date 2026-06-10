@@ -327,21 +327,21 @@ const CollectionPage = () => {
     let cancelled = false;
     getSubcategoriesByCategory(categoryId).then(subs => {
       if (!cancelled) setSubOpts(subs);
-    });
+    }).catch(() => {});
     return () => { cancelled = true; };
   }, [categoryId, getSubcategoriesByCategory]);
 
   useEffect(() => {
     if (!filterSub) { setBrandOpts([]); setFilterBrand(''); return; }
     let cancelled = false;
-    getBrandsBySubcategory(filterSub).then(b => { if (!cancelled) setBrandOpts(b); });
+    getBrandsBySubcategory(filterSub).then(b => { if (!cancelled) setBrandOpts(b); }).catch(() => {});
     return () => { cancelled = true; };
   }, [filterSub, getBrandsBySubcategory]);
 
   useEffect(() => {
     if (!filterBrand) { setSeriesOpts([]); setFilterSeries(''); return; }
     let cancelled = false;
-    getSeriesByBrand(filterBrand).then(s => { if (!cancelled) setSeriesOpts(s); });
+    getSeriesByBrand(filterBrand).then(s => { if (!cancelled) setSeriesOpts(s); }).catch(() => {});
     return () => { cancelled = true; };
   }, [filterBrand, getSeriesByBrand]);
 
@@ -365,7 +365,10 @@ const CollectionPage = () => {
       .then(({ data }) => {
         if (cancelled) return;
         setNewReleases((data ?? []).map(i => ({ ...i, source: 'vault' })));
-        setNewReleasesLoading(false);
+      }).catch(() => {
+        if (!cancelled) setNewReleases([]);
+      }).finally(() => {
+        if (!cancelled) setNewReleasesLoading(false);
       });
 
     return () => { cancelled = true; };
@@ -446,9 +449,14 @@ const CollectionPage = () => {
   }, [categoryId]);
 
   // ─── Main Browse Grid ─────────────────────────────────────────────────────
+  // Each call gets a unique id; state updates are skipped once a newer call
+  // (or unmount) supersedes this one, so stale responses can't overwrite the grid.
+  const listingsFetchIdRef = useRef(0);
   const fetchListings = useCallback(async (page = 1) => {
     if (!categoryId) return;
-    if (isMounted.current) { setListingsLoading(true); setListingsError(null); }
+    const fetchId = ++listingsFetchIdRef.current;
+    const isCurrent = () => listingsFetchIdRef.current === fetchId;
+    setListingsLoading(true); setListingsError(null);
 
     const perPage = LISTINGS_PER_PAGE;
     const from = (page - 1) * perPage;
@@ -481,16 +489,16 @@ const CollectionPage = () => {
 
       const { data, error, count } = await q;
 
-      if (!isMounted.current) return;
+      if (!isCurrent()) return;
       if (error) throw error;
 
       setListings(page === 1 ? (data ?? []) : prev => [...prev, ...(data ?? [])]);
       setTotalListings(count ?? 0);
       setListingsPage(page);
     } catch (err) {
-      if (isMounted.current) setListingsError('Failed to load listings. Please try again.');
+      if (isCurrent()) setListingsError('Failed to load listings. Please try again.');
     } finally {
-      if (isMounted.current) setListingsLoading(false);
+      if (isCurrent()) setListingsLoading(false);
     }
   }, [categoryId, activeEra, filterType, filterCondition, filterVariant, filterSort, filterSub, filterBrand, filterSeries]);
 
