@@ -76,7 +76,7 @@ const ProductDetailPage = () => {
             grade: vi?.grade,
             grading_company: vi?.grading_company,
             year: vi?.card_year || vi?.year || null,
-            set: vi?.card_set || vi?.era || vi?.collection || null,
+            set: vi?.set_name || vi?.card_set || vi?.era || vi?.collection || null,
             category: listing.category,
             listing_type: listingTypeMap[listing.listing_type] || 'For Sale',
             owner_id: listing.seller_id,
@@ -106,22 +106,22 @@ const ProductDetailPage = () => {
         if (!isMounted) return;
 
         if (source === 'vault') {
+          // Always prefer the marketplace listing if one exists — it has price + buy action
+          const { data: activeListing } = await supabase
+            .from('listings')
+            .select('id')
+            .eq('vault_item_id', id)
+            .eq('status', 'active')
+            .maybeSingle();
+
+          if (isMounted && activeListing) {
+            navigate(`/product/marketplace/${activeListing.id}`, { replace: true });
+            return;
+          }
+
           const userRole = isAdmin ? 'admin' : 'user';
           const isAuthorized = canViewVaultProduct(currentUser?.id, data.owner_id, data.is_public, userRole);
           if (!isAuthorized) {
-            // If this vault item has an active marketplace listing, redirect there
-            const { data: activeListing } = await supabase
-              .from('listings')
-              .select('id')
-              .eq('vault_item_id', id)
-              .eq('status', 'active')
-              .maybeSingle();
-
-            if (isMounted && activeListing) {
-              navigate(`/product/marketplace/${activeListing.id}`, { replace: true });
-              return;
-            }
-
             if (isMounted) {
               setError('403 Forbidden: You do not have permission to view this private vault item.');
               setLoading(false);
@@ -174,11 +174,12 @@ const ProductDetailPage = () => {
     const priceInCents = Math.round((product.price || 0) * 100);
     const cartProduct = {
       id: product.id,
+      source,
       title: product.name,
       price: priceInCents / 100,
       image: product.images?.[0] || null,
       year: product.year || product.card_year || null,
-      set: product.set || product.card_set || product.era || product.collection || null,
+      set: product.set || product.set_name || product.card_set || product.era || product.collection || null,
       grading_company: product.grading_company || product.gradingCompany || null,
       grade: product.grade || null,
     };
