@@ -71,6 +71,7 @@ const AddEditCardPage = () => {
   const [selCategoryId, setSelCategoryId]     = useState('');
   const [franchiseId, setFranchiseId]         = useState('');
   const [manufacturerId, setManufacturerId]   = useState('');
+  const [setId, setSetId]                     = useState('');
   const [lockedBaseValue, setLockedBaseValue] = useState(null);
   const [psaPopData, setPsaPopData]           = useState(null);
 
@@ -164,6 +165,7 @@ const AddEditCardPage = () => {
         const resolvedFranchise = card.franchise_id ?? card.category_id ?? null;
         if (resolvedFranchise) setFranchiseId(resolvedFranchise);
         if (card.manufacturer_id) setManufacturerId(card.manufacturer_id);
+        // set_id not yet on vault_items — resolved via setName text for now
 
         // Fetch PSA population data if the card has a CardSight ID
         if (card.cardsight_card_id) {
@@ -307,6 +309,7 @@ const AddEditCardPage = () => {
         category_id:         franchiseId || null,
         franchise_id:        franchiseId || null,
         manufacturer_id:     manufacturerId || null,
+        set_id:              setId || null,
         collection:          formData.collection  || null,
         card_name:           formData.cardName.trim(),
         set_name:            formData.setName?.trim()     || null,
@@ -549,12 +552,17 @@ const AddEditCardPage = () => {
                     categoryId={selCategoryId}
                     franchiseId={franchiseId}
                     manufacturerId={manufacturerId}
+                    setId={setId}
                     onCategoryChange={setSelCategoryId}
                     onFranchiseChange={(id, name) => {
                       setFranchiseId(id);
                       set('collection', name);
                     }}
                     onManufacturerChange={setManufacturerId}
+                    onSetChange={(id, name) => {
+                      setSetId(id);
+                      if (name) set('setName', name);
+                    }}
                     highlighted={isAutoFilled}
                   />
 
@@ -571,30 +579,28 @@ const AddEditCardPage = () => {
                     {errors.cardName && <p className="text-destructive text-xs">{errors.cardName}</p>}
                   </div>
 
-                  {/* Era / Set Name */}
+                  {/* Era / Set Name — read-only if a set was picked from the hierarchy */}
                   <div className="space-y-2">
-                    <Label className="font-bold">Era / Set Name</Label>
-                    {eraOpts.length > 0 ? (
-                      <Select value={formData.setName || '__none__'} onValueChange={v => set('setName', v === '__none__' ? '' : v)}>
-                        <SelectTrigger className="h-11 bg-background">
-                          <SelectValue placeholder="Select an era or set…" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">— Not specified —</SelectItem>
-                          <SelectSeparator />
-                          {eraOpts.map(era => (
-                            <SelectItem key={era.name} value={era.name}>
-                              {era.name}{era.years ? ` (${era.years})` : ''}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <Label className="font-bold">Set Name</Label>
+                    {setId ? (
+                      <div className="flex items-center gap-2">
+                        <div className="h-11 flex-1 flex items-center px-3 rounded-md border border-border bg-muted/40 text-sm text-foreground">
+                          {formData.setName}
+                        </div>
+                        <button
+                          type="button"
+                          className="text-xs text-muted-foreground hover:text-destructive underline whitespace-nowrap"
+                          onClick={() => { setSetId(''); set('setName', ''); }}
+                        >
+                          Clear
+                        </button>
+                      </div>
                     ) : (
                       <Input
                         id="setName"
                         value={formData.setName}
                         onChange={e => set('setName', e.target.value)}
-                        placeholder="e.g. Base Set"
+                        placeholder="e.g. 2024-25 Prizm Basketball"
                         className="h-11 bg-background"
                       />
                     )}
