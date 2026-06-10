@@ -75,6 +75,8 @@ const ProductDetailPage = () => {
             condition: vi?.condition,
             grade: vi?.grade,
             grading_company: vi?.grading_company,
+            year: vi?.card_year || vi?.year || null,
+            set: vi?.card_set || vi?.era || vi?.collection || null,
             category: listing.category,
             listing_type: listingTypeMap[listing.listing_type] || 'For Sale',
             owner_id: listing.seller_id,
@@ -292,9 +294,14 @@ const ProductDetailPage = () => {
               {product.name}
             </h1>
             
-            <p className="text-muted-foreground font-medium text-sm mb-6">
+            <p className="text-muted-foreground font-medium text-sm mb-2">
               {product.category || product.collectionType}
             </p>
+            {(product.year || product.set) && (
+              <p className="text-muted-foreground text-sm mb-6">
+                {[product.year, product.set].filter(Boolean).join(' · ')}
+              </p>
+            )}
 
             <div className="mb-8">
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Estimated Value / Price</p>

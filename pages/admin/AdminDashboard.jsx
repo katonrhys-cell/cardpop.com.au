@@ -192,6 +192,26 @@ const AdminDashboard = () => {
           </div>
           <h2 className="text-2xl font-bold text-foreground">Dashboard Error</h2>
           <p className="text-muted-foreground">{error}</p>
+          <Button onClick={() => fetchRef.current?.()} className="w-full rounded-xl">
+            <RefreshCw className="w-4 h-4 mr-2" /> Retry
+          </Button>
+          <div className="pt-2 border-t border-border">
+            <p className="text-xs text-muted-foreground mb-4 font-medium uppercase tracking-wider">Quick Navigation</p>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              {[
+                { label: 'Events', link: '/admin/events' },
+                { label: 'Users', link: '/admin/users' },
+                { label: 'Verification', link: '/admin/verification' },
+                { label: 'Orders', link: '/admin/orders' },
+                { label: 'Categories', link: '/admin/categories' },
+                { label: 'Settings', link: '/admin/settings' },
+              ].map(({ label, link }) => (
+                <Button key={link} asChild variant="outline" size="sm" className="rounded-lg">
+                  <Link to={link}>{label}</Link>
+                </Button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     );
