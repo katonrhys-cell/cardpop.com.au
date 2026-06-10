@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign } from 'lucide-react';
+import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatEntryFee } from '@/lib/eventSeo.js';
@@ -155,6 +155,35 @@ const EventDetailCard = ({ event }) => {
                 </a>
               </Button>
             </div>
+
+            {(event.instagram_url || event.facebook_url || event.website_url) && (
+              <div className="pt-6 border-t border-border">
+                <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Follow the Organiser</p>
+                <div className="flex flex-col gap-2">
+                  {event.instagram_url && (
+                    <Button variant="outline" className="w-full justify-start h-11 border-border hover:bg-muted font-semibold" asChild>
+                      <a href={event.instagram_url} target="_blank" rel="noopener noreferrer">
+                        <Instagram className="w-4 h-4 mr-2 text-pink-600" /> Instagram
+                      </a>
+                    </Button>
+                  )}
+                  {event.facebook_url && (
+                    <Button variant="outline" className="w-full justify-start h-11 border-border hover:bg-muted font-semibold" asChild>
+                      <a href={event.facebook_url} target="_blank" rel="noopener noreferrer">
+                        <Facebook className="w-4 h-4 mr-2 text-blue-600" /> Facebook
+                      </a>
+                    </Button>
+                  )}
+                  {event.website_url && (
+                    <Button variant="outline" className="w-full justify-start h-11 border-border hover:bg-muted font-semibold" asChild>
+                      <a href={event.website_url} target="_blank" rel="noopener noreferrer">
+                        <Globe className="w-4 h-4 mr-2 text-primary" /> Official Website
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="pt-6 border-t border-border">
               <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Share Event</p>
