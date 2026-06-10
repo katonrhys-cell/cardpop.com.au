@@ -481,7 +481,7 @@ const HomePage = () => {
                 initial={{ opacity: 0, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: Math.min(i, 8) * 0.05 }}
+                transition={{ duration: 0.2, delay: Math.min(i, 8) * 0.03 }}
                 className="flex-shrink-0 snap-start w-32"
               >
                 <Link
