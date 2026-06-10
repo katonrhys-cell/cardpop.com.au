@@ -216,6 +216,7 @@ if (window.navigation && window.self !== window.top) {
 
 const addTransformIndexHtml = {
 	name: 'add-transform-index-html',
+	apply: 'serve',
 	transformIndexHtml(html) {
 		const tags = [
 			{
