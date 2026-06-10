@@ -1,7 +1,8 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, ShieldCheck, Lock, ShoppingCart, ArrowRightLeft, Layers } from 'lucide-react';
+import { Star, ShieldCheck, Lock, ShoppingCart, ArrowRightLeft, Layers, ZoomIn } from 'lucide-react';
+import ImageZoomModal from '@/components/ImageZoomModal.jsx';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { VARIANT_BADGES } from '@/lib/cardVariants.js';
@@ -24,6 +25,7 @@ const resolveImageUrl = (path) => {
 };
 
 const VaultListingCard = ({ vaultItem }) => {
+  const [zoomOpen, setZoomOpen] = useState(false);
   const rawImg = vaultItem.vault_images?.[0]?.storage_path || vaultItem.card_image || vaultItem.vault_images?.[0]?.image_url || vaultItem.image_url || null;
   const imgSrc = resolveImageUrl(rawImg);
   const sellerId = vaultItem.user_id || vaultItem.owner_id;
@@ -69,7 +71,25 @@ const VaultListingCard = ({ vaultItem }) => {
             {specialBadge[1].label}
           </div>
         )}
+
+        {/* Zoom button */}
+        {imgSrc && (
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setZoomOpen(true); }}
+            aria-label="Zoom image"
+            className="absolute bottom-3 right-3 z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm text-foreground flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-background"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+        )}
       </Link>
+
+      <ImageZoomModal
+        isOpen={zoomOpen}
+        onClose={() => setZoomOpen(false)}
+        imageUrl={imgSrc}
+        altText={vaultItem.card_name || vaultItem.name || 'Card Image'}
+      />
       
       <div className="p-5 flex flex-col flex-1">
         <Link to={detailPath} className="block mb-3">

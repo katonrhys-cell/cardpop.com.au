@@ -1,7 +1,8 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, Tag, Heart } from 'lucide-react';
+import { Star, Tag, Heart, ZoomIn } from 'lucide-react';
+import ImageZoomModal from '@/components/ImageZoomModal.jsx';
 import { toast } from 'sonner';
 import VerifiedBadge from '@/components/VerifiedBadge.jsx';
 import SellerTierBadge from '@/components/SellerTierBadge.jsx';
@@ -24,6 +25,7 @@ const GRADE_BADGE = {
 };
 
 const MarketplaceListingCard = ({ listing }) => {
+  const [zoomOpen, setZoomOpen] = useState(false);
   const { isAuthenticated } = useAuth();
   const { isWatchlisted, toggle } = useWatchlist();
   const watchlisted = isWatchlisted(listing.id);
@@ -110,7 +112,25 @@ const MarketplaceListingCard = ({ listing }) => {
         >
           <Heart className={`w-4 h-4 ${watchlisted ? 'fill-current' : ''}`} />
         </button>
+
+        {/* Zoom button */}
+        {imgSrc && (
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setZoomOpen(true); }}
+            aria-label="Zoom image"
+            className="absolute bottom-3 left-3 z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm text-foreground flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-background"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+        )}
       </Link>
+
+      <ImageZoomModal
+        isOpen={zoomOpen}
+        onClose={() => setZoomOpen(false)}
+        imageUrl={imgSrc}
+        altText={listing.title || 'Card Image'}
+      />
       
       <div className="p-5 flex flex-col flex-1">
         <Link to={detailPath} className="block mb-2">
