@@ -162,6 +162,7 @@ const BrowseDropdown = ({ onNavigate }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const timerRef = useRef(null);
+  const location = useLocation();
 
   const handleMouseEnter = () => {
     clearTimeout(timerRef.current);
@@ -170,6 +171,19 @@ const BrowseDropdown = ({ onNavigate }) => {
   const handleMouseLeave = () => {
     timerRef.current = setTimeout(() => setOpen(false), 120);
   };
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  // Close when the route changes (e.g. navigation from within the panel)
+  useEffect(() => { setOpen(false); }, [location.pathname]);
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
@@ -268,16 +282,27 @@ const BrowseDropdown = ({ onNavigate }) => {
 // ─── Blog mega-dropdown ───────────────────────────────────────────────────────
 const BlogDropdown = ({ onNavigate }) => {
   const [open, setOpen] = useState(false);
+  const ref = useRef(null);
   const location = useLocation();
   const timerRef = useRef(null);
   const isBlogActive = location.pathname.startsWith('/blog');
 
   const handleMouseEnter = () => { clearTimeout(timerRef.current); setOpen(true); };
   const handleMouseLeave = () => { timerRef.current = setTimeout(() => setOpen(false), 120); };
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  useEffect(() => { setOpen(false); }, [location.pathname]);
+
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
   return (
-    <div className="relative" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+    <div className="relative" ref={ref} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
       <button
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
