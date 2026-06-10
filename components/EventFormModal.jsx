@@ -62,6 +62,8 @@ const INITIAL_STATE = {
   organizer_phone: '',
   website_url: '',
   ticket_url: '',
+  instagram_url: '',
+  facebook_url: '',
   entry_fee_aud: '',
   is_free: true,
   capacity: '',
@@ -157,6 +159,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         organizer_phone:     scrapedData.organizer_phone || scrapedData.contact?.phone || '',
         website_url:         scrapedData.website_url || scrapedData.contact?.website || '',
         ticket_url:          scrapedData.ticket_url || scrapedData.registrationLink || '',
+        instagram_url:       scrapedData.instagram_url || '',
+        facebook_url:        scrapedData.facebook_url || '',
         entry_fee_aud:       scrapedData.entry_fee_aud != null ? String(scrapedData.entry_fee_aud) : scrapedData.price != null ? String(scrapedData.price) : '',
         is_free:             scrapedData.is_free ?? (!scrapedData.entry_fee_aud && !scrapedData.price),
         capacity:            scrapedData.capacity != null ? String(scrapedData.capacity) : '',
@@ -204,6 +208,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         organizer_phone:     event.organizer_phone || '',
         website_url:         event.website_url || '',
         ticket_url:          event.ticket_url || '',
+        instagram_url:       event.instagram_url || '',
+        facebook_url:        event.facebook_url || '',
         entry_fee_aud:       event.entry_fee_aud != null ? String(event.entry_fee_aud) : '',
         is_free:             event.is_free ?? true,
         capacity:            event.capacity != null ? String(event.capacity) : '',
@@ -310,6 +316,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         organizer_phone:     formData.organizer_phone.trim() || null,
         website_url:         formData.website_url.trim() || null,
         ticket_url:          formData.ticket_url.trim() || null,
+        instagram_url:       formData.instagram_url.trim() || null,
+        facebook_url:        formData.facebook_url.trim() || null,
         entry_fee_aud:       formData.is_free ? 0 : (parseFloat(formData.entry_fee_aud) || 0),
         is_free:             formData.is_free,
         capacity:            formData.capacity ? parseInt(formData.capacity, 10) : null,
@@ -577,6 +585,14 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   <div className="sm:col-span-2 space-y-2">
                     <Label htmlFor="ticket_url" className="font-bold">Tickets / Registration URL</Label>
                     <Input id="ticket_url" name="ticket_url" type="url" value={formData.ticket_url} onChange={handleChange} className={inputCls} placeholder="https://" disabled={loading} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="instagram_url" className="font-bold">Instagram URL</Label>
+                    <Input id="instagram_url" name="instagram_url" type="url" value={formData.instagram_url} onChange={handleChange} className={inputCls} placeholder="https://instagram.com/..." disabled={loading} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="facebook_url" className="font-bold">Facebook URL</Label>
+                    <Input id="facebook_url" name="facebook_url" type="url" value={formData.facebook_url} onChange={handleChange} className={inputCls} placeholder="https://facebook.com/..." disabled={loading} />
                   </div>
                 </div>
 
