@@ -106,22 +106,22 @@ const ProductDetailPage = () => {
         if (!isMounted) return;
 
         if (source === 'vault') {
+          // Always prefer the marketplace listing if one exists — it has price + buy action
+          const { data: activeListing } = await supabase
+            .from('listings')
+            .select('id')
+            .eq('vault_item_id', id)
+            .eq('status', 'active')
+            .maybeSingle();
+
+          if (isMounted && activeListing) {
+            navigate(`/product/marketplace/${activeListing.id}`, { replace: true });
+            return;
+          }
+
           const userRole = isAdmin ? 'admin' : 'user';
           const isAuthorized = canViewVaultProduct(currentUser?.id, data.owner_id, data.is_public, userRole);
           if (!isAuthorized) {
-            // If this vault item has an active marketplace listing, redirect there
-            const { data: activeListing } = await supabase
-              .from('listings')
-              .select('id')
-              .eq('vault_item_id', id)
-              .eq('status', 'active')
-              .maybeSingle();
-
-            if (isMounted && activeListing) {
-              navigate(`/product/marketplace/${activeListing.id}`, { replace: true });
-              return;
-            }
-
             if (isMounted) {
               setError('403 Forbidden: You do not have permission to view this private vault item.');
               setLoading(false);
