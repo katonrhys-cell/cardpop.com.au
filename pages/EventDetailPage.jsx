@@ -33,10 +33,10 @@ const EventDetailPage = () => {
       setIsLoading(true);
       try {
         const column = UUID_PATTERN.test(eventId) ? 'id' : 'slug';
+        // events_public exposes only approved events with public-safe columns
         const { data, error } = await supabase
-          .from('events')
+          .from('events_public')
           .select('*')
-          .eq('status', 'approved')
           .eq(column, eventId)
           .maybeSingle();
         if (error) throw error;

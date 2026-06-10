@@ -12,9 +12,9 @@ async function sessionTimeoutMiddleware(req, res, next) {
     const token = req.headers.authorization?.substring(7);
 
     const { data: profile } = await supabase
-      .from('profiles')
+      .from('user_security')
       .select('active_sessions')
-      .eq('id', userId)
+      .eq('user_id', userId)
       .single();
 
     const sessions = profile?.active_sessions || [];
@@ -26,16 +26,16 @@ async function sessionTimeoutMiddleware(req, res, next) {
     const inactiveTime = Date.now() - new Date(currentSession.lastActivityAt).getTime();
 
     if (inactiveTime > SESSION_TIMEOUT_MS) {
-      await supabase.from('profiles')
+      await supabase.from('user_security')
         .update({ active_sessions: sessions.filter(s => s.sessionId !== token) })
-        .eq('id', userId);
+        .eq('user_id', userId);
       return res.status(401).json({ error: 'Session expired due to inactivity' });
     }
 
     // Update lastActivityAt
-    await supabase.from('profiles')
+    await supabase.from('user_security')
       .update({ active_sessions: sessions.map(s => s.sessionId === token ? { ...s, lastActivityAt: new Date().toISOString() } : s) })
-      .eq('id', userId);
+      .eq('user_id', userId);
 
     next();
   } catch (error) {
