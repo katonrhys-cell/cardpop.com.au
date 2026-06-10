@@ -1,535 +1,422 @@
-
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
-import { FolderTree, Plus, RefreshCw, Loader2, AlertCircle, Info } from 'lucide-react';
+import {
+  ChevronRight, ChevronDown, Plus, Pencil, Trash2, Loader2,
+  FolderTree, Tag, Factory, Check, X,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
-import { useDragDrop } from '@/hooks/useDragDrop.js';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient.js';
 
-import CategoryDragItem from '@/components/admin/CategoryDragItem.jsx';
-import SubcategoryDragItem from '@/components/admin/SubcategoryDragItem.jsx';
-import BrandDragItem from '@/components/admin/BrandDragItem.jsx';
-import SeriesDragItem from '@/components/admin/SeriesDragItem.jsx';
-import DropZoneContainer from '@/components/admin/DropZoneContainer.jsx';
+// ─── helpers ──────────────────────────────────────────────────────────────────
 
-const TreeNode = ({ node, type, childrenNodes, onAddChild, onEdit, onDelete, onDropSuccess }) => {
-  const [expanded, setExpanded] = useState(true);
+const slug = (name) =>
+  name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-  const handleToggle = () => {
-    setExpanded(!expanded);
-  };
+// ─── Inline editable text ─────────────────────────────────────────────────────
 
-  const childType = type === 'category' ? 'subcategory' : type === 'subcategory' ? 'brand' : 'series';
-  const childCount = childrenNodes ? childrenNodes.length : 0;
-
-  const renderNode = () => {
-    const props = {
-      expanded,
-      onToggle: handleToggle,
-      onEdit,
-      onDelete,
-      onAddChild,
-      onDropSuccess,
-      childCount
-    };
-
-    switch (type) {
-      case 'category': return <CategoryDragItem category={node} {...props} />;
-      case 'subcategory': return <SubcategoryDragItem subcategory={node} {...props} />;
-      case 'brand': return <BrandDragItem brand={node} {...props} />;
-      case 'series': return <SeriesDragItem series={node} {...props} />;
-      default: return null;
-    }
-  };
-
+const InlineEdit = ({ value, onSave, onCancel }) => {
+  const [text, setText] = useState(value);
   return (
-    <div className="w-full relative">
-      {renderNode()}
+    <span className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+      <Input
+        autoFocus
+        value={text}
+        onChange={e => setText(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') onSave(text); if (e.key === 'Escape') onCancel(); }}
+        className="h-7 text-sm w-48 px-2"
+      />
+      <button onClick={() => onSave(text)} className="text-emerald-600 hover:text-emerald-700"><Check className="w-4 h-4" /></button>
+      <button onClick={onCancel} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+    </span>
+  );
+};
 
-      {expanded && type !== 'series' && (
-        <div className="relative pl-6 ml-6 border-l-2 border-border/40 mt-1 mb-3">
-          {childrenNodes && childrenNodes.length > 0 ? (
-            <div className="space-y-1">
-              {childrenNodes.map(child => (
-                <TreeNode 
-                  key={child.node.id} 
-                  node={child.node} 
-                  type={childType} 
-                  childrenNodes={child.children}
-                  onAddChild={onAddChild} 
-                  onEdit={onEdit} 
-                  onDelete={onDelete} 
-                  onDropSuccess={onDropSuccess}
-                />
-              ))}
-              <DropZoneContainer 
-                targetType={`${childType}_list`} 
-                targetId={node.id} 
-                onDropSuccess={(draggedData, targetData) => onDropSuccess(draggedData, { ...targetData, parentId: node.id })}
-                className="h-4 w-full rounded-md mt-1"
-              />
-            </div>
-          ) : (
-            <DropZoneContainer 
-              targetType={`${childType}_list`} 
-              targetId={node.id} 
-              onDropSuccess={(draggedData, targetData) => onDropSuccess(draggedData, { ...targetData, parentId: node.id })}
-              className="py-4 px-4 text-sm text-muted-foreground italic opacity-70 border border-dashed border-border rounded-lg text-center"
-            >
-              No {childType}s found. Drag items here to add.
-            </DropZoneContainer>
-          )}
-        </div>
-      )}
+// ─── Add-row inline form ───────────────────────────────────────────────────────
+
+const AddRow = ({ placeholder, onAdd, onCancel }) => {
+  const [text, setText] = useState('');
+  return (
+    <div className="flex items-center gap-2 mt-2 ml-2" onClick={e => e.stopPropagation()}>
+      <Input
+        autoFocus
+        value={text}
+        onChange={e => setText(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter' && text.trim()) onAdd(text.trim()); if (e.key === 'Escape') onCancel(); }}
+        placeholder={placeholder}
+        className="h-7 text-sm w-52 px-2"
+      />
+      <Button size="sm" className="h-7 px-3 text-xs" onClick={() => text.trim() && onAdd(text.trim())}>Add</Button>
+      <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={onCancel}>Cancel</Button>
     </div>
   );
 };
 
+// ─── Confirm delete button ────────────────────────────────────────────────────
+
+const DeleteButton = ({ onConfirm, label }) => {
+  const [confirming, setConfirming] = useState(false);
+  if (confirming) return (
+    <span className="flex items-center gap-1 text-xs" onClick={e => e.stopPropagation()}>
+      <span className="text-destructive font-medium">Delete {label}?</span>
+      <button onClick={() => { setConfirming(false); onConfirm(); }} className="text-destructive hover:text-destructive/80 font-bold">Yes</button>
+      <button onClick={() => setConfirming(false)} className="text-muted-foreground hover:text-foreground">No</button>
+    </span>
+  );
+  return (
+    <button onClick={e => { e.stopPropagation(); setConfirming(true); }} className="text-muted-foreground hover:text-destructive transition-colors">
+      <Trash2 className="w-3.5 h-3.5" />
+    </button>
+  );
+};
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
 const CategoryManagementPage = () => {
-  const { 
-    updateItemParent,
-    updateSeriesParentBrand,
-    updateBrandParentSubcategory,
-    deleteSeries,
-    deleteBrand,
-    convertCategoryToSubcategory,
-    convertBrandToSubcategory,
-    convertBrandToSeries,
-    convertSeriesToBrand
-  } = useDragDrop();
-  
-  const [treeData, setTreeData] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  
-  const [errors, setErrors] = useState({
-    categories: null,
-    subcategories: null,
-    brands: null,
-    series: null
-  });
-  
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalMode, setModalMode] = useState('add');
-  const [modalType, setModalType] = useState('category');
-  const [activeNode, setActiveNode] = useState(null); 
-  const [formData, setFormData] = useState({ 
-    name: '', 
-    slug: '', 
-    description: '', 
-    releaseYear: '',
-    logo_url: '',
-    website_url: ''
-  });
+  const [rootCategories, setRootCategories] = useState([]);
+  const [franchises, setFranchises]         = useState({});       // { categoryId: [...] }
+  const [manufacturers, setManufacturers]   = useState({});       // { franchiseId: [...] }
+  const [expanded, setExpanded]             = useState({});       // { id: bool }
+  const [loading, setLoading]               = useState(true);
+  const [editingId, setEditingId]           = useState(null);
+  const [addingUnder, setAddingUnder]       = useState(null);     // { type, parentId }
+  const [saving, setSaving]                 = useState(false);
 
-  const checkAuthStatus = () => {
-    // Auth status is managed by AdminContext; no PocketBase authStore needed
-    setIsAdmin(true);
-  };
-
-  const loadAllData = async () => {
-    setIsLoading(true);
-    setErrors({
-      categories: null,
-      subcategories: null,
-      brands: null,
-      series: null
-    });
-
-    let fetchedCats = [];
-    let fetchedSubcats = [];
-    // brands and series have been consolidated into Categories — return []
-
+  // ── Load all data ────────────────────────────────────────────────────────
+  const loadAll = useCallback(async () => {
+    setLoading(true);
     try {
-      const { data, error: catErr } = await supabase
-        .from('categories')
-        .select('*')
-        .is('parent_id', null)
-        .order('created_at', { ascending: false });
-      if (catErr) throw catErr;
-      fetchedCats = data || [];
+      const [{ data: cats }, { data: mfrs }] = await Promise.all([
+        supabase.from('categories').select('*').eq('is_active', true).order('sort_order'),
+        supabase.from('manufacturers').select('*').eq('is_active', true).order('sort_order'),
+      ]);
+
+      const roots = (cats ?? []).filter(c => c.parent_id === null);
+      const franchMap = {};
+      roots.forEach(r => {
+        franchMap[r.id] = (cats ?? []).filter(c => c.parent_id === r.id);
+      });
+      const mfrMap = {};
+      (mfrs ?? []).forEach(m => {
+        if (!mfrMap[m.franchise_id]) mfrMap[m.franchise_id] = [];
+        mfrMap[m.franchise_id].push(m);
+      });
+
+      setRootCategories(roots);
+      setFranchises(franchMap);
+      setManufacturers(mfrMap);
+      // Auto-expand roots
+      const exp = {};
+      roots.forEach(r => { exp[r.id] = true; });
+      setExpanded(exp);
     } catch (err) {
-      setErrors(prev => ({ ...prev, categories: err.message || "Failed to load categories" }));
+      toast.error('Failed to load hierarchy');
+    } finally {
+      setLoading(false);
     }
-
-    try {
-      const { data, error: subErr } = await supabase
-        .from('categories')
-        .select('*')
-        .not('parent_id', 'is', null)
-        .order('created_at', { ascending: false });
-      if (subErr) throw subErr;
-      fetchedSubcats = data || [];
-    } catch (err) {
-      setErrors(prev => ({ ...prev, subcategories: err.message || "Failed to load subcategories" }));
-    }
-
-    // brands and series not available — set info notices
-    setErrors(prev => ({
-      ...prev,
-      brands: null,
-      series: null
-    }));
-
-    const tree = fetchedCats.map(cat => ({
-      node: cat,
-      children: fetchedSubcats
-        .filter(s => s.parent_id === cat.id)
-        .map(subcat => ({
-          node: subcat,
-          children: [] // brands removed
-        }))
-    }));
-
-    setTreeData(tree);
-    setIsLoading(false);
-  };
-
-  useEffect(() => {
-    checkAuthStatus();
-    loadAllData();
   }, []);
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await loadAllData();
-    setIsRefreshing(false);
-    if (!Object.values(errors).some(Boolean)) {
-      toast.success('Hierarchy refreshed successfully');
-    }
-  };
+  useEffect(() => { loadAll(); }, [loadAll]);
 
-  const handleAddChild = (parentNode, childType) => {
-    setModalMode('add');
-    setModalType(childType);
-    setActiveNode(parentNode);
-    setFormData({ name: '', slug: '', description: '', releaseYear: '', logo_url: '', website_url: '' });
-    setModalOpen(true);
-  };
+  const toggle = (id) => setExpanded(e => ({ ...e, [id]: !e[id] }));
 
-  const handleAddRoot = () => {
-    setModalMode('add');
-    setModalType('category');
-    setActiveNode(null);
-    setFormData({ name: '', slug: '', description: '', releaseYear: '', logo_url: '', website_url: '' });
-    setModalOpen(true);
-  };
-
-  const handleEdit = (node, type) => {
-    setModalMode('edit');
-    setModalType(type);
-    setActiveNode(node);
-    setFormData({ 
-      name: node.name || '', 
-      slug: node.slug || '', 
-      description: node.description || '',
-      releaseYear: node.releaseYear || '',
-      logo_url: node.logo_url || '',
-      website_url: node.website_url || ''
-    });
-    setModalOpen(true);
-  };
-
-  const handleDelete = async (node, type) => {
-    if (!window.confirm(`Delete ${type} "${node.name}"? This cannot be undone.`)) return;
-
+  // ── Save name edit ───────────────────────────────────────────────────────
+  const saveEdit = async (type, id, name) => {
+    if (!name.trim()) return;
+    setSaving(true);
     try {
-      if (type === 'series' || type === 'brand') {
-        toast.info('This taxonomy level has been consolidated into Categories in the new schema.');
-        return;
-      }
-      // Both category and subcategory map to the categories table
-      const { error: delErr } = await supabase
-        .from('categories')
-        .delete()
-        .eq('id', node.id);
-      if (delErr) throw delErr;
-
-      toast.success(`${type} deleted successfully`);
-      loadAllData();
-    } catch (err) {
-      console.error(`[Hierarchy] Error deleting ${type}:`, err);
-      toast.error(`Failed to delete: ${err.message}`);
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (modalType === 'brand' || modalType === 'series') {
-      toast.info('This taxonomy level has been consolidated into Categories in the new schema.');
-      setModalOpen(false);
-      return;
-    }
-
-    // Both category and subcategory go into the categories table
-    const payload = {
-      name: formData.name,
-      description: formData.description,
-      slug: formData.slug || formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      parent_id: modalType === 'subcategory' && activeNode ? activeNode.id : null
-    };
-
-    try {
-      setIsSaving(true);
-      if (modalMode === 'add') {
-        const { error: insertErr } = await supabase.from('categories').insert(payload);
-        if (insertErr) throw insertErr;
-        toast.success(`${modalType} created successfully`);
+      if (type === 'manufacturer') {
+        const { error } = await supabase.from('manufacturers').update({ name: name.trim(), slug: slug(name) }).eq('id', id);
+        if (error) throw error;
       } else {
-        const { error: updateErr } = await supabase
-          .from('categories')
-          .update(payload)
-          .eq('id', activeNode.id);
-        if (updateErr) throw updateErr;
-        toast.success(`${modalType} updated successfully`);
+        const { error } = await supabase.from('categories').update({ name: name.trim(), slug: slug(name) }).eq('id', id);
+        if (error) throw error;
       }
-
-      setModalOpen(false);
-      await loadAllData();
+      toast.success('Updated');
+      setEditingId(null);
+      loadAll();
     } catch (err) {
-      console.error(`[Hierarchy] Error saving ${modalType}:`, err);
-      toast.error(`Failed to save: ${err.message}`);
+      toast.error(err.message || 'Failed to update');
     } finally {
-      setIsSaving(false);
+      setSaving(false);
     }
   };
 
-  const handleDropSuccess = async (draggedData, targetData) => {
-    setIsSaving(true);
+  // ── Delete ───────────────────────────────────────────────────────────────
+  const handleDelete = async (type, id) => {
+    setSaving(true);
     try {
-      if (draggedData.type === 'category' && targetData.targetType === 'category') {
-        if (draggedData.id === targetData.targetId) return false;
-        await convertCategoryToSubcategory(draggedData.id, targetData.targetId);
-        toast.success(`Converted "${draggedData.name}" to a subcategory`);
-        await loadAllData();
-        return true;
+      if (type === 'manufacturer') {
+        const { error } = await supabase.from('manufacturers').update({ is_active: false }).eq('id', id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('categories').update({ is_active: false }).eq('id', id);
+        if (error) throw error;
       }
-
-      if (draggedData.type === 'brand' && targetData.targetType === 'category') {
-        await convertBrandToSubcategory(draggedData.id, targetData.targetId);
-        toast.success(`Converted brand "${draggedData.name}" to a subcategory`);
-        await loadAllData();
-        return true;
-      }
-
-      if (draggedData.type === 'brand' && targetData.targetType === 'brand') {
-        if (draggedData.id === targetData.targetId) return false;
-        await convertBrandToSeries(draggedData.id, targetData.targetId);
-        toast.success(`Converted brand "${draggedData.name}" to a series`);
-        await loadAllData();
-        return true;
-      }
-
-      if (draggedData.type === 'series' && targetData.targetType === 'subcategory') {
-        await convertSeriesToBrand(draggedData.id, targetData.targetId);
-        toast.success(`Converted series "${draggedData.name}" to a brand`);
-        await loadAllData();
-        return true;
-      }
-
-      // Explicit reparenting handling based on type
-      if (['category', 'subcategory', 'brand', 'series'].includes(draggedData.type)) {
-        if (draggedData.parentId !== targetData.targetId && targetData.targetType !== `${draggedData.type}_list`) {
-          
-          if (draggedData.type === 'series' && targetData.targetType === 'brand') {
-            await updateSeriesParentBrand(draggedData.id, targetData.targetId);
-          } else if (draggedData.type === 'brand' && targetData.targetType === 'subcategory') {
-            await updateBrandParentSubcategory(draggedData.id, targetData.targetId);
-          } else if (draggedData.type !== 'series' && draggedData.type !== 'brand') {
-            await updateItemParent(draggedData.type, draggedData.id, targetData.targetId);
-          }
-          
-          toast.success(`Moved ${draggedData.name} successfully`);
-          await loadAllData();
-          return true;
-        }
-      }
-      
-      if (targetData.targetType.endsWith('_list')) {
-        if (draggedData.type === 'category') {
-          toast.success(`Dropped ${draggedData.name} in category list`);
-          await loadAllData();
-          return true;
-        } else {
-          if (draggedData.parentId !== targetData.parentId) {
-            
-            if (draggedData.type === 'series') {
-              await updateSeriesParentBrand(draggedData.id, targetData.parentId);
-            } else if (draggedData.type === 'brand') {
-              await updateBrandParentSubcategory(draggedData.id, targetData.parentId);
-            } else {
-              await updateItemParent(draggedData.type, draggedData.id, targetData.parentId);
-            }
-
-            toast.success(`Moved ${draggedData.name} successfully`);
-            await loadAllData();
-            return true;
-          }
-        }
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('[Hierarchy] Drag and drop error:', error);
-      toast.error(`Failed to move item: ${error.message}`);
-      return false;
+      toast.success('Removed');
+      loadAll();
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete');
     } finally {
-      setIsSaving(false);
+      setSaving(false);
     }
   };
 
-  const hasAnyErrors = Object.values(errors).some(Boolean);
+  // ── Add ──────────────────────────────────────────────────────────────────
+  const handleAdd = async (type, name, parentId) => {
+    if (!name.trim()) return;
+    setSaving(true);
+    try {
+      if (type === 'manufacturer') {
+        const { error } = await supabase.from('manufacturers').insert({
+          name: name.trim(),
+          slug: slug(name),
+          franchise_id: parentId,
+          sort_order: (manufacturers[parentId]?.length ?? 0) + 1,
+          is_active: true,
+        });
+        if (error) throw error;
+      } else {
+        const sortBase = type === 'category'
+          ? rootCategories.length + 1
+          : (franchises[parentId]?.length ?? 0) + 1;
+        const { error } = await supabase.from('categories').insert({
+          name: name.trim(),
+          slug: slug(name),
+          parent_id: parentId ?? null,
+          category_group: type === 'category' ? 'root' : (
+            rootCategories.find(r => r.id === parentId)?.category_group ?? 'other'
+          ),
+          sort_order: sortBase,
+          is_active: true,
+        });
+        if (error) throw error;
+      }
+      toast.success(`${name} added`);
+      setAddingUnder(null);
+      loadAll();
+    } catch (err) {
+      toast.error(err.message || 'Failed to add');
+    } finally {
+      setSaving(false);
+    }
+  };
 
+  // ── Counts ───────────────────────────────────────────────────────────────
+  const franchiseCount = Object.values(franchises).reduce((s, a) => s + a.length, 0);
+  const mfrCount       = Object.values(manufacturers).reduce((s, a) => s + a.length, 0);
+
+  // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="w-full space-y-6 py-6 px-4 sm:px-6 md:px-8 max-w-5xl mx-auto">
-      <Helmet><title>Category Hierarchy | Admin</title></Helmet>
+    <div className="p-6 max-w-4xl mx-auto space-y-6">
+      <Helmet><title>Hierarchy Management | CardPop Admin</title></Helmet>
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-3">
-            Hierarchy Tree
-            {isSaving && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
+          <h1 className="text-2xl font-serif font-bold flex items-center gap-2">
+            <FolderTree className="w-6 h-6" /> Hierarchy Management
           </h1>
-          <p className="text-muted-foreground mt-1">Manage nested categories, brands, and series across the platform.</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            {rootCategories.length} categories · {franchiseCount} franchises · {mfrCount} manufacturers
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button 
-            variant="outline" 
-            onClick={handleRefresh} 
-            disabled={isRefreshing || isLoading}
-            className="rounded-xl font-bold shadow-sm"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
-          </Button>
-          <Button onClick={handleAddRoot} className="rounded-xl font-bold shadow-sm">
-            <Plus className="w-4 h-4 mr-2" /> Add Category
-          </Button>
-        </div>
+        <Button
+          size="sm"
+          onClick={() => setAddingUnder({ type: 'category', parentId: null })}
+          className="gap-1.5"
+        >
+          <Plus className="w-4 h-4" /> Add Category
+        </Button>
       </div>
 
-      {isAdmin && (
-        <Accordion type="single" collapsible className="w-full bg-transparent border-none">
-        </Accordion>
-      )}
+      {loading ? (
+        <div className="flex items-center gap-2 text-muted-foreground py-12 justify-center">
+          <Loader2 className="w-5 h-5 animate-spin" /> Loading…
+        </div>
+      ) : (
+        <div className="space-y-2">
 
-      {hasAnyErrors && (
-        <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4 flex flex-col gap-2">
-          <div className="flex items-center gap-2 text-destructive font-bold">
-            <AlertCircle className="w-5 h-5" />
-            Some collections failed to load
-          </div>
-          <ul className="text-sm text-destructive/80 space-y-1 list-disc list-inside pl-7">
-            {errors.categories && <li><strong>Categories:</strong> {errors.categories}</li>}
-            {errors.subcategories && <li><strong>Subcategories:</strong> {errors.subcategories}</li>}
-            {errors.brands && <li><strong>Brands:</strong> {errors.brands}</li>}
-            {errors.series && <li><strong>Series:</strong> {errors.series}</li>}
-          </ul>
-          <div className="mt-2 text-sm text-foreground/80 flex items-center gap-1.5 font-medium">
-            <Info className="w-4 h-4 text-primary" /> Partial data is displayed. Please resolve the errors and refresh.
-          </div>
+          {/* Root category add row */}
+          {addingUnder?.type === 'category' && addingUnder?.parentId === null && (
+            <AddRow
+              placeholder="New category name…"
+              onAdd={name => handleAdd('category', name, null)}
+              onCancel={() => setAddingUnder(null)}
+            />
+          )}
+
+          {rootCategories.map(cat => (
+            <div key={cat.id} className="rounded-xl border border-border bg-card overflow-hidden">
+
+              {/* ── Category row ── */}
+              <div
+                className="flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-muted/40 select-none"
+                onClick={() => toggle(cat.id)}
+              >
+                <button className="text-muted-foreground" onClick={e => { e.stopPropagation(); toggle(cat.id); }}>
+                  {expanded[cat.id]
+                    ? <ChevronDown className="w-4 h-4" />
+                    : <ChevronRight className="w-4 h-4" />}
+                </button>
+                <FolderTree className="w-4 h-4 text-brand-blue shrink-0" />
+
+                {editingId === cat.id ? (
+                  <InlineEdit
+                    value={cat.name}
+                    onSave={name => saveEdit('category', cat.id, name)}
+                    onCancel={() => setEditingId(null)}
+                  />
+                ) : (
+                  <span className="font-bold text-sm flex-1">{cat.name}</span>
+                )}
+
+                <Badge variant="outline" className="text-xs ml-auto mr-3">
+                  {franchises[cat.id]?.length ?? 0} franchises
+                </Badge>
+
+                <span className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={e => e.stopPropagation()}>
+                  <button className="text-muted-foreground hover:text-foreground" onClick={() => setEditingId(cat.id)}>
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <DeleteButton label={cat.name} onConfirm={() => handleDelete('category', cat.id)} />
+                  <button
+                    className="text-muted-foreground hover:text-primary ml-1"
+                    onClick={() => setAddingUnder({ type: 'franchise', parentId: cat.id })}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
+                </span>
+              </div>
+
+              {/* ── Franchises ── */}
+              {expanded[cat.id] && (
+                <div className="border-t border-border/50 bg-muted/20">
+
+                  {addingUnder?.type === 'franchise' && addingUnder?.parentId === cat.id && (
+                    <div className="px-4 py-2">
+                      <AddRow
+                        placeholder="New franchise name…"
+                        onAdd={name => handleAdd('franchise', name, cat.id)}
+                        onCancel={() => setAddingUnder(null)}
+                      />
+                    </div>
+                  )}
+
+                  {(franchises[cat.id] ?? []).length === 0 && addingUnder?.parentId !== cat.id && (
+                    <p className="text-xs text-muted-foreground px-10 py-3 italic">No franchises yet.</p>
+                  )}
+
+                  {(franchises[cat.id] ?? []).map(fr => (
+                    <div key={fr.id}>
+
+                      {/* franchise row */}
+                      <div
+                        className="flex items-center gap-2 px-10 py-2.5 cursor-pointer hover:bg-muted/40 select-none border-b border-border/30 last:border-b-0"
+                        onClick={() => toggle(fr.id)}
+                      >
+                        <button className="text-muted-foreground">
+                          {expanded[fr.id]
+                            ? <ChevronDown className="w-3.5 h-3.5" />
+                            : <ChevronRight className="w-3.5 h-3.5" />}
+                        </button>
+                        <Tag className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+
+                        {editingId === fr.id ? (
+                          <InlineEdit
+                            value={fr.name}
+                            onSave={name => saveEdit('franchise', fr.id, name)}
+                            onCancel={() => setEditingId(null)}
+                          />
+                        ) : (
+                          <span className="text-sm flex-1">{fr.name}</span>
+                        )}
+
+                        <span className="text-xs text-muted-foreground mr-3">
+                          {manufacturers[fr.id]?.length ?? 0} manufacturers
+                        </span>
+
+                        <span className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                          <button className="text-muted-foreground hover:text-foreground" onClick={() => setEditingId(fr.id)}>
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                          <DeleteButton label={fr.name} onConfirm={() => handleDelete('franchise', fr.id)} />
+                          <button
+                            className="text-muted-foreground hover:text-primary ml-1"
+                            onClick={() => setAddingUnder({ type: 'manufacturer', parentId: fr.id })}
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        </span>
+                      </div>
+
+                      {/* ── Manufacturers ── */}
+                      {expanded[fr.id] && (
+                        <div className="bg-muted/10">
+
+                          {addingUnder?.type === 'manufacturer' && addingUnder?.parentId === fr.id && (
+                            <div className="px-16 py-2">
+                              <AddRow
+                                placeholder="New manufacturer name…"
+                                onAdd={name => handleAdd('manufacturer', name, fr.id)}
+                                onCancel={() => setAddingUnder(null)}
+                              />
+                            </div>
+                          )}
+
+                          {(manufacturers[fr.id] ?? []).length === 0 && addingUnder?.parentId !== fr.id && (
+                            <p className="text-xs text-muted-foreground px-16 py-2 italic">No manufacturers yet.</p>
+                          )}
+
+                          {(manufacturers[fr.id] ?? []).map(mfr => (
+                            <div
+                              key={mfr.id}
+                              className="flex items-center gap-2 px-16 py-2 border-b border-border/20 last:border-b-0 hover:bg-muted/30"
+                            >
+                              <Factory className="w-3 h-3 text-muted-foreground shrink-0" />
+
+                              {editingId === mfr.id ? (
+                                <InlineEdit
+                                  value={mfr.name}
+                                  onSave={name => saveEdit('manufacturer', mfr.id, name)}
+                                  onCancel={() => setEditingId(null)}
+                                />
+                              ) : (
+                                <span className="text-xs text-muted-foreground flex-1">{mfr.name}</span>
+                              )}
+
+                              <span className="flex items-center gap-1.5">
+                                <button className="text-muted-foreground hover:text-foreground" onClick={() => setEditingId(mfr.id)}>
+                                  <Pencil className="w-3 h-3" />
+                                </button>
+                                <DeleteButton label={mfr.name} onConfirm={() => handleDelete('manufacturer', mfr.id)} />
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                    </div>
+                  ))}
+
+                  {/* Add franchise button at bottom */}
+                  {addingUnder?.parentId !== cat.id && (
+                    <button
+                      className="w-full text-xs text-muted-foreground hover:text-primary flex items-center gap-1.5 px-10 py-2 hover:bg-muted/30 transition-colors"
+                      onClick={() => setAddingUnder({ type: 'franchise', parentId: cat.id })}
+                    >
+                      <Plus className="w-3 h-3" /> Add franchise
+                    </button>
+                  )}
+                </div>
+              )}
+
+            </div>
+          ))}
         </div>
       )}
-
-      <Card className="border-border shadow-sm rounded-2xl overflow-hidden p-4 sm:p-6 bg-card">
-        {isLoading ? (
-          <div className="py-24 text-center text-muted-foreground flex flex-col items-center">
-            <Loader2 className="w-8 h-8 animate-spin mb-4 text-primary/50" />
-            Loading hierarchy tree...
-          </div>
-        ) : treeData.length === 0 && !errors.categories ? (
-          <div className="p-16 text-center flex flex-col items-center bg-background rounded-xl border border-dashed border-border">
-            <FolderTree className="w-12 h-12 text-muted-foreground opacity-30 mb-4" />
-            <p className="font-medium text-foreground">No categories created yet.</p>
-            <p className="text-sm text-muted-foreground mt-1">Click "Add Category" to get started.</p>
-          </div>
-        ) : (
-          <DropZoneContainer 
-            targetType="category_list" 
-            targetId="root" 
-            onDropSuccess={handleDropSuccess}
-            className="space-y-3 min-h-[400px] p-2"
-          >
-            {treeData.map(cat => (
-              <TreeNode 
-                key={cat.node.id} 
-                node={cat.node} 
-                type="category" 
-                childrenNodes={cat.children}
-                onAddChild={handleAddChild}
-                onEdit={handleEdit}
-                onDelete={handleDelete}
-                onDropSuccess={handleDropSuccess}
-              />
-            ))}
-          </DropZoneContainer>
-        )}
-      </Card>
-
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-md rounded-3xl border-border max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="font-serif text-xl">
-              {modalMode === 'edit' ? `Editing ${modalType}` : activeNode ? `Adding ${modalType} to ${activeNode.name}` : `New Category`}
-            </DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-5 pt-4">
-            <div className="space-y-2">
-              <Label className="font-bold text-foreground">Name <span className="text-destructive">*</span></Label>
-              <Input required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className="bg-background rounded-xl text-foreground" />
-            </div>
-            
-            {['category', 'subcategory'].includes(modalType) && (
-              <div className="space-y-2">
-                <Label className="font-bold text-foreground">Slug</Label>
-                <Input value={formData.slug} onChange={e => setFormData({...formData, slug: e.target.value})} placeholder="auto-generated if empty" className="font-mono text-sm bg-background rounded-xl text-foreground" />
-              </div>
-            )}
-
-            {modalType === 'brand' && (
-              <>
-                <div className="space-y-2">
-                  <Label className="font-bold text-foreground">Logo URL</Label>
-                  <Input type="url" value={formData.logo_url} onChange={e => setFormData({...formData, logo_url: e.target.value})} placeholder="https://example.com/logo.png" className="bg-background rounded-xl text-foreground" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="font-bold text-foreground">Website URL</Label>
-                  <Input type="url" value={formData.website_url} onChange={e => setFormData({...formData, website_url: e.target.value})} placeholder="https://example.com" className="bg-background rounded-xl text-foreground" />
-                </div>
-              </>
-            )}
-
-            {modalType === 'series' && (
-              <div className="space-y-2">
-                <Label className="font-bold text-foreground">Release Year</Label>
-                <Input type="number" value={formData.releaseYear} onChange={e => setFormData({...formData, releaseYear: e.target.value})} className="bg-background rounded-xl text-foreground" />
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label className="font-bold text-foreground">Description</Label>
-              <Input value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="bg-background rounded-xl text-foreground" />
-            </div>
-
-            <DialogFooter className="pt-6 border-t border-border mt-2">
-              <Button type="button" variant="ghost" onClick={() => setModalOpen(false)} className="rounded-xl">Cancel</Button>
-              <Button type="submit" disabled={isSaving} className="rounded-xl font-bold shadow-sm">
-                {isSaving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                {isSaving ? 'Saving...' : 'Save Changes'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
