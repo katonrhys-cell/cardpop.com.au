@@ -12,9 +12,8 @@ const RelatedEvents = ({ currentEventId, currentState }) => {
       try {
         const todayStr = new Date().toISOString().split('T')[0];
         let query = supabase
-          .from('events')
+          .from('events_public')
           .select('*')
-          .eq('status', 'approved')
           .neq('id', currentEventId)
           .gte('start_date', todayStr)
           .order('start_date', { ascending: true })
@@ -27,9 +26,8 @@ const RelatedEvents = ({ currentEventId, currentState }) => {
         // Fall back to any upcoming events if none share the same state
         if (currentState && (!data || data.length === 0)) {
           ({ data, error } = await supabase
-            .from('events')
+            .from('events_public')
             .select('*')
-            .eq('status', 'approved')
             .neq('id', currentEventId)
             .gte('start_date', todayStr)
             .order('start_date', { ascending: true })

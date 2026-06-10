@@ -40,10 +40,10 @@ const CommunityEventsPage = () => {
     setIsLoading(true);
     setError(null);
     try {
+      // events_public exposes only approved events with public-safe columns
       const { data, error: fetchError } = await supabase
-        .from('events')
+        .from('events_public')
         .select('*')
-        .eq('status', 'approved')
         .order('start_date', { ascending: true });
       if (fetchError) throw fetchError;
       if (isMounted.current) setEvents(data || []);
@@ -58,28 +58,8 @@ const CommunityEventsPage = () => {
   useEffect(() => {
     isMounted.current = true;
     fetchEvents();
-
-    const channel = supabase.channel(`community-events-full-${Date.now()}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'events' }, payload => {
-        if (!isMounted.current) return;
-        const record = payload.new;
-        if (payload.eventType === 'INSERT' && record.status === 'approved') {
-          setEvents(prev => [...prev, record].sort((a, b) => new Date(a.start_date) - new Date(b.start_date)));
-        } else if (payload.eventType === 'UPDATE') {
-          setEvents(prev => {
-            const rest = prev.filter(ev => ev.id !== record.id);
-            if (record.status === 'approved') rest.push(record);
-            return rest.sort((a, b) => new Date(a.start_date) - new Date(b.start_date));
-          });
-        } else if (payload.eventType === 'DELETE') {
-          setEvents(prev => prev.filter(ev => ev.id !== payload.old.id));
-        }
-      })
-      .subscribe();
-
     return () => {
       isMounted.current = false;
-      supabase.removeChannel(channel);
     };
   }, []);
 
