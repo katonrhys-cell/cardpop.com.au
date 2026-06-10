@@ -11,7 +11,7 @@ router.post('/create', authMiddleware, async (req, res) => {
   const userId = req.user.id;
 
   const { data: profile, error } = await supabase
-    .from('profiles').select('active_sessions').eq('id', userId).single();
+    .from('user_security').select('active_sessions').eq('user_id', userId).single();
   if (error) throw error;
 
   const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
@@ -23,7 +23,7 @@ router.post('/create', authMiddleware, async (req, res) => {
   const activeSessions = [...(profile?.active_sessions || []), newSession];
 
   const { error: updateError } = await supabase
-    .from('profiles').update({ active_sessions: activeSessions }).eq('id', userId);
+    .from('user_security').update({ active_sessions: activeSessions }).eq('user_id', userId);
   if (updateError) throw updateError;
 
   logger.info(`Session created for user ${userId}`);
@@ -32,7 +32,7 @@ router.post('/create', authMiddleware, async (req, res) => {
 
 router.get('/', authMiddleware, async (req, res) => {
   const { data: profile, error } = await supabase
-    .from('profiles').select('active_sessions').eq('id', req.user.id).single();
+    .from('user_security').select('active_sessions').eq('user_id', req.user.id).single();
   if (error) throw error;
 
   res.json({
@@ -51,11 +51,11 @@ router.post('/logout-other', authMiddleware, async (req, res) => {
   if (!currentSessionId) return res.status(400).json({ error: 'currentSessionId is required' });
 
   const { data: profile, error } = await supabase
-    .from('profiles').select('active_sessions').eq('id', req.user.id).single();
+    .from('user_security').select('active_sessions').eq('user_id', req.user.id).single();
   if (error) throw error;
 
   const updatedSessions = (profile?.active_sessions || []).filter(s => s.sessionId === currentSessionId);
-  const { error: logoutErr } = await supabase.from('profiles').update({ active_sessions: updatedSessions }).eq('id', req.user.id);
+  const { error: logoutErr } = await supabase.from('user_security').update({ active_sessions: updatedSessions }).eq('user_id', req.user.id);
   if (logoutErr) throw logoutErr;
   await supabase.from('audit_logs').insert({
     user_id: req.user.id, event_type: 'logout_other_sessions',
@@ -72,16 +72,16 @@ router.delete('/:sessionId', authMiddleware, async (req, res) => {
   if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
 
   const { data: profile, error } = await supabase
-    .from('profiles').select('active_sessions').eq('id', req.user.id).single();
+    .from('user_security').select('active_sessions').eq('user_id', req.user.id).single();
   if (error) throw error;
 
   const sessions = profile?.active_sessions || [];
   const sessionToRevoke = sessions.find(s => s.sessionId === sessionId);
   if (!sessionToRevoke) return res.status(404).json({ error: 'Session not found' });
 
-  const { error: revokeErr } = await supabase.from('profiles')
+  const { error: revokeErr } = await supabase.from('user_security')
     .update({ active_sessions: sessions.filter(s => s.sessionId !== sessionId) })
-    .eq('id', req.user.id);
+    .eq('user_id', req.user.id);
   if (revokeErr) throw revokeErr;
   await supabase.from('audit_logs').insert({
     user_id: req.user.id, event_type: 'session_revoked',

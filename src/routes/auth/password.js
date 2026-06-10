@@ -91,7 +91,7 @@ router.post('/change', authMiddleware, async (req, res) => {
   if (updateError) throw updateError;
 
   // Clear active sessions for security
-  await supabase.from('profiles').update({ active_sessions: [] }).eq('id', req.user.id).catch(() => {});
+  await supabase.from('user_security').update({ active_sessions: [] }).eq('user_id', req.user.id).catch(() => {});
 
   await supabase.from('audit_logs').insert({
     user_id: req.user.id,

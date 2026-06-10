@@ -16,9 +16,9 @@ router.post('/generate', authMiddleware, async (req, res) => {
   });
 
   const { error } = await supabase
-    .from('profiles')
+    .from('user_security')
     .update({ backup_codes: encryptedCodes })
-    .eq('id', req.user.id);
+    .eq('user_id', req.user.id);
 
   if (error) throw error;
 
@@ -31,9 +31,9 @@ router.post('/verify', authMiddleware, async (req, res) => {
   if (!code) return res.status(400).json({ error: 'Backup code is required' });
 
   const { data: profile, error } = await supabase
-    .from('profiles')
+    .from('user_security')
     .select('backup_codes')
-    .eq('id', req.user.id)
+    .eq('user_id', req.user.id)
     .single();
 
   if (error) throw error;
@@ -49,9 +49,9 @@ router.post('/verify', authMiddleware, async (req, res) => {
   });
 
   const { error: updateError } = await supabase
-    .from('profiles')
+    .from('user_security')
     .update({ backup_codes: updatedEncrypted })
-    .eq('id', req.user.id);
+    .eq('user_id', req.user.id);
 
   if (updateError) throw updateError;
 
