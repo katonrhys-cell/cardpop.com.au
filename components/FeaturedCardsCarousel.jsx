@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Sparkles, ImageOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Sparkles, ImageOff, ZoomIn } from 'lucide-react';
+import ImageZoomModal from '@/components/ImageZoomModal.jsx';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,6 +14,7 @@ const FeaturedCardsCarousel = () => {
   
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [zoomImage, setZoomImage] = useState(null);
   const [visibleItems, setVisibleItems] = useState(4);
   const pauseTimeoutRef = useRef(null);
 
@@ -239,6 +241,16 @@ const FeaturedCardsCarousel = () => {
                           <span className="text-sm font-medium">No Image</span>
                         </div>
                       )}
+
+                      {card.image_urls && card.image_urls.length > 0 && (
+                        <button
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setZoomImage({ url: card.image_urls[0], alt: card.card_name || card.cardName || 'Card Image' }); }}
+                          aria-label="Zoom image"
+                          className="absolute bottom-3 right-3 z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm text-foreground flex items-center justify-center shadow-md opacity-0 group-hover/card:opacity-100 transition-opacity duration-200 hover:bg-background"
+                        >
+                          <ZoomIn className="w-4 h-4" />
+                        </button>
+                      )}
                       
                       <div className="absolute top-4 left-4 flex flex-col gap-2">
                         {card.featured && (
@@ -280,6 +292,13 @@ const FeaturedCardsCarousel = () => {
           </AnimatePresence>
         </motion.div>
       </div>
+
+      <ImageZoomModal
+        isOpen={!!zoomImage}
+        onClose={() => setZoomImage(null)}
+        imageUrl={zoomImage?.url}
+        altText={zoomImage?.alt}
+      />
     </div>
   );
 };

@@ -1,10 +1,11 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, ShieldCheck } from 'lucide-react';
+import { Star, ShieldCheck, ZoomIn } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { supabase } from '@/lib/supabaseClient.js';
+import ImageZoomModal from '@/components/ImageZoomModal.jsx';
 
 const GRADE_BADGE = {
   psa:   'bg-red-600 text-white',
@@ -22,6 +23,7 @@ const resolveImageUrl = (path) => {
 };
 
 const ProductCard = ({ product }) => {
+  const [zoomOpen, setZoomOpen] = useState(false);
   const rawImg = product.images?.[0] || product.cardImage?.[0] || product.card_image || null;
   const imgSrc = resolveImageUrl(rawImg);
   const sellerId = product.seller_id || product.seller || product.owner_id || product.owner || product.user_id;
@@ -73,7 +75,25 @@ const ProductCard = ({ product }) => {
             {gradingCompany.toUpperCase()} {product.grade}
           </div>
         )}
+
+        {/* Zoom button */}
+        {imgSrc && (
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setZoomOpen(true); }}
+            aria-label="Zoom image"
+            className="absolute bottom-3 right-3 z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm text-foreground flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-background"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+        )}
       </Link>
+
+      <ImageZoomModal
+        isOpen={zoomOpen}
+        onClose={() => setZoomOpen(false)}
+        imageUrl={imgSrc}
+        altText={product.name || product.cardName || 'Card Image'}
+      />
       
       <div className="p-5 flex flex-col flex-1">
         <Link to={detailPath} className="block mb-2">
