@@ -5,10 +5,10 @@ import {
   ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, Sparkles, Loader2,
   Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp,
 } from 'lucide-react';
-import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCategories } from '@/hooks/useCategories.js';
+import CardHierarchySelector from '@/components/CardHierarchySelector.jsx';
 import { COLLECTION_CONFIGS } from '@/data/collectionConfigs.js';
 import { useCollectionEras } from '@/hooks/useCollectionEras.js';
 import { VARIANT_GROUPS } from '@/lib/cardVariants.js';
@@ -61,15 +61,18 @@ const AddEditCardPage = () => {
   const { getCategories } = useCategories();
 
   const isEdit = !!id;
-  const [loading, setLoading]       = useState(isEdit);
-  const [saving, setSaving]         = useState(false);
-  const [imageFile, setImageFile]   = useState(null);
+  const [loading, setLoading]           = useState(isEdit);
+  const [saving, setSaving]             = useState(false);
+  const [imageFile, setImageFile]       = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const [errors, setErrors]         = useState({});
+  const [errors, setErrors]             = useState({});
   const [isAutoFilled, setIsAutoFilled] = useState(false);
-  const [categoryId, setCategoryId] = useState(null);
+  // Hierarchy selection
+  const [selCategoryId, setSelCategoryId]     = useState('');
+  const [franchiseId, setFranchiseId]         = useState('');
+  const [manufacturerId, setManufacturerId]   = useState('');
   const [lockedBaseValue, setLockedBaseValue] = useState(null);
-  const [psaPopData, setPsaPopData] = useState(null);
+  const [psaPopData, setPsaPopData]           = useState(null);
 
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
@@ -78,7 +81,7 @@ const AddEditCardPage = () => {
 
   const emptyForm = {
     // Card identity
-    collection:     'Pokemon',
+    collection:     '',
     cardName:       '',
     setName:        '',
     cardNumber:     '',
@@ -108,7 +111,7 @@ const AddEditCardPage = () => {
 
   const set = (key, val) => setFormData(f => ({ ...f, [key]: val }));
 
-  // Derive collection slug from selected collection name
+  // Derive collection slug for era lookups (uses franchise name stored in formData.collection)
   const collectionSlug = (() => {
     const selected = formData.collection?.toLowerCase();
     const entry = Object.entries(COLLECTION_CONFIGS).find(([, cfg]) =>
@@ -120,21 +123,21 @@ const AddEditCardPage = () => {
   // Fetch eras from DB for the selected collection (falls back to static config)
   const { eras: eraOpts } = useCollectionEras(collectionSlug);
 
-  // ─── Resolve category_id whenever collection changes ──────────────────────
+  // When AI autofills formData.collection (a name string), try to resolve it to a franchiseId
   useEffect(() => {
+    if (!formData.collection || franchiseId) return;
     getCategories().then(cats => {
-      const selected = formData.collection?.toLowerCase();
-      // Try matching against COLLECTION_CONFIGS aliases first
+      const selected = formData.collection.toLowerCase();
       const configEntry = Object.values(COLLECTION_CONFIGS).find(cfg =>
         [cfg.name, ...(cfg.categoryAliases ?? [])].some(a => a.toLowerCase() === selected)
       );
       const aliases = configEntry
         ? [configEntry.name, ...(configEntry.categoryAliases ?? [])].map(a => a.toLowerCase())
         : [selected];
-      const match = cats.find(c => aliases.includes(c.name.toLowerCase()));
-      setCategoryId(match?.id ?? null);
+      const match = cats.find(c => c.parent_id !== null && aliases.includes(c.name.toLowerCase()));
+      if (match) setFranchiseId(match.id);
     });
-  }, [formData.collection, getCategories]);
+  }, [formData.collection]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Load existing card when editing ─────────────────────────────────────
   useEffect(() => {
@@ -156,6 +159,11 @@ const AddEditCardPage = () => {
           return;
         }
         setLockedBaseValue(card.locked_base_value_aud ?? null);
+
+        // Restore hierarchy selectors
+        const resolvedFranchise = card.franchise_id ?? card.category_id ?? null;
+        if (resolvedFranchise) setFranchiseId(resolvedFranchise);
+        if (card.manufacturer_id) setManufacturerId(card.manufacturer_id);
 
         // Fetch PSA population data if the card has a CardSight ID
         if (card.cardsight_card_id) {
@@ -296,7 +304,9 @@ const AddEditCardPage = () => {
 
       const payload = {
         owner_id:            currentUser.id,
-        category_id:         categoryId || null,
+        category_id:         franchiseId || null,
+        franchise_id:        franchiseId || null,
+        manufacturer_id:     manufacturerId || null,
         collection:          formData.collection  || null,
         card_name:           formData.cardName.trim(),
         set_name:            formData.setName?.trim()     || null,
@@ -349,6 +359,7 @@ const AddEditCardPage = () => {
               setErrors({});
               setIsAutoFilled(false);
               clearScan();
+              // Keep franchise/manufacturer selected for fast repeat entry
               window.scrollTo(0, 0);
             },
           },
@@ -533,19 +544,19 @@ const AddEditCardPage = () => {
                 )}
 
                 <div className="grid md:grid-cols-2 gap-4">
-                  {/* Collection */}
-                  <div className="space-y-2 md:col-span-2">
-                    <Label className="font-bold">Collection / Game <span className="text-destructive">*</span></Label>
-                    <Select value={formData.collection} onValueChange={v => set('collection', v)}>
-                      <SelectTrigger className={`h-11 bg-background ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''}`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {COLLECTIONS_LIST.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    {categoryId && <p className="text-xs text-muted-foreground">✓ Matched to collection page</p>}
-                  </div>
+                  {/* Category → Franchise → Manufacturer */}
+                  <CardHierarchySelector
+                    categoryId={selCategoryId}
+                    franchiseId={franchiseId}
+                    manufacturerId={manufacturerId}
+                    onCategoryChange={setSelCategoryId}
+                    onFranchiseChange={(id, name) => {
+                      setFranchiseId(id);
+                      set('collection', name);
+                    }}
+                    onManufacturerChange={setManufacturerId}
+                    highlighted={isAutoFilled}
+                  />
 
                   {/* Card Name */}
                   <div className="space-y-2">

@@ -36,6 +36,31 @@ export const useCategories = () => {
     return all.filter(c => c.category_group === group);
   }, [getCategories]);
 
+  // Root (top-level) categories: Sports, TCG, Comics, Non-Sport, Collectibles
+  const getRootCategories = useCallback(async () => {
+    const all = await getCategories();
+    return all.filter(c => c.parent_id === null);
+  }, [getCategories]);
+
+  // Franchises are categories whose parent_id = a root category id
+  const getFranchisesByCategory = useCallback(async (categoryId) => {
+    if (!categoryId) return [];
+    const all = await getCategories();
+    return all.filter(c => c.parent_id === categoryId);
+  }, [getCategories]);
+
+  // Manufacturers linked to a specific franchise
+  const getManufacturersByFranchise = useCallback(async (franchiseId) => {
+    if (!franchiseId) return [];
+    const { data } = await supabase
+      .from('manufacturers')
+      .select('*')
+      .eq('franchise_id', franchiseId)
+      .eq('is_active', true)
+      .order('sort_order');
+    return data ?? [];
+  }, []);
+
   // Subcategories are now represented as categories with parent_id set
   const getSubcategoriesByCategory = useCallback(async (categoryId) => {
     if (!categoryId) return [];
@@ -117,6 +142,9 @@ export const useCategories = () => {
     loading,
     error,
     getCategories,
+    getRootCategories,
+    getFranchisesByCategory,
+    getManufacturersByFranchise,
     getCategoriesByGroup,
     getSubcategoriesByCategory,
     // Legacy aliases
