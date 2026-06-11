@@ -87,6 +87,18 @@ export const useCategories = () => {
     return data ?? [];
   }, []);
 
+  // Subsets for a specific set
+  const getSubsetsBySet = useCallback(async (setId) => {
+    if (!setId) return [];
+    const { data } = await supabase
+      .from('subsets')
+      .select('*')
+      .eq('set_id', setId)
+      .eq('is_active', true)
+      .order('sort_order');
+    return data ?? [];
+  }, []);
+
   // Subcategories are now represented as categories with parent_id set
   const getSubcategoriesByCategory = useCallback(async (categoryId) => {
     if (!categoryId) return [];
@@ -174,6 +186,7 @@ export const useCategories = () => {
     getSetsByFranchiseAndManufacturer,
     getCategoriesByGroup,
     getParallelsByFranchise,
+    getSubsetsBySet,
     getSubcategoriesByCategory,
     // Legacy aliases
     getBrandsBySubcategory:  async () => [],
