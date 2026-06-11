@@ -367,9 +367,9 @@ const BlogDropdown = ({ onNavigate }) => {
 };
 
 const COMMUNITY_ITEMS = [
-  { href: '/community',           label: 'Forum',                   desc: 'Discussions and community posts',     Icon: MessageSquare, gradient: 'from-violet-500 to-purple-600' },
-  { href: '/community',           label: 'Profiles',                desc: 'Browse collector profiles',           Icon: Users,         gradient: 'from-sky-500 to-blue-600'     },
-  { href: '/community',           label: 'Retailers & Suppliers',   desc: 'Find local shops and suppliers',      Icon: Store,         gradient: 'from-amber-500 to-orange-500' },
+  { href: '/community/forum',     label: 'Forum',                   desc: 'Discussions and community posts',     Icon: MessageSquare, gradient: 'from-violet-500 to-purple-600' },
+  { href: '/community/profiles',  label: 'Profiles',                desc: 'Browse collector profiles',           Icon: Users,         gradient: 'from-sky-500 to-blue-600'     },
+  { href: '/community/retailers', label: 'Retailers & Suppliers',   desc: 'Find local shops and suppliers',      Icon: Store,         gradient: 'from-amber-500 to-orange-500' },
   { href: '/community/whatnot',   label: 'Whatnot',                 desc: 'Live buying and selling shows',       Icon: WhatnotIcon,   gradient: 'from-green-500 to-emerald-600', isWhatnot: true },
 ];
 
