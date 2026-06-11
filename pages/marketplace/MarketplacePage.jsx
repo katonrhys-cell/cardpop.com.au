@@ -1,28 +1,18 @@
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCategories } from '@/hooks/useCategories.js';
-import { useCollectionEras } from '@/hooks/useCollectionEras.js';
-import { COLLECTION_CONFIGS } from '@/data/collectionConfigs.js';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, RefreshCw, AlertCircle, Users, X } from 'lucide-react';
+import { Search, RefreshCw, AlertCircle, Users, X, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select, SelectContent, SelectGroup, SelectItem,
+  SelectLabel, SelectSeparator, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import { toast } from 'sonner';
-
-// Map a DB category name to a collection config slug (e.g. "Pokémon" → "pokemon")
-function resolveEraSlug(categoryName) {
-  if (!categoryName) return null;
-  const lower = categoryName.toLowerCase();
-  for (const [slug, cfg] of Object.entries(COLLECTION_CONFIGS)) {
-    const aliases = [cfg.name, ...(cfg.categoryAliases ?? [])].map(a => a.toLowerCase());
-    if (aliases.includes(lower)) return slug;
-  }
-  return null;
-}
 
 const MarketplacePage = () => {
   const [listings, setListings] = useState([]);
@@ -33,44 +23,37 @@ const MarketplacePage = () => {
   const [filterMode, setFilterMode] = useState('All');
   const [filterRookie, setFilterRookie] = useState(false);
 
-  // Category Filter States
-  const { buildNameMap, getCategories, getSubcategoriesByCategory } = useCategories();
-  const [nameMap, setNameMap] = useState({});
-  const [filterCat, setFilterCat] = useState('');
-  const [filterSub, setFilterSub] = useState('');
-  const [filterEra, setFilterEra] = useState('');
-  const [catOpts, setCatOpts] = useState([]);
-  const [subOpts, setSubOpts] = useState([]);
+  // 4-level hierarchy filters
+  const {
+    getRootCategories,
+    getFranchisesByCategory,
+    getManufacturersByFranchise,
+    getSetsByFranchiseAndManufacturer,
+  } = useCategories();
 
-  // Resolve the matching collection config slug so we can show eras in the filter
-  const [eraSlug, setEraSlug] = useState(null);
-  const { eras: categoryEras } = useCollectionEras(eraSlug);
+  const [filterCat, setFilterCat]           = useState('');
+  const [filterFranchise, setFilterFranchise] = useState('');
+  const [filterMfr, setFilterMfr]           = useState('');
+  const [filterSet, setFilterSet]           = useState('');
 
-  // When the selected category changes, try to map it to a collection config
-  useEffect(() => {
-    if (!filterCat) {
-      setEraSlug(null);
-      setFilterEra('');
-      return;
-    }
-    const catName = catOpts.find(c => c.id === filterCat)?.name;
-    const slug = resolveEraSlug(catName);
-    setEraSlug(slug);
-    setFilterEra('');
-  }, [filterCat, catOpts]);
+  const [catOpts, setCatOpts]         = useState([]);
+  const [franchiseOpts, setFranchiseOpts] = useState([]);
+  const [mfrOpts, setMfrOpts]         = useState([]);
+  const [setOpts, setSetOpts]         = useState([]);
 
-  // Search and Price Filter States
-  const [search, setSearch] = useState('');
+  const [catNames, setCatNames] = useState({});
+
+  // Search and price
+  const [search, setSearch]     = useState('');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [debouncedMin, setDebouncedMin] = useState('');
-  const [debouncedMax, setDebouncedMax] = useState('');
+  const [debouncedMin, setDebouncedMin]       = useState('');
+  const [debouncedMax, setDebouncedMax]       = useState('');
 
   const fetchRef = useRef(null);
-  const isMounted = useRef(true);
-  useEffect(() => { return () => { isMounted.current = false; }; }, []);
 
+  // Debounce
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400);
     return () => clearTimeout(t);
@@ -81,24 +64,55 @@ const MarketplacePage = () => {
     return () => clearTimeout(t);
   }, [minPrice, maxPrice]);
 
-  // Initialize Name Map and Categories (root categories only)
+  // Load root categories once
   useEffect(() => {
-    let active = true;
-    const init = async () => {
-      const map = await buildNameMap();
-      if (active) setNameMap(map);
-      const allCats = await getCategories();
-      if (active) setCatOpts(allCats.filter(c => !c.parent_id));
-    };
-    init();
-    return () => { active = false; };
-  }, [buildNameMap, getCategories]);
+    getRootCategories().then(cats => {
+      setCatOpts(cats);
+      const map = {};
+      cats.forEach(c => { map[c.id] = c.name; });
+      setCatNames(map);
+    });
+  }, [getRootCategories]);
 
-  // Cascading Dropdown Handlers
+  // Cascade: category → franchises
   useEffect(() => {
-    if (filterCat) getSubcategoriesByCategory(filterCat).then(setSubOpts).catch(() => setSubOpts([]));
-    else { setSubOpts([]); setFilterSub(''); }
-  }, [filterCat, getSubcategoriesByCategory]);
+    setFilterFranchise('');
+    setFilterMfr('');
+    setFilterSet('');
+    setFranchiseOpts([]);
+    setMfrOpts([]);
+    setSetOpts([]);
+    if (filterCat) getFranchisesByCategory(filterCat).then(setFranchiseOpts);
+  }, [filterCat, getFranchisesByCategory]);
+
+  // Cascade: franchise → manufacturers + sets
+  useEffect(() => {
+    setFilterMfr('');
+    setFilterSet('');
+    setMfrOpts([]);
+    setSetOpts([]);
+    if (filterFranchise) {
+      getManufacturersByFranchise(filterFranchise).then(setMfrOpts);
+      getSetsByFranchiseAndManufacturer(filterFranchise, '').then(setSetOpts);
+    }
+  }, [filterFranchise, getManufacturersByFranchise, getSetsByFranchiseAndManufacturer]);
+
+  // Cascade: manufacturer → refine sets
+  useEffect(() => {
+    setFilterSet('');
+    if (filterFranchise) {
+      getSetsByFranchiseAndManufacturer(filterFranchise, filterMfr || '').then(setSetOpts);
+    }
+  }, [filterMfr, filterFranchise, getSetsByFranchiseAndManufacturer]);
+
+  // Group sets by series
+  const groupedSets = setOpts.reduce((acc, s) => {
+    const g = s.series || 'Other';
+    if (!acc[g]) acc[g] = [];
+    acc[g].push(s);
+    return acc;
+  }, {});
+  const seriesGroups = Object.entries(groupedSets).sort(([a], [b]) => a.localeCompare(b));
 
   // Main listings fetch
   useEffect(() => {
@@ -111,31 +125,28 @@ const MarketplacePage = () => {
         let query = supabase
           .from('listings')
           .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
+          .eq('status', 'active')
+          .neq('listing_type', 'vault')
           .limit(100);
 
-        const activeCat = filterSub || filterCat;
-        if (activeCat) query = query.eq('vault_items.category_id', activeCat);
+        // Apply hierarchy filters from most specific to least
+        if (filterSet)       query = query.eq('vault_items.set_id', filterSet);
+        else if (filterMfr)  query = query.eq('vault_items.manufacturer_id', filterMfr);
+        else if (filterFranchise) query = query.eq('vault_items.franchise_id', filterFranchise);
+        else if (filterCat)  query = query.eq('vault_items.category_id', filterCat);
+
         if (debouncedSearch.trim()) query = query.ilike('vault_items.card_name', `%${debouncedSearch.trim()}%`);
         if (debouncedMin && !isNaN(debouncedMin)) query = query.gte('price_aud', Number(debouncedMin));
         if (debouncedMax && !isNaN(debouncedMax)) query = query.lte('price_aud', Number(debouncedMax));
 
-        // Always exclude vault-only (private) listings from the public marketplace
-        query = query.eq('status', 'active').neq('listing_type', 'vault');
-
-        if (filterMode === 'Auction') {
-          query = query.eq('listing_type', 'auction');
-        } else if (filterMode === 'BuyNow') {
-          query = query.eq('listing_type', 'fixed');
-        } else if (filterMode === 'ForTrade') {
-          query = query.eq('listing_type', 'trade');
-        } else if (filterMode === 'MakeOffer') {
-          query = query.eq('accepts_offers', true);
-        }
+        if (filterMode === 'Auction')   query = query.eq('listing_type', 'auction');
+        else if (filterMode === 'BuyNow') query = query.eq('listing_type', 'fixed');
+        else if (filterMode === 'ForTrade') query = query.eq('listing_type', 'trade');
+        else if (filterMode === 'MakeOffer') query = query.eq('accepts_offers', true);
 
         if (filterRookie) query = query.contains('vault_items.cardVariants', ['Rookie Card (RC)']);
-        if (filterEra) query = query.eq('vault_items.set_name', filterEra);
 
-        if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
+        if (sort === 'price_asc')  query = query.order('price_aud', { ascending: true });
         else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
         else query = query.order('created_at', { ascending: false });
 
@@ -155,12 +166,13 @@ const MarketplacePage = () => {
     fetchRef.current = run;
     run();
     return () => { cancelled = true; };
-  }, [sort, filterMode, filterCat, filterSub, filterEra, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
+  }, [sort, filterMode, filterCat, filterFranchise, filterMfr, filterSet, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
 
   const clearFilters = () => {
     setFilterCat('');
-    setFilterSub('');
-    setFilterEra('');
+    setFilterFranchise('');
+    setFilterMfr('');
+    setFilterSet('');
     setFilterMode('All');
     setFilterRookie(false);
     setSearch('');
@@ -168,14 +180,17 @@ const MarketplacePage = () => {
     setMaxPrice('');
   };
 
-  const getBreadcrumbPath = () => {
-    const parts = [nameMap[filterCat], filterEra || nameMap[filterSub]].filter(Boolean);
-    if (parts.length === 0) return null;
-    return `Filtering by: ${parts.join(' > ')}`;
+  const getBreadcrumb = () => {
+    const setName = setOpts.find(s => s.id === filterSet)?.name;
+    const mfrName = mfrOpts.find(m => m.id === filterMfr)?.name;
+    const frName  = franchiseOpts.find(f => f.id === filterFranchise)?.name;
+    const catName = catNames[filterCat];
+    const parts = [catName, frName, mfrName, setName].filter(Boolean);
+    return parts.length ? `Filtering by: ${parts.join(' › ')}` : null;
   };
 
-  const breadcrumbText = getBreadcrumbPath();
-  const hasActiveFilters = filterCat || filterSub || filterEra || filterMode !== 'All' || filterRookie || search || minPrice || maxPrice;
+  const breadcrumbText = getBreadcrumb();
+  const hasActiveFilters = filterCat || filterFranchise || filterMfr || filterSet || filterMode !== 'All' || filterRookie || search || minPrice || maxPrice;
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans pb-20">
@@ -194,67 +209,96 @@ const MarketplacePage = () => {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 w-full flex-1">
 
         {/* Filter Panel */}
-        <div className="bg-muted/30 border border-border p-4 rounded-2xl mb-6 flex flex-wrap items-center gap-3">
-          {/* Search */}
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <Input
-              placeholder="Search card name..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="pl-9 h-10 rounded-xl bg-background border-border"
-            />
+        <div className="bg-muted/30 border border-border p-4 rounded-2xl mb-6 space-y-3">
+          {/* Row 1: Search + Price */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <Input
+                placeholder="Search card name..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-9 h-10 rounded-xl bg-background border-border"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                placeholder="Min $"
+                value={minPrice}
+                onChange={e => setMinPrice(e.target.value)}
+                className="w-24 h-10 rounded-xl bg-background border-border"
+              />
+              <span className="text-muted-foreground text-sm font-medium">–</span>
+              <Input
+                type="number"
+                placeholder="Max $"
+                value={maxPrice}
+                onChange={e => setMaxPrice(e.target.value)}
+                className="w-24 h-10 rounded-xl bg-background border-border"
+              />
+            </div>
+            {hasActiveFilters && (
+              <Button variant="ghost" onClick={clearFilters} className="rounded-xl text-muted-foreground hover:text-foreground ml-auto">
+                <X className="w-4 h-4 mr-2" /> Clear All
+              </Button>
+            )}
           </div>
-          {/* Category */}
-          <Select value={filterCat} onValueChange={setFilterCat}>
-            <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Categories" /></SelectTrigger>
-            <SelectContent>{catOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-          </Select>
-          {/* Set / Era (when category maps to a known collection) or Subcategory */}
-          {categoryEras.length > 0 ? (
-            <Select value={filterEra} onValueChange={setFilterEra}>
-              <SelectTrigger className="w-[200px] bg-background border-border rounded-xl font-medium">
-                <SelectValue placeholder="All Sets / Eras" />
+
+          {/* Row 2: 4-level cascade */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Category */}
+            <Select value={filterCat} onValueChange={setFilterCat}>
+              <SelectTrigger className="w-[160px] bg-background border-border rounded-xl font-medium">
+                <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Sets / Eras</SelectItem>
-                {categoryEras.map(era => (
-                  <SelectItem key={era.name} value={era.name}>
-                    {era.name}{era.years ? ` (${era.years})` : ''}
-                  </SelectItem>
-                ))}
+                {catOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
-          ) : (
-            <Select value={filterSub} onValueChange={setFilterSub} disabled={!filterCat}>
-              <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium"><SelectValue placeholder="All Subcategories" /></SelectTrigger>
-              <SelectContent>{subOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+
+            {/* Franchise */}
+            <Select value={filterFranchise} onValueChange={setFilterFranchise} disabled={!filterCat}>
+              <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium">
+                <SelectValue placeholder={filterCat ? 'Franchise' : '— select category —'} />
+              </SelectTrigger>
+              <SelectContent>
+                {franchiseOpts.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+              </SelectContent>
             </Select>
-          )}
-          {/* Price Range */}
-          <div className="flex items-center gap-2">
-            <Input
-              type="number"
-              placeholder="Min $"
-              value={minPrice}
-              onChange={e => setMinPrice(e.target.value)}
-              className="w-24 h-10 rounded-xl bg-background border-border"
-            />
-            <span className="text-muted-foreground text-sm font-medium">–</span>
-            <Input
-              type="number"
-              placeholder="Max $"
-              value={maxPrice}
-              onChange={e => setMaxPrice(e.target.value)}
-              className="w-24 h-10 rounded-xl bg-background border-border"
-            />
+
+            {/* Manufacturer — only show if franchise has manufacturers */}
+            {filterFranchise && mfrOpts.length > 0 && (
+              <Select value={filterMfr} onValueChange={setFilterMfr}>
+                <SelectTrigger className="w-[200px] bg-background border-border rounded-xl font-medium">
+                  <SelectValue placeholder="Manufacturer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {mfrOpts.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+
+            {/* Set — only show if franchise selected and sets exist */}
+            {filterFranchise && setOpts.length > 0 && (
+              <Select value={filterSet} onValueChange={setFilterSet}>
+                <SelectTrigger className="w-[240px] bg-background border-border rounded-xl font-medium">
+                  <SelectValue placeholder="Set / Release" />
+                </SelectTrigger>
+                <SelectContent>
+                  {seriesGroups.map(([series, items], gi) => (
+                    <SelectGroup key={series}>
+                      {gi > 0 && <SelectSeparator />}
+                      <SelectLabel>{series}</SelectLabel>
+                      {items.map(s => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
-          {/* Clear */}
-          {hasActiveFilters && (
-            <Button variant="ghost" onClick={clearFilters} className="rounded-xl text-muted-foreground hover:text-foreground ml-auto">
-              <X className="w-4 h-4 mr-2" /> Clear All
-            </Button>
-          )}
         </div>
 
         {breadcrumbText && (
@@ -263,6 +307,7 @@ const MarketplacePage = () => {
           </p>
         )}
 
+        {/* Listing type + sort row */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-6 border-b border-border">
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -359,46 +404,23 @@ const MarketplacePage = () => {
             <p className="text-muted-foreground max-w-sm text-center mb-8">
               There are currently no items matching your filter criteria.
             </p>
-            
-            {/* Smart Suggestions */}
             <div className="flex flex-col items-center gap-4 mb-8">
               <p className="text-sm font-medium text-muted-foreground">Try these suggestions:</p>
               <div className="flex flex-wrap justify-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => { setSearch(''); setFilterCat(''); setFilterSub(''); setFilterMode('All'); }}
-                  className="rounded-full"
-                >
+                <Button variant="outline" size="sm" onClick={clearFilters} className="rounded-full">
                   Clear All Filters
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => { setSearch('Charizard'); }}
-                  className="rounded-full"
-                >
+                <Button variant="outline" size="sm" onClick={() => setSearch('Charizard')} className="rounded-full">
                   Charizard
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => { setSearch('Pikachu'); }}
-                  className="rounded-full"
-                >
+                <Button variant="outline" size="sm" onClick={() => setSearch('Pikachu')} className="rounded-full">
                   Pikachu
                 </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => { setSearch('Black Lotus'); }}
-                  className="rounded-full"
-                >
+                <Button variant="outline" size="sm" onClick={() => setSearch('Black Lotus')} className="rounded-full">
                   Black Lotus
                 </Button>
               </div>
             </div>
-
             <Button onClick={clearFilters} variant="outline" className="rounded-xl font-bold">
               View All Listings
             </Button>
