@@ -123,6 +123,9 @@ const CommunityEventsPage = lazy(() => import('@/pages/community/CommunityEvents
 const EventDetailPage = lazy(() => import('@/pages/EventDetailPage.jsx'));
 const CommunityDiscussionPage = lazy(() => import('@/pages/community/CommunityDiscussionPage.jsx'));
 const WhatnotShowsPage = lazy(() => import('@/pages/community/WhatnotShowsPage.jsx'));
+const ForumPage = lazy(() => import('@/pages/community/ForumPage.jsx'));
+const ProfilesPage = lazy(() => import('@/pages/community/ProfilesPage.jsx'));
+const RetailersPage = lazy(() => import('@/pages/community/RetailersPage.jsx'));
 
 // Admin Dashboard Area
 const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard.jsx'));
@@ -277,6 +280,9 @@ const App = () => {
                         <Route path="/blog/category/:category" element={<BlogCategoryPage />} />
                         <Route path="/blog/:id" element={<BlogArticlePage />} />
                         <Route path="/community" element={<CommunityPage />} />
+                        <Route path="/community/forum" element={<ForumPage />} />
+                        <Route path="/community/profiles" element={<ProfilesPage />} />
+                        <Route path="/community/retailers" element={<RetailersPage />} />
                         <Route path="/community/events" element={<CommunityEventsPage />} />
                         <Route path="/community/events/:eventId" element={<EventDetailPage />} />
                         <Route path="/community/discussion/:id" element={<CommunityDiscussionPage />} />
