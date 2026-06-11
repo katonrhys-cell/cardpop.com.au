@@ -58,7 +58,7 @@ const AddEditCardPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { currentUser } = useAuth();
-  const { getCategories } = useCategories();
+  const { getCategories, getParallelsByFranchise, getSubsetsBySet } = useCategories();
 
   const isEdit = !!id;
   const [loading, setLoading]           = useState(isEdit);
@@ -72,6 +72,10 @@ const AddEditCardPage = () => {
   const [franchiseId, setFranchiseId]         = useState('');
   const [manufacturerId, setManufacturerId]   = useState('');
   const [setId, setSetId]                     = useState('');
+  const [parallelId, setParallelId]           = useState('');
+  const [parallelOpts, setParallelOpts]       = useState([]);
+  const [subsetId, setSubsetId]               = useState('');
+  const [subsetOpts, setSubsetOpts]           = useState([]);
   const [lockedBaseValue, setLockedBaseValue] = useState(null);
   const [psaPopData, setPsaPopData]           = useState(null);
 
@@ -140,6 +144,20 @@ const AddEditCardPage = () => {
     });
   }, [formData.collection]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load parallels whenever franchise changes
+  useEffect(() => {
+    setParallelId('');
+    setParallelOpts([]);
+    if (franchiseId) getParallelsByFranchise(franchiseId).then(setParallelOpts);
+  }, [franchiseId, getParallelsByFranchise]);
+
+  // Load subsets whenever set changes
+  useEffect(() => {
+    setSubsetId('');
+    setSubsetOpts([]);
+    if (setId) getSubsetsBySet(setId).then(setSubsetOpts);
+  }, [setId, getSubsetsBySet]);
+
   // ─── Load existing card when editing ─────────────────────────────────────
   useEffect(() => {
     if (!isEdit) return;
@@ -162,10 +180,13 @@ const AddEditCardPage = () => {
         setLockedBaseValue(card.locked_base_value_aud ?? null);
 
         // Restore hierarchy selectors
-        const resolvedFranchise = card.franchise_id ?? card.category_id ?? null;
+        const resolvedFranchise = card.franchise_id ?? null;
         if (resolvedFranchise) setFranchiseId(resolvedFranchise);
+        if (card.category_id) setSelCategoryId(card.category_id);
         if (card.manufacturer_id) setManufacturerId(card.manufacturer_id);
-        // set_id not yet on vault_items — resolved via setName text for now
+        if (card.set_id) setSetId(card.set_id);
+        if (card.parallel_id) setParallelId(card.parallel_id);
+        if (card.subset_id) setSubsetId(card.subset_id);
 
         // Fetch PSA population data if the card has a CardSight ID
         if (card.cardsight_card_id) {
@@ -306,10 +327,12 @@ const AddEditCardPage = () => {
 
       const payload = {
         owner_id:            currentUser.id,
-        category_id:         franchiseId || null,
+        category_id:         selCategoryId || null,
         franchise_id:        franchiseId || null,
         manufacturer_id:     manufacturerId || null,
         set_id:              setId || null,
+        parallel_id:         parallelId || null,
+        subset_id:           subsetId   || null,
         collection:          formData.collection  || null,
         card_name:           formData.cardName.trim(),
         set_name:            formData.setName?.trim()     || null,
@@ -565,6 +588,48 @@ const AddEditCardPage = () => {
                     }}
                     highlighted={isAutoFilled}
                   />
+
+                  {/* Parallel / Variation — shown once franchise is selected and has parallels */}
+                  {parallelOpts.length > 0 && (
+                    <div className="md:col-span-2 space-y-2">
+                      <Label className="font-bold">Parallel / Variation</Label>
+                      <Select value={parallelId || '__none__'} onValueChange={v => setParallelId(v === '__none__' ? '' : v)}>
+                        <SelectTrigger className="h-11 bg-background">
+                          <SelectValue placeholder="Select parallel…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">No parallel (base)</SelectItem>
+                          <SelectSeparator />
+                          {parallelOpts.map(p => (
+                            <SelectItem key={p.id} value={p.id}>
+                              {p.name}{p.print_run ? ` /${p.print_run}` : ''}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Subset / Insert Set — shown once a set is selected and has subsets */}
+                  {subsetOpts.length > 0 && (
+                    <div className="md:col-span-2 space-y-2">
+                      <Label className="font-bold">Subset / Insert Set</Label>
+                      <Select value={subsetId || '__none__'} onValueChange={v => setSubsetId(v === '__none__' ? '' : v)}>
+                        <SelectTrigger className="h-11 bg-background">
+                          <SelectValue placeholder="Select subset…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">No subset (base set card)</SelectItem>
+                          <SelectSeparator />
+                          {subsetOpts.map(s => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
                   {/* Card Name */}
                   <div className="space-y-2">

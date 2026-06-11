@@ -24,7 +24,7 @@ const DigitalVaultPage = () => {
     try {
       const { data, error: fetchError } = await supabase
         .from('vault_items')
-        .select('*')
+        .select('*, parallel:parallels(id,name), subset:subsets(id,name)')
         .eq('owner_id', currentUser.id)
         .order('created_at', { ascending: false })
         .limit(50);
@@ -153,6 +153,20 @@ const DigitalVaultPage = () => {
                     )}
                   </div>
                   <h3 className="font-bold text-lg mb-1 truncate">{card.card_name}</h3>
+                  {(card.parallel?.name || card.subset?.name) && (
+                    <div className="flex flex-wrap gap-1 mb-1.5">
+                      {card.parallel?.name && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 leading-none">
+                          {card.parallel.name}
+                        </span>
+                      )}
+                      {card.subset?.name && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300 leading-none">
+                          {card.subset.name}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div className="text-sm text-muted-foreground mb-4 space-y-1 font-medium">
                     <p>{card.collection} • {card.condition}</p>
                     <p className="text-primary font-bold">Est: ${card.estimated_value_aud || 0}</p>
