@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
@@ -249,13 +249,44 @@ const AddEditCardPage = () => {
     const reader = new FileReader();
     reader.onloadend = () => setImagePreview(reader.result);
     reader.readAsDataURL(file);
-    // Run CardSight AI identification in the background as soon as image is selected
-    cardSightIdentify(file);
+    // Clear any previous analysis results when a new image is selected
+    clearScan();
+    clearCardSight();
   };
 
-  // ─── AI auto-fill ─────────────────────────────────────────────────────────
-  const handleApplyAI = () => {
-    if (!scanResult) return;
+  // ─── Unified AI analysis ──────────────────────────────────────────────────
+  // Tracks whether results should be auto-applied (set true on button click)
+  const isAnalysisMode = useRef(false);
+
+  const handleAnalyzeWithAI = () => {
+    if (!imageFile) return;
+    isAnalysisMode.current = true;
+    clearScan();
+    clearCardSight();
+    // Run both CardSight identification and OCR scan in parallel
+    cardSightIdentify(imageFile);
+    scanCard(imageFile);
+  };
+
+  // Auto-apply CardSight results when they arrive
+  useEffect(() => {
+    if (!cardSightResult || !isAnalysisMode.current) return;
+    if (cardSightResult.identified) {
+      const fields = mapCardSightToFormFields(cardSightResult);
+      setFormData(prev => ({ ...prev, ...fields }));
+      if (cardSightResult.pricing?.avgPrice) {
+        set('estimatedValue', String(cardSightResult.pricing.avgPrice.toFixed(2)));
+      }
+      if (cardSightResult.card?.id) fetchPricingById(cardSightResult.card.id);
+      else if (cardSightResult.card?.name) fetchPricingByName(cardSightResult.card.name);
+      setIsAutoFilled(true);
+      toast.success('Card identified! Fields auto-filled from catalog.');
+    }
+  }, [cardSightResult]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-apply OCR results when they arrive, filling only fields left empty by CardSight
+  useEffect(() => {
+    if (!scanResult || !isAnalysisMode.current) return;
     const conditionMap = {
       'Mint': 'mint', 'Near Mint': 'near_mint', 'Excellent': 'excellent',
       'Good': 'good', 'Fair': 'light_played',
@@ -263,26 +294,27 @@ const AddEditCardPage = () => {
     const gradingCompanyMap = { 'PSA': 'psa', 'BGS': 'bgs', 'CGC': 'cgc' };
     setFormData(prev => ({
       ...prev,
-      cardName:       scanResult.name               || prev.cardName,
-      collection:     scanResult.collectionType     || prev.collection,
-      setName:        scanResult.cardSetName        || prev.setName,
-      cardNumber:     scanResult.cardNumber         || prev.cardNumber,
-      year:           scanResult.releaseYear        || prev.year,
+      cardName:       prev.cardName       || scanResult.name          || '',
+      collection:     prev.collection     || scanResult.collectionType || '',
+      setName:        prev.setName        || scanResult.cardSetName   || '',
+      cardNumber:     prev.cardNumber     || scanResult.cardNumber    || '',
+      year:           prev.year           || scanResult.releaseYear   || '',
       condition:      conditionMap[scanResult.condition] || prev.condition,
-      grade:          scanResult.gradeScore         || prev.grade,
-      gradingCompany: gradingCompanyMap[scanResult.gradingService] ?? prev.gradingCompany,
-      certNumber:     scanResult.certificationNumber || prev.certNumber,
-      notes: [
+      grade:          prev.grade          || scanResult.gradeScore    || '',
+      gradingCompany: prev.gradingCompany !== 'raw'
+        ? prev.gradingCompany
+        : (gradingCompanyMap[scanResult.gradingService] ?? prev.gradingCompany),
+      certNumber:     prev.certNumber     || scanResult.certificationNumber || '',
+      notes: prev.notes || [
         scanResult.description,
         scanResult.rarity   ? `Rarity: ${scanResult.rarity}` : '',
         scanResult.cardType ? `Type: ${scanResult.cardType}` : '',
-      ].filter(Boolean).join('\n') || prev.notes,
+      ].filter(Boolean).join('\n') || '',
     }));
-    // Trigger eBay price lookup so user gets a market-based suggested value
     lookupPrice(scanResult);
-    toast.success('Fields auto-filled successfully. Please review and edit as needed.');
     setIsAutoFilled(true);
-  };
+    isAnalysisMode.current = false;
+  }, [scanResult]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Validation ───────────────────────────────────────────────────────────
   const validateForm = () => {
@@ -457,37 +489,40 @@ const AddEditCardPage = () => {
                   />
                 </div>
 
-                {/* AI Analysis */}
+                {/* Unified AI Analysis */}
                 <div className="mt-4 space-y-3">
-                  {!scanResult && imageFile && (
+                  {imageFile && !isScanning && !isIdentifying && (
                     <Button
                       type="button"
                       variant="secondary"
-                      onClick={() => scanCard(imageFile)}
-                      disabled={isScanning}
+                      onClick={handleAnalyzeWithAI}
                       className="w-full bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20"
                     >
-                      {isScanning
-                        ? <><Loader2 className="w-4 h-4 animate-spin mr-2" /> Analyzing...</>
-                        : <><Sparkles className="w-4 h-4 mr-2" /> Analyze with AI</>
-                      }
+                      <Sparkles className="w-4 h-4 mr-2" /> Analyze with AI
                     </Button>
                   )}
 
-                  {/* CardSight AI identification result */}
-                  {(isIdentifying || cardSightResult) && (
-                    <div className={`p-3 rounded-xl border animate-in fade-in ${cardSightResult?.identified ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-muted/30 border-border'}`}>
-                      {isIdentifying ? (
-                        <p className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                          <Loader2 className="w-3 h-3 animate-spin" /> CardSight AI identifying card…
-                        </p>
-                      ) : cardSightResult?.identified ? (
+                  {(isScanning || isIdentifying) && (
+                    <div className="p-3 rounded-xl border border-border bg-muted/30 animate-in fade-in">
+                      <p className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Analyzing card…
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Combined AI results panel — shown after analysis completes */}
+                  {!isScanning && !isIdentifying && (cardSightResult || scanResult) && (
+                    <div className={`p-3 rounded-xl border animate-in fade-in ${cardSightResult?.identified ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-primary/5 border-primary/20'}`}>
+                      <h4 className={`text-xs font-bold mb-2 flex items-center gap-1.5 ${cardSightResult?.identified ? 'text-emerald-700' : 'text-primary'}`}>
+                        <Sparkles className="w-3.5 h-3.5" />
+                        {cardSightResult?.identified
+                          ? `Catalog Match — ${cardSightResult.exactMatch ? 'Exact' : 'Set'} (${cardSightResult.confidence})`
+                          : 'AI Analysis — fields auto-filled'}
+                      </h4>
+
+                      {cardSightResult?.identified && (
                         <>
-                          <p className="text-xs font-bold text-emerald-700 mb-2 flex items-center gap-1.5">
-                            <TrendingUp className="w-3.5 h-3.5" />
-                            CardSight AI — {cardSightResult.exactMatch ? 'Exact Match' : 'Set Match'} ({cardSightResult.confidence})
-                          </p>
-                          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-foreground/80 mb-3">
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-foreground/80 mb-2">
                             {cardSightResult.card?.name && <div className="col-span-2"><strong className="text-foreground">Card:</strong> {cardSightResult.card.name}</div>}
                             {cardSightResult.card?.setName && <div><strong className="text-foreground">Set:</strong> {cardSightResult.card.setName}</div>}
                             {cardSightResult.card?.year && <div><strong className="text-foreground">Year:</strong> {cardSightResult.card.year}</div>}
@@ -497,60 +532,37 @@ const AddEditCardPage = () => {
                             {cardSightResult.parallel && <div className="col-span-2"><strong className="text-foreground">Parallel:</strong> {cardSightResult.parallel.name ?? 'Yes'}</div>}
                           </div>
                           {cardSightResult.pricing && (
-                            <div className="text-xs text-emerald-800 bg-emerald-500/10 rounded-lg px-2.5 py-2 mb-3">
+                            <div className="text-xs text-emerald-800 bg-emerald-500/10 rounded-lg px-2.5 py-2 mb-2">
                               <strong>Market Pricing</strong> ({cardSightResult.pricing.salesCount} sales) —
                               Avg: <strong>${cardSightResult.pricing.avgPrice?.toFixed(2)}</strong> &nbsp;
                               Low: ${cardSightResult.pricing.minPrice?.toFixed(2)} &nbsp;
                               High: ${cardSightResult.pricing.maxPrice?.toFixed(2)}
                             </div>
                           )}
-                          <div className="flex gap-2 pt-2 border-t border-emerald-500/10">
-                            <Button
-                              type="button"
-                              size="sm"
-                              className="flex-1 font-semibold text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
-                              onClick={() => {
-                                const fields = mapCardSightToFormFields(cardSightResult);
-                                setFormData(prev => ({ ...prev, ...fields }));
-                                if (cardSightResult.pricing?.avgPrice) {
-                                  set('estimatedValue', String(cardSightResult.pricing.avgPrice.toFixed(2)));
-                                }
-                                // Fetch separate CardSight pricing panel data
-                                if (cardSightResult.card?.id) fetchPricingById(cardSightResult.card.id);
-                                else if (cardSightResult.card?.name) fetchPricingByName(cardSightResult.card.name);
-                                setIsAutoFilled(true);
-                                toast.success('Card details filled from CardSight catalog.');
-                              }}
-                            >
-                              Apply Catalog Data
-                            </Button>
-                            <Button type="button" size="sm" variant="outline" className="text-xs" onClick={clearCardSight}>
-                              Dismiss
-                            </Button>
-                          </div>
                         </>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">CardSight: card not found in catalog.</p>
                       )}
-                    </div>
-                  )}
 
-                  {scanResult && (
-                    <div className="p-4 bg-primary/5 border border-primary/20 rounded-xl animate-in fade-in slide-in-from-top-2">
-                      <h4 className="font-bold text-sm text-primary mb-3 flex items-center gap-2">
-                        <Sparkles className="w-4 h-4" /> AI Analysis Results
-                      </h4>
-                      <div className="grid grid-cols-2 gap-2 text-sm text-foreground/80 mb-4">
-                        <div className="col-span-2"><strong className="text-foreground">Name:</strong> {scanResult.name || 'N/A'}</div>
-                        <div><strong className="text-foreground">Category:</strong> {scanResult.collectionType || 'N/A'}</div>
-                        <div><strong className="text-foreground">Condition:</strong> {scanResult.condition || 'N/A'}</div>
-                        {scanResult.cardSetName && <div><strong className="text-foreground">Set:</strong> {scanResult.cardSetName}</div>}
-                        {scanResult.gradeScore && <div><strong className="text-foreground">Grade:</strong> {scanResult.gradeScore}</div>}
-                        {scanResult.rarity && <div className="col-span-2"><strong className="text-foreground">Rarity:</strong> {scanResult.rarity}</div>}
-                      </div>
-                      <div className="flex gap-2 pt-3 border-t border-primary/10">
-                        <Button type="button" size="sm" onClick={handleApplyAI} className="flex-1 font-semibold">Auto-fill Fields</Button>
-                        <Button type="button" size="sm" variant="outline" onClick={() => { clearScan(); setIsAutoFilled(false); }} className="flex-1">Clear</Button>
+                      {scanResult && !cardSightResult?.identified && (
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-foreground/80 mb-2">
+                          {scanResult.name && <div className="col-span-2"><strong className="text-foreground">Name:</strong> {scanResult.name}</div>}
+                          {scanResult.collectionType && <div><strong className="text-foreground">Category:</strong> {scanResult.collectionType}</div>}
+                          {scanResult.condition && <div><strong className="text-foreground">Condition:</strong> {scanResult.condition}</div>}
+                          {scanResult.cardSetName && <div><strong className="text-foreground">Set:</strong> {scanResult.cardSetName}</div>}
+                          {scanResult.gradeScore && <div><strong className="text-foreground">Grade:</strong> {scanResult.gradeScore}</div>}
+                          {scanResult.rarity && <div className="col-span-2"><strong className="text-foreground">Rarity:</strong> {scanResult.rarity}</div>}
+                        </div>
+                      )}
+
+                      <div className="pt-2 border-t border-border/50">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="text-xs w-full"
+                          onClick={() => { clearScan(); clearCardSight(); setIsAutoFilled(false); }}
+                        >
+                          Dismiss
+                        </Button>
                       </div>
                     </div>
                   )}
