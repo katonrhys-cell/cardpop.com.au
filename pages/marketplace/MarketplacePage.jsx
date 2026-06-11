@@ -23,23 +23,29 @@ const MarketplacePage = () => {
   const [filterMode, setFilterMode] = useState('All');
   const [filterRookie, setFilterRookie] = useState(false);
 
-  // 4-level hierarchy filters
+  // 6-level hierarchy filters
   const {
     getRootCategories,
     getFranchisesByCategory,
     getManufacturersByFranchise,
     getSetsByFranchiseAndManufacturer,
+    getParallelsByFranchise,
+    getSubsetsBySet,
   } = useCategories();
 
   const [filterCat, setFilterCat]           = useState('');
   const [filterFranchise, setFilterFranchise] = useState('');
   const [filterMfr, setFilterMfr]           = useState('');
   const [filterSet, setFilterSet]           = useState('');
+  const [filterParallel, setFilterParallel] = useState('');
+  const [filterSubset, setFilterSubset]     = useState('');
 
-  const [catOpts, setCatOpts]         = useState([]);
+  const [catOpts, setCatOpts]             = useState([]);
   const [franchiseOpts, setFranchiseOpts] = useState([]);
-  const [mfrOpts, setMfrOpts]         = useState([]);
-  const [setOpts, setSetOpts]         = useState([]);
+  const [mfrOpts, setMfrOpts]             = useState([]);
+  const [setOpts, setSetOpts]             = useState([]);
+  const [parallelOpts, setParallelOpts]   = useState([]);
+  const [subsetOpts, setSubsetOpts]       = useState([]);
 
   const [catNames, setCatNames] = useState({});
 
@@ -76,34 +82,35 @@ const MarketplacePage = () => {
 
   // Cascade: category → franchises
   useEffect(() => {
-    setFilterFranchise('');
-    setFilterMfr('');
-    setFilterSet('');
-    setFranchiseOpts([]);
-    setMfrOpts([]);
-    setSetOpts([]);
+    setFilterFranchise(''); setFilterMfr(''); setFilterSet(''); setFilterParallel(''); setFilterSubset('');
+    setFranchiseOpts([]); setMfrOpts([]); setSetOpts([]); setParallelOpts([]); setSubsetOpts([]);
     if (filterCat) getFranchisesByCategory(filterCat).then(setFranchiseOpts);
   }, [filterCat, getFranchisesByCategory]);
 
-  // Cascade: franchise → manufacturers + sets
+  // Cascade: franchise → manufacturers + sets + parallels
   useEffect(() => {
-    setFilterMfr('');
-    setFilterSet('');
-    setMfrOpts([]);
-    setSetOpts([]);
+    setFilterMfr(''); setFilterSet(''); setFilterParallel(''); setFilterSubset('');
+    setMfrOpts([]); setSetOpts([]); setParallelOpts([]); setSubsetOpts([]);
     if (filterFranchise) {
       getManufacturersByFranchise(filterFranchise).then(setMfrOpts);
       getSetsByFranchiseAndManufacturer(filterFranchise, '').then(setSetOpts);
+      getParallelsByFranchise(filterFranchise).then(setParallelOpts);
     }
-  }, [filterFranchise, getManufacturersByFranchise, getSetsByFranchiseAndManufacturer]);
+  }, [filterFranchise, getManufacturersByFranchise, getSetsByFranchiseAndManufacturer, getParallelsByFranchise]);
 
   // Cascade: manufacturer → refine sets
   useEffect(() => {
-    setFilterSet('');
+    setFilterSet(''); setFilterSubset(''); setSubsetOpts([]);
     if (filterFranchise) {
       getSetsByFranchiseAndManufacturer(filterFranchise, filterMfr || '').then(setSetOpts);
     }
   }, [filterMfr, filterFranchise, getSetsByFranchiseAndManufacturer]);
+
+  // Cascade: set → subsets
+  useEffect(() => {
+    setFilterSubset(''); setSubsetOpts([]);
+    if (filterSet) getSubsetsBySet(filterSet).then(setSubsetOpts);
+  }, [filterSet, getSubsetsBySet]);
 
   // Group sets by series
   const groupedSets = setOpts.reduce((acc, s) => {
@@ -129,11 +136,15 @@ const MarketplacePage = () => {
           .neq('listing_type', 'vault')
           .limit(100);
 
-        // Apply hierarchy filters from most specific to least
-        if (filterSet)       query = query.eq('vault_items.set_id', filterSet);
-        else if (filterMfr)  query = query.eq('vault_items.manufacturer_id', filterMfr);
+        // Apply hierarchy filters — most specific wins for the hierarchy levels,
+        // but parallel and subset stack on top independently
+        if (filterSet)            query = query.eq('vault_items.set_id', filterSet);
+        else if (filterMfr)       query = query.eq('vault_items.manufacturer_id', filterMfr);
         else if (filterFranchise) query = query.eq('vault_items.franchise_id', filterFranchise);
-        else if (filterCat)  query = query.eq('vault_items.category_id', filterCat);
+        else if (filterCat)       query = query.eq('vault_items.category_id', filterCat);
+
+        if (filterParallel) query = query.eq('vault_items.parallel_id', filterParallel);
+        if (filterSubset)   query = query.eq('vault_items.subset_id', filterSubset);
 
         if (debouncedSearch.trim()) query = query.ilike('vault_items.card_name', `%${debouncedSearch.trim()}%`);
         if (debouncedMin && !isNaN(debouncedMin)) query = query.gte('price_aud', Number(debouncedMin));
@@ -166,31 +177,28 @@ const MarketplacePage = () => {
     fetchRef.current = run;
     run();
     return () => { cancelled = true; };
-  }, [sort, filterMode, filterCat, filterFranchise, filterMfr, filterSet, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
+  }, [sort, filterMode, filterCat, filterFranchise, filterMfr, filterSet, filterParallel, filterSubset, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
 
   const clearFilters = () => {
-    setFilterCat('');
-    setFilterFranchise('');
-    setFilterMfr('');
-    setFilterSet('');
-    setFilterMode('All');
-    setFilterRookie(false);
-    setSearch('');
-    setMinPrice('');
-    setMaxPrice('');
+    setFilterCat(''); setFilterFranchise(''); setFilterMfr(''); setFilterSet('');
+    setFilterParallel(''); setFilterSubset('');
+    setFilterMode('All'); setFilterRookie(false);
+    setSearch(''); setMinPrice(''); setMaxPrice('');
   };
 
   const getBreadcrumb = () => {
-    const setName = setOpts.find(s => s.id === filterSet)?.name;
-    const mfrName = mfrOpts.find(m => m.id === filterMfr)?.name;
-    const frName  = franchiseOpts.find(f => f.id === filterFranchise)?.name;
-    const catName = catNames[filterCat];
-    const parts = [catName, frName, mfrName, setName].filter(Boolean);
+    const setName      = setOpts.find(s => s.id === filterSet)?.name;
+    const mfrName      = mfrOpts.find(m => m.id === filterMfr)?.name;
+    const frName       = franchiseOpts.find(f => f.id === filterFranchise)?.name;
+    const catName      = catNames[filterCat];
+    const parallelName = parallelOpts.find(p => p.id === filterParallel)?.name;
+    const subsetName   = subsetOpts.find(s => s.id === filterSubset)?.name;
+    const parts = [catName, frName, mfrName, setName, parallelName, subsetName].filter(Boolean);
     return parts.length ? `Filtering by: ${parts.join(' › ')}` : null;
   };
 
   const breadcrumbText = getBreadcrumb();
-  const hasActiveFilters = filterCat || filterFranchise || filterMfr || filterSet || filterMode !== 'All' || filterRookie || search || minPrice || maxPrice;
+  const hasActiveFilters = filterCat || filterFranchise || filterMfr || filterSet || filterParallel || filterSubset || filterMode !== 'All' || filterRookie || search || minPrice || maxPrice;
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans pb-20">
@@ -294,6 +302,36 @@ const MarketplacePage = () => {
                         <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                       ))}
                     </SelectGroup>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {/* Parallel — only show when franchise has parallels */}
+            {filterFranchise && parallelOpts.length > 0 && (
+              <Select value={filterParallel} onValueChange={setFilterParallel}>
+                <SelectTrigger className="w-[200px] bg-background border-border rounded-xl font-medium">
+                  <SelectValue placeholder="Parallel / Variation" />
+                </SelectTrigger>
+                <SelectContent>
+                  {parallelOpts.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}{p.print_run ? ` /${p.print_run}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {/* Subset — only show when a set is selected and it has subsets */}
+            {filterSet && subsetOpts.length > 0 && (
+              <Select value={filterSubset} onValueChange={setFilterSubset}>
+                <SelectTrigger className="w-[200px] bg-background border-border rounded-xl font-medium">
+                  <SelectValue placeholder="Subset / Insert" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subsetOpts.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
