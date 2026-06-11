@@ -140,6 +140,20 @@ const MarketplaceListingCard = ({ listing }) => {
           <h3 className="font-bold text-base leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors">
             {vaultItem?.card_name || listing.title || 'Untitled Listing'}
           </h3>
+          {(vaultItem?.parallel?.name || vaultItem?.subset?.name) && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {vaultItem.parallel?.name && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 leading-none">
+                  {vaultItem.parallel.name}
+                </span>
+              )}
+              {vaultItem.subset?.name && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300 leading-none">
+                  {vaultItem.subset.name}
+                </span>
+              )}
+            </div>
+          )}
         </Link>
         
         <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-border">

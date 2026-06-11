@@ -131,7 +131,7 @@ const MarketplacePage = () => {
       try {
         let query = supabase
           .from('listings')
-          .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
+          .select('*, vault_item:vault_items!inner(*, vault_images(*), parallel:parallels(id,name,color), subset:subsets(id,name)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
           .eq('status', 'active')
           .neq('listing_type', 'vault')
           .limit(100);
