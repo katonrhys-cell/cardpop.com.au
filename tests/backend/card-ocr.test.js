@@ -131,9 +131,9 @@ describe('POST /scan', () => {
     expect(res.body.error).toMatch(/503/);
   });
 
-  it('returns 500 when no files are uploaded', async () => {
+  it('returns 400 when no files are uploaded', async () => {
     const res = await request(app).post('/scan');
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/image is required/i);
   });
 
