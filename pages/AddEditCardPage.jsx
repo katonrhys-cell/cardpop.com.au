@@ -65,6 +65,8 @@ const AddEditCardPage = () => {
   const [saving, setSaving]             = useState(false);
   const [imageFile, setImageFile]       = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [extraFiles, setExtraFiles]     = useState([null, null]);
+  const [extraPreviews, setExtraPreviews] = useState([null, null]);
   const [errors, setErrors]             = useState({});
   const [isAutoFilled, setIsAutoFilled] = useState(false);
   // Hierarchy selection
@@ -96,6 +98,9 @@ const AddEditCardPage = () => {
     isFoil:         false,
     isSealed:       false,
     isRookie:       false,
+    isRefractor:    false,
+    serialNumber:   '',
+    isAuto:         false,
     // Grading
     gradingCompany: 'raw',
     grade:          '',
@@ -209,6 +214,9 @@ const AddEditCardPage = () => {
           isFoil:         card.is_foil        ?? false,
           isSealed:       card.is_sealed      ?? false,
           isRookie:       card.is_rookie      ?? false,
+          isRefractor:    card.is_refractor   ?? false,
+          serialNumber:   card.serial_number  || '',
+          isAuto:         card.is_auto        ?? false,
           gradingCompany: card.grading_company || 'raw',
           grade:          card.grade          || '',
           certNumber:     card.cert_number    || '',
@@ -226,6 +234,12 @@ const AddEditCardPage = () => {
             ? card.card_image
             : supabase.storage.from('vault-images').getPublicUrl(card.card_image).data.publicUrl;
           if (!cancelled) setImagePreview(imgUrl);
+        }
+        if (card.card_images?.length) {
+          const urls = card.card_images.map(p =>
+            p.startsWith('http') ? p : supabase.storage.from('vault-images').getPublicUrl(p).data.publicUrl
+          );
+          if (!cancelled) setExtraPreviews([urls[0] ?? null, urls[1] ?? null]);
         }
       } catch {
         if (!cancelled) {
@@ -251,6 +265,16 @@ const AddEditCardPage = () => {
     reader.readAsDataURL(file);
     // Run CardSight AI identification in the background as soon as image is selected
     cardSightIdentify(file);
+  };
+
+  const handleExtraImageChange = (index, e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 5242880) { toast.error('Image must be less than 5MB'); return; }
+    setExtraFiles(prev => { const n = [...prev]; n[index] = file; return n; });
+    const reader = new FileReader();
+    reader.onloadend = () => setExtraPreviews(prev => { const n = [...prev]; n[index] = reader.result; return n; });
+    reader.readAsDataURL(file);
   };
 
   // ─── AI auto-fill ─────────────────────────────────────────────────────────
@@ -321,6 +345,18 @@ const AddEditCardPage = () => {
         cardImagePath = filePath;
       }
 
+      const extraImagePaths = [];
+      for (const file of extraFiles) {
+        if (!file) continue;
+        const fileExt = file.name.split('.').pop();
+        const filePath = `${currentUser.id}/${Date.now()}-extra-${Math.random().toString(36).slice(2)}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('vault-images')
+          .upload(filePath, file, { upsert: true });
+        if (uploadError) throw uploadError;
+        extraImagePaths.push(filePath);
+      }
+
       const isGraded  = formData.gradingCompany !== 'raw';
       const isPublic  = formData.listingType !== 'private';
       const tradeAud  = parseFloat(formData.tradeValue) || 0;
@@ -342,6 +378,9 @@ const AddEditCardPage = () => {
         is_foil:             formData.isFoil,
         is_sealed:           formData.isSealed,
         is_rookie:           formData.isRookie,
+        is_refractor:        formData.isRefractor,
+        serial_number:       formData.serialNumber?.trim() || null,
+        is_auto:             formData.isAuto,
         grading_company:     formData.gradingCompany,
         grade:               isGraded ? (formData.grade?.trim() || null) : null,
         cert_number:         isGraded ? (formData.certNumber?.trim() || null) : null,
@@ -366,6 +405,7 @@ const AddEditCardPage = () => {
       };
 
       if (cardImagePath) payload.card_image = cardImagePath;
+      if (extraImagePaths.length) payload.card_images = extraImagePaths;
 
       if (isEdit) {
         const { error } = await supabase.from('vault_items').update(payload).eq('id', id).eq('owner_id', currentUser.id);
@@ -382,6 +422,8 @@ const AddEditCardPage = () => {
               setFormData({ ...emptyForm, collection: formData.collection });
               setImageFile(null);
               setImagePreview(null);
+              setExtraFiles([null, null]);
+              setExtraPreviews([null, null]);
               setErrors({});
               setIsAutoFilled(false);
               clearScan();
@@ -455,6 +497,33 @@ const AddEditCardPage = () => {
                     onChange={handleImageChange}
                     className="absolute inset-0 opacity-0 cursor-pointer"
                   />
+                </div>
+
+                {/* Additional photos */}
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  {[0, 1].map(i => (
+                    <div key={i} className="aspect-[3/4] bg-muted/50 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center relative overflow-hidden group transition-colors hover:border-primary/50 hover:bg-primary/5">
+                      {extraPreviews[i] ? (
+                        <>
+                          <img src={extraPreviews[i]} alt={`Photo ${i + 2}`} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <p className="text-white text-xs font-medium flex items-center gap-1"><Upload className="w-3 h-3" /> Change</p>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-center p-3">
+                          <ImageIcon className="w-7 h-7 text-muted-foreground mx-auto mb-1.5 opacity-50 group-hover:text-primary group-hover:opacity-100 transition-colors" />
+                          <p className="text-xs text-muted-foreground">Photo {i + 2}</p>
+                        </div>
+                      )}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={e => handleExtraImageChange(i, e)}
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                      />
+                    </div>
+                  ))}
                 </div>
 
                 {/* AI Analysis */}
@@ -741,7 +810,7 @@ const AddEditCardPage = () => {
                     </Select>
                   </div>
 
-                  {/* Foil + Sealed toggles */}
+                  {/* Card Attributes toggles */}
                   <div className="space-y-2 md:col-span-2">
                     <Label className="font-bold">Card Attributes</Label>
                     <div className="flex gap-3">
@@ -764,6 +833,40 @@ const AddEditCardPage = () => {
                           <span className={`text-xs mt-0.5 ${formData[key] ? 'text-primary/70' : 'text-muted-foreground'}`}>{desc}</span>
                         </button>
                       ))}
+                    </div>
+                    <div className="flex gap-3 items-stretch">
+                      {[
+                        { key: 'isRefractor', label: '🌈 Refractor',  desc: 'Refractor / prizm parallel' },
+                        { key: 'isAuto',      label: '✍️ Auto',        desc: 'Signed autograph card' },
+                      ].map(({ key, label, desc }) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => set(key, !formData[key])}
+                          className={`flex-1 flex flex-col items-start px-4 py-3 rounded-xl border-2 text-left transition-all ${
+                            formData[key]
+                              ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                              : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                          }`}
+                        >
+                          <span className="font-bold text-sm">{label}</span>
+                          <span className={`text-xs mt-0.5 ${formData[key] ? 'text-primary/70' : 'text-muted-foreground'}`}>{desc}</span>
+                        </button>
+                      ))}
+                      <div className={`flex-1 flex flex-col px-4 py-3 rounded-xl border-2 transition-all ${
+                        formData.serialNumber
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border bg-background'
+                      }`}>
+                        <span className={`font-bold text-sm mb-1 ${formData.serialNumber ? 'text-primary' : 'text-foreground'}`}>🔢 Serial #</span>
+                        <input
+                          type="text"
+                          placeholder="e.g. 42/99"
+                          value={formData.serialNumber}
+                          onChange={e => set('serialNumber', e.target.value)}
+                          className="bg-transparent text-xs outline-none placeholder:text-muted-foreground w-full"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
