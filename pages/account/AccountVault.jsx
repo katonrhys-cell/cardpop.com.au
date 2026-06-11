@@ -54,7 +54,7 @@ const AccountVault = () => {
     try {
       let query = supabase
         .from('vault_items')
-        .select('*')
+        .select('*, parallel:parallels(id,name), subset:subsets(id,name)')
         .eq('owner_id', currentUser.id)
         .order('created_at', { ascending: false })
         .limit(200);
@@ -167,6 +167,12 @@ const AccountVault = () => {
           {card.set_name && <p className="text-xs text-muted-foreground mb-2">{card.set_name}</p>}
 
           <div className="flex flex-wrap gap-1.5 mb-3">
+            {card.parallel?.name && (
+              <Badge variant="secondary" className="text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-0">{card.parallel.name}</Badge>
+            )}
+            {card.subset?.name && (
+              <Badge variant="secondary" className="text-[10px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300 border-0">{card.subset.name}</Badge>
+            )}
             {card.collection && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{card.collection}</Badge>}
             {card.year && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{card.year}</Badge>}
             {card.card_number && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">#{card.card_number}</Badge>}
