@@ -96,6 +96,9 @@ const AddEditCardPage = () => {
     isFoil:         false,
     isSealed:       false,
     isRookie:       false,
+    isRefractor:    false,
+    serialNumber:   '',
+    isAuto:         false,
     // Grading
     gradingCompany: 'raw',
     grade:          '',
@@ -209,6 +212,9 @@ const AddEditCardPage = () => {
           isFoil:         card.is_foil        ?? false,
           isSealed:       card.is_sealed      ?? false,
           isRookie:       card.is_rookie      ?? false,
+          isRefractor:    card.is_refractor   ?? false,
+          serialNumber:   card.serial_number  || '',
+          isAuto:         card.is_auto        ?? false,
           gradingCompany: card.grading_company || 'raw',
           grade:          card.grade          || '',
           certNumber:     card.cert_number    || '',
@@ -342,6 +348,9 @@ const AddEditCardPage = () => {
         is_foil:             formData.isFoil,
         is_sealed:           formData.isSealed,
         is_rookie:           formData.isRookie,
+        is_refractor:        formData.isRefractor,
+        serial_number:       formData.serialNumber?.trim() || null,
+        is_auto:             formData.isAuto,
         grading_company:     formData.gradingCompany,
         grade:               isGraded ? (formData.grade?.trim() || null) : null,
         cert_number:         isGraded ? (formData.certNumber?.trim() || null) : null,
@@ -741,7 +750,7 @@ const AddEditCardPage = () => {
                     </Select>
                   </div>
 
-                  {/* Foil + Sealed toggles */}
+                  {/* Card Attributes toggles */}
                   <div className="space-y-2 md:col-span-2">
                     <Label className="font-bold">Card Attributes</Label>
                     <div className="flex gap-3">
@@ -764,6 +773,40 @@ const AddEditCardPage = () => {
                           <span className={`text-xs mt-0.5 ${formData[key] ? 'text-primary/70' : 'text-muted-foreground'}`}>{desc}</span>
                         </button>
                       ))}
+                    </div>
+                    <div className="flex gap-3 items-stretch">
+                      {[
+                        { key: 'isRefractor', label: '🌈 Refractor',  desc: 'Refractor / prizm parallel' },
+                        { key: 'isAuto',      label: '✍️ Auto',        desc: 'Signed autograph card' },
+                      ].map(({ key, label, desc }) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => set(key, !formData[key])}
+                          className={`flex-1 flex flex-col items-start px-4 py-3 rounded-xl border-2 text-left transition-all ${
+                            formData[key]
+                              ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                              : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                          }`}
+                        >
+                          <span className="font-bold text-sm">{label}</span>
+                          <span className={`text-xs mt-0.5 ${formData[key] ? 'text-primary/70' : 'text-muted-foreground'}`}>{desc}</span>
+                        </button>
+                      ))}
+                      <div className={`flex-1 flex flex-col px-4 py-3 rounded-xl border-2 transition-all ${
+                        formData.serialNumber
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border bg-background'
+                      }`}>
+                        <span className={`font-bold text-sm mb-1 ${formData.serialNumber ? 'text-primary' : 'text-foreground'}`}>🔢 Serial #</span>
+                        <input
+                          type="text"
+                          placeholder="e.g. 42/99"
+                          value={formData.serialNumber}
+                          onChange={e => set('serialNumber', e.target.value)}
+                          className="bg-transparent text-xs outline-none placeholder:text-muted-foreground w-full"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
