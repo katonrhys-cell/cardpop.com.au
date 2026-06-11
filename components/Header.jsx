@@ -8,6 +8,19 @@ import {
   FolderTree, ListOrdered, BarChart3, Store,
   BookOpen, Globe, Star, Award, TrendingUp, Newspaper
 } from 'lucide-react';
+
+const WhatnotIcon = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" className={className}>
+    <rect width="32" height="32" rx="8" fill="#00C854" />
+    <path
+      d="M5 9l4.5 14 4-9.5 2.5 5.5 2.5-5.5 4 9.5L27 9"
+      stroke="white"
+      strokeWidth="2.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 import { useDarkMode } from '@/hooks/useDarkMode.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import CardPopLogo from '@/components/CardPopLogo.jsx';
@@ -353,6 +366,86 @@ const BlogDropdown = ({ onNavigate }) => {
   );
 };
 
+const COMMUNITY_ITEMS = [
+  { href: '/community/forum',     label: 'Forum',                   desc: 'Discussions and community posts',     Icon: MessageSquare, gradient: 'from-violet-500 to-purple-600' },
+  { href: '/community/profiles',  label: 'Profiles',                desc: 'Browse collector profiles',           Icon: Users,         gradient: 'from-sky-500 to-blue-600'     },
+  { href: '/community/retailers', label: 'Retailers & Suppliers',   desc: 'Find local shops and suppliers',      Icon: Store,         gradient: 'from-amber-500 to-orange-500' },
+  { href: '/community/whatnot',   label: 'Whatnot',                 desc: 'Live buying and selling shows',       Icon: WhatnotIcon,   gradient: 'from-green-500 to-emerald-600', isWhatnot: true },
+];
+
+// ─── Community mega-dropdown ──────────────────────────────────────────────────
+const CommunityDropdown = ({ onNavigate }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const location = useLocation();
+  const timerRef = useRef(null);
+  const isCommunityActive = location.pathname.startsWith('/community');
+
+  const handleMouseEnter = () => { clearTimeout(timerRef.current); setOpen(true); };
+  const handleMouseLeave = () => { timerRef.current = setTimeout(() => setOpen(false), 120); };
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  useEffect(() => { setOpen(false); }, [location.pathname]);
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  return (
+    <div className="relative" ref={ref} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        className={`flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+          open || isCommunityActive
+            ? 'bg-primary text-primary-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+        }`}
+      >
+        Community
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-72 bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+          <Link
+            to="/community"
+            onClick={() => { setOpen(false); onNavigate?.(); }}
+            className="flex items-center justify-between px-5 py-3.5 border-b border-border hover:bg-muted/60 transition-colors group"
+          >
+            <div>
+              <span className="text-sm font-bold text-foreground">Community Hub</span>
+              <p className="text-xs text-muted-foreground mt-0.5">Connect with collectors</p>
+            </div>
+            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
+          </Link>
+          <div className="p-3 grid gap-0.5">
+            {COMMUNITY_ITEMS.map(item => (
+              <Link
+                key={item.label}
+                to={item.href}
+                onClick={() => { setOpen(false); onNavigate?.(); }}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
+              >
+                <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${item.isWhatnot ? '' : item.gradient} shrink-0 shadow-sm overflow-hidden`}>
+                  <item.Icon className="w-4 h-4 text-white" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{item.label}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{item.desc}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Mobile blog section (expandable) ────────────────────────────────────────
 const MobileBlogSection = ({ onNavigate }) => {
   const [open, setOpen] = useState(false);
@@ -390,6 +483,52 @@ const MobileBlogSection = ({ onNavigate }) => {
                   <cat.Icon className="w-3.5 h-3.5 text-white" />
                 </span>
                 <span className="text-xs font-semibold text-foreground truncate">{cat.label}</span>
+              </Link>
+            </SheetClose>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Mobile community section (expandable) ───────────────────────────────────
+const MobileCommunitySection = ({ onNavigate }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-4">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-muted transition-colors mb-0.5"
+      >
+        <span className="text-sm font-bold text-foreground flex items-center gap-2">
+          <Users className="w-4 h-4 text-primary" />
+          Community
+        </span>
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="flex flex-col gap-0.5 mb-1 pl-2">
+          <SheetClose asChild>
+            <Link
+              to="/community"
+              onClick={onNavigate}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-semibold text-muted-foreground"
+            >
+              Community Hub
+            </Link>
+          </SheetClose>
+          {COMMUNITY_ITEMS.map(item => (
+            <SheetClose key={item.label} asChild>
+              <Link
+                to={item.href}
+                onClick={onNavigate}
+                className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
+              >
+                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${item.isWhatnot ? '' : item.gradient} shrink-0 overflow-hidden`}>
+                  <item.Icon className="w-3.5 h-3.5 text-white" />
+                </span>
+                <span className="text-xs font-semibold text-foreground truncate">{item.label}</span>
               </Link>
             </SheetClose>
           ))}
@@ -728,8 +867,14 @@ const Header = () => {
                     onNavigate={() => setMobileMenuOpen(false)}
                   />
 
+                  {/* Mobile Community */}
+                  <MobileCommunitySection
+                    key={`community-${String(mobileMenuOpen)}`}
+                    onNavigate={() => setMobileMenuOpen(false)}
+                  />
+
                   <nav className="flex flex-col gap-1.5 mb-6">
-                    {NAV_LINKS.filter(l => l.label !== 'Blog').map((link) => {
+                    {NAV_LINKS.filter(l => l.label !== 'Blog' && l.label !== 'Community').map((link) => {
                       const isActive = isNavLinkActive(link);
                       return (
                         <SheetClose key={link.label} asChild>
@@ -839,6 +984,9 @@ const Header = () => {
             {NAV_LINKS.map((link) => {
               if (link.label === 'Blog') {
                 return <BlogDropdown key="blog" onNavigate={() => setMobileMenuOpen(false)} />;
+              }
+              if (link.label === 'Community') {
+                return <CommunityDropdown key="community" onNavigate={() => setMobileMenuOpen(false)} />;
               }
               const isActive = isNavLinkActive(link);
               return (
