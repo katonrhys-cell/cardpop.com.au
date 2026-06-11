@@ -75,6 +75,18 @@ export const useCategories = () => {
     return data ?? [];
   }, []);
 
+  // Parallels/variations for a franchise
+  const getParallelsByFranchise = useCallback(async (franchiseId) => {
+    if (!franchiseId) return [];
+    const { data } = await supabase
+      .from('parallels')
+      .select('*')
+      .eq('franchise_id', franchiseId)
+      .eq('is_active', true)
+      .order('sort_order');
+    return data ?? [];
+  }, []);
+
   // Subcategories are now represented as categories with parent_id set
   const getSubcategoriesByCategory = useCallback(async (categoryId) => {
     if (!categoryId) return [];
@@ -161,6 +173,7 @@ export const useCategories = () => {
     getManufacturersByFranchise,
     getSetsByFranchiseAndManufacturer,
     getCategoriesByGroup,
+    getParallelsByFranchise,
     getSubcategoriesByCategory,
     // Legacy aliases
     getBrandsBySubcategory:  async () => [],
