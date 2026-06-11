@@ -24,6 +24,8 @@ import { useEbayPriceLookup } from '@/hooks/useEbayPriceLookup.js';
 import { useCardSight, mapCardSightToFormFields } from '@/hooks/useCardSight.js';
 import PSAPopPanel from '@/components/PSAPopPanel.jsx';
 import { useCardsightPricing } from '@/hooks/useCardsightPricing.js';
+import PhotoQualityScore from '@/components/PhotoQualityScore.jsx';
+import { analyzePhotoQuality } from '@/utils/photoQuality.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -65,6 +67,8 @@ const AddEditCardPage = () => {
   const [saving, setSaving]             = useState(false);
   const [imageFile, setImageFile]       = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [photoQuality, setPhotoQuality] = useState(null);
+  const [checkingQuality, setCheckingQuality] = useState(false);
   const [extraFiles, setExtraFiles]     = useState([null, null]);
   const [extraPreviews, setExtraPreviews] = useState([null, null]);
   const [errors, setErrors]             = useState({});
@@ -266,6 +270,13 @@ const AddEditCardPage = () => {
     // Clear any previous analysis results when a new image is selected
     clearScan();
     clearCardSight();
+    // Score the photo against the CardPop Photography Standard (advisory only)
+    setPhotoQuality(null);
+    setCheckingQuality(true);
+    analyzePhotoQuality(file)
+      .then(setPhotoQuality)
+      .catch(() => setPhotoQuality(null))
+      .finally(() => setCheckingQuality(false));
   };
 
   // ─── Unified AI analysis ──────────────────────────────────────────────────
@@ -495,9 +506,19 @@ const AddEditCardPage = () => {
             {/* ── Left: Image + AI ── */}
             <div className="lg:col-span-1 space-y-5">
               <div className="premium-card p-6 bg-card">
-                <Label className="font-bold text-base mb-4 block">
-                  Card Image <span className="text-destructive">*</span>
-                </Label>
+                <div className="flex items-center justify-between mb-4">
+                  <Label className="font-bold text-base">
+                    Card Image <span className="text-destructive">*</span>
+                  </Label>
+                  <Link
+                    to="/photography-standard"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline font-medium"
+                  >
+                    Photo guide
+                  </Link>
+                </div>
                 <div className="aspect-[3/4] bg-muted/50 rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center relative overflow-hidden group transition-colors hover:border-primary/50 hover:bg-primary/5">
                   {imagePreview ? (
                     <>
@@ -520,6 +541,13 @@ const AddEditCardPage = () => {
                     className="absolute inset-0 opacity-0 cursor-pointer"
                   />
                 </div>
+
+                {/* Photo Quality Score (CardPop Photography Standard) */}
+                {(checkingQuality || photoQuality) && (
+                  <div className="mt-4">
+                    <PhotoQualityScore result={photoQuality} loading={checkingQuality} />
+                  </div>
+                )}
 
                 {/* Unified AI Analysis */}
                 <div className="mt-4 space-y-3">
