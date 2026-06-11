@@ -180,8 +180,9 @@ const AddEditCardPage = () => {
         setLockedBaseValue(card.locked_base_value_aud ?? null);
 
         // Restore hierarchy selectors
-        const resolvedFranchise = card.franchise_id ?? card.category_id ?? null;
+        const resolvedFranchise = card.franchise_id ?? null;
         if (resolvedFranchise) setFranchiseId(resolvedFranchise);
+        if (card.category_id) setSelCategoryId(card.category_id);
         if (card.manufacturer_id) setManufacturerId(card.manufacturer_id);
         if (card.set_id) setSetId(card.set_id);
         if (card.parallel_id) setParallelId(card.parallel_id);
@@ -326,7 +327,7 @@ const AddEditCardPage = () => {
 
       const payload = {
         owner_id:            currentUser.id,
-        category_id:         franchiseId || null,
+        category_id:         selCategoryId || null,
         franchise_id:        franchiseId || null,
         manufacturer_id:     manufacturerId || null,
         set_id:              setId || null,
