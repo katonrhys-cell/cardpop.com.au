@@ -316,7 +316,7 @@ const AddEditCardPage = () => {
       'Mint': 'mint', 'Near Mint': 'near_mint', 'Excellent': 'excellent',
       'Good': 'good', 'Fair': 'light_played',
     };
-    const gradingCompanyMap = { 'PSA': 'psa', 'BGS': 'bgs', 'CGC': 'cgc' };
+    const gradingCompanyMap = { 'PSA': 'psa', 'BGS': 'bgs', 'CGC': 'cgc', 'SGC': 'sgc', 'ACE': 'ace' };
     setFormData(prev => ({
       ...prev,
       cardName:       prev.cardName       || scanResult.name          || '',

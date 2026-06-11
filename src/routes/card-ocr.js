@@ -9,7 +9,15 @@ const router = Router();
 
 router.use(supabaseAuth);
 
-router.post('/scan', integratedAiRateLimit, uploadFiles({
+// Reject before multipart parsing so anonymous requests can't buffer uploads into memory
+const requireAuth = (req, res, next) => {
+	if (!req.userId) {
+		return res.status(401).json({ error: 'Authentication required' });
+	}
+	next();
+};
+
+router.post('/scan', integratedAiRateLimit, requireAuth, uploadFiles({
 	allowedMimeTypes: [
 		'image/jpeg',
 		'image/png',
@@ -17,12 +25,8 @@ router.post('/scan', integratedAiRateLimit, uploadFiles({
 	],
 	fieldName: 'images',
 }), async (req, res) => {
-	if (!req.userId) {
-		return res.status(401).json({ error: 'Authentication required' });
-	}
-
 	if (!req.files?.length) {
-		throw new Error('An image is required for card scanning');
+		return res.status(400).json({ error: 'An image is required for card scanning' });
 	}
 
 	const imageUrls = await uploadImagesToSupabase({ images: req.files });
