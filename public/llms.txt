@@ -9,11 +9,11 @@
 - [Admin - User Management | CardPop](/adminusers): No description available
 - [Analytics & Reports | Admin Portal](/analyticsreports): No description available
 - [Brand Management | Admin Portal](/brandsmanagement): No description available
-- [Category Hierarchy | Admin](/categorymanagement): No description available
 - [Category Mapping Tools | Admin](/categorymapping): No description available
 - [Check Your Email | Card Pop](/signup): No description available
 - [Commission Settings | CardPop Admin](/commissionsettings): No description available
 - [Complete Profile | Card Pop](/profilecompletion): No description available
+- [Hierarchy Management | CardPop Admin](/categorymanagement): No description available
 - [Log In | CardPop](/login): No description available
 - [Manage Events | Admin Portal](/eventsadmin): No description available
 - [Manage Events | Admin Portal](/eventsmanagement): No description available
