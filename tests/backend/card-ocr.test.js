@@ -7,10 +7,16 @@ vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-vi.mock('../../src/middleware/pocketbase-auth.js', () => ({
-  supabaseAuth: (req, _res, next) => { req.userId = 'user-1'; next(); },
-  pocketbaseAuth: (req, _res, next) => { req.userId = 'user-1'; next(); },
-}));
+// Controllable auth: tests can clear authState.userId to simulate an
+// unauthenticated request (supabaseAuth passes through without setting userId)
+const authState = vi.hoisted(() => ({ userId: 'user-1' }));
+vi.mock('../../src/middleware/pocketbase-auth.js', () => {
+  const middleware = (req, _res, next) => {
+    if (authState.userId) req.userId = authState.userId;
+    next();
+  };
+  return { supabaseAuth: middleware, pocketbaseAuth: middleware };
+});
 
 vi.mock('../../src/middleware/integrated-ai-rate-limit.js', () => ({
   integratedAiRateLimit: (_req, _res, next) => next(),
@@ -66,11 +72,65 @@ const app = makeApp();
 beforeEach(() => {
   vi.clearAllMocks();
   mockFiles = [];
+  authState.userId = 'user-1';
 });
 
 // ─── POST /scan ───────────────────────────────────────────────────────────────
 
 describe('POST /scan', () => {
+  it('returns 401 when unauthenticated', async () => {
+    authState.userId = null;
+    mockFiles = [{ buffer: Buffer.from('img'), mimetype: 'image/jpeg', originalname: 'card.jpg' }];
+
+    const res = await request(app).post('/scan');
+
+    expect(res.status).toBe(401);
+    expect(res.body.error).toMatch(/authentication required/i);
+  });
+
+  it('does not upload images or call the AI when unauthenticated', async () => {
+    authState.userId = null;
+    mockFiles = [{ buffer: Buffer.from('img'), mimetype: 'image/jpeg', originalname: 'card.jpg' }];
+
+    await request(app).post('/scan');
+
+    expect(mockUploadImagesToSupabase).not.toHaveBeenCalled();
+    expect(mockStreamOneShot).not.toHaveBeenCalled();
+  });
+
+  it('includes one image block per uploaded file plus the text instruction', async () => {
+    mockFiles = [
+      { buffer: Buffer.from('a'), mimetype: 'image/jpeg', originalname: 'front.jpg' },
+      { buffer: Buffer.from('b'), mimetype: 'image/png', originalname: 'back.png' },
+    ];
+    mockUploadImagesToSupabase.mockResolvedValue([
+      'https://storage.example.com/front.jpg',
+      'https://storage.example.com/back.png',
+    ]);
+    mockStreamOneShot.mockResolvedValue(makeSseStream());
+
+    await request(app).post('/scan');
+
+    const { userMessage } = mockStreamOneShot.mock.calls[0][0];
+    expect(userMessage).toHaveLength(3);
+    expect(userMessage[0].type).toBe('text');
+    expect(userMessage.filter(b => b.type === 'image').map(b => b.image)).toEqual([
+      'https://storage.example.com/front.jpg',
+      'https://storage.example.com/back.png',
+    ]);
+  });
+
+  it('returns 500 when the AI stream cannot be established', async () => {
+    mockFiles = [{ buffer: Buffer.from('img'), mimetype: 'image/jpeg', originalname: 'card.jpg' }];
+    mockUploadImagesToSupabase.mockResolvedValue(['https://storage.example.com/card.jpg']);
+    mockStreamOneShot.mockRejectedValue(new Error('AI proxy request failed with status 503'));
+
+    const res = await request(app).post('/scan');
+
+    expect(res.status).toBe(500);
+    expect(res.body.error).toMatch(/503/);
+  });
+
   it('returns 500 when no files are uploaded', async () => {
     const res = await request(app).post('/scan');
     expect(res.status).toBe(500);
