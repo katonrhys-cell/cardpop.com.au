@@ -6,10 +6,10 @@ import { MessageSquare, Users, Store, ExternalLink, ShieldCheck } from 'lucide-r
 
 const WhatnotIcon = ({ className = 'w-4 h-4' }) => (
   <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" className={className}>
-    <rect width="32" height="32" rx="8" fill="#00C854" />
+    <rect width="32" height="32" rx="8" fill="#000000" />
     <path
       d="M5 9l4.5 14 4-9.5 2.5 5.5 2.5-5.5 4 9.5L27 9"
-      stroke="white"
+      stroke="#FFDF00"
       strokeWidth="2.8"
       strokeLinecap="round"
       strokeLinejoin="round"

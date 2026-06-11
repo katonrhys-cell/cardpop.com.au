@@ -11,10 +11,10 @@ import {
 
 const WhatnotIcon = ({ className = 'w-4 h-4' }) => (
   <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" className={className}>
-    <rect width="32" height="32" rx="8" fill="#00C854" />
+    <rect width="32" height="32" rx="8" fill="#000000" />
     <path
       d="M5 9l4.5 14 4-9.5 2.5 5.5 2.5-5.5 4 9.5L27 9"
-      stroke="white"
+      stroke="#FFDF00"
       strokeWidth="2.8"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -370,7 +370,7 @@ const COMMUNITY_ITEMS = [
   { href: '/community/forum',     label: 'Forum',                   desc: 'Discussions and community posts',     Icon: MessageSquare, gradient: 'from-violet-500 to-purple-600' },
   { href: '/community/profiles',  label: 'Profiles',                desc: 'Browse collector profiles',           Icon: Users,         gradient: 'from-sky-500 to-blue-600'     },
   { href: '/community/retailers', label: 'Retailers & Suppliers',   desc: 'Find local shops and suppliers',      Icon: Store,         gradient: 'from-amber-500 to-orange-500' },
-  { href: '/community/whatnot',   label: 'Whatnot',                 desc: 'Live buying and selling shows',       Icon: WhatnotIcon,   gradient: 'from-green-500 to-emerald-600', isWhatnot: true },
+  { href: '/community/whatnot',   label: 'Whatnot',                 desc: 'Live buying and selling shows',       Icon: WhatnotIcon,   gradient: 'from-yellow-400 to-yellow-500', isWhatnot: true },
 ];
 
 // ─── Community mega-dropdown ──────────────────────────────────────────────────
