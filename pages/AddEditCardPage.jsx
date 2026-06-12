@@ -306,6 +306,13 @@ const AddEditCardPage = () => {
       else if (cardSightResult.card?.name) fetchPricingByName(cardSightResult.card.name);
       setIsAutoFilled(true);
       toast.success('Card identified! Fields auto-filled from catalog.');
+    } else {
+      const advisory = cardSightResult.serverMessages?.[0]?.message;
+      toast.info(
+        advisory
+          ? `Catalog match not found: ${advisory}`
+          : 'No catalog match found — filling details from the image scan only.'
+      );
     }
   }, [cardSightResult]); // eslint-disable-line react-hooks/exhaustive-deps
 
