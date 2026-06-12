@@ -101,6 +101,8 @@ const AddEditCardPage = () => {
     isRefractor:    false,
     serialNumber:   '',
     isAuto:         false,
+    autoType:       '',
+    autoSigners:    1,
     // Grading
     gradingCompany: 'raw',
     grade:          '',
@@ -217,6 +219,8 @@ const AddEditCardPage = () => {
           isRefractor:    card.is_refractor   ?? false,
           serialNumber:   card.serial_number  || '',
           isAuto:         card.is_auto        ?? false,
+          autoType:       card.auto_type      || '',
+          autoSigners:    card.auto_signers   ?? 1,
           gradingCompany: card.grading_company || 'raw',
           grade:          card.grade          || '',
           certNumber:     card.cert_number    || '',
@@ -381,6 +385,8 @@ const AddEditCardPage = () => {
         is_refractor:        formData.isRefractor,
         serial_number:       formData.serialNumber?.trim() || null,
         is_auto:             formData.isAuto,
+        auto_type:           formData.isAuto ? (formData.autoType || null) : null,
+        auto_signers:        formData.isAuto ? (formData.autoSigners || 1) : null,
         grading_company:     formData.gradingCompany,
         grade:               isGraded ? (formData.grade?.trim() || null) : null,
         cert_number:         isGraded ? (formData.certNumber?.trim() || null) : null,
@@ -892,6 +898,66 @@ const AddEditCardPage = () => {
                         />
                       </div>
                     </div>
+
+                    {/* Auto sub-details — shown when Auto is toggled on */}
+                    {formData.isAuto && (
+                      <div className="mt-3 p-4 rounded-xl border-2 border-blue-400/30 bg-blue-400/5 space-y-4 animate-in fade-in slide-in-from-top-1">
+                        <p className="text-xs font-extrabold uppercase tracking-widest text-blue-700 dark:text-blue-400">Autograph Details</p>
+
+                        {/* Signature type */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Signature Type</Label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[
+                              { value: 'on_card', label: 'On-Card', desc: 'Player signed the card directly' },
+                              { value: 'sticker', label: 'Sticker / Label', desc: 'Signed sticker affixed by manufacturer' },
+                              { value: 'cut',     label: 'Cut Signature', desc: 'Historical signature embedded into the card' },
+                            ].map(({ value, label, desc }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('autoType', formData.autoType === value ? '' : value)}
+                                className={`flex flex-col items-start px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
+                                  formData.autoType === value
+                                    ? 'border-blue-500 bg-blue-500/10 text-blue-700 dark:text-blue-400 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                }`}
+                              >
+                                <span className="font-bold text-xs">{label}</span>
+                                <span className={`text-[10px] mt-0.5 leading-tight ${formData.autoType === value ? 'text-blue-600/70 dark:text-blue-400/70' : 'text-muted-foreground'}`}>{desc}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Number of signers */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Number of Signatures</Label>
+                          <div className="flex gap-2">
+                            {[
+                              { value: 1, label: 'Solo',   sub: '1 signature' },
+                              { value: 2, label: 'Dual',   sub: '2 signatures' },
+                              { value: 3, label: 'Triple', sub: '3 signatures' },
+                              { value: 4, label: 'Quad',   sub: '4 signatures' },
+                            ].map(({ value, label, sub }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('autoSigners', value)}
+                                className={`flex-1 flex flex-col items-center px-2 py-2.5 rounded-xl border-2 text-center transition-all ${
+                                  formData.autoSigners === value
+                                    ? 'border-blue-500 bg-blue-500/10 text-blue-700 dark:text-blue-400 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                }`}
+                              >
+                                <span className="font-bold text-sm">{label}</span>
+                                <span className={`text-[10px] mt-0.5 ${formData.autoSigners === value ? 'text-blue-600/70 dark:text-blue-400/70' : 'text-muted-foreground'}`}>{sub}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </SectionCard>

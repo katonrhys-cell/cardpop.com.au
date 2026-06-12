@@ -178,6 +178,18 @@ const VaultListingDetailPage = () => {
               </div>
             )}
             {vi?.cert_number && <div className="flex justify-between"><span className="text-muted-foreground">Cert Number</span> <span className="font-medium">{vi.cert_number}</span></div>}
+            {vi?.is_auto && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Autograph</span>
+                <span className="font-medium text-right">
+                  {[
+                    vi.auto_signers > 1 ? ['Solo','Dual','Triple','Quad'][(vi.auto_signers - 1)] : null,
+                    vi.auto_type === 'on_card' ? 'On-Card' : vi.auto_type === 'sticker' ? 'Sticker' : vi.auto_type === 'cut' ? 'Cut Signature' : null,
+                    'Auto',
+                  ].filter(Boolean).join(' ')}
+                </span>
+              </div>
+            )}
 
             {/* Attributes */}
             {(vi?.is_foil || vi?.is_refractor || vi?.is_auto || vi?.is_rookie || vi?.is_sealed) && (

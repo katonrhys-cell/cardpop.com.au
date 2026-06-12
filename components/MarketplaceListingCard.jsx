@@ -176,7 +176,15 @@ const MarketplaceListingCard = ({ listing }) => {
             )}
             {vaultItem?.is_foil && <Badge variant="outline" className="text-[10px] font-bold border-yellow-400/50 text-yellow-700 bg-yellow-400/10">Foil</Badge>}
             {vaultItem?.is_refractor && <Badge variant="outline" className="text-[10px] font-bold border-indigo-400/50 text-indigo-700 bg-indigo-400/10">Refractor</Badge>}
-            {vaultItem?.is_auto && <Badge variant="outline" className="text-[10px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10">Auto</Badge>}
+            {vaultItem?.is_auto && (
+              <Badge variant="outline" className="text-[10px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10">
+                {[
+                  vaultItem.auto_signers > 1 ? ['','Dual','Triple','Quad'][vaultItem.auto_signers - 1] : null,
+                  vaultItem.auto_type === 'on_card' ? 'On-Card' : vaultItem.auto_type === 'sticker' ? 'Sticker' : vaultItem.auto_type === 'cut' ? 'Cut Sig' : null,
+                  'Auto',
+                ].filter(Boolean).join(' ')}
+              </Badge>
+            )}
             {vaultItem?.is_rookie && <Badge variant="outline" className="text-[10px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10">RC</Badge>}
             {vaultItem?.is_sealed && <Badge variant="outline" className="text-[10px] font-bold border-green-400/50 text-green-700 bg-green-400/10">Sealed</Badge>}
             {variants.map(v => (
