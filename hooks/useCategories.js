@@ -11,23 +11,27 @@ export const useCategories = () => {
 
   const getCategories = useCallback(async (forceRefresh = false) => {
     if (cache.categories && !forceRefresh) return cache.categories;
-    setLoading(true);
-    try {
-      const { data, error: err } = await supabase
+    // Use an in-flight promise to deduplicate concurrent requests
+    if (!cache._fetch) {
+      cache._fetch = supabase
         .from('categories')
         .select('*')
         .eq('is_active', true)
-        .order('sort_order');
-      if (err) throw err;
-      cache.categories = data ?? [];
-      return cache.categories;
-    } catch (err) {
-      setError(err.message);
-      toast.error('Failed to load categories');
-      return [];
-    } finally {
-      setLoading(false);
+        .order('sort_order')
+        .then(({ data, error: err }) => {
+          cache._fetch = null;
+          if (err) { setError(err.message); throw err; }
+          cache.categories = data ?? [];
+          return cache.categories;
+        })
+        .catch(err => {
+          cache._fetch = null;
+          setError(err.message);
+          toast.error('Failed to load categories');
+          return [];
+        });
     }
+    return cache._fetch;
   }, []);
 
   // Returns categories filtered by group ('tcg' | 'sports')
@@ -117,7 +121,7 @@ export const useCategories = () => {
       const { data: record, error: err } = await supabase
         .from('categories').insert(data).select().single();
       if (err) throw err;
-      cache.categories = null; // invalidate cache
+      cache.categories = null; cache._fetch = null; // invalidate cache
       toast.success('Category created');
       return record;
     } catch (err) {

@@ -160,6 +160,13 @@ const AccountVault = () => {
           <div className="absolute top-3 left-3 z-10 pointer-events-none">
             {getListingBadge(card)}
           </div>
+          {card.serial_number && (
+            <div className="absolute bottom-3 right-3 z-10 pointer-events-none">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold tracking-wide bg-black/70 text-white backdrop-blur-sm border border-white/10 shadow-md">
+                <span className="opacity-60">#</span>{card.serial_number}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="p-4 flex flex-col flex-1">
@@ -176,7 +183,9 @@ const AccountVault = () => {
             {card.collection && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{card.collection}</Badge>}
             {card.year && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{card.year}</Badge>}
             {card.card_number && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">#{card.card_number}</Badge>}
-            {card.variant && <Badge variant="secondary" className="text-[10px] font-medium bg-violet-500/10 text-violet-700 border border-violet-200/50">{card.variant}</Badge>}
+            {card.variant && card.variant.split(',').map(v => v.trim()).filter(Boolean).map(v => (
+              <Badge key={v} variant="secondary" className="text-[10px] font-medium bg-violet-500/10 text-violet-700 border border-violet-200/50">{v}</Badge>
+            ))}
             {card.condition && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{CONDITION_LABELS[card.condition] || card.condition}</Badge>}
             {card.grading_company && card.grading_company !== 'raw' && (
               <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground uppercase">{card.grading_company} {card.grade || ''}</Badge>

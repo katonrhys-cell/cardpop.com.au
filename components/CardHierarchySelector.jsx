@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
 import {
   Select, SelectContent, SelectGroup, SelectItem,
@@ -40,42 +41,55 @@ const CardHierarchySelector = ({
     getSetsByFranchiseAndManufacturer,
   } = useCategories();
 
-  const [rootCategories, setRootCategories] = useState([]);
-  const [franchises, setFranchises]         = useState([]);
-  const [manufacturers, setManufacturers]   = useState([]);
-  const [sets, setSets]                     = useState([]);
-  const [loadingRoots, setLoadingRoots]     = useState(true);
-  const [loadingSets, setLoadingSets]       = useState(false);
+  const [rootCategories, setRootCategories]       = useState([]);
+  const [franchises, setFranchises]               = useState([]);
+  const [manufacturers, setManufacturers]         = useState([]);
+  const [sets, setSets]                           = useState([]);
+  const [loadingRoots, setLoadingRoots]           = useState(true);
+  const [loadingFranchises, setLoadingFranchises] = useState(false);
+  const [loadingManufacturers, setLoadingManufacturers] = useState(false);
+  const [loadingSets, setLoadingSets]             = useState(false);
 
   // Load root categories once on mount
   useEffect(() => {
-    getRootCategories().then(cats => {
-      setRootCategories(cats);
-      setLoadingRoots(false);
-    });
+    getRootCategories()
+      .then(cats => setRootCategories(cats))
+      .catch(() => toast.error('Failed to load categories'))
+      .finally(() => setLoadingRoots(false));
   }, [getRootCategories]);
 
   // Load franchises whenever categoryId changes
   useEffect(() => {
     if (!categoryId) { setFranchises([]); return; }
-    getFranchisesByCategory(categoryId).then(setFranchises);
+    setLoadingFranchises(true);
+    getFranchisesByCategory(categoryId)
+      .then(setFranchises)
+      .catch(() => toast.error('Failed to load franchises'))
+      .finally(() => setLoadingFranchises(false));
   }, [categoryId, getFranchisesByCategory]);
 
   // Load manufacturers (+ resolve categoryId for edit mode) when franchiseId changes
   useEffect(() => {
-    if (!franchiseId) { setManufacturers([]); setSets([]); return; }
-    getManufacturersByFranchise(franchiseId).then(setManufacturers);
+    if (!franchiseId) { setManufacturers([]); return; }
+    setLoadingManufacturers(true);
+    getManufacturersByFranchise(franchiseId)
+      .then(setManufacturers)
+      .catch(() => toast.error('Failed to load manufacturers'))
+      .finally(() => setLoadingManufacturers(false));
 
+    // Edit-mode only: resolve the parent category when franchise is pre-loaded but category isn't
     if (!categoryId) {
-      getCategories().then(all => {
-        const franchise = all.find(c => c.id === franchiseId);
-        if (franchise?.parent_id) {
-          onCategoryChange?.(franchise.parent_id);
-          getFranchisesByCategory(franchise.parent_id).then(setFranchises);
-        }
-      });
+      getCategories()
+        .then(all => {
+          const franchise = all.find(c => c.id === franchiseId);
+          if (franchise?.parent_id) {
+            onCategoryChange?.(franchise.parent_id);
+            getFranchisesByCategory(franchise.parent_id).then(setFranchises);
+          }
+        })
+        .catch(() => {});
     }
-  }, [franchiseId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [franchiseId, categoryId, getManufacturersByFranchise, getCategories, getFranchisesByCategory, onCategoryChange]);
 
   // Load sets whenever franchise or manufacturer changes
   useEffect(() => {
@@ -83,6 +97,7 @@ const CardHierarchySelector = ({
     setLoadingSets(true);
     getSetsByFranchiseAndManufacturer(franchiseId, manufacturerId)
       .then(setSets)
+      .catch(() => toast.error('Failed to load sets'))
       .finally(() => setLoadingSets(false));
   }, [franchiseId, manufacturerId, getSetsByFranchiseAndManufacturer]);
 
@@ -159,10 +174,13 @@ const CardHierarchySelector = ({
           <Select
             value={franchiseId || ''}
             onValueChange={handleFranchiseChange}
-            disabled={!categoryId}
+            disabled={!categoryId || loadingFranchises}
           >
             <SelectTrigger className={`h-11 bg-background ${ring}`}>
-              <SelectValue placeholder={categoryId ? 'Select franchise…' : 'Pick category first'} />
+              {loadingFranchises
+                ? <span className="flex items-center gap-2 text-muted-foreground"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…</span>
+                : <SelectValue placeholder={categoryId ? 'Select franchise…' : 'Pick category first'} />
+              }
             </SelectTrigger>
             <SelectContent>
               {franchises.map(f => (
@@ -178,10 +196,13 @@ const CardHierarchySelector = ({
           <Select
             value={manufacturerId || ''}
             onValueChange={handleManufacturerChange}
-            disabled={!franchiseId}
+            disabled={!franchiseId || loadingManufacturers}
           >
             <SelectTrigger className="h-11 bg-background">
-              <SelectValue placeholder={franchiseId ? 'Select manufacturer…' : 'Pick franchise first'} />
+              {loadingManufacturers
+                ? <span className="flex items-center gap-2 text-muted-foreground"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…</span>
+                : <SelectValue placeholder={franchiseId ? 'Select manufacturer…' : 'Pick franchise first'} />
+              }
             </SelectTrigger>
             <SelectContent>
               {manufacturers.map(m => (
