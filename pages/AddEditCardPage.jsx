@@ -93,7 +93,7 @@ const AddEditCardPage = () => {
     setName:        '',
     cardNumber:     '',
     year:           '',
-    variant:        '',
+    variant:        [],
     // Attributes
     isFoil:         false,
     isSealed:       false,
@@ -210,7 +210,7 @@ const AddEditCardPage = () => {
           setName:        card.set_name       || '',
           cardNumber:     card.card_number    || '',
           year:           card.year           ? String(card.year) : '',
-          variant:        card.variant        || '',
+          variant:        card.variant ? card.variant.split(',').map(s => s.trim()).filter(Boolean) : [],
           isFoil:         card.is_foil        ?? false,
           isSealed:       card.is_sealed      ?? false,
           isRookie:       card.is_rookie      ?? false,
@@ -374,7 +374,7 @@ const AddEditCardPage = () => {
         set_name:            formData.setName?.trim()     || null,
         card_number:         formData.cardNumber?.trim()  || null,
         year:                formData.year ? parseInt(formData.year, 10) : null,
-        variant:             formData.variant             || null,
+        variant:             formData.variant.length ? formData.variant.join(', ') : null,
         is_foil:             formData.isFoil,
         is_sealed:           formData.isSealed,
         is_rookie:           formData.isRookie,
@@ -767,28 +767,52 @@ const AddEditCardPage = () => {
                     />
                   </div>
 
-                  {/* Variant */}
-                  <div className="space-y-2">
-                    <Label className="font-bold">Card Variant / Finish</Label>
-                    <Select value={formData.variant || '__none__'} onValueChange={v => set('variant', v === '__none__' ? '' : v)}>
-                      <SelectTrigger className="h-11 bg-background">
-                        <SelectValue placeholder="Select variant…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">No variant</SelectItem>
-                        {VARIANT_GROUPS.map((group, gi) => (
-                          <React.Fragment key={group.label}>
-                            {gi > 0 && <SelectSeparator />}
-                            <div className="px-2 py-1.5 text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
-                              {group.label}
-                            </div>
-                            {group.variants.map(v => (
-                              <SelectItem key={v} value={v}>{v}</SelectItem>
-                            ))}
-                          </React.Fragment>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  {/* Variant / Finish — multi-select */}
+                  <div className="space-y-3 md:col-span-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="font-bold">Card Variant / Finish</Label>
+                      {formData.variant.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => set('variant', [])}
+                          className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+                        >
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground -mt-1">Select all that apply</p>
+                    <div className="space-y-3">
+                      {VARIANT_GROUPS.map(group => (
+                        <div key={group.label}>
+                          <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground mb-1.5">{group.label}</p>
+                          <div className="flex flex-wrap gap-2">
+                            {group.variants.map(v => {
+                              const active = formData.variant.includes(v);
+                              return (
+                                <button
+                                  key={v}
+                                  type="button"
+                                  onClick={() => set('variant', active ? formData.variant.filter(x => x !== v) : [...formData.variant, v])}
+                                  className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
+                                    active
+                                      ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                                      : 'border-border bg-background text-foreground hover:border-muted-foreground/40'
+                                  }`}
+                                >
+                                  {active && <span className="mr-1">✓</span>}{v}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {formData.variant.length > 0 && (
+                      <p className="text-xs text-primary font-medium">
+                        Selected: {formData.variant.join(' · ')}
+                      </p>
+                    )}
                   </div>
 
                   {/* Condition */}
