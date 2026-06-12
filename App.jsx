@@ -273,6 +273,7 @@ const App = () => {
                         <Route path="/grading" element={<GradingPage />} />
                         <Route path="/grading/what-is-grading" element={<WhatIsGradingPage />} />
                         <Route path="/grading/scales" element={<GradingScalesPage />} />
+                        <Route path="/grading/scales/:scale" element={<GradingScalePage />} />
                         <Route path="/grading/companies" element={<GradingCompaniesPage />} />
                         <Route path="/grading/guide/:scale" element={<GradingScalePage />} />
                         
