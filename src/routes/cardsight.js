@@ -4,12 +4,11 @@ import {
   isExactMatch,
   isSetLevelMatch,
   hasGrading,
-  getGradingInfo,
   hasParallel,
   getParallelInfo,
   getFieldValue,
 } from 'cardsightai';
-import { getCardSightClient } from '../utils/cardSightClient.js';
+import { getCardSightClient, summarisePricing, getSegmentName } from '../utils/cardSightClient.js';
 import { uploadFiles } from '../middleware/file-upload.js';
 import { supabaseAuth } from '../middleware/pocketbase-auth.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -21,6 +20,9 @@ import logger from '../utils/logger.js';
 const router = Router();
 
 router.use(supabaseAuth);
+
+// CardSight pricing accepts these listing types; anything else is dropped
+const VALID_LISTING_TYPES = new Set(['auction', 'fixed', 'both']);
 
 // ─── POST /cardsight/identify ─────────────────────────────────────────────────
 // Accepts a card image, returns identification + catalog + pricing in one shot.
@@ -39,7 +41,7 @@ router.post(
     const imageBuffer = req.files[0].buffer;
 
     // 1. Identify the card
-    const identifyResult = await client.identify.card(imageBuffer);
+    const { data: identifyResult } = await client.identify.card(imageBuffer);
 
     if (!identifyResult?.detections?.length) {
       return res.json({ identified: false, message: 'No card detected in the image.' });
@@ -49,6 +51,8 @@ router.post(
     if (!best) {
       return res.json({ identified: false, message: 'Could not identify card with sufficient confidence.' });
     }
+
+    const segmentName = await getSegmentName(best.card?.segmentId);
 
     const response = {
       identified: true,
@@ -61,15 +65,20 @@ router.post(
         year: best.card?.year ?? null,
         setName: best.card?.setName ?? null,
         setId: best.card?.setId ?? null,
-        cardNumber: best.card?.cardNumber ?? null,
+        cardNumber: best.card?.number ?? null,
         manufacturer: best.card?.manufacturer ?? null,
-        segment: best.card?.segment ?? null,
-        sport: best.card?.sport ?? null,
+        segment: segmentName,
         rarity: getFieldValue(best, 'Rarity') ?? null,
         hp: getFieldValue(best, 'HP') ?? null,
         artist: getFieldValue(best, 'Artist') ?? null,
       },
-      grading: hasGrading(best) ? getGradingInfo(best) : null,
+      grading: hasGrading(best)
+        ? {
+            company: best.grading.company?.name ?? null,
+            grade: best.grading.grade?.value ?? null,
+            condition: best.grading.grade?.condition ?? null,
+          }
+        : null,
       parallel: hasParallel(best) ? getParallelInfo(best) : null,
     };
 
@@ -81,31 +90,23 @@ router.post(
         client.pricing.get(cardId),
       ]);
 
-      if (catalogResult.status === 'fulfilled') {
-        const c = catalogResult.value;
+      if (catalogResult.status === 'fulfilled' && catalogResult.value.data) {
+        const c = catalogResult.value.data;
         response.catalog = {
           id: c.id,
           name: c.name,
-          year: c.year,
-          setName: c.setName,
-          manufacturer: c.manufacturer,
-          cardNumber: c.cardNumber,
-          imageUrl: c.imageUrl ?? null,
+          year: c.releaseYear ?? null,
+          setName: c.setName ?? null,
+          releaseName: c.releaseName ?? null,
+          cardNumber: c.number ?? null,
+          numberedTo: c.numberedTo ?? null,
           parallels: c.parallels ?? [],
         };
       }
 
       if (pricingResult.status === 'fulfilled') {
-        const p = pricingResult.value;
-        response.pricing = {
-          avgPrice: p.avgPrice ?? null,
-          minPrice: p.minPrice ?? null,
-          maxPrice: p.maxPrice ?? null,
-          salesCount: p.salesCount ?? null,
-          lastSalePrice: p.lastSalePrice ?? null,
-          lastSaleDate: p.lastSaleDate ?? null,
-          currency: p.currency ?? 'AUD',
-        };
+        const summary = summarisePricing(pricingResult.value.data);
+        if (summary) response.pricing = summary;
       }
 
       logger.info(`[CARDSIGHT] Identified card ${cardId} (${response.card.name}) confidence=${best.confidence}`);
@@ -139,20 +140,46 @@ router.post(
 );
 
 // ─── GET /cardsight/pricing/:cardId ──────────────────────────────────────────
-// Fetch current pricing for a known CardSight card ID.
+// Fetch current pricing for a known CardSight card ID, flattened to aggregates.
 router.get('/pricing/:cardId', async (req, res) => {
   const { cardId } = req.params;
   const { parallel_id, grade_id, period, listing_type } = req.query;
 
   const client = getCardSightClient();
-  const data = await client.pricing.get(cardId, {
+  const { data } = await client.pricing.get(cardId, {
     ...(parallel_id && { parallel_id }),
     ...(grade_id && { grade_id }),
     ...(period && { period }),
-    ...(listing_type && { listing_type }),
+    ...(VALID_LISTING_TYPES.has(listing_type) && { listing_type }),
   });
 
-  res.json(data);
+  const summary = summarisePricing(data);
+  res.json({
+    card_id: cardId,
+    avg_price: summary?.avgPrice ?? null,
+    min_price: summary?.minPrice ?? null,
+    max_price: summary?.maxPrice ?? null,
+    count: summary?.salesCount ?? 0,
+    last_sale_price: summary?.lastSalePrice ?? null,
+    last_sale_date: summary?.lastSaleDate ?? null,
+    currency: summary?.currency ?? 'USD',
+  });
+});
+
+// ─── GET /cardsight/autocomplete ─────────────────────────────────────────────
+// Lightweight card-name lookup used to resolve a name to a CardSight card ID.
+router.get('/autocomplete', async (req, res) => {
+  const { q, take } = req.query;
+  if (!q?.trim()) return res.status(400).json({ error: 'q is required' });
+
+  const client = getCardSightClient();
+  const { data } = await client.catalog.search({
+    q: q.trim(),
+    type: 'card',
+    ...(take && { take: Number(take) }),
+  });
+
+  res.json({ results: data?.results ?? [] });
 });
 
 // ─── GET /cardsight/catalog/search ───────────────────────────────────────────
@@ -162,7 +189,7 @@ router.get('/catalog/search', async (req, res) => {
   if (!q?.trim()) return res.status(400).json({ error: 'q is required' });
 
   const client = getCardSightClient();
-  const data = await client.catalog.search({
+  const { data } = await client.catalog.search({
     q: q.trim(),
     ...(type && { type }),
     ...(year && { year }),
@@ -177,7 +204,7 @@ router.get('/catalog/search', async (req, res) => {
 router.get('/marketplace/:cardId', async (req, res) => {
   const { cardId } = req.params;
   const client = getCardSightClient();
-  const data = await client.marketplace.get(cardId);
+  const { data } = await client.marketplace.get(cardId);
   res.json(data);
 });
 
