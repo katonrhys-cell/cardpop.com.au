@@ -1,6 +1,7 @@
 import process from 'node:process';
 import 'dotenv/config';
 import { CardSightAI } from 'cardsightai';
+import { getUsdToAudRate } from './exchangeRates.js';
 import logger from './logger.js';
 
 let _client = null;
@@ -51,6 +52,31 @@ export function summarisePricing(pricing) {
 		lastSalePrice: newestFirst[0].price ?? null,
 		lastSaleDate: newestFirst[0].date ?? null,
 		currency: 'USD',
+	};
+}
+
+/**
+ * Like summarisePricing, but converts the USD aggregates to AUD using the
+ * current exchange rate. Includes the rate used as `fxRate`.
+ *
+ * @param {object|null|undefined} pricing - PricingResponse payload
+ * @returns {Promise<object|null>}
+ */
+export async function summarisePricingAud(pricing) {
+	const summary = summarisePricing(pricing);
+	if (!summary) return null;
+
+	const rate = await getUsdToAudRate();
+	const round2 = n => Math.round(n * 100) / 100;
+
+	return {
+		...summary,
+		avgPrice: round2(summary.avgPrice * rate),
+		minPrice: round2(summary.minPrice * rate),
+		maxPrice: round2(summary.maxPrice * rate),
+		lastSalePrice: summary.lastSalePrice != null ? round2(summary.lastSalePrice * rate) : null,
+		currency: 'AUD',
+		fxRate: rate,
 	};
 }
 
