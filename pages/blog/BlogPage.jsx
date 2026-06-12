@@ -12,7 +12,7 @@ const CATEGORIES = [
   { slug: 'australia-focus',  label: 'Australia Focus',   desc: 'Australian trading card market and events' },
   { slug: 'beginner-guides',  label: 'Beginner Guides',   desc: 'Essential guides for new collectors and traders' },
   { slug: 'card-spotlight',   label: 'Card Spotlight',    desc: 'Deep dives into iconic and valuable cards' },
-  { slug: 'grading-guides',   label: 'Grading Guides',    desc: 'Card grading standards and preparation guides' },
+  { slug: 'grading-guides',   label: 'Grading Hub',       desc: 'Card grading standards and preparation guides' },
   { slug: 'investing-value',  label: 'Investing & Value', desc: 'Investment strategies and card valuation insights' },
   { slug: 'news-releases',    label: 'News & Releases',   desc: 'Latest TCG releases and industry news' },
 ];

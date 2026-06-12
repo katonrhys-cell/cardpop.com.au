@@ -5,7 +5,7 @@ import { BookOpen, ChevronRight, ArrowLeft } from 'lucide-react';
 
 const WhatIsGradingPage = () => (
   <div className="min-h-screen bg-background">
-    <SEOHead title="What is Card Grading? | CardPop" description="Discover what professional card grading is, why it matters, and how it can increase the value of your trading card collection." />
+    <SEOHead title="What is Card Grading? | CardPop Grading Hub" description="Discover what professional card grading is, why it matters for Australian collectors, and how encapsulated cards command higher prices on the secondary market." />
 
     <section className="bg-card border-b border-border py-20 text-center">
       <div className="container-default">
@@ -86,6 +86,29 @@ const WhatIsGradingPage = () => (
             <div key={pillar} className={`px-7 py-5 ${i < arr.length - 1 ? 'border-b border-border' : ''}`}>
               <h3 className="font-bold text-primary mb-1">{pillar}</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* How to submit from Australia */}
+      <div>
+        <h2 className="text-2xl font-bold mb-5">How to Submit Your Cards (Australia)</h2>
+        <div className="bg-card border border-border rounded-3xl overflow-hidden">
+          {[
+            { step: '1', title: 'Choose a Grading Company', body: 'For local convenience, use ACE Grading (AUD pricing, no customs). For international resale value, PSA is the most recognised globally.' },
+            { step: '2', title: 'Assess Your Cards First', body: 'Self-grade your cards using our Grading Scales page. Only submit cards you believe will achieve a 7 or higher — lower grades rarely justify the cost.' },
+            { step: '3', title: 'Package Cards Correctly', body: 'Penny sleeve → toploader → team bag. For international submissions, add a rigid cardboard layer inside a bubble mailer. Label clearly and insure the parcel.' },
+            { step: '4', title: 'Fill Out a Submission Form', body: 'Most graders require an online submission form completed before you post cards. Declare declared value accurately — customs and insurance depend on it.' },
+            { step: '5', title: 'Wait for Your Slabs', body: 'Track your submission via the grader\'s portal. Turnaround varies: ACE 7–30 days; international economy 60–150 days. Add shipping time both ways.' },
+            { step: '6', title: 'List on CardPop Marketplace', body: 'Once your slabs arrive, list them on CardPop with the grade and cert number. Graded cards sell faster and at higher prices than raw cards.' },
+          ].map(({ step, title, body }, i, arr) => (
+            <div key={step} className={`flex gap-5 px-7 py-5 ${i < arr.length - 1 ? 'border-b border-border' : ''}`}>
+              <span className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-black text-primary text-sm">{step}</span>
+              <div>
+                <h3 className="font-bold mb-1">{title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
+              </div>
             </div>
           ))}
         </div>

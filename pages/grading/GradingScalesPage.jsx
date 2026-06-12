@@ -26,7 +26,7 @@ const gradeColor = (g) => {
 
 const GradingScalesPage = () => (
   <div className="min-h-screen bg-background">
-    <SEOHead title="Grading Scales | CardPop" description="Understand trading card grading scales from 1 to 10. Learn what each grade means and how condition affects your card's value." />
+    <SEOHead title="Trading Card Grading Scales 1–10 | CardPop Grading Hub" description="Understand the PSA, BGS and ACE trading card grading scales from 1 to 10. Learn exactly what each grade means and how condition affects your card's resale value in Australia." />
 
     <section className="bg-card border-b border-border py-20 text-center">
       <div className="container-default">
