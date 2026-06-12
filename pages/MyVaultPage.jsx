@@ -157,6 +157,13 @@ const MyVaultPage = () => {
           <div className="absolute top-3 left-3 z-10 pointer-events-none flex flex-col gap-1.5 items-start">
             {getListingBadge(card)}
           </div>
+          {card.serial_number && (
+            <div className="absolute bottom-3 right-3 z-10 pointer-events-none">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold tracking-wide bg-black/70 text-white backdrop-blur-sm border border-white/10 shadow-md">
+                <span className="opacity-60">#</span>{card.serial_number}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="p-4 flex flex-col flex-1">

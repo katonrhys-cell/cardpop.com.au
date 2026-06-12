@@ -72,12 +72,21 @@ const VaultListingCard = ({ vaultItem }) => {
           </div>
         )}
 
+        {/* Serial number badge — bottom-right, always visible */}
+        {vaultItem.serial_number && (
+          <div className="absolute bottom-3 right-3 z-10 pointer-events-none">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold tracking-wide bg-black/70 text-white backdrop-blur-sm border border-white/10 shadow-md">
+              <span className="opacity-60">#</span>{vaultItem.serial_number}
+            </span>
+          </div>
+        )}
+
         {/* Zoom button */}
         {imgSrc && (
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setZoomOpen(true); }}
             aria-label="Zoom image"
-            className="absolute bottom-3 right-3 z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm text-foreground flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-background"
+            className={`absolute z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm text-foreground flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-background ${vaultItem.serial_number ? 'bottom-11 right-3' : 'bottom-3 right-3'}`}
           >
             <ZoomIn className="w-4 h-4" />
           </button>
