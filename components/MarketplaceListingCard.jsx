@@ -48,8 +48,10 @@ const MarketplaceListingCard = ({ listing }) => {
     ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
     : null;
 
-  const rawVariants = vaultItem?.cardVariants;
-  const variants = Array.isArray(rawVariants) ? rawVariants : (rawVariants ? [rawVariants] : []);
+  const rawVariants = vaultItem?.variant
+    ? vaultItem.variant.split(',').map(s => s.trim()).filter(Boolean)
+    : (Array.isArray(vaultItem?.cardVariants) ? vaultItem.cardVariants : (vaultItem?.cardVariants ? [vaultItem.cardVariants] : []));
+  const variants = rawVariants;
   const specialBadge = Object.entries(VARIANT_BADGES).find(([key]) => variants.includes(key));
   const borderClass = specialBadge
     ? `${specialBadge[1].border} ${specialBadge[1].glow}`
@@ -100,11 +102,20 @@ const MarketplaceListingCard = ({ listing }) => {
           </div>
         )}
 
-        {/* Watchlist heart — bottom right */}
+        {/* Serial number badge — bottom right, always visible */}
+        {vaultItem?.serial_number && (
+          <div className="absolute bottom-3 right-3 z-10 pointer-events-none">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold tracking-wide bg-black/70 text-white backdrop-blur-sm border border-white/10 shadow-md">
+              <span className="opacity-60">#</span>{vaultItem.serial_number}
+            </span>
+          </div>
+        )}
+
+        {/* Watchlist heart — bottom right (shifts up when serial badge present) */}
         <button
           onClick={handleHeart}
           aria-label={watchlisted ? 'Remove from watchlist' : 'Add to watchlist'}
-          className={`absolute bottom-3 right-3 z-10 w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all duration-200 ${
+          className={`absolute z-10 w-8 h-8 rounded-full flex items-center justify-center shadow-md transition-all duration-200 ${vaultItem?.serial_number ? 'bottom-11 right-3' : 'bottom-3 right-3'} ${
             watchlisted
               ? 'bg-rose-500 text-white scale-110'
               : 'bg-background/80 backdrop-blur-sm text-muted-foreground hover:text-rose-500 hover:bg-background'
@@ -135,25 +146,43 @@ const MarketplaceListingCard = ({ listing }) => {
       <div className="p-5 flex flex-col flex-1">
         <Link to={detailPath} className="block mb-2">
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
-            {listing.category || 'Trading Card'}
+            {listing.category || vaultItem?.collection || 'Trading Card'}
           </p>
-          <h3 className="font-bold text-base leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors">
+          <h3 className="font-bold text-base leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors mb-1">
             {vaultItem?.card_name || listing.title || 'Untitled Listing'}
           </h3>
-          {(vaultItem?.parallel?.name || vaultItem?.subset?.name) && (
-            <div className="flex flex-wrap gap-1 mt-1.5">
-              {vaultItem.parallel?.name && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 leading-none">
-                  {vaultItem.parallel.name}
-                </span>
-              )}
-              {vaultItem.subset?.name && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300 leading-none">
-                  {vaultItem.subset.name}
-                </span>
-              )}
-            </div>
+          {vaultItem?.set_name && (
+            <p className="text-xs text-muted-foreground mb-2 truncate">{vaultItem.set_name}</p>
           )}
+          <div className="flex flex-wrap gap-1.5">
+            {vaultItem?.parallel?.name && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 leading-none">
+                {vaultItem.parallel.name}
+              </span>
+            )}
+            {vaultItem?.subset?.name && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300 leading-none">
+                {vaultItem.subset.name}
+              </span>
+            )}
+            {vaultItem?.year && (
+              <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{vaultItem.year}</Badge>
+            )}
+            {vaultItem?.card_number && (
+              <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">#{vaultItem.card_number}</Badge>
+            )}
+            {vaultItem?.condition && (
+              <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground capitalize">{vaultItem.condition.replace(/_/g, ' ')}</Badge>
+            )}
+            {vaultItem?.is_foil && <Badge variant="outline" className="text-[10px] font-bold border-yellow-400/50 text-yellow-700 bg-yellow-400/10">Foil</Badge>}
+            {vaultItem?.is_refractor && <Badge variant="outline" className="text-[10px] font-bold border-indigo-400/50 text-indigo-700 bg-indigo-400/10">Refractor</Badge>}
+            {vaultItem?.is_auto && <Badge variant="outline" className="text-[10px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10">Auto</Badge>}
+            {vaultItem?.is_rookie && <Badge variant="outline" className="text-[10px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10">RC</Badge>}
+            {vaultItem?.is_sealed && <Badge variant="outline" className="text-[10px] font-bold border-green-400/50 text-green-700 bg-green-400/10">Sealed</Badge>}
+            {variants.map(v => (
+              <Badge key={v} variant="outline" className="text-[10px] font-bold border-primary/30 text-primary bg-primary/5">{v}</Badge>
+            ))}
+          </div>
         </Link>
         
         <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-border">

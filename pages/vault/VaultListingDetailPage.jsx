@@ -122,12 +122,33 @@ const VaultListingDetailPage = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mt-8">
         {/* Image Gallery */}
-        <div className="bg-muted/30 p-8 rounded-3xl border border-border flex items-center justify-center">
-          <img 
-            src={imageUrl} 
-            alt={title}
-            className="w-full max-w-md h-auto object-contain rounded-xl drop-shadow-xl"
-          />
+        <div className="space-y-3">
+          <div className="bg-muted/30 p-8 rounded-3xl border border-border flex items-center justify-center relative">
+            <img
+              src={imageUrl}
+              alt={title}
+              className="w-full max-w-md h-auto object-contain rounded-xl drop-shadow-xl"
+            />
+            {vi?.serial_number && (
+              <div className="absolute bottom-5 right-5">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-extrabold tracking-wide bg-black/70 text-white backdrop-blur-sm border border-white/10 shadow-md">
+                  <span className="opacity-60">#</span>{vi.serial_number}
+                </span>
+              </div>
+            )}
+          </div>
+          {vi?.card_images?.length > 0 && (
+            <div className="grid grid-cols-3 gap-2">
+              {vi.card_images.map((imgPath, i) => {
+                const src = imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl;
+                return (
+                  <div key={i} className="bg-muted/30 rounded-xl border border-border overflow-hidden aspect-[3/4]">
+                    <img src={src} alt={`${title} photo ${i + 2}`} className="w-full h-full object-cover" loading="lazy" />
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Details */}
@@ -142,13 +163,56 @@ const VaultListingDetailPage = () => {
             ${price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
           </div>
 
-          <div className="bg-card rounded-2xl border border-border p-6 mb-8 space-y-4">
+          <div className="bg-card rounded-2xl border border-border p-6 mb-8 space-y-3">
             <h3 className="font-bold text-lg mb-2">Card Details</h3>
-            {vi?.card_number && <div className="flex justify-between"><span className="text-muted-foreground">Card Number</span> <span className="font-medium">{vi.card_number}</span></div>}
+            {vi?.set_name && <div className="flex justify-between"><span className="text-muted-foreground">Set</span> <span className="font-medium text-right">{vi.set_name}</span></div>}
+            {vi?.collection && <div className="flex justify-between"><span className="text-muted-foreground">Collection</span> <span className="font-medium">{vi.collection}</span></div>}
             {vi?.year && <div className="flex justify-between"><span className="text-muted-foreground">Year</span> <span className="font-medium">{vi.year}</span></div>}
-            {vi?.grading_company && vi.grading_company !== 'raw' && <div className="flex justify-between"><span className="text-muted-foreground">Grading</span> <span className="font-medium flex items-center gap-1"><ShieldCheck className="w-4 h-4 text-primary" />{vi.grading_company.toUpperCase()} {vi.grade}</span></div>}
+            {vi?.card_number && <div className="flex justify-between"><span className="text-muted-foreground">Card Number</span> <span className="font-medium">#{vi.card_number}</span></div>}
+            {vi?.condition && <div className="flex justify-between"><span className="text-muted-foreground">Condition</span> <span className="font-medium capitalize">{vi.condition.replace(/_/g, ' ')}</span></div>}
+            {vi?.serial_number && <div className="flex justify-between"><span className="text-muted-foreground">Serial Number</span> <span className="font-extrabold text-primary">#{vi.serial_number}</span></div>}
+            {vi?.grading_company && vi.grading_company !== 'raw' && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Grading</span>
+                <span className="font-medium flex items-center gap-1"><ShieldCheck className="w-4 h-4 text-primary" />{vi.grading_company.toUpperCase()} {vi.grade}</span>
+              </div>
+            )}
+            {vi?.cert_number && <div className="flex justify-between"><span className="text-muted-foreground">Cert Number</span> <span className="font-medium">{vi.cert_number}</span></div>}
 
-            {/* PSA population data — shown when available, blank otherwise */}
+            {/* Attributes */}
+            {(vi?.is_foil || vi?.is_refractor || vi?.is_auto || vi?.is_rookie || vi?.is_sealed) && (
+              <div className="flex justify-between items-start pt-1">
+                <span className="text-muted-foreground">Attributes</span>
+                <div className="flex flex-wrap gap-1.5 justify-end max-w-[60%]">
+                  {vi.is_foil && <Badge variant="outline" className="text-[10px] font-bold border-yellow-400/50 text-yellow-700 bg-yellow-400/10">Foil</Badge>}
+                  {vi.is_refractor && <Badge variant="outline" className="text-[10px] font-bold border-indigo-400/50 text-indigo-700 bg-indigo-400/10">Refractor</Badge>}
+                  {vi.is_auto && <Badge variant="outline" className="text-[10px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10">Auto</Badge>}
+                  {vi.is_rookie && <Badge variant="outline" className="text-[10px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10">Rookie Card</Badge>}
+                  {vi.is_sealed && <Badge variant="outline" className="text-[10px] font-bold border-green-400/50 text-green-700 bg-green-400/10">Sealed</Badge>}
+                </div>
+              </div>
+            )}
+
+            {/* Variant / Finish */}
+            {vi?.variant && (
+              <div className="flex justify-between items-start pt-1">
+                <span className="text-muted-foreground">Variant / Finish</span>
+                <div className="flex flex-wrap gap-1.5 justify-end max-w-[60%]">
+                  {vi.variant.split(',').map(v => v.trim()).filter(Boolean).map(v => (
+                    <Badge key={v} variant="outline" className="text-[10px] font-bold border-primary/30 text-primary bg-primary/5">{v}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {vi?.notes && (
+              <div className="pt-3 border-t border-border">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1">Notes</p>
+                <p className="text-sm text-foreground whitespace-pre-line">{vi.notes}</p>
+              </div>
+            )}
+
+            {/* PSA population data — shown when available */}
             {vi?.cardsight_card_id && (
               <div className="pt-4 border-t border-border">
                 <PSAPopPanel rawData={psaData} />
