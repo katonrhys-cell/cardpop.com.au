@@ -8,7 +8,7 @@ import {
   getParallelInfo,
   getFieldValue,
 } from 'cardsightai';
-import { getCardSightClient, summarisePricing, getSegmentName } from '../utils/cardSightClient.js';
+import { getCardSightClient, summarisePricingAud, getSegmentName } from '../utils/cardSightClient.js';
 import { uploadFiles } from '../middleware/file-upload.js';
 import { supabaseAuth } from '../middleware/pocketbase-auth.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -105,7 +105,7 @@ router.post(
       }
 
       if (pricingResult.status === 'fulfilled') {
-        const summary = summarisePricing(pricingResult.value.data);
+        const summary = await summarisePricingAud(pricingResult.value.data);
         if (summary) response.pricing = summary;
       }
 
@@ -153,7 +153,7 @@ router.get('/pricing/:cardId', async (req, res) => {
     ...(VALID_LISTING_TYPES.has(listing_type) && { listing_type }),
   });
 
-  const summary = summarisePricing(data);
+  const summary = await summarisePricingAud(data);
   res.json({
     card_id: cardId,
     avg_price: summary?.avgPrice ?? null,
@@ -162,7 +162,7 @@ router.get('/pricing/:cardId', async (req, res) => {
     count: summary?.salesCount ?? 0,
     last_sale_price: summary?.lastSalePrice ?? null,
     last_sale_date: summary?.lastSaleDate ?? null,
-    currency: summary?.currency ?? 'USD',
+    currency: summary?.currency ?? 'AUD',
   });
 });
 

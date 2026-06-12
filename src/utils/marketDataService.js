@@ -1,4 +1,4 @@
-import { getCardSightClient, summarisePricing } from './cardSightClient.js';
+import { getCardSightClient, summarisePricingAud } from './cardSightClient.js';
 import { callEbayApi } from './ebayClient.js';
 import supabase from './supabaseClient.js';
 import logger from './logger.js';
@@ -37,7 +37,7 @@ async function fetchAndPersistCardSight(cardId, cardName, setName) {
   const client = getCardSightClient();
 
   const [pricingResult, populationResult] = await Promise.allSettled([
-    client.pricing.get(cardId).then(r => summarisePricing(r.data)),
+    client.pricing.get(cardId).then(r => summarisePricingAud(r.data)),
     client.population.card(cardId).then(r => r.data).catch(() => null), // may not exist for all cards
   ]);
 
@@ -58,7 +58,7 @@ async function fetchAndPersistCardSight(cardId, cardName, setName) {
           set_name:        setName  ?? null,
           source:          'cardsight',
           market_value:    marketValue,
-          currency:        pricing.currency ?? 'USD',
+          currency:        pricing.currency ?? 'AUD',
           last_updated:    new Date().toISOString(),
           confidence_score: confidence,
           raw_data:         pricing,
