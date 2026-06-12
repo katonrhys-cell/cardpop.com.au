@@ -180,7 +180,7 @@ const MarketplaceListingCard = ({ listing }) => {
               <Badge variant="outline" className="text-[10px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10">
                 {[
                   vaultItem.auto_signers > 1 ? ['','Dual','Triple','Quad'][vaultItem.auto_signers - 1] : null,
-                  vaultItem.auto_type === 'on_card' ? 'On-Card' : vaultItem.auto_type === 'sticker' ? 'Sticker' : vaultItem.auto_type === 'cut' ? 'Cut Sig' : null,
+                  {on_card:'On-Card',sticker:'Sticker',cut:'Cut Sig',licensed:'Licensed',in_person:'IP'}[vaultItem.auto_type] ?? null,
                   'Auto',
                 ].filter(Boolean).join(' ')}
               </Badge>

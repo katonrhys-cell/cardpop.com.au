@@ -907,11 +907,13 @@ const AddEditCardPage = () => {
                         {/* Signature type */}
                         <div className="space-y-2">
                           <Label className="text-xs font-bold text-foreground">Signature Type</Label>
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="grid grid-cols-2 gap-2">
                             {[
-                              { value: 'on_card', label: 'On-Card', desc: 'Player signed the card directly' },
-                              { value: 'sticker', label: 'Sticker / Label', desc: 'Signed sticker affixed by manufacturer' },
-                              { value: 'cut',     label: 'Cut Signature', desc: 'Historical signature embedded into the card' },
+                              { value: 'on_card',    label: 'On-Card',            desc: 'Player signed the card directly' },
+                              { value: 'sticker',    label: 'Sticker / Label',    desc: 'Signed sticker affixed by manufacturer' },
+                              { value: 'cut',        label: 'Cut Signature',      desc: 'Historical signature embedded into the card' },
+                              { value: 'licensed',   label: 'Licensed / Certified', desc: 'Pulled from sealed box — authenticity guaranteed by manufacturer' },
+                              { value: 'in_person',  label: 'In-Person (IP)',     desc: 'Obtained directly from the player — may not include authentication' },
                             ].map(({ value, label, desc }) => (
                               <button
                                 key={value}

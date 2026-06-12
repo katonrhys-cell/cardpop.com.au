@@ -184,7 +184,7 @@ const VaultListingDetailPage = () => {
                 <span className="font-medium text-right">
                   {[
                     vi.auto_signers > 1 ? ['Solo','Dual','Triple','Quad'][(vi.auto_signers - 1)] : null,
-                    vi.auto_type === 'on_card' ? 'On-Card' : vi.auto_type === 'sticker' ? 'Sticker' : vi.auto_type === 'cut' ? 'Cut Signature' : null,
+                    {on_card:'On-Card',sticker:'Sticker',cut:'Cut Signature',licensed:'Licensed / Certified',in_person:'In-Person (IP)'}[vi.auto_type] ?? null,
                     'Auto',
                   ].filter(Boolean).join(' ')}
                 </span>
