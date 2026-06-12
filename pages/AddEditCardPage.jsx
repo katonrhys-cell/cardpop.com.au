@@ -781,8 +781,8 @@ const AddEditCardPage = () => {
                         </button>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground -mt-1">Select all that apply</p>
-                    <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground -mt-1">Select all that apply — scroll to see more</p>
+                    <div className="max-h-52 overflow-y-auto rounded-xl border border-border bg-muted/20 p-3 space-y-3">
                       {VARIANT_GROUPS.map(group => (
                         <div key={group.label}>
                           <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground mb-1.5">{group.label}</p>
