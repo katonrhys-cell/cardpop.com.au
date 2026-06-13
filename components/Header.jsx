@@ -388,7 +388,8 @@ const CommunityDropdown = ({ onNavigate }) => {
   const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
   const location = useLocation();
   const isCommunityActive = location.pathname.startsWith('/community') &&
-    !NAV_LINKS.some(l => l.href !== '/community' && l.href.startsWith('/community') && location.pathname === l.href);
+    !NAV_LINKS.some(l => l.href !== '/community' && l.href.startsWith('/community') &&
+      (location.pathname === l.href || location.pathname.startsWith(l.href + '/')));
 
   return (
     <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
