@@ -293,6 +293,8 @@ const HomePage = () => {
                   alt={`${card.name} ${card.rarity}`}
                   className="absolute inset-0 w-full h-full object-contain p-1"
                   draggable={false}
+                  width="176"
+                  height="240"
                 />
               )}
 
