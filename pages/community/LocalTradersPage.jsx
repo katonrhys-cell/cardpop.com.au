@@ -24,35 +24,41 @@ const AU_STATES = [
 const LocalTradersPage = () => {
   const { isAuthenticated, currentUser } = useAuth();
   const [traders, setTraders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedState, setSelectedState] = useState(null);
+  // undefined = still resolving user location; null = resolved, no state / show all
+  const [selectedState, setSelectedState] = useState(undefined);
   const [search, setSearch] = useState('');
   const [userState, setUserState] = useState(null);
 
-  // Load the logged-in user's state so we can default to it
+  // Load the logged-in user's state so we can default to it.
+  // Sets selectedState exactly once after the profile fetch resolves.
   useEffect(() => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {
+      setSelectedState(null);
+      return;
+    }
     supabase
       .from('profiles')
       .select('location_state')
       .eq('id', currentUser.id)
       .single()
       .then(({ data }) => {
-        if (data?.location_state) {
-          setUserState(data.location_state.toUpperCase().trim());
-          setSelectedState(prev => prev ?? data.location_state.toUpperCase().trim());
-        }
+        const state = data?.location_state?.toUpperCase().trim() || null;
+        setUserState(state);
+        setSelectedState(state);
       })
-      .catch(() => {});
+      .catch(() => { setSelectedState(null); });
   }, [currentUser?.id]);
 
+  // loading = true until selectedState is resolved (not undefined)
+  const loading = selectedState === undefined;
+
   const fetchTraders = useCallback(async () => {
-    setLoading(true);
+    if (selectedState === undefined) return;
     try {
       let query = supabase
         .from('profiles')
         .select('id, display_name, username, avatar_url, profile_photo_or_character, bio, location_state, location_suburb, rating, reviews_count, is_verified, listings_count, collection_count')
-        .eq('is_verified', 'true')
+        .eq('is_verified', true)
         .not('location_state', 'is', null)
         .order('rating', { ascending: false })
         .limit(80);
@@ -65,8 +71,6 @@ const LocalTradersPage = () => {
       setTraders(data || []);
     } catch (err) {
       console.error(err);
-    } finally {
-      setLoading(false);
     }
   }, [selectedState]);
 
