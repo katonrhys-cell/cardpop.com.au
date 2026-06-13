@@ -8,6 +8,18 @@ import {
   FolderTree, ListOrdered, BarChart3, Store,
   BookOpen, Globe, Star, Award, TrendingUp, Newspaper, BadgeCheck
 } from 'lucide-react';
+import { useDarkMode } from '@/hooks/useDarkMode.js';
+import { useAuth } from '@/contexts/AuthContext.jsx';
+import CardPopLogo from '@/components/CardPopLogo.jsx';
+import { TCG_CATEGORY_DATA, SPORTS_CATEGORY_DATA } from '@/components/CategoryIcons.jsx';
+import { useCart } from '@/hooks/useCart.jsx';
+import { supabase } from '@/lib/supabaseClient.js';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Badge } from '@/components/ui/badge';
+import VaultDropdown from '@/components/VaultDropdown.jsx';
+import SearchBar from '@/components/SearchBar.jsx';
+import NotificationBell from '@/components/NotificationBell.jsx';
 
 const WhatnotIcon = ({ className = 'w-4 h-4' }) => (
   <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" className={className}>
@@ -21,18 +33,6 @@ const WhatnotIcon = ({ className = 'w-4 h-4' }) => (
     />
   </svg>
 );
-import { useDarkMode } from '@/hooks/useDarkMode.js';
-import { useAuth } from '@/contexts/AuthContext.jsx';
-import CardPopLogo from '@/components/CardPopLogo.jsx';
-import { TCG_CATEGORY_DATA, SPORTS_CATEGORY_DATA } from '@/components/CategoryIcons.jsx';
-import { useCart } from '@/hooks/useCart.jsx';
-import { supabase } from '@/lib/supabaseClient.js';
-import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { Badge } from '@/components/ui/badge';
-import VaultDropdown from '@/components/VaultDropdown.jsx';
-import SearchBar from '@/components/SearchBar.jsx';
-import NotificationBell from '@/components/NotificationBell.jsx';
 
 export const TCG_COLLECTIONS = [
   'Pokemon', 'Magic: The Gathering', 'Yu-Gi-Oh', 'Digimon',
