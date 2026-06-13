@@ -550,7 +550,7 @@ const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout })
       >
         <div className="relative h-8 w-8 rounded-full overflow-hidden shrink-0 bg-primary/10 flex items-center justify-center">
           {currentUser.avatar_url ? (
-            <img src={currentUser.avatar_url} alt={currentUser.name} className="h-full w-full object-cover" />
+            <img src={currentUser.avatar_url} alt={currentUser.name} className="h-full w-full object-cover" width="32" height="32" />
           ) : (
             <User className="h-4 w-4 text-primary" />
           )}

@@ -79,6 +79,8 @@ const FeaturedSellersCarousel = () => {
                   src={seller.avatar_url}
                   alt={seller.name}
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  width="96"
+                  height="96"
                 />
               ) : (
                 <span className="text-3xl font-bold text-muted-foreground font-serif">

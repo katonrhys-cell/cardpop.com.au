@@ -31,6 +31,8 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete }) => {
           alt={eventTitle}
           className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
           loading="lazy"
+          width="800"
+          height="192"
         />
         <div className="absolute top-3 left-3 flex gap-2">
           <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm text-foreground">{eventTypeLabel(event)}</Badge>
