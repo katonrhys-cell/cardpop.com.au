@@ -287,14 +287,17 @@ const AddEditCardPage = () => {
   // Tracks whether results should be auto-applied (set true on button click)
   const isAnalysisMode = useRef(false);
 
-  const handleAnalyzeWithAI = () => {
+  const handleAnalyzeWithAI = async () => {
     if (!imageFile) return;
     isAnalysisMode.current = true;
     clearScan();
     clearCardSight();
-    // Run both CardSight identification and OCR scan in parallel
-    cardSightIdentify(imageFile);
-    scanCard(imageFile);
+    // Try CardSight catalog identification first
+    const csResult = await cardSightIdentify(imageFile);
+    // Only fall back to OCR if CardSight couldn't identify the card
+    if (!csResult?.identified) {
+      scanCard(imageFile);
+    }
   };
 
   // Auto-apply CardSight results when they arrive
@@ -583,8 +586,15 @@ const AddEditCardPage = () => {
                     </div>
                   )}
 
+                  {/* No-match state — analysis finished but card not found */}
+                  {!isScanning && !isIdentifying && cardSightResult && !cardSightResult.identified && !scanResult && (
+                    <div className="p-3 rounded-xl border border-border bg-muted/30 animate-in fade-in">
+                      <p className="text-xs text-muted-foreground">Card not found in catalog. Try a clearer image or fill in the details manually.</p>
+                    </div>
+                  )}
+
                   {/* Combined AI results panel — shown after analysis completes */}
-                  {!isScanning && !isIdentifying && (cardSightResult || scanResult) && (
+                  {!isScanning && !isIdentifying && (cardSightResult?.identified || scanResult) && (
                     <div className={`p-3 rounded-xl border animate-in fade-in ${cardSightResult?.identified ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-primary/5 border-primary/20'}`}>
                       <h4 className={`text-xs font-bold mb-2 flex items-center gap-1.5 ${cardSightResult?.identified ? 'text-emerald-700' : 'text-primary'}`}>
                         <Sparkles className="w-3.5 h-3.5" />

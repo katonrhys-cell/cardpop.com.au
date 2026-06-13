@@ -1,5 +1,15 @@
 /* CardPop Australia — Syne ExtraBold 800 for headings (loaded via <link> in index.html) */
 
+/* Metric-adjusted fallback for Syne — reduces layout shift if Syne isn't cached yet */
+@font-face {
+  font-family: 'Syne Fallback';
+  src: local('Arial');
+  ascent-override: 94%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  size-adjust: 107%;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -92,7 +102,7 @@
 
     /* ── Typography ─────────────────────────────────────────────────── */
     --font-sans:    'Helvetica Neue', Helvetica, Arial, sans-serif;
-    --font-heading: 'Syne', sans-serif;
+    --font-heading: 'Syne', 'Syne Fallback', sans-serif;
     --font-mono:    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
 
     /* ── SEO & Content ──────────────────────────────────────────────── */
