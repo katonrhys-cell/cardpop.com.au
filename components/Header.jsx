@@ -64,7 +64,7 @@ const NAV_LINKS = [
   { label: 'Analytics', href: '/analytics' },
   { label: 'Blog', href: '/blog' },
   { label: 'Community', href: '/community' },
-  { label: 'Events', href: '/community/events' },
+  { label: 'Events', href: '/events' },
   { label: 'Grading', href: '/grading' },
   { label: 'About', href: '/about' },
 ];
@@ -387,9 +387,7 @@ const COMMUNITY_ITEMS = [
 const CommunityDropdown = ({ onNavigate }) => {
   const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
   const location = useLocation();
-  const isCommunityActive = location.pathname.startsWith('/community') &&
-    !NAV_LINKS.some(l => l.href !== '/community' && l.href.startsWith('/community') &&
-      (location.pathname === l.href || location.pathname.startsWith(l.href + '/')));
+  const isCommunityActive = location.pathname.startsWith('/community');
 
   return (
     <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
