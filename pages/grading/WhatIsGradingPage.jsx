@@ -122,7 +122,7 @@ const WhatIsGradingPage = () => (
         <h2 className="text-2xl font-bold mb-5">How to Submit Your Cards (Australia)</h2>
         <div className="bg-card border border-border rounded-3xl overflow-hidden">
           {[
-            { step: '1', title: 'Choose a Grading Company', body: 'For local convenience, use ACE Grading (AUD pricing, no customs). For international resale value, PSA is the most recognised globally.' },
+            { step: '1', title: 'Choose a Grading Company', body: 'For local convenience, use ARK Grading (arkgrading.com.au) — Melbourne-based, Australian submissions only, AUD pricing, no customs. For international resale value, PSA is the most recognised globally.' },
             { step: '2', title: 'Assess Your Cards First', body: 'Self-grade using our Grading Scales page. Only submit cards you believe will achieve a 7 or higher — lower grades rarely justify the cost.' },
             { step: '3', title: 'Package Cards Correctly', body: 'Penny sleeve → toploader → team bag. For international submissions, add a rigid cardboard layer inside a bubble mailer. Label clearly and insure the parcel.' },
             { step: '4', title: 'Fill Out a Submission Form', body: 'Most graders require an online submission form before you post cards. Declare the value accurately — customs and insurance depend on it.' },
