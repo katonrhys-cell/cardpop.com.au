@@ -11,10 +11,10 @@ import {
 
 const WhatnotIcon = ({ className = 'w-4 h-4' }) => (
   <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" className={className}>
-    <rect width="32" height="32" rx="8" fill="#00C854" />
+    <rect width="32" height="32" rx="8" fill="#000000" />
     <path
       d="M5 9l4.5 14 4-9.5 2.5 5.5 2.5-5.5 4 9.5L27 9"
-      stroke="white"
+      stroke="#FFDF00"
       strokeWidth="2.8"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -53,7 +53,7 @@ const BLOG_CATEGORIES = [
   { slug: 'australia-focus',  label: 'Australia Focus',   desc: 'Local TCG market and events',         Icon: Globe,     gradient: 'from-green-500 to-emerald-600' },
   { slug: 'beginner-guides',  label: 'Beginner Guides',   desc: 'Guides for new collectors',           Icon: BookOpen,  gradient: 'from-blue-500 to-indigo-600'   },
   { slug: 'card-spotlight',   label: 'Card Spotlight',    desc: 'Deep dives into iconic cards',         Icon: Star,      gradient: 'from-yellow-500 to-orange-500' },
-  { slug: 'grading-guides',   label: 'Grading Guides',    desc: 'Grading standards and preparation',   Icon: Award,     gradient: 'from-purple-500 to-violet-600' },
+  { slug: 'grading-guides',   label: 'Grading Hub',       desc: 'Grading standards and preparation',   Icon: Award,     gradient: 'from-purple-500 to-violet-600' },
   { slug: 'investing-value',  label: 'Investing & Value', desc: 'Investment strategies and valuation', Icon: TrendingUp, gradient: 'from-rose-500 to-pink-600'    },
   { slug: 'news-releases',    label: 'News & Releases',   desc: 'Latest TCG releases and industry news', Icon: Newspaper, gradient: 'from-cyan-500 to-sky-600'  },
 ];
@@ -170,19 +170,37 @@ const MobileBrowseSection = ({ onNavigate }) => {
   );
 };
 
-// ─── Browse Collections mega-dropdown ─────────────────────────────────────────
-const BrowseDropdown = ({ onNavigate }) => {
+// Shared open/close behaviour for the desktop hover dropdowns.
+// Hover-open must ignore non-mouse pointers: on touch screens a tap fires a
+// synthetic mouseenter immediately followed by click, so a plain
+// onMouseEnter+toggle pair opens the menu and instantly closes it again
+// (and the next tap does the opposite), making the menus feel dead.
+const useHoverDropdown = () => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const timerRef = useRef(null);
+  const openedByHover = useRef(false);
   const location = useLocation();
 
-  const handleMouseEnter = () => {
+  const handlePointerEnter = (e) => {
+    if (e.pointerType !== 'mouse') return;
     clearTimeout(timerRef.current);
+    if (!open) openedByHover.current = true;
     setOpen(true);
   };
-  const handleMouseLeave = () => {
+  const handlePointerLeave = (e) => {
+    if (e.pointerType !== 'mouse') return;
     timerRef.current = setTimeout(() => setOpen(false), 120);
+  };
+  const handleTriggerClick = () => {
+    // A click right after hover-open (mouse users clicking the trigger they
+    // just hovered) should keep the menu open, not toggle it shut.
+    if (open && openedByHover.current) {
+      openedByHover.current = false;
+      return;
+    }
+    openedByHover.current = false;
+    setOpen(o => !o);
   };
 
   // Close on outside click
@@ -200,16 +218,23 @@ const BrowseDropdown = ({ onNavigate }) => {
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
+  return { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick };
+};
+
+// ─── Browse Collections mega-dropdown ─────────────────────────────────────────
+const BrowseDropdown = ({ onNavigate }) => {
+  const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
+
   return (
     <div
       className="relative"
       ref={ref}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
     >
       {/* Trigger */}
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={handleTriggerClick}
         aria-expanded={open}
         className={`flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
           open
@@ -294,30 +319,14 @@ const BrowseDropdown = ({ onNavigate }) => {
 
 // ─── Blog mega-dropdown ───────────────────────────────────────────────────────
 const BlogDropdown = ({ onNavigate }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
   const location = useLocation();
-  const timerRef = useRef(null);
   const isBlogActive = location.pathname.startsWith('/blog');
 
-  const handleMouseEnter = () => { clearTimeout(timerRef.current); setOpen(true); };
-  const handleMouseLeave = () => { timerRef.current = setTimeout(() => setOpen(false), 120); };
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  useEffect(() => { setOpen(false); }, [location.pathname]);
-
-  useEffect(() => () => clearTimeout(timerRef.current), []);
-
   return (
-    <div className="relative" ref={ref} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+    <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={handleTriggerClick}
         aria-expanded={open}
         className={`flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
           open || isBlogActive
@@ -376,29 +385,14 @@ const COMMUNITY_ITEMS = [
 
 // ─── Community mega-dropdown ──────────────────────────────────────────────────
 const CommunityDropdown = ({ onNavigate }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
   const location = useLocation();
-  const timerRef = useRef(null);
   const isCommunityActive = location.pathname.startsWith('/community');
 
-  const handleMouseEnter = () => { clearTimeout(timerRef.current); setOpen(true); };
-  const handleMouseLeave = () => { timerRef.current = setTimeout(() => setOpen(false), 120); };
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  useEffect(() => { setOpen(false); }, [location.pathname]);
-  useEffect(() => () => clearTimeout(timerRef.current), []);
-
   return (
-    <div className="relative" ref={ref} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+    <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={handleTriggerClick}
         aria-expanded={open}
         className={`flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
           open || isCommunityActive
@@ -621,6 +615,21 @@ const Header = () => {
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
+
+  // Failsafe: Radix Dialog/DropdownMenu put `pointer-events: none` on <body>
+  // while open and can leave it behind when the close races a route change
+  // (close animation interrupted by navigation). When that happens nothing on
+  // the page responds to taps anymore, so menu selections after the first
+  // navigation appear dead. Once no Radix layer is open, restore the body.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const openLayer = document.querySelector('[data-state="open"][role="dialog"], [data-state="open"][role="menu"]');
+      if (!openLayer && document.body.style.pointerEvents === 'none') {
+        document.body.style.pointerEvents = '';
+      }
+    }, 400); // just past the Sheet's 300ms close animation
+    return () => clearTimeout(timer);
+  }, [location.pathname, mobileMenuOpen]);
 
   useEffect(() => {
     const handleScroll = () => {

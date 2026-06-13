@@ -167,6 +167,7 @@ const ShippingPage = lazy(() => import('@/pages/info/ShippingPage.jsx'));
 const TermsPage = lazy(() => import('@/pages/info/TermsPage.jsx'));
 const TrustSafetyPage = lazy(() => import('@/pages/info/TrustSafetyPage.jsx'));
 const AccessibilityPage = lazy(() => import('@/pages/info/AccessibilityPage.jsx'));
+const PhotographyStandardPage = lazy(() => import('@/pages/info/PhotographyStandardPage.jsx'));
 
 const App = () => {
   return (
@@ -273,6 +274,7 @@ const App = () => {
                         <Route path="/grading" element={<GradingPage />} />
                         <Route path="/grading/what-is-grading" element={<WhatIsGradingPage />} />
                         <Route path="/grading/scales" element={<GradingScalesPage />} />
+                        <Route path="/grading/scales/:scale" element={<GradingScalePage />} />
                         <Route path="/grading/companies" element={<GradingCompaniesPage />} />
                         <Route path="/grading/guide/:scale" element={<GradingScalePage />} />
                         
@@ -308,6 +310,8 @@ const App = () => {
                         <Route path="/terms" element={<TermsPage />} />
                         <Route path="/trust-safety" element={<TrustSafetyPage />} />
                         <Route path="/accessibility" element={<AccessibilityPage />} />
+                        <Route path="/photography-standard" element={<PhotographyStandardPage />} />
+                        <Route path="/photography-guide" element={<PhotographyStandardPage />} />
                         
                         {/* --- PROTECTED ADMIN ROUTES (NESTED UNDER ADMINLAYOUT) --- */}
                         <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>}>

@@ -15,10 +15,10 @@ import { CalendarDays, ExternalLink, Plus, Tv2, Trash2, Clock, X, Star, ImageIco
 
 const WhatnotIcon = ({ className = 'w-5 h-5' }) => (
   <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" className={className}>
-    <rect width="32" height="32" rx="8" fill="#00C854" />
+    <rect width="32" height="32" rx="8" fill="#000000" />
     <path
       d="M5 9l4.5 14 4-9.5 2.5 5.5 2.5-5.5 4 9.5L27 9"
-      stroke="white"
+      stroke="#FFDF00"
       strokeWidth="2.8"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -219,14 +219,14 @@ const WhatnotShowsPage = () => {
 
         {/* ── Auth banner ── */}
         {isAuthenticated ? (
-          <div className="bg-[#00C854]/10 border border-[#00C854]/30 rounded-2xl p-5 mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="bg-[#FFDF00]/10 border border-[#FFDF00]/40 rounded-2xl p-5 mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <p className="font-bold text-foreground text-base mb-0.5">Got a show coming up?</p>
               <p className="text-sm text-muted-foreground">List it here so your followers know when to tune in.</p>
             </div>
             <Button
               onClick={() => setShowForm(v => !v)}
-              className="shrink-0 bg-[#00C854] hover:bg-[#00C854]/90 text-white font-bold rounded-xl gap-2"
+              className="shrink-0 bg-[#FFDF00] hover:bg-[#FFDF00]/90 text-black font-bold rounded-xl gap-2"
             >
               {showForm ? <><X className="w-4 h-4" /> Cancel</> : <><Plus className="w-4 h-4" /> List My Show</>}
             </Button>
@@ -340,7 +340,7 @@ const WhatnotShowsPage = () => {
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="w-full border-2 border-dashed border-border rounded-xl p-6 flex flex-col items-center gap-2 text-muted-foreground hover:border-[#00C854]/50 hover:text-[#00C854] transition-colors cursor-pointer"
+                  className="w-full border-2 border-dashed border-border rounded-xl p-6 flex flex-col items-center gap-2 text-muted-foreground hover:border-[#FFDF00]/60 hover:text-yellow-600 dark:hover:text-[#FFDF00] transition-colors cursor-pointer"
                 >
                   <ImageIcon className="w-8 h-8 opacity-50" />
                   <span className="text-sm font-medium">Upload a show preview or promotional image</span>
@@ -385,7 +385,7 @@ const WhatnotShowsPage = () => {
             <Button
               type="submit"
               disabled={submitting}
-              className="w-full rounded-xl font-bold h-11 bg-[#00C854] hover:bg-[#00C854]/90 text-white"
+              className="w-full rounded-xl font-bold h-11 bg-[#FFDF00] hover:bg-[#FFDF00]/90 text-black"
             >
               {submitting ? 'Publishing…' : 'Publish Show'}
             </Button>
@@ -419,7 +419,7 @@ const WhatnotShowsPage = () => {
               return (
                 <div
                   key={show.id}
-                  className="bg-card border border-border rounded-2xl overflow-hidden hover:border-[#00C854]/40 hover:shadow-md transition-all"
+                  className="bg-card border border-border rounded-2xl overflow-hidden hover:border-[#FFDF00]/50 hover:shadow-md transition-all"
                 >
                   {/* Preview image */}
                   {show.preview_image_url && (
@@ -432,7 +432,7 @@ const WhatnotShowsPage = () => {
                       <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none" />
                       <div className="absolute top-3 left-3">
                         {upcoming ? (
-                          <Badge className="bg-[#00C854] text-white border-0 font-bold text-xs shadow-md">Upcoming</Badge>
+                          <Badge className="bg-[#FFDF00] text-black border-0 font-bold text-xs shadow-md">Upcoming</Badge>
                         ) : (
                           <Badge className="bg-black/60 text-white border-0 text-xs backdrop-blur-sm">Live / Recent</Badge>
                         )}
@@ -452,9 +452,9 @@ const WhatnotShowsPage = () => {
 
                   <div className="p-5 flex flex-col sm:flex-row gap-4">
                     {/* Date pill */}
-                    <div className="flex-shrink-0 flex flex-col items-center justify-center bg-[#00C854]/10 border border-[#00C854]/20 rounded-xl px-4 py-3 min-w-[90px] text-center self-start">
-                      <CalendarDays className="w-5 h-5 text-[#00C854] mb-1" />
-                      <span className="text-xs font-bold text-[#00C854] leading-tight">{date.split(',')[0]}</span>
+                    <div className="flex-shrink-0 flex flex-col items-center justify-center bg-[#FFDF00]/10 border border-[#FFDF00]/30 rounded-xl px-4 py-3 min-w-[90px] text-center self-start">
+                      <CalendarDays className="w-5 h-5 text-yellow-600 dark:text-[#FFDF00] mb-1" />
+                      <span className="text-xs font-bold text-yellow-600 dark:text-[#FFDF00] leading-tight">{date.split(',')[0]}</span>
                       <span className="text-base font-extrabold text-foreground leading-tight">{date.split(',')[1]?.trim()}</span>
                       <span className="text-xs text-muted-foreground mt-0.5 flex items-center gap-0.5">
                         <Clock className="w-3 h-3" />{time}
@@ -469,7 +469,7 @@ const WhatnotShowsPage = () => {
                           <h3 className="font-bold text-base leading-tight">{show.show_title}</h3>
                           {!show.preview_image_url && (
                             upcoming ? (
-                              <Badge className="bg-[#00C854]/15 text-[#00C854] border-[#00C854]/30 font-bold text-[10px]">Upcoming</Badge>
+                              <Badge className="bg-[#FFDF00]/15 text-yellow-700 dark:text-[#FFDF00] border-[#FFDF00]/40 font-bold text-[10px]">Upcoming</Badge>
                             ) : (
                               <Badge variant="secondary" className="text-[10px]">Live / Recent</Badge>
                             )
@@ -535,7 +535,7 @@ const WhatnotShowsPage = () => {
                               href={show.whatnot_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 text-sm font-bold text-[#00C854] hover:underline"
+                              className="inline-flex items-center gap-1.5 text-sm font-bold text-yellow-600 dark:text-[#FFDF00] hover:underline"
                             >
                               Watch Show
                               <ExternalLink className="w-3 h-3" />
@@ -557,7 +557,7 @@ const WhatnotShowsPage = () => {
             {isAuthenticated && (
               <Button
                 onClick={() => setShowForm(true)}
-                className="rounded-xl font-bold bg-[#00C854] hover:bg-[#00C854]/90 text-white gap-2"
+                className="rounded-xl font-bold bg-[#FFDF00] hover:bg-[#FFDF00]/90 text-black gap-2"
               >
                 <Plus className="w-4 h-4" /> List My Show
               </Button>
