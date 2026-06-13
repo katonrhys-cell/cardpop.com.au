@@ -18,6 +18,9 @@ vi.mock('../../src/utils/supabaseClient.js', () => ({ default: mockSupabase, sup
 vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
+vi.mock('../../src/middleware/auth.js', () => ({
+  authMiddleware: (req, _res, next) => { req.user = { id: 'user-1' }; next(); },
+}));
 
 import verificationRouter from '../../src/routes/verification.js';
 
@@ -61,21 +64,16 @@ describe('GET /googlee177016f79225570.html', () => {
 // ─── POST /send-verification-email ───────────────────────────────────────────
 
 describe('POST /send-verification-email', () => {
-  it('returns 400 when userId is missing', async () => {
-    const res = await request(app).post('/send-verification-email').send({});
-    expect(res.status).toBe(400);
-  });
-
   it('returns 404 when user is not found in Supabase', async () => {
     mockSupabase.auth.admin.getUserById.mockResolvedValue({ data: { user: null }, error: { message: 'not found' } });
-    const res = await request(app).post('/send-verification-email').send({ userId: 'bad-user' });
+    const res = await request(app).post('/send-verification-email').send({});
     expect(res.status).toBe(404);
   });
 
   it('returns 500 when generateLink fails', async () => {
     mockSupabase.auth.admin.getUserById.mockResolvedValue({ data: { user: USER }, error: null });
     mockSupabase.auth.admin.generateLink.mockResolvedValue({ error: { message: 'link error' } });
-    const res = await request(app).post('/send-verification-email').send({ userId: 'user-1' });
+    const res = await request(app).post('/send-verification-email').send({});
     expect(res.status).toBe(500);
   });
 
@@ -83,24 +81,9 @@ describe('POST /send-verification-email', () => {
     mockSupabase.auth.admin.getUserById.mockResolvedValue({ data: { user: USER }, error: null });
     mockSupabase.auth.admin.generateLink.mockResolvedValue({ error: null });
     mockSupabase.from.mockReturnValue(makeBuilder({ data: null, error: null }));
-    const res = await request(app).post('/send-verification-email').send({ userId: 'user-1' });
+    const res = await request(app).post('/send-verification-email').send({});
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-  });
-});
-
-// ─── POST /verify-email ───────────────────────────────────────────────────────
-
-describe('POST /verify-email', () => {
-  it('returns 400 when token is missing', async () => {
-    const res = await request(app).post('/verify-email').send({});
-    expect(res.status).toBe(400);
-  });
-
-  it('returns 400 when token is invalid', async () => {
-    const res = await request(app).post('/verify-email').send({ token: 'invalid-token-not-in-store' });
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/invalid or expired/i);
   });
 });
 

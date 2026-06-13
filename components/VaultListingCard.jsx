@@ -1,7 +1,8 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, ShieldCheck, Lock, ShoppingCart, ArrowRightLeft, Layers } from 'lucide-react';
+import { Star, ShieldCheck, Lock, ShoppingCart, ArrowRightLeft, Layers, ZoomIn } from 'lucide-react';
+import ImageZoomModal from '@/components/ImageZoomModal.jsx';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { VARIANT_BADGES } from '@/lib/cardVariants.js';
@@ -24,6 +25,7 @@ const resolveImageUrl = (path) => {
 };
 
 const VaultListingCard = ({ vaultItem }) => {
+  const [zoomOpen, setZoomOpen] = useState(false);
   const rawImg = vaultItem.vault_images?.[0]?.storage_path || vaultItem.card_image || vaultItem.vault_images?.[0]?.image_url || vaultItem.image_url || null;
   const imgSrc = resolveImageUrl(rawImg);
   const sellerId = vaultItem.user_id || vaultItem.owner_id;
@@ -33,8 +35,10 @@ const VaultListingCard = ({ vaultItem }) => {
 
   const badgeConfig = getStatusBadge(vaultItem.listing_type);
   const StatusIcon = badgeConfig.icon;
-  const rawVariants = vaultItem.cardVariants;
-  const variants = Array.isArray(rawVariants) ? rawVariants : (rawVariants ? [rawVariants] : []);
+  const rawVariants = vaultItem.variant
+    ? vaultItem.variant.split(',').map(s => s.trim()).filter(Boolean)
+    : (Array.isArray(vaultItem.cardVariants) ? vaultItem.cardVariants : (vaultItem.cardVariants ? [vaultItem.cardVariants] : []));
+  const variants = rawVariants;
   const specialBadge = Object.entries(VARIANT_BADGES).find(([key]) => variants.includes(key));
   const extraVariants = variants.filter(v => !VARIANT_BADGES[v]).slice(0, 2);
   const borderClass = specialBadge
@@ -69,39 +73,68 @@ const VaultListingCard = ({ vaultItem }) => {
             {specialBadge[1].label}
           </div>
         )}
+
+        {/* Serial number badge — bottom-right, always visible */}
+        {vaultItem.serial_number && (
+          <div className="absolute bottom-3 right-3 z-10 pointer-events-none">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold tracking-wide bg-black/70 text-white backdrop-blur-sm border border-white/10 shadow-md">
+              <span className="opacity-60">#</span>{vaultItem.serial_number}
+            </span>
+          </div>
+        )}
+
+        {/* Zoom button */}
+        {imgSrc && (
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setZoomOpen(true); }}
+            aria-label="Zoom image"
+            className={`absolute z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm text-foreground flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-background ${vaultItem.serial_number ? 'bottom-11 right-3' : 'bottom-3 right-3'}`}
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+        )}
       </Link>
+
+      <ImageZoomModal
+        isOpen={zoomOpen}
+        onClose={() => setZoomOpen(false)}
+        imageUrl={imgSrc}
+        altText={vaultItem.card_name || vaultItem.name || 'Card Image'}
+      />
       
       <div className="p-5 flex flex-col flex-1">
         <Link to={detailPath} className="block mb-3">
-          <h3 className="font-bold text-base leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors mb-2">
+          <h3 className="font-bold text-base leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors mb-1">
             {vaultItem.card_name || vaultItem.name || 'Untitled Vault Item'}
           </h3>
-          
+          {vaultItem.set_name && (
+            <p className="text-xs text-muted-foreground mb-2 truncate">{vaultItem.set_name}</p>
+          )}
           <div className="flex flex-wrap gap-1.5">
-            {vaultItem.category && (
-              <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">
-                Cat: {vaultItem.category}
+            {vaultItem.year && (
+              <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{vaultItem.year}</Badge>
+            )}
+            {vaultItem.card_number && (
+              <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">#{vaultItem.card_number}</Badge>
+            )}
+            {vaultItem.condition && (
+              <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground capitalize">{vaultItem.condition.replace(/_/g, ' ')}</Badge>
+            )}
+            {vaultItem.is_foil && <Badge variant="outline" className="text-[10px] font-bold border-yellow-400/50 text-yellow-700 bg-yellow-400/10">Foil</Badge>}
+            {vaultItem.is_refractor && <Badge variant="outline" className="text-[10px] font-bold border-indigo-400/50 text-indigo-700 bg-indigo-400/10">Refractor</Badge>}
+            {vaultItem.is_auto && (
+              <Badge variant="outline" className="text-[10px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10">
+                {[
+                  vaultItem.auto_signers > 1 ? ['','Dual','Triple','Quad'][vaultItem.auto_signers - 1] : null,
+                  {on_card:'On-Card',sticker:'Sticker',cut:'Cut Sig',licensed:'Licensed',in_person:'IP'}[vaultItem.auto_type] ?? null,
+                  'Auto',
+                ].filter(Boolean).join(' ')}
               </Badge>
             )}
-            {vaultItem.subcategory && (
-              <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">
-                Sub: {vaultItem.subcategory}
-              </Badge>
-            )}
-            {vaultItem.brand && (
-              <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">
-                Brand: {vaultItem.brand}
-              </Badge>
-            )}
-            {vaultItem.series && (
-              <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">
-                Series: {vaultItem.series}
-              </Badge>
-            )}
-            {variants.slice(0, 3).map(v => (
-              <Badge key={v} variant="outline" className="text-[10px] font-bold border-primary/30 text-primary bg-primary/5">
-                {v}
-              </Badge>
+            {vaultItem.is_rookie && <Badge variant="outline" className="text-[10px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10">RC</Badge>}
+            {vaultItem.is_sealed && <Badge variant="outline" className="text-[10px] font-bold border-green-400/50 text-green-700 bg-green-400/10">Sealed</Badge>}
+            {variants.map(v => (
+              <Badge key={v} variant="outline" className="text-[10px] font-bold border-primary/30 text-primary bg-primary/5">{v}</Badge>
             ))}
           </div>
         </Link>

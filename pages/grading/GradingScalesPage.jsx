@@ -1,19 +1,30 @@
 import React from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
-import { BarChart2, ArrowLeft, ChevronRight } from 'lucide-react';
+import { BarChart2, ArrowLeft, ArrowRight, ChevronRight } from 'lucide-react';
 
-const SCALES = [
-  { grade: '10', label: 'Gem Mint',            condition: 'Perfect in every way — virtually no flaws under magnification. Centering 55/45 or better front, 75/25 back.' },
-  { grade: '9',  label: 'Mint',                condition: 'One minor flaw allowed — a slight print spot or surface scratch; otherwise perfect centering and edges.' },
-  { grade: '8',  label: 'Near Mint–Mint',      condition: 'Up to two minor flaws visible. Slight imperfection on corners or surface; no creases.' },
-  { grade: '7',  label: 'Near Mint',           condition: 'Small flaws on corners or edges. Surface may show minor scratches or light print lines. No creases.' },
-  { grade: '6',  label: 'Excellent–Mint',      condition: 'Light wear overall. May have minor corner or edge issues. Surface shows slight loss of gloss.' },
-  { grade: '5',  label: 'Excellent',           condition: 'Obvious signs of wear on corners. Moderate scratching on surface. Centering may be noticeably off.' },
-  { grade: '4',  label: 'Very Good–Excellent', condition: 'Some rounding of corners and/or edges. Light creasing possible. Surface shows definite wear.' },
-  { grade: '3',  label: 'Very Good',           condition: 'Significant creasing, rounding of corners, and surface wear. Card retains its original shape.' },
-  { grade: '2',  label: 'Good',                condition: 'Heavy wear throughout. Major creases, scratches, or stains. May have writing or minor tears.' },
-  { grade: '1',  label: 'Poor',                condition: 'Heavily damaged. Significant defects including major creases, tears, or tape on both surfaces.' },
+const COMPANIES = [
+  { slug: 'psa', name: 'PSA', full: 'Professional Sports Authenticator', note: '1–10 Scale' },
+  { slug: 'bgs', name: 'BGS', full: 'Beckett Grading Services', note: '1–10 Scale with Subgrades' },
+  { slug: 'cgc', name: 'CGC', full: 'Certified Guaranty Company', note: '1–10 Scale' },
+  { slug: 'ace', name: 'ACE', full: 'ACE Grading', note: '1–10 Scale with Custom Labels' },
+];
+
+const UNIVERSAL_SCALE = [
+  { grade: '10',  label: 'Gem Mint / Pristine',  condition: 'Virtually flawless. Perfect or near-perfect centering. Sharp focus, clean edges, and completely intact corners under magnification.' },
+  { grade: '9',   label: 'Mint',                  condition: 'A superb condition card exhibiting only one very minor flaw, such as a slight printing imperfection or very slightly off-white borders.' },
+  { grade: '8',   label: 'Near Mint – Mint',       condition: 'A high-end card that appears Mint at first glance but reveals minor flaws upon close inspection, like slight corner wear or minor centering issues.' },
+  { grade: '7',   label: 'Near Mint',              condition: 'Shows slight surface wear or a minor printing defect. Corners may have slight fraying, but image focus remains sharp.' },
+  { grade: '5–6', label: 'Excellent to EX-MT',     condition: 'Visible surface wear, minor scratching, or loss of original gloss. Edges and corners show clear but moderate wear.' },
+  { grade: '1–4', label: 'Poor to Very Good',       condition: 'Heavily handled. Features creasing, severe corner wear, scuffing, staining, or other major defects. The card\'s core image is still visible.' },
+];
+
+const TIPS = [
+  { tip: 'Handle cards by the edges only', detail: 'Fingerprints and oils from your skin cause surface damage that\'s visible to graders.' },
+  { tip: 'Use penny sleeves immediately after pulling', detail: 'Even a brand-new pack-fresh card can pick up micro-scratches from a binder or box.' },
+  { tip: 'Store vertically in a hard case', detail: 'Avoid pressure or bending. Horizontal stacking can cause edge and corner wear over time.' },
+  { tip: 'Check centering before submitting', detail: 'Centering is the most common reason PSA 10s become PSA 9s. Use a ruler or centering tool.' },
+  { tip: 'Clean only with a soft microfibre cloth', detail: 'Never use paper towels or tissues — they leave micro-scratches on the surface.' },
 ];
 
 const gradeColor = (g) => {
@@ -26,15 +37,18 @@ const gradeColor = (g) => {
 
 const GradingScalesPage = () => (
   <div className="min-h-screen bg-background">
-    <SEOHead title="Grading Scales | CardPop" description="Understand trading card grading scales from 1 to 10. Learn what each grade means and how condition affects your card's value." />
+    <SEOHead
+      title="Trading Card Grading Scales 1–10 | CardPop Grading Hub"
+      description="Understand the PSA, BGS, CGC and ACE trading card grading scales from 1 to 10. Learn exactly what each grade means and how condition affects your card's resale value in Australia."
+    />
 
     <section className="bg-card border-b border-border py-20 text-center">
       <div className="container-default">
         <BarChart2 className="w-12 h-12 text-primary mx-auto mb-6" />
         <h1 className="text-4xl md:text-5xl font-bold mb-4">Grading Scales</h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-          The complete 1–10 condition scale used by major authenticators.
-          Understand exactly what separates a Mint 9 from a Gem Mint 10.
+          While most authenticators use a 1 to 10 scale, the exact definitions and
+          tolerances for a "Gem Mint" card differ slightly between companies.
         </p>
       </div>
     </section>
@@ -45,36 +59,52 @@ const GradingScalesPage = () => (
         <ArrowLeft className="w-4 h-4" /> Back to Grading Hub
       </Link>
 
-      {/* Scale table */}
-      <div className="bg-card border border-border rounded-3xl overflow-hidden">
-        <div className="grid grid-cols-[56px_160px_1fr] text-xs font-semibold uppercase tracking-widest text-muted-foreground bg-muted/50 px-6 py-3 border-b border-border">
-          <span>Grade</span>
-          <span>Label</span>
-          <span>Condition</span>
-        </div>
-        {SCALES.map(({ grade, label, condition }, i) => (
-          <div
-            key={grade}
-            className={`grid grid-cols-[56px_160px_1fr] gap-2 px-6 py-5 items-start hover:bg-muted/20 transition-colors ${i < SCALES.length - 1 ? 'border-b border-border/60' : ''}`}
+      {/* Company quick-links */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {COMPANIES.map(({ slug, name, full, note }) => (
+          <Link
+            key={slug}
+            to={`/grading/scales/${slug}`}
+            className="bg-card border border-border rounded-2xl p-4 hover:border-primary/50 hover:shadow-md transition-all group"
           >
-            <span className={`font-black text-2xl leading-none ${gradeColor(grade)}`}>{grade}</span>
-            <span className="font-semibold text-sm pt-0.5">{label}</span>
-            <span className="text-sm text-muted-foreground leading-relaxed">{condition}</span>
-          </div>
+            <p className="text-xl font-black text-primary mb-0.5 group-hover:text-primary/80 transition-colors">{name}</p>
+            <p className="text-xs text-muted-foreground leading-snug">{full}</p>
+            <p className="text-xs text-muted-foreground mt-1 italic">{note}</p>
+            <ArrowRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors mt-2" />
+          </Link>
         ))}
+      </div>
+
+      {/* Universal scale */}
+      <div>
+        <h2 className="text-2xl font-bold mb-2">The Universal 1–10 Scale</h2>
+        <p className="text-muted-foreground mb-5 text-sm leading-relaxed">
+          Despite proprietary differences, all major grading companies align to a generally accepted universal standard of condition.
+        </p>
+        <div className="bg-card border border-border rounded-3xl overflow-hidden">
+          <div className="grid grid-cols-[64px_160px_1fr] text-xs font-semibold uppercase tracking-widest text-muted-foreground bg-muted/50 px-6 py-3 border-b border-border">
+            <span>Grade</span>
+            <span>Condition</span>
+            <span>General Characteristics</span>
+          </div>
+          {UNIVERSAL_SCALE.map(({ grade, label, condition }, i) => (
+            <div
+              key={grade}
+              className={`grid grid-cols-[64px_160px_1fr] gap-2 px-6 py-5 items-start hover:bg-muted/20 transition-colors ${i < UNIVERSAL_SCALE.length - 1 ? 'border-b border-border/60' : ''}`}
+            >
+              <span className={`font-black text-xl leading-none ${gradeColor(grade)}`}>{grade}</span>
+              <span className="font-semibold text-sm pt-0.5">{label}</span>
+              <span className="text-sm text-muted-foreground leading-relaxed">{condition}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Tips */}
       <div>
         <h2 className="text-2xl font-bold mb-5">Tips for Maximising Your Grade</h2>
         <div className="space-y-3">
-          {[
-            { tip: 'Handle cards by the edges only', detail: 'Fingerprints and oils from your skin cause surface damage that\'s visible to graders.' },
-            { tip: 'Use penny sleeves immediately after pulling', detail: 'Even a brand-new pack-fresh card can pick up micro-scratches from a binder or box.' },
-            { tip: 'Store vertically in a hard case', detail: 'Avoid pressure or bending. Horizontal stacking can cause edge and corner wear over time.' },
-            { tip: 'Check centering before submitting', detail: 'Centering is the most common reason PSA 10s become PSA 9s. Use a ruler or centering tool.' },
-            { tip: 'Clean only with a soft microfibre cloth', detail: 'Never use paper towels or tissues — they leave micro-scratches on the surface.' },
-          ].map(({ tip, detail }) => (
+          {TIPS.map(({ tip, detail }) => (
             <div key={tip} className="bg-card border border-border rounded-2xl px-6 py-5">
               <p className="font-semibold mb-1">{tip}</p>
               <p className="text-sm text-muted-foreground">{detail}</p>

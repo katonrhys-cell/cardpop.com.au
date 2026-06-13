@@ -11,7 +11,7 @@ router.get('/', authMiddleware, async (req, res) => {
   const { currentSessionId } = req.query;
 
   const { data: profile, error } = await supabase
-    .from('profiles').select('active_sessions').eq('id', req.user.id).single();
+    .from('user_security').select('active_sessions').eq('user_id', req.user.id).single();
   if (error) throw error;
 
   const devices = (profile?.active_sessions || []).map(session => {
@@ -36,7 +36,7 @@ router.post('/:sessionId/trust', authMiddleware, async (req, res) => {
   if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
 
   const { data: profile, error } = await supabase
-    .from('profiles').select('active_sessions').eq('id', req.user.id).single();
+    .from('user_security').select('active_sessions').eq('user_id', req.user.id).single();
   if (error) throw error;
 
   const activeSessions = profile?.active_sessions || [];
@@ -45,9 +45,9 @@ router.post('/:sessionId/trust', authMiddleware, async (req, res) => {
   }
 
   const { error: updateError } = await supabase
-    .from('profiles')
+    .from('user_security')
     .update({ active_sessions: activeSessions.map(s => s.sessionId === sessionId ? { ...s, trusted: true } : s) })
-    .eq('id', req.user.id);
+    .eq('user_id', req.user.id);
   if (updateError) throw updateError;
 
   logger.info(`Session ${sessionId} marked as trusted for user ${req.user.id}`);

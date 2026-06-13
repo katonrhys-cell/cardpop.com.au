@@ -11,23 +11,27 @@ export const useCategories = () => {
 
   const getCategories = useCallback(async (forceRefresh = false) => {
     if (cache.categories && !forceRefresh) return cache.categories;
-    setLoading(true);
-    try {
-      const { data, error: err } = await supabase
+    // Use an in-flight promise to deduplicate concurrent requests
+    if (!cache._fetch) {
+      cache._fetch = supabase
         .from('categories')
         .select('*')
         .eq('is_active', true)
-        .order('sort_order');
-      if (err) throw err;
-      cache.categories = data ?? [];
-      return cache.categories;
-    } catch (err) {
-      setError(err.message);
-      toast.error('Failed to load categories');
-      return [];
-    } finally {
-      setLoading(false);
+        .order('sort_order')
+        .then(({ data, error: err }) => {
+          cache._fetch = null;
+          if (err) { setError(err.message); throw err; }
+          cache.categories = data ?? [];
+          return cache.categories;
+        })
+        .catch(err => {
+          cache._fetch = null;
+          setError(err.message);
+          toast.error('Failed to load categories');
+          return [];
+        });
     }
+    return cache._fetch;
   }, []);
 
   // Returns categories filtered by group ('tcg' | 'sports')
@@ -35,6 +39,69 @@ export const useCategories = () => {
     const all = await getCategories(forceRefresh);
     return all.filter(c => c.category_group === group);
   }, [getCategories]);
+
+  // Root (top-level) categories: Sports, TCG, Comics, Non-Sport, Collectibles
+  const getRootCategories = useCallback(async () => {
+    const all = await getCategories();
+    return all.filter(c => c.parent_id === null);
+  }, [getCategories]);
+
+  // Franchises are categories whose parent_id = a root category id
+  const getFranchisesByCategory = useCallback(async (categoryId) => {
+    if (!categoryId) return [];
+    const all = await getCategories();
+    return all.filter(c => c.parent_id === categoryId);
+  }, [getCategories]);
+
+  // Manufacturers linked to a specific franchise
+  const getManufacturersByFranchise = useCallback(async (franchiseId) => {
+    if (!franchiseId) return [];
+    const { data } = await supabase
+      .from('manufacturers')
+      .select('*')
+      .eq('franchise_id', franchiseId)
+      .eq('is_active', true)
+      .order('sort_order');
+    return data ?? [];
+  }, []);
+
+  // Sets for a franchise+manufacturer combo, grouped by series
+  const getSetsByFranchiseAndManufacturer = useCallback(async (franchiseId, manufacturerId) => {
+    if (!franchiseId) return [];
+    let query = supabase
+      .from('sets')
+      .select('*')
+      .eq('category_id', franchiseId)
+      .eq('is_active', true)
+      .order('name', { ascending: false });
+    if (manufacturerId) query = query.eq('manufacturer_id', manufacturerId);
+    const { data } = await query;
+    return data ?? [];
+  }, []);
+
+  // Parallels/variations for a franchise
+  const getParallelsByFranchise = useCallback(async (franchiseId) => {
+    if (!franchiseId) return [];
+    const { data } = await supabase
+      .from('parallels')
+      .select('*')
+      .eq('franchise_id', franchiseId)
+      .eq('is_active', true)
+      .order('sort_order');
+    return data ?? [];
+  }, []);
+
+  // Subsets for a specific set
+  const getSubsetsBySet = useCallback(async (setId) => {
+    if (!setId) return [];
+    const { data } = await supabase
+      .from('subsets')
+      .select('*')
+      .eq('set_id', setId)
+      .eq('is_active', true)
+      .order('sort_order');
+    return data ?? [];
+  }, []);
 
   // Subcategories are now represented as categories with parent_id set
   const getSubcategoriesByCategory = useCallback(async (categoryId) => {
@@ -54,7 +121,7 @@ export const useCategories = () => {
       const { data: record, error: err } = await supabase
         .from('categories').insert(data).select().single();
       if (err) throw err;
-      cache.categories = null; // invalidate cache
+      cache.categories = null; cache._fetch = null; // invalidate cache
       toast.success('Category created');
       return record;
     } catch (err) {
@@ -117,7 +184,13 @@ export const useCategories = () => {
     loading,
     error,
     getCategories,
+    getRootCategories,
+    getFranchisesByCategory,
+    getManufacturersByFranchise,
+    getSetsByFranchiseAndManufacturer,
     getCategoriesByGroup,
+    getParallelsByFranchise,
+    getSubsetsBySet,
     getSubcategoriesByCategory,
     // Legacy aliases
     getBrandsBySubcategory:  async () => [],

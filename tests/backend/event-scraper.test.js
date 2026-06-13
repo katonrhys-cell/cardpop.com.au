@@ -7,6 +7,10 @@ vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
+vi.mock('../../src/middleware/auth.js', () => ({
+  authMiddleware: (req, _res, next) => { req.user = { id: 'user-1', app_metadata: { is_admin: true } }; next(); },
+}));
+
 const mockAiStream = vi.hoisted(() => vi.fn());
 vi.mock('../../src/api/integrated-ai.js', () => ({
   stream: mockAiStream,

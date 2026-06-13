@@ -1,4 +1,4 @@
-import { getCardSightClient } from './cardSightClient.js';
+import { getCardSightClient, summarisePricingAud } from './cardSightClient.js';
 import { callEbayApi } from './ebayClient.js';
 import supabase from './supabaseClient.js';
 import logger from './logger.js';
@@ -37,8 +37,8 @@ async function fetchAndPersistCardSight(cardId, cardName, setName) {
   const client = getCardSightClient();
 
   const [pricingResult, populationResult] = await Promise.allSettled([
-    client.pricing.get(cardId),
-    client.population.card(cardId).catch(() => null), // may not exist for all cards
+    client.pricing.get(cardId).then(r => summarisePricingAud(r.data)),
+    client.population.card(cardId).then(r => r.data).catch(() => null), // may not exist for all cards
   ]);
 
   const pricing = pricingResult.status === 'fulfilled' ? pricingResult.value : null;
@@ -72,7 +72,7 @@ async function fetchAndPersistCardSight(cardId, cardName, setName) {
 
   // ── PSA population row ─────────────────────────────────────────────────────
   if (pop) {
-    const totalPop   = pop.totalPopulation ?? pop.total ?? 0;
+    const totalPop   = pop.total_population ?? 0;
     const confidence = psaConfidence(totalPop);
 
     const { error: psaErr } = await supabase

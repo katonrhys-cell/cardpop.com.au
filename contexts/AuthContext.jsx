@@ -160,11 +160,11 @@ export const AuthProvider = ({ children }) => {
   };
 
   const resetPassword = async (email) => {
-    const base = window.location.hostname === 'localhost'
-      ? window.location.origin
-      : 'https://cardpop.com.au';
+    // Use the current origin so the reset link returns the user to whichever
+    // domain they were on (cardpop.online or cardpop.com.au). Each origin must
+    // be in the Supabase Auth redirect allowlist.
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${base}/account/reset-password`,
+      redirectTo: `${window.location.origin}/account/reset-password`,
     });
     if (error) throw new Error(error.message);
     return true;

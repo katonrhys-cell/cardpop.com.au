@@ -75,6 +75,8 @@ const ProductDetailPage = () => {
             condition: vi?.condition,
             grade: vi?.grade,
             grading_company: vi?.grading_company,
+            year: vi?.card_year || vi?.year || null,
+            set: vi?.set_name || vi?.card_set || vi?.era || vi?.collection || null,
             category: listing.category,
             listing_type: listingTypeMap[listing.listing_type] || 'For Sale',
             owner_id: listing.seller_id,
@@ -104,22 +106,22 @@ const ProductDetailPage = () => {
         if (!isMounted) return;
 
         if (source === 'vault') {
+          // Always prefer the marketplace listing if one exists — it has price + buy action
+          const { data: activeListing } = await supabase
+            .from('listings')
+            .select('id')
+            .eq('vault_item_id', id)
+            .eq('status', 'active')
+            .maybeSingle();
+
+          if (isMounted && activeListing) {
+            navigate(`/product/marketplace/${activeListing.id}`, { replace: true });
+            return;
+          }
+
           const userRole = isAdmin ? 'admin' : 'user';
           const isAuthorized = canViewVaultProduct(currentUser?.id, data.owner_id, data.is_public, userRole);
           if (!isAuthorized) {
-            // If this vault item has an active marketplace listing, redirect there
-            const { data: activeListing } = await supabase
-              .from('listings')
-              .select('id')
-              .eq('vault_item_id', id)
-              .eq('status', 'active')
-              .maybeSingle();
-
-            if (isMounted && activeListing) {
-              navigate(`/product/marketplace/${activeListing.id}`, { replace: true });
-              return;
-            }
-
             if (isMounted) {
               setError('403 Forbidden: You do not have permission to view this private vault item.');
               setLoading(false);
@@ -172,9 +174,14 @@ const ProductDetailPage = () => {
     const priceInCents = Math.round((product.price || 0) * 100);
     const cartProduct = {
       id: product.id,
+      source,
       title: product.name,
       price: priceInCents / 100,
-      image: product.images?.[0] || null
+      image: product.images?.[0] || null,
+      year: product.year || product.card_year || null,
+      set: product.set || product.set_name || product.card_set || product.era || product.collection || null,
+      grading_company: product.grading_company || product.gradingCompany || null,
+      grade: product.grade || null,
     };
     const cartVariant = {
       id: product.id,
@@ -288,9 +295,14 @@ const ProductDetailPage = () => {
               {product.name}
             </h1>
             
-            <p className="text-muted-foreground font-medium text-sm mb-6">
+            <p className="text-muted-foreground font-medium text-sm mb-2">
               {product.category || product.collectionType}
             </p>
+            {(product.year || product.set) && (
+              <p className="text-muted-foreground text-sm mb-6">
+                {[product.year, product.set].filter(Boolean).join(' · ')}
+              </p>
+            )}
 
             <div className="mb-8">
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Estimated Value / Price</p>

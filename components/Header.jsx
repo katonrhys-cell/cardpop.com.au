@@ -8,6 +8,19 @@ import {
   FolderTree, ListOrdered, BarChart3, Store,
   BookOpen, Globe, Star, Award, TrendingUp, Newspaper
 } from 'lucide-react';
+
+const WhatnotIcon = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" className={className}>
+    <rect width="32" height="32" rx="8" fill="#000000" />
+    <path
+      d="M5 9l4.5 14 4-9.5 2.5 5.5 2.5-5.5 4 9.5L27 9"
+      stroke="#FFDF00"
+      strokeWidth="2.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 import { useDarkMode } from '@/hooks/useDarkMode.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import CardPopLogo from '@/components/CardPopLogo.jsx';
@@ -40,7 +53,7 @@ const BLOG_CATEGORIES = [
   { slug: 'australia-focus',  label: 'Australia Focus',   desc: 'Local TCG market and events',         Icon: Globe,     gradient: 'from-green-500 to-emerald-600' },
   { slug: 'beginner-guides',  label: 'Beginner Guides',   desc: 'Guides for new collectors',           Icon: BookOpen,  gradient: 'from-blue-500 to-indigo-600'   },
   { slug: 'card-spotlight',   label: 'Card Spotlight',    desc: 'Deep dives into iconic cards',         Icon: Star,      gradient: 'from-yellow-500 to-orange-500' },
-  { slug: 'grading-guides',   label: 'Grading Guides',    desc: 'Grading standards and preparation',   Icon: Award,     gradient: 'from-purple-500 to-violet-600' },
+  { slug: 'grading-guides',   label: 'Grading Hub',       desc: 'Grading standards and preparation',   Icon: Award,     gradient: 'from-purple-500 to-violet-600' },
   { slug: 'investing-value',  label: 'Investing & Value', desc: 'Investment strategies and valuation', Icon: TrendingUp, gradient: 'from-rose-500 to-pink-600'    },
   { slug: 'news-releases',    label: 'News & Releases',   desc: 'Latest TCG releases and industry news', Icon: Newspaper, gradient: 'from-cyan-500 to-sky-600'  },
 ];
@@ -157,34 +170,71 @@ const MobileBrowseSection = ({ onNavigate }) => {
   );
 };
 
-// ─── Browse Collections mega-dropdown ─────────────────────────────────────────
-const BrowseDropdown = ({ onNavigate }) => {
+// Shared open/close behaviour for the desktop hover dropdowns.
+// Hover-open must ignore non-mouse pointers: on touch screens a tap fires a
+// synthetic mouseenter immediately followed by click, so a plain
+// onMouseEnter+toggle pair opens the menu and instantly closes it again
+// (and the next tap does the opposite), making the menus feel dead.
+const useHoverDropdown = () => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const timerRef = useRef(null);
   const location = useLocation();
 
-  const handleMouseEnter = () => {
+  const handlePointerEnter = (e) => {
+    if (e.pointerType !== 'mouse') return;
     clearTimeout(timerRef.current);
+    if (!open) openedByHover.current = true;
     setOpen(true);
   };
-  const handleMouseLeave = () => {
+  const handlePointerLeave = (e) => {
+    if (e.pointerType !== 'mouse') return;
     timerRef.current = setTimeout(() => setOpen(false), 120);
   };
+  const handleTriggerClick = () => {
+    // A click right after hover-open (mouse users clicking the trigger they
+    // just hovered) should keep the menu open, not toggle it shut.
+    if (open && openedByHover.current) {
+      openedByHover.current = false;
+      return;
+    }
+    openedByHover.current = false;
+    setOpen(o => !o);
+  };
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  // Close when the route changes (e.g. navigation from within the panel)
+  useEffect(() => { setOpen(false); }, [location.pathname]);
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
   useEffect(() => { setOpen(false); }, [location.pathname]);
+
+  return { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick };
+};
+
+// ─── Browse Collections mega-dropdown ─────────────────────────────────────────
+const BrowseDropdown = ({ onNavigate }) => {
+  const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
 
   return (
     <div
       className="relative"
       ref={ref}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
     >
       {/* Trigger */}
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={handleTriggerClick}
         aria-expanded={open}
         className={`flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
           open
@@ -269,9 +319,8 @@ const BrowseDropdown = ({ onNavigate }) => {
 
 // ─── Blog mega-dropdown ───────────────────────────────────────────────────────
 const BlogDropdown = ({ onNavigate }) => {
-  const [open, setOpen] = useState(false);
+  const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
   const location = useLocation();
-  const timerRef = useRef(null);
   const isBlogActive = location.pathname.startsWith('/blog');
 
   const handleMouseEnter = () => { clearTimeout(timerRef.current); setOpen(true); };
@@ -280,9 +329,9 @@ const BlogDropdown = ({ onNavigate }) => {
   useEffect(() => { setOpen(false); }, [location.pathname]);
 
   return (
-    <div className="relative" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+    <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={handleTriggerClick}
         aria-expanded={open}
         className={`flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
           open || isBlogActive
@@ -321,6 +370,71 @@ const BlogDropdown = ({ onNavigate }) => {
                 <div className="min-w-0">
                   <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{cat.label}</p>
                   <p className="text-[11px] text-muted-foreground truncate">{cat.desc}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const COMMUNITY_ITEMS = [
+  { href: '/community/forum',     label: 'Forum',                   desc: 'Discussions and community posts',     Icon: MessageSquare, gradient: 'from-violet-500 to-purple-600' },
+  { href: '/community/profiles',  label: 'Profiles',                desc: 'Browse collector profiles',           Icon: Users,         gradient: 'from-sky-500 to-blue-600'     },
+  { href: '/community/retailers', label: 'Retailers & Suppliers',   desc: 'Find local shops and suppliers',      Icon: Store,         gradient: 'from-amber-500 to-orange-500' },
+  { href: '/community/whatnot',   label: 'Whatnot',                 desc: 'Live buying and selling shows',       Icon: WhatnotIcon,   gradient: 'from-yellow-400 to-yellow-500', isWhatnot: true },
+];
+
+// ─── Community mega-dropdown ──────────────────────────────────────────────────
+const CommunityDropdown = ({ onNavigate }) => {
+  const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
+  const location = useLocation();
+  const isCommunityActive = location.pathname.startsWith('/community');
+
+  return (
+    <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
+      <button
+        onClick={handleTriggerClick}
+        aria-expanded={open}
+        className={`flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+          open || isCommunityActive
+            ? 'bg-primary text-primary-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+        }`}
+      >
+        Community
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-72 bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+          <Link
+            to="/community"
+            onClick={() => { setOpen(false); onNavigate?.(); }}
+            className="flex items-center justify-between px-5 py-3.5 border-b border-border hover:bg-muted/60 transition-colors group"
+          >
+            <div>
+              <span className="text-sm font-bold text-foreground">Community Hub</span>
+              <p className="text-xs text-muted-foreground mt-0.5">Connect with collectors</p>
+            </div>
+            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
+          </Link>
+          <div className="p-3 grid gap-0.5">
+            {COMMUNITY_ITEMS.map(item => (
+              <Link
+                key={item.label}
+                to={item.href}
+                onClick={() => { setOpen(false); onNavigate?.(); }}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
+              >
+                <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${item.isWhatnot ? '' : item.gradient} shrink-0 shadow-sm overflow-hidden`}>
+                  <item.Icon className="w-4 h-4 text-white" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{item.label}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{item.desc}</p>
                 </div>
               </Link>
             ))}
@@ -377,6 +491,52 @@ const MobileBlogSection = ({ onNavigate }) => {
   );
 };
 
+// ─── Mobile community section (expandable) ───────────────────────────────────
+const MobileCommunitySection = ({ onNavigate }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-4">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-muted transition-colors mb-0.5"
+      >
+        <span className="text-sm font-bold text-foreground flex items-center gap-2">
+          <Users className="w-4 h-4 text-primary" />
+          Community
+        </span>
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="flex flex-col gap-0.5 mb-1 pl-2">
+          <SheetClose asChild>
+            <Link
+              to="/community"
+              onClick={onNavigate}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-semibold text-muted-foreground"
+            >
+              Community Hub
+            </Link>
+          </SheetClose>
+          {COMMUNITY_ITEMS.map(item => (
+            <SheetClose key={item.label} asChild>
+              <Link
+                to={item.href}
+                onClick={onNavigate}
+                className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
+              >
+                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${item.isWhatnot ? '' : item.gradient} shrink-0 overflow-hidden`}>
+                  <item.Icon className="w-3.5 h-3.5 text-white" />
+                </span>
+                <span className="text-xs font-semibold text-foreground truncate">{item.label}</span>
+              </Link>
+            </SheetClose>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Plain inline account section — no nested Radix portals inside the Sheet Dialog
 const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout }) => {
   const [expanded, setExpanded] = useState(false);
@@ -418,6 +578,11 @@ const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout })
             </Link>
           </SheetClose>
           <SheetClose asChild>
+            <Link to="/account/events" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
+              <Calendar className="w-4 h-4" /> My Events
+            </Link>
+          </SheetClose>
+          <SheetClose asChild>
             <Link to="/account/profile" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
               <Settings className="w-4 h-4" /> Account Settings
             </Link>
@@ -454,6 +619,21 @@ const Header = () => {
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
+
+  // Failsafe: Radix Dialog/DropdownMenu put `pointer-events: none` on <body>
+  // while open and can leave it behind when the close races a route change
+  // (close animation interrupted by navigation). When that happens nothing on
+  // the page responds to taps anymore, so menu selections after the first
+  // navigation appear dead. Once no Radix layer is open, restore the body.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const openLayer = document.querySelector('[data-state="open"][role="dialog"], [data-state="open"][role="menu"]');
+      if (!openLayer && document.body.style.pointerEvents === 'none') {
+        document.body.style.pointerEvents = '';
+      }
+    }, 400); // just past the Sheet's 300ms close animation
+    return () => clearTimeout(timer);
+  }, [location.pathname, mobileMenuOpen]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -671,9 +851,11 @@ const Header = () => {
               <SheetContent side="right" className="w-[85vw] sm:w-[350px] p-0 flex flex-col border-l border-border bg-background">
                 <SheetHeader className="p-6 border-b border-border text-left bg-muted/30 shrink-0">
                   <SheetTitle asChild>
-                    <span className="text-2xl">
-                      <CardPopLogo variant="full" iconClassName="w-7 h-[34px]" />
-                    </span>
+                    <SheetClose asChild>
+                      <Link to="/" className="text-2xl inline-block" onClick={() => setMobileMenuOpen(false)}>
+                        <CardPopLogo variant="full" iconClassName="w-7 h-[34px]" />
+                      </Link>
+                    </SheetClose>
                   </SheetTitle>
                 </SheetHeader>
 
@@ -699,8 +881,14 @@ const Header = () => {
                     onNavigate={() => setMobileMenuOpen(false)}
                   />
 
+                  {/* Mobile Community */}
+                  <MobileCommunitySection
+                    key={`community-${String(mobileMenuOpen)}`}
+                    onNavigate={() => setMobileMenuOpen(false)}
+                  />
+
                   <nav className="flex flex-col gap-1.5 mb-6">
-                    {NAV_LINKS.filter(l => l.label !== 'Blog').map((link) => {
+                    {NAV_LINKS.filter(l => l.label !== 'Blog' && l.label !== 'Community').map((link) => {
                       const isActive = isNavLinkActive(link);
                       return (
                         <SheetClose key={link.label} asChild>
@@ -810,6 +998,9 @@ const Header = () => {
             {NAV_LINKS.map((link) => {
               if (link.label === 'Blog') {
                 return <BlogDropdown key="blog" onNavigate={() => setMobileMenuOpen(false)} />;
+              }
+              if (link.label === 'Community') {
+                return <CommunityDropdown key="community" onNavigate={() => setMobileMenuOpen(false)} />;
               }
               const isActive = isNavLinkActive(link);
               return (

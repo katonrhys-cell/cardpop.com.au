@@ -15,7 +15,7 @@ const CATEGORIES = [
   { value: 'australia-focus',  label: 'Australia Focus'   },
   { value: 'beginner-guides',  label: 'Beginner Guides'   },
   { value: 'card-spotlight',   label: 'Card Spotlight'    },
-  { value: 'grading-guides',   label: 'Grading Guides'    },
+  { value: 'grading-guides',   label: 'Grading Hub'       },
   { value: 'investing-value',  label: 'Investing & Value' },
   { value: 'news-releases',    label: 'News & Releases'   },
 ];

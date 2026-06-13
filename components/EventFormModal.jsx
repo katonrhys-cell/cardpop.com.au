@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, UploadCloud, X, Wand2, Trash2, Plus, Tag } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import { slugify } from '@/lib/slugify.js';
 import { toast } from 'sonner';
 
 const AUS_STATES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'];
@@ -61,6 +62,8 @@ const INITIAL_STATE = {
   organizer_phone: '',
   website_url: '',
   ticket_url: '',
+  instagram_url: '',
+  facebook_url: '',
   entry_fee_aud: '',
   is_free: true,
   capacity: '',
@@ -115,8 +118,11 @@ const CharCount = ({ value = '', max, warn = 0.85 }) => {
   );
 };
 
-const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved }) => {
+// mode="admin" exposes status/featured/SEO controls; mode="user" locks
+// submissions to pending_review so they go through the admin approval queue.
+const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = 'admin' }) => {
   const { currentUser } = useAuth();
+  const isUserMode = mode === 'user';
   const [loading, setLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
@@ -153,6 +159,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved }) => {
         organizer_phone:     scrapedData.organizer_phone || scrapedData.contact?.phone || '',
         website_url:         scrapedData.website_url || scrapedData.contact?.website || '',
         ticket_url:          scrapedData.ticket_url || scrapedData.registrationLink || '',
+        instagram_url:       scrapedData.instagram_url || '',
+        facebook_url:        scrapedData.facebook_url || '',
         entry_fee_aud:       scrapedData.entry_fee_aud != null ? String(scrapedData.entry_fee_aud) : scrapedData.price != null ? String(scrapedData.price) : '',
         is_free:             scrapedData.is_free ?? (!scrapedData.entry_fee_aud && !scrapedData.price),
         capacity:            scrapedData.capacity != null ? String(scrapedData.capacity) : '',
@@ -200,6 +208,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved }) => {
         organizer_phone:     event.organizer_phone || '',
         website_url:         event.website_url || '',
         ticket_url:          event.ticket_url || '',
+        instagram_url:       event.instagram_url || '',
+        facebook_url:        event.facebook_url || '',
         entry_fee_aud:       event.entry_fee_aud != null ? String(event.entry_fee_aud) : '',
         is_free:             event.is_free ?? true,
         capacity:            event.capacity != null ? String(event.capacity) : '',
@@ -258,6 +268,12 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved }) => {
       return;
     }
 
+    if (!formData.start_date) {
+      toast.error('Start date is required.');
+      setActiveTab('venue');
+      return;
+    }
+
     setLoading(true);
     try {
       let image_url = event?.image_url ?? null;
@@ -278,9 +294,10 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved }) => {
         short_description:   formData.short_description.trim() || null,
         description:         formData.description.trim() || null,
         event_type:          formData.event_type,
-        status:              formData.status,
+        // User submissions always enter the review queue — RLS enforces this too
+        status:              isUserMode ? 'pending_review' : formData.status,
         featured_card_games: formData.featured_card_games.length ? formData.featured_card_games : null,
-        is_featured:         formData.is_featured,
+        is_featured:         isUserMode ? false : formData.is_featured,
         image_url,
         // Venue
         venue_name:          formData.venue_name.trim() || null,
@@ -299,6 +316,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved }) => {
         organizer_phone:     formData.organizer_phone.trim() || null,
         website_url:         formData.website_url.trim() || null,
         ticket_url:          formData.ticket_url.trim() || null,
+        instagram_url:       formData.instagram_url.trim() || null,
+        facebook_url:        formData.facebook_url.trim() || null,
         entry_fee_aud:       formData.is_free ? 0 : (parseFloat(formData.entry_fee_aud) || 0),
         is_free:             formData.is_free,
         capacity:            formData.capacity ? parseInt(formData.capacity, 10) : null,
@@ -316,11 +335,19 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved }) => {
       if (event?.id) {
         const { error } = await supabase.from('events').update(payload).eq('id', event.id);
         if (error) throw error;
-        toast.success('Event updated successfully');
+        toast.success(isUserMode ? 'Event updated — it will be reviewed before publishing.' : 'Event updated successfully');
       } else {
-        const { error } = await supabase.from('events').insert(payload);
+        // SEO-friendly slug for the event detail URL; suffix on collision
+        payload.slug = `${slugify(formData.title)}-${formData.start_date}`;
+        let { error } = await supabase.from('events').insert(payload);
+        if (error?.code === '23505') {
+          payload.slug = `${payload.slug}-${Math.random().toString(36).slice(2, 6)}`;
+          ({ error } = await supabase.from('events').insert(payload));
+        }
         if (error) throw error;
-        toast.success('Event created successfully');
+        toast.success(isUserMode
+          ? 'Event submitted! Our team will review it before it appears on the calendar.'
+          : 'Event created successfully');
       }
 
       if (onSaved) onSaved();
@@ -350,7 +377,9 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved }) => {
             )}
           </div>
           <DialogDescription className="text-muted-foreground mt-1">
-            {event?.id ? 'Update event details, SEO, and visibility.' : 'Add a comprehensive event listing with full SEO setup.'}
+            {isUserMode
+              ? 'Submit your card event to the CardPop calendar. Our team reviews every submission before it goes live.'
+              : event?.id ? 'Update event details, SEO, and visibility.' : 'Add a comprehensive event listing with full SEO setup.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -362,7 +391,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved }) => {
                   { id: 'details',   label: 'Details' },
                   { id: 'venue',     label: 'Venue & Dates' },
                   { id: 'organiser', label: 'Organiser' },
-                  { id: 'seo',       label: 'SEO' },
+                  ...(isUserMode ? [] : [{ id: 'seo', label: 'SEO' }]),
                 ].map(tab => (
                   <TabsTrigger
                     key={tab.id}
@@ -408,15 +437,17 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved }) => {
                     </Select>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label className="font-bold">Status</Label>
-                    <Select value={formData.status} onValueChange={v => set('status', v)} disabled={loading}>
-                      <SelectTrigger className={inputCls}><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {STATUS_OPTIONS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {!isUserMode && (
+                    <div className="space-y-2">
+                      <Label className="font-bold">Status</Label>
+                      <Select value={formData.status} onValueChange={v => set('status', v)} disabled={loading}>
+                        <SelectTrigger className={inputCls}><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {STATUS_OPTIONS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                 </div>
 
                 {/* Featured Card Games */}
@@ -439,13 +470,15 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved }) => {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3 p-3 bg-muted/20 rounded-xl border border-border">
-                  <Switch checked={formData.is_featured} onCheckedChange={v => set('is_featured', v)} disabled={loading} />
-                  <div>
-                    <p className="text-sm font-semibold">Feature on Homepage</p>
-                    <p className="text-xs text-muted-foreground">Appears in the featured events section</p>
+                {!isUserMode && (
+                  <div className="flex items-center gap-3 p-3 bg-muted/20 rounded-xl border border-border">
+                    <Switch checked={formData.is_featured} onCheckedChange={v => set('is_featured', v)} disabled={loading} />
+                    <div>
+                      <p className="text-sm font-semibold">Feature on Homepage</p>
+                      <p className="text-xs text-muted-foreground">Appears in the featured events section</p>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Image upload */}
                 <div className="space-y-2">
@@ -553,6 +586,14 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved }) => {
                     <Label htmlFor="ticket_url" className="font-bold">Tickets / Registration URL</Label>
                     <Input id="ticket_url" name="ticket_url" type="url" value={formData.ticket_url} onChange={handleChange} className={inputCls} placeholder="https://" disabled={loading} />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="instagram_url" className="font-bold">Instagram URL</Label>
+                    <Input id="instagram_url" name="instagram_url" type="url" value={formData.instagram_url} onChange={handleChange} className={inputCls} placeholder="https://instagram.com/..." disabled={loading} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="facebook_url" className="font-bold">Facebook URL</Label>
+                    <Input id="facebook_url" name="facebook_url" type="url" value={formData.facebook_url} onChange={handleChange} className={inputCls} placeholder="https://facebook.com/..." disabled={loading} />
+                  </div>
                 </div>
 
                 <div className="pt-2 border-t border-border space-y-5">
@@ -583,7 +624,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved }) => {
                 </div>
               </TabsContent>
 
-              {/* ── TAB 4: SEO ── */}
+              {/* ── TAB 4: SEO (admin only) ── */}
+              {!isUserMode && (
               <TabsContent value="seo" className="mt-0 space-y-5 animate-in fade-in">
                 <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 text-sm text-muted-foreground">
                   Complete SEO fields are auto-generated by the AI scraper. Review and refine them here for best search performance.
@@ -622,6 +664,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved }) => {
                   </div>
                 )}
               </TabsContent>
+              )}
 
             </div>
           </Tabs>
@@ -639,7 +682,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved }) => {
               <Button type="button" variant="ghost" onClick={onClose} disabled={loading} className="rounded-xl font-bold">Cancel</Button>
               <Button type="submit" disabled={loading} className="rounded-xl font-bold px-8 shadow-md">
                 {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {event?.id ? 'Save Changes' : 'Create Event'}
+                {event?.id ? 'Save Changes' : isUserMode ? 'Submit for Review' : 'Create Event'}
               </Button>
             </div>
           </DialogFooter>

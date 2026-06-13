@@ -14,7 +14,7 @@ vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 vi.mock('../../src/middleware/auth.js', () => ({
-  authMiddleware: (req, _res, next) => { req.user = { id: 'user-1' }; next(); },
+  authMiddleware: (req, _res, next) => { req.user = { id: 'user-1', app_metadata: { is_admin: true } }; next(); },
 }));
 
 import categoriesRouter from '../../src/routes/categories.js';

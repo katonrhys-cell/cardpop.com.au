@@ -90,6 +90,7 @@ const AccountSecurity = lazy(() => import('@/pages/account/AccountSecurity.jsx')
 const AccountVerification = lazy(() => import('@/pages/account/AccountVerification.jsx'));
 const AccountSellerTier = lazy(() => import('@/pages/account/AccountSellerTier.jsx'));
 const AccountOrders = lazy(() => import('@/pages/account/AccountOrders.jsx'));
+const AccountEvents = lazy(() => import('@/pages/account/AccountEvents.jsx'));
 
 // Vault & Trading
 const MyVaultPage = lazy(() => import('@/pages/MyVaultPage.jsx'));
@@ -122,6 +123,9 @@ const CommunityEventsPage = lazy(() => import('@/pages/community/CommunityEvents
 const EventDetailPage = lazy(() => import('@/pages/EventDetailPage.jsx'));
 const CommunityDiscussionPage = lazy(() => import('@/pages/community/CommunityDiscussionPage.jsx'));
 const WhatnotShowsPage = lazy(() => import('@/pages/community/WhatnotShowsPage.jsx'));
+const ForumPage = lazy(() => import('@/pages/community/ForumPage.jsx'));
+const ProfilesPage = lazy(() => import('@/pages/community/ProfilesPage.jsx'));
+const RetailersPage = lazy(() => import('@/pages/community/RetailersPage.jsx'));
 
 // Admin Dashboard Area
 const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard.jsx'));
@@ -162,6 +166,7 @@ const ShippingPage = lazy(() => import('@/pages/info/ShippingPage.jsx'));
 const TermsPage = lazy(() => import('@/pages/info/TermsPage.jsx'));
 const TrustSafetyPage = lazy(() => import('@/pages/info/TrustSafetyPage.jsx'));
 const AccessibilityPage = lazy(() => import('@/pages/info/AccessibilityPage.jsx'));
+const PhotographyStandardPage = lazy(() => import('@/pages/info/PhotographyStandardPage.jsx'));
 
 const App = () => {
   return (
@@ -243,6 +248,7 @@ const App = () => {
                         <Route path="/account/verification" element={<ProtectedRoute><AccountVerification /></ProtectedRoute>} />
                         <Route path="/account/seller-tier" element={<ProtectedRoute><AccountSellerTier /></ProtectedRoute>} />
                         <Route path="/account/orders" element={<ProtectedRoute><AccountOrders /></ProtectedRoute>} />
+                        <Route path="/account/events" element={<ProtectedRoute><AccountEvents /></ProtectedRoute>} />
                         
                         {/* Vault & Trading */}
                         <Route path="/vault" element={<ProtectedRoute><MyVaultPage /></ProtectedRoute>} />
@@ -267,6 +273,7 @@ const App = () => {
                         <Route path="/grading" element={<GradingPage />} />
                         <Route path="/grading/what-is-grading" element={<WhatIsGradingPage />} />
                         <Route path="/grading/scales" element={<GradingScalesPage />} />
+                        <Route path="/grading/scales/:scale" element={<GradingScalePage />} />
                         <Route path="/grading/companies" element={<GradingCompaniesPage />} />
                         <Route path="/grading/guide/:scale" element={<GradingScalePage />} />
                         
@@ -275,6 +282,9 @@ const App = () => {
                         <Route path="/blog/category/:category" element={<BlogCategoryPage />} />
                         <Route path="/blog/:id" element={<BlogArticlePage />} />
                         <Route path="/community" element={<CommunityPage />} />
+                        <Route path="/community/forum" element={<ForumPage />} />
+                        <Route path="/community/profiles" element={<ProfilesPage />} />
+                        <Route path="/community/retailers" element={<RetailersPage />} />
                         <Route path="/community/events" element={<CommunityEventsPage />} />
                         <Route path="/community/events/:eventId" element={<EventDetailPage />} />
                         <Route path="/community/discussion/:id" element={<CommunityDiscussionPage />} />
@@ -298,6 +308,8 @@ const App = () => {
                         <Route path="/terms" element={<TermsPage />} />
                         <Route path="/trust-safety" element={<TrustSafetyPage />} />
                         <Route path="/accessibility" element={<AccessibilityPage />} />
+                        <Route path="/photography-standard" element={<PhotographyStandardPage />} />
+                        <Route path="/photography-guide" element={<PhotographyStandardPage />} />
                         
                         {/* --- PROTECTED ADMIN ROUTES (NESTED UNDER ADMINLAYOUT) --- */}
                         <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>}>

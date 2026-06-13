@@ -1,10 +1,11 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, ShieldCheck } from 'lucide-react';
+import { Star, ShieldCheck, ZoomIn } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { supabase } from '@/lib/supabaseClient.js';
+import ImageZoomModal from '@/components/ImageZoomModal.jsx';
 
 const GRADE_BADGE = {
   psa:   'bg-red-600 text-white',
@@ -22,6 +23,7 @@ const resolveImageUrl = (path) => {
 };
 
 const ProductCard = ({ product }) => {
+  const [zoomOpen, setZoomOpen] = useState(false);
   const rawImg = product.images?.[0] || product.cardImage?.[0] || product.card_image || null;
   const imgSrc = resolveImageUrl(rawImg);
   const sellerId = product.seller_id || product.seller || product.owner_id || product.owner || product.user_id;
@@ -73,16 +75,64 @@ const ProductCard = ({ product }) => {
             {gradingCompany.toUpperCase()} {product.grade}
           </div>
         )}
+
+        {/* Serial number badge — bottom right */}
+        {(product.serial_number || product.serialNumber) && (
+          <div className={`absolute z-10 pointer-events-none ${isGraded ? 'bottom-11 right-3' : 'bottom-3 right-3'}`}>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold tracking-wide bg-black/70 text-white backdrop-blur-sm border border-white/10 shadow-md">
+              <span className="opacity-60">#</span>{product.serial_number || product.serialNumber}
+            </span>
+          </div>
+        )}
+
+        {/* Zoom button */}
+        {imgSrc && (
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setZoomOpen(true); }}
+            aria-label="Zoom image"
+            className="absolute bottom-3 right-3 z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm text-foreground flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-background"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+        )}
       </Link>
+
+      <ImageZoomModal
+        isOpen={zoomOpen}
+        onClose={() => setZoomOpen(false)}
+        imageUrl={imgSrc}
+        altText={product.name || product.cardName || 'Card Image'}
+      />
       
       <div className="p-5 flex flex-col flex-1">
         <Link to={detailPath} className="block mb-2">
           <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">
             {product.category || product.collectionType || 'Trading Card'}
           </p>
-          <h3 className="font-bold text-base leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors">
+          <h3 className="font-bold text-base leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors mb-1">
             {product.name || product.cardName || 'Untitled Card'}
           </h3>
+          {(product.set_name || product.setName) && (
+            <p className="text-xs text-muted-foreground mb-2 truncate">{product.set_name || product.setName}</p>
+          )}
+          <div className="flex flex-wrap gap-1.5">
+            {(product.year) && (
+              <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{product.year}</Badge>
+            )}
+            {(product.card_number || product.cardNumber) && (
+              <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">#{product.card_number || product.cardNumber}</Badge>
+            )}
+            {product.condition && (
+              <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground capitalize">{product.condition.replace(/_/g, ' ')}</Badge>
+            )}
+            {(product.is_foil || product.isFoil) && <Badge variant="outline" className="text-[10px] font-bold border-yellow-400/50 text-yellow-700 bg-yellow-400/10">Foil</Badge>}
+            {(product.is_refractor || product.isRefractor) && <Badge variant="outline" className="text-[10px] font-bold border-indigo-400/50 text-indigo-700 bg-indigo-400/10">Refractor</Badge>}
+            {(product.is_auto || product.isAuto) && <Badge variant="outline" className="text-[10px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10">Auto</Badge>}
+            {(product.is_sealed || product.isSealed) && <Badge variant="outline" className="text-[10px] font-bold border-green-400/50 text-green-700 bg-green-400/10">Sealed</Badge>}
+            {(product.variant || product.cardVariant) && (product.variant || product.cardVariant).split(',').map(v => v.trim()).filter(Boolean).map(v => (
+              <Badge key={v} variant="outline" className="text-[10px] font-bold border-primary/30 text-primary bg-primary/5">{v}</Badge>
+            ))}
+          </div>
         </Link>
         
         <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-border">

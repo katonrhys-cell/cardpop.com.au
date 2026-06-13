@@ -20,7 +20,7 @@ const GradingCompaniesPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <SEOHead title="Grading Companies | CardPop" description="Compare professional trading card grading companies. Find out how PSA, BGS, CGC, ACE and SGC grade and authenticate your cards." />
+      <SEOHead title="Grading Companies Australia — PSA, BGS, CGC, ACE | CardPop Grading Hub" description="Compare the best trading card grading companies for Australian collectors. PSA, BGS, CGC, and ACE Grading — turnaround times, AUD pricing, and which service is right for you." />
 
       <section className="bg-card border-b border-border py-20 text-center">
         <div className="container-default">
@@ -90,7 +90,7 @@ const GradingCompaniesPage = () => {
               { co: 'PSA',  for: 'Pokémon, Sports', time: '20–150 days', price: 'From $25 USD' },
               { co: 'BGS',  for: 'All TCG, Vintage', time: '15–90 days', price: 'From $22 USD' },
               { co: 'CGC',  for: 'All TCG',          time: '10–60 days', price: 'From $15 USD' },
-              { co: 'ACE',  for: 'AU collectors',    time: '7–30 days',  price: 'From $25 AUD' },
+              { co: 'ARK',  for: 'AU collectors',    time: 'Local turnaround',  price: 'AUD pricing' },
             ].map(({ co, for: f, time, price }, i, arr) => (
               <div key={co} className={`grid grid-cols-4 px-5 py-4 text-sm ${i < arr.length - 1 ? 'border-b border-border/60' : ''} hover:bg-muted/20 transition-colors`}>
                 <span className="font-bold text-primary">{co}</span>

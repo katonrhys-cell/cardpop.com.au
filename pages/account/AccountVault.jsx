@@ -54,7 +54,7 @@ const AccountVault = () => {
     try {
       let query = supabase
         .from('vault_items')
-        .select('*')
+        .select('*, parallel:parallels(id,name), subset:subsets(id,name)')
         .eq('owner_id', currentUser.id)
         .order('created_at', { ascending: false })
         .limit(200);
@@ -160,6 +160,13 @@ const AccountVault = () => {
           <div className="absolute top-3 left-3 z-10 pointer-events-none">
             {getListingBadge(card)}
           </div>
+          {card.serial_number && (
+            <div className="absolute bottom-3 right-3 z-10 pointer-events-none">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold tracking-wide bg-black/70 text-white backdrop-blur-sm border border-white/10 shadow-md">
+                <span className="opacity-60">#</span>{card.serial_number}
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="p-4 flex flex-col flex-1">
@@ -167,10 +174,18 @@ const AccountVault = () => {
           {card.set_name && <p className="text-xs text-muted-foreground mb-2">{card.set_name}</p>}
 
           <div className="flex flex-wrap gap-1.5 mb-3">
+            {card.parallel?.name && (
+              <Badge variant="secondary" className="text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 border-0">{card.parallel.name}</Badge>
+            )}
+            {card.subset?.name && (
+              <Badge variant="secondary" className="text-[10px] font-bold bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300 border-0">{card.subset.name}</Badge>
+            )}
             {card.collection && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{card.collection}</Badge>}
             {card.year && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{card.year}</Badge>}
             {card.card_number && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">#{card.card_number}</Badge>}
-            {card.variant && <Badge variant="secondary" className="text-[10px] font-medium bg-violet-500/10 text-violet-700 border border-violet-200/50">{card.variant}</Badge>}
+            {card.variant && card.variant.split(',').map(v => v.trim()).filter(Boolean).map(v => (
+              <Badge key={v} variant="secondary" className="text-[10px] font-medium bg-violet-500/10 text-violet-700 border border-violet-200/50">{v}</Badge>
+            ))}
             {card.condition && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{CONDITION_LABELS[card.condition] || card.condition}</Badge>}
             {card.grading_company && card.grading_company !== 'raw' && (
               <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground uppercase">{card.grading_company} {card.grade || ''}</Badge>

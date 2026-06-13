@@ -1,12 +1,13 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight } from 'lucide-react';
+import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { formatEntryFee } from '@/lib/eventSeo.js';
 import { toast } from 'sonner';
 
 const EventDetailCard = ({ event }) => {
-  const isTradeShow = event.type === 'Trade Show';
+  const isTradeShow = event.type === 'Trade Show' || event.type === 'Card Show';
 
   const handleShare = (platform) => {
     const url = encodeURIComponent(window.location.href);
@@ -111,6 +112,28 @@ const EventDetailCard = ({ event }) => {
                   <p className="text-muted-foreground leading-snug">{event.location}</p>
                 </div>
               </div>
+
+              <div className="flex gap-4 items-start">
+                <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
+                  <DollarSign className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-bold text-foreground">Entry</p>
+                  <p className="text-muted-foreground leading-snug">{formatEntryFee(event)}</p>
+                </div>
+              </div>
+
+              {event.organizer_name && (
+                <div className="flex gap-4 items-start">
+                  <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
+                    <Users className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-foreground">Organiser</p>
+                    <p className="text-muted-foreground leading-snug">{event.organizer_name}</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-3 pt-4">
@@ -122,7 +145,7 @@ const EventDetailCard = ({ event }) => {
                 </Button>
               ) : (
                 <Button className="w-full h-12 text-base font-bold" variant="secondary" disabled>
-                  Free Entry / No Tickets
+                  {event.is_free ? 'Free Entry — No Ticket Needed' : 'Tickets at the Door'}
                 </Button>
               )}
               
@@ -132,6 +155,35 @@ const EventDetailCard = ({ event }) => {
                 </a>
               </Button>
             </div>
+
+            {(event.instagram_url || event.facebook_url || event.website_url) && (
+              <div className="pt-6 border-t border-border">
+                <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Follow the Organiser</p>
+                <div className="flex flex-col gap-2">
+                  {event.instagram_url && (
+                    <Button variant="outline" className="w-full justify-start h-11 border-border hover:bg-muted font-semibold" asChild>
+                      <a href={event.instagram_url} target="_blank" rel="noopener noreferrer">
+                        <Instagram className="w-4 h-4 mr-2 text-pink-600" /> Instagram
+                      </a>
+                    </Button>
+                  )}
+                  {event.facebook_url && (
+                    <Button variant="outline" className="w-full justify-start h-11 border-border hover:bg-muted font-semibold" asChild>
+                      <a href={event.facebook_url} target="_blank" rel="noopener noreferrer">
+                        <Facebook className="w-4 h-4 mr-2 text-blue-600" /> Facebook
+                      </a>
+                    </Button>
+                  )}
+                  {event.website_url && (
+                    <Button variant="outline" className="w-full justify-start h-11 border-border hover:bg-muted font-semibold" asChild>
+                      <a href={event.website_url} target="_blank" rel="noopener noreferrer">
+                        <Globe className="w-4 h-4 mr-2 text-primary" /> Official Website
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="pt-6 border-t border-border">
               <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Share Event</p>

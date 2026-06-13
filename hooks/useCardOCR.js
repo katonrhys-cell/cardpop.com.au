@@ -126,6 +126,8 @@ function mapGradingService(raw) {
   if (gs.includes('PSA')) return 'PSA';
   if (gs.includes('BGS') || gs.includes('BECKETT')) return 'BGS';
   if (gs.includes('CGC')) return 'CGC';
+  if (gs.includes('SGC')) return 'SGC';
+  if (gs.includes('ACE')) return 'ACE';
   return 'None';
 }
 

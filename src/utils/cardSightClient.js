@@ -1,47 +1,107 @@
+import process from 'node:process';
 import 'dotenv/config';
+import { CardSightAI } from 'cardsightai';
+import { getUsdToAudRate } from './exchangeRates.js';
 import logger from './logger.js';
 
-const CARDSIGHT_API_KEY = process.env.CARDSIGHT_API_KEY;
-const CARDSIGHT_BASE_URL = 'https://api.cardsight.ai';
+let _client = null;
 
-if (!CARDSIGHT_API_KEY) {
-  logger.warn('[CARDSIGHT] CARDSIGHT_API_KEY not configured — card identification and pricing will be unavailable');
+export function getCardSightClient() {
+	if (!_client) {
+		// CARDSIGHT_API_KEY is the documented name (.env.example); CARDSIGHTAI_API_KEY
+		// is the SDK's own default, accepted as a fallback.
+		const apiKey = process.env.CARDSIGHT_API_KEY || process.env.CARDSIGHTAI_API_KEY;
+		if (!apiKey) {
+			throw new Error('CardSight API not configured: set CARDSIGHT_API_KEY');
+		}
+		_client = new CardSightAI({ apiKey });
+	}
+	return _client;
 }
 
-async function callCardsight(endpoint, options = {}) {
-  if (!CARDSIGHT_API_KEY) {
-    throw new Error('CardSight API not configured: set CARDSIGHT_API_KEY');
-  }
+/**
+ * Flattens a CardSight PricingResponse (raw + graded sale records) into the
+ * aggregate stats shape the rest of the app consumes. CardSight prices are USD.
+ *
+ * @param {object|null|undefined} pricing - PricingResponse payload
+ * @returns {{ avgPrice: number, minPrice: number, maxPrice: number, salesCount: number, lastSalePrice: number|null, lastSaleDate: string|null, currency: string }|null}
+ */
+export function summarisePricing(pricing) {
+	if (!pricing) return null;
 
-  const isFormData = options.body instanceof FormData;
+	const records = [
+		...(pricing.raw?.records ?? []),
+		...(pricing.graded ?? []).flatMap(company =>
+			(company.grades ?? []).flatMap(grade => grade.records ?? [])
+		),
+	].filter(record => record?.price > 0);
 
-  const headers = {
-    'X-API-Key': CARDSIGHT_API_KEY,
-    ...options.headers,
-  };
+	if (!records.length) return null;
 
-  // Let fetch set Content-Type (with multipart boundary) for FormData; set JSON otherwise
-  if (!isFormData && options.body && !headers['Content-Type']) {
-    headers['Content-Type'] = 'application/json';
-  }
+	const prices = records.map(record => record.price);
+	const newestFirst = [...records].sort(
+		(a, b) => new Date(b.date ?? 0) - new Date(a.date ?? 0)
+	);
+	const round2 = n => Math.round(n * 100) / 100;
 
-  const url = `${CARDSIGHT_BASE_URL}${endpoint}`;
-  logger.debug(`[CARDSIGHT] ${options.method || 'GET'} ${endpoint}`);
-
-  const response = await fetch(url, { ...options, headers });
-
-  if (!response.ok) {
-    const text = await response.text();
-    logger.error(`[CARDSIGHT] Error ${response.status} on ${endpoint}: ${text}`);
-    let message = `CardSight API error: ${response.status}`;
-    try {
-      const err = JSON.parse(text);
-      if (err.message) message = err.message;
-    } catch {}
-    throw new Error(message);
-  }
-
-  return response.json();
+	return {
+		avgPrice: round2(prices.reduce((sum, p) => sum + p, 0) / prices.length),
+		minPrice: round2(Math.min(...prices)),
+		maxPrice: round2(Math.max(...prices)),
+		salesCount: prices.length,
+		lastSalePrice: newestFirst[0].price ?? null,
+		lastSaleDate: newestFirst[0].date ?? null,
+		currency: 'USD',
+	};
 }
 
-export { callCardsight };
+/**
+ * Like summarisePricing, but converts the USD aggregates to AUD using the
+ * current exchange rate. Includes the rate used as `fxRate`.
+ *
+ * @param {object|null|undefined} pricing - PricingResponse payload
+ * @returns {Promise<object|null>}
+ */
+export async function summarisePricingAud(pricing) {
+	const summary = summarisePricing(pricing);
+	if (!summary) return null;
+
+	const rate = await getUsdToAudRate();
+	const round2 = n => Math.round(n * 100) / 100;
+
+	return {
+		...summary,
+		avgPrice: round2(summary.avgPrice * rate),
+		minPrice: round2(summary.minPrice * rate),
+		maxPrice: round2(summary.maxPrice * rate),
+		lastSalePrice: summary.lastSalePrice != null ? round2(summary.lastSalePrice * rate) : null,
+		currency: 'AUD',
+		fxRate: rate,
+	};
+}
+
+// Segment id → name cache (segments are a small, near-static catalog)
+let _segmentMap = null;
+
+/**
+ * Resolves a CardSight segment UUID to its display name (e.g. "Pokemon",
+ * "Basketball"). Returns null when unknown or the lookup fails.
+ *
+ * @param {string|null|undefined} segmentId
+ * @returns {Promise<string|null>}
+ */
+export async function getSegmentName(segmentId) {
+	if (!segmentId) return null;
+
+	if (!_segmentMap) {
+		try {
+			const { data } = await getCardSightClient().catalog.segments({ take: 100 });
+			_segmentMap = new Map((data?.segments ?? []).map(s => [s.id, s.name]));
+		} catch (err) {
+			logger.warn(`[CARDSIGHT] Failed to load segments: ${err.message}`);
+			return null;
+		}
+	}
+
+	return _segmentMap.get(segmentId) ?? null;
+}

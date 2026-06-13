@@ -24,6 +24,8 @@ vi.mock('../../src/middleware/auth.js', () => ({
     next();
   },
 }));
+const mockMaybeSingle = vi.hoisted(() => vi.fn());
+
 vi.mock('../../src/utils/supabaseClient.js', () => {
   const chain = () => {
     const q = {};
@@ -34,8 +36,9 @@ vi.mock('../../src/utils/supabaseClient.js', () => {
     q.limit = () => q;
     q.range = () => q;
     q.update = () => q;
+    q.contains = () => q;
     q.single = () => Promise.resolve({ data: null, error: null });
-    q.maybeSingle = () => Promise.resolve({ data: null, error: null });
+    q.maybeSingle = () => mockMaybeSingle();
     q.insert = () => Promise.resolve({ data: null, error: null });
     return q;
   };
@@ -55,55 +58,45 @@ function makeApp() {
 
 const app = makeApp();
 
-const VALID_ITEMS = [{ name: 'Charizard', price: 99.99, quantity: 1 }];
 const VALID_CHECKOUT_BODY = {
-  items: VALID_ITEMS,
-  total: 99.99,
+  listingId: 'listing-1',
   successUrl: 'https://example.com/success',
   cancelUrl: 'https://example.com/cancel',
 };
 
-beforeEach(() => vi.clearAllMocks());
+const MOCK_LISTING = {
+  id: 'listing-1',
+  price_aud: 99.99,
+  title: 'Charizard VMAX',
+  seller_id: 'seller-999',
+  vault_item_id: 'vault-1',
+  seller: { seller_tier: 'standard', display_name: 'Card Shop' },
+  vault_item: { card_name: 'Charizard VMAX' },
+};
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockMaybeSingle.mockResolvedValue({ data: MOCK_LISTING, error: null });
+});
 
 // ─── POST /create-checkout ────────────────────────────────────────────────────
 
 describe('POST /create-checkout', () => {
-  it('returns 400 when items is missing', async () => {
-    const res = await request(app).post('/create-checkout').send({ ...VALID_CHECKOUT_BODY, items: undefined });
+  it('returns 400 when listingId is missing', async () => {
+    const res = await request(app).post('/create-checkout').send({ successUrl: 'https://example.com/success', cancelUrl: 'https://example.com/cancel' });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/items/i);
+    expect(res.body.error).toMatch(/listingId/i);
   });
 
-  it('returns 400 when items is an empty array', async () => {
-    const res = await request(app).post('/create-checkout').send({ ...VALID_CHECKOUT_BODY, items: [] });
-    expect(res.status).toBe(400);
-  });
-
-  it('returns 400 when successUrl is missing', async () => {
-    const res = await request(app).post('/create-checkout').send({ ...VALID_CHECKOUT_BODY, successUrl: undefined });
+  it('returns 400 when successUrl or cancelUrl is missing', async () => {
+    const res = await request(app).post('/create-checkout').send({ listingId: 'listing-1' });
     expect(res.status).toBe(400);
   });
 
-  it('returns 400 when total is missing', async () => {
-    const res = await request(app).post('/create-checkout').send({ ...VALID_CHECKOUT_BODY, total: undefined });
-    expect(res.status).toBe(400);
-  });
-
-  it('throws when an item is missing required fields', async () => {
-    mockStripe.checkout.sessions.create.mockResolvedValue({ id: 'cs_1', url: 'https://stripe.com/pay' });
-    const badItems = [{ name: 'No price card', quantity: 1 }]; // missing price
-    const res = await request(app).post('/create-checkout').send({ ...VALID_CHECKOUT_BODY, items: badItems });
-    expect(res.status).toBe(500);
-    expect(res.body.error).toMatch(/name, price, and quantity/i);
-  });
-
-  it('converts item price to cents and calls stripe.checkout.sessions.create', async () => {
-    mockStripe.checkout.sessions.create.mockResolvedValue({ id: 'cs_1', url: 'https://stripe.com/pay/cs_1' });
-    await request(app).post('/create-checkout').send(VALID_CHECKOUT_BODY);
-    const [createArgs] = mockStripe.checkout.sessions.create.mock.calls;
-    const lineItem = createArgs[0].line_items[0];
-    expect(lineItem.price_data.unit_amount).toBe(9999); // $99.99 → 9999 cents
-    expect(lineItem.quantity).toBe(1);
+  it('returns 404 when listing is not found', async () => {
+    mockMaybeSingle.mockResolvedValue({ data: null, error: null });
+    const res = await request(app).post('/create-checkout').send(VALID_CHECKOUT_BODY);
+    expect(res.status).toBe(404);
   });
 
   it('returns the checkout session URL on success', async () => {
@@ -113,7 +106,7 @@ describe('POST /create-checkout', () => {
     expect(res.body.url).toBe('https://stripe.com/pay/cs_1');
   });
 
-  it('throws when stripe returns a session without a URL', async () => {
+  it('returns 500 when stripe returns a session without a URL', async () => {
     mockStripe.checkout.sessions.create.mockResolvedValue({ id: 'cs_1', url: null });
     const res = await request(app).post('/create-checkout').send(VALID_CHECKOUT_BODY);
     expect(res.status).toBe(500);
