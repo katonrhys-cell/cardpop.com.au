@@ -212,12 +212,33 @@ const PublicSellerProfilePage = () => {
                   <MessageSquare className="w-4 h-4 mr-2" /> Message User
                 </Button>
                 
-                {seller.social_links && Object.keys(seller.social_links).length > 0 && (
+                {seller.social_links && Object.keys(seller.social_links).filter(k => seller.social_links[k]).length > 0 && (
                   <div className="flex items-center gap-2 pl-4 border-l border-[hsl(var(--section-divider))]">
-                    {Object.entries(seller.social_links).map(([platform, link]) => (
-                      <a key={platform} href={link} target="_blank" rel="noopener noreferrer" className="p-2 text-muted-foreground hover:text-primary transition-colors bg-muted/50 rounded-lg">
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
+                    {Object.entries(seller.social_links).filter(([, link]) => link).map(([platform, link]) => (
+                      platform === 'whatnot' ? (
+                        <a
+                          key={platform}
+                          href={link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Whatnot"
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-orange-500 hover:text-orange-600 transition-colors bg-orange-500/10 hover:bg-orange-500/20 rounded-lg text-sm font-bold"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5" />
+                          Whatnot
+                        </a>
+                      ) : (
+                        <a
+                          key={platform}
+                          href={link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={platform.charAt(0).toUpperCase() + platform.slice(1)}
+                          className="p-2 text-muted-foreground hover:text-primary transition-colors bg-muted/50 rounded-lg"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      )
                     ))}
                   </div>
                 )}

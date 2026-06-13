@@ -24,7 +24,8 @@ const AccountProfile = () => {
     location_state: '',
     location_suburb: '',
     social_twitter: '',
-    social_instagram: ''
+    social_instagram: '',
+    social_whatnot: ''
   });
 
   const [avatarFile, setAvatarFile] = useState(null);
@@ -40,7 +41,8 @@ const AccountProfile = () => {
         location_state: currentUser.location_state || '',
         location_suburb: currentUser.location_suburb || '',
         social_twitter: socials.twitter || '',
-        social_instagram: socials.instagram || ''
+        social_instagram: socials.instagram || '',
+        social_whatnot: socials.whatnot || ''
       });
     }
   }, [currentUser]);
@@ -101,6 +103,11 @@ const AccountProfile = () => {
         location_state: formData.location_state,
         location_suburb: formData.location_suburb,
         avatar_url,
+        social_links: {
+          twitter: formData.social_twitter,
+          instagram: formData.social_instagram,
+          whatnot: formData.social_whatnot,
+        },
       }).eq('id', currentUser.id);
 
       if (updateErr) throw updateErr;
@@ -283,6 +290,46 @@ const AccountProfile = () => {
                     className="min-h-[200px] resize-none rounded-xl font-medium shadow-sm"
                     placeholder="Tell the community about your collection focus..."
                   />
+                </div>
+
+                <div className="space-y-4 pt-2">
+                  <h3 className="font-bold text-foreground text-sm uppercase tracking-wider">Social Links</h3>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="social_twitter" className="font-bold text-foreground">Twitter URL</Label>
+                    <Input
+                      id="social_twitter"
+                      name="social_twitter"
+                      value={formData.social_twitter}
+                      onChange={handleChange}
+                      className="h-12 rounded-xl font-medium shadow-sm"
+                      placeholder="https://twitter.com/yourhandle"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="social_instagram" className="font-bold text-foreground">Instagram URL</Label>
+                    <Input
+                      id="social_instagram"
+                      name="social_instagram"
+                      value={formData.social_instagram}
+                      onChange={handleChange}
+                      className="h-12 rounded-xl font-medium shadow-sm"
+                      placeholder="https://instagram.com/yourhandle"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="social_whatnot" className="font-bold text-foreground">Whatnot Channel URL</Label>
+                    <Input
+                      id="social_whatnot"
+                      name="social_whatnot"
+                      value={formData.social_whatnot}
+                      onChange={handleChange}
+                      className="h-12 rounded-xl font-medium shadow-sm"
+                      placeholder="https://www.whatnot.com/user/yourname"
+                    />
+                  </div>
                 </div>
               </div>
 
