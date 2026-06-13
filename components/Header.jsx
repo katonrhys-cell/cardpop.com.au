@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Package, Users, Calendar, FileText, Building2, Layers, CheckCircle,
   Sun, Moon, ChevronDown, ArrowRight, Layers2, User, LogOut, Settings,
   FolderTree, ListOrdered, BarChart3, Store,
-  BookOpen, Globe, Star, Award, TrendingUp, Newspaper
+  BookOpen, Globe, Star, Award, TrendingUp, Newspaper, BadgeCheck
 } from 'lucide-react';
 
 const WhatnotIcon = ({ className = 'w-4 h-4' }) => (
@@ -381,10 +381,11 @@ const BlogDropdown = ({ onNavigate }) => {
 };
 
 const COMMUNITY_ITEMS = [
-  { href: '/community/forum',     label: 'Forum',                   desc: 'Discussions and community posts',     Icon: MessageSquare, gradient: 'from-violet-500 to-purple-600' },
-  { href: '/community/profiles',  label: 'Profiles',                desc: 'Browse collector profiles',           Icon: Users,         gradient: 'from-sky-500 to-blue-600'     },
-  { href: '/community/retailers', label: 'Retailers & Suppliers',   desc: 'Find local shops and suppliers',      Icon: Store,         gradient: 'from-amber-500 to-orange-500' },
-  { href: '/community/whatnot',   label: 'Whatnot',                 desc: 'Live buying and selling shows',       Icon: WhatnotIcon,   gradient: 'from-yellow-400 to-yellow-500', isWhatnot: true },
+  { href: '/community/forum',          label: 'Forum',                 desc: 'Discussions and community posts',        Icon: MessageSquare, gradient: 'from-violet-500 to-purple-600'  },
+  { href: '/community/profiles',       label: 'Profiles',              desc: 'Browse collector profiles',              Icon: Users,         gradient: 'from-sky-500 to-blue-600'      },
+  { href: '/community/local-traders',  label: 'Local Traders',         desc: 'Endorsed sellers near you',              Icon: BadgeCheck,    gradient: 'from-emerald-500 to-teal-600'  },
+  { href: '/community/retailers',      label: 'Retailers & Suppliers', desc: 'Find local shops and suppliers',         Icon: Store,         gradient: 'from-amber-500 to-orange-500'  },
+  { href: '/community/whatnot',        label: 'Whatnot',               desc: 'Live buying and selling shows',          Icon: WhatnotIcon,   gradient: 'from-green-500 to-emerald-600', isWhatnot: true },
 ];
 
 // ─── Community mega-dropdown ──────────────────────────────────────────────────
