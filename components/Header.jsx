@@ -162,6 +162,7 @@ const BrowseDropdown = ({ onNavigate }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const timerRef = useRef(null);
+  const location = useLocation();
 
   const handleMouseEnter = () => {
     clearTimeout(timerRef.current);
@@ -172,6 +173,7 @@ const BrowseDropdown = ({ onNavigate }) => {
   };
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
+  useEffect(() => { setOpen(false); }, [location.pathname]);
 
   return (
     <div
@@ -275,6 +277,7 @@ const BlogDropdown = ({ onNavigate }) => {
   const handleMouseEnter = () => { clearTimeout(timerRef.current); setOpen(true); };
   const handleMouseLeave = () => { timerRef.current = setTimeout(() => setOpen(false), 120); };
   useEffect(() => () => clearTimeout(timerRef.current), []);
+  useEffect(() => { setOpen(false); }, [location.pathname]);
 
   return (
     <div className="relative" onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
