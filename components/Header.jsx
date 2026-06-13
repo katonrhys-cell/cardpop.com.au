@@ -179,7 +179,6 @@ const useHoverDropdown = () => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const timerRef = useRef(null);
-  const openedByHover = useRef(false);
   const location = useLocation();
 
   const handlePointerEnter = (e) => {
@@ -217,6 +216,7 @@ const useHoverDropdown = () => {
   useEffect(() => { setOpen(false); }, [location.pathname]);
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
+  useEffect(() => { setOpen(false); }, [location.pathname]);
 
   return { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick };
 };
@@ -322,6 +322,11 @@ const BlogDropdown = ({ onNavigate }) => {
   const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
   const location = useLocation();
   const isBlogActive = location.pathname.startsWith('/blog');
+
+  const handleMouseEnter = () => { clearTimeout(timerRef.current); setOpen(true); };
+  const handleMouseLeave = () => { timerRef.current = setTimeout(() => setOpen(false), 120); };
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+  useEffect(() => { setOpen(false); }, [location.pathname]);
 
   return (
     <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
