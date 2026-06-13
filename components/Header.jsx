@@ -733,7 +733,18 @@ const Header = () => {
         {/* ── Row 1: Logo + Search + actions ── */}
         <div className="relative flex items-center py-3 border-b border-border/40">
 
-          <Link to="/" className="shrink-0 relative z-10" onClick={() => setMobileMenuOpen(false)}>
+          <Link
+            to="/"
+            aria-label="CardPop — back to home"
+            className="shrink-0 relative z-10 flex items-center"
+            onClick={() => {
+              setMobileMenuOpen(false);
+              // Already on home: Link won't re-navigate, so scroll back to the top
+              if (location.pathname === '/') {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }
+            }}
+          >
             <CardPopLogo variant="full" iconClassName="w-9 h-[44px]" />
           </Link>
 
@@ -853,7 +864,17 @@ const Header = () => {
                 <SheetHeader className="p-6 border-b border-border text-left bg-muted/30 shrink-0">
                   <SheetTitle asChild>
                     <SheetClose asChild>
-                      <Link to="/" className="text-2xl inline-block" onClick={() => setMobileMenuOpen(false)}>
+                      <Link
+                        to="/"
+                        aria-label="CardPop — back to home"
+                        className="text-2xl inline-block"
+                        onClick={() => {
+                          setMobileMenuOpen(false);
+                          if (location.pathname === '/') {
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }
+                        }}
+                      >
                         <CardPopLogo variant="full" iconClassName="w-7 h-[34px]" />
                       </Link>
                     </SheetClose>
