@@ -32,16 +32,17 @@ const SECTIONS = [
       'Compare PSA, BGS, CGC, ACE Grading and more. Find turnaround times, Australian pricing, and which service suits your cards and budget.',
     cta: 'COMPARE SERVICES',
   },
+  {
+    href: '/grading/local',
+    icon: MapPin,
+    title: 'Submit Locally with Trusted Graders',
+    description:
+      'Skip international shipping and customs. Ranked local Australian grading services for TCG and sports cards, plus the best PSA and Beckett submission partners in Australia.',
+    cta: 'VIEW LOCAL OPTIONS',
+  },
 ];
 
 const AU_TIPS = [
-  {
-    icon: MapPin,
-    title: 'Submit Locally with Trusted Graders',
-    href: '/grading/local',
-    internal: true,
-    body: 'Skip international shipping and customs. Discover trusted Australian grading services offering AUD pricing and fast local turnarounds.',
-  },
   {
     icon: DollarSign,
     title: 'Factor in the Full Cost',
@@ -132,22 +133,12 @@ const GradingPage = () => (
           Here's what you need to know before submitting.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {AU_TIPS.map(({ icon: Icon, title, href, internal, body }) => (
+          {AU_TIPS.map(({ icon: Icon, title, body }) => (
             <div key={title} className="bg-card border border-border rounded-2xl p-6">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
                 <Icon className="w-5 h-5 text-primary" />
               </div>
-              {href && internal ? (
-                <Link to={href} className="font-bold mb-2 hover:text-primary transition-colors inline-flex items-center gap-1.5">
-                  {title} <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              ) : href ? (
-                <a href={href} target="_blank" rel="noopener noreferrer" className="font-bold mb-2 hover:text-primary transition-colors inline-flex items-center gap-1.5">
-                  {title} <ArrowRight className="w-3.5 h-3.5" />
-                </a>
-              ) : (
-                <h3 className="font-bold mb-2">{title}</h3>
-              )}
+              <h3 className="font-bold mb-2">{title}</h3>
               <p className="text-sm text-muted-foreground leading-relaxed mt-2">{body}</p>
             </div>
           ))}
