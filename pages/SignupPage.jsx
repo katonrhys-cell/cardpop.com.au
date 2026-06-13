@@ -132,15 +132,16 @@ const SignupPage = () => {
           <form onSubmit={handleAccountSubmit} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="name" className="font-bold text-xs uppercase tracking-wide">Full Name</Label>
-              <Input 
-                id="name" 
-                required 
+              <Input
+                id="name"
+                required
                 value={formData.name}
                 onChange={(e) => setFormData({...formData, name: e.target.value})}
                 className="bg-background h-12"
                 placeholder="e.g. Maya Chen"
                 disabled={loading}
               />
+              <p className="text-xs text-muted-foreground">Must match the identification you provide</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="email" className="font-bold text-xs uppercase tracking-wide">Email Address</Label>
