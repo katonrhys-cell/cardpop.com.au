@@ -37,9 +37,10 @@ const SECTIONS = [
 const AU_TIPS = [
   {
     icon: MapPin,
-    title: 'Submit Locally with ARK Grading',
-    href: 'https://arkgrading.com.au',
-    body: 'ARK Grading is an Australian grading service based in Melbourne, VIC — accepting Australian submissions only. Known for science-backed grading, beautiful custom labels, simple AUD pricing, and fast local turnarounds. No international shipping, no customs, no headaches.',
+    title: 'Submit Locally with Trusted Graders',
+    href: '/grading/local',
+    internal: true,
+    body: 'Skip international shipping and customs. Discover trusted Australian grading services offering AUD pricing and fast local turnarounds.',
   },
   {
     icon: DollarSign,
@@ -131,12 +132,16 @@ const GradingPage = () => (
           Here's what you need to know before submitting.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {AU_TIPS.map(({ icon: Icon, title, href, body }) => (
+          {AU_TIPS.map(({ icon: Icon, title, href, internal, body }) => (
             <div key={title} className="bg-card border border-border rounded-2xl p-6">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
                 <Icon className="w-5 h-5 text-primary" />
               </div>
-              {href ? (
+              {href && internal ? (
+                <Link to={href} className="font-bold mb-2 hover:text-primary transition-colors inline-flex items-center gap-1.5">
+                  {title} <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              ) : href ? (
                 <a href={href} target="_blank" rel="noopener noreferrer" className="font-bold mb-2 hover:text-primary transition-colors inline-flex items-center gap-1.5">
                   {title} <ArrowRight className="w-3.5 h-3.5" />
                 </a>
