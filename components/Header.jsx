@@ -179,6 +179,7 @@ const useHoverDropdown = () => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const timerRef = useRef(null);
+  const openedByHover = useRef(false);
   const location = useLocation();
 
   const handlePointerEnter = (e) => {
