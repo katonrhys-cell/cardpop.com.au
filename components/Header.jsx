@@ -64,7 +64,7 @@ const NAV_LINKS = [
   { label: 'Analytics', href: '/analytics' },
   { label: 'Blog', href: '/blog' },
   { label: 'Community', href: '/community' },
-  { label: 'Events', href: '/community/events' },
+  { label: 'Events', href: '/events' },
   { label: 'Grading', href: '/grading' },
   { label: 'About', href: '/about' },
 ];
