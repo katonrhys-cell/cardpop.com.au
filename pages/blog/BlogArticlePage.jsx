@@ -5,7 +5,33 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, FileText } from 'lucide-react';
-import { generateBlogPostingSchema, generateFAQStructuredData } from '@/utils/seoUtils.js';
+import { generateBlogPostingSchema, generateFAQStructuredData, generateBreadcrumbStructuredData } from '@/utils/seoUtils.js';
+
+const CONVICTION_LABELS = ['', 'High Risk', 'Negative', 'Neutral', 'Positive', 'Strong Buy'];
+const CONVICTION_COLOURS = ['', '#dc2626', '#ea580c', '#ca8a04', '#16a34a', '#15803d'];
+
+const ConvictionRating = ({ rating }) => {
+  if (!rating || rating < 1 || rating > 5) return null;
+  const stars = Array.from({ length: 5 }, (_, i) => i < rating);
+  return (
+    <div className="flex items-center gap-2 mt-4 pt-4 border-t border-white/10">
+      <span className="text-[10px] font-bold tracking-widest uppercase text-white/40">
+        CardPop Conviction Rating™
+      </span>
+      <div className="flex items-center gap-0.5 ml-1">
+        {stars.map((filled, i) => (
+          <svg key={i} width="12" height="12" viewBox="0 0 12 12" fill={filled ? CONVICTION_COLOURS[rating] : 'none'}
+               stroke={filled ? CONVICTION_COLOURS[rating] : 'rgba(255,255,255,0.2)'} strokeWidth="1.2">
+            <polygon points="6,1 7.5,4.5 11,5 8.5,7.5 9.2,11 6,9.2 2.8,11 3.5,7.5 1,5 4.5,4.5" />
+          </svg>
+        ))}
+      </div>
+      <span className="text-xs font-semibold" style={{ color: CONVICTION_COLOURS[rating] }}>
+        {CONVICTION_LABELS[rating]}
+      </span>
+    </div>
+  );
+};
 
 const VALID_CATEGORIES = new Set([
   'Market Watch', 'Investment Outlook', 'Set Analysis', 'Rookie Report',
@@ -147,7 +173,25 @@ const BlogArticlePage = () => {
     ? generateFAQStructuredData(faqData.map(f => ({ question: f.question, answer: f.answer })))
     : null;
 
-  const structuredDataArray = [blogStructuredData, faqStructuredData].filter(Boolean);
+  const breadcrumbStructuredData = generateBreadcrumbStructuredData([
+    { name: 'CardPop', url: 'https://cardpop.online' },
+    { name: 'The Parallel Report', url: 'https://cardpop.online/blog' },
+    ...(article.category ? [{ name: article.category, url: `https://cardpop.online/blog/category/${encodeURIComponent(article.category)}` }] : []),
+    { name: article.title, url: canonicalUrl },
+  ]);
+
+  const organisationSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'CardPop',
+    url: 'https://cardpop.online',
+    logo: 'https://cardpop.online/logo.png',
+    description: "Australia's trusted trading card marketplace and home of The Parallel Report.",
+    sameAs: ['https://cardpop.online/blog'],
+    publishingPrinciples: 'https://cardpop.online/blog',
+  };
+
+  const structuredDataArray = [blogStructuredData, faqStructuredData, breadcrumbStructuredData, organisationSchema].filter(Boolean);
 
   return (
     <article className="min-h-[100dvh] bg-background pb-24 overflow-x-hidden">
@@ -220,7 +264,15 @@ const BlogArticlePage = () => {
                 <span>{formatPublishedDate(article.published_at || article.created_at)}</span>
               </>
             )}
+            {article.read_time_minutes && (
+              <>
+                <span className="text-white/20">&bull;</span>
+                <span>{article.read_time_minutes} min read</span>
+              </>
+            )}
           </div>
+
+          <ConvictionRating rating={article.conviction_rating} />
 
         </div>
       </div>
