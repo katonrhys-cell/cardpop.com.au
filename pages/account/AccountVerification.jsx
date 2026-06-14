@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient.js';
+import apiServerClient from '@/lib/apiServerClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
 
@@ -64,6 +65,11 @@ const AccountVerification = () => {
   const [selfieFile, setSelfieFile] = useState(null);
   const [selfiePreview, setSelfiePreview] = useState(null);
 
+  const [extracting, setExtracting] = useState(false);
+  const [extractedName, setExtractedName] = useState(null);
+  const [extractionConfidence, setExtractionConfidence] = useState(null);
+  const [nameMatch, setNameMatch] = useState(null); // true | false | null
+
   useEffect(() => {
     if (!currentUser?.id) { setLoadingState(false); return; }
     let cancelled = false;
@@ -85,7 +91,14 @@ const AccountVerification = () => {
     return () => { cancelled = true; };
   }, [currentUser?.id]);
 
-  const handleFileChange = (setter, previewSetter) => (e) => {
+  useEffect(() => {
+    if (!extractedName) { setNameMatch(null); return; }
+    if (!form.fullLegalName.trim()) { setNameMatch(null); return; }
+    const normalize = (s) => s.toLowerCase().replace(/[^a-z\s]/g, '').replace(/\s+/g, ' ').trim();
+    setNameMatch(normalize(extractedName) === normalize(form.fullLegalName));
+  }, [form.fullLegalName, extractedName]);
+
+  const handleFileChange = (setter, previewSetter, isPhotoId = false) => async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 10 * 1024 * 1024) { toast.error('File must be under 10MB'); return; }
@@ -93,6 +106,32 @@ const AccountVerification = () => {
     const reader = new FileReader();
     reader.onloadend = () => previewSetter(reader.result);
     reader.readAsDataURL(file);
+
+    if (isPhotoId) {
+      setExtracting(true);
+      setExtractedName(null);
+      setNameMatch(null);
+      try {
+        const fd = new FormData();
+        fd.append('image', file);
+        const res = await apiServerClient.fetch('/id-verification/extract-name', { method: 'POST', body: fd });
+        if (res.ok) {
+          const data = await res.json();
+          setExtractedName(data.extracted_name);
+          setExtractionConfidence(data.confidence);
+          if (data.extracted_name && form.fullLegalName.trim()) {
+            const normalize = (s) => s.toLowerCase().replace(/[^a-z\s]/g, '').replace(/\s+/g, ' ').trim();
+            setNameMatch(normalize(data.extracted_name) === normalize(form.fullLegalName));
+          } else {
+            setNameMatch(null);
+          }
+        }
+      } catch {
+        // silently fail — extraction is best-effort
+      } finally {
+        setExtracting(false);
+      }
+    }
   };
 
   const uploadFile = async (file, path) => {
@@ -132,6 +171,9 @@ const AccountVerification = () => {
         photo_id_path: photoIdPath,
         selfie_path: selfiePath,
         status: 'pending',
+        id_extracted_name: extractedName || null,
+        name_match: nameMatch,
+        name_match_confidence: extractionConfidence || null,
       });
       if (error) throw error;
 
@@ -222,6 +264,24 @@ const AccountVerification = () => {
             <div className="space-y-1.5">
               <Label htmlFor="fullName" className="font-bold text-sm flex items-center gap-1.5"><User className="w-4 h-4" /> Full Legal Name *</Label>
               <Input id="fullName" value={form.fullLegalName} onChange={e => setForm(p => ({ ...p, fullLegalName: e.target.value }))} placeholder="As it appears on your ID" className="rounded-xl h-11" required />
+              {(extracting || extractedName) && (
+                <div className={`mt-2 flex items-center gap-2 text-xs font-medium px-3 py-2 rounded-lg ${
+                  extracting ? 'bg-muted text-muted-foreground' :
+                  nameMatch === true ? 'bg-emerald-500/10 text-emerald-700' :
+                  nameMatch === false ? 'bg-amber-500/10 text-amber-700' :
+                  'bg-muted text-muted-foreground'
+                }`}>
+                  {extracting ? (
+                    <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Scanning ID document…</>
+                  ) : nameMatch === true ? (
+                    <><CheckCircle2 className="w-3.5 h-3.5" /> Name matches your ID document</>
+                  ) : nameMatch === false ? (
+                    <><AlertCircle className="w-3.5 h-3.5" /> ID shows "{extractedName}" — please ensure names match</>
+                  ) : (
+                    <><AlertCircle className="w-3.5 h-3.5" /> Could not read name from ID — please ensure it matches</>
+                  )}
+                </div>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="dob" className="font-bold text-sm flex items-center gap-1.5"><Calendar className="w-4 h-4" /> Date of Birth *</Label>
@@ -245,7 +305,7 @@ const AccountVerification = () => {
               accept="image/*,.pdf"
               file={photoIdFile}
               preview={photoIdPreview}
-              onChange={handleFileChange(setPhotoIdFile, setPhotoIdPreview)}
+              onChange={handleFileChange(setPhotoIdFile, setPhotoIdPreview, true)}
               helpText="Passport, driver's licence, or national ID card. Max 10MB."
             />
             <FileUploadBox

@@ -622,18 +622,47 @@ const Header = () => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
-  // Failsafe: Radix Dialog/DropdownMenu put `pointer-events: none` on <body>
-  // while open and can leave it behind when the close races a route change
-  // (close animation interrupted by navigation). When that happens nothing on
-  // the page responds to taps anymore, so menu selections after the first
-  // navigation appear dead. Once no Radix layer is open, restore the body.
+  // Failsafe: Radix Dialog/DropdownMenu sets `pointer-events: none` on <body>
+  // while open and can leave it behind when the close animation is interrupted
+  // by navigation. The route-change timer below handles the normal case.
+  // The MutationObserver handles the deadlock case: pointer events are stuck,
+  // the user can't navigate, so the route never changes and the timer never fires.
+  useEffect(() => {
+    const clearStalePointerEvents = () => {
+      if (document.body.style.pointerEvents !== 'none') return;
+      const hasOpenLayer = document.querySelector(
+        '[data-state="open"][role="dialog"], [data-state="open"][role="menu"], [data-radix-popper-content-wrapper]'
+      );
+      if (!hasOpenLayer) {
+        document.body.style.pointerEvents = '';
+        document.body.style.overflow = '';
+      }
+    };
+
+    // Watch for any style change on body and fix it after animations settle
+    const observer = new MutationObserver(() => {
+      setTimeout(clearStalePointerEvents, 350);
+    });
+    observer.observe(document.body, { attributes: true, attributeFilter: ['style'] });
+
+    // Periodic sweep as a last resort (500ms is imperceptible to users)
+    const interval = setInterval(clearStalePointerEvents, 500);
+
+    return () => {
+      observer.disconnect();
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Also clear 400ms after route/menu changes (original behaviour, kept for completeness)
   useEffect(() => {
     const timer = setTimeout(() => {
       const openLayer = document.querySelector('[data-state="open"][role="dialog"], [data-state="open"][role="menu"]');
       if (!openLayer && document.body.style.pointerEvents === 'none') {
         document.body.style.pointerEvents = '';
+        document.body.style.overflow = '';
       }
-    }, 400); // just past the Sheet's 300ms close animation
+    }, 400);
     return () => clearTimeout(timer);
   }, [location.pathname, mobileMenuOpen]);
 
