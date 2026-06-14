@@ -154,6 +154,15 @@ const SubcategoryManagementPage = lazy(() => import('@/pages/admin/SubcategoryMa
 const BrandsManagementPage = lazy(() => import('@/pages/admin/BrandsManagementPage.jsx'));
 const ProductLinesManagementPage = lazy(() => import('@/pages/admin/ProductLinesManagementPage.jsx'));
 const CollectionsManagementPage = lazy(() => import('@/pages/admin/CollectionsManagementPage.jsx'));
+const FeaturedCardsAdminPage = lazy(() => import('@/pages/FeaturedCardsAdminPage.jsx'));
+const ListingsManagementPage = lazy(() => import('@/pages/ListingsManagementPage.jsx'));
+
+// Previously-orphaned pages now wired up
+const SalesHistoryPage = lazy(() => import('@/pages/SalesHistoryPage.jsx'));
+const CategoryPage = lazy(() => import('@/pages/CategoryPage.jsx'));
+const PublicCollectionsPage = lazy(() => import('@/pages/PublicCollectionsPage.jsx'));
+const CardMarketDetailPage = lazy(() => import('@/pages/CardMarketDetailPage.jsx'));
+const AddYourFirstCardPage = lazy(() => import('@/pages/AddYourFirstCardPage.jsx'));
 
 // Info & Misc Pages
 const SearchResultsPage = lazy(() => import('@/pages/SearchResultsPage.jsx'));
@@ -207,6 +216,7 @@ const App = () => {
                         <Route path="/complete-profile/:token" element={<ProfileCompletionPage />} />
                         
                         {/* Collections */}
+                        <Route path="/collections" element={<PublicCollectionsPage />} />
                         <Route path="/collections/:collectionSlug" element={<CollectionRoute />} />
 
                         {/* Marketplace */}
@@ -258,12 +268,14 @@ const App = () => {
                         {/* Vault & Trading */}
                         <Route path="/vault" element={<ProtectedRoute><MyVaultPage /></ProtectedRoute>} />
                         <Route path="/my-vault" element={<ProtectedRoute><MyVaultPage /></ProtectedRoute>} />
+                        <Route path="/vault/welcome" element={<AddYourFirstCardPage />} />
                         <Route path="/vault/profile" element={<ProtectedRoute><VaultProfilePage /></ProtectedRoute>} />
                         <Route path="/vault/add" element={<ProtectedRoute><AddEditCardPage /></ProtectedRoute>} />
                         <Route path="/vault/edit/:id" element={<ProtectedRoute><AddEditCardPage /></ProtectedRoute>} />
                         <Route path="/trade-requests" element={<ProtectedRoute><TradeRequestsPage /></ProtectedRoute>} />
                         <Route path="/messaging" element={<ProtectedRoute><MessagingPage /></ProtectedRoute>} />
                         <Route path="/transactions" element={<ProtectedRoute><TransactionHistoryPage /></ProtectedRoute>} />
+                        <Route path="/sales-history" element={<SalesHistoryPage />} />
 
                         {/* Markets & Analytics */}
                         <Route path="/analytics" element={<MarketsPage />} />
@@ -273,6 +285,8 @@ const App = () => {
                         <Route path="/markets" element={<Navigate to="/analytics" replace />} />
                         <Route path="/markets/*" element={<Navigate to="/analytics" replace />} />
                         <Route path="/australian-markets" element={<AustralianMarketsPage />} />
+                        <Route path="/card-market/:cardId" element={<CardMarketDetailPage />} />
+                        <Route path="/category/:categoryId" element={<CategoryPage />} />
                         
                         {/* Grading */}
                         <Route path="/grading" element={<GradingPage />} />
@@ -344,6 +358,8 @@ const App = () => {
                           <Route path="commissions" element={<CommissionSettingsPage />} />
                           <Route path="product-lines" element={<ProductLinesManagementPage />} />
                           <Route path="collections" element={<CollectionsManagementPage />} />
+                          <Route path="featured" element={<FeaturedCardsAdminPage />} />
+                          <Route path="all-listings" element={<ListingsManagementPage />} />
                         </Route>
                         
                         {/* --- CATCH-ALL 404 ROUTE --- */}
