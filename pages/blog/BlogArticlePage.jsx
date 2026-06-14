@@ -7,16 +7,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { generateBlogPostingSchema, generateFAQStructuredData } from '@/utils/seoUtils.js';
 
-const CATEGORY_BADGE_COLOURS = {
-  'Market Watch':       'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
-  'Investment Outlook': 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
-  'Set Analysis':       'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300',
-  'Rookie Report':      'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300',
-  'Industry News':      'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300',
-  'Collector Insights': 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300',
-  'Population Report':  'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
-  'Parallel Spotlight': 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300',
-};
+const VALID_CATEGORIES = new Set([
+  'Market Watch', 'Investment Outlook', 'Set Analysis', 'Rookie Report',
+  'Industry News', 'Collector Insights', 'Population Report', 'Parallel Spotlight',
+]);
 
 const formatPublishedDate = (dateStr) => {
   if (!dateStr) return null;
@@ -165,52 +159,69 @@ const BlogArticlePage = () => {
         structuredData={structuredDataArray.length === 1 ? structuredDataArray[0] : structuredDataArray}
       />
 
-      {/* Parallel Report masthead */}
-      <div className="border-b border-border bg-background">
-        <div className="container-default max-w-4xl mx-auto pt-10 pb-8">
-          <Link to="/blog" className="inline-flex items-center text-xs font-medium text-muted-foreground hover:text-foreground transition-colors group mb-6">
+      {/* Parallel Report masthead — charcoal hero, CardPop Red accents */}
+      <div className="bg-brand-charcoal text-white">
+        <div className="container-default max-w-4xl mx-auto pt-8 pb-10">
+
+          {/* Back link */}
+          <Link to="/blog" className="inline-flex items-center text-xs font-medium text-white/50 hover:text-white/90 transition-colors group mb-8">
             <ArrowLeft className="w-3.5 h-3.5 mr-1.5 group-hover:-translate-x-1 transition-transform duration-300" />
             Back to The Parallel Report
           </Link>
 
-          <div className="flex items-baseline gap-2.5 mb-1">
-            <span className="text-xs font-bold tracking-[0.18em] uppercase text-muted-foreground">CardPop</span>
-            <span className="text-muted-foreground/40 text-xs">/</span>
-            <span className="text-xs font-bold tracking-[0.18em] uppercase text-foreground">The Parallel Report</span>
+          {/* Publication identity */}
+          <div className="flex items-center gap-3 mb-1">
+            {/* Slab-inspired badge */}
+            <div className="border border-white/20 rounded px-2.5 py-1 flex items-center gap-1.5 shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-brand-red inline-block" />
+              <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/80">CardPop Research</span>
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground tracking-widest uppercase mb-6">
+
+          <h2 className="font-heading text-2xl md:text-3xl font-extrabold tracking-tight text-white mb-1">
+            The Parallel Report
+          </h2>
+          <p className="text-xs tracking-widest uppercase text-white/40 mb-2">
             Research &bull; Analysis &bull; Market Intelligence
           </p>
+          <p className="text-sm text-white/55 mb-7">
+            Exploring the stories, trends and data shaping the hobby.
+          </p>
 
-          <div className="border-t border-border pt-6 mb-6" />
+          {/* Divider */}
+          <div className="border-t border-white/10 mb-7" />
 
-          {article.category && (
-            <span className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full mb-4 ${CATEGORY_BADGE_COLOURS[article.category] || 'bg-muted text-muted-foreground'}`}>
+          {/* Category badge */}
+          {article.category && VALID_CATEGORIES.has(article.category) && (
+            <span className="inline-block text-[11px] font-bold tracking-widest uppercase px-3 py-1 rounded mb-5"
+                  style={{ background: '#CE1126', color: '#fff' }}>
               {article.category}
             </span>
           )}
 
-          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-5 text-balance leading-tight">
+          {/* Article title */}
+          <h1 className="font-heading text-3xl md:text-4xl lg:text-[2.75rem] font-extrabold leading-tight text-white mb-5 text-balance">
             {article.title}
           </h1>
 
+          {/* Excerpt */}
           {article.excerpt && (
-            <p className="text-base text-muted-foreground leading-relaxed mb-6 max-w-2xl">
+            <p className="text-base text-white/65 leading-relaxed mb-7 max-w-2xl">
               {article.excerpt}
             </p>
           )}
 
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span>By <span className="font-medium text-foreground">{article.author || 'CardPop Research'}</span></span>
+          {/* Byline */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-white/45">
+            <span>By <span className="font-semibold text-white/80">{article.author || 'CardPop Research'}</span></span>
             {(article.published_at || article.created_at) && (
               <>
-                <span className="text-muted-foreground/40">&bull;</span>
-                <span>Published {formatPublishedDate(article.published_at || article.created_at)}</span>
+                <span className="text-white/20">&bull;</span>
+                <span>{formatPublishedDate(article.published_at || article.created_at)}</span>
               </>
             )}
           </div>
 
-          <div className="border-t border-border mt-6" />
         </div>
       </div>
 
@@ -222,7 +233,7 @@ const BlogArticlePage = () => {
         </div>
       )}
 
-      <div className="w-full mb-24">
+      <div className="w-full mt-10 mb-24">
         {htmlContent ? (
           <div
             className="article-content w-full max-w-4xl mx-auto prose prose-neutral dark:prose-invert px-4"
