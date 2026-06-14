@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, Sparkles, Loader2,
-  Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp,
+  Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -65,8 +65,8 @@ const AddEditCardPage = () => {
   const [saving, setSaving]             = useState(false);
   const [imageFile, setImageFile]       = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const [extraFiles, setExtraFiles]     = useState([null, null]);
-  const [extraPreviews, setExtraPreviews] = useState([null, null]);
+  const [extraFiles, setExtraFiles]     = useState([null, null, null, null, null]);
+  const [extraPreviews, setExtraPreviews] = useState([null, null, null, null, null]);
   const [errors, setErrors]             = useState({});
   const [isAutoFilled, setIsAutoFilled] = useState(false);
   // Hierarchy selection
@@ -239,7 +239,8 @@ const AddEditCardPage = () => {
           const urls = card.card_images.map(p =>
             p.startsWith('http') ? p : supabase.storage.from('vault-images').getPublicUrl(p).data.publicUrl
           );
-          if (!cancelled) setExtraPreviews([urls[0] ?? null, urls[1] ?? null]);
+          const filled = Array.from({ length: 5 }, (_, i) => urls[i] ?? null);
+          if (!cancelled) setExtraPreviews(filled);
         }
       } catch {
         if (!cancelled) {
@@ -447,8 +448,8 @@ const AddEditCardPage = () => {
               setFormData({ ...emptyForm, collection: formData.collection });
               setImageFile(null);
               setImagePreview(null);
-              setExtraFiles([null, null]);
-              setExtraPreviews([null, null]);
+              setExtraFiles([null, null, null, null, null]);
+              setExtraPreviews([null, null, null, null, null]);
               setErrors({});
               setIsAutoFilled(false);
               clearScan();
@@ -522,6 +523,60 @@ const AddEditCardPage = () => {
                     onChange={handleImageChange}
                     className="absolute inset-0 opacity-0 cursor-pointer"
                   />
+                </div>
+
+                {/* Extra image slots — up to 5 additional photos */}
+                <div className="mt-4">
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">Additional Photos (up to 5)</p>
+                  <div className="grid grid-cols-5 gap-2">
+                    {extraFiles.map((_, idx) => (
+                      <div key={idx} className="aspect-square">
+                        {extraPreviews[idx] ? (
+                          <div className="relative w-full h-full rounded-lg overflow-hidden border-2 border-primary/30 group">
+                            <img
+                              src={extraPreviews[idx]}
+                              alt={`Extra ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nf = [...extraFiles]; nf[idx] = null;
+                                const np = [...extraPreviews]; np[idx] = null;
+                                setExtraFiles(nf); setExtraPreviews(np);
+                              }}
+                              className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="w-2.5 h-2.5 text-white" />
+                            </button>
+                          </div>
+                        ) : (
+                          <label className="flex w-full h-full rounded-lg border-2 border-dashed border-border bg-muted/30 items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors">
+                            <Plus className="w-4 h-4 text-muted-foreground" />
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              className="sr-only"
+                              onChange={(e) => {
+                                const file = e.target.files[0];
+                                if (!file) return;
+                                if (file.size > 5242880) { toast.error('Image must be less than 5MB'); return; }
+                                const nf = [...extraFiles]; nf[idx] = file;
+                                setExtraFiles(nf);
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  const np = [...extraPreviews]; np[idx] = reader.result;
+                                  setExtraPreviews(np);
+                                };
+                                reader.readAsDataURL(file);
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Unified AI Analysis */}

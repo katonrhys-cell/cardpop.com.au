@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ShoppingCart, ShieldCheck, BarChart3 } from 'lucide-react';
 import PSAPopPanel from '@/components/PSAPopPanel.jsx';
+import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 
 const VaultListingDetailPage = () => {
   const { itemId } = useParams();
@@ -99,10 +100,10 @@ const VaultListingDetailPage = () => {
   const structuredData = generateStructuredData(listing);
   const title = vi?.card_name || 'Card Listing';
   const price = listing.price_aud || vi?.estimated_value_aud || 0;
-  const rawPath = vi?.card_image || vi?.vault_images?.[0]?.storage_path || null;
-  const imageUrl = rawPath
-    ? (rawPath.startsWith('http') ? rawPath : supabase.storage.from('vault-images').getPublicUrl(rawPath).data.publicUrl)
-    : '/placeholder-card.png';
+  const allImages = [];
+  if (vi?.card_image) allImages.push(vi.card_image);
+  if (vi?.card_images?.length) vi.card_images.forEach(p => { if (p) allImages.push(p); });
+  if (vi?.vault_images?.length) vi.vault_images.forEach(img => { if (img.storage_path && !allImages.includes(img.storage_path)) allImages.push(img.storage_path); });
 
   const breadcrumbs = [
     { label: 'Home', path: '/' },
@@ -122,12 +123,8 @@ const VaultListingDetailPage = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mt-8">
         {/* Image Gallery */}
-        <div className="bg-muted/30 p-8 rounded-3xl border border-border flex items-center justify-center">
-          <img 
-            src={imageUrl} 
-            alt={title}
-            className="w-full max-w-md h-auto object-contain rounded-xl drop-shadow-xl"
-          />
+        <div>
+          <ProductImageCarousel images={allImages} />
         </div>
 
         {/* Details */}

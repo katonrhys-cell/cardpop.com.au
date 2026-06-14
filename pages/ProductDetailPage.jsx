@@ -60,8 +60,11 @@ const ProductDetailPage = () => {
           const vi = listing.vault_item;
           const images = [];
           if (vi?.card_image) images.push(vi.card_image);
+          if (vi?.card_images?.length) {
+            vi.card_images.forEach(p => { if (p) images.push(p); });
+          }
           if (vi?.vault_images?.length) {
-            vi.vault_images.forEach(img => { if (img.storage_path) images.push(img.storage_path); });
+            vi.vault_images.forEach(img => { if (img.storage_path && !images.includes(img.storage_path)) images.push(img.storage_path); });
           }
 
           const listingTypeMap = { fixed: 'For Sale', auction: 'For Sale', trade: 'For Trade', vault: 'Private' };
