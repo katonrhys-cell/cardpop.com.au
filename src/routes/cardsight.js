@@ -38,13 +38,29 @@ router.post(
     }
 
     const client = getCardSightClient();
-    const imageBuffer = req.files[0].buffer;
+    const file = req.files[0];
+    // Wrap the buffer in a File so the multipart part carries the validated
+    // MIME type and a filename — a bare buffer is sent as application/octet-stream,
+    // which CardSight can fail to process.
+    const image = new File(
+      [file.buffer],
+      file.originalname || `card.${file.detectedExt ?? 'jpg'}`,
+      { type: file.mimetype }
+    );
 
     // 1. Identify the card
-    const { data: identifyResult } = await client.identify.card(imageBuffer);
+    const { data: identifyResult } = await client.identify.card(image);
 
     if (!identifyResult?.detections?.length) {
-      return res.json({ identified: false, message: 'No card detected in the image.' });
+      logger.info(
+        `[CARDSIGHT] No detections: requestId=${identifyResult?.requestId} success=${identifyResult?.success} ` +
+        `processingTime=${identifyResult?.processingTime} messages=${JSON.stringify(identifyResult?.messages ?? [])}`
+      );
+      return res.json({
+        identified: false,
+        message: 'No card detected in the image.',
+        serverMessages: identifyResult?.messages ?? [],
+      });
     }
 
     const best = getHighestConfidenceDetection(identifyResult);

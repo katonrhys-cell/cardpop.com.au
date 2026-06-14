@@ -38,10 +38,12 @@ const SellerCard = ({ seller }) => {
       {/* 1. Circular Avatar (Left) */}
       <div className="shrink-0 relative">
         {avatarUrl ? (
-          <img 
-            src={avatarUrl} 
-            alt={`${seller.name || 'Seller'} avatar`} 
+          <img
+            src={avatarUrl}
+            alt={`${seller.name || 'Seller'} avatar`}
             className="w-[80px] h-[80px] rounded-full object-cover ring-2 ring-offset-2 ring-transparent group-hover:ring-primary/20 transition-all"
+            width="80"
+            height="80"
           />
         ) : (
           <div className="w-[80px] h-[80px] rounded-full bg-background flex items-center justify-center ring-2 ring-offset-2 ring-transparent group-hover:ring-primary/20 transition-all">

@@ -20,6 +20,8 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 import { useCategories } from '@/hooks/useCategories.js';
 import { toast } from 'sonner';
 import VaultListingModal from '@/components/VaultListingModal.jsx';
+import ShopProductForm from '@/components/ShopProductForm.jsx';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const StatCard = ({ title, value, icon: Icon, trend, description, loading }) => (
   <Card className="shadow-sm border-border hover:border-primary/40 transition-colors">
@@ -75,6 +77,7 @@ const AdminDashboard = () => {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [isShopModalOpen, setIsShopModalOpen] = useState(false);
   
   // Category Filtering
   const [nameMap, setNameMap] = useState({});
@@ -129,7 +132,7 @@ const AdminDashboard = () => {
       try {
         let vaultQuery = supabase
           .from('vault_items')
-          .select('*, profiles!vault_items_owner_id_fkey(username, display_name)', { count: 'exact' })
+          .select('*, profiles(display_name, full_name)', { count: 'exact' })
           .order('created_at', { ascending: false })
           .range(0, 19);
 
@@ -224,9 +227,14 @@ const AdminDashboard = () => {
           <h1 className="text-3xl font-bold font-serif tracking-tight text-foreground mb-2">Platform Overview</h1>
           <p className="text-muted-foreground text-lg">System metrics and live administrative data.</p>
         </div>
-        <Button variant="outline" onClick={() => fetchRef.current?.()} disabled={loading} className="rounded-xl">
-          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setIsShopModalOpen(true)} className="rounded-xl font-bold">
+            <ShoppingCart className="w-4 h-4 mr-2" /> Add to Shop
+          </Button>
+          <Button variant="outline" onClick={() => fetchRef.current?.()} disabled={loading} className="rounded-xl">
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -252,7 +260,7 @@ const AdminDashboard = () => {
       <div className="space-y-6">
         <h2 className="text-2xl font-serif font-bold text-foreground">Core Management</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <ManagementBox title="Product Management" description="Oversee official catalog." icon={Package} link="/admin/products" />
+          <ManagementBox title="Shop Management" description="Add, edit and manage shop products." icon={ShoppingCart} link="/admin/products" />
           <ManagementBox title="Brands Management" description="Add game and sports brands." icon={Building2} link="/admin/brands" />
           <ManagementBox title="Category Management" description="Organize top-level categories." icon={FolderTree} link="/admin/categories" />
           <ManagementBox title="Subcategory Management" description="Manage nested subcategories." icon={Layers2} link="/admin/subcategories" />
@@ -348,7 +356,7 @@ const AdminDashboard = () => {
                 vaultProducts.map((vp) => {
                   const path = [nameMap[vp.category_id]].filter(Boolean).join(' > ');
                   const ownerProfile = vp.profiles;
-                  const ownerDisplay = ownerProfile?.display_name || ownerProfile?.username || vp.owner_id;
+                  const ownerDisplay = ownerProfile?.display_name || ownerProfile?.full_name || vp.owner_id;
                   return (
                     <TableRow key={vp.id}>
                       <TableCell className="font-bold px-6">{vp.card_name}</TableCell>
@@ -375,12 +383,27 @@ const AdminDashboard = () => {
         </CardContent>
       </Card>
 
-      <VaultListingModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        product={selectedProduct} 
+      <VaultListingModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        product={selectedProduct}
         onUpdate={() => fetchRef.current?.()}
       />
+
+      <Dialog open={isShopModalOpen} onOpenChange={setIsShopModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-background rounded-2xl border-border p-0">
+          <div className="p-8">
+            <DialogHeader className="mb-8">
+              <DialogTitle className="text-2xl font-bold font-serif text-foreground">Add Shop Product</DialogTitle>
+            </DialogHeader>
+            <ShopProductForm
+              product={null}
+              onSuccess={() => { setIsShopModalOpen(false); toast.success('Product added to shop!'); }}
+              onCancel={() => setIsShopModalOpen(false)}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

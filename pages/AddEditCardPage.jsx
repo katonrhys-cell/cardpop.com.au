@@ -97,7 +97,7 @@ const AddEditCardPage = () => {
     setName:        '',
     cardNumber:     '',
     year:           '',
-    variant:        '',
+    variant:        [],
     // Attributes
     isFoil:         false,
     isSealed:       false,
@@ -105,6 +105,8 @@ const AddEditCardPage = () => {
     isRefractor:    false,
     serialNumber:   '',
     isAuto:         false,
+    autoType:       '',
+    autoSigners:    1,
     // Grading
     gradingCompany: 'raw',
     grade:          '',
@@ -214,13 +216,15 @@ const AddEditCardPage = () => {
           setName:        card.set_name       || '',
           cardNumber:     card.card_number    || '',
           year:           card.year           ? String(card.year) : '',
-          variant:        card.variant        || '',
+          variant:        card.variant ? card.variant.split(',').map(s => s.trim()).filter(Boolean) : [],
           isFoil:         card.is_foil        ?? false,
           isSealed:       card.is_sealed      ?? false,
           isRookie:       card.is_rookie      ?? false,
           isRefractor:    card.is_refractor   ?? false,
           serialNumber:   card.serial_number  || '',
           isAuto:         card.is_auto        ?? false,
+          autoType:       card.auto_type      || '',
+          autoSigners:    card.auto_signers   ?? 1,
           gradingCompany: card.grading_company || 'raw',
           grade:          card.grade          || '',
           certNumber:     card.cert_number    || '',
@@ -283,14 +287,17 @@ const AddEditCardPage = () => {
   // Tracks whether results should be auto-applied (set true on button click)
   const isAnalysisMode = useRef(false);
 
-  const handleAnalyzeWithAI = () => {
+  const handleAnalyzeWithAI = async () => {
     if (!imageFile) return;
     isAnalysisMode.current = true;
     clearScan();
     clearCardSight();
-    // Run both CardSight identification and OCR scan in parallel
-    cardSightIdentify(imageFile);
-    scanCard(imageFile);
+    // Try CardSight catalog identification first
+    const csResult = await cardSightIdentify(imageFile);
+    // Only fall back to OCR if CardSight couldn't identify the card
+    if (!csResult?.identified) {
+      scanCard(imageFile);
+    }
   };
 
   // Auto-apply CardSight results when they arrive
@@ -306,6 +313,13 @@ const AddEditCardPage = () => {
       else if (cardSightResult.card?.name) fetchPricingByName(cardSightResult.card.name);
       setIsAutoFilled(true);
       toast.success('Card identified! Fields auto-filled from catalog.');
+    } else {
+      const advisory = cardSightResult.serverMessages?.[0]?.message;
+      toast.info(
+        advisory
+          ? `Catalog match not found: ${advisory}`
+          : 'No catalog match found — filling details from the image scan only.'
+      );
     }
   }, [cardSightResult]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -407,13 +421,15 @@ const AddEditCardPage = () => {
         set_name:            formData.setName?.trim()     || null,
         card_number:         formData.cardNumber?.trim()  || null,
         year:                formData.year ? parseInt(formData.year, 10) : null,
-        variant:             formData.variant             || null,
+        variant:             formData.variant.length ? formData.variant.join(', ') : null,
         is_foil:             formData.isFoil,
         is_sealed:           formData.isSealed,
         is_rookie:           formData.isRookie,
         is_refractor:        formData.isRefractor,
         serial_number:       formData.serialNumber?.trim() || null,
         is_auto:             formData.isAuto,
+        auto_type:           formData.isAuto ? (formData.autoType || null) : null,
+        auto_signers:        formData.isAuto ? (formData.autoSigners || 1) : null,
         grading_company:     formData.gradingCompany,
         grade:               isGraded ? (formData.grade?.trim() || null) : null,
         cert_number:         isGraded ? (formData.certNumber?.trim() || null) : null,
@@ -570,8 +586,15 @@ const AddEditCardPage = () => {
                     </div>
                   )}
 
+                  {/* No-match state — analysis finished but card not found */}
+                  {!isScanning && !isIdentifying && cardSightResult && !cardSightResult.identified && !scanResult && (
+                    <div className="p-3 rounded-xl border border-border bg-muted/30 animate-in fade-in">
+                      <p className="text-xs text-muted-foreground">Card not found in catalog. Try a clearer image or fill in the details manually.</p>
+                    </div>
+                  )}
+
                   {/* Combined AI results panel — shown after analysis completes */}
-                  {!isScanning && !isIdentifying && (cardSightResult || scanResult) && (
+                  {!isScanning && !isIdentifying && (cardSightResult?.identified || scanResult) && (
                     <div className={`p-3 rounded-xl border animate-in fade-in ${cardSightResult?.identified ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-primary/5 border-primary/20'}`}>
                       <h4 className={`text-xs font-bold mb-2 flex items-center gap-1.5 ${cardSightResult?.identified ? 'text-emerald-700' : 'text-primary'}`}>
                         <Sparkles className="w-3.5 h-3.5" />
@@ -770,28 +793,52 @@ const AddEditCardPage = () => {
                     />
                   </div>
 
-                  {/* Variant */}
-                  <div className="space-y-2">
-                    <Label className="font-bold">Card Variant / Finish</Label>
-                    <Select value={formData.variant || '__none__'} onValueChange={v => set('variant', v === '__none__' ? '' : v)}>
-                      <SelectTrigger className="h-11 bg-background">
-                        <SelectValue placeholder="Select variant…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">No variant</SelectItem>
-                        {VARIANT_GROUPS.map((group, gi) => (
-                          <React.Fragment key={group.label}>
-                            {gi > 0 && <SelectSeparator />}
-                            <div className="px-2 py-1.5 text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
-                              {group.label}
-                            </div>
-                            {group.variants.map(v => (
-                              <SelectItem key={v} value={v}>{v}</SelectItem>
-                            ))}
-                          </React.Fragment>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  {/* Variant / Finish — multi-select */}
+                  <div className="space-y-3 md:col-span-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="font-bold">Card Variant / Finish</Label>
+                      {formData.variant.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => set('variant', [])}
+                          className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+                        >
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground -mt-1">Select all that apply — scroll to see more</p>
+                    <div className="max-h-52 overflow-y-auto rounded-xl border border-border bg-muted/20 p-3 space-y-3">
+                      {VARIANT_GROUPS.map(group => (
+                        <div key={group.label}>
+                          <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground mb-1.5">{group.label}</p>
+                          <div className="flex flex-wrap gap-2">
+                            {group.variants.map(v => {
+                              const active = formData.variant.includes(v);
+                              return (
+                                <button
+                                  key={v}
+                                  type="button"
+                                  onClick={() => set('variant', active ? formData.variant.filter(x => x !== v) : [...formData.variant, v])}
+                                  className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
+                                    active
+                                      ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                                      : 'border-border bg-background text-foreground hover:border-muted-foreground/40'
+                                  }`}
+                                >
+                                  {active && <span className="mr-1">✓</span>}{v}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {formData.variant.length > 0 && (
+                      <p className="text-xs text-primary font-medium">
+                        Selected: {formData.variant.join(' · ')}
+                      </p>
+                    )}
                   </div>
 
                   {/* Condition */}
@@ -871,6 +918,68 @@ const AddEditCardPage = () => {
                         />
                       </div>
                     </div>
+
+                    {/* Auto sub-details — shown when Auto is toggled on */}
+                    {formData.isAuto && (
+                      <div className="mt-3 p-4 rounded-xl border-2 border-blue-400/30 bg-blue-400/5 space-y-4 animate-in fade-in slide-in-from-top-1">
+                        <p className="text-xs font-extrabold uppercase tracking-widest text-blue-700 dark:text-blue-400">Autograph Details</p>
+
+                        {/* Signature type */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Signature Type</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { value: 'on_card',    label: 'On-Card',            desc: 'Player signed the card directly' },
+                              { value: 'sticker',    label: 'Sticker / Label',    desc: 'Signed sticker affixed by manufacturer' },
+                              { value: 'cut',        label: 'Cut Signature',      desc: 'Historical signature embedded into the card' },
+                              { value: 'licensed',   label: 'Licensed / Certified', desc: 'Pulled from sealed box — authenticity guaranteed by manufacturer' },
+                              { value: 'in_person',  label: 'In-Person (IP)',     desc: 'Obtained directly from the player — may not include authentication' },
+                            ].map(({ value, label, desc }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('autoType', formData.autoType === value ? '' : value)}
+                                className={`flex flex-col items-start px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
+                                  formData.autoType === value
+                                    ? 'border-blue-500 bg-blue-500/10 text-blue-700 dark:text-blue-400 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                }`}
+                              >
+                                <span className="font-bold text-xs">{label}</span>
+                                <span className={`text-[10px] mt-0.5 leading-tight ${formData.autoType === value ? 'text-blue-600/70 dark:text-blue-400/70' : 'text-muted-foreground'}`}>{desc}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Number of signers */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Number of Signatures</Label>
+                          <div className="flex gap-2">
+                            {[
+                              { value: 1, label: 'Solo',   sub: '1 signature' },
+                              { value: 2, label: 'Dual',   sub: '2 signatures' },
+                              { value: 3, label: 'Triple', sub: '3 signatures' },
+                              { value: 4, label: 'Quad',   sub: '4 signatures' },
+                            ].map(({ value, label, sub }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('autoSigners', value)}
+                                className={`flex-1 flex flex-col items-center px-2 py-2.5 rounded-xl border-2 text-center transition-all ${
+                                  formData.autoSigners === value
+                                    ? 'border-blue-500 bg-blue-500/10 text-blue-700 dark:text-blue-400 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                }`}
+                              >
+                                <span className="font-bold text-sm">{label}</span>
+                                <span className={`text-[10px] mt-0.5 ${formData.autoSigners === value ? 'text-blue-600/70 dark:text-blue-400/70' : 'text-muted-foreground'}`}>{sub}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </SectionCard>

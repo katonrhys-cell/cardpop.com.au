@@ -170,6 +170,8 @@ const TrustedSellersCarousel = () => {
                       src={seller.avatar_url}
                       alt={`${seller.name || 'Seller'} avatar`}
                       className="w-24 h-24 rounded-2xl object-cover shadow-sm ring-4 ring-background"
+                      width="96"
+                      height="96"
                     />
                   ) : (
                     <div className="w-24 h-24 rounded-2xl bg-muted flex items-center justify-center shadow-sm ring-4 ring-background">

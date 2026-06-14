@@ -73,7 +73,8 @@ export function useCardOCR() {
       setScanResult(mapOCRResult(data));
       toast.success('Card scanned! Review the results below.');
     } catch (err) {
-      toast.error('Scan failed: ' + (err.message || 'Unknown error'));
+      // Non-fatal — OCR is a fallback; log but don't alarm the user
+      console.warn('[useCardOCR] scan failed:', err.message);
     } finally {
       setIsScanning(false);
     }

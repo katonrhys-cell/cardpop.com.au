@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input.jsx';
 import { Label } from '@/components/ui/label.jsx';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card.jsx';
 import { toast } from 'sonner';
-import { Loader2, ArrowRight, Mail, Lock, LockOpen } from 'lucide-react';
+import { Loader2, ArrowRight, Lock, LockOpen, Smartphone } from 'lucide-react';
 
 // ─── Lock animation variants ─────────────────────────────────────────────────
 const lockContainerVariants = {
@@ -103,14 +103,14 @@ const LoginPage = () => {
 
   const handleMfaSubmit = async (e) => {
     e.preventDefault();
-    if (mfaCode.length !== 8) {
-      toast.error('Please enter the 8-digit code sent to your email.');
+    if (mfaCode.length !== 6) {
+      toast.error('Please enter the 6-digit code from your authenticator app.');
       return;
     }
 
     setLoading(true);
     try {
-      await verifyMFACode(mfaData.mfaId, mfaData.otpId, mfaCode);
+      await verifyMFACode(mfaData.factorId, mfaCode);
       toast.success('Verification successful. Welcome back!');
       navigate(from, { replace: true });
     } catch (error) {
@@ -197,7 +197,7 @@ const LoginPage = () => {
               className="mt-2 text-base text-muted-foreground"
             >
               {mfaStep
-                ? 'Enter the 8-digit code sent to your email address.'
+                ? 'Enter the 6-digit code from your authenticator app.'
                 : 'Sign in to access your vault and marketplace.'}
             </motion.p>
           </div>
@@ -288,7 +288,7 @@ const LoginPage = () => {
                   <CardHeader className="space-y-1 pb-6 text-center">
                     <CardTitle className="text-xl">Security Check</CardTitle>
                     <CardDescription className="flex items-center justify-center gap-2">
-                      <Mail className="w-4 h-4" /> Code sent to {email}
+                      <Smartphone className="w-4 h-4" /> Open your authenticator app
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
@@ -298,9 +298,9 @@ const LoginPage = () => {
                         id="mfaCode"
                         type="text"
                         inputMode="numeric"
-                        pattern="\d{8}"
-                        maxLength={8}
-                        placeholder="••••••••"
+                        pattern="\d{6}"
+                        maxLength={6}
+                        placeholder="••••••"
                         value={mfaCode}
                         onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
                         required
@@ -309,7 +309,7 @@ const LoginPage = () => {
                         autoFocus
                       />
                       <p className="text-xs text-center text-muted-foreground mt-2">
-                        Enter the 8-digit code from your email
+                        Enter the 6-digit code from Google Authenticator, Authy, or similar
                       </p>
                     </div>
                   </CardContent>
@@ -317,7 +317,7 @@ const LoginPage = () => {
                     <Button
                       type="submit"
                       className="w-full font-bold h-12 text-base rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white"
-                      disabled={loading || mfaCode.length !== 8}
+                      disabled={loading || mfaCode.length !== 6}
                     >
                       {loading ? (
                         <Loader2 className="w-5 h-5 animate-spin" />

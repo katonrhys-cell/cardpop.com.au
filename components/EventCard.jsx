@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, MapPin, Clock, Users, Edit, Trash2, Info } from 'lucide-react';
+import { Calendar, MapPin, Clock, Users, Edit, Trash2, Info, ImageOff } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,8 +13,8 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete }) => {
   const formattedTime = formatEventTime(event);
   const formattedLocation = formatEventLocation(event);
 
-  const imageUrl = event.image_url || event.image
-    || 'https://images.unsplash.com/photo-1540317580384-e5d43616b9aa?q=80&w=800&auto=format&fit=crop';
+  const rawImageUrl = event.image_url || event.image || null;
+  const [imgError, setImgError] = useState(false);
 
   const handleRsvp = (e) => {
     e.stopPropagation();
@@ -26,12 +26,20 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete }) => {
   return (
     <Card className="flex flex-col overflow-hidden h-full shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl group border-border">
       <div className="relative h-48 w-full overflow-hidden bg-muted">
-        <img
-          src={imageUrl}
-          alt={eventTitle}
-          className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
-          loading="lazy"
-        />
+        {rawImageUrl && !imgError ? (
+          <img
+            src={rawImageUrl}
+            alt={eventTitle}
+            className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
+            loading="lazy"
+            onError={() => setImgError(true)}
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-muted to-muted/60">
+            <ImageOff className="w-8 h-8 text-muted-foreground opacity-40" />
+            <span className="text-xs text-muted-foreground font-medium">No image</span>
+          </div>
+        )}
         <div className="absolute top-3 left-3 flex gap-2">
           <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm text-foreground">{eventTypeLabel(event)}</Badge>
           {event.status === 'inactive' && (

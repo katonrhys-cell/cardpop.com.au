@@ -350,42 +350,42 @@ const MarketplacePage = () => {
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant={filterMode === 'All' ? 'default' : 'outline'}
-              className={`rounded-full px-5 font-bold ${filterMode === 'All' ? 'text-white shadow-md' : 'font-medium bg-background'}`}
+              className={`rounded-full px-5 font-bold ${filterMode === 'All' ? 'text-white shadow-md' : 'font-medium bg-background hover:bg-primary hover:text-white'}`}
               onClick={() => setFilterMode('All')}
             >
               All Listings
             </Button>
             <Button
               variant="outline"
-              className={`rounded-full px-5 font-bold ${filterMode === 'Auction' ? 'bg-brand-charcoal hover:bg-brand-charcoal/90 text-white shadow-md border-none' : 'bg-background hover:text-brand-charcoal hover:border-brand-charcoal'}`}
+              className={`rounded-full px-5 font-bold ${filterMode === 'Auction' ? 'bg-brand-charcoal hover:bg-brand-charcoal/90 text-white shadow-md border-none' : 'bg-background hover:bg-brand-charcoal hover:text-white hover:border-brand-charcoal'}`}
               onClick={() => setFilterMode('Auction')}
             >
               Auction
             </Button>
             <Button
               variant="outline"
-              className={`rounded-full px-5 font-bold ${filterMode === 'BuyNow' ? 'bg-[hsl(var(--vault-sale))] hover:bg-[hsl(var(--vault-sale))]/90 text-white shadow-md border-none' : 'bg-background hover:text-[hsl(var(--vault-sale))] hover:border-[hsl(var(--vault-sale))]'}`}
+              className={`rounded-full px-5 font-bold ${filterMode === 'BuyNow' ? 'bg-[hsl(var(--vault-sale))] hover:bg-[hsl(var(--vault-sale))]/90 text-white shadow-md border-none' : 'bg-background hover:bg-[hsl(var(--vault-sale))] hover:text-white hover:border-[hsl(var(--vault-sale))]'}`}
               onClick={() => setFilterMode('BuyNow')}
             >
               Buy Now
             </Button>
             <Button
               variant="outline"
-              className={`rounded-full px-5 font-bold ${filterMode === 'MakeOffer' ? 'bg-amber-700 hover:bg-amber-800 text-white shadow-md border-none' : 'bg-background hover:text-amber-700 hover:border-amber-700'}`}
+              className={`rounded-full px-5 font-bold ${filterMode === 'MakeOffer' ? 'bg-amber-700 hover:bg-amber-800 text-white shadow-md border-none' : 'bg-background hover:bg-amber-700 hover:text-white hover:border-amber-700'}`}
               onClick={() => setFilterMode('MakeOffer')}
             >
               Make an Offer
             </Button>
             <Button
               variant="outline"
-              className={`rounded-full px-5 font-bold ${filterMode === 'ForTrade' ? 'bg-[hsl(var(--vault-trade))] hover:bg-[hsl(var(--vault-trade))]/90 text-white shadow-md border-none' : 'bg-background hover:text-[hsl(var(--vault-trade))] hover:border-[hsl(var(--vault-trade))]'}`}
+              className={`rounded-full px-5 font-bold ${filterMode === 'ForTrade' ? 'bg-[hsl(var(--vault-trade))] hover:bg-[hsl(var(--vault-trade))]/90 text-white shadow-md border-none' : 'bg-background hover:bg-[hsl(var(--vault-trade))] hover:text-white hover:border-[hsl(var(--vault-trade))]'}`}
               onClick={() => setFilterMode('ForTrade')}
             >
               For Trade
             </Button>
             <Button
               variant="outline"
-              className={`rounded-full px-5 font-bold ${filterRookie ? 'bg-amber-400 text-amber-900 shadow-md border-none hover:bg-amber-400' : 'bg-background hover:text-amber-700 hover:border-amber-400'}`}
+              className={`rounded-full px-5 font-bold ${filterRookie ? 'bg-amber-500 text-white shadow-md border-none hover:bg-amber-600' : 'bg-background hover:bg-amber-500 hover:text-white hover:border-amber-500'}`}
               onClick={() => setFilterRookie(r => !r)}
             >
               🏅 Rookie Cards

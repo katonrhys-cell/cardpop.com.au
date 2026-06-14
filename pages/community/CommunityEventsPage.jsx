@@ -122,7 +122,7 @@ const CommunityEventsPage = () => {
       <SEOHead
         title="Trading Card Shows & TCG Events in Australia 2026 | CardPop"
         description="Australia's trading card event calendar — card shows, TCG expos, fairs and collector meets in Sydney, Melbourne, Brisbane, Adelaide and Perth. Dates, venues and tickets."
-        canonicalUrl={`${SITE_URL}/community/events`}
+        canonicalUrl={`${SITE_URL}/events`}
         structuredData={structuredData}
       />
 

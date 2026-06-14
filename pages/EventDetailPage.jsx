@@ -76,7 +76,7 @@ const EventDetailPage = () => {
             <h1 className="font-serif text-3xl font-bold mb-2 text-foreground">Event Not Found</h1>
             <p className="text-muted-foreground mb-6">The event you're looking for doesn't exist or has been removed.</p>
             <Button asChild className="rounded-xl">
-              <Link to="/community/events">
+              <Link to="/events">
                 <ArrowLeft className="w-4 h-4 mr-2" /> Back to Events
               </Link>
             </Button>
@@ -111,7 +111,7 @@ const EventDetailPage = () => {
       <SEOHead
         title={seoTitle}
         description={seoDescription}
-        canonicalUrl={`${SITE_URL}/community/events/${event.slug || event.id}`}
+        canonicalUrl={`${SITE_URL}/events/${event.slug || event.id}`}
         ogImage={event.image_url || undefined}
         structuredData={[buildEventJsonLd(event), buildBreadcrumbJsonLd(event)]}
       />
@@ -122,7 +122,7 @@ const EventDetailPage = () => {
           asChild
           className="mb-8 -ml-4 text-muted-foreground hover:bg-card hover:text-primary transition-colors rounded-xl"
         >
-          <Link to="/community/events">
+          <Link to="/events">
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to Calendar
           </Link>
         </Button>
