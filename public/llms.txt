@@ -6,7 +6,6 @@
 - [Add Your First Card | Card Pop](/addyourfirstcard): No description available
 - [Admin - Manage Events | CardPop](/eventsadmin): No description available
 - [Admin - Manage Featured Cards | CardPop](/featuredcardsadmin): No description available
-- [Admin - User Management | CardPop](/adminusers): No description available
 - [Analytics & Reports | Admin Portal](/analyticsreports): No description available
 - [Brand Management | Admin Portal](/brandsmanagement): No description available
 - [Category Mapping Tools | Admin](/categorymapping): No description available
@@ -37,7 +36,6 @@
 - [Secure Checkout | Card Pop](/checkout): No description available
 - [Security Settings | Card Pop](/securitysettings): No description available
 - [Security Settings | CardPop](/accountsecurity): No description available
-- [Seller Dashboard | CardPop](/sellerdashboard): No description available
 - [Seller Tier | CardPop](/accountsellertier): No description available
 - [Subcategory Management | Admin Portal](/subcategorymanagement): No description available
 - [System Diagnostics | Admin](/systemdiagnostics): No description available

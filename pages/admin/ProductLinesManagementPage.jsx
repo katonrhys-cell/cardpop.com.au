@@ -42,7 +42,6 @@ const ProductLinesManagementPage = () => {
 
   const fetchData = async (showToast = false) => {
     setLoading(true);
-    console.log('[DEBUG] Fetching product lines and brands data...');
     try {
       const { data: allCats } = await supabase.from('categories').select('*').order('sort_order');
       const topLevel = (allCats ?? []).filter(c => !c.parent_id);
@@ -52,7 +51,7 @@ const ProductLinesManagementPage = () => {
       setError(null);
       if (showToast) toast.success('Product lines refreshed');
     } catch (err) {
-      console.error('[DEBUG] Failed to fetch data:', err);
+      console.error('[ProductLinesManagementPage] Failed to fetch data:', err);
       setError("Failed to load product lines from database. Please check your connection.");
       if (showToast) toast.error('Failed to refresh data');
     } finally {

@@ -23,7 +23,6 @@ import wishlistRouter from './wishlist.js';
 import recommendationsRouter from './recommendations.js';
 import priceHistoryRouter from './price-history.js';
 import newsletterRouter from './newsletter.js';
-import cardSightRouter from './cardsight.js';
 import marketDataRouter from './market-data.js';
 
 const router = Router();
@@ -44,10 +43,6 @@ export default () => {
     // ID verification name extraction
     router.use('/id-verification', idVerificationRouter);
 
-    // CardSight AI identification, catalog, and pricing routes
-    router.use('/cardsight', apiLimiter);
-    router.use('/cardsight', cardSightRouter);
-    
     // Event scraper routes with API rate limiting
     router.use('/event-scraper', apiLimiter);
     router.use('/event-scraper', eventScraperRouter);
@@ -61,7 +56,7 @@ export default () => {
     router.use('/ebay', apiLimiter);
     router.use('/ebay', ebayRouter);
 
-    // CardSight routes with API rate limiting
+    // CardSight AI identification, catalog, and pricing routes
     router.use('/cardsight', apiLimiter);
     router.use('/cardsight', cardsightRouter);
     

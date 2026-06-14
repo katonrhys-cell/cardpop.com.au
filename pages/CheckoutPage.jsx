@@ -4,7 +4,6 @@ import { Helmet } from 'react-helmet';
 import { useCart } from '@/hooks/useCart.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
-import pb from '@/lib/pocketbaseClient.js';
 import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 
@@ -50,11 +49,14 @@ const CheckoutPage = () => {
     const initDirectCheckout = async () => {
       if (cardId && source === 'Vault') {
         try {
-          const card = await pb.collection('vault_items').getOne(cardId, { expand: 'vault_images' });
-          const images = card.expand?.vault_images || [];
-          const imageUrl = images[0]
-            ? pb.getFileUrl(images[0], images[0].image)
-            : null;
+          const { data: card, error } = await supabase
+            .from('vault_items')
+            .select('*, vault_images(*)')
+            .eq('id', cardId)
+            .single();
+          if (error) throw error;
+          const images = card.vault_images || [];
+          const imageUrl = images[0]?.image_url || resolveImg(images[0]?.image) || null;
           if (!cancelled) setDirectItem({
             product: {
               id: card.id,
@@ -65,7 +67,8 @@ const CheckoutPage = () => {
             quantity: 1,
             variant: null,
           });
-        } catch {
+        } catch (err) {
+          console.error('[CheckoutPage] Failed to load vault item:', err);
           if (!cancelled) {
             toast.error('Item not found or unavailable');
             navigate('/browse');
