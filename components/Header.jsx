@@ -447,10 +447,10 @@ const CommunityDropdown = ({ onNavigate }) => {
 };
 
 const EVENT_ITEMS = [
-  { type: 'card_show',       label: 'Card Shows',       desc: 'Trading card fairs and expos',        Icon: Ticket,          gradient: 'from-red-500 to-rose-600'      },
-  { type: 'trade_event',     label: 'Trade Events',     desc: 'Swap meets and trading nights',       Icon: Handshake,       gradient: 'from-blue-500 to-indigo-600'   },
-  { type: 'community_event', label: 'Community Events', desc: 'Collector meetups and community fun', Icon: Users,           gradient: 'from-violet-500 to-purple-600' },
-  { type: 'lgs_event',       label: 'Store Events',     desc: 'Local game store tournaments',        Icon: Store,           gradient: 'from-amber-500 to-orange-500'  },
+  { href: '/events/card-shows',       label: 'Card Shows',       desc: 'Trading card fairs and expos',        Icon: Ticket,    gradient: 'from-red-500 to-rose-600'      },
+  { href: '/events/trade-events',     label: 'Trade Events',     desc: 'Swap meets and trading nights',       Icon: Handshake, gradient: 'from-blue-500 to-indigo-600'   },
+  { href: '/events/community-events', label: 'Community Events', desc: 'Collector meetups and community fun', Icon: Users,     gradient: 'from-violet-500 to-purple-600' },
+  { href: '/events/store-events',     label: 'Store Events',     desc: 'Local game store tournaments',        Icon: Store,     gradient: 'from-amber-500 to-orange-500'  },
 ];
 
 // ─── Events dropdown ──────────────────────────────────────────────────────────
@@ -490,8 +490,8 @@ const EventsDropdown = ({ onNavigate }) => {
           <div className="p-3 grid gap-0.5">
             {EVENT_ITEMS.map(item => (
               <Link
-                key={item.type}
-                to={`/events?type=${item.type}`}
+                key={item.href}
+                to={item.href}
                 onClick={() => { setOpen(false); onNavigate?.(); }}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
               >
@@ -584,9 +584,9 @@ const MobileEventsSection = ({ onNavigate }) => {
             </Link>
           </SheetClose>
           {EVENT_ITEMS.map(item => (
-            <SheetClose key={item.type} asChild>
+            <SheetClose key={item.href} asChild>
               <Link
-                to={`/events?type=${item.type}`}
+                to={item.href}
                 onClick={onNavigate}
                 className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
               >
