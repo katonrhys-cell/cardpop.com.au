@@ -622,31 +622,32 @@ const Header = () => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
-  // Failsafe: Radix Dialog/DropdownMenu sets `pointer-events: none` on <body>
-  // while open and can leave it behind when the close animation is interrupted
-  // by navigation. The route-change timer below handles the normal case.
-  // The MutationObserver handles the deadlock case: pointer events are stuck,
-  // the user can't navigate, so the route never changes and the timer never fires.
+  // Failsafe: Radix Dialog/Sheet uses @radix-ui/react-remove-scroll which sets
+  // overflow:hidden (and sometimes pointer-events:none) on <body> while open.
+  // If the user navigates away while a Dialog/Sheet is open (e.g. VaultListingModal),
+  // the component unmounts mid-animation and leaves stale body styles behind.
+  // This causes the next page's scroll to be locked at the previous page's position,
+  // making the new page appear blank even though it rendered correctly.
   useEffect(() => {
-    const clearStalePointerEvents = () => {
-      if (document.body.style.pointerEvents !== 'none') return;
+    const clearStaleBodyStyles = () => {
       const hasOpenLayer = document.querySelector(
         '[data-state="open"][role="dialog"], [data-state="open"][role="menu"], [data-radix-popper-content-wrapper]'
       );
       if (!hasOpenLayer) {
-        document.body.style.pointerEvents = '';
-        document.body.style.overflow = '';
+        if (document.body.style.pointerEvents === 'none') document.body.style.pointerEvents = '';
+        if (document.body.style.overflow === 'hidden') document.body.style.overflow = '';
+        if (document.body.style.paddingRight) document.body.style.paddingRight = '';
       }
     };
 
     // Watch for any style change on body and fix it after animations settle
     const observer = new MutationObserver(() => {
-      setTimeout(clearStalePointerEvents, 350);
+      setTimeout(clearStaleBodyStyles, 350);
     });
     observer.observe(document.body, { attributes: true, attributeFilter: ['style'] });
 
     // Periodic sweep as a last resort (500ms is imperceptible to users)
-    const interval = setInterval(clearStalePointerEvents, 500);
+    const interval = setInterval(clearStaleBodyStyles, 500);
 
     return () => {
       observer.disconnect();
@@ -654,15 +655,19 @@ const Header = () => {
     };
   }, []);
 
-  // Also clear 400ms after route/menu changes (original behaviour, kept for completeness)
+  // Clear stale body styles immediately on every route change, and again after
+  // 400ms to catch anything that the close animation set after the route changed.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const openLayer = document.querySelector('[data-state="open"][role="dialog"], [data-state="open"][role="menu"]');
-      if (!openLayer && document.body.style.pointerEvents === 'none') {
-        document.body.style.pointerEvents = '';
-        document.body.style.overflow = '';
+    const clearStaleBodyStyles = () => {
+      const hasOpenLayer = document.querySelector('[data-state="open"][role="dialog"], [data-state="open"][role="menu"]');
+      if (!hasOpenLayer) {
+        if (document.body.style.pointerEvents === 'none') document.body.style.pointerEvents = '';
+        if (document.body.style.overflow === 'hidden') document.body.style.overflow = '';
+        if (document.body.style.paddingRight) document.body.style.paddingRight = '';
       }
-    }, 400);
+    };
+    clearStaleBodyStyles();
+    const timer = setTimeout(clearStaleBodyStyles, 400);
     return () => clearTimeout(timer);
   }, [location.pathname, mobileMenuOpen]);
 
