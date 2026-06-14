@@ -1,11 +1,18 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, MapPin, Clock, Users, Edit, Trash2, Info, ImageOff } from 'lucide-react';
+import { Calendar, MapPin, Clock, Users, Edit, Trash2, Info, ImageOff, Ticket, Handshake, Store } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { eventPath, eventTypeLabel, formatEventDate, formatEventTime, formatEventLocation } from '@/lib/eventSeo.js';
 import { toast } from 'sonner';
+
+const EVENT_TYPE_STYLES = {
+  card_show:       { gradient: 'from-red-500 to-rose-600',       Icon: Ticket    },
+  trade_event:     { gradient: 'from-blue-500 to-indigo-600',    Icon: Handshake },
+  community_event: { gradient: 'from-violet-500 to-purple-600',  Icon: Users     },
+  lgs_event:       { gradient: 'from-amber-500 to-orange-500',   Icon: Store     },
+};
 
 const EventCard = ({ event, isAdmin, onView, onEdit, onDelete }) => {
   const eventTitle = event.title || event.name;
@@ -41,7 +48,21 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete }) => {
           </div>
         )}
         <div className="absolute top-3 left-3 flex gap-2">
-          <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm text-foreground">{eventTypeLabel(event)}</Badge>
+          {(() => {
+            const style = EVENT_TYPE_STYLES[event.event_type];
+            if (style) {
+              const { gradient, Icon } = style;
+              return (
+                <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r ${gradient} text-white text-xs font-bold shadow-sm backdrop-blur-sm`}>
+                  <Icon className="w-3 h-3" />
+                  {eventTypeLabel(event)}
+                </span>
+              );
+            }
+            return (
+              <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm text-foreground">{eventTypeLabel(event)}</Badge>
+            );
+          })()}
           {event.status === 'inactive' && (
             <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm text-foreground">Inactive</Badge>
           )}
