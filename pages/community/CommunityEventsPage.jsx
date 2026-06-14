@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { CalendarDays, Search, MapPin, SlidersHorizontal, X } from 'lucide-react';
 import { format } from 'date-fns';
@@ -20,13 +20,19 @@ const todayStr = new Date().toISOString().split('T')[0];
 const nextYearStr = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
 const CommunityEventsPage = () => {
+  const [searchParams] = useSearchParams();
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterState, setFilterState] = useState('all');
-  const [filterType, setFilterType] = useState('all');
+  const [filterType, setFilterType] = useState(() => searchParams.get('type') || 'all');
+
+  // Sync filter when URL query param changes (e.g. clicking a different event type from the nav)
+  useEffect(() => {
+    setFilterType(searchParams.get('type') || 'all');
+  }, [searchParams]);
   const [startDate, setStartDate] = useState(todayStr);
   const [endDate, setEndDate] = useState(nextYearStr);
 
