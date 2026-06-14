@@ -34,11 +34,18 @@ const SEOHead = ({ title, description, canonicalUrl, ogImage, structuredData }) 
       {resolvedOgImage && <meta name="twitter:image" content={resolvedOgImage} />}
 
       {/* Structured Data JSON-LD */}
-      {structuredData && (
-        <script type="application/ld+json">
-          {JSON.stringify(structuredData)}
-        </script>
-      )}
+      {structuredData && (() => {
+        const items = Array.isArray(structuredData) ? structuredData.filter(Boolean) : [structuredData];
+        if (items.length === 0) return null;
+        const payload = items.length === 1
+          ? items[0]
+          : { '@context': 'https://schema.org', '@graph': items.map(({ '@context': _ctx, ...rest }) => rest) };
+        return (
+          <script type="application/ld+json">
+            {JSON.stringify(payload)}
+          </script>
+        );
+      })()}
     </Helmet>
   );
 };

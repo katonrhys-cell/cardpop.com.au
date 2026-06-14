@@ -300,6 +300,7 @@ const App = () => {
                         {/* Community & Blog */}
                         <Route path="/blog" element={<BlogPage />} />
                         <Route path="/blog/category/:category" element={<BlogCategoryPage />} />
+                        <Route path="/blog/slug/:slug" element={<BlogArticlePage />} />
                         <Route path="/blog/:id" element={<BlogArticlePage />} />
                         <Route path="/community" element={<CommunityPage />} />
                         <Route path="/community/forum" element={<ForumPage />} />

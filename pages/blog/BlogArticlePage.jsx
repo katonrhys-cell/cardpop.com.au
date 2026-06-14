@@ -5,10 +5,64 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, FileText } from 'lucide-react';
-import { generateBlogPostingSchema } from '@/utils/seoUtils.js';
+import { generateBlogPostingSchema, generateFAQStructuredData } from '@/utils/seoUtils.js';
+
+const CATEGORY_BADGE_COLOURS = {
+  'Market Watch':       'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+  'Investment Outlook': 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300',
+  'Set Analysis':       'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300',
+  'Rookie Report':      'bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300',
+  'Industry News':      'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300',
+  'Collector Insights': 'bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300',
+  'Population Report':  'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+  'Parallel Spotlight': 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300',
+};
+
+const formatPublishedDate = (dateStr) => {
+  if (!dateStr) return null;
+  try {
+    return new Date(dateStr).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric' });
+  } catch {
+    return null;
+  }
+};
+
+const FAQ_DATA = {
+  'psa-grading-guide-for-australian-collectors-2026': [
+    {
+      question: 'How much does PSA grading cost in Australia?',
+      answer: 'Through Australian PSA Certified Dealers, PSA grading costs range from approximately AUD $68 per card (Economy, ~95 business days) to AUD $370+ per card (Super Express, ~15 business days). Note: Direct PSA submissions from Australia are currently suspended (May 2026) due to US tariff changes — Australian dealers are the only submission route until PSA reinstates international access.'
+    },
+    {
+      question: 'What is the best PSA grade for an Australian collector?',
+      answer: 'PSA 9 (Mint) is the sweet spot for most Australian collectors — it represents near-perfect condition, commands strong resale value, and is achievable for most well-cared-for modern cards. PSA 10 (Gem Mint) commands 4–10× premium prices but only 2–5% of modern cards submitted achieve it.'
+    },
+    {
+      question: 'How do I submit cards for PSA grading in Australia?',
+      answer: 'The easiest way is through an Australian PSA Certified Dealer. The Hobby Australia (Point Cook, VIC) is the only PSA Certified Dealer in the Southern Hemisphere. Other popular local submission services include Card Bot (Melbourne + postal), Mana Market, One Stop Poke Shop, and Slabd. All handle shipping, insurance and customs on your behalf.'
+    },
+    {
+      question: 'How long does PSA grading take from Australia?',
+      answer: 'Through an Australian dealer on Economy tier, expect 95 business days (roughly 4–5 calendar months) at PSA, plus transit time to and from the US. Express tiers reduce PSA time to 15–35 business days but cost significantly more. Total door-to-door time including transit is typically 5–6 months on Economy.'
+    },
+    {
+      question: 'Is PSA grading worth it for Australian collectors?',
+      answer: 'PSA grading is worth it when: the card is likely to grade PSA 9 or PSA 10, the graded value significantly exceeds raw value plus grading fees, and the card is liquid enough to sell easily. It is generally not worth grading common modern cards under AUD $100 raw value, or cards likely to grade PSA 8 or below.'
+    },
+    {
+      question: 'What is the difference between PSA and BGS grading?',
+      answer: 'PSA uses whole-number grades 1–10 and is the gold standard for sports cards resale value in Australia. BGS (Beckett) uses half-point grades including BGS 9.5, provides four sub-grades (centering, corners, edges, surface), and has a Black Label 10 Pristine as its top designation. PSA commands higher resale prices for sports cards in Australia.'
+    }
+  ]
+};
+
+const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
 const BlogArticlePage = () => {
-  const { id } = useParams();
+  const { id, slug } = useParams();
+  const identifier = slug || id;
+  const bySlug = !!slug || (id && !isUUID(id));
+
   const [article, setArticle] = useState(null);
   const [htmlContent, setHtmlContent] = useState('');
   const [loading, setLoading] = useState(true);
@@ -21,7 +75,12 @@ const BlogArticlePage = () => {
       setLoading(true);
       setError(null);
       try {
-        const { data: res, error: fetchErr } = await supabase.from('blog_articles').select('*').eq('id', id).single();
+        let query = supabase.from('blog_articles').select('*');
+        query = bySlug
+          ? query.eq('slug', identifier).single()
+          : query.eq('id', identifier).single();
+
+        const { data: res, error: fetchErr } = await query;
         if (fetchErr) throw fetchErr;
         if (cancelled) return;
         setArticle(res);
@@ -29,16 +88,16 @@ const BlogArticlePage = () => {
 
         const { data: related } = await supabase
           .from('blog_articles')
-          .select('id, title, featured_image_url, content')
+          .select('id, slug, title, featured_image_url, excerpt, content')
           .eq('is_published', true)
-          .neq('id', id)
+          .neq('id', res.id)
           .order('created_at', { ascending: false })
           .limit(3);
         if (!cancelled) setRelatedArticles(related ?? []);
 
       } catch (err) {
-        console.error("Error loading article:", err);
-        if (!cancelled) setError("Article not found or unavailable.");
+        console.error('Error loading article:', err);
+        if (!cancelled) setError('Article not found or unavailable.');
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -46,7 +105,7 @@ const BlogArticlePage = () => {
     fetchArticleData();
     window.scrollTo({ top: 0, behavior: 'smooth' });
     return () => { cancelled = true; };
-  }, [id]);
+  }, [identifier, bySlug]);
 
   if (loading) {
     return (
@@ -77,51 +136,97 @@ const BlogArticlePage = () => {
   }
 
   const imageUrl = article.featured_image_url || null;
+  const articleSlug = article.slug;
+  const canonicalUrl = `https://cardpop.online/blog/slug/${articleSlug}`;
 
-  // Generate blog posting structured data
   const blogStructuredData = generateBlogPostingSchema({
-    title: article.title,
+    title: article.seo_title || article.title,
     image: article.featured_image_url,
-    author: article.author || 'CardPop Team',
-    publishedAt: article.created_at,
+    author: article.author || 'The Parallel Report',
+    publishedAt: article.published_at || article.created_at,
     updated: article.updated_at,
-    excerpt: article.excerpt
+    excerpt: article.seo_description || article.excerpt
   });
+
+  const faqData = articleSlug ? FAQ_DATA[articleSlug] : null;
+  const faqStructuredData = faqData
+    ? generateFAQStructuredData(faqData.map(f => ({ question: f.question, answer: f.answer })))
+    : null;
+
+  const structuredDataArray = [blogStructuredData, faqStructuredData].filter(Boolean);
 
   return (
     <article className="min-h-[100dvh] bg-background pb-24 overflow-x-hidden">
       <SEOHead
-        title={`${article.title} | CardPop Blog`}
-        description={article.excerpt || `Read ${article.title} on The Parallel Report — CardPop's trading card blog.`}
+        title={article.seo_title || `${article.title} | The Parallel Report`}
+        description={article.seo_description || article.excerpt || `Read ${article.title} on The Parallel Report — CardPop's trading card blog.`}
         ogImage={article.featured_image_url || undefined}
-        structuredData={blogStructuredData}
+        canonicalUrl={canonicalUrl}
+        structuredData={structuredDataArray.length === 1 ? structuredDataArray[0] : structuredDataArray}
       />
-      
-      <div className="container-default pt-12 pb-8">
-        <Link to="/blog" className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors group">
-          <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform duration-300" /> 
-          Back to The Parallel Report
-        </Link>
+
+      {/* Parallel Report masthead */}
+      <div className="border-b border-border bg-background">
+        <div className="container-default max-w-4xl mx-auto pt-10 pb-8">
+          <Link to="/blog" className="inline-flex items-center text-xs font-medium text-muted-foreground hover:text-foreground transition-colors group mb-6">
+            <ArrowLeft className="w-3.5 h-3.5 mr-1.5 group-hover:-translate-x-1 transition-transform duration-300" />
+            Back to The Parallel Report
+          </Link>
+
+          <div className="flex items-baseline gap-2.5 mb-1">
+            <span className="text-xs font-bold tracking-[0.18em] uppercase text-muted-foreground">CardPop</span>
+            <span className="text-muted-foreground/40 text-xs">/</span>
+            <span className="text-xs font-bold tracking-[0.18em] uppercase text-foreground">The Parallel Report</span>
+          </div>
+          <p className="text-xs text-muted-foreground tracking-widest uppercase mb-6">
+            Research &bull; Analysis &bull; Market Intelligence
+          </p>
+
+          <div className="border-t border-border pt-6 mb-6" />
+
+          {article.category && (
+            <span className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full mb-4 ${CATEGORY_BADGE_COLOURS[article.category] || 'bg-muted text-muted-foreground'}`}>
+              {article.category}
+            </span>
+          )}
+
+          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-5 text-balance leading-tight">
+            {article.title}
+          </h1>
+
+          {article.excerpt && (
+            <p className="text-base text-muted-foreground leading-relaxed mb-6 max-w-2xl">
+              {article.excerpt}
+            </p>
+          )}
+
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span>By <span className="font-medium text-foreground">{article.author || 'CardPop Research'}</span></span>
+            {(article.published_at || article.created_at) && (
+              <>
+                <span className="text-muted-foreground/40">&bull;</span>
+                <span>Published {formatPublishedDate(article.published_at || article.created_at)}</span>
+              </>
+            )}
+          </div>
+
+          <div className="border-t border-border mt-6" />
+        </div>
       </div>
 
       {imageUrl && (
-        <div className="container-default max-w-6xl mx-auto mb-12">
+        <div className="container-default max-w-4xl mx-auto mt-10 mb-4">
           <div className="aspect-[21/9] rounded-2xl overflow-hidden bg-muted shadow-lg">
              <img src={imageUrl} alt={article.title} className="w-full h-full object-cover" />
           </div>
         </div>
       )}
 
-      <div className="container-default max-w-6xl mx-auto mb-8">
-        <h1 className="text-4xl md:text-5xl font-bold mb-4 text-balance">{article.title}</h1>
-        <p className="text-muted-foreground font-medium">By {article.author || 'CardPop Team'}</p>
-      </div>
-
       <div className="w-full mb-24">
         {htmlContent ? (
-          <div 
+          <div
             className="article-content w-full max-w-4xl mx-auto prose prose-neutral dark:prose-invert px-4"
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(htmlContent) }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(htmlContent, { ADD_ATTR: ['target'] }) }}
           />
         ) : (
           <div className="container-default max-w-6xl mx-auto">
@@ -137,10 +242,11 @@ const BlogArticlePage = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
               {relatedArticles.map((related) => {
                 const relImg = related.featured_image_url || null;
+                const relLink = related.slug ? `/blog/slug/${related.slug}` : `/blog/${related.id}`;
                 return (
-                  <Link 
-                    key={related.id} 
-                    to={`/blog/${related.id}`} 
+                  <Link
+                    key={related.id}
+                    to={relLink}
                     className="group flex flex-col bg-card border border-border rounded-xl overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 h-full"
                   >
                     <div className="aspect-[16/9] bg-muted relative overflow-hidden">
@@ -157,7 +263,7 @@ const BlogArticlePage = () => {
                         {related.title}
                       </h3>
                       <p className="text-sm text-muted-foreground line-clamp-2">
-                        {related.content?.substring(0, 80)}...
+                        {related.excerpt || related.content?.substring(0, 80)}...
                       </p>
                     </div>
                   </Link>
