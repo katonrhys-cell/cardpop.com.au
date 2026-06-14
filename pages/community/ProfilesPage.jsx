@@ -28,7 +28,7 @@ const ProfilesPage = () => {
         .order('created_at', { ascending: false })
         .limit(60);
 
-      if (activeFilter === 'Verified') query = query.eq('is_verified', 'true');
+      if (activeFilter === 'Verified') query = query.eq('is_verified', true);
 
       const { data } = await query;
       setProfiles(data || []);

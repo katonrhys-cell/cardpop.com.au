@@ -68,7 +68,7 @@ const AccountEvents = () => {
         <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
         <p>
           Every submission is reviewed by the CardPop team before it appears on the{' '}
-          <Link to="/community/events" className="text-primary font-semibold hover:underline">public events calendar</Link>.
+          <Link to="/events" className="text-primary font-semibold hover:underline">public events calendar</Link>.
           You can edit your event while it&apos;s pending review.
         </p>
       </div>

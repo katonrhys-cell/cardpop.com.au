@@ -6,21 +6,8 @@ import {
   LayoutDashboard, Package, Users, Calendar, FileText, Building2, Layers, CheckCircle,
   Sun, Moon, ChevronDown, ArrowRight, Layers2, User, LogOut, Settings,
   FolderTree, ListOrdered, BarChart3, Store,
-  BookOpen, Globe, Star, Award, TrendingUp, Newspaper
+  BookOpen, Globe, Star, Award, TrendingUp, Newspaper, BadgeCheck
 } from 'lucide-react';
-
-const WhatnotIcon = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" className={className}>
-    <rect width="32" height="32" rx="8" fill="#00C854" />
-    <path
-      d="M5 9l4.5 14 4-9.5 2.5 5.5 2.5-5.5 4 9.5L27 9"
-      stroke="white"
-      strokeWidth="2.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
 import { useDarkMode } from '@/hooks/useDarkMode.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import CardPopLogo from '@/components/CardPopLogo.jsx';
@@ -33,6 +20,19 @@ import { Badge } from '@/components/ui/badge';
 import VaultDropdown from '@/components/VaultDropdown.jsx';
 import SearchBar from '@/components/SearchBar.jsx';
 import NotificationBell from '@/components/NotificationBell.jsx';
+
+const WhatnotIcon = ({ className = 'w-4 h-4' }) => (
+  <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" className={className}>
+    <rect width="32" height="32" rx="8" fill="#000000" />
+    <path
+      d="M5 9l4.5 14 4-9.5 2.5 5.5 2.5-5.5 4 9.5L27 9"
+      stroke="#FFDF00"
+      strokeWidth="2.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 
 export const TCG_COLLECTIONS = [
   'Pokemon', 'Magic: The Gathering', 'Yu-Gi-Oh', 'Digimon',
@@ -53,7 +53,7 @@ const BLOG_CATEGORIES = [
   { slug: 'australia-focus',  label: 'Australia Focus',   desc: 'Local TCG market and events',         Icon: Globe,     gradient: 'from-green-500 to-emerald-600' },
   { slug: 'beginner-guides',  label: 'Beginner Guides',   desc: 'Guides for new collectors',           Icon: BookOpen,  gradient: 'from-blue-500 to-indigo-600'   },
   { slug: 'card-spotlight',   label: 'Card Spotlight',    desc: 'Deep dives into iconic cards',         Icon: Star,      gradient: 'from-yellow-500 to-orange-500' },
-  { slug: 'grading-guides',   label: 'Grading Guides',    desc: 'Grading standards and preparation',   Icon: Award,     gradient: 'from-purple-500 to-violet-600' },
+  { slug: 'grading-guides',   label: 'Grading Hub',       desc: 'Grading standards and preparation',   Icon: Award,     gradient: 'from-purple-500 to-violet-600' },
   { slug: 'investing-value',  label: 'Investing & Value', desc: 'Investment strategies and valuation', Icon: TrendingUp, gradient: 'from-rose-500 to-pink-600'    },
   { slug: 'news-releases',    label: 'News & Releases',   desc: 'Latest TCG releases and industry news', Icon: Newspaper, gradient: 'from-cyan-500 to-sky-600'  },
 ];
@@ -64,7 +64,7 @@ const NAV_LINKS = [
   { label: 'Analytics', href: '/analytics' },
   { label: 'Blog', href: '/blog' },
   { label: 'Community', href: '/community' },
-  { label: 'Events', href: '/community/events' },
+  { label: 'Events', href: '/events' },
   { label: 'Grading', href: '/grading' },
   { label: 'About', href: '/about' },
 ];
@@ -170,19 +170,37 @@ const MobileBrowseSection = ({ onNavigate }) => {
   );
 };
 
-// ─── Browse Collections mega-dropdown ─────────────────────────────────────────
-const BrowseDropdown = ({ onNavigate }) => {
+// Shared open/close behaviour for the desktop hover dropdowns.
+// Hover-open must ignore non-mouse pointers: on touch screens a tap fires a
+// synthetic mouseenter immediately followed by click, so a plain
+// onMouseEnter+toggle pair opens the menu and instantly closes it again
+// (and the next tap does the opposite), making the menus feel dead.
+const useHoverDropdown = () => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const timerRef = useRef(null);
+  const openedByHover = useRef(false);
   const location = useLocation();
 
-  const handleMouseEnter = () => {
+  const handlePointerEnter = (e) => {
+    if (e.pointerType !== 'mouse') return;
     clearTimeout(timerRef.current);
+    if (!open) openedByHover.current = true;
     setOpen(true);
   };
-  const handleMouseLeave = () => {
+  const handlePointerLeave = (e) => {
+    if (e.pointerType !== 'mouse') return;
     timerRef.current = setTimeout(() => setOpen(false), 120);
+  };
+  const handleTriggerClick = () => {
+    // A click right after hover-open (mouse users clicking the trigger they
+    // just hovered) should keep the menu open, not toggle it shut.
+    if (open && openedByHover.current) {
+      openedByHover.current = false;
+      return;
+    }
+    openedByHover.current = false;
+    setOpen(o => !o);
   };
 
   // Close on outside click
@@ -199,17 +217,25 @@ const BrowseDropdown = ({ onNavigate }) => {
   useEffect(() => { setOpen(false); }, [location.pathname]);
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
+  useEffect(() => { setOpen(false); }, [location.pathname]);
+
+  return { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick };
+};
+
+// ─── Browse Collections mega-dropdown ─────────────────────────────────────────
+const BrowseDropdown = ({ onNavigate }) => {
+  const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
 
   return (
     <div
       className="relative"
       ref={ref}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={handlePointerLeave}
     >
       {/* Trigger */}
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={handleTriggerClick}
         aria-expanded={open}
         className={`flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
           open
@@ -294,30 +320,19 @@ const BrowseDropdown = ({ onNavigate }) => {
 
 // ─── Blog mega-dropdown ───────────────────────────────────────────────────────
 const BlogDropdown = ({ onNavigate }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
   const location = useLocation();
-  const timerRef = useRef(null);
   const isBlogActive = location.pathname.startsWith('/blog');
 
   const handleMouseEnter = () => { clearTimeout(timerRef.current); setOpen(true); };
   const handleMouseLeave = () => { timerRef.current = setTimeout(() => setOpen(false), 120); };
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
+  useEffect(() => () => clearTimeout(timerRef.current), []);
   useEffect(() => { setOpen(false); }, [location.pathname]);
 
-  useEffect(() => () => clearTimeout(timerRef.current), []);
-
   return (
-    <div className="relative" ref={ref} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+    <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={handleTriggerClick}
         aria-expanded={open}
         className={`flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
           open || isBlogActive
@@ -367,37 +382,23 @@ const BlogDropdown = ({ onNavigate }) => {
 };
 
 const COMMUNITY_ITEMS = [
-  { href: '/community/forum',     label: 'Forum',                   desc: 'Discussions and community posts',     Icon: MessageSquare, gradient: 'from-violet-500 to-purple-600' },
-  { href: '/community/profiles',  label: 'Profiles',                desc: 'Browse collector profiles',           Icon: Users,         gradient: 'from-sky-500 to-blue-600'     },
-  { href: '/community/retailers', label: 'Retailers & Suppliers',   desc: 'Find local shops and suppliers',      Icon: Store,         gradient: 'from-amber-500 to-orange-500' },
-  { href: '/community/whatnot',   label: 'Whatnot',                 desc: 'Live buying and selling shows',       Icon: WhatnotIcon,   gradient: 'from-green-500 to-emerald-600', isWhatnot: true },
+  { href: '/community/forum',          label: 'Forum',                 desc: 'Discussions and community posts',        Icon: MessageSquare, gradient: 'from-violet-500 to-purple-600'  },
+  { href: '/community/profiles',       label: 'Profiles',              desc: 'Browse collector profiles',              Icon: Users,         gradient: 'from-sky-500 to-blue-600'      },
+  { href: '/community/local-traders',  label: 'Local Traders',         desc: 'Endorsed sellers near you',              Icon: BadgeCheck,    gradient: 'from-emerald-500 to-teal-600'  },
+  { href: '/community/retailers',      label: 'Retailers & Suppliers', desc: 'Find local shops and suppliers',         Icon: Store,         gradient: 'from-amber-500 to-orange-500'  },
+  { href: '/community/whatnot',        label: 'Whatnot',               desc: 'Live buying and selling shows',          Icon: WhatnotIcon,   gradient: 'from-green-500 to-emerald-600', isWhatnot: true },
 ];
 
 // ─── Community mega-dropdown ──────────────────────────────────────────────────
 const CommunityDropdown = ({ onNavigate }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
   const location = useLocation();
-  const timerRef = useRef(null);
   const isCommunityActive = location.pathname.startsWith('/community');
 
-  const handleMouseEnter = () => { clearTimeout(timerRef.current); setOpen(true); };
-  const handleMouseLeave = () => { timerRef.current = setTimeout(() => setOpen(false), 120); };
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  useEffect(() => { setOpen(false); }, [location.pathname]);
-  useEffect(() => () => clearTimeout(timerRef.current), []);
-
   return (
-    <div className="relative" ref={ref} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+    <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={handleTriggerClick}
         aria-expanded={open}
         className={`flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
           open || isCommunityActive
@@ -550,7 +551,7 @@ const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout })
       >
         <div className="relative h-8 w-8 rounded-full overflow-hidden shrink-0 bg-primary/10 flex items-center justify-center">
           {currentUser.avatar_url ? (
-            <img src={currentUser.avatar_url} alt={currentUser.name} className="h-full w-full object-cover" />
+            <img src={currentUser.avatar_url} alt={currentUser.name} className="h-full w-full object-cover" width="32" height="32" />
           ) : (
             <User className="h-4 w-4 text-primary" />
           )}
@@ -620,6 +621,50 @@ const Header = () => {
   useEffect(() => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
+
+  // Failsafe: Radix Dialog/DropdownMenu sets `pointer-events: none` on <body>
+  // while open and can leave it behind when the close animation is interrupted
+  // by navigation. The route-change timer below handles the normal case.
+  // The MutationObserver handles the deadlock case: pointer events are stuck,
+  // the user can't navigate, so the route never changes and the timer never fires.
+  useEffect(() => {
+    const clearStalePointerEvents = () => {
+      if (document.body.style.pointerEvents !== 'none') return;
+      const hasOpenLayer = document.querySelector(
+        '[data-state="open"][role="dialog"], [data-state="open"][role="menu"], [data-radix-popper-content-wrapper]'
+      );
+      if (!hasOpenLayer) {
+        document.body.style.pointerEvents = '';
+        document.body.style.overflow = '';
+      }
+    };
+
+    // Watch for any style change on body and fix it after animations settle
+    const observer = new MutationObserver(() => {
+      setTimeout(clearStalePointerEvents, 350);
+    });
+    observer.observe(document.body, { attributes: true, attributeFilter: ['style'] });
+
+    // Periodic sweep as a last resort (500ms is imperceptible to users)
+    const interval = setInterval(clearStalePointerEvents, 500);
+
+    return () => {
+      observer.disconnect();
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Also clear 400ms after route/menu changes (original behaviour, kept for completeness)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const openLayer = document.querySelector('[data-state="open"][role="dialog"], [data-state="open"][role="menu"]');
+      if (!openLayer && document.body.style.pointerEvents === 'none') {
+        document.body.style.pointerEvents = '';
+        document.body.style.overflow = '';
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [location.pathname, mobileMenuOpen]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -718,7 +763,18 @@ const Header = () => {
         {/* ── Row 1: Logo + Search + actions ── */}
         <div className="relative flex items-center py-3 border-b border-border/40">
 
-          <Link to="/" className="shrink-0 relative z-10" onClick={() => setMobileMenuOpen(false)}>
+          <Link
+            to="/"
+            aria-label="CardPop — back to home"
+            className="shrink-0 relative z-10 flex items-center"
+            onClick={() => {
+              setMobileMenuOpen(false);
+              // Already on home: Link won't re-navigate, so scroll back to the top
+              if (location.pathname === '/') {
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }
+            }}
+          >
             <CardPopLogo variant="full" iconClassName="w-9 h-[44px]" />
           </Link>
 
@@ -838,7 +894,17 @@ const Header = () => {
                 <SheetHeader className="p-6 border-b border-border text-left bg-muted/30 shrink-0">
                   <SheetTitle asChild>
                     <SheetClose asChild>
-                      <Link to="/" className="text-2xl inline-block" onClick={() => setMobileMenuOpen(false)}>
+                      <Link
+                        to="/"
+                        aria-label="CardPop — back to home"
+                        className="text-2xl inline-block"
+                        onClick={() => {
+                          setMobileMenuOpen(false);
+                          if (location.pathname === '/') {
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }
+                        }}
+                      >
                         <CardPopLogo variant="full" iconClassName="w-7 h-[34px]" />
                       </Link>
                     </SheetClose>

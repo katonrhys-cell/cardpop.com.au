@@ -168,7 +168,6 @@ const RetailersPage = () => {
                         target="_blank"
                         rel="noopener noreferrer"
                         className="hover:text-primary transition-colors truncate"
-                        onClick={e => e.stopPropagation()}
                       >
                         {retailer.website.replace(/^https?:\/\//, '')}
                       </a>

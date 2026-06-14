@@ -277,6 +277,32 @@ const AdminVerificationDashboard = () => {
           <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
             {selected && (
               <>
+                {/* AI name extraction result */}
+                {(selected.id_extracted_name !== undefined && selected.id_extracted_name !== null) ? (
+                  <div className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-medium border ${
+                    selected.name_match === true
+                      ? 'bg-emerald-500/10 text-emerald-700 border-emerald-200'
+                      : selected.name_match === false
+                      ? 'bg-amber-500/10 text-amber-700 border-amber-200'
+                      : 'bg-muted text-muted-foreground border-border'
+                  }`}>
+                    {selected.name_match === true
+                      ? <CheckCircle className="w-4 h-4 shrink-0" />
+                      : <AlertCircle className="w-4 h-4 shrink-0" />}
+                    <div className="flex-1 min-w-0">
+                      <span className="font-bold">AI Name Match{selected.name_match_confidence ? ` (${selected.name_match_confidence} confidence)` : ''}:</span>{' '}
+                      {selected.name_match === true
+                        ? `Extracted "${selected.id_extracted_name}" — matches submitted name`
+                        : `Extracted "${selected.id_extracted_name}" — does not match submitted name`}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-medium border bg-muted text-muted-foreground border-border">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>No AI name extraction data available for this submission</span>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   {[
                     ['Full Legal Name', selected.full_legal_name],

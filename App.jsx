@@ -40,6 +40,9 @@ const CollectionPage = lazy(() => import('@/pages/collections/CollectionPage.jsx
 // Forces CollectionPage to fully remount when the slug changes, resetting all filter/state
 const CollectionRoute = () => { const { collectionSlug } = useParams(); return <CollectionPage key={collectionSlug} />; };
 
+// Redirects /community/events/:eventId → /events/:eventId
+const RedirectEventDetail = () => { const { eventId } = useParams(); return <Navigate to={`/events/${eventId}`} replace />; };
+
 // Resets the error boundary on every route change so a page error doesn't persist to other pages
 const RouteErrorBoundary = ({ children }) => {
   const { pathname } = useLocation();
@@ -113,6 +116,7 @@ const GradingScalePage = lazy(() => import('@/pages/grading/GradingScalePage.jsx
 const WhatIsGradingPage = lazy(() => import('@/pages/grading/WhatIsGradingPage.jsx'));
 const GradingScalesPage = lazy(() => import('@/pages/grading/GradingScalesPage.jsx'));
 const GradingCompaniesPage = lazy(() => import('@/pages/grading/GradingCompaniesPage.jsx'));
+const LocalGradersPage = lazy(() => import('@/pages/grading/LocalGradersPage.jsx'));
 
 // Community & Blog
 const BlogPage = lazy(() => import('@/pages/blog/BlogPage.jsx'));
@@ -126,6 +130,7 @@ const WhatnotShowsPage = lazy(() => import('@/pages/community/WhatnotShowsPage.j
 const ForumPage = lazy(() => import('@/pages/community/ForumPage.jsx'));
 const ProfilesPage = lazy(() => import('@/pages/community/ProfilesPage.jsx'));
 const RetailersPage = lazy(() => import('@/pages/community/RetailersPage.jsx'));
+const LocalTradersPage = lazy(() => import('@/pages/community/LocalTradersPage.jsx'));
 
 // Admin Dashboard Area
 const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard.jsx'));
@@ -166,6 +171,7 @@ const ShippingPage = lazy(() => import('@/pages/info/ShippingPage.jsx'));
 const TermsPage = lazy(() => import('@/pages/info/TermsPage.jsx'));
 const TrustSafetyPage = lazy(() => import('@/pages/info/TrustSafetyPage.jsx'));
 const AccessibilityPage = lazy(() => import('@/pages/info/AccessibilityPage.jsx'));
+const PhotographyStandardPage = lazy(() => import('@/pages/info/PhotographyStandardPage.jsx'));
 
 const App = () => {
   return (
@@ -272,7 +278,9 @@ const App = () => {
                         <Route path="/grading" element={<GradingPage />} />
                         <Route path="/grading/what-is-grading" element={<WhatIsGradingPage />} />
                         <Route path="/grading/scales" element={<GradingScalesPage />} />
+                        <Route path="/grading/scales/:scale" element={<GradingScalePage />} />
                         <Route path="/grading/companies" element={<GradingCompaniesPage />} />
+                        <Route path="/grading/local" element={<LocalGradersPage />} />
                         <Route path="/grading/guide/:scale" element={<GradingScalePage />} />
                         
                         {/* Community & Blog */}
@@ -283,8 +291,11 @@ const App = () => {
                         <Route path="/community/forum" element={<ForumPage />} />
                         <Route path="/community/profiles" element={<ProfilesPage />} />
                         <Route path="/community/retailers" element={<RetailersPage />} />
-                        <Route path="/community/events" element={<CommunityEventsPage />} />
-                        <Route path="/community/events/:eventId" element={<EventDetailPage />} />
+                        <Route path="/community/local-traders" element={<LocalTradersPage />} />
+                        <Route path="/events" element={<CommunityEventsPage />} />
+                        <Route path="/events/:eventId" element={<EventDetailPage />} />
+                        <Route path="/community/events" element={<Navigate to="/events" replace />} />
+                        <Route path="/community/events/:eventId" element={<RedirectEventDetail />} />
                         <Route path="/community/discussion/:id" element={<CommunityDiscussionPage />} />
                         <Route path="/community/whatnot" element={<WhatnotShowsPage />} />
                         <Route path="/community/user/:sellerId" element={<SellerProfilePage />} />
@@ -306,6 +317,8 @@ const App = () => {
                         <Route path="/terms" element={<TermsPage />} />
                         <Route path="/trust-safety" element={<TrustSafetyPage />} />
                         <Route path="/accessibility" element={<AccessibilityPage />} />
+                        <Route path="/photography-standard" element={<PhotographyStandardPage />} />
+                        <Route path="/photography-guide" element={<PhotographyStandardPage />} />
                         
                         {/* --- PROTECTED ADMIN ROUTES (NESTED UNDER ADMINLAYOUT) --- */}
                         <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>}>

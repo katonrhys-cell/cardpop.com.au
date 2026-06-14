@@ -104,7 +104,10 @@ const CommunityEventsPage = () => {
     setEndDate(nextYearStr);
   };
 
-  const dateInputClass = 'flex h-11 w-full rounded-xl border border-border bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2';
+  // appearance-none + the -webkit-date-and-time-value override stop iOS Safari
+  // from centering the value and shrinking native date inputs, so they line up
+  // with the other filter fields.
+  const dateInputClass = 'flex h-11 w-full min-w-0 appearance-none items-center rounded-xl border border-border bg-background px-3 text-left text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [&::-webkit-date-and-time-value]:text-left';
 
   const structuredData = useMemo(() => {
     const upcoming = events
@@ -119,7 +122,7 @@ const CommunityEventsPage = () => {
       <SEOHead
         title="Trading Card Shows & TCG Events in Australia 2026 | CardPop"
         description="Australia's trading card event calendar — card shows, TCG expos, fairs and collector meets in Sydney, Melbourne, Brisbane, Adelaide and Perth. Dates, venues and tickets."
-        canonicalUrl={`${SITE_URL}/community/events`}
+        canonicalUrl={`${SITE_URL}/events`}
         structuredData={structuredData}
       />
 

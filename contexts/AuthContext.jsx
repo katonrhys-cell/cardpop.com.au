@@ -100,32 +100,17 @@ export const AuthProvider = ({ children }) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new Error(error.message);
 
-    const { data: profileData } = await supabase
-      .from('profiles')
-      .select('mfa_enabled')
-      .eq('id', data.user.id)
-      .single();
+    // Check if the user has a verified TOTP factor enrolled via Supabase native MFA.
+    const { data: factors } = await supabase.auth.mfa.listFactors();
+    const totpFactor = factors?.totp?.find(f => f.status === 'verified');
 
-    if (profileData?.mfa_enabled) {
-      const res = await fetch('/hcgi/api/auth/mfa/request', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${data.session.access_token}`,
-        },
-        body: JSON.stringify({ email: data.user.email }),
-      });
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json.error || 'Failed to send MFA code');
-      }
-      const mfaResult = await res.json();
-      // Set session eagerly — MFA is a UI gate; backend APIs are already protected by Supabase JWT.
+    if (totpFactor) {
+      // Eagerly set the AAL1 session so API calls work while MFA challenge is pending.
       if (data.session) {
         setSession(data.session);
         setCurrentUser(data.session.user);
       }
-      return { requiresMfa: true, mfaId: mfaResult.mfaId };
+      return { requiresMfa: true, factorId: totpFactor.id };
     }
 
     // Eagerly update session state so ProtectedRoute sees isAuthenticated=true
@@ -162,9 +147,9 @@ export const AuthProvider = ({ children }) => {
   const resetPassword = async (email) => {
     const base = window.location.hostname === 'localhost'
       ? window.location.origin
-      : 'https://cardpop.com.au';
+      : window.location.origin;
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${base}/account/reset-password`,
+      redirectTo: `${window.location.origin}/account/reset-password`,
     });
     if (error) throw new Error(error.message);
     return true;
@@ -174,6 +159,63 @@ export const AuthProvider = ({ children }) => {
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) throw new Error(error.message);
     return true;
+  };
+
+  // ── Supabase native TOTP MFA ──────────────────────────────────────────────
+
+  // Start enrollment: returns { id, totp: { qr_code, secret, uri } }
+  const enrollTOTP = async () => {
+    const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp' });
+    if (error) throw new Error(error.message);
+    return data;
+  };
+
+  // Confirm enrollment with the first code from the authenticator app,
+  // and upgrade the session to AAL2.
+  const confirmTOTP = async (factorId, code) => {
+    const { data: challenge, error: ce } = await supabase.auth.mfa.challenge({ factorId });
+    if (ce) throw new Error(ce.message);
+    const { data, error } = await supabase.auth.mfa.verify({
+      factorId,
+      challengeId: challenge.id,
+      code,
+    });
+    if (error) throw new Error(error.message);
+    if (data.session) {
+      setSession(data.session);
+      setCurrentUser(data.session.user);
+    }
+    return data;
+  };
+
+  // Remove a TOTP factor (disables MFA).
+  const unenrollTOTP = async (factorId) => {
+    const { error } = await supabase.auth.mfa.unenroll({ factorId });
+    if (error) throw new Error(error.message);
+  };
+
+  // List enrolled MFA factors.
+  const listMFAFactors = async () => {
+    const { data, error } = await supabase.auth.mfa.listFactors();
+    if (error) throw new Error(error.message);
+    return data;
+  };
+
+  // Complete the MFA challenge at login (upgrades session from AAL1 → AAL2).
+  const verifyMFACode = async (factorId, code) => {
+    const { data: challenge, error: ce } = await supabase.auth.mfa.challenge({ factorId });
+    if (ce) throw new Error(ce.message);
+    const { data, error } = await supabase.auth.mfa.verify({
+      factorId,
+      challengeId: challenge.id,
+      code,
+    });
+    if (error) throw new Error(error.message);
+    if (data.session) {
+      setSession(data.session);
+      setCurrentUser(data.session.user);
+    }
+    return data;
   };
 
   const isAdmin    = profile?.is_admin    ?? false;
@@ -202,18 +244,11 @@ export const AuthProvider = ({ children }) => {
     requestOTP:             async () => { throw new Error('OTP auth not supported — use email/password.'); },
     requestMFA:             async () => { throw new Error('Use Supabase MFA.'); },
     loginWithOTP:           async () => { throw new Error('Use Supabase MFA.'); },
-    verifyMFACode:          async (mfaId, _otpId, code) => {
-      const res = await fetch('/hcgi/api/auth/mfa/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mfaId, code }),
-      });
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error(json.error || 'MFA verification failed');
-      }
-      return res.json();
-    },
+    verifyMFACode,
+    enrollTOTP,
+    confirmTOTP,
+    unenrollTOTP,
+    listMFAFactors,
     enableMFA:              async () => {},
     disableMFA:             async () => {},
     resendVerificationEmail,

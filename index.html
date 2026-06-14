@@ -21,9 +21,9 @@
     <!-- Preload critical resources -->
     <link rel="preload" href="/og-image.jpg" as="image" type="image/jpeg" />
     
-    <!-- Prevent CLS with explicit dimensions -->
+    <!-- Prevent CLS: width+height attrs + height:auto lets browser compute aspect-ratio before load -->
     <style>
-      img { max-width: 100%; height: auto; }
+      img { max-width: 100%; height: auto; aspect-ratio: auto; }
     </style>
 
     <title>CardPop | Australia's Trading Card Marketplace</title>
@@ -33,11 +33,12 @@
     <link rel="canonical" href="https://cardpop.online/" />
 
     <!-- Google Fonts — preconnect first, then load Syne -->
+    <!-- font-display:optional prevents layout shift on swap (FOUT); Syne shows on warm cache -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" media="print" onload="this.media='all'" />
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" /></noscript>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=optional" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=optional" media="print" onload="this.media='all'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=optional" /></noscript>
 
     <!-- Open Graph (Facebook, Discord, Slack previews) -->
     <meta property="og:type" content="website" />
