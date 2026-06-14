@@ -43,7 +43,6 @@ const SubcategoryManagementPage = () => {
 
   const fetchData = async (showToast = false) => {
     setLoading(true);
-    console.log('[DEBUG] Fetching subcategories and categories data...');
     try {
       const { data: allCats } = await supabase.from('categories').select('*').order('sort_order');
       const topLevel = (allCats ?? []).filter(c => !c.parent_id);
@@ -53,7 +52,7 @@ const SubcategoryManagementPage = () => {
       setError(null);
       if (showToast) toast.success('Data refreshed');
     } catch (err) {
-      console.error('[DEBUG] Failed to fetch data:', err);
+      console.error('[SubcategoryManagementPage] Failed to fetch data:', err);
       setError("Failed to load subcategories from database. Please check your connection.");
       if (showToast) toast.error('Failed to refresh data');
     } finally {

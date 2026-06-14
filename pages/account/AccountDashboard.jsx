@@ -50,7 +50,7 @@ const AccountDashboard = () => {
       // Fetch seller tier independently — a missing profile row must not block stats
       supabase.from('profiles').select('seller_tier').eq('id', currentUser.id).maybeSingle()
         .then(({ data }) => { if (!cancelled && data) setSellerTier(data.seller_tier); })
-        .catch(() => {});
+        .catch((err) => { console.warn('[AccountDashboard] seller tier fetch failed:', err); });
 
       try {
         const [salesRes, revenueRes, listingsRes, vaultRes, tradesRes] = await Promise.all([

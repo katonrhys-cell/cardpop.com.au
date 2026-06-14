@@ -29,9 +29,7 @@ const ProductCard = ({ product }) => {
   const sellerId = product.seller_id || product.seller || product.owner_id || product.owner || product.user_id;
   const sellerObj = product.expand?.seller_id || product.expand?.seller || product.expand?.owner || product.expand?.user_id;
   const titleSlug = slugify(product.name || product.cardName || product.title || 'card');
-  const detailPath = product.source
-    ? `/product/${product.source}/${product.id}/${titleSlug}`
-    : `/card-details/${product.id}`;
+  const detailPath = `/product/${product.source || 'vault'}/${product.id}/${titleSlug}`;
   const gradingCompany = product.grading_company || product.gradingCompany || '';
   const isGraded = gradingCompany && gradingCompany !== 'raw' && product.grade;
 

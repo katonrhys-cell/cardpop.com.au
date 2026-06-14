@@ -316,7 +316,7 @@ const CollectionPage = () => {
       const aliases = [config.name, ...(config.categoryAliases ?? [])].map(a => a.toLowerCase());
       const match = cats.find(c => aliases.includes(c.name.toLowerCase()));
       if (match) setCategoryId(match.id);
-    }).catch(() => {});
+    }).catch((err) => { console.warn('[CollectionPage] category fetch failed:', err); });
 
     return () => { cancelled = true; };
   }, [config, getCategories]);
@@ -327,21 +327,21 @@ const CollectionPage = () => {
     let cancelled = false;
     getSubcategoriesByCategory(categoryId).then(subs => {
       if (!cancelled) setSubOpts(subs);
-    }).catch(() => {});
+    }).catch((err) => { console.warn('[CollectionPage] subcategories fetch failed:', err); });
     return () => { cancelled = true; };
   }, [categoryId, getSubcategoriesByCategory]);
 
   useEffect(() => {
     if (!filterSub) { setBrandOpts([]); setFilterBrand(''); return; }
     let cancelled = false;
-    getBrandsBySubcategory(filterSub).then(b => { if (!cancelled) setBrandOpts(b); }).catch(() => {});
+    getBrandsBySubcategory(filterSub).then(b => { if (!cancelled) setBrandOpts(b); }).catch((err) => { console.warn('[CollectionPage] brands fetch failed:', err); });
     return () => { cancelled = true; };
   }, [filterSub, getBrandsBySubcategory]);
 
   useEffect(() => {
     if (!filterBrand) { setSeriesOpts([]); setFilterSeries(''); return; }
     let cancelled = false;
-    getSeriesByBrand(filterBrand).then(s => { if (!cancelled) setSeriesOpts(s); }).catch(() => {});
+    getSeriesByBrand(filterBrand).then(s => { if (!cancelled) setSeriesOpts(s); }).catch((err) => { console.warn('[CollectionPage] series fetch failed:', err); });
     return () => { cancelled = true; };
   }, [filterBrand, getSeriesByBrand]);
 
