@@ -58,7 +58,7 @@ const SignupPage = () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: formData.email, firstName: formData.name.split(' ')[0] }),
-        }).catch(() => {});
+        }).catch((err) => { console.warn('[SignupPage] Newsletter subscribe failed:', err); });
       }
 
       try {

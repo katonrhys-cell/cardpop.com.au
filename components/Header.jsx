@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Package, Users, Calendar, FileText, Building2, Layers, CheckCircle,
   Sun, Moon, ChevronDown, ArrowRight, Layers2, User, LogOut, Settings,
   FolderTree, ListOrdered, BarChart3, Store,
-  BookOpen, Globe, Star, Award, TrendingUp, Newspaper, BadgeCheck
+  BookOpen, Globe, Star, Award, TrendingUp, Newspaper, BadgeCheck, Ticket, Handshake
 } from 'lucide-react';
 import { useDarkMode } from '@/hooks/useDarkMode.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -447,6 +447,71 @@ const CommunityDropdown = ({ onNavigate }) => {
   );
 };
 
+const EVENT_ITEMS = [
+  { type: 'card_show',       label: 'Card Shows',       desc: 'Trading card fairs and expos',        Icon: Ticket,          gradient: 'from-red-500 to-rose-600'      },
+  { type: 'trade_event',     label: 'Trade Events',     desc: 'Swap meets and trading nights',       Icon: Handshake,       gradient: 'from-blue-500 to-indigo-600'   },
+  { type: 'community_event', label: 'Community Events', desc: 'Collector meetups and community fun', Icon: Users,           gradient: 'from-violet-500 to-purple-600' },
+  { type: 'lgs_event',       label: 'Store Events',     desc: 'Local game store tournaments',        Icon: Store,           gradient: 'from-amber-500 to-orange-500'  },
+];
+
+// ─── Events dropdown ──────────────────────────────────────────────────────────
+const EventsDropdown = ({ onNavigate }) => {
+  const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
+  const location = useLocation();
+  const isEventsActive = location.pathname.startsWith('/events');
+
+  return (
+    <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
+      <button
+        onClick={handleTriggerClick}
+        aria-expanded={open}
+        className={`flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+          open || isEventsActive
+            ? 'bg-primary text-primary-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+        }`}
+      >
+        Events
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-72 bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+          <Link
+            to="/events"
+            onClick={() => { setOpen(false); onNavigate?.(); }}
+            className="flex items-center justify-between px-5 py-3.5 border-b border-border hover:bg-muted/60 transition-colors group"
+          >
+            <div>
+              <span className="text-sm font-bold text-foreground">All Events</span>
+              <p className="text-xs text-muted-foreground mt-0.5">Full Australian event calendar</p>
+            </div>
+            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
+          </Link>
+          <div className="p-3 grid gap-0.5">
+            {EVENT_ITEMS.map(item => (
+              <Link
+                key={item.type}
+                to={`/events?type=${item.type}`}
+                onClick={() => { setOpen(false); onNavigate?.(); }}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
+              >
+                <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${item.gradient} shrink-0 shadow-sm`}>
+                  <item.Icon className="w-4 h-4 text-white" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{item.label}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{item.desc}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Mobile blog section (expandable) ────────────────────────────────────────
 const MobileBlogSection = ({ onNavigate }) => {
   const [open, setOpen] = useState(false);
@@ -484,6 +549,52 @@ const MobileBlogSection = ({ onNavigate }) => {
                   <cat.Icon className="w-3.5 h-3.5 text-white" />
                 </span>
                 <span className="text-xs font-semibold text-foreground truncate">{cat.label}</span>
+              </Link>
+            </SheetClose>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Mobile events section (expandable) ──────────────────────────────────────
+const MobileEventsSection = ({ onNavigate }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-4">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-muted transition-colors mb-0.5"
+      >
+        <span className="text-sm font-bold text-foreground flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-primary" />
+          Events
+        </span>
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="flex flex-col gap-0.5 mb-1 pl-2">
+          <SheetClose asChild>
+            <Link
+              to="/events"
+              onClick={onNavigate}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-semibold text-muted-foreground"
+            >
+              All Events
+            </Link>
+          </SheetClose>
+          {EVENT_ITEMS.map(item => (
+            <SheetClose key={item.type} asChild>
+              <Link
+                to={`/events?type=${item.type}`}
+                onClick={onNavigate}
+                className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
+              >
+                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${item.gradient} shrink-0`}>
+                  <item.Icon className="w-3.5 h-3.5 text-white" />
+                </span>
+                <span className="text-xs font-semibold text-foreground truncate">{item.label}</span>
               </Link>
             </SheetClose>
           ))}
@@ -622,31 +733,32 @@ const Header = () => {
     setMobileMenuOpen(false);
   }, [location.pathname]);
 
-  // Failsafe: Radix Dialog/DropdownMenu sets `pointer-events: none` on <body>
-  // while open and can leave it behind when the close animation is interrupted
-  // by navigation. The route-change timer below handles the normal case.
-  // The MutationObserver handles the deadlock case: pointer events are stuck,
-  // the user can't navigate, so the route never changes and the timer never fires.
+  // Failsafe: Radix Dialog/Sheet uses @radix-ui/react-remove-scroll which sets
+  // overflow:hidden (and sometimes pointer-events:none) on <body> while open.
+  // If the user navigates away while a Dialog/Sheet is open (e.g. VaultListingModal),
+  // the component unmounts mid-animation and leaves stale body styles behind.
+  // This causes the next page's scroll to be locked at the previous page's position,
+  // making the new page appear blank even though it rendered correctly.
   useEffect(() => {
-    const clearStalePointerEvents = () => {
-      if (document.body.style.pointerEvents !== 'none') return;
+    const clearStaleBodyStyles = () => {
       const hasOpenLayer = document.querySelector(
         '[data-state="open"][role="dialog"], [data-state="open"][role="menu"], [data-radix-popper-content-wrapper]'
       );
       if (!hasOpenLayer) {
-        document.body.style.pointerEvents = '';
-        document.body.style.overflow = '';
+        if (document.body.style.pointerEvents === 'none') document.body.style.pointerEvents = '';
+        if (document.body.style.overflow === 'hidden') document.body.style.overflow = '';
+        if (document.body.style.paddingRight) document.body.style.paddingRight = '';
       }
     };
 
     // Watch for any style change on body and fix it after animations settle
     const observer = new MutationObserver(() => {
-      setTimeout(clearStalePointerEvents, 350);
+      setTimeout(clearStaleBodyStyles, 350);
     });
     observer.observe(document.body, { attributes: true, attributeFilter: ['style'] });
 
     // Periodic sweep as a last resort (500ms is imperceptible to users)
-    const interval = setInterval(clearStalePointerEvents, 500);
+    const interval = setInterval(clearStaleBodyStyles, 500);
 
     return () => {
       observer.disconnect();
@@ -654,15 +766,19 @@ const Header = () => {
     };
   }, []);
 
-  // Also clear 400ms after route/menu changes (original behaviour, kept for completeness)
+  // Clear stale body styles immediately on every route change, and again after
+  // 400ms to catch anything that the close animation set after the route changed.
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const openLayer = document.querySelector('[data-state="open"][role="dialog"], [data-state="open"][role="menu"]');
-      if (!openLayer && document.body.style.pointerEvents === 'none') {
-        document.body.style.pointerEvents = '';
-        document.body.style.overflow = '';
+    const clearStaleBodyStyles = () => {
+      const hasOpenLayer = document.querySelector('[data-state="open"][role="dialog"], [data-state="open"][role="menu"]');
+      if (!hasOpenLayer) {
+        if (document.body.style.pointerEvents === 'none') document.body.style.pointerEvents = '';
+        if (document.body.style.overflow === 'hidden') document.body.style.overflow = '';
+        if (document.body.style.paddingRight) document.body.style.paddingRight = '';
       }
-    }, 400);
+    };
+    clearStaleBodyStyles();
+    const timer = setTimeout(clearStaleBodyStyles, 400);
     return () => clearTimeout(timer);
   }, [location.pathname, mobileMenuOpen]);
 
@@ -939,8 +1055,14 @@ const Header = () => {
                     onNavigate={() => setMobileMenuOpen(false)}
                   />
 
+                  {/* Mobile Events */}
+                  <MobileEventsSection
+                    key={`events-${String(mobileMenuOpen)}`}
+                    onNavigate={() => setMobileMenuOpen(false)}
+                  />
+
                   <nav className="flex flex-col gap-1.5 mb-6">
-                    {NAV_LINKS.filter(l => l.label !== 'Blog' && l.label !== 'Community').map((link) => {
+                    {NAV_LINKS.filter(l => l.label !== 'Blog' && l.label !== 'Community' && l.label !== 'Events').map((link) => {
                       const isActive = isNavLinkActive(link);
                       return (
                         <SheetClose key={link.label} asChild>
@@ -1053,6 +1175,9 @@ const Header = () => {
               }
               if (link.label === 'Community') {
                 return <CommunityDropdown key="community" onNavigate={() => setMobileMenuOpen(false)} />;
+              }
+              if (link.label === 'Events') {
+                return <EventsDropdown key="events" onNavigate={() => setMobileMenuOpen(false)} />;
               }
               const isActive = isNavLinkActive(link);
               return (

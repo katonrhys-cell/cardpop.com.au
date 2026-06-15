@@ -77,7 +77,7 @@ const WhatnotShowsPage = () => {
           setForm(f => ({ ...f, seller_name: data.display_name || data.username || '' }));
         }
       })
-      .catch(() => {});
+      .catch((err) => { console.warn('[WhatnotShowsPage] profile fetch failed:', err); });
     return () => { cancelled = true; };
   }, [currentUser?.id]);
 
