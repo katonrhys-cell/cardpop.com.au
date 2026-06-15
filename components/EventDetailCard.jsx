@@ -1,13 +1,19 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe } from 'lucide-react';
+import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Handshake, Store } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatEntryFee } from '@/lib/eventSeo.js';
 import { toast } from 'sonner';
 
+const EVENT_TYPE_STYLES = {
+  card_show:       { gradient: 'from-red-500 to-rose-600',      Icon: Ticket    },
+  trade_event:     { gradient: 'from-blue-500 to-indigo-600',   Icon: Handshake },
+  community_event: { gradient: 'from-violet-500 to-purple-600', Icon: Users     },
+  lgs_event:       { gradient: 'from-amber-500 to-orange-500',  Icon: Store     },
+};
+
 const EventDetailCard = ({ event }) => {
-  const isTradeShow = event.type === 'Trade Show' || event.type === 'Card Show';
 
   const handleShare = (platform) => {
     const url = encodeURIComponent(window.location.href);
@@ -52,16 +58,25 @@ const EventDetailCard = ({ event }) => {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent" />
 
-          {/* Type pill — top-right on all screen sizes */}
-          <div className="absolute top-4 right-4">
-            <Badge
-              variant="secondary"
-              className={`font-bold shadow-md backdrop-blur-md border-none px-3 py-1.5 text-sm ${
-                isTradeShow ? 'bg-primary text-white' : 'bg-secondary text-white'
-              }`}
-            >
-              {event.type}
-            </Badge>
+          {/* Type pill — top-left */}
+          <div className="absolute top-4 left-4">
+            {(() => {
+              const style = EVENT_TYPE_STYLES[event.event_type];
+              if (style) {
+                const { gradient, Icon } = style;
+                return (
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r ${gradient} text-white text-sm font-bold shadow-md backdrop-blur-sm`}>
+                    <Icon className="w-3.5 h-3.5" />
+                    {event.type}
+                  </span>
+                );
+              }
+              return (
+                <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-sm text-white text-sm font-bold shadow-md">
+                  {event.type}
+                </span>
+              );
+            })()}
           </div>
 
           {/* Title — bottom of hero, with strong text shadow for legibility */}
