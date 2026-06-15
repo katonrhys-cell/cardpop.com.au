@@ -167,6 +167,20 @@ router.post(
   }
 );
 
+// ─── GET /cardsight/status ───────────────────────────────────────────────────
+// Quick health check: verifies the API key is set and can reach CardSight.
+router.get('/status', async (req, res) => {
+  try {
+    const client = getCardSightClient();
+    // Minimal API call — just fetch the first segment to confirm connectivity
+    const { data } = await client.catalog.segments({ take: 1 });
+    res.json({ ok: true, segments: data?.segments?.length ?? 0 });
+  } catch (err) {
+    logger.error(`[CARDSIGHT] Status check failed: ${err.message}`);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // ─── GET /cardsight/pricing/:cardId ──────────────────────────────────────────
 // Fetch current pricing for a known CardSight card ID, flattened to aggregates.
 router.get('/pricing/:cardId', async (req, res) => {
