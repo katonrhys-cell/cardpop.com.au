@@ -668,7 +668,7 @@ const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout })
           )}
         </div>
         <div className="flex flex-col items-start overflow-hidden flex-1">
-          <span className="text-sm font-bold truncate w-full text-left">{currentUser.name || 'Collector'}</span>
+          <span className="text-sm font-bold truncate w-full text-left">{currentUser.display_name || currentUser.name || 'Collector'}</span>
           <span className="text-xs text-muted-foreground truncate w-full text-left">View Profile Options</span>
         </div>
         <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
