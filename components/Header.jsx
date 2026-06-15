@@ -217,7 +217,6 @@ const useHoverDropdown = () => {
   useEffect(() => { setOpen(false); }, [location.pathname]);
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
-  useEffect(() => { setOpen(false); }, [location.pathname]);
 
   return { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick };
 };
@@ -323,11 +322,6 @@ const BlogDropdown = ({ onNavigate }) => {
   const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
   const location = useLocation();
   const isBlogActive = location.pathname.startsWith('/blog');
-
-  const handleMouseEnter = () => { clearTimeout(timerRef.current); setOpen(true); };
-  const handleMouseLeave = () => { timerRef.current = setTimeout(() => setOpen(false), 120); };
-  useEffect(() => () => clearTimeout(timerRef.current), []);
-  useEffect(() => { setOpen(false); }, [location.pathname]);
 
   return (
     <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
@@ -741,9 +735,7 @@ const Header = () => {
   // making the new page appear blank even though it rendered correctly.
   useEffect(() => {
     const clearStaleBodyStyles = () => {
-      const hasOpenLayer = document.querySelector(
-        '[data-state="open"][role="dialog"], [data-state="open"][role="menu"], [data-radix-popper-content-wrapper]'
-      );
+      const hasOpenLayer = document.querySelector('[data-state="open"][role="dialog"]');
       if (!hasOpenLayer) {
         if (document.body.style.pointerEvents === 'none') document.body.style.pointerEvents = '';
         if (document.body.style.overflow === 'hidden') document.body.style.overflow = '';
@@ -770,7 +762,7 @@ const Header = () => {
   // 400ms to catch anything that the close animation set after the route changed.
   useEffect(() => {
     const clearStaleBodyStyles = () => {
-      const hasOpenLayer = document.querySelector('[data-state="open"][role="dialog"], [data-state="open"][role="menu"]');
+      const hasOpenLayer = document.querySelector('[data-state="open"][role="dialog"]');
       if (!hasOpenLayer) {
         if (document.body.style.pointerEvents === 'none') document.body.style.pointerEvents = '';
         if (document.body.style.overflow === 'hidden') document.body.style.overflow = '';
