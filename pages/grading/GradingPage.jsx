@@ -3,7 +3,7 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import {
   SearchCheck, BookOpen, BarChart2, Building2, ArrowRight,
-  Store, ShieldCheck, DollarSign, Clock, MapPin, HelpCircle,
+  Store, ShieldCheck, DollarSign, Clock, MapPin, HelpCircle, TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -57,6 +57,11 @@ const AU_TIPS = [
     icon: ShieldCheck,
     title: 'Protect Cards Before Submitting',
     body: 'Use penny sleeves and toploaders for every card. Double-sleeve in a team bag for international posts. One scratch in transit can drop a PSA 10 to a PSA 9.',
+  },
+  {
+    icon: TrendingUp,
+    title: 'Check the Pop Report First',
+    body: 'Before submitting any card, look up its population report on PSA or BGS. A high-population PSA 10 adds little premium over raw; a low-pop 10 on a sought-after card can multiply its value. Knowing the pop protects you from spending $50 grading a card worth the same raw.',
   },
 ];
 
