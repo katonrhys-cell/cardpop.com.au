@@ -45,22 +45,31 @@ const EventDetailCard = ({ event }) => {
       <div className="bg-card rounded-3xl overflow-hidden border border-border shadow-lg">
         {/* Hero Image */}
         <div className="w-full h-64 md:h-96 lg:h-[450px] relative bg-muted">
-          <img 
-            src={event.image} 
-            alt={event.name} 
+          <img
+            src={event.image}
+            alt={event.name}
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-          <div className="absolute bottom-0 left-0 p-6 md:p-10 w-full">
-            <Badge 
-              variant="secondary" 
-              className={`mb-4 font-bold shadow-sm backdrop-blur-md border-none px-3 py-1 text-sm ${
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent" />
+
+          {/* Type pill — top-right on all screen sizes */}
+          <div className="absolute top-4 right-4">
+            <Badge
+              variant="secondary"
+              className={`font-bold shadow-md backdrop-blur-md border-none px-3 py-1.5 text-sm ${
                 isTradeShow ? 'bg-primary text-white' : 'bg-secondary text-white'
               }`}
             >
               {event.type}
             </Badge>
-            <h1 className="font-serif text-3xl md:text-5xl lg:text-6xl font-extrabold text-white leading-tight tracking-tight">
+          </div>
+
+          {/* Title — bottom of hero, with strong text shadow for legibility */}
+          <div className="absolute bottom-0 left-0 px-5 pb-5 md:px-10 md:pb-8 w-full">
+            <h1
+              className="font-serif text-2xl md:text-5xl lg:text-6xl font-extrabold text-white leading-tight tracking-tight"
+              style={{ textShadow: '0 2px 16px rgba(0,0,0,0.85), 0 1px 4px rgba(0,0,0,0.95)' }}
+            >
               {event.name}
             </h1>
           </div>
