@@ -242,7 +242,7 @@ const BlogArticlePage = () => {
             </div>
           </div>
 
-          <h2 className="font-heading text-2xl md:text-3xl font-extrabold tracking-tight text-white mb-1">
+          <h2 className="font-heading text-2xl md:text-3xl font-bold tracking-tight text-white mb-1">
             The Parallel Report
           </h2>
           <p className="text-xs tracking-widest uppercase text-white/40 mb-2">
@@ -264,7 +264,7 @@ const BlogArticlePage = () => {
           )}
 
           {/* Article title */}
-          <h1 className="font-heading text-3xl md:text-4xl lg:text-[2.75rem] font-extrabold leading-tight text-white mb-5 text-balance">
+          <h1 className="font-heading text-3xl md:text-4xl lg:text-[2.75rem] font-bold leading-snug tracking-tight text-white mb-5 text-balance">
             {article.title}
           </h1>
 
