@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import DOMPurify from 'dompurify';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -80,6 +80,7 @@ const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-
 
 const BlogArticlePage = () => {
   const { id, slug } = useParams();
+  const navigate = useNavigate();
   const identifier = slug || id;
   const bySlug = !!slug || (id && !isUUID(id));
 
@@ -104,6 +105,16 @@ const BlogArticlePage = () => {
         const { data: res, error: fetchErr } = await query;
         if (fetchErr) throw fetchErr;
         if (cancelled) return;
+
+        // Redirect UUID URLs and /blog/slug/ prefixed URLs to clean /blog/[slug]
+        if (res.slug) {
+          const target = `/blog/${res.slug}`;
+          if (window.location.pathname !== target) {
+            navigate(target, { replace: true });
+            return;
+          }
+        }
+
         setArticle(res);
         setHtmlContent(res.content_html || res.content || '');
 
@@ -177,7 +188,7 @@ const BlogArticlePage = () => {
 
   const imageUrl = article.featured_image_url || null;
   const articleSlug = article.slug;
-  const canonicalUrl = `https://cardpop.online/blog/slug/${articleSlug}`;
+  const canonicalUrl = `https://cardpop.online/blog/${articleSlug}`;
 
   const blogStructuredData = generateBlogPostingSchema({
     title: article.seo_title || article.title,
@@ -388,7 +399,7 @@ const BlogArticlePage = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
               {relatedArticles.map((related) => {
                 const relImg = related.featured_image_url || null;
-                const relLink = related.slug ? `/blog/slug/${related.slug}` : `/blog/${related.id}`;
+                const relLink = related.slug ? `/blog/${related.slug}` : `/blog/${related.id}`;
                 return (
                   <Link
                     key={related.id}
