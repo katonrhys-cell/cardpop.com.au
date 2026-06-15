@@ -49,7 +49,7 @@ const AustralianMarketsPage = () => {
         const dateMap = {};
         const gradeMap = { 'Mint': 0, 'Near Mint': 0, 'Excellent': 0, 'Good': 0, 'Fair': 0 };
         
-        salesJson.sales.forEach(sale => {
+        (salesJson.sales ?? []).forEach(sale => {
           // Date aggregation
           const dateStr = sale.saleDate.split('T')[0];
           if (!dateMap[dateStr]) dateMap[dateStr] = { sum: 0, count: 0 };

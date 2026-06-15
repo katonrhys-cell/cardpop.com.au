@@ -8,13 +8,10 @@ const errorMiddleware = (err, req, res, next) => {
 		return next(err);
 	}
 
+	const isProd = process.env.NODE_ENV === NodeEnv.Production;
 	res.status(500).json({
-		message: 'Something went wrong!',
-		// Always expose the actual error message to help diagnose issues
-		error: err.message || 'Unknown error',
-		...(process.env.NODE_ENV !== NodeEnv.Production && {
-			stack: err.stack,
-		}),
+		message: isProd ? 'Something went wrong!' : (err.message || 'Unknown error'),
+		...(!isProd && { stack: err.stack }),
 	});
 };
 
