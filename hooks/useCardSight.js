@@ -32,6 +32,8 @@ export function useCardSight() {
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
+        // Return structured error so caller can show a meaningful message
+        if (err.apiError) return { identified: false, apiError: true, message: err.message };
         throw new Error(err.error || `CardSight identify failed (${response.status})`);
       }
 
@@ -39,9 +41,8 @@ export function useCardSight() {
       setResult(data);
       return data;
     } catch (err) {
-      // Non-fatal — caller decides what to do with missing results
       console.warn('[useCardSight] identify failed:', err.message);
-      return null;
+      return { identified: false, apiError: true, message: err.message };
     } finally {
       setIsIdentifying(false);
     }

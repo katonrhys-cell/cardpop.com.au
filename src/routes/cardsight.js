@@ -37,8 +37,16 @@ router.post(
       return res.status(400).json({ error: 'An image file is required.' });
     }
 
-    const client = getCardSightClient();
-    const file = req.files[0];
+    let client;
+    try {
+      client = getCardSightClient();
+    } catch (err) {
+      logger.error(`[CARDSIGHT] Client init failed: ${err.message}`);
+      return res.status(503).json({ identified: false, apiError: true, message: 'Card identification service is not configured.' });
+    }
+
+    try {
+      const file = req.files[0];
     // Wrap the buffer in a File so the multipart part carries the validated
     // MIME type and a filename — a bare buffer is sent as application/octet-stream,
     // which CardSight can fail to process.
@@ -152,6 +160,10 @@ router.post(
     }
 
     res.json(response);
+    } catch (err) {
+      logger.error(`[CARDSIGHT] identify error: ${err.message}`, err.stack);
+      return res.status(502).json({ identified: false, apiError: true, message: `Card identification failed: ${err.message}` });
+    }
   }
 );
 
