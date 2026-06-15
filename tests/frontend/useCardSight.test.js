@@ -50,7 +50,8 @@ describe('useCardSight — identify', () => {
     let returned;
     await act(async () => { returned = await result.current.identify(FILE); });
 
-    expect(returned).toBeNull();
+    expect(returned).toMatchObject({ apiError: true, identified: false });
+    expect(returned.message).toBeTruthy();
     expect(result.current.result).toBeNull();
     expect(result.current.isIdentifying).toBe(false);
   });
@@ -62,7 +63,7 @@ describe('useCardSight — identify', () => {
     let returned;
     await act(async () => { returned = await result.current.identify(FILE); });
 
-    expect(returned).toBeNull();
+    expect(returned).toMatchObject({ apiError: true, identified: false, message: 'Network down' });
     expect(result.current.result).toBeNull();
   });
 

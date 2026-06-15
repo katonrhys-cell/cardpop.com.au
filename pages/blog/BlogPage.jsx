@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link, useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -119,24 +119,21 @@ const BlogPage = () => {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    let cancelled = false;
-    const fetchArticles = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const { data } = await supabase.from('blog_articles').select('*').eq('is_published', true).order('created_at', { ascending: false }).limit(100);
-        if (!cancelled) setArticles(data ?? []);
-      } catch (err) {
-        console.error('Error fetching articles:', err);
-        if (!cancelled) setError('Failed to load articles. Please try again later.');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    fetchArticles();
-    return () => { cancelled = true; };
+  const fetchArticles = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data } = await supabase.from('blog_articles').select('*').eq('is_published', true).order('created_at', { ascending: false }).limit(100);
+      setArticles(data ?? []);
+    } catch (err) {
+      console.error('Error fetching articles:', err);
+      setError('Failed to load articles. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => { fetchArticles(); }, [fetchArticles]);
 
   // Articles for the Featured Stories strip (only on the main blog page, no search/category filter)
   const featuredArticles = useMemo(

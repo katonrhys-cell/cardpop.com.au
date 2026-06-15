@@ -72,10 +72,11 @@ export function useCardOCR() {
       const data = JSON.parse(jsonMatch[0]);
       const result = mapOCRResult(data);
       setScanResult(result);
+      toast.success('Card scanned successfully!');
       return result;
     } catch (err) {
-      // Non-fatal — OCR is a fallback; log but don't alarm the user
       console.warn('[useCardOCR] scan failed:', err.message);
+      toast.error(err.message);
     } finally {
       setIsScanning(false);
     }
