@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
@@ -283,76 +283,65 @@ const AddEditCardPage = () => {
   };
 
   // ─── Unified AI analysis ──────────────────────────────────────────────────
-  // Tracks whether results should be auto-applied (set true on button click)
-  const isAnalysisMode = useRef(false);
-
   const handleAnalyzeWithAI = async () => {
     if (!imageFile) return;
-    isAnalysisMode.current = true;
     clearScan();
     clearCardSight();
-    // Try CardSight catalog identification first
-    const csResult = await cardSightIdentify(imageFile);
-    // Only fall back to OCR if CardSight couldn't identify the card
-    if (!csResult?.identified) {
-      scanCard(imageFile);
-    }
-  };
 
-  // Auto-apply CardSight results when they arrive
-  useEffect(() => {
-    if (!cardSightResult || !isAnalysisMode.current) return;
-    if (cardSightResult.identified) {
-      const fields = mapCardSightToFormFields(cardSightResult);
+    // 1. Try CardSight catalog identification first (returns result directly)
+    const csResult = await cardSightIdentify(imageFile);
+
+    if (csResult?.identified) {
+      const fields = mapCardSightToFormFields(csResult);
       setFormData(prev => ({ ...prev, ...fields }));
-      if (cardSightResult.pricing?.avgPrice) {
-        set('estimatedValue', String(cardSightResult.pricing.avgPrice.toFixed(2)));
+      if (csResult.pricing?.avgPrice) {
+        set('estimatedValue', String(csResult.pricing.avgPrice.toFixed(2)));
       }
-      if (cardSightResult.card?.id) fetchPricingById(cardSightResult.card.id);
-      else if (cardSightResult.card?.name) fetchPricingByName(cardSightResult.card.name);
+      if (csResult.card?.id) fetchPricingById(csResult.card.id);
+      else if (csResult.card?.name) fetchPricingByName(csResult.card.name);
       setIsAutoFilled(true);
       toast.success('Card identified! Fields auto-filled from catalog.');
-    } else {
-      const advisory = cardSightResult.serverMessages?.[0]?.message;
-      toast.info(
-        advisory
-          ? `Catalog match not found: ${advisory}`
-          : 'No catalog match found — filling details from the image scan only.'
-      );
+      return;
     }
-  }, [cardSightResult]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-apply OCR results when they arrive, filling only fields left empty by CardSight
-  useEffect(() => {
-    if (!scanResult || !isAnalysisMode.current) return;
+    // 2. CardSight didn't find the card — fall back to OCR
+    const advisory = csResult?.serverMessages?.[0]?.message;
+    if (advisory) toast.info(`Catalog match not found: ${advisory}`);
+
     const conditionMap = {
       'Mint': 'mint', 'Near Mint': 'near_mint', 'Excellent': 'excellent',
       'Good': 'good', 'Fair': 'light_played',
     };
     const gradingCompanyMap = { 'PSA': 'psa', 'BGS': 'bgs', 'CGC': 'cgc', 'SGC': 'sgc', 'ACE': 'ace' };
-    setFormData(prev => ({
-      ...prev,
-      cardName:       prev.cardName       || scanResult.name          || '',
-      collection:     prev.collection     || scanResult.collectionType || '',
-      setName:        prev.setName        || scanResult.cardSetName   || '',
-      cardNumber:     prev.cardNumber     || scanResult.cardNumber    || '',
-      year:           prev.year           || scanResult.releaseYear   || '',
-      condition:      conditionMap[scanResult.condition] || prev.condition,
-      grade:          prev.grade          || scanResult.gradeScore    || '',
-      gradingCompany: prev.gradingCompany !== 'raw'
-        ? prev.gradingCompany
-        : (gradingCompanyMap[scanResult.gradingService] ?? prev.gradingCompany),
-      certNumber:     prev.certNumber     || scanResult.certificationNumber || '',
-      notes: prev.notes || [
-        scanResult.description,
-        scanResult.rarity   ? `Rarity: ${scanResult.rarity}` : '',
-        scanResult.cardType ? `Type: ${scanResult.cardType}` : '',
-      ].filter(Boolean).join('\n') || '',
-    }));
-    lookupPrice(scanResult);
-    setIsAutoFilled(true);
-    isAnalysisMode.current = false;
-  }, [scanResult]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const ocrResult = await scanCard(imageFile);
+    if (ocrResult) {
+      setFormData(prev => ({
+        ...prev,
+        cardName:       ocrResult.name          || prev.cardName,
+        collection:     ocrResult.collectionType || prev.collection,
+        setName:        ocrResult.cardSetName   || prev.setName,
+        cardNumber:     ocrResult.cardNumber    || prev.cardNumber,
+        year:           ocrResult.releaseYear   || prev.year,
+        condition:      conditionMap[ocrResult.condition] || prev.condition,
+        grade:          ocrResult.gradeScore    || prev.grade,
+        gradingCompany: ocrResult.gradingService !== 'None'
+          ? (gradingCompanyMap[ocrResult.gradingService] ?? prev.gradingCompany)
+          : prev.gradingCompany,
+        certNumber:     ocrResult.certificationNumber || prev.certNumber,
+        notes: prev.notes || [
+          ocrResult.description,
+          ocrResult.rarity   ? `Rarity: ${ocrResult.rarity}` : '',
+          ocrResult.cardType ? `Type: ${ocrResult.cardType}` : '',
+        ].filter(Boolean).join('\n') || '',
+      }));
+      lookupPrice(ocrResult);
+      setIsAutoFilled(true);
+      toast.success('Card scanned! Fields auto-filled — please review.');
+    } else {
+      toast.error('Could not identify this card. Try a clearer image or fill in the details manually.');
+    }
+  };
 
   // ─── Validation ───────────────────────────────────────────────────────────
   const validateForm = () => {
