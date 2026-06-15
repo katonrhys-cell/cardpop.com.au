@@ -88,6 +88,7 @@ const BlogArticlePage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [relatedArticles, setRelatedArticles] = useState([]);
+  const [marketplaceCards, setMarketplaceCards] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,14 +107,33 @@ const BlogArticlePage = () => {
         setArticle(res);
         setHtmlContent(res.content_html || res.content || '');
 
-        const { data: related } = await supabase
-          .from('blog_articles')
-          .select('id, slug, title, featured_image_url, excerpt, content')
-          .eq('is_published', true)
-          .neq('id', res.id)
-          .order('created_at', { ascending: false })
-          .limit(3);
-        if (!cancelled) setRelatedArticles(related ?? []);
+        const [relatedRes, cardsRes] = await Promise.all([
+          supabase
+            .from('blog_articles')
+            .select('id, slug, title, featured_image_url, excerpt, content')
+            .eq('is_published', true)
+            .neq('id', res.id)
+            .order('created_at', { ascending: false })
+            .limit(3),
+          (res.marketplace_keywords?.length > 0)
+            ? supabase
+                .from('listings')
+                .select('id, slug, price_aud, accepts_offers, vault_items(card_name, set_name, grade, grading_company, card_image, year)')
+                .eq('status', 'active')
+                .limit(6)
+            : Promise.resolve({ data: [] }),
+        ]);
+
+        if (!cancelled) {
+          setRelatedArticles(relatedRes.data ?? []);
+          // client-side filter by keywords since OR ilike across joined table is complex
+          const keywords = (res.marketplace_keywords ?? []).map(k => k.toLowerCase());
+          const filtered = (cardsRes.data ?? []).filter(l => {
+            const name = (l.vault_items?.card_name ?? '').toLowerCase();
+            return keywords.some(kw => name.includes(kw));
+          });
+          setMarketplaceCards(filtered);
+        }
 
       } catch (err) {
         console.error('Error loading article:', err);
@@ -297,6 +317,69 @@ const BlogArticlePage = () => {
           </div>
         )}
       </div>
+
+      {marketplaceCards.length > 0 && (
+        <section className="border-t border-border py-14">
+          <div className="container-default max-w-4xl mx-auto">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="border border-white/20 rounded px-2.5 py-1 flex items-center gap-1.5 bg-brand-charcoal shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-brand-red inline-block" />
+                <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-white/80">CardPop Marketplace</span>
+              </div>
+            </div>
+            <h2 className="font-heading font-extrabold text-xl mb-1">Shop Cards From This Article</h2>
+            <p className="text-sm text-muted-foreground mb-6">Live listings from The CardPop Marketplace — updated in real time.</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+              {marketplaceCards.map((listing) => {
+                const card = listing.vault_items;
+                const href = listing.slug ? `/marketplace/${listing.slug}` : `/marketplace/listing/${listing.id}`;
+                return (
+                  <Link
+                    key={listing.id}
+                    to={href}
+                    className="group flex flex-col bg-card border border-border rounded-xl overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                  >
+                    <div className="aspect-[3/4] bg-muted relative overflow-hidden">
+                      {card?.card_image ? (
+                        <img src={card.card_image} alt={card.card_name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <FileText className="w-8 h-8 text-muted-foreground opacity-20" />
+                        </div>
+                      )}
+                      {card?.grade && (
+                        <span className="absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded bg-brand-charcoal text-white">
+                          {card.grading_company} {card.grade}
+                        </span>
+                      )}
+                    </div>
+                    <div className="p-3 flex flex-col gap-1">
+                      <p className="font-semibold text-sm leading-tight line-clamp-2 group-hover:text-primary transition-colors">
+                        {card?.card_name}
+                      </p>
+                      {card?.set_name && (
+                        <p className="text-[11px] text-muted-foreground line-clamp-1">{card.set_name}{card.year ? ` · ${card.year}` : ''}</p>
+                      )}
+                      <p className="font-bold text-sm mt-1" style={{ color: '#CE1126' }}>
+                        A${Number(listing.price_aud).toFixed(2)}
+                        {listing.accepts_offers && <span className="text-[10px] font-normal text-muted-foreground ml-1">· offers</span>}
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+            <div className="mt-6 text-center">
+              <Link
+                to="/marketplace"
+                className="inline-flex items-center text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Browse all listings →
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
 
       {relatedArticles.length > 0 && (
         <section className="bg-secondary/30 py-20 border-t border-border">
