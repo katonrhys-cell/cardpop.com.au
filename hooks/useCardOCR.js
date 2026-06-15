@@ -70,8 +70,9 @@ export function useCardOCR() {
       if (!jsonMatch) throw new Error('Could not extract card data from image');
 
       const data = JSON.parse(jsonMatch[0]);
-      setScanResult(mapOCRResult(data));
-      toast.success('Card scanned! Review the results below.');
+      const result = mapOCRResult(data);
+      setScanResult(result);
+      return result;
     } catch (err) {
       // Non-fatal — OCR is a fallback; log but don't alarm the user
       console.warn('[useCardOCR] scan failed:', err.message);
