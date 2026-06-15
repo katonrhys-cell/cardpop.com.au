@@ -291,6 +291,11 @@ const AddEditCardPage = () => {
     // 1. Try CardSight catalog identification first (returns result directly)
     const csResult = await cardSightIdentify(imageFile);
 
+    if (csResult?.apiError) {
+      toast.warning(`Card identification service unavailable — fill in the details manually. (${csResult.message})`);
+      return;
+    }
+
     if (csResult?.identified) {
       const fields = mapCardSightToFormFields(csResult);
       setFormData(prev => ({ ...prev, ...fields }));
@@ -339,7 +344,7 @@ const AddEditCardPage = () => {
       setIsAutoFilled(true);
       toast.success('Card scanned! Fields auto-filled — please review.');
     } else {
-      toast.error('Could not identify this card. Try a clearer image or fill in the details manually.');
+      toast.error('Could not identify this card — the card may not be in the catalog yet. Please fill in the details manually.');
     }
   };
 
