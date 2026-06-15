@@ -282,16 +282,29 @@
    Use these classes inside .article-content HTML content.
    ═══════════════════════════════════════════════════════ */
 
+/* Article body headings — 700 weight for clarity over 800 extrabold */
+.article-content h1,
+.article-content h2,
+.article-content h3,
+.article-content h4,
+.article-content h5,
+.article-content h6 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
 /* Section label — "SUMMARY", "MARKET DATA" etc. */
 .article-content .section-label {
   display: block;
-  font-size: 0.65rem;
+  font-size: 0.8rem;
   font-weight: 800;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
   color: #CE1126;
   margin-bottom: 0.5rem;
   font-family: var(--font-heading);
+  -webkit-font-smoothing: antialiased;
 }
 
 /* Executive Summary block */
