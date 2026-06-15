@@ -43,7 +43,7 @@ const FeaturedCard = ({ article }) => {
   const imageUrl = article.featured_image_url || null;
   return (
     <Link
-      to={`/blog/${article.id}`}
+      to={`/blog/${article.slug || article.id}`}
       className="group flex flex-col bg-card border border-border rounded-2xl overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       <div className="aspect-video bg-muted relative overflow-hidden">
@@ -80,7 +80,7 @@ const ArticleCard = ({ article }) => {
   const imageUrl = article.featured_image_url || null;
   return (
     <Link
-      to={`/blog/${article.id}`}
+      to={`/blog/${article.slug || article.id}`}
       className="group flex flex-col bg-card border border-border rounded-2xl overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       <div className="aspect-[16/9] bg-muted relative overflow-hidden">
