@@ -33,7 +33,7 @@ export function useCardSight() {
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
         // Return structured error so caller can show a meaningful message
-        const errMsg = err.message || err.error || `CardSight identify failed (${response.status})`;
+        const errMsg = err.error || err.message || `CardSight identify failed (${response.status})`;
         return { identified: false, apiError: true, message: errMsg };
       }
 
