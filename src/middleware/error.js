@@ -10,12 +10,10 @@ const errorMiddleware = (err, req, res, next) => {
 
 	res.status(500).json({
 		message: 'Something went wrong!',
+		// Always expose the actual error message to help diagnose issues
+		error: err.message || 'Unknown error',
 		...(process.env.NODE_ENV !== NodeEnv.Production && {
-			error: {
-				name: err.name,
-				message: err.message,
-				stack: err.stack,
-			},
+			stack: err.stack,
 		}),
 	});
 };
