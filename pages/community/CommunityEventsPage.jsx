@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { CalendarDays, Search, MapPin, SlidersHorizontal, X } from 'lucide-react';
 import { format } from 'date-fns';
@@ -19,22 +19,60 @@ const EVENT_TYPES = Object.entries(EVENT_TYPE_LABELS).map(([value, label]) => ({
 const todayStr = new Date().toISOString().split('T')[0];
 const nextYearStr = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-const CommunityEventsPage = () => {
-  const [searchParams] = useSearchParams();
+const TYPE_SEO = {
+  card_show: {
+    path: '/events/card-shows',
+    title: 'Card Shows in Australia 2026 | CardPop',
+    description: 'Find trading card shows and expos across Australia — Pokemon, Magic, sports cards and more. Dates, venues and tickets for card fairs in Sydney, Melbourne, Brisbane and beyond.',
+    heading: 'Card Shows Across Australia',
+    subheading: 'Trading card fairs, expos and collector shows happening nationwide.',
+  },
+  trade_event: {
+    path: '/events/trade-events',
+    title: 'Trading Card Swap Meets & Trade Events Australia 2026 | CardPop',
+    description: 'Discover trading card swap meets and trade nights across Australia. Find dates, venues and details for collector trading events in every state.',
+    heading: 'Trade Events Across Australia',
+    subheading: 'Swap meets, trading nights and collector exchanges nationwide.',
+  },
+  community_event: {
+    path: '/events/community-events',
+    title: 'Trading Card Community Events Australia 2026 | CardPop',
+    description: 'Join trading card community meetups and collector gatherings across Australia. Find local TCG community events, casual play nights and collector meets near you.',
+    heading: 'Community Events Across Australia',
+    subheading: 'Collector meetups, casual play nights and community gatherings.',
+  },
+  lgs_event: {
+    path: '/events/store-events',
+    title: 'Local Game Store Events & TCG Tournaments Australia 2026 | CardPop',
+    description: 'Find local game store tournaments and TCG events across Australia. Pokemon, Magic: The Gathering, Yu-Gi-Oh, One Piece and more — find a store event near you.',
+    heading: 'Store Events Across Australia',
+    subheading: 'Local game store tournaments and in-store TCG events.',
+  },
+};
+
+const ALL_SEO = {
+  path: '/events',
+  title: 'Trading Card Shows & TCG Events in Australia 2026 | CardPop',
+  description: "Australia's trading card event calendar — card shows, TCG expos, fairs and collector meets in Sydney, Melbourne, Brisbane, Adelaide and Perth. Dates, venues and tickets.",
+  heading: 'Trading Card Events Across Australia',
+  subheading: 'Your go-to directory for TCG tournaments, card fairs, and collector shows happening nationwide. Find events near you — from major expos to local meetups.',
+};
+
+const CommunityEventsPage = ({ defaultType = 'all' }) => {
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterState, setFilterState] = useState('all');
-  const [filterType, setFilterType] = useState(() => searchParams.get('type') || 'all');
-
-  // Sync filter when URL query param changes (e.g. clicking a different event type from the nav)
-  useEffect(() => {
-    setFilterType(searchParams.get('type') || 'all');
-  }, [searchParams]);
+  const [filterType, setFilterType] = useState(defaultType);
   const [startDate, setStartDate] = useState(todayStr);
   const [endDate, setEndDate] = useState(nextYearStr);
+
+  // Reset filter when the route changes between type pages
+  useEffect(() => {
+    setFilterType(defaultType);
+  }, [defaultType]);
 
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -46,7 +84,6 @@ const CommunityEventsPage = () => {
     setIsLoading(true);
     setError(null);
     try {
-      // events_public exposes only approved events with public-safe columns
       const { data, error: fetchError } = await supabase
         .from('events_public')
         .select('*')
@@ -64,9 +101,7 @@ const CommunityEventsPage = () => {
   useEffect(() => {
     isMounted.current = true;
     fetchEvents();
-    return () => {
-      isMounted.current = false;
-    };
+    return () => { isMounted.current = false; };
   }, []);
 
   const filteredEvents = useMemo(() => {
@@ -99,20 +134,17 @@ const CommunityEventsPage = () => {
     return groups;
   }, [filteredEvents]);
 
-  const hasActiveFilters = searchTerm || filterState !== 'all' || filterType !== 'all' ||
+  const hasActiveFilters = searchTerm || filterState !== 'all' || filterType !== defaultType ||
     startDate !== todayStr || endDate !== nextYearStr;
 
   const clearFilters = () => {
     setSearchTerm('');
     setFilterState('all');
-    setFilterType('all');
+    setFilterType(defaultType);
     setStartDate(todayStr);
     setEndDate(nextYearStr);
   };
 
-  // appearance-none + the -webkit-date-and-time-value override stop iOS Safari
-  // from centering the value and shrinking native date inputs, so they line up
-  // with the other filter fields.
   const dateInputClass = 'flex h-11 w-full min-w-0 appearance-none items-center rounded-xl border border-border bg-background px-3 text-left text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [&::-webkit-date-and-time-value]:text-left';
 
   const structuredData = useMemo(() => {
@@ -123,28 +155,26 @@ const CommunityEventsPage = () => {
     return buildEventListJsonLd(upcoming);
   }, [events]);
 
+  const seo = TYPE_SEO[defaultType] || ALL_SEO;
+
   return (
     <div className="flex flex-col bg-background font-sans min-h-screen">
       <SEOHead
-        title="Trading Card Shows & TCG Events in Australia 2026 | CardPop"
-        description="Australia's trading card event calendar — card shows, TCG expos, fairs and collector meets in Sydney, Melbourne, Brisbane, Adelaide and Perth. Dates, venues and tickets."
-        canonicalUrl={`${SITE_URL}/events`}
+        title={seo.title}
+        description={seo.description}
+        canonicalUrl={`${SITE_URL}${seo.path}`}
         structuredData={structuredData}
       />
 
-      {/* Hero — matches all other main section pages */}
+      {/* Hero */}
       <section className="bg-card border-b border-border py-20 text-center">
         <div className="container-default">
           <CalendarDays className="w-12 h-12 text-primary mx-auto mb-6" />
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            Trading Card Events<br className="hidden sm:block" /> Across Australia
-          </h1>
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">{seo.heading}</h1>
           <Badge variant="outline" className="mb-4 text-xs font-semibold tracking-widest uppercase border-primary/40 text-primary px-3 py-1">
             Event Calendar
           </Badge>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Your go-to directory for TCG tournaments, card fairs, and collector shows happening nationwide. Find events near you — from major expos to local meetups.
-          </p>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{seo.subheading}</p>
         </div>
       </section>
 

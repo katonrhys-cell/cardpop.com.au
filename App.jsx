@@ -308,6 +308,10 @@ const App = () => {
                         <Route path="/community/retailers" element={<RetailersPage />} />
                         <Route path="/community/local-traders" element={<LocalTradersPage />} />
                         <Route path="/events" element={<CommunityEventsPage />} />
+                        <Route path="/events/card-shows" element={<CommunityEventsPage defaultType="card_show" />} />
+                        <Route path="/events/trade-events" element={<CommunityEventsPage defaultType="trade_event" />} />
+                        <Route path="/events/community-events" element={<CommunityEventsPage defaultType="community_event" />} />
+                        <Route path="/events/store-events" element={<CommunityEventsPage defaultType="lgs_event" />} />
                         <Route path="/events/:eventId" element={<EventDetailPage />} />
                         <Route path="/community/events" element={<Navigate to="/events" replace />} />
                         <Route path="/community/events/:eventId" element={<RedirectEventDetail />} />
