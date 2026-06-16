@@ -14,7 +14,15 @@ export function getCardSightClient() {
 		if (!apiKey) {
 			throw new Error('CardSight API not configured: set CARDSIGHT_API_KEY');
 		}
-		_client = new CardSightAI({ apiKey });
+		// Wrap the global fetch with a 25-second timeout so a slow/unresponsive
+		// CardSight API doesn't hang the Vercel function until it times out (30s).
+		const fetchWithTimeout = (url, options = {}) => {
+			const controller = new AbortController();
+			const timer = setTimeout(() => controller.abort(), 25_000);
+			return fetch(url, { ...options, signal: controller.signal })
+				.finally(() => clearTimeout(timer));
+		};
+		_client = new CardSightAI({ apiKey, fetch: fetchWithTimeout });
 	}
 	return _client;
 }
