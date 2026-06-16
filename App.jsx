@@ -119,6 +119,7 @@ const WhatIsGradingPage = lazy(() => import('@/pages/grading/WhatIsGradingPage.j
 const GradingScalesPage = lazy(() => import('@/pages/grading/GradingScalesPage.jsx'));
 const GradingCompaniesPage = lazy(() => import('@/pages/grading/GradingCompaniesPage.jsx'));
 const LocalGradersPage = lazy(() => import('@/pages/grading/LocalGradersPage.jsx'));
+const GradeEstimatorPage = lazy(() => import('@/pages/grading/GradeEstimatorPage.jsx'));
 
 // Community & Blog
 const BlogPage = lazy(() => import('@/pages/blog/BlogPage.jsx'));
@@ -300,6 +301,7 @@ const App = () => {
                         <Route path="/grading/companies" element={<GradingCompaniesPage />} />
                         <Route path="/grading/local" element={<LocalGradersPage />} />
                         <Route path="/grading/guide/:scale" element={<GradingScalePage />} />
+                        <Route path="/grading/estimator" element={<GradeEstimatorPage />} />
                         
                         {/* Community & Blog */}
                         <Route path="/blog" element={<BlogPage />} />
