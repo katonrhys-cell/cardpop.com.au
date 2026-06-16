@@ -35,7 +35,7 @@ const FAQPage = () => {
       <SEOHead
         title="FAQ | CardPop Australia — Trading Card Marketplace"
         description="Answers to common questions about buying, selling and trading on CardPop — Australia's trusted trading card marketplace. Learn about fees, the Vault, trades, and payments."
-        canonicalUrl="https://cardpop.online/faq"
+        canonicalUrl="https://cardpop.com.au/faq"
         structuredData={faqSchema}
       />
       

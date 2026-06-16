@@ -92,7 +92,7 @@ app.get('/.well-known/security.txt', (req, res) => {
 	res.type('text/plain').send(`Contact: mailto:support@cardpop.com.au
 Expires: ${new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()}
 Preferred-Languages: en
-Canonical: https://cardpop.online/.well-known/security.txt
+Canonical: https://cardpop.com.au/.well-known/security.txt
 `);
 });
 

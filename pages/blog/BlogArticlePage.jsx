@@ -188,7 +188,7 @@ const BlogArticlePage = () => {
 
   const imageUrl = article.featured_image_url || null;
   const articleSlug = article.slug;
-  const canonicalUrl = `https://cardpop.online/blog/${articleSlug}`;
+  const canonicalUrl = `https://cardpop.com.au/blog/${articleSlug}`;
 
   const blogStructuredData = generateBlogPostingSchema({
     title: article.seo_title || article.title,
@@ -205,9 +205,9 @@ const BlogArticlePage = () => {
     : null;
 
   const breadcrumbStructuredData = generateBreadcrumbStructuredData([
-    { name: 'CardPop', url: 'https://cardpop.online' },
-    { name: 'The Parallel Report', url: 'https://cardpop.online/blog' },
-    ...(article.category ? [{ name: article.category, url: `https://cardpop.online/blog/category/${encodeURIComponent(article.category)}` }] : []),
+    { name: 'CardPop', url: 'https://cardpop.com.au' },
+    { name: 'The Parallel Report', url: 'https://cardpop.com.au/blog' },
+    ...(article.category ? [{ name: article.category, url: `https://cardpop.com.au/blog/category/${encodeURIComponent(article.category)}` }] : []),
     { name: article.title, url: canonicalUrl },
   ]);
 
@@ -215,11 +215,11 @@ const BlogArticlePage = () => {
     '@context': 'https://schema.org',
     '@type': 'Organization',
     name: 'CardPop',
-    url: 'https://cardpop.online',
-    logo: 'https://cardpop.online/logo.png',
+    url: 'https://cardpop.com.au',
+    logo: 'https://cardpop.com.au/logo.png',
     description: "Australia's trusted trading card marketplace and home of The Parallel Report.",
-    sameAs: ['https://cardpop.online/blog'],
-    publishingPrinciples: 'https://cardpop.online/blog',
+    sameAs: ['https://cardpop.com.au/blog'],
+    publishingPrinciples: 'https://cardpop.com.au/blog',
   };
 
   const structuredDataArray = [blogStructuredData, faqStructuredData, breadcrumbStructuredData, organisationSchema].filter(Boolean);

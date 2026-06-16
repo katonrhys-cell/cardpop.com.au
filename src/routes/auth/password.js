@@ -38,7 +38,7 @@ router.post('/reset/request', async (req, res) => {
   const { error } = await supabase.auth.admin.generateLink({
     type: 'recovery',
     email: trimmedEmail,
-    options: { redirectTo: `${process.env.APP_URL || 'https://cardpop.online'}/reset-password` },
+    options: { redirectTo: `${process.env.APP_URL || 'https://cardpop.com.au'}/reset-password` },
   });
 
   if (error) {

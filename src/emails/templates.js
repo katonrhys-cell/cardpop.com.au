@@ -47,7 +47,7 @@ ${footerNoteRow}
 <tr><td style="background:#1C1C1E;border-radius:0 0 12px 12px;padding:24px 40px;text-align:center;">
 <p style="margin:0 0 4px;font-size:14px;font-weight:700;color:#FFFFFF;">CardPop</p>
 <p style="margin:0 0 12px;font-size:12px;color:#9CA3AF;">Australia's Premium Trading Card Marketplace</p>
-<p style="margin:0;font-size:12px;"><a href="https://cardpop.online" style="color:#E63946;text-decoration:none;">cardpop.online</a> &nbsp;&middot;&nbsp; <a href="https://cardpop.online/account" style="color:#9CA3AF;text-decoration:none;">My Account</a> &nbsp;&middot;&nbsp; <a href="mailto:support@cardpop.online" style="color:#9CA3AF;text-decoration:none;">Support</a></p>
+<p style="margin:0;font-size:12px;"><a href="https://cardpop.com.au" style="color:#E63946;text-decoration:none;">cardpop.online</a> &nbsp;&middot;&nbsp; <a href="https://cardpop.com.au/account" style="color:#9CA3AF;text-decoration:none;">My Account</a> &nbsp;&middot;&nbsp; <a href="mailto:support@cardpop.online" style="color:#9CA3AF;text-decoration:none;">Support</a></p>
 </td></tr>
 </table>
 </td></tr></table>
@@ -80,7 +80,7 @@ ${summaryTable([
     'Purchase Confirmed!',
     `You did it, ${buyerName}!`,
     body,
-    `https://cardpop.online/orders/${orderId}`,
+    `https://cardpop.com.au/orders/${orderId}`,
     'View Order',
     'This receipt was sent to confirm your purchase on CardPop. Keep it for your records.',
   );
@@ -104,7 +104,7 @@ ${summaryTable([
     'You Made a Sale!',
     `Well done, ${sellerName}!`,
     body,
-    `https://cardpop.online/orders/${orderId}`,
+    `https://cardpop.com.au/orders/${orderId}`,
     'View Order',
     'This receipt was sent to confirm your sale on CardPop. Keep it for your records.',
   );
@@ -124,7 +124,7 @@ ${summaryTable([
     'Refund Processed',
     `Hi ${buyerName},`,
     body,
-    `https://cardpop.online/orders/${orderId}`,
+    `https://cardpop.com.au/orders/${orderId}`,
     'View Order',
     null,
   );
@@ -145,7 +145,7 @@ ${summaryTable([
     'Refund Issued on Your Sale',
     `Hi ${sellerName},`,
     body,
-    `https://cardpop.online/orders/${orderId}`,
+    `https://cardpop.com.au/orders/${orderId}`,
     'View Order',
     null,
   );
