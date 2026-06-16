@@ -1,0 +1,206 @@
+import { Router } from 'express';
+import { callEbayApi } from '../utils/ebayClient.js';
+import logger from '../utils/logger.js';
+
+const router = Router();
+
+const FETCH_TIMEOUT_MS = 8000;
+
+// ── Free API adapters ─────────────────────────────────────────────────────────
+
+async function searchPokemon(q, take) {
+	const encoded = encodeURIComponent(`name:"${q}*"`);
+	const url = `https://api.pokemontcg.io/v2/cards?q=${encoded}&pageSize=${Math.min(take, 20)}&select=id,name,set,number,rarity,images`;
+	const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+	if (!res.ok) return [];
+	const { data } = await res.json();
+	return (data ?? []).map(c => ({
+		id: c.id,
+		name: c.name,
+		setName: c.set?.name ?? null,
+		year: c.set?.releaseDate ? parseInt(c.set.releaseDate.slice(0, 4), 10) : null,
+		cardNumber: c.number ?? null,
+		rarity: c.rarity ?? null,
+		imageUrl: c.images?.small ?? null,
+		source: 'pokemon-tcg',
+	}));
+}
+
+async function searchScryfall(q, take) {
+	const url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(q)}&order=name&unique=cards`;
+	const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+	if (!res.ok) return [];
+	const { data } = await res.json();
+	return (data ?? []).slice(0, take).map(c => ({
+		id: c.id,
+		name: c.name,
+		setName: c.set_name ?? null,
+		year: c.released_at ? parseInt(c.released_at.slice(0, 4), 10) : null,
+		cardNumber: c.collector_number ?? null,
+		rarity: c.rarity ?? null,
+		imageUrl: c.image_uris?.small ?? c.card_faces?.[0]?.image_uris?.small ?? null,
+		source: 'scryfall',
+	}));
+}
+
+async function searchYugioh(q, take) {
+	const url = `https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(q)}&num=${Math.min(take, 20)}&offset=0`;
+	const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+	if (!res.ok) return [];
+	const { data } = await res.json();
+	return (data ?? []).map(c => ({
+		id: String(c.id),
+		name: c.name,
+		setName: null,
+		year: null,
+		cardNumber: null,
+		rarity: null,
+		imageUrl: c.card_images?.[0]?.image_url_small ?? null,
+		source: 'yugioh-api',
+	}));
+}
+
+function resolveApis(collection) {
+	const col = (collection || '').toLowerCase();
+	if (col === 'pokemon') return ['pokemon'];
+	if (col === 'magic' || col === 'magic: the gathering' || col === 'mtg') return ['scryfall'];
+	if (col === 'yu-gi-oh' || col === 'yugioh') return ['yugioh'];
+	// No collection specified — try all three
+	return ['pokemon', 'scryfall', 'yugioh'];
+}
+
+async function runSearches(apis, q, take) {
+	const tasks = apis.map(api => {
+		if (api === 'pokemon') return searchPokemon(q, take).catch(() => []);
+		if (api === 'scryfall') return searchScryfall(q, take).catch(() => []);
+		if (api === 'yugioh')   return searchYugioh(q, take).catch(() => []);
+		return Promise.resolve([]);
+	});
+	const results = await Promise.all(tasks);
+	return results.flat();
+}
+
+// ── GET /catalog/search ───────────────────────────────────────────────────────
+// Query params: q (required), collection (optional), segment (alias), take (default 10)
+router.get('/search', async (req, res) => {
+	const { q, collection, segment, take = '10' } = req.query;
+	if (!q?.trim()) return res.status(400).json({ error: 'q is required' });
+
+	const limit = Math.min(parseInt(take, 10) || 10, 50);
+	const col = collection || segment || '';
+
+	try {
+		const apis = resolveApis(col);
+		const raw = await runSearches(apis, q.trim(), limit);
+
+		// Deduplicate by source+id, cap at limit
+		const seen = new Set();
+		const results = raw.filter(r => {
+			const key = `${r.source}:${r.id}`;
+			if (seen.has(key)) return false;
+			seen.add(key);
+			return true;
+		}).slice(0, limit);
+
+		res.json({ results });
+	} catch (err) {
+		logger.warn(`[CATALOG_SEARCH] ${err.message}`);
+		res.status(502).json({ error: 'Catalog search failed' });
+	}
+});
+
+// ── GET /catalog/autocomplete ─────────────────────────────────────────────────
+// Lightweight typeahead: name + set only, no images.
+router.get('/autocomplete', async (req, res) => {
+	const { q, collection, take = '5' } = req.query;
+	if (!q?.trim() || q.trim().length < 2) return res.json({ results: [] });
+
+	const limit = Math.min(parseInt(take, 10) || 5, 20);
+	const col = collection || '';
+
+	try {
+		const apis = resolveApis(col);
+		const raw = await runSearches(apis, q.trim(), limit);
+
+		const seen = new Set();
+		const results = raw
+			.filter(r => {
+				const key = `${r.source}:${r.id}`;
+				if (seen.has(key)) return false;
+				seen.add(key);
+				return true;
+			})
+			.slice(0, limit)
+			.map(({ id, name, setName, cardNumber, source }) => ({ id, name, setName, cardNumber, source }));
+
+		res.json({ results });
+	} catch (err) {
+		logger.warn(`[CATALOG_AUTOCOMPLETE] ${err.message}`);
+		res.json({ results: [] });
+	}
+});
+
+// ── GET /catalog/pricing ──────────────────────────────────────────────────────
+// eBay-backed pricing by card name. Returns a CardSight-compatible envelope so
+// callers don't need separate field mapping.
+// Query params: name (required), set (optional), grading_service, grade
+router.get('/pricing', async (req, res) => {
+	const { name, set, grading_service, grade } = req.query;
+	if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
+
+	const parts = [name.trim()];
+	if (set?.trim()) parts.push(set.trim());
+	if (grading_service && grading_service !== 'None' && grading_service !== 'raw') {
+		parts.push(grading_service.trim());
+		if (grade) parts.push(String(grade).trim());
+	}
+	const query = parts.join(' ');
+
+	try {
+		const params = new URLSearchParams({
+			q: query,
+			filter: 'buyingOptions:{AUCTION|FIXED_PRICE},itemLocationCountry:AU',
+			limit: 15,
+			sort: 'newlyListed',
+		});
+
+		const data = await callEbayApi(`/buy/browse/v1/item_summary/search?${params}`);
+		const prices = (data.itemSummaries ?? [])
+			.map(i => parseFloat(i.price?.value || 0))
+			.filter(p => p > 0);
+
+		if (!prices.length) {
+			return res.json({
+				avgPrice: null,  avg_price: null,
+				minPrice: null,  min_price: null,
+				maxPrice: null,  max_price: null,
+				count: 0, salesCount: 0,
+				lastSalePrice: null, last_sale_price: null,
+				lastSaleDate: null,  last_sale_date: null,
+				currency: 'AUD', source: 'ebay_au',
+			});
+		}
+
+		const round2 = n => Math.round(n * 100) / 100;
+		const avg = round2(prices.reduce((a, b) => a + b, 0) / prices.length);
+		const min = round2(Math.min(...prices));
+		const max = round2(Math.max(...prices));
+
+		res.json({
+			avgPrice: avg,   avg_price: avg,
+			minPrice: min,   min_price: min,
+			maxPrice: max,   max_price: max,
+			count: prices.length,
+			salesCount: prices.length,
+			lastSalePrice: null, last_sale_price: null,
+			lastSaleDate: null,  last_sale_date: null,
+			currency: 'AUD',
+			source: 'ebay_au',
+		});
+	} catch (err) {
+		logger.warn(`[CATALOG_PRICING] ${err.message}`);
+		res.status(502).json({ error: 'Pricing lookup failed' });
+	}
+});
+
+export default router;

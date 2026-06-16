@@ -71,7 +71,7 @@ export function useCardSight() {
     if (!q?.trim()) return null;
     try {
       const params = new URLSearchParams({ q: q.trim(), ...opts });
-      const response = await apiServerClient.fetch(`/cardsight/catalog/search?${params}`);
+      const response = await apiServerClient.fetch(`/catalog/search?${params}`);
       if (!response.ok) return null;
       return await response.json();
     } catch {

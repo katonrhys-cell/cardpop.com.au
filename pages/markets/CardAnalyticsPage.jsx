@@ -266,26 +266,19 @@ const CardAnalyticsPage = () => {
     return () => { cancelled = true; };
   }, [cardName, cardSet]);
 
-  // Fetch CardSight completed sales for this card
+  // Fetch eBay pricing for this card (replaces CardSight autocomplete → pricing flow)
   useEffect(() => {
     if (!cardName || cardName === 'Unknown Card') { setCsLoading(false); return; }
     let cancelled = false;
     const run = async () => {
       setCsLoading(true);
       try {
-        const acRes = await apiServerClient.fetch(
-          `/cardsight/autocomplete?q=${encodeURIComponent(cardName)}&take=1`
-        );
-        if (!acRes.ok || cancelled) return;
-        const acData = await acRes.json();
-        const cardId = acData?.results?.[0]?.id ?? acData?.[0]?.id ?? acData?.data?.[0]?.id;
-        if (!cardId || cancelled) return;
-        const prRes = await apiServerClient.fetch(
-          `/cardsight/pricing/${cardId}?period=30d&listing_type=sold`
-        );
+        const params = new URLSearchParams({ name: cardName });
+        if (cardSet) params.set('set', cardSet);
+        const prRes = await apiServerClient.fetch(`/catalog/pricing?${params}`);
         if (!prRes.ok || cancelled) return;
         const prData = await prRes.json();
-        if (!cancelled) setCsData(prData);
+        if (!cancelled && prData.count > 0) setCsData(prData);
       } catch {
         // non-critical
       } finally {
@@ -294,7 +287,7 @@ const CardAnalyticsPage = () => {
     };
     run();
     return () => { cancelled = true; };
-  }, [cardName]);
+  }, [cardName, cardSet]);
 
   const cardUrl = (c) => `/analytics/card?name=${encodeURIComponent(c.name)}&set=${encodeURIComponent(c.set)}&collection=${encodeURIComponent(c.collection)}&price=${c.price}&change=${c.change}`;
 
@@ -485,15 +478,15 @@ const CardAnalyticsPage = () => {
         {/* Metrics */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {[
-            { label: csData ? 'Avg Sold (CardSight)' : liveData ? 'Avg Listed (AUD)' : 'Avg Sold (AUD)',
+            { label: csData ? (csData.source === 'ebay_au' ? 'Avg Listed (eBay AU)' : 'Avg Sold (CardSight)') : liveData ? 'Avg Listed (AUD)' : 'Avg Sold (AUD)',
               value: `$${(csData?.avgPrice ?? liveData?.avgPrice ?? avgSale).toFixed(2)}`, icon: DollarSign, colored: false },
-            { label: csData ? 'High Sale (CardSight)' : liveData ? 'Highest Listed' : '90-Day High',
+            { label: csData ? (csData.source === 'ebay_au' ? 'High Listed (eBay AU)' : 'High Sale (CardSight)') : liveData ? 'Highest Listed' : '90-Day High',
               value: `$${(csData?.maxPrice ?? liveData?.maxPrice ?? high90).toFixed(2)}`,  icon: TrendingUp, colored: false },
-            { label: csData ? 'Low Sale (CardSight)' : liveData ? 'Lowest Listed' : '90-Day Low',
+            { label: csData ? (csData.source === 'ebay_au' ? 'Low Listed (eBay AU)' : 'Low Sale (CardSight)') : liveData ? 'Lowest Listed' : '90-Day Low',
               value: `$${(csData?.minPrice ?? liveData?.minPrice ?? low90).toFixed(2)}`,   icon: TrendingDown, colored: false },
             { label: '7-Day Change',
               value: `${change7d >= 0 ? '+' : ''}${change7d}%`,       icon: Activity, colored: true, up: change7d >= 0 },
-            { label: csData ? 'Completed Sales' : liveData ? 'Active Listings' : '90-Day Sales',
+            { label: csData ? (csData.source === 'ebay_au' ? 'Active Listings' : 'Completed Sales') : liveData ? 'Active Listings' : '90-Day Sales',
               value: csData?.salesCount ?? liveData?.volume ?? vol90,  icon: BarChart3, colored: false },
           ].map(({ label, value, icon: Icon, colored, up }) => (
             <div key={label} className="bg-card border border-border rounded-2xl p-4 text-center">
@@ -504,13 +497,13 @@ const CardAnalyticsPage = () => {
           ))}
         </div>
 
-        {/* CardSight completed sales data */}
+        {/* Market pricing data (eBay AU or CardSight) */}
         {(csLoading || csData) && (() => {
           if (csLoading) {
             return (
               <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-4 flex items-center gap-2 text-xs text-muted-foreground">
                 <Activity className="w-3.5 h-3.5 animate-pulse text-blue-500" />
-                Loading CardSight market data…
+                Loading market data…
               </div>
             );
           }
@@ -519,13 +512,14 @@ const CardAnalyticsPage = () => {
           const max = csData.max_price ?? csData.maximum_price;
           const count = csData.count ?? csData.total_count ?? csData.total;
           if (!avg) return null;
+          const isEbay = csData.source === 'ebay_au';
           return (
             <div className="bg-blue-500/5 border border-blue-500/20 rounded-2xl p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-bold flex items-center gap-2 text-blue-700 dark:text-blue-400">
-                  <ShieldCheck className="w-4 h-4" /> CardSight · 30-Day Completed Sales
+                  <ShieldCheck className="w-4 h-4" /> {isEbay ? 'eBay AU · Active Listings' : 'CardSight · 30-Day Completed Sales'}
                 </h2>
-                {count != null && <span className="text-xs text-muted-foreground">{count} sales</span>}
+                {count != null && <span className="text-xs text-muted-foreground">{count} {isEbay ? 'listings' : 'sales'}</span>}
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center">
