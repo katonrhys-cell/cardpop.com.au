@@ -44,9 +44,6 @@ const AboutPage = () => {
       {/* ── Hero ── */}
       <section className="bg-foreground text-background px-6 py-28 md:py-36">
         <div className="max-w-6xl mx-auto">
-          <span className="inline-block text-primary text-[0.7rem] font-bold tracking-[0.16em] uppercase mb-5">
-            About CardPop Australia
-          </span>
           <h1 className="text-[clamp(2.4rem,5vw,4rem)] leading-[1.05] font-extrabold mb-6 max-w-2xl">
             Built for the hobby.<br />Powered by collectors.
           </h1>
@@ -73,9 +70,6 @@ const AboutPage = () => {
       {/* ── Founder Story ── */}
       <section className="bg-background px-6 py-24">
         <div className="max-w-[760px] mx-auto">
-          <span className="block font-heading font-extrabold text-[5.5rem] leading-[0.7] text-primary mb-8 select-none">
-            "
-          </span>
           <div className="space-y-5 text-[1.05rem] leading-[1.8] text-foreground">
             <p>
               I'm a Melbourne-based collector who fell into the hobby and never looked back.
@@ -180,9 +174,6 @@ const AboutPage = () => {
                 key={name}
                 className="bg-background/5 border border-background/10 rounded-2xl p-8"
               >
-                <span className="block font-heading font-extrabold text-primary text-3xl leading-none mb-4">
-                  "
-                </span>
                 <p className="text-sm text-background/75 leading-[1.75] mb-6">{quote}</p>
                 <p className="font-bold text-background text-sm">{name}</p>
                 <p className="text-xs text-background/40 mt-0.5">{location}</p>
