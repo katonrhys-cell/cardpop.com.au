@@ -163,7 +163,7 @@ const AdminVerificationDashboard = () => {
   const pendingCount = verifications.filter(v => v.status === 'pending').length;
 
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-6 animate-in fade-in duration-300 py-6 px-4 sm:px-6 md:px-8 max-w-7xl mx-auto">
       <Helmet><title>Verification Management | Admin</title></Helmet>
 
       <div className="flex items-center justify-between gap-4 flex-wrap">
