@@ -168,17 +168,13 @@ router.post(
 );
 
 // ─── GET /cardsight/status ───────────────────────────────────────────────────
-// Quick health check: verifies the API key is set and can reach CardSight.
-router.get('/status', async (req, res) => {
-  try {
-    const client = getCardSightClient();
-    // Minimal API call — just fetch the first segment to confirm connectivity
-    const { data } = await client.catalog.segments({ take: 1 });
-    res.json({ ok: true, segments: data?.segments?.length ?? 0 });
-  } catch (err) {
-    logger.error(`[CARDSIGHT] Status check failed: ${err.message}`);
-    res.status(500).json({ ok: false, error: err.message });
+// Quick health check: verifies the API key env var is set (no live API call).
+router.get('/status', (req, res) => {
+  const key = process.env.CARDSIGHT_API_KEY || process.env.CARDSIGHTAI_API_KEY;
+  if (!key) {
+    return res.status(500).json({ ok: false, error: 'CARDSIGHT_API_KEY is not set in environment variables' });
   }
+  res.json({ ok: true, keyConfigured: true, keyPrefix: key.slice(0, 6) + '...' });
 });
 
 // ─── GET /cardsight/pricing/:cardId ──────────────────────────────────────────
