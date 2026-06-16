@@ -132,7 +132,7 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
       };
 
       if (article?.id) {
-        const { error } = await supabase.from('blog_articles').update(payload).eq('id', article.id).eq('author_id', currentUser?.id);
+        const { error } = await supabase.from('blog_articles').update(payload).eq('id', article.id);
         if (error) throw error;
         toast.success('Article updated.');
       } else {

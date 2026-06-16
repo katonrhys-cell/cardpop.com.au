@@ -282,16 +282,29 @@
    Use these classes inside .article-content HTML content.
    ═══════════════════════════════════════════════════════ */
 
+/* Article body headings — 700 weight for clarity over 800 extrabold */
+.article-content h1,
+.article-content h2,
+.article-content h3,
+.article-content h4,
+.article-content h5,
+.article-content h6 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
 /* Section label — "SUMMARY", "MARKET DATA" etc. */
 .article-content .section-label {
   display: block;
-  font-size: 0.65rem;
+  font-size: 0.8rem;
   font-weight: 800;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.15em;
   text-transform: uppercase;
   color: #CE1126;
   margin-bottom: 0.5rem;
   font-family: var(--font-heading);
+  -webkit-font-smoothing: antialiased;
 }
 
 /* Executive Summary block */
@@ -402,4 +415,73 @@
   font-size: 0.8rem;
   font-weight: 700;
   margin: 1rem 0;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   ARTICLE BODY PROSE — restores spacing/list defaults stripped by
+   Tailwind preflight (no @tailwindcss/typography plugin installed).
+   Higher-specificity component rules (.article-summary, .article-
+   takeaways, .article-sources, .not-prose blocks) override these.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Paragraphs — only unclassed elements so not-prose utility-classed
+   <p> tags keep their own mb-* / leading-* utilities intact.        */
+.article-content p:not([class]) {
+  margin-bottom: 1.25rem;
+  line-height: 1.75;
+}
+.article-content p:not([class]):last-child { margin-bottom: 0; }
+
+/* Headings — sizes and vertical rhythm (preflight sets font-size:inherit) */
+.article-content h2 {
+  font-size: 1.5rem;
+  margin-top: 2.25rem;
+  margin-bottom: 0.75rem;
+}
+.article-content h3 {
+  font-size: 1.25rem;
+  margin-top: 1.75rem;
+  margin-bottom: 0.5rem;
+}
+.article-content h4 {
+  font-size: 1.0625rem;
+  margin-top: 1.25rem;
+  margin-bottom: 0.375rem;
+}
+
+/* Ordered and unordered lists — restore numbers/bullets and indentation.
+   .article-takeaways ul/.article-sources ol (specificity 0,2,1) beat
+   these (0,1,1) so component styling is unaffected.                  */
+.article-content ol,
+.article-content ul {
+  margin: 0.75rem 0 1.25rem;
+  padding-left: 1.75rem;
+}
+.article-content ol { list-style: decimal; }
+.article-content ul { list-style: disc; }
+
+/* List items */
+.article-content li {
+  margin-bottom: 0.625rem;
+  line-height: 1.7;
+}
+.article-content li:last-child { margin-bottom: 0; }
+.article-content li > p:not([class]) { margin-bottom: 0.25rem; }
+
+/* Inline text */
+.article-content strong { font-weight: 700; }
+.article-content em     { font-style: italic; }
+
+/* Plain links (no Tailwind class) — use brand red */
+.article-content a:not([class]) {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.article-content a:not([class]):hover { opacity: 0.8; }
+
+/* Grade scale coloured header rows — guarantee white text on coloured
+   backgrounds regardless of Tailwind class purge state.               */
+.article-content [style*="background:"] {
+  color: white;
 }

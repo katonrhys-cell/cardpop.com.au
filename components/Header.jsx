@@ -217,7 +217,6 @@ const useHoverDropdown = () => {
   useEffect(() => { setOpen(false); }, [location.pathname]);
 
   useEffect(() => () => clearTimeout(timerRef.current), []);
-  useEffect(() => { setOpen(false); }, [location.pathname]);
 
   return { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick };
 };
@@ -323,11 +322,6 @@ const BlogDropdown = ({ onNavigate }) => {
   const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
   const location = useLocation();
   const isBlogActive = location.pathname.startsWith('/blog');
-
-  const handleMouseEnter = () => { clearTimeout(timerRef.current); setOpen(true); };
-  const handleMouseLeave = () => { timerRef.current = setTimeout(() => setOpen(false), 120); };
-  useEffect(() => () => clearTimeout(timerRef.current), []);
-  useEffect(() => { setOpen(false); }, [location.pathname]);
 
   return (
     <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
@@ -448,10 +442,10 @@ const CommunityDropdown = ({ onNavigate }) => {
 };
 
 const EVENT_ITEMS = [
-  { type: 'card_show',       label: 'Card Shows',       desc: 'Trading card fairs and expos',        Icon: Ticket,          gradient: 'from-red-500 to-rose-600'      },
-  { type: 'trade_event',     label: 'Trade Events',     desc: 'Swap meets and trading nights',       Icon: Handshake,       gradient: 'from-blue-500 to-indigo-600'   },
-  { type: 'community_event', label: 'Community Events', desc: 'Collector meetups and community fun', Icon: Users,           gradient: 'from-violet-500 to-purple-600' },
-  { type: 'lgs_event',       label: 'Store Events',     desc: 'Local game store tournaments',        Icon: Store,           gradient: 'from-amber-500 to-orange-500'  },
+  { href: '/events/card-shows',       label: 'Card Shows',       desc: 'Trading card fairs and expos',        Icon: Ticket,    gradient: 'from-red-500 to-rose-600'      },
+  { href: '/events/trade-events',     label: 'Trade Events',     desc: 'Swap meets and trading nights',       Icon: Handshake, gradient: 'from-blue-500 to-indigo-600'   },
+  { href: '/events/community-events', label: 'Community Events', desc: 'Collector meetups and community fun', Icon: Users,     gradient: 'from-violet-500 to-purple-600' },
+  { href: '/events/store-events',     label: 'Store Events',     desc: 'Local game store tournaments',        Icon: Store,     gradient: 'from-amber-500 to-orange-500'  },
 ];
 
 // ─── Events dropdown ──────────────────────────────────────────────────────────
@@ -491,8 +485,8 @@ const EventsDropdown = ({ onNavigate }) => {
           <div className="p-3 grid gap-0.5">
             {EVENT_ITEMS.map(item => (
               <Link
-                key={item.type}
-                to={`/events?type=${item.type}`}
+                key={item.href}
+                to={item.href}
                 onClick={() => { setOpen(false); onNavigate?.(); }}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
               >
@@ -585,9 +579,9 @@ const MobileEventsSection = ({ onNavigate }) => {
             </Link>
           </SheetClose>
           {EVENT_ITEMS.map(item => (
-            <SheetClose key={item.type} asChild>
+            <SheetClose key={item.href} asChild>
               <Link
-                to={`/events?type=${item.type}`}
+                to={item.href}
                 onClick={onNavigate}
                 className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
               >
@@ -668,7 +662,7 @@ const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout })
           )}
         </div>
         <div className="flex flex-col items-start overflow-hidden flex-1">
-          <span className="text-sm font-bold truncate w-full text-left">{currentUser.name || 'Collector'}</span>
+          <span className="text-sm font-bold truncate w-full text-left">{currentUser.display_name || currentUser.name || 'Collector'}</span>
           <span className="text-xs text-muted-foreground truncate w-full text-left">View Profile Options</span>
         </div>
         <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${expanded ? 'rotate-180' : ''}`} />
@@ -741,9 +735,7 @@ const Header = () => {
   // making the new page appear blank even though it rendered correctly.
   useEffect(() => {
     const clearStaleBodyStyles = () => {
-      const hasOpenLayer = document.querySelector(
-        '[data-state="open"][role="dialog"], [data-state="open"][role="menu"], [data-radix-popper-content-wrapper]'
-      );
+      const hasOpenLayer = document.querySelector('[data-state="open"][role="dialog"]');
       if (!hasOpenLayer) {
         if (document.body.style.pointerEvents === 'none') document.body.style.pointerEvents = '';
         if (document.body.style.overflow === 'hidden') document.body.style.overflow = '';
@@ -770,7 +762,7 @@ const Header = () => {
   // 400ms to catch anything that the close animation set after the route changed.
   useEffect(() => {
     const clearStaleBodyStyles = () => {
-      const hasOpenLayer = document.querySelector('[data-state="open"][role="dialog"], [data-state="open"][role="menu"]');
+      const hasOpenLayer = document.querySelector('[data-state="open"][role="dialog"]');
       if (!hasOpenLayer) {
         if (document.body.style.pointerEvents === 'none') document.body.style.pointerEvents = '';
         if (document.body.style.overflow === 'hidden') document.body.style.overflow = '';

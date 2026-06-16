@@ -1,13 +1,19 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe } from 'lucide-react';
+import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Handshake, Store } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatEntryFee } from '@/lib/eventSeo.js';
 import { toast } from 'sonner';
 
+const EVENT_TYPE_STYLES = {
+  card_show:       { gradient: 'from-red-500 to-rose-600',      Icon: Ticket    },
+  trade_event:     { gradient: 'from-blue-500 to-indigo-600',   Icon: Handshake },
+  community_event: { gradient: 'from-violet-500 to-purple-600', Icon: Users     },
+  lgs_event:       { gradient: 'from-amber-500 to-orange-500',  Icon: Store     },
+};
+
 const EventDetailCard = ({ event }) => {
-  const isTradeShow = event.type === 'Trade Show' || event.type === 'Card Show';
 
   const handleShare = (platform) => {
     const url = encodeURIComponent(window.location.href);
@@ -45,22 +51,40 @@ const EventDetailCard = ({ event }) => {
       <div className="bg-card rounded-3xl overflow-hidden border border-border shadow-lg">
         {/* Hero Image */}
         <div className="w-full h-64 md:h-96 lg:h-[450px] relative bg-muted">
-          <img 
-            src={event.image} 
-            alt={event.name} 
+          <img
+            src={event.image}
+            alt={event.name}
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-          <div className="absolute bottom-0 left-0 p-6 md:p-10 w-full">
-            <Badge 
-              variant="secondary" 
-              className={`mb-4 font-bold shadow-sm backdrop-blur-md border-none px-3 py-1 text-sm ${
-                isTradeShow ? 'bg-primary text-white' : 'bg-secondary text-white'
-              }`}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent" />
+
+          {/* Type pill — top-left */}
+          <div className="absolute top-4 left-4">
+            {(() => {
+              const style = EVENT_TYPE_STYLES[event.event_type];
+              if (style) {
+                const { gradient, Icon } = style;
+                return (
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r ${gradient} text-white text-sm font-bold shadow-md backdrop-blur-sm`}>
+                    <Icon className="w-3.5 h-3.5" />
+                    {event.type}
+                  </span>
+                );
+              }
+              return (
+                <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-sm text-white text-sm font-bold shadow-md">
+                  {event.type}
+                </span>
+              );
+            })()}
+          </div>
+
+          {/* Title — bottom of hero, with strong text shadow for legibility */}
+          <div className="absolute bottom-0 left-0 px-5 pb-5 md:px-10 md:pb-8 w-full">
+            <h1
+              className="font-serif text-2xl md:text-5xl lg:text-6xl font-extrabold text-white leading-tight tracking-tight"
+              style={{ textShadow: '0 2px 16px rgba(0,0,0,0.85), 0 1px 4px rgba(0,0,0,0.95)' }}
             >
-              {event.type}
-            </Badge>
-            <h1 className="font-serif text-3xl md:text-5xl lg:text-6xl font-extrabold text-white leading-tight tracking-tight">
               {event.name}
             </h1>
           </div>
