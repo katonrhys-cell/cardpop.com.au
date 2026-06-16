@@ -94,6 +94,8 @@ const AccountVerification = lazy(() => import('@/pages/account/AccountVerificati
 const AccountSellerTier = lazy(() => import('@/pages/account/AccountSellerTier.jsx'));
 const AccountOrders = lazy(() => import('@/pages/account/AccountOrders.jsx'));
 const AccountEvents = lazy(() => import('@/pages/account/AccountEvents.jsx'));
+const AccountSoleTrader = lazy(() => import('@/pages/account/AccountSoleTrader.jsx'));
+const SoleTraderStorePage = lazy(() => import('@/pages/SoleTraderStorePage.jsx'));
 
 // Vault & Trading
 const MyVaultPage = lazy(() => import('@/pages/MyVaultPage.jsx'));
@@ -226,6 +228,7 @@ const App = () => {
                         
                         {/* Public Profile Routes */}
                         <Route path="/seller/:userId" element={<PublicSellerProfilePage />} />
+                        <Route path="/dealer/:userId" element={<SoleTraderStorePage />} />
                         
                         {/* Unified Product Route — optional slug is cosmetic, id is used for fetching */}
                         <Route path="/product/:source/:id/:slug?" element={<ProductDetailPage />} />
@@ -264,6 +267,7 @@ const App = () => {
                         <Route path="/account/seller-tier" element={<ProtectedRoute><AccountSellerTier /></ProtectedRoute>} />
                         <Route path="/account/orders" element={<ProtectedRoute><AccountOrders /></ProtectedRoute>} />
                         <Route path="/account/events" element={<ProtectedRoute><AccountEvents /></ProtectedRoute>} />
+                        <Route path="/account/sole-trader" element={<ProtectedRoute><AccountSoleTrader /></ProtectedRoute>} />
                         
                         {/* Vault & Trading */}
                         <Route path="/vault" element={<ProtectedRoute><MyVaultPage /></ProtectedRoute>} />
