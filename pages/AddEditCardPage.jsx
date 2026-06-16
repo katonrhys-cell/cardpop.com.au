@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-  ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, Sparkles, Loader2,
+  ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, ChevronDown, Sparkles, Loader2,
   Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -84,6 +84,7 @@ const AddEditCardPage = () => {
   const [psaPopData, setPsaPopData]           = useState(null);
   const [photoQuality, setPhotoQuality]       = useState(null);
   const [checkingQuality, setCheckingQuality] = useState(false);
+  const [showAutoGuide, setShowAutoGuide]     = useState(false);
 
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
@@ -971,11 +972,13 @@ const AddEditCardPage = () => {
                           <Label className="text-xs font-bold text-foreground">Signature Type</Label>
                           <div className="grid grid-cols-2 gap-2">
                             {[
-                              { value: 'on_card',    label: 'On-Card',            desc: 'Player signed the card directly' },
-                              { value: 'sticker',    label: 'Sticker / Label',    desc: 'Signed sticker affixed by manufacturer' },
-                              { value: 'cut',        label: 'Cut Signature',      desc: 'Historical signature embedded into the card' },
-                              { value: 'licensed',   label: 'Licensed / Certified', desc: 'Pulled from sealed box — authenticity guaranteed by manufacturer' },
-                              { value: 'in_person',  label: 'In-Person (IP)',     desc: 'Obtained directly from the player — may not include authentication' },
+                              { value: 'on_card',     label: 'On-Card',          desc: 'Hard-signed directly on the card surface' },
+                              { value: 'sticker',     label: 'Sticker Auto',     desc: 'Signed sticker applied by the manufacturer' },
+                              { value: 'cut',         label: 'Cut Signature',    desc: 'Historical signature cut from a document' },
+                              { value: 'relic_patch', label: 'Relic & Patch',    desc: 'Auto + embedded game-used memorabilia' },
+                              { value: 'in_person',   label: 'In-Person / TTM',  desc: 'Obtained directly from the player' },
+                              { value: 'redemption',  label: 'Redemption Card',  desc: 'Redeemable code — signed card sent later' },
+                              { value: 'book',        label: 'Book Card',        desc: 'Multi-panel card with multiple autos or swatches' },
                             ].map(({ value, label, desc }) => (
                               <button
                                 key={value}
@@ -991,6 +994,74 @@ const AddEditCardPage = () => {
                                 <span className={`text-[10px] mt-0.5 leading-tight ${formData.autoType === value ? 'text-blue-600/70 dark:text-blue-400/70' : 'text-muted-foreground'}`}>{desc}</span>
                               </button>
                             ))}
+                          </div>
+
+                          {/* Collapsible auto type guide */}
+                          <div className="rounded-xl border border-blue-400/25 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setShowAutoGuide(v => !v)}
+                              className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-blue-400/5 transition-colors"
+                            >
+                              <span className="text-[11px] font-bold text-blue-700 dark:text-blue-400">Not sure which type? View guide</span>
+                              <ChevronDown className={`h-3.5 w-3.5 text-blue-600 dark:text-blue-400 transition-transform duration-200 ${showAutoGuide ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showAutoGuide && (
+                              <div className="px-3 pb-3 divide-y divide-border/40">
+                                {[
+                                  {
+                                    title: 'On-Card Autograph',
+                                    badge: 'Highest Value',
+                                    badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20',
+                                    body: 'Also known as hard-signed autos. The player signs their name directly onto the surface of the trading card. These are the most sought-after by collectors — they carry a more personal connection to the player and are visually superior to other auto types.',
+                                  },
+                                  {
+                                    title: 'Sticker Autograph',
+                                    badge: 'Common',
+                                    badgeClass: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20',
+                                    body: 'The manufacturer sends athletes large sheets of clear stickers or labels. The player signs the stickers, which are sent back to the company and applied to the finished cards. This method is highly efficient for manufacturers, but typically carries a lower collector value than on-card autos.',
+                                  },
+                                  {
+                                    title: 'Cut Signature',
+                                    badge: 'Historical',
+                                    badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20',
+                                    body: 'Used for historical figures, vintage athletes, or celebrities who are no longer alive or available to sign modern cards. The manufacturer cuts a signature from an old document, letter, or cheque and mounts it directly into the card.',
+                                  },
+                                  {
+                                    title: 'Relic & Patch Auto',
+                                    badge: 'Premium',
+                                    badgeClass: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-500/20',
+                                    body: 'These cards feature an athlete\'s signature alongside an embedded piece of memorabilia — a game-used jersey, bat, or glove. A Patch Auto includes a multi-coloured embroidered jersey piece (often boosting value), while a Logo Patch Auto features a highly coveted league, team, or manufacturer logo.',
+                                  },
+                                  {
+                                    title: 'In-Person / TTM Auto',
+                                    badge: 'Collector Obtained',
+                                    badgeClass: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20',
+                                    body: 'Signatures obtained directly by the collector rather than pulled from a factory pack. Collectors either meet a player at a game or signing event (In-Person) or mail a card to the player\'s team facility requesting a signature (Through The Mail). These may not include third-party authentication.',
+                                  },
+                                  {
+                                    title: 'Redemption Card',
+                                    badge: 'Pending Auto',
+                                    badgeClass: 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-500/20',
+                                    body: 'When an athlete fails to return their signed cards before a product\'s release, the manufacturer inserts a Redemption card instead. The card contains a unique code the collector submits on the manufacturer\'s website, and the actual signed card is mailed to them at a later date.',
+                                  },
+                                  {
+                                    title: 'Book Card',
+                                    badge: 'Multi-Panel',
+                                    badgeClass: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20',
+                                    body: 'Oversized, multi-panel cards that open like a book. They often contain multiple autographs, large jersey swatches, or a combination of several player signatures — making them some of the most visually impressive and collectible cards in any set.',
+                                  },
+                                ].map(({ title, badge, badgeClass, body }) => (
+                                  <div key={title} className="py-2.5 first:pt-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-[11px] font-bold text-foreground">{title}</span>
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${badgeClass}`}>{badge}</span>
+                                    </div>
+                                    <p className="text-[10px] leading-relaxed text-muted-foreground">{body}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
 
