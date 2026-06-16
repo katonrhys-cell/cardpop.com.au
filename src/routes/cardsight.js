@@ -56,22 +56,36 @@ router.post(
       { type: file.mimetype }
     );
 
-    // 1. Identify the card
-    const { data: identifyResult } = await client.identify.card(image);
+    // 1. Identify the card across all major segments in parallel.
+    // identify.card() defaults to baseball only — for a multi-sport marketplace
+    // we try each major segment and take the highest-confidence detection.
+    const SEGMENTS = ['basketball', 'baseball', 'football', 'soccer', 'pokemon', 'hockey', 'ufc', 'golf', 'tennis', 'cricket'];
+    const segmentResults = await Promise.allSettled(
+      SEGMENTS.map(seg => client.identify.cardBySegment(seg, image))
+    );
 
-    if (!identifyResult?.detections?.length) {
-      logger.info(
-        `[CARDSIGHT] No detections: requestId=${identifyResult?.requestId} success=${identifyResult?.success} ` +
-        `processingTime=${identifyResult?.processingTime} messages=${JSON.stringify(identifyResult?.messages ?? [])}`
-      );
+    // Merge all detections from every segment that returned successfully
+    let allDetections = [];
+    let serverMessages = [];
+    for (const r of segmentResults) {
+      if (r.status === 'fulfilled' && r.value?.data) {
+        allDetections = allDetections.concat(r.value.data.detections ?? []);
+        serverMessages = serverMessages.concat(r.value.data.messages ?? []);
+      }
+    }
+
+    if (!allDetections.length) {
+      logger.info(`[CARDSIGHT] No detections across ${SEGMENTS.length} segments. messages=${JSON.stringify(serverMessages)}`);
       return res.json({
         identified: false,
         message: 'No card detected in the image.',
-        serverMessages: identifyResult?.messages ?? [],
+        serverMessages,
       });
     }
 
-    const best = getHighestConfidenceDetection(identifyResult);
+    // Pick the highest-confidence detection across all segments
+    const syntheticResult = { detections: allDetections };
+    const best = getHighestConfidenceDetection(syntheticResult);
     if (!best) {
       return res.json({ identified: false, message: 'Could not identify card with sufficient confidence.' });
     }
