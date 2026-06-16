@@ -47,7 +47,7 @@ const PhotographyStandardPage = () => {
 
       <h2>Equipment Levels</h2>
       <p>You don't need expensive gear to meet the standard — a modern phone and window light are enough to start.</p>
-      <div className="not-prose grid md:grid-cols-3 gap-4 my-6">
+      <div className="not-prose grid md:grid-cols-3 gap-4 mt-3 mb-8">
         {EQUIPMENT_LEVELS.map((level) => (
           <div key={level.name} className="rounded-2xl border border-border bg-card p-5">
             <h3 className="font-bold text-foreground mb-0.5">{level.name}</h3>
@@ -95,7 +95,8 @@ const PhotographyStandardPage = () => {
       </ol>
 
       <h2>Seller Upload Rules</h2>
-      <div className="not-prose grid sm:grid-cols-2 gap-4 my-6">
+      <p>Photos must represent the actual card you're selling. The following rules apply to all listings.</p>
+      <div className="not-prose grid sm:grid-cols-2 gap-4 mt-3 mb-8">
         <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-5">
           <h3 className="font-bold text-foreground mb-3">Allowed</h3>
           <ul className="space-y-1.5 text-sm text-muted-foreground">
