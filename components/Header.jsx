@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, startTransition } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ShoppingCart, Menu, Shield, MessageSquare, ArrowRightLeft,
@@ -99,8 +99,10 @@ const MobileBrowseSection = ({ onNavigate }) => {
   const navigate = useNavigate();
 
   const handleCollectionNav = (slug) => {
-    navigate(`/collections/${slug}`);
-    onNavigate?.();
+    startTransition(() => {
+      navigate(`/collections/${slug}`);
+      onNavigate?.();
+    });
   };
 
   return (
@@ -111,7 +113,7 @@ const MobileBrowseSection = ({ onNavigate }) => {
 
       {/* TCG accordion */}
       <button
-        onClick={() => setTcgOpen(o => !o)}
+        onClick={() => startTransition(() => setTcgOpen(o => !o))}
         className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-muted transition-colors mb-0.5"
       >
         <span className="text-sm font-bold text-foreground flex items-center gap-2">
@@ -140,7 +142,7 @@ const MobileBrowseSection = ({ onNavigate }) => {
 
       {/* Sports accordion */}
       <button
-        onClick={() => setSportsOpen(o => !o)}
+        onClick={() => startTransition(() => setSportsOpen(o => !o))}
         className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-muted transition-colors mb-0.5"
       >
         <span className="text-sm font-bold text-foreground flex items-center gap-2">
@@ -200,7 +202,7 @@ const useHoverDropdown = () => {
       return;
     }
     openedByHover.current = false;
-    setOpen(o => !o);
+    startTransition(() => setOpen(o => !o));
   };
 
   // Close on outside click
@@ -512,7 +514,7 @@ const MobileBlogSection = ({ onNavigate }) => {
   return (
     <div className="mb-4">
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={() => startTransition(() => setOpen(o => !o))}
         className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-muted transition-colors mb-0.5"
       >
         <span className="text-sm font-bold text-foreground flex items-center gap-2">
@@ -558,7 +560,7 @@ const MobileEventsSection = ({ onNavigate }) => {
   return (
     <div className="mb-4">
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={() => startTransition(() => setOpen(o => !o))}
         className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-muted transition-colors mb-0.5"
       >
         <span className="text-sm font-bold text-foreground flex items-center gap-2">
@@ -604,7 +606,7 @@ const MobileCommunitySection = ({ onNavigate }) => {
   return (
     <div className="mb-4">
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={() => startTransition(() => setOpen(o => !o))}
         className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-muted transition-colors mb-0.5"
       >
         <span className="text-sm font-bold text-foreground flex items-center gap-2">
