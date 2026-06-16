@@ -48,7 +48,7 @@ export const generateResponsiveSizes = (maxWidth = 1200) => {
 export const generateSrcSet = (baseUrl, sizes) => {
   return sizes
     .map(size => {
-      const url = new URL(baseUrl, typeof window !== 'undefined' ? window.location.origin : 'https://cardpop.online');
+      const url = new URL(baseUrl, typeof window !== 'undefined' ? window.location.origin : 'https://cardpop.com.au');
       url.searchParams.set('w', size);
       url.searchParams.set('q', '80');
       url.searchParams.set('fm', 'webp');
@@ -70,7 +70,7 @@ export const generateOptimizedImageUrl = (imageUrl, options = {}) => {
   } = options;
   
   try {
-    const url = new URL(imageUrl, typeof window !== 'undefined' ? window.location.origin : 'https://cardpop.online');
+    const url = new URL(imageUrl, typeof window !== 'undefined' ? window.location.origin : 'https://cardpop.com.au');
     url.searchParams.set('w', width);
     url.searchParams.set('q', quality);
     url.searchParams.set('fm', format);

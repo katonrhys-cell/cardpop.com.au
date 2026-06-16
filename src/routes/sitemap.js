@@ -18,7 +18,7 @@ router.get('/products', async (req, res) => {
         const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${products?.map(product => `  <url>
-    <loc>https://cardpop.online/shop/product/${product.id}</loc>
+    <loc>https://cardpop.com.au/shop/product/${product.id}</loc>
     <lastmod>${new Date(product.updated).toISOString()}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
@@ -48,7 +48,7 @@ router.get('/listings', async (req, res) => {
         const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${listings?.map(listing => `  <url>
-    <loc>https://cardpop.online/vault/listing/${listing.id}</loc>
+    <loc>https://cardpop.com.au/vault/listing/${listing.id}</loc>
     <lastmod>${new Date(listing.updated).toISOString()}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
@@ -78,7 +78,7 @@ router.get('/blog', async (req, res) => {
         const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${posts?.map(post => `  <url>
-    <loc>https://cardpop.online/blog/${post.slug || post.id}</loc>
+    <loc>https://cardpop.com.au/blog/${post.slug || post.id}</loc>
     <lastmod>${new Date(post.updated).toISOString()}</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
@@ -98,19 +98,19 @@ router.get('/index', async (req, res) => {
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <sitemap>
-    <loc>https://cardpop.online/sitemap.xml</loc>
+    <loc>https://cardpop.com.au/sitemap.xml</loc>
     <lastmod>${new Date().toISOString()}</lastmod>
   </sitemap>
   <sitemap>
-    <loc>https://cardpop.online/api/sitemap/products</loc>
+    <loc>https://cardpop.com.au/api/sitemap/products</loc>
     <lastmod>${new Date().toISOString()}</lastmod>
   </sitemap>
   <sitemap>
-    <loc>https://cardpop.online/api/sitemap/listings</loc>
+    <loc>https://cardpop.com.au/api/sitemap/listings</loc>
     <lastmod>${new Date().toISOString()}</lastmod>
   </sitemap>
   <sitemap>
-    <loc>https://cardpop.online/api/sitemap/blog</loc>
+    <loc>https://cardpop.com.au/api/sitemap/blog</loc>
     <lastmod>${new Date().toISOString()}</lastmod>
   </sitemap>
 </sitemapindex>`;

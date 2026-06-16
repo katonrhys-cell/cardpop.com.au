@@ -121,7 +121,7 @@ export const generateLocalBusinessSchema = () => {
     "@type": "OnlineStore",
     "name": "CardPop",
     "description": "Australia's most trusted trading card marketplace for Pokémon, Magic: The Gathering, sports cards and more.",
-    "url": "https://cardpop.online",
+    "url": "https://cardpop.com.au",
     "address": {
       "@type": "PostalAddress",
       "postOfficeBoxNumber": "1024",
@@ -174,7 +174,7 @@ export const generateBlogPostingSchema = (blogPost) => {
 export const generateSitemap = (listings, products) => {
   // A helper function to generate XML strings. 
   // In a real frontend app, this is often handled by a serverless function, but we can generate text.
-  const baseUrl = "https://cardpop.online";
+  const baseUrl = "https://cardpop.com.au";
   let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
   
   xml += `  <url>\n    <loc>${baseUrl}/</loc>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>\n`;

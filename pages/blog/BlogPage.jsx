@@ -171,7 +171,7 @@ const BlogPage = () => {
       <SEOHead
         title={pageTitle}
         description="The Parallel Report by CardPop — trading card news, market analysis, grading guides and investment insights for Australian Pokémon, MTG and sports card collectors."
-        canonicalUrl={categoryParam ? `https://cardpop.online/blog/category/${categoryParam}` : 'https://cardpop.online/blog'}
+        canonicalUrl={categoryParam ? `https://cardpop.com.au/blog/category/${categoryParam}` : 'https://cardpop.com.au/blog'}
       />
 
       {/* ── Hero ── */}

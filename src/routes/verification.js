@@ -28,7 +28,7 @@ router.post('/send-verification-email', authMiddleware, async (req, res) => {
   const { error } = await supabase.auth.admin.generateLink({
     type: 'signup',
     email: user.email,
-    options: { redirectTo: `${process.env.APP_URL || 'https://cardpop.online'}/account` },
+    options: { redirectTo: `${process.env.APP_URL || 'https://cardpop.com.au'}/account` },
   });
 
   if (error) {
@@ -58,7 +58,7 @@ router.post('/resend-verification', async (req, res) => {
   const { error } = await supabase.auth.admin.generateLink({
     type: 'signup',
     email: trimmedEmail,
-    options: { redirectTo: `${process.env.APP_URL || 'https://cardpop.online'}/account` },
+    options: { redirectTo: `${process.env.APP_URL || 'https://cardpop.com.au'}/account` },
   });
 
   // Always return success to prevent email enumeration
