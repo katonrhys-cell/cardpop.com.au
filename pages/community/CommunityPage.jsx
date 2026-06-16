@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
-import { MessageSquare, Users, Store, ExternalLink, ShieldCheck } from 'lucide-react';
+import { MessageSquare, Users, Store, ExternalLink, ShieldCheck, X, Sparkles } from 'lucide-react';
 
 const WhatnotIcon = ({ className = 'w-4 h-4' }) => (
   <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" className={className}>
@@ -30,6 +30,14 @@ const CommunityPage = () => {
   const [loadingDiscussions, setLoadingDiscussions] = useState(true);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
   const [loadingRetailers, setLoadingRetailers] = useState(true);
+  const [bannerDismissed, setBannerDismissed] = useState(
+    () => sessionStorage.getItem('traderSaleBannerDismissed') === 'true'
+  );
+
+  const dismissBanner = () => {
+    sessionStorage.setItem('traderSaleBannerDismissed', 'true');
+    setBannerDismissed(true);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -78,6 +86,43 @@ const CommunityPage = () => {
           </p>
         </div>
       </section>
+
+      {!bannerDismissed && (
+        <div className="relative overflow-hidden bg-gradient-to-r from-brand-red via-rose-600 to-brand-blue text-white">
+          <div className="absolute inset-0 opacity-10 pointer-events-none"
+            style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)', backgroundSize: '40px 40px' }}
+          />
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center gap-4 relative">
+            <div className="flex-shrink-0 bg-white/20 rounded-full p-2.5">
+              <Sparkles className="w-6 h-6 text-white" />
+            </div>
+            <div className="flex-1 text-center sm:text-left">
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1">
+                <span className="bg-white text-brand-red font-bold text-xs px-2.5 py-0.5 rounded-full uppercase tracking-wide">
+                  Limited Offer
+                </span>
+                <span className="font-bold text-lg leading-tight">30 Days Free Trading — No Credit Card Required</span>
+              </div>
+              <p className="text-white/85 text-sm">
+                Local traders can now list and sell cards on CardPop completely free for 30 days. Join Australia's fastest-growing trading card community today.
+              </p>
+            </div>
+            <Link
+              to="/signup"
+              className="flex-shrink-0 bg-white text-brand-red font-bold text-sm px-5 py-2.5 rounded-xl hover:bg-white/90 transition-colors whitespace-nowrap shadow-sm"
+            >
+              Register Free
+            </Link>
+            <button
+              onClick={dismissBanner}
+              aria-label="Dismiss banner"
+              className="absolute top-3 right-3 sm:static flex-shrink-0 text-white/70 hover:text-white transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <Tabs defaultValue="forum">
