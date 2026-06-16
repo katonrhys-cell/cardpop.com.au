@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import supabase from '../utils/supabaseClient.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -84,8 +84,8 @@ router.get('/public', async (req, res) => {
   });
 });
 
-// GET /vault/:id — single vault item
-router.get('/:id', async (req, res) => {
+// GET /vault/:id — single vault item (public items visible to all; private items require ownership)
+router.get('/:id', optionalAuthMiddleware, async (req, res) => {
   const { id } = req.params;
   if (!id?.trim()) return res.status(400).json({ error: 'Product ID is required' });
 

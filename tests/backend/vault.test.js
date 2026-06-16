@@ -14,6 +14,7 @@ vi.mock('../../src/utils/logger.js', () => ({
 let mockUser = { id: 'user-1', app_metadata: {} };
 vi.mock('../../src/middleware/auth.js', () => ({
   authMiddleware: (req, _res, next) => { req.user = mockUser; next(); },
+  optionalAuthMiddleware: (req, _res, next) => { req.user = mockUser; next(); },
 }));
 
 import vaultRouter from '../../src/routes/vault.js';
