@@ -119,7 +119,11 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
           setEnableSeries(!!card.seriesId);
 
           if (card.images && card.images.length > 0) {
-            const urls = card.images.map(img => (typeof img === 'string' && img.startsWith('http') ? img : img));
+            const urls = card.images.map(img => {
+              if (!img || typeof img !== 'string') return null;
+              if (img.startsWith('http')) return img;
+              return supabase.storage.from('vault-images').getPublicUrl(img).data.publicUrl;
+            }).filter(Boolean);
             setPreviewUrls(urls);
             setSelectedFiles(card.images.map(img => ({ isExisting: true, filename: img })));
           }
