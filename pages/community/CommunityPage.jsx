@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
-import { MessageSquare, Users, Store, ExternalLink, ShieldCheck, X, Sparkles } from 'lucide-react';
+import { MessageSquare, Users, Store, ExternalLink, ShieldCheck, ChevronLeft, ChevronRight, Instagram } from 'lucide-react';
 
 const WhatnotIcon = ({ className = 'w-4 h-4' }) => (
   <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" className={className}>
@@ -22,6 +22,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
+const TOTAL_SLIDES = 3;
+
 const CommunityPage = () => {
   const navigate = useNavigate();
   const [discussions, setDiscussions] = useState([]);
@@ -30,14 +32,24 @@ const CommunityPage = () => {
   const [loadingDiscussions, setLoadingDiscussions] = useState(true);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
   const [loadingRetailers, setLoadingRetailers] = useState(true);
-  const [bannerDismissed, setBannerDismissed] = useState(
-    () => sessionStorage.getItem('traderSaleBannerDismissed') === 'true'
-  );
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [slideKey, setSlideKey] = useState(0);
 
-  const dismissBanner = () => {
-    sessionStorage.setItem('traderSaleBannerDismissed', 'true');
-    setBannerDismissed(true);
+  const goToSlide = (i) => {
+    setCurrentSlide(i);
+    setSlideKey(prev => prev + 1);
   };
+  const prevSlide = () => goToSlide((currentSlide - 1 + TOTAL_SLIDES) % TOTAL_SLIDES);
+  const nextSlide = () => goToSlide((currentSlide + 1) % TOTAL_SLIDES);
+
+  useEffect(() => {
+    if (isPaused) return;
+    const timer = setInterval(() => {
+      setCurrentSlide(prev => (prev + 1) % TOTAL_SLIDES);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [isPaused, slideKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -77,52 +89,130 @@ const CommunityPage = () => {
     <div className="min-h-screen bg-background">
       <SEOHead title="Community Hub | CardPop" description="Connect with Australian trading card collectors. Join discussions, share your collection and trade cards on CardPop." />
 
-      <section className="bg-card border-b border-border py-20 text-center">
-        <div className="container-default">
-          <Users className="w-12 h-12 text-primary mx-auto mb-6" />
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">The Collector's Hub</h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Discuss market trends, connect with verified collectors, and discover authorized retailers shaping the hobby.
-          </p>
-        </div>
-      </section>
-
-      {!bannerDismissed && (
-        <div className="relative overflow-hidden bg-gradient-to-r from-brand-red via-rose-600 to-brand-blue text-white">
-          <div className="absolute inset-0 opacity-10 pointer-events-none"
-            style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)', backgroundSize: '40px 40px' }}
-          />
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center gap-4 relative">
-            <div className="flex-shrink-0 bg-white/20 rounded-full p-2.5">
-              <Sparkles className="w-6 h-6 text-white" />
-            </div>
-            <div className="flex-1 text-center sm:text-left">
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1">
-                <span className="bg-white text-brand-red font-bold text-xs px-2.5 py-0.5 rounded-full uppercase tracking-wide">
-                  Limited Offer
-                </span>
-                <span className="font-bold text-lg leading-tight">30 Days Free Trading — No Credit Card Required</span>
+      {/* ── Hero Carousel ── */}
+      <section
+        className="relative overflow-hidden min-h-[300px] sm:min-h-[340px]"
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+      >
+        {/* Slide 1 — Free Trial */}
+        <div className={`absolute inset-0 transition-opacity duration-700 ${currentSlide === 0 ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+          <div className="relative h-full bg-gradient-to-r from-brand-blue via-blue-600 to-indigo-700 text-white flex flex-col items-center justify-center px-4 py-12 text-center">
+            <div
+              className="absolute inset-0 opacity-10 pointer-events-none"
+              style={{ backgroundImage: 'radial-gradient(circle at 25% 40%, white 1px, transparent 1px), radial-gradient(circle at 75% 70%, white 1px, transparent 1px)', backgroundSize: '40px 40px' }}
+            />
+            <div className="relative z-10 flex flex-col items-center gap-3 max-w-2xl">
+              <div className="bg-white/20 rounded-full p-3">
+                <Users className="w-8 h-8 text-white" />
               </div>
-              <p className="text-white/85 text-sm">
-                Local traders can now list and sell cards on CardPop completely free for 30 days. Join Australia's fastest-growing trading card community today.
+              <span className="bg-white text-brand-blue font-bold text-xs px-3 py-1 rounded-full uppercase tracking-wide">
+                Limited Offer
+              </span>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold leading-tight">
+                30 Days Free Trading — No Credit Card Required
+              </h2>
+              <p className="text-white/85 text-sm sm:text-base">
+                Local traders can list and sell cards on CardPop completely free for 30 days. Join Australia's fastest-growing trading card community today.
               </p>
+              <Link
+                to="/signup"
+                className="mt-2 bg-white text-brand-blue font-bold text-sm px-6 py-3 rounded-xl hover:bg-white/90 transition-colors shadow-lg"
+              >
+                Register Free
+              </Link>
             </div>
-            <Link
-              to="/signup"
-              className="flex-shrink-0 bg-white text-brand-red font-bold text-sm px-5 py-2.5 rounded-xl hover:bg-white/90 transition-colors whitespace-nowrap shadow-sm"
-            >
-              Register Free
-            </Link>
-            <button
-              onClick={dismissBanner}
-              aria-label="Dismiss banner"
-              className="absolute top-3 right-3 sm:static flex-shrink-0 text-white/70 hover:text-white transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
           </div>
         </div>
-      )}
+
+        {/* Slide 2 — Whatnot Shows */}
+        <div className={`absolute inset-0 transition-opacity duration-700 ${currentSlide === 1 ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+          <div className="relative h-full bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-900 text-white flex flex-col items-center justify-center px-4 py-12 text-center">
+            <div
+              className="absolute inset-0 opacity-5 pointer-events-none"
+              style={{ backgroundImage: 'radial-gradient(circle, #FFDF00 1px, transparent 1px)', backgroundSize: '30px 30px' }}
+            />
+            <div className="relative z-10 flex flex-col items-center gap-3 max-w-2xl">
+              <WhatnotIcon className="w-14 h-14" />
+              <span className="bg-yellow-400 text-black font-bold text-xs px-3 py-1 rounded-full uppercase tracking-wide">
+                Go Live on Whatnot
+              </span>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold leading-tight">
+                Promote Your Whatnot Shows &amp; Breaks
+              </h2>
+              <p className="text-white/80 text-sm sm:text-base">
+                Got live pack breaks and auctions? Sign up and list your Whatnot shows on CardPop to get discovered by thousands of Australian collectors.
+              </p>
+              <Link
+                to="/signup"
+                className="mt-2 bg-yellow-400 text-black font-bold text-sm px-6 py-3 rounded-xl hover:bg-yellow-300 transition-colors shadow-lg"
+              >
+                Sign Up &amp; Promote Your Show
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Slide 3 — Instagram / Socials */}
+        <div className={`absolute inset-0 transition-opacity duration-700 ${currentSlide === 2 ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+          <div className="relative h-full bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 text-white flex flex-col items-center justify-center px-4 py-12 text-center">
+            <div
+              className="absolute inset-0 opacity-10 pointer-events-none"
+              style={{ backgroundImage: 'radial-gradient(circle at 30% 60%, white 1px, transparent 1px), radial-gradient(circle at 70% 30%, white 1px, transparent 1px)', backgroundSize: '35px 35px' }}
+            />
+            <div className="relative z-10 flex flex-col items-center gap-3 max-w-2xl">
+              <div className="bg-white/20 rounded-full p-3">
+                <Instagram className="w-8 h-8 text-white" />
+              </div>
+              <span className="border border-white/40 bg-white/20 text-white font-bold text-xs px-3 py-1 rounded-full uppercase tracking-wide">
+                Connect
+              </span>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold leading-tight">
+                Share Your Collection on Instagram
+              </h2>
+              <p className="text-white/85 text-sm sm:text-base">
+                Link your Instagram to your CardPop profile. Get discovered, share your pulls, and connect with collectors and breakers across Australia.
+              </p>
+              <Link
+                to="/signup"
+                className="mt-2 bg-white text-pink-600 font-bold text-sm px-6 py-3 rounded-xl hover:bg-white/90 transition-colors shadow-lg"
+              >
+                Build Your Collector Profile
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Prev Arrow */}
+        <button
+          onClick={prevSlide}
+          className="absolute left-3 top-1/2 -translate-y-1/2 z-20 bg-black/30 hover:bg-black/50 text-white rounded-full p-2 transition-colors"
+          aria-label="Previous slide"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+
+        {/* Next Arrow */}
+        <button
+          onClick={nextSlide}
+          className="absolute right-3 top-1/2 -translate-y-1/2 z-20 bg-black/30 hover:bg-black/50 text-white rounded-full p-2 transition-colors"
+          aria-label="Next slide"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+
+        {/* Dots */}
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+          {Array.from({ length: TOTAL_SLIDES }).map((_, i) => (
+            <button
+              key={i}
+              onClick={() => goToSlide(i)}
+              className={`h-2 rounded-full transition-all duration-300 ${i === currentSlide ? 'w-6 bg-white' : 'w-2 bg-white/50 hover:bg-white/75'}`}
+              aria-label={`Go to slide ${i + 1}`}
+            />
+          ))}
+        </div>
+      </section>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <Tabs defaultValue="forum">
