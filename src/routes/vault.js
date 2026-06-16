@@ -6,6 +6,8 @@ import logger from '../utils/logger.js';
 
 const router = express.Router();
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // GET /vault/products — authenticated user's own vault items
 router.get('/products', authMiddleware, async (req, res) => {
   const { page = '1', limit = '20', sort = 'created_at' } = req.query;
@@ -52,6 +54,10 @@ router.get('/public', async (req, res) => {
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
   const from = (pageNum - 1) * limitNum;
+
+  if (userId?.trim() && !UUID_RE.test(userId.trim())) {
+    return res.status(400).json({ error: 'Invalid userId format' });
+  }
 
   let query = supabase
     .from('vault_items')
@@ -138,7 +144,9 @@ router.patch('/:id/base-value', authMiddleware, async (req, res) => {
   const { id } = req.params;
   const { newValue, reason } = req.body;
 
-  const isAdmin = req.user.app_metadata?.is_admin === true;
+  // Verify admin status against the DB (defence-in-depth: don't rely solely on JWT claim)
+  const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', req.user.id).single();
+  const isAdmin = profile?.is_admin === true;
 
   if (!isAdmin) {
     return res.status(403).json({ error: 'Only administrators can adjust locked base values.' });

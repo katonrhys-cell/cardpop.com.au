@@ -117,6 +117,18 @@ describe('GET /public', () => {
     const res = await request(app).get('/public');
     expect(res.body.products[0].userName).toBe('Unknown');
   });
+
+  it('rejects non-UUID userId with 400', async () => {
+    const res = await request(app).get('/public?userId=not-a-uuid');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/invalid userid/i);
+  });
+
+  it('accepts a valid UUID userId and filters results', async () => {
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: [], error: null, count: 0 }));
+    const res = await request(app).get('/public?userId=00000000-0000-0000-0000-000000000001');
+    expect(res.status).toBe(200);
+  });
 });
 
 // ─── GET /:id ─────────────────────────────────────────────────────────────────
@@ -163,5 +175,55 @@ describe('GET /:id', () => {
     mockSupabase.from.mockReturnValue(makeBuilder({ data: ITEM, error: null }));
     const res = await request(app).get('/item-1');
     expect(res.status).toBe(403);
+  });
+});
+
+// ─── PATCH /:id/base-value ────────────────────────────────────────────────────
+
+describe('PATCH /:id/base-value', () => {
+  // Full reset so mockReturnValueOnce queues from earlier describe blocks don't leak in.
+  beforeEach(() => vi.resetAllMocks());
+
+  function makeUpdateBuilder(result) {
+    const b = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue(result),
+      then: (resolve, reject) => Promise.resolve(result).then(resolve, reject),
+    };
+    return b;
+  }
+
+  function setupPatchMocks({ isAdmin, updateResult }) {
+    mockSupabase.from.mockImplementation((table) => {
+      if (table === 'profiles') return makeBuilder({ data: { is_admin: isAdmin }, error: null });
+      return makeUpdateBuilder(updateResult ?? { data: null, error: null });
+    });
+  }
+
+  it('returns 403 when profiles DB says user is not admin', async () => {
+    mockUser = { id: 'user-1', app_metadata: { is_admin: true } };
+    setupPatchMocks({ isAdmin: false });
+    const res = await request(app).patch('/item-1/base-value').send({ newValue: 50 });
+    expect(res.status).toBe(403);
+  });
+
+  it('updates base value when profiles DB confirms admin', async () => {
+    mockUser = { id: 'admin-1', app_metadata: { is_admin: true } };
+    setupPatchMocks({
+      isAdmin: true,
+      updateResult: { data: { id: 'item-1', card_name: 'Charizard', locked_base_value_aud: 50 }, error: null },
+    });
+    const res = await request(app).patch('/item-1/base-value').send({ newValue: 50, reason: 'market correction' });
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  it('returns 400 for invalid newValue', async () => {
+    mockUser = { id: 'admin-1', app_metadata: { is_admin: true } };
+    setupPatchMocks({ isAdmin: true });
+    const res = await request(app).patch('/item-1/base-value').send({ newValue: -5 });
+    expect(res.status).toBe(400);
   });
 });
