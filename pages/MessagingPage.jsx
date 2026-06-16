@@ -1,13 +1,34 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
-import { Send, MessageSquare, AlertCircle } from 'lucide-react';
+import { Send, MessageSquare, AlertCircle, Shield, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
+
+// Keywords that suggest an attempt to conduct sales or trades outside CardPop
+const OFFLINE_SALE_KEYWORDS = [
+  // External payment platforms
+  'paypal', 'venmo', 'cash app', 'cashapp', 'payid', 'pay id', 'zelle',
+  'afterpay', 'zip pay', 'klarna', 'bank transfer', 'bank details',
+  'bsb number', 'account number', 'direct transfer', 'direct deposit',
+  // External marketplaces / platforms
+  'facebook marketplace', 'fb marketplace', 'gumtree', 'depop', 'ebay listing',
+  // Contact sharing suggesting off-platform continuation
+  'my phone', 'my mobile', 'phone number', 'mobile number', 'call me on',
+  'text me on', 'whatsapp me', 'dm me on instagram', 'find me on',
+  'add me on', 'my instagram', 'my facebook',
+  // Explicit off-platform / fee-avoidance language
+  'outside cardpop', 'off the platform', 'off platform', 'off-platform',
+  'outside the site', 'outside this app', 'without the fees', 'avoid the fee',
+  'skip the fees', 'bypass',
+];
+
+const containsFlaggedContent = (text) =>
+  OFFLINE_SALE_KEYWORDS.some(kw => text.toLowerCase().includes(kw));
 
 const MessagingPage = () => {
   const { currentUser } = useAuth();
@@ -162,6 +183,11 @@ const MessagingPage = () => {
     if (!newMessage.trim() || !selectedUserId || sending) return;
 
     const content = newMessage.trim();
+
+    if (containsFlaggedContent(content)) {
+      toast.warning('Your message may contain off-platform sales content. Conducting sales or trades outside CardPop may result in a ban.', { duration: 5000 });
+    }
+
     setNewMessage('');
     setSending(true);
 
@@ -203,6 +229,13 @@ const MessagingPage = () => {
 
       <div className="mb-4">
         <h1 className="font-serif text-3xl font-bold text-foreground">Messages</h1>
+      </div>
+
+      <div className="mb-4 flex items-start gap-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+        <Shield className="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+        <p>
+          <strong>Platform Safety Notice:</strong> Soliciting sales or trades outside CardPop — including via direct bank transfer, third-party payment platforms, or external marketplaces — initiated through this messaging system may result in a permanent ban.
+        </p>
       </div>
 
       <div className="flex-1 bg-card border border-border shadow-sm rounded-3xl overflow-hidden flex flex-col md:flex-row min-h-0">
@@ -296,18 +329,25 @@ const MessagingPage = () => {
                 <div className="space-y-4 max-w-3xl mx-auto flex flex-col">
                   {messages.map((msg, idx) => {
                     const isSent = msg.sender_id === currentUser.id;
+                    const isFlagged = containsFlaggedContent(msg.content);
                     return (
-                      <div key={msg.id || idx} className={`flex ${isSent ? 'justify-end' : 'justify-start'}`}>
+                      <div key={msg.id || idx} className={`flex flex-col ${isSent ? 'items-end' : 'items-start'}`}>
                         <div className={`max-w-[85%] md:max-w-[70%] rounded-2xl px-5 py-3 shadow-sm ${
-                          isSent 
-                            ? 'bg-primary text-primary-foreground rounded-br-sm' 
+                          isSent
+                            ? 'bg-primary text-primary-foreground rounded-br-sm'
                             : 'bg-card border border-border text-card-foreground rounded-bl-sm'
-                        }`}>
+                        } ${isFlagged ? 'border-2 border-amber-400' : ''}`}>
                           <p className="leading-relaxed text-sm md:text-base whitespace-pre-wrap break-words">{msg.content}</p>
                           <p className={`text-[10px] mt-2 font-medium tracking-wide text-right opacity-70`}>
                             {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>
                         </div>
+                        {isFlagged && (
+                          <div className={`flex items-center gap-1.5 mt-1 text-amber-600 dark:text-amber-400 text-[11px] ${isSent ? 'mr-1' : 'ml-1'}`}>
+                            <AlertTriangle className="w-3 h-3 shrink-0" />
+                            <span>This message may contain off-platform sales content — against CardPop's terms of service.</span>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -323,13 +363,19 @@ const MessagingPage = () => {
                     onChange={(e) => setNewMessage(e.target.value)}
                     placeholder="Type a message..."
                     disabled={sending}
-                    className="flex-1 rounded-xl h-12 bg-background border-border text-foreground focus-visible:ring-primary"
+                    className={`flex-1 rounded-xl h-12 bg-background border-border text-foreground focus-visible:ring-primary ${containsFlaggedContent(newMessage) ? 'border-amber-400 focus-visible:ring-amber-400' : ''}`}
                   />
                   <Button type="submit" disabled={sending || !newMessage.trim()} className="rounded-xl h-12 px-6 font-bold shadow-sm">
                     <Send className="h-5 w-5 md:mr-2" />
                     <span className="hidden md:inline">Send</span>
                   </Button>
                 </form>
+                {containsFlaggedContent(newMessage) && (
+                  <div className="max-w-3xl mx-auto mt-2 flex items-center gap-2 text-amber-600 dark:text-amber-400 text-xs">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <span>This message may contain content related to off-platform sales or contact sharing, which violates CardPop's terms of service and may result in a ban.</span>
+                  </div>
+                )}
               </div>
             </>
           ) : (
