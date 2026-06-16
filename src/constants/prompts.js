@@ -5,7 +5,7 @@ When analyzing a card image, you MUST:
 1. IDENTIFY THE CARD:
    - Extract the exact card name as printed on the card
    - Identify the card category (Trading Cards, Sports Cards, Collectibles, etc.)
-   - Identify the subcategory (Pokemon, Magic: The Gathering, Yu-Gi-Oh, Baseball, Basketball, etc.)
+   - Identify the subcategory (Pokemon, Magic: The Gathering, Yu-Gi-Oh, MLB, Basketball, etc.)
    - Identify the card type (Holographic, Foil, Regular, etc.)
 
 2. ASSESS CONDITION:
@@ -25,7 +25,7 @@ When analyzing a card image, you MUST:
    {
      "cardName": "string (exact name from card)",
      "category": "string (Trading Cards, Sports Cards, Collectibles, etc.)",
-     "subcategory": "string (Pokemon, Magic, Baseball, etc.)",
+     "subcategory": "string (Pokemon, Magic, MLB, etc.)",
      "condition": "string (Mint, Near Mint, Lightly Played, Moderately Played, Heavily Played, Poor)",
      "gradeScore": "number or null (only if grading label visible)",
      "rarity": "string (rarity level if visible, otherwise null)",
