@@ -74,6 +74,17 @@ const ContactPage = () => {
                 <p className="text-muted-foreground text-sm mt-1">support@cardpop.online</p>
               </div>
               <div>
+                <strong className="text-sm font-semibold">Admin Email</strong>
+                <p className="text-muted-foreground text-sm mt-1">admin@cardpop.com.au</p>
+              </div>
+              <div>
+                <strong className="text-sm font-semibold">Mailing Address</strong>
+                <p className="text-muted-foreground text-sm mt-1">
+                  PO Box 1024<br />
+                  ASCOT VALE VICTORIA 3032
+                </p>
+              </div>
+              <div>
                 <strong className="text-sm font-semibold">Business Hours</strong>
                 <p className="text-muted-foreground text-sm mt-1">Monday – Friday: 9am – 5pm AEST</p>
               </div>
