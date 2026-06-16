@@ -135,6 +135,7 @@ const ForumPage = lazy(() => import('@/pages/community/ForumPage.jsx'));
 const ProfilesPage = lazy(() => import('@/pages/community/ProfilesPage.jsx'));
 const RetailersPage = lazy(() => import('@/pages/community/RetailersPage.jsx'));
 const LocalTradersPage = lazy(() => import('@/pages/community/LocalTradersPage.jsx'));
+const LocalMapPage = lazy(() => import('@/pages/community/LocalMapPage.jsx'));
 
 // Admin Dashboard Area
 const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard.jsx'));
@@ -315,6 +316,7 @@ const App = () => {
                         <Route path="/community/profiles" element={<ProfilesPage />} />
                         <Route path="/community/retailers" element={<RetailersPage />} />
                         <Route path="/community/local-traders" element={<LocalTradersPage />} />
+                        <Route path="/community/map" element={<LocalMapPage />} />
                         <Route path="/events" element={<CommunityEventsPage />} />
                         <Route path="/events/card-shows" element={<CommunityEventsPage defaultType="card_show" />} />
                         <Route path="/events/trade-events" element={<CommunityEventsPage defaultType="trade_event" />} />
