@@ -89,7 +89,17 @@ const CommunityPage = () => {
     <div className="min-h-screen bg-background">
       <SEOHead title="Community Hub | CardPop" description="Connect with Australian trading card collectors. Join discussions, share your collection and trade cards on CardPop." />
 
-      {/* ── Hero Carousel ── */}
+      <section className="bg-card border-b border-border py-20 text-center">
+        <div className="container-default">
+          <Users className="w-12 h-12 text-primary mx-auto mb-6" />
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">The Collector's Hub</h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Discuss market trends, connect with verified collectors, and discover authorized retailers shaping the hobby.
+          </p>
+        </div>
+      </section>
+
+      {/* ── Promo Carousel ── */}
       <section
         className="relative overflow-hidden min-h-[300px] sm:min-h-[340px]"
         onMouseEnter={() => setIsPaused(true)}
