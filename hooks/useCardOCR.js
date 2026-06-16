@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
 import { integratedAiClient } from '@/lib/integratedAiClient';
-import { toast } from 'sonner';
 import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 
 const SSEEventType = {
@@ -72,11 +71,9 @@ export function useCardOCR() {
       const data = JSON.parse(jsonMatch[0]);
       const result = mapOCRResult(data);
       setScanResult(result);
-      toast.success('Card scanned successfully!');
       return result;
     } catch (err) {
       console.warn('[useCardOCR] scan failed:', err.message);
-      toast.error(err.message);
     } finally {
       setIsScanning(false);
     }
