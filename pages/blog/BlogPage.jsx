@@ -168,7 +168,11 @@ const BlogPage = () => {
 
   return (
     <div className="min-h-[100dvh] bg-background">
-      <SEOHead title={pageTitle} description="The Parallel Report — trading card news, guides and insights for Australian collectors." />
+      <SEOHead
+        title={pageTitle}
+        description="The Parallel Report by CardPop — trading card news, market analysis, grading guides and investment insights for Australian Pokémon, MTG and sports card collectors."
+        canonicalUrl={categoryParam ? `https://cardpop.online/blog/category/${categoryParam}` : 'https://cardpop.online/blog'}
+      />
 
       {/* ── Hero ── */}
       <section className="bg-card border-b border-border py-20 text-center">

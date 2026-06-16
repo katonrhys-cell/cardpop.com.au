@@ -118,20 +118,21 @@ export const generateFAQStructuredData = (faqs) => {
 export const generateLocalBusinessSchema = () => {
   return {
     "@context": "https://schema.org",
-    "@type": "LocalBusiness",
+    "@type": "OnlineStore",
     "name": "CardPop",
     "description": "Australia's most trusted trading card marketplace for Pokémon, Magic: The Gathering, sports cards and more.",
     "url": "https://cardpop.online",
-    "telephone": "+61-400-000-000",
     "address": {
       "@type": "PostalAddress",
-      "addressCountry": "AU",
-      "addressRegion": "Australia"
+      "postOfficeBoxNumber": "1024",
+      "addressLocality": "Ascot Vale",
+      "addressRegion": "VIC",
+      "postalCode": "3032",
+      "addressCountry": "AU"
     },
-    "geo": {
-      "@type": "GeoCoordinates",
-      "latitude": "-25.2744",
-      "longitude": "133.7751"
+    "areaServed": {
+      "@type": "Country",
+      "name": "Australia"
     },
     "openingHoursSpecification": {
       "@type": "OpeningHoursSpecification",

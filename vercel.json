@@ -6,9 +6,13 @@
   "functions": {
     "api/index.js": {
       "maxDuration": 30
+    },
+    "api/sitemap.js": {
+      "maxDuration": 10
     }
   },
   "rewrites": [
+    { "source": "/sitemap.xml", "destination": "/api/sitemap" },
     { "source": "/hcgi/api/:path*", "destination": "/api/:path*" },
     { "source": "/api/:path*", "destination": "/api/index" },
     { "source": "/(.*)", "destination": "/index.html" }
