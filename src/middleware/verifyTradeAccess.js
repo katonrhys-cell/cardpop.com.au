@@ -4,7 +4,7 @@ import logger from '../utils/logger.js';
 
 async function verifyTradeAccess(req, res, next) {
   try {
-    const isTradeRoute = req.path.toLowerCase().includes('trade');
+    const isTradeRoute = req.path.toLowerCase().startsWith('/trade');
     if (!isTradeRoute) return next();
 
     logger.info(`[TRADE_ACCESS] Trade route: ${req.method} ${req.path}`);

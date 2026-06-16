@@ -325,7 +325,20 @@ export default defineConfig({
 				'@babel/traverse',
 				'@babel/generator',
 				'@babel/types'
-			]
+			],
+			output: {
+				manualChunks(id) {
+					if (!id.includes('node_modules')) return;
+					if (id.includes('framer-motion')) return 'vendor-motion';
+					if (id.includes('lucide-react')) return 'vendor-icons';
+					if (id.includes('@radix-ui')) return 'vendor-radix';
+					if (id.includes('react-router')) return 'vendor-router';
+					if (id.includes('react-hook-form') || id.includes('@hookform') || id.includes('zod')) return 'vendor-forms';
+					if (id.includes('@sentry')) return 'vendor-sentry';
+					if (id.includes('date-fns') || id.includes('react-day-picker')) return 'vendor-dates';
+					if (id.includes('@stripe') || id.includes('stripe')) return 'vendor-stripe';
+				},
+			},
 		}
 	}
 });

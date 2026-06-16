@@ -4,6 +4,7 @@ import supabase from '../../utils/supabaseClient.js';
 import { generateBackupCodes } from '../../utils/otpGenerator.js';
 import { encrypt, decrypt } from '../../utils/encryption.js';
 import { authMiddleware } from '../../middleware/auth.js';
+import { backupCodeLimiter } from '../../middleware/endpoint-rate-limit.js';
 import logger from '../../utils/logger.js';
 
 const router = express.Router();
@@ -26,7 +27,7 @@ router.post('/generate', authMiddleware, async (req, res) => {
   res.json({ codes, message: 'Backup codes generated. Save them in a secure location.' });
 });
 
-router.post('/verify', authMiddleware, async (req, res) => {
+router.post('/verify', authMiddleware, backupCodeLimiter, async (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: 'Backup code is required' });
 

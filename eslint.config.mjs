@@ -4,7 +4,7 @@ import importPlugin from 'eslint-plugin-import';
 import globals from 'globals';
 
 export default [
-	{ ignores: ['node_modules/**', 'dist/**', 'build/**', 'vite.config.js'] },
+	{ ignores: ['node_modules/**', 'dist/**', 'build/**', 'vite.config.js', 'vitest.config.js', 'pb_hooks/**', 'pb_migrations/**', 'components/CollectionsDropdown.jsx'] },
 	{
 		files: ['**/*.js', '**/*.jsx'],
 		plugins: { react, 'react-hooks': reactHooks, import: importPlugin },
@@ -19,7 +19,7 @@ export default [
 			'import/extensions': ['.js', '.jsx'],
 			'import/resolver': {
 				node: { extensions: ['.js', '.jsx'] },
-				alias: { map: [['@', './src']], extensions: ['.js', '.jsx'] },
+				alias: { map: [['@', '.']], extensions: ['.js', '.jsx'] },
 			},
 		},
 		rules: {
@@ -51,4 +51,5 @@ export default [
 		},
 	},
 	{ files: ['tools/**/*.js', 'tailwind.config.js'], languageOptions: { globals: globals.node } },
+	{ files: ['src/**/*.js', 'api/**/*.js', 'tests/backend/**/*.js'], languageOptions: { globals: globals.node } },
 ];

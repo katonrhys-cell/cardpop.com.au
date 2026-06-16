@@ -302,7 +302,7 @@ export const SPORTS_CATEGORY_DATA = [
   { slug: 'nba',       name: 'NBA',       gradient: 'from-blue-700 to-red-600',      Icon: CourtBallIcon          },
   { slug: 'nbl',       name: 'NBL',       gradient: 'from-green-600 to-teal-600',    Icon: NBLBallIcon            },
   { slug: 'nfl',       name: 'NFL',       gradient: 'from-blue-800 to-indigo-600',   Icon: AmericanFootballIcon   },
-  { slug: 'baseball',  name: 'Baseball',  gradient: 'from-red-500 to-slate-700',     Icon: BaseballIcon           },
+  { slug: 'mlb',       name: 'MLB',       gradient: 'from-red-500 to-slate-700',     Icon: BaseballIcon           },
   { slug: 'cricket',   name: 'Cricket',   gradient: 'from-lime-500 to-green-700',    Icon: CricketIcon            },
   { slug: 'nrl',       name: 'NRL',       gradient: 'from-sky-600 to-blue-800',      Icon: RugbyBallIcon          },
   { slug: 'afl',       name: 'AFL',       gradient: 'from-red-600 to-yellow-500',    Icon: AFLBallIcon            },
@@ -330,7 +330,7 @@ export const HOMEPAGE_CATEGORIES = [
   TCG_CATEGORY_DATA[8], // Riftbound
   TCG_CATEGORY_DATA[9], // TMNT
   SPORTS_CATEGORY_DATA[1], // NBL
-  SPORTS_CATEGORY_DATA[3], // Baseball
+  SPORTS_CATEGORY_DATA[3], // MLB
   SPORTS_CATEGORY_DATA[4], // Cricket
   SPORTS_CATEGORY_DATA[5], // NRL
   SPORTS_CATEGORY_DATA[6], // AFL

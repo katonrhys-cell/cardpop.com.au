@@ -121,7 +121,7 @@ export function mapCardSightToFormFields(result) {
     if (seg.includes('pokemon') || seg.includes('tcg')) fields.collection = 'Pokemon';
     else if (seg.includes('basketball') || seg.includes('nba')) fields.collection = 'NBA Basketball';
     else if (seg.includes('football') || seg.includes('nfl')) fields.collection = 'NFL Football';
-    else if (seg.includes('baseball') || seg.includes('mlb')) fields.collection = 'MLB Baseball';
+    else if (seg.includes('baseball') || seg.includes('mlb')) fields.collection = 'MLB';
     else if (seg.includes('soccer') || seg.includes('football')) fields.collection = 'Soccer';
     else if (seg.includes('ufc') || seg.includes('mma')) fields.collection = 'UFC';
   }

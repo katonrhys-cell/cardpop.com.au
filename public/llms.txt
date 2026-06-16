@@ -47,5 +47,5 @@
 - [Verification Management | Admin](/adminverificationdashboard): No description available
 - [Verification Pending | Card Pop](/verificationpending): No description available
 - [Verification Status | CardPop](/verificationsubmission): No description available
-- [Wallet | CardPop](/accountwallet): No description available
+- [Wallet & Payouts | CardPop](/accountwallet): No description available
 - [Watchlist | CardPop](/accountwatchlist): No description available

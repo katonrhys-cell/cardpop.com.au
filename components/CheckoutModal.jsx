@@ -41,10 +41,15 @@ const CheckoutModal = ({ isOpen, onClose, listingId, transactionType = 'fixed', 
       setError(null);
       try {
         const params = new URLSearchParams({ listingId, transactionType });
-        const res = await apiClient.get(`/stripe/calculate?${params}`);
-        if (!cancelled) setBreakdown(res.data);
+        const res = await apiClient.fetch(`/stripe/calculate?${params}`);
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || 'Could not load price breakdown.');
+        }
+        const data = await res.json();
+        if (!cancelled) setBreakdown(data);
       } catch (err) {
-        if (!cancelled) setError(err.response?.data?.error || 'Could not load price breakdown.');
+        if (!cancelled) setError(err.message || 'Could not load price breakdown.');
       } finally {
         if (!cancelled) setLoadingBreakdown(false);
       }
@@ -64,14 +69,20 @@ const CheckoutModal = ({ isOpen, onClose, listingId, transactionType = 'fixed', 
       const payload = { listingId, transactionType, successUrl, cancelUrl };
       if (offerId) payload.offerId = offerId;
 
-      const res = await apiClient.post('/stripe/create-checkout', payload);
-      if (res.data?.url) {
-        window.location.href = res.data.url;
-      } else {
-        throw new Error('No checkout URL returned');
+      const res = await apiClient.fetch('/stripe/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to start checkout. Please try again.');
       }
+      const data = await res.json();
+      if (!data?.url) throw new Error('No checkout URL returned');
+      window.location.href = data.url;
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to start checkout. Please try again.');
+      toast.error(err.message || 'Failed to start checkout. Please try again.');
       setLoadingCheckout(false);
     }
   };
