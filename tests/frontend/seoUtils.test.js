@@ -215,7 +215,7 @@ describe('generateSitemap', () => {
 
   it('includes the homepage URL', () => {
     const xml = generateSitemap([], []);
-    expect(xml).toContain('<loc>https://cardpop.online/</loc>');
+    expect(xml).toContain('<loc>https://cardpop.com.au/</loc>');
   });
 
   it('includes static routes for /vault and /shop', () => {
