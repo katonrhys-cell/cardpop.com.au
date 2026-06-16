@@ -6,7 +6,8 @@ import {
   LayoutDashboard, Package, Users, Calendar, FileText, Building2, Layers, CheckCircle,
   Sun, Moon, ChevronDown, ArrowRight, Layers2, User, LogOut, Settings,
   FolderTree, ListOrdered, BarChart3, Store,
-  BookOpen, Globe, Star, Award, TrendingUp, Newspaper, BadgeCheck, Ticket, Handshake
+  BookOpen, Globe, Star, Award, TrendingUp, Newspaper, BadgeCheck, Ticket, Handshake,
+  Calculator, MapPin, ClipboardList, HelpCircle
 } from 'lucide-react';
 import { useDarkMode } from '@/hooks/useDarkMode.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -508,6 +509,72 @@ const EventsDropdown = ({ onNavigate }) => {
   );
 };
 
+const GRADING_ITEMS = [
+  { href: '/grading/estimator',          label: 'CardPop Grade Estimator',  desc: 'Estimate your card grade instantly',      Icon: Calculator,    gradient: 'from-blue-500 to-indigo-600'   },
+  { href: '/grading/grade-scale',        label: 'Grade Scale',              desc: 'Understand grading scales and standards', Icon: ClipboardList, gradient: 'from-violet-500 to-purple-600' },
+  { href: '/grading/local-graders',      label: 'Local Graders',            desc: 'Find graders near you in Australia',      Icon: MapPin,        gradient: 'from-emerald-500 to-teal-600' },
+  { href: '/grading/submission-partners',label: 'Submission Partners',      desc: 'Trusted submission services and agents',  Icon: Handshake,     gradient: 'from-amber-500 to-orange-500' },
+  { href: '/grading/where-to-grade',     label: 'Where to Grade My Cards',  desc: 'Compare grading companies and options',   Icon: HelpCircle,    gradient: 'from-rose-500 to-pink-600'    },
+];
+
+// ─── Grading dropdown ─────────────────────────────────────────────────────────
+const GradingDropdown = ({ onNavigate }) => {
+  const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
+  const location = useLocation();
+  const isGradingActive = location.pathname.startsWith('/grading');
+
+  return (
+    <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
+      <button
+        onClick={handleTriggerClick}
+        aria-expanded={open}
+        className={`flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+          open || isGradingActive
+            ? 'bg-primary text-primary-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+        }`}
+      >
+        Grading
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-72 bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+          <Link
+            to="/grading"
+            onClick={() => { setOpen(false); onNavigate?.(); }}
+            className="flex items-center justify-between px-5 py-3.5 border-b border-border hover:bg-muted/60 transition-colors group"
+          >
+            <div>
+              <span className="text-sm font-bold text-foreground">Grading Hub</span>
+              <p className="text-xs text-muted-foreground mt-0.5">Everything about card grading</p>
+            </div>
+            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
+          </Link>
+          <div className="p-3 grid gap-0.5">
+            {GRADING_ITEMS.map(item => (
+              <Link
+                key={item.href}
+                to={item.href}
+                onClick={() => { setOpen(false); onNavigate?.(); }}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
+              >
+                <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${item.gradient} shrink-0 shadow-sm`}>
+                  <item.Icon className="w-4 h-4 text-white" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{item.label}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{item.desc}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Mobile blog section (expandable) ────────────────────────────────────────
 const MobileBlogSection = ({ onNavigate }) => {
   const [open, setOpen] = useState(false);
@@ -634,6 +701,52 @@ const MobileCommunitySection = ({ onNavigate }) => {
                 className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
               >
                 <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${item.isWhatnot ? '' : item.gradient} shrink-0 overflow-hidden`}>
+                  <item.Icon className="w-3.5 h-3.5 text-white" />
+                </span>
+                <span className="text-xs font-semibold text-foreground truncate">{item.label}</span>
+              </Link>
+            </SheetClose>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Mobile grading section (expandable) ─────────────────────────────────────
+const MobileGradingSection = ({ onNavigate }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-4">
+      <button
+        onClick={() => startTransition(() => setOpen(o => !o))}
+        className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-muted transition-colors mb-0.5"
+      >
+        <span className="text-sm font-bold text-foreground flex items-center gap-2">
+          <Award className="w-4 h-4 text-primary" />
+          Grading
+        </span>
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="flex flex-col gap-0.5 mb-1 pl-2">
+          <SheetClose asChild>
+            <Link
+              to="/grading"
+              onClick={onNavigate}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-semibold text-muted-foreground"
+            >
+              Grading Hub
+            </Link>
+          </SheetClose>
+          {GRADING_ITEMS.map(item => (
+            <SheetClose key={item.href} asChild>
+              <Link
+                to={item.href}
+                onClick={onNavigate}
+                className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
+              >
+                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${item.gradient} shrink-0`}>
                   <item.Icon className="w-3.5 h-3.5 text-white" />
                 </span>
                 <span className="text-xs font-semibold text-foreground truncate">{item.label}</span>
@@ -1055,8 +1168,14 @@ const Header = () => {
                     onNavigate={() => setMobileMenuOpen(false)}
                   />
 
+                  {/* Mobile Grading */}
+                  <MobileGradingSection
+                    key={`grading-${String(mobileMenuOpen)}`}
+                    onNavigate={() => setMobileMenuOpen(false)}
+                  />
+
                   <nav className="flex flex-col gap-1.5 mb-6">
-                    {NAV_LINKS.filter(l => l.label !== 'Blog' && l.label !== 'Community' && l.label !== 'Events').map((link) => {
+                    {NAV_LINKS.filter(l => l.label !== 'Blog' && l.label !== 'Community' && l.label !== 'Events' && l.label !== 'Grading').map((link) => {
                       const isActive = isNavLinkActive(link);
                       return (
                         <SheetClose key={link.label} asChild>
@@ -1172,6 +1291,9 @@ const Header = () => {
               }
               if (link.label === 'Events') {
                 return <EventsDropdown key="events" onNavigate={() => setMobileMenuOpen(false)} />;
+              }
+              if (link.label === 'Grading') {
+                return <GradingDropdown key="grading" onNavigate={() => setMobileMenuOpen(false)} />;
               }
               const isActive = isNavLinkActive(link);
               return (
