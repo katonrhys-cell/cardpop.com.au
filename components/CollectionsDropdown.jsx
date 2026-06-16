@@ -9,7 +9,7 @@ const tcgCollections = [
 ];
 
 const sportsCollections = [
-  'NBL', 'NBA', 'NHL', 'Baseball', 'NFL', 'Cricket', 
+  'NBL', 'NBA', 'NHL', 'MLB', 'NFL', 'Cricket',
   'NRL', 'Formula 1', 'Golf', 'Soccer', 'AFL', 'Tennis', 
   'Wrestling', 'UFC'
 ];

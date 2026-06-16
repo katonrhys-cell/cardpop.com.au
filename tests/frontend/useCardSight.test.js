@@ -175,7 +175,7 @@ describe('mapCardSightToFormFields', () => {
     ['pokemon tcg', 'Pokemon'],
     ['NBA Basketball', 'NBA Basketball'],
     ['NFL', 'NFL Football'],
-    ['mlb baseball', 'MLB Baseball'],
+    ['mlb baseball', 'MLB'],
     ['soccer', 'Soccer'],
     ['UFC', 'UFC'],
   ])('maps segment %s → collection %s', (segment, expected) => {

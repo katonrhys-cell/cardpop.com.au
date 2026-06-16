@@ -418,15 +418,15 @@ export const COLLECTION_CONFIGS = {
     holyGrailDesc:  'The finest NFL singles on CardPop — rookie autos, 1/1 patch cards, and PSA-graded legends.',
   },
 
-  // ── Baseball ──────────────────────────────────────────────────────────────
-  baseball: {
-    slug: 'baseball',
-    name: 'Baseball Cards',
-    categoryAliases: ['Baseball', 'Baseball Cards', 'MLB'],
+  // ── MLB ───────────────────────────────────────────────────────────────────
+  mlb: {
+    slug: 'mlb',
+    name: 'MLB',
+    categoryAliases: ['MLB', 'Baseball', 'Baseball Cards'],
     tagline: 'America\'s Pastime — Collect the Icons',
-    seoTitle: 'Baseball Cards Australia | CardPop',
-    seoDescription: 'Buy and sell baseball cards from verified Australian collectors. Browse Topps Chrome, Bowman Chrome prospects, and vintage T206 pieces.',
-    seoIntro: 'Baseball cards are one of the most storied collecting hobbies in the world, with a history stretching back over 100 years. Australian collectors have a growing passion for the hobby — from vintage Honus Wagner reprints to modern Shohei Ohtani rookies.',
+    seoTitle: 'MLB Cards Australia | CardPop',
+    seoDescription: 'Buy and sell MLB cards from verified Australian collectors. Browse Topps Chrome, Bowman Chrome prospects, and vintage T206 pieces.',
+    seoIntro: 'MLB cards are one of the most storied collecting hobbies in the world, with a history stretching back over 100 years. Australian collectors have a growing passion for the hobby — from vintage Honus Wagner reprints to modern Shohei Ohtani rookies.',
     heroGradient: 'from-red-500 via-red-400 to-slate-600',
     heroTextDark: false,
     accentHex: '#EF4444',
@@ -439,7 +439,7 @@ export const COLLECTION_CONFIGS = {
       era('Vintage (Pre-1980)','1900–1980','from-stone-500 to-amber-700',  'T206, T205 & classic wax.'),
     ],
     holyGrailLabel: 'Hall of Fame Hits',
-    holyGrailDesc:  'The finest baseball cards on CardPop — rookie autos, vintage gems, and PSA-graded legends.',
+    holyGrailDesc:  'The finest MLB cards on CardPop — rookie autos, vintage gems, and PSA-graded legends.',
   },
 
   // ── Soccer ────────────────────────────────────────────────────────────────
