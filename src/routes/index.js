@@ -25,6 +25,7 @@ import recommendationsRouter from './recommendations.js';
 import priceHistoryRouter from './price-history.js';
 import newsletterRouter from './newsletter.js';
 import marketDataRouter from './market-data.js';
+import catalogRouter from './catalog.js';
 
 const router = Router();
 
@@ -60,9 +61,13 @@ export default () => {
     router.use('/ebay', apiLimiter);
     router.use('/ebay', ebayRouter);
 
-    // CardSight AI identification, catalog, and pricing routes
+    // CardSight AI identification routes (image recognition only)
     router.use('/cardsight', apiLimiter);
     router.use('/cardsight', cardsightRouter);
+
+    // Free-API-backed card catalog search and eBay pricing
+    router.use('/catalog', apiLimiter);
+    router.use('/catalog', catalogRouter);
     
     // Stripe: high-capacity limiter for the webhook, standard for other endpoints
     router.use('/stripe/webhook', stripeLimiter);

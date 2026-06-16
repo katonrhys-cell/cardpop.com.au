@@ -22,25 +22,23 @@ export function useCardsightPricing() {
     }
   }, []);
 
-  const fetchPricingByName = useCallback(async (cardName, period = '30d') => {
+  const fetchPricingByName = useCallback(async (cardName) => {
     if (!cardName) return;
     setIsLoadingCsPrice(true);
     setCsPrice(null);
     try {
-      const acRes = await apiServerClient.fetch(
-        `/cardsight/autocomplete?q=${encodeURIComponent(cardName)}&take=1`
+      const res = await apiServerClient.fetch(
+        `/catalog/pricing?name=${encodeURIComponent(cardName)}`
       );
-      if (!acRes.ok) throw new Error('Autocomplete failed');
-      const acData = await acRes.json();
-      const cardId = acData?.results?.[0]?.id ?? acData?.[0]?.id ?? acData?.data?.[0]?.id;
-      if (!cardId) return;
-      await fetchPricingById(cardId, period);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.count > 0) setCsPrice({ cardId: null, ...data });
     } catch {
       // non-critical
     } finally {
       setIsLoadingCsPrice(false);
     }
-  }, [fetchPricingById]);
+  }, []);
 
   const clearCsPrice = useCallback(() => setCsPrice(null), []);
 

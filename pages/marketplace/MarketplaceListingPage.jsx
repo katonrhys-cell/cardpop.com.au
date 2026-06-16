@@ -37,26 +37,19 @@ const MarketplaceListingPage = () => {
     return () => { cancelled = true; };
   }, [id]);
 
-  // Fetch CardSight pricing once listing title is known
+  // Fetch eBay pricing once listing title is known (replaces CardSight autocomplete → pricing)
   useEffect(() => {
     if (!listing?.title) return;
     let cancelled = false;
     const fetchCsPrice = async () => {
       setCsPriceLoading(true);
       try {
-        const acRes = await apiServerClient.fetch(
-          `/cardsight/autocomplete?q=${encodeURIComponent(listing.title)}&take=1`
-        );
-        if (!acRes.ok || cancelled) return;
-        const acData = await acRes.json();
-        const cardId = acData?.results?.[0]?.id ?? acData?.[0]?.id ?? acData?.data?.[0]?.id;
-        if (!cardId || cancelled) return;
         const prRes = await apiServerClient.fetch(
-          `/cardsight/pricing/${cardId}?period=30d&listing_type=sold`
+          `/catalog/pricing?name=${encodeURIComponent(listing.title)}`
         );
         if (!prRes.ok || cancelled) return;
         const prData = await prRes.json();
-        if (!cancelled) setCsPrice(prData);
+        if (!cancelled && prData.count > 0) setCsPrice(prData);
       } catch {
         // non-critical
       } finally {
