@@ -9,7 +9,7 @@ const InfoPageLayout = ({ title, description, eyebrow, icon: Icon, children, rel
     <div className="min-h-screen bg-background">
 
       {/* ── Hero header ── */}
-      <section className="bg-card border-b border-border py-20 text-center">
+      <section className="bg-card border-b border-border py-14 text-center">
         <div className="container-default">
           {Icon && <Icon className="w-12 h-12 text-primary mx-auto mb-6" />}
           {eyebrow && (
