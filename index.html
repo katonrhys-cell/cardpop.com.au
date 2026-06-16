@@ -27,7 +27,7 @@
     </style>
 
     <title>CardPop | Australia's Trading Card Marketplace</title>
-    <meta name="description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop — Australia's most trusted trading card platform." />
+    <meta name="description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, Yu-Gi-Oh, and sports cards on CardPop — Australia's trusted online trading card marketplace. Browse thousands of listings, check live prices, and shop sealed boxes." />
     <meta name="keywords" content="trading cards Australia, Pokemon cards Australia, buy sell trade cards, MTG Australia, sports cards Australia, card marketplace" />
     <meta name="author" content="CardPop" />
     <link rel="canonical" href="https://cardpop.online/" />
@@ -91,6 +91,10 @@
       "description": "Australia's most trusted trading card marketplace.",
       "address": {
         "@type": "PostalAddress",
+        "postOfficeBoxNumber": "1024",
+        "addressLocality": "Ascot Vale",
+        "addressRegion": "VIC",
+        "postalCode": "3032",
         "addressCountry": "AU"
       },
       "sameAs": [
@@ -99,24 +103,27 @@
     }
     </script>
 
-    <!-- Structured data: LocalBusiness for Australia -->
+    <!-- Structured data: OnlineStore for Australia -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "LocalBusiness",
+      "@type": "OnlineStore",
       "name": "CardPop",
-      "description": "Australia's most trusted trading card marketplace for Pokémon, Magic: The Gathering, sports cards and more.",
+      "description": "Australia's most trusted trading card marketplace for Pokémon, Magic: The Gathering, Yu-Gi-Oh and sports cards.",
       "url": "https://cardpop.online",
-      "telephone": "+61-400-000-000",
+      "currenciesAccepted": "AUD",
+      "paymentAccepted": "Credit Card",
       "address": {
         "@type": "PostalAddress",
-        "addressCountry": "AU",
-        "addressRegion": "Australia"
+        "postOfficeBoxNumber": "1024",
+        "addressLocality": "Ascot Vale",
+        "addressRegion": "VIC",
+        "postalCode": "3032",
+        "addressCountry": "AU"
       },
-      "geo": {
-        "@type": "GeoCoordinates",
-        "latitude": "-25.2744",
-        "longitude": "133.7751"
+      "areaServed": {
+        "@type": "Country",
+        "name": "Australia"
       },
       "openingHoursSpecification": {
         "@type": "OpeningHoursSpecification",
@@ -132,7 +139,17 @@
         "opens": "00:00",
         "closes": "23:59"
       },
-      "priceRange": "$$"
+      "priceRange": "$$",
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Trading Cards",
+        "itemListElement": [
+          { "@type": "OfferCatalog", "name": "Pokémon Cards" },
+          { "@type": "OfferCatalog", "name": "Magic: The Gathering Cards" },
+          { "@type": "OfferCatalog", "name": "Yu-Gi-Oh Cards" },
+          { "@type": "OfferCatalog", "name": "Sports Cards" }
+        ]
+      }
     }
     </script>
   </head>
