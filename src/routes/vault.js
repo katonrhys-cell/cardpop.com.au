@@ -1,10 +1,12 @@
 import 'dotenv/config';
 import express from 'express';
 import supabase from '../utils/supabaseClient.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // GET /vault/products — authenticated user's own vault items
 router.get('/products', authMiddleware, async (req, res) => {
@@ -53,6 +55,10 @@ router.get('/public', async (req, res) => {
   const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
   const from = (pageNum - 1) * limitNum;
 
+  if (userId?.trim() && !UUID_RE.test(userId.trim())) {
+    return res.status(400).json({ error: 'Invalid userId format' });
+  }
+
   let query = supabase
     .from('vault_items')
     .select('*, profiles!owner_id(username, business_name)', { count: 'exact' })
@@ -84,8 +90,8 @@ router.get('/public', async (req, res) => {
   });
 });
 
-// GET /vault/:id — single vault item
-router.get('/:id', async (req, res) => {
+// GET /vault/:id — single vault item (public items visible to all; private items require ownership)
+router.get('/:id', optionalAuthMiddleware, async (req, res) => {
   const { id } = req.params;
   if (!id?.trim()) return res.status(400).json({ error: 'Product ID is required' });
 
@@ -138,7 +144,9 @@ router.patch('/:id/base-value', authMiddleware, async (req, res) => {
   const { id } = req.params;
   const { newValue, reason } = req.body;
 
-  const isAdmin = req.user.app_metadata?.is_admin === true;
+  // Verify admin status against the DB (defence-in-depth: don't rely solely on JWT claim)
+  const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', req.user.id).single();
+  const isAdmin = profile?.is_admin === true;
 
   if (!isAdmin) {
     return res.status(403).json({ error: 'Only administrators can adjust locked base values.' });

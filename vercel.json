@@ -15,6 +15,20 @@
   ],
   "headers": [
     {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-XSS-Protection", "value": "1; mode=block" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=()" },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://odoglvswwymyjuwlonkf.supabase.co wss://odoglvswwymyjuwlonkf.supabase.co https://api.stripe.com; font-src 'self' data:; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self';"
+        }
+      ]
+    },
+    {
       "source": "/api/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Credentials", "value": "true" }
@@ -22,4 +36,3 @@
     }
   ]
 }
-

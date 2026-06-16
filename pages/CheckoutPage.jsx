@@ -155,6 +155,7 @@ const CheckoutPage = () => {
 
       if (!res.ok) throw new Error('Payment service unavailable. Please try again later.');
       const data = await res.json();
+      if (!data?.url) throw new Error('No checkout URL returned from payment service.');
       window.location.href = data.url;
     } catch (err) {
       toast.error(err.message || 'Payment initiation failed.');

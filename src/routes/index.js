@@ -106,15 +106,11 @@ export default () => {
     // Apply auth middleware first, then trade access verification
     // This protects any route containing 'trade' in the path
     router.use((req, res, next) => {
-        // Check if this is a trade route
-        if (req.path.toLowerCase().includes('trade')) {
-            // Apply auth middleware for trade routes
+        if (req.path.toLowerCase().startsWith('/trade')) {
             return authMiddleware(req, res, () => {
-                // Then apply trade access verification
                 verifyTradeAccess(req, res, next);
             });
         }
-        // For non-trade routes, just continue
         next();
     });
 

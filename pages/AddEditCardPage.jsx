@@ -82,6 +82,8 @@ const AddEditCardPage = () => {
   const [subsetOpts, setSubsetOpts]           = useState([]);
   const [lockedBaseValue, setLockedBaseValue] = useState(null);
   const [psaPopData, setPsaPopData]           = useState(null);
+  const [photoQuality, setPhotoQuality]       = useState(null);
+  const [checkingQuality, setCheckingQuality] = useState(false);
 
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();

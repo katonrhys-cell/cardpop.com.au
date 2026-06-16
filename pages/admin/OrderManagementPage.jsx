@@ -74,12 +74,20 @@ const RefundDetailDialog = ({ order, refund, onClose, onUpdate }) => {
   const handleProcess = async () => {
     setSaving(true);
     try {
-      await apiClient.post('/stripe/refund', { refundId: refund.id });
+      const res = await apiClient.fetch('/stripe/refund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refundId: refund.id }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Refund processing failed');
+      }
       toast.success('Stripe refund issued');
       onUpdate();
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Refund processing failed');
+      toast.error(err.message || 'Refund processing failed');
       setSaving(false);
     }
   };

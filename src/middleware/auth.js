@@ -27,4 +27,20 @@ async function authMiddleware(req, res, next) {
   }
 }
 
-export { authMiddleware };
+// Like authMiddleware but never returns 401 — populates req.user if a valid
+// Bearer token is present, otherwise continues with req.user undefined.
+// Use on routes that serve both public and authenticated content.
+async function optionalAuthMiddleware(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    try {
+      const { data } = await supabase.auth.getUser(authHeader.substring(7));
+      if (data?.user) req.user = data.user;
+    } catch {
+      // Ignore — treat as unauthenticated
+    }
+  }
+  next();
+}
+
+export { authMiddleware, optionalAuthMiddleware };

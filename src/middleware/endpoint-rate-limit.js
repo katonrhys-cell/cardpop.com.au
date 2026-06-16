@@ -74,17 +74,16 @@ const stripeLimiter = rateLimit({
 	},
 });
 
-// MFA verify rate limiter: 5 attempts per 15 minutes per IP
-// Prevents brute-forcing 8-digit OTP codes across any mfaId
+// MFA verify rate limiter: 5 attempts per 15 minutes, keyed by mfaId so that
+// rotating IPs cannot bypass the limit for the same MFA session.
 const mfaLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000,
 	max: 5,
 	standardHeaders: true,
 	legacyHeaders: false,
-	keyGenerator: (req) => ipKeyGenerator(req),
+	keyGenerator: (req) => req.body?.mfaId || ipKeyGenerator(req),
 	handler: (req, res) => {
-		const clientIp = ipKeyGenerator(req);
-		logger.warn(`[RATE_LIMIT] MFA verify rate limit exceeded for IP: ${clientIp}`);
+		logger.warn(`[RATE_LIMIT] MFA verify rate limit exceeded for mfaId: ${req.body?.mfaId}`);
 		res.status(429).json({
 			error: 'Too many verification attempts, please try again later',
 			retryAfter: req.rateLimit.resetTime,
@@ -92,4 +91,21 @@ const mfaLimiter = rateLimit({
 	},
 });
 
-export { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, mfaLimiter };
+// Backup code verify rate limiter: 5 attempts per 15 minutes per authenticated user.
+// The route already requires authMiddleware so req.user is always populated here.
+const backupCodeLimiter = rateLimit({
+	windowMs: 15 * 60 * 1000,
+	max: 5,
+	standardHeaders: true,
+	legacyHeaders: false,
+	keyGenerator: (req) => req.user?.id || ipKeyGenerator(req),
+	handler: (req, res) => {
+		logger.warn(`[RATE_LIMIT] Backup code verify rate limit exceeded for user: ${req.user?.id}`);
+		res.status(429).json({
+			error: 'Too many backup code attempts, please try again later',
+			retryAfter: req.rateLimit.resetTime,
+		});
+	},
+});
+
+export { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, mfaLimiter, backupCodeLimiter };
