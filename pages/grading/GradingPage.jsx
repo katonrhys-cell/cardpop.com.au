@@ -3,7 +3,7 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import {
   SearchCheck, BookOpen, BarChart2, Building2, ArrowRight,
-  Store, ShieldCheck, DollarSign, Clock, MapPin, HelpCircle, TrendingUp,
+  Store, ShieldCheck, DollarSign, Clock, MapPin, HelpCircle, TrendingUp, Calculator,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -39,6 +39,14 @@ const SECTIONS = [
     description:
       'Skip international shipping and customs. Ranked local Australian grading services for TCG and sports cards, plus the best PSA and Beckett submission partners in Australia.',
     cta: 'VIEW LOCAL OPTIONS',
+  },
+  {
+    href: '/grading/estimator',
+    icon: Calculator,
+    title: 'Grade Estimator',
+    description:
+      'Upload photos of your card and receive AI-generated preliminary grade estimates across PSA, BGS, CGC, ACE, and SGC. A helpful guide before you commit to a professional submission.',
+    cta: 'TRY ESTIMATOR',
   },
 ];
 
