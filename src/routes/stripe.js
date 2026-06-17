@@ -266,6 +266,173 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
   }
 });
 
+// ─── POST /create-cart-checkout ──────────────────────────────────────────────
+// Multi-item cart checkout. Each item is priced server-side from its source of
+// truth — never trust client prices/totals. Admin "shop" products (shop_products)
+// are platform-owned: GST only, no commission. Marketplace "listing" items use
+// the normal commission + GST breakdown. A single Stripe session collects the
+// payment; a 'pending' order row is written as the snapshot the webhook confirms.
+
+router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
+  try {
+    const { items, successUrl, cancelUrl, shippingAddress } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: 'items is required' });
+    }
+    if (!successUrl || !cancelUrl) {
+      return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
+    }
+
+    const userId = req.user.id;
+    const email  = req.user.email;
+
+    const gstEnabled = await getPlatformSetting('gst_enabled', true);
+    const gstRate    = Number(await getPlatformSetting('gst_rate_pct', 10));
+
+    const lineItems = [];      // Stripe line items
+    const orderLines = [];     // snapshot stored on the order
+    let itemsCents = 0;
+    let commissionCents = 0;
+    let gstCents = 0;
+
+    for (const raw of items) {
+      const type = raw?.type;
+      const id = raw?.id;
+      const quantity = Math.max(1, parseInt(raw?.quantity, 10) || 1);
+
+      if (type === 'shop') {
+        const { data: product, error } = await supabase
+          .from('shop_products')
+          .select('id, title, price_aud, stock_quantity, status')
+          .eq('id', id)
+          .maybeSingle();
+        if (error) throw error;
+        if (!product || product.status !== 'active') {
+          return res.status(404).json({ error: `Shop product unavailable` });
+        }
+        if (product.stock_quantity < quantity) {
+          return res.status(409).json({ error: `Not enough stock for ${product.title}` });
+        }
+
+        const unitCents = Math.round(Number(product.price_aud) * 100);
+        const lineCents = unitCents * quantity;
+        const lineGstCents = gstEnabled ? Math.round(lineCents * (gstRate / 100)) : 0;
+
+        itemsCents += lineCents;
+        gstCents += lineGstCents;
+
+        lineItems.push({
+          price_data: { currency: 'aud', product_data: { name: product.title }, unit_amount: unitCents },
+          quantity,
+        });
+        orderLines.push({
+          type: 'shop', id: product.id, seller_id: null, title: product.title,
+          quantity, unit_price_aud: unitCents / 100, line_total_aud: lineCents / 100,
+          commission_aud: 0, gst_aud: lineGstCents / 100,
+        });
+      } else if (type === 'listing') {
+        const { data: listing, error } = await supabase
+          .from('listings')
+          .select('id, price_aud, seller_id, listing_type, status, vault_item:vault_items!inner(card_name), seller:profiles!seller_id(seller_tier)')
+          .eq('id', id)
+          .eq('status', 'active')
+          .maybeSingle();
+        if (error) throw error;
+        if (!listing) {
+          return res.status(404).json({ error: 'A listing in your cart is no longer available' });
+        }
+        if (listing.seller_id === userId) {
+          return res.status(403).json({ error: 'You cannot purchase your own listing' });
+        }
+
+        // Marketplace items are unique — always quantity 1.
+        const breakdown = await calculateBreakdown(listing, 'fixed');
+        const itemC = Math.round(breakdown.itemPrice * 100);
+        const commC = Math.round(breakdown.commissionAud * 100);
+        const gstC  = Math.round(breakdown.gstAud * 100);
+        const name  = listing.vault_item?.card_name || 'Trading Card';
+
+        itemsCents += itemC;
+        commissionCents += commC;
+        gstCents += gstC;
+
+        lineItems.push({
+          price_data: { currency: 'aud', product_data: { name }, unit_amount: itemC },
+          quantity: 1,
+        });
+        orderLines.push({
+          type: 'listing', id: listing.id, seller_id: listing.seller_id, title: name,
+          quantity: 1, unit_price_aud: itemC / 100, line_total_aud: itemC / 100,
+          commission_aud: commC / 100, gst_aud: gstC / 100,
+        });
+      } else {
+        return res.status(400).json({ error: `Unknown cart item type: ${type}` });
+      }
+    }
+
+    if (commissionCents > 0) {
+      lineItems.push({
+        price_data: { currency: 'aud', product_data: { name: 'Platform Fee' }, unit_amount: commissionCents },
+        quantity: 1,
+      });
+    }
+    if (gstCents > 0) {
+      lineItems.push({
+        price_data: { currency: 'aud', product_data: { name: 'GST' }, unit_amount: gstCents },
+        quantity: 1,
+      });
+    }
+
+    const grandCents = itemsCents + commissionCents + gstCents;
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items:           lineItems,
+      mode:                 'payment',
+      success_url:          successUrl,
+      cancel_url:           cancelUrl,
+      customer_email:       email,
+      metadata:             { userId, cartCheckout: 'true' },
+    });
+
+    if (!session?.url) throw new Error('Stripe returned a session without a URL');
+
+    const s = shippingAddress || {};
+    const { error: orderErr } = await supabase.from('orders').insert({
+      buyer_id:          userId,
+      seller_id:         null,
+      listing_id:        null,
+      stripe_session_id: session.id,
+      item_price_aud:    itemsCents / 100,
+      shipping_aud:      0,
+      platform_fee_aud:  (commissionCents + gstCents) / 100,
+      gst_aud:           gstCents / 100,
+      total_aud:         grandCents / 100,
+      transaction_type:  'cart',
+      status:            'pending',
+      buyer_protection:  true,
+      order_items:       orderLines,
+      shipping_name:     s.name     ? String(s.name).slice(0, 100)     : null,
+      shipping_address:  s.address  ? String(s.address).slice(0, 200)  : null,
+      shipping_suburb:   s.suburb   ? String(s.suburb).slice(0, 100)   : null,
+      shipping_state:    s.state    ? String(s.state).slice(0, 50)     : null,
+      shipping_postcode: s.postcode ? String(s.postcode).slice(0, 10)  : null,
+    });
+
+    if (orderErr) {
+      logger.error(`[STRIPE] pending cart order insert failed: ${orderErr.message}`);
+      throw new Error('Could not record the order');
+    }
+
+    logger.info(`[STRIPE] Cart session created: ${session.id} (${orderLines.length} items, $${grandCents / 100})`);
+    res.json({ url: session.url, sessionId: session.id, total: grandCents / 100 });
+  } catch (err) {
+    logger.error(`[STRIPE] create-cart-checkout error: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── GET /session/:sessionId ─────────────────────────────────────────────────
 
 router.get('/session/:sessionId', authMiddleware, async (req, res) => {
@@ -334,15 +501,82 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         const session = event.data.object;
         logger.info(`[STRIPE] checkout.session.completed: ${session.id}`);
 
-        // Idempotency — skip if we already recorded this session
+        // Look up any order we already have for this session.
         const { data: existing } = await supabase
           .from('orders')
-          .select('id')
+          .select('id, status, total_aud, order_items, buyer_id')
           .eq('stripe_session_id', session.id)
           .maybeSingle();
 
-        if (existing) {
-          logger.info(`[STRIPE] Order already exists for session ${session.id}, skipping`);
+        // Already finalised — idempotent skip.
+        if (existing && existing.status !== 'pending') {
+          logger.info(`[STRIPE] Order already processed for session ${session.id}, skipping`);
+          break;
+        }
+
+        // Multi-item cart: confirm the pre-created 'pending' snapshot order.
+        if (existing && existing.status === 'pending') {
+          const amountCents = session.amount_total || 0;
+          const expectedCents = Math.round(Number(existing.total_aud) * 100);
+          if (Math.abs(amountCents - expectedCents) > 2) {
+            logger.error(`[STRIPE] Cart amount mismatch for ${session.id}: Stripe=${amountCents}¢ expected=${expectedCents}¢ — marking failed`);
+            await supabase.from('orders').update({ status: 'payment_failed' }).eq('id', existing.id);
+            break;
+          }
+
+          const cartPaymentIntentId = typeof session.payment_intent === 'string'
+            ? session.payment_intent
+            : (session.payment_intent?.id ?? null);
+
+          await supabase.from('orders')
+            .update({ status: 'payment_confirmed', stripe_payment_intent_id: cartPaymentIntentId })
+            .eq('id', existing.id);
+
+          const lines = Array.isArray(existing.order_items) ? existing.order_items : [];
+          const sellerIds = new Set();
+          for (const line of lines) {
+            if (line.type === 'listing' && line.id) {
+              await supabase.from('listings')
+                .update({ status: 'sold', sold_at: new Date().toISOString() })
+                .eq('id', line.id);
+              if (line.seller_id) sellerIds.add(line.seller_id);
+            } else if (line.type === 'shop' && line.id) {
+              await supabase.rpc('decrement_shop_stock', { p_id: line.id, p_qty: line.quantity || 1 });
+            }
+          }
+
+          if (existing.buyer_id) {
+            await supabase.from('notifications').insert({
+              user_id: existing.buyer_id,
+              type:    'order_confirmed',
+              title:   'Order Confirmed',
+              body:    `Your payment of $${(amountCents / 100).toFixed(2)} AUD was successful.`,
+            });
+          }
+          for (const sid of sellerIds) {
+            await supabase.from('notifications').insert({
+              user_id: sid, type: 'item_sold', title: 'Item Sold!',
+              body: 'One of your listings sold through a cart checkout.',
+            });
+          }
+
+          if (existing.buyer_id) {
+            const { data: buyerProfile } = await supabase.from('profiles')
+              .select('email, display_name').eq('id', existing.buyer_id).maybeSingle();
+            if (buyerProfile?.email) {
+              const itemCount = lines.reduce((n, l) => n + (l.quantity || 1), 0);
+              await sendOrderConfirmed({
+                buyerEmail: buyerProfile.email,
+                buyerName:  buyerProfile.display_name || 'Collector',
+                cardName:   `${itemCount} item${itemCount === 1 ? '' : 's'}`,
+                itemPrice:  amountCents / 100,
+                total:      amountCents / 100,
+                orderId:    existing.id,
+              }).catch(e => logger.warn(`[STRIPE] cart confirm email failed: ${e.message}`));
+            }
+          }
+
+          logger.info(`[STRIPE] Cart order ${existing.id} confirmed for session ${session.id}`);
           break;
         }
 
