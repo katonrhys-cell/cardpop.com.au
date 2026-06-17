@@ -85,7 +85,7 @@ function scoreIcon(score) {
 function scoreBadge(score) {
   const map = {
     excellent: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-    good: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+    good: 'bg-sky-500/10 text-sky-600 dark:text-sky-400',
     fair: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
     poor: 'bg-red-500/10 text-red-600 dark:text-red-400',
   };
@@ -162,11 +162,11 @@ function ImageUploadSlot({ label, required, file, onFile, onRemove }) {
           onDrop={handleDrop}
           className={`aspect-[2.5/3.5] rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-3 transition-all cursor-pointer
             ${dragging
-              ? 'border-indigo-500 bg-indigo-500/10'
-              : 'border-border hover:border-indigo-400 hover:bg-indigo-500/5'}`}
+              ? 'border-primary bg-primary/10'
+              : 'border-border hover:border-primary/60 hover:bg-primary/5'}`}
         >
-          <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center">
-            <Upload className="w-6 h-6 text-indigo-500" />
+          <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
+            <Upload className="w-6 h-6 text-primary" />
           </div>
           <div className="text-center px-4">
             <p className="text-sm font-medium">Drop image here</p>
@@ -265,8 +265,8 @@ function ResultsView({ result, onReset }) {
       {(cardIdentification?.name || cardIdentification?.set) && (
         <div className="bg-card border border-border rounded-2xl p-5">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center flex-shrink-0">
-              <Star className="w-5 h-5 text-indigo-500" />
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Star className="w-5 h-5 text-primary" />
             </div>
             <div>
               {cardIdentification.name && (
@@ -285,7 +285,7 @@ function ResultsView({ result, onReset }) {
               </div>
             </div>
             {overallCondition && (
-              <span className="ml-auto text-sm font-semibold px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 whitespace-nowrap">
+              <span className="ml-auto text-sm font-semibold px-3 py-1 rounded-full bg-primary/10 text-primary whitespace-nowrap">
                 {overallCondition}
               </span>
             )}
@@ -295,9 +295,9 @@ function ResultsView({ result, onReset }) {
 
       {/* Image quality note */}
       {imageQualityNote && (
-        <div className="flex gap-3 bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
-          <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-blue-700 dark:text-blue-300">{imageQualityNote}</p>
+        <div className="flex gap-3 bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+          <Info className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-amber-700 dark:text-amber-300">{imageQualityNote}</p>
         </div>
       )}
 
@@ -426,7 +426,7 @@ const GradeEstimatorPage = () => {
       />
 
       {/* Hero */}
-      <section className="bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-800 py-20 text-center text-white">
+      <section className="bg-gradient-to-br from-brand-charcoal via-gray-900 to-brand-charcoal py-20 text-center text-white">
         <div className="container-default">
           <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center mx-auto mb-6">
             <Calculator className="w-7 h-7 text-white" />
@@ -454,15 +454,15 @@ const GradeEstimatorPage = () => {
             {/* Login gate */}
             {!isAuthenticated ? (
               <div className="bg-card border border-border rounded-3xl p-10 text-center">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center mx-auto mb-5">
-                  <Calculator className="w-7 h-7 text-indigo-500" />
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-5">
+                  <Calculator className="w-7 h-7 text-primary" />
                 </div>
                 <h2 className="text-2xl font-bold mb-3">Sign in to Use the Grade Estimator</h2>
                 <p className="text-muted-foreground max-w-sm mx-auto mb-7 leading-relaxed">
                   Create a free CardPop account to access the AI grade estimator and other grading tools.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                  <Button asChild size="lg" className="bg-indigo-600 hover:bg-indigo-700 text-white px-8">
+                  <Button asChild size="lg" className="px-8">
                     <Link to="/signup">Create Free Account</Link>
                   </Button>
                   <Button asChild variant="outline" size="lg" className="px-8">
@@ -520,7 +520,7 @@ const GradeEstimatorPage = () => {
                   size="lg"
                   disabled={!frontImage || isAnalysing}
                   onClick={handleSubmit}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50"
+                  className="w-full disabled:opacity-50"
                 >
                   {isAnalysing ? (
                     <>
@@ -551,8 +551,8 @@ const GradeEstimatorPage = () => {
                   { step: '3', title: 'Review Estimates', body: 'Receive preliminary grade estimates across PSA, BGS, CGC, ACE, and SGC alongside a condition breakdown.' },
                 ].map(({ step, title, body }) => (
                   <div key={step} className="bg-card border border-border rounded-2xl p-5">
-                    <div className="w-9 h-9 rounded-xl bg-indigo-500/10 flex items-center justify-center mb-4">
-                      <span className="text-indigo-600 dark:text-indigo-400 font-black text-sm">{step}</span>
+                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center mb-4">
+                      <span className="text-primary font-black text-sm">{step}</span>
                     </div>
                     <h3 className="font-bold mb-2">{title}</h3>
                     <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
@@ -580,7 +580,7 @@ const GradeEstimatorPage = () => {
             </section>
 
             {/* Links to grading resources */}
-            <section className="bg-gradient-to-br from-indigo-500/5 via-blue-500/5 to-indigo-500/5 border border-indigo-500/20 rounded-3xl p-8 text-center">
+            <section className="bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 border border-primary/20 rounded-3xl p-8 text-center">
               <h2 className="text-xl font-bold mb-2">Learn More About Card Grading</h2>
               <p className="text-muted-foreground text-sm mb-6 max-w-md mx-auto">
                 Understanding grading standards helps you self-assess more accurately before using this tool.
