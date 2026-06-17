@@ -121,6 +121,7 @@ const GradingCompaniesPage = lazy(() => import('@/pages/grading/GradingCompanies
 const LocalGradersPage = lazy(() => import('@/pages/grading/LocalGradersPage.jsx'));
 const SubmissionPartnersPage = lazy(() => import('@/pages/grading/SubmissionPartnersPage.jsx'));
 const GradeEstimatorPage = lazy(() => import('@/pages/grading/GradeEstimatorPage.jsx'));
+const GradingROIPage = lazy(() => import('@/pages/grading/GradingROIPage.jsx'));
 
 // Community & Blog
 const BlogPage = lazy(() => import('@/pages/blog/BlogPage.jsx'));
@@ -305,6 +306,7 @@ const App = () => {
                         <Route path="/grading/submission-partners" element={<SubmissionPartnersPage />} />
                         <Route path="/grading/guide/:scale" element={<GradingScalePage />} />
                         <Route path="/grading/estimator" element={<GradeEstimatorPage />} />
+                        <Route path="/grading/roi-calculator" element={<GradingROIPage />} />
                         
                         {/* Community & Blog */}
                         <Route path="/blog" element={<BlogPage />} />
