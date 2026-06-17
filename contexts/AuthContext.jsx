@@ -145,11 +145,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const resetPassword = async (email) => {
-    const base = window.location.hostname === 'localhost'
-      ? window.location.origin
-      : window.location.origin;
+    // Must point at a real, public route that renders PasswordResetPage so the
+    // recovery link resolves (there is no /account/reset-password route).
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/account/reset-password`,
+      redirectTo: `${window.location.origin}/reset-password`,
     });
     if (error) throw new Error(error.message);
     return true;

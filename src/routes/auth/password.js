@@ -35,7 +35,7 @@ router.post('/reset/request', async (req, res) => {
   logger.info(`Password reset requested for ${trimmedEmail}`);
 
   // Use Supabase's built-in password reset email
-  const { error } = await supabase.auth.admin.generateLink({
+  const { data, error } = await supabase.auth.admin.generateLink({
     type: 'recovery',
     email: trimmedEmail,
     options: { redirectTo: `${process.env.APP_URL || 'https://cardpop.com.au'}/reset-password` },
@@ -44,8 +44,9 @@ router.post('/reset/request', async (req, res) => {
   if (error) {
     logger.warn(`Password reset failed for ${trimmedEmail}: ${error.message}`);
   } else {
-    // Audit log (best-effort)
-    const { data: { user } } = await supabase.auth.admin.getUserByEmail(trimmedEmail);
+    // Audit log (best-effort). generateLink already returns the resolved user;
+    // there is no supabase.auth.admin.getUserByEmail method.
+    const user = data?.user;
     if (user) {
       await supabase.from('audit_logs').insert({
         user_id: user.id,
