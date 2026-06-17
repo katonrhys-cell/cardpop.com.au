@@ -341,9 +341,7 @@ const AddEditCardPage = () => {
       }));
       lookupPrice(ocrResult);
       setIsAutoFilled(true);
-      toast.success('Card scanned! Fields auto-filled — please review.');
-    } else {
-      toast.error('Could not identify this card — the card may not be in the catalog yet. Please fill in the details manually.');
+      // Success/failure feedback is surfaced by useCardOCR itself.
     }
   };
 

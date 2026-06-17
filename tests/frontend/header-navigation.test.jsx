@@ -138,8 +138,9 @@ describe('Header desktop dropdowns — consecutive navigations', () => {
     await user.click(screen.getByRole('link', { name: /forum/i }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/community/forum'));
 
-    await user.click(screen.getByRole('link', { name: 'Grading' }));
-    await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/grading'));
+    // Marketplace is a plain top-level nav link (Grading is now a dropdown).
+    await user.click(screen.getByRole('link', { name: 'Marketplace' }));
+    await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/marketplace'));
   });
 
   it('mouse click on a hover-opened trigger keeps the menu open instead of toggling it shut', async () => {

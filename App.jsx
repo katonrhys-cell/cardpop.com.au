@@ -303,6 +303,7 @@ const App = () => {
                         <Route path="/grading/scales/:scale" element={<GradingScalePage />} />
                         <Route path="/grading/companies" element={<GradingCompaniesPage />} />
                         <Route path="/grading/local" element={<Navigate to="/grading/submission-partners" replace />} />
+                        <Route path="/grading/local-graders" element={<LocalGradersPage />} />
                         <Route path="/grading/submission-partners" element={<SubmissionPartnersPage />} />
                         <Route path="/grading/guide/:scale" element={<GradingScalePage />} />
                         <Route path="/grading/estimator" element={<GradeEstimatorPage />} />

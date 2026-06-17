@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { toast } from 'sonner';
 import { integratedAiClient } from '@/lib/integratedAiClient';
 import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 
@@ -71,9 +72,13 @@ export function useCardOCR() {
       const data = JSON.parse(jsonMatch[0]);
       const result = mapOCRResult(data);
       setScanResult(result);
+      toast.success('Card scanned — review the extracted details before applying.');
       return result;
     } catch (err) {
+      // Surface the failure to the user instead of silently swallowing it —
+      // otherwise the scan animation just vanishes with no feedback.
       console.warn('[useCardOCR] scan failed:', err.message);
+      toast.error(err.message || 'Card scan failed. Please try again.');
     } finally {
       setIsScanning(false);
     }

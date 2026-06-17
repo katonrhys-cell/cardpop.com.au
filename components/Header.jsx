@@ -512,10 +512,10 @@ const EventsDropdown = ({ onNavigate }) => {
 
 const GRADING_ITEMS = [
   { href: '/grading/estimator',          label: 'CardPop Grade Estimator',  desc: 'Estimate your card grade instantly',      Icon: Calculator,    gradient: 'from-blue-500 to-indigo-600'   },
-  { href: '/grading/grade-scale',        label: 'Grade Scale',              desc: 'Understand grading scales and standards', Icon: ClipboardList, gradient: 'from-violet-500 to-purple-600' },
+  { href: '/grading/scales',             label: 'Grade Scale',              desc: 'Understand grading scales and standards', Icon: ClipboardList, gradient: 'from-violet-500 to-purple-600' },
   { href: '/grading/local-graders',      label: 'Local Graders',            desc: 'Find graders near you in Australia',      Icon: MapPin,        gradient: 'from-emerald-500 to-teal-600' },
   { href: '/grading/submission-partners',label: 'Submission Partners',      desc: 'Trusted submission services and agents',  Icon: Handshake,     gradient: 'from-amber-500 to-orange-500' },
-  { href: '/grading/where-to-grade',     label: 'Where to Grade My Cards',  desc: 'Compare grading companies and options',   Icon: HelpCircle,    gradient: 'from-rose-500 to-pink-600'    },
+  { href: '/grading/companies',          label: 'Where to Grade My Cards',  desc: 'Compare grading companies and options',   Icon: HelpCircle,    gradient: 'from-rose-500 to-pink-600'    },
 ];
 
 // ─── Grading dropdown ─────────────────────────────────────────────────────────
