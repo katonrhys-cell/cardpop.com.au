@@ -1,7 +1,13 @@
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
+import { optionalAuthMiddleware } from '../middleware/auth.js';
 
 const router = Router();
+
+// Populate req.user when a valid Bearer token is present. The handlers below
+// enforce authentication themselves (returning 401 when req.user is absent),
+// while the public /check route degrades gracefully for anonymous callers.
+router.use(optionalAuthMiddleware);
 
 // Get user's wishlist
 router.get('/', async (req, res) => {

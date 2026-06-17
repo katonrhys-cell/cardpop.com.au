@@ -1,7 +1,11 @@
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
+import { optionalAuthMiddleware } from '../middleware/auth.js';
 
 const router = Router();
+
+// Reads are public; writes are gated to admins (see POST handler).
+router.use(optionalAuthMiddleware);
 
 // Get price history for an item
 router.get('/:itemId', async (req, res) => {
@@ -52,9 +56,14 @@ router.get('/:itemId', async (req, res) => {
   }
 });
 
-// Record a price point (for automated tracking)
+// Record a price point (for automated tracking) — admin only to prevent
+// anyone from injecting arbitrary prices that feed valuations.
 router.post('/', async (req, res) => {
   try {
+    if (req.user?.app_metadata?.is_admin !== true) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
     const { item_id, item_type, price, currency = 'AUD', source = 'listing' } = req.body;
 
     if (!item_id || !item_type || !price) {

@@ -1,7 +1,11 @@
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
+import { optionalAuthMiddleware } from '../middleware/auth.js';
 
 const router = Router();
+
+// Reads are public; writes are gated to admins (see POST handler).
+router.use(optionalAuthMiddleware);
 
 // Get market data for a card
 router.get('/:cardName', async (req, res) => {
@@ -58,9 +62,14 @@ router.get('/:cardName', async (req, res) => {
   }
 });
 
-// Record market data (for automated imports)
+// Record market data (for automated imports) — admin only to prevent
+// anyone from injecting arbitrary prices that feed valuations.
 router.post('/', async (req, res) => {
   try {
+    if (req.user?.app_metadata?.is_admin !== true) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
     const { card_name, set_name, source, market_price, low_price, mid_price, high_price, currency = 'USD' } = req.body;
 
     if (!card_name || !source || !market_price) {
