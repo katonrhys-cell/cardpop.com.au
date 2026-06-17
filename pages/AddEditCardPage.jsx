@@ -293,11 +293,7 @@ const AddEditCardPage = () => {
     // 1. Try CardSight catalog identification first (returns result directly)
     const csResult = await cardSightIdentify(imageFile);
 
-    if (csResult?.apiError) {
-      toast.warning(`Card identification service unavailable — fill in the details manually. (${csResult.message})`);
-      return;
-    }
-
+    // If CardSight service is unavailable, fall through to OCR — don't bail out
     if (csResult?.identified) {
       const fields = mapCardSightToFormFields(csResult);
       setFormData(prev => ({ ...prev, ...fields }));
@@ -313,7 +309,7 @@ const AddEditCardPage = () => {
 
     // 2. CardSight didn't find the card — fall back to OCR
     const advisory = csResult?.serverMessages?.[0]?.message;
-    if (advisory) toast.info(`Catalog match not found: ${advisory}`);
+    if (advisory && !csResult?.apiError) toast.info(`Catalog match not found: ${advisory}`);
 
     const conditionMap = {
       'Mint': 'mint', 'Near Mint': 'near_mint', 'Excellent': 'excellent',

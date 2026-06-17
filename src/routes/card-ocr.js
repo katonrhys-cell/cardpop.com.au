@@ -1,15 +1,15 @@
+import process from 'node:process';
 import { Router } from 'express';
-import { ContentBlockType, streamOneShot, uploadImagesToSupabase } from '../api/integrated-ai.js';
 import { CardOCRPrompt } from '../constants/prompts.js';
 import { uploadFiles } from '../middleware/file-upload.js';
 import { integratedAiRateLimit } from '../middleware/integrated-ai-rate-limit.js';
 import { supabaseAuth } from '../middleware/pocketbase-auth.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
 router.use(supabaseAuth);
 
-// Reject before multipart parsing so anonymous requests can't buffer uploads into memory
 const requireAuth = (req, res, next) => {
 	if (!req.userId) {
 		return res.status(401).json({ error: 'Authentication required' });
@@ -17,38 +17,77 @@ const requireAuth = (req, res, next) => {
 	next();
 };
 
+function sseWrite(res, type, content) {
+	res.write(`data: ${JSON.stringify({ type, data: { content } })}\n\n`);
+}
+
 router.post('/scan', integratedAiRateLimit, requireAuth, uploadFiles({
-	allowedMimeTypes: [
-		'image/jpeg',
-		'image/png',
-		'image/webp',
-	],
+	allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
 	fieldName: 'images',
 }), async (req, res) => {
 	if (!req.files?.length) {
 		return res.status(400).json({ error: 'An image is required for card scanning' });
 	}
 
-	const imageUrls = await uploadImagesToSupabase({ images: req.files });
-
-	const userMessage = [
-		{ type: ContentBlockType.Text, text: 'Analyze this trading card and extract all visible information as JSON.' },
-		...imageUrls.map(url => ({ type: ContentBlockType.Image, image: url })),
-	];
-
-	const sseStream = await streamOneShot({
-		systemPrompt: CardOCRPrompt,
-		userMessage,
-	});
+	const apiKey = process.env.ANTHROPIC_API_KEY;
+	if (!apiKey) {
+		logger.error('[CARD_OCR] ANTHROPIC_API_KEY is not set');
+		return res.status(503).json({ error: 'Card scanning service is not configured.' });
+	}
 
 	res.setHeader('Content-Type', 'text/event-stream');
 	res.setHeader('Cache-Control', 'no-cache');
 	res.setHeader('Connection', 'keep-alive');
 	res.setHeader('X-Accel-Buffering', 'no');
 
-	sseStream.pipe(res);
+	try {
+		const imageBlocks = req.files.map(file => ({
+			type: 'image',
+			source: {
+				type: 'base64',
+				media_type: file.mimetype,
+				data: file.buffer.toString('base64'),
+			},
+		}));
 
-	res.on('close', () => sseStream.destroy());
+		const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'x-api-key': apiKey,
+				'anthropic-version': '2023-06-01',
+			},
+			body: JSON.stringify({
+				model: 'claude-haiku-4-5-20251001',
+				max_tokens: 1024,
+				system: CardOCRPrompt,
+				messages: [{
+					role: 'user',
+					content: [
+						{ type: 'text', text: 'Analyze this trading card and extract all visible information as JSON.' },
+						...imageBlocks,
+					],
+				}],
+			}),
+			signal: AbortSignal.timeout(25_000),
+		});
+
+		if (!anthropicRes.ok) {
+			const errBody = await anthropicRes.text().catch(() => '');
+			throw new Error(`Anthropic API error ${anthropicRes.status}: ${errBody}`);
+		}
+
+		const anthropicData = await anthropicRes.json();
+		const content = anthropicData.content?.[0]?.text ?? '';
+
+		sseWrite(res, 'content', content);
+		sseWrite(res, 'completed', '[COMPLETED]');
+		res.end();
+	} catch (err) {
+		logger.error(`[CARD_OCR] scan failed: ${err.message}`);
+		sseWrite(res, 'error', err.message);
+		res.end();
+	}
 });
 
 export default router;
