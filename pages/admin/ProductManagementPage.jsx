@@ -30,7 +30,7 @@ const ProductManagementPage = () => {
     if (!isMounted.current) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('listings').select('*').eq('type', 'shop').order('created_at', { ascending: false }).limit(100);
+      const { data, error } = await supabase.from('shop_products').select('*').order('created_at', { ascending: false }).limit(200);
       if (error) throw error;
       if (isMounted.current) setProducts(data ?? []);
     } catch (err) {
@@ -50,7 +50,7 @@ const ProductManagementPage = () => {
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this shop product?")) return;
     try {
-      const { error } = await supabase.from('listings').delete().eq('id', id);
+      const { error } = await supabase.from('shop_products').delete().eq('id', id);
       if (error) throw error;
       toast.success("Product deleted.");
       setProducts(products.filter(p => p.id !== id));
@@ -69,16 +69,16 @@ const ProductManagementPage = () => {
     fetchProducts();
   };
 
-  const filteredProducts = products.filter(p => 
-    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+  const filteredProducts = products.filter(p =>
+    p.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.category?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const stats = {
     total: products.length,
-    public: products.filter(p => p.visibility === 'public').length,
-    private: products.filter(p => p.visibility === 'private').length,
-    marketplaceOnly: products.filter(p => p.visibility === 'marketplace-only').length
+    active: products.filter(p => p.status === 'active').length,
+    draft: products.filter(p => p.status === 'draft').length,
+    archived: products.filter(p => p.status === 'archived').length
   };
 
   return (
@@ -107,15 +107,15 @@ const ProductManagementPage = () => {
         </Card>
         <Card className="p-5 rounded-2xl bg-card border border-border shadow-sm flex items-center gap-4">
           <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-xl"><BarChart3 className="w-6 h-6" /></div>
-          <div><p className="text-sm font-bold text-muted-foreground uppercase">Shop + Market</p><p className="text-2xl font-bold">{stats.public}</p></div>
+          <div><p className="text-sm font-bold text-muted-foreground uppercase">Active</p><p className="text-2xl font-bold">{stats.active}</p></div>
         </Card>
         <Card className="p-5 rounded-2xl bg-card border border-border shadow-sm flex items-center gap-4">
           <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl"><BarChart3 className="w-6 h-6" /></div>
-          <div><p className="text-sm font-bold text-muted-foreground uppercase">Shop Only</p><p className="text-2xl font-bold">{stats.private}</p></div>
+          <div><p className="text-sm font-bold text-muted-foreground uppercase">Draft</p><p className="text-2xl font-bold">{stats.draft}</p></div>
         </Card>
         <Card className="p-5 rounded-2xl bg-card border border-border shadow-sm flex items-center gap-4">
           <div className="p-3 bg-amber-500/10 text-amber-500 rounded-xl"><BarChart3 className="w-6 h-6" /></div>
-          <div><p className="text-sm font-bold text-muted-foreground uppercase">Market Only</p><p className="text-2xl font-bold">{stats.marketplaceOnly}</p></div>
+          <div><p className="text-sm font-bold text-muted-foreground uppercase">Archived</p><p className="text-2xl font-bold">{stats.archived}</p></div>
         </Card>
       </div>
 
@@ -139,7 +139,7 @@ const ProductManagementPage = () => {
                 <TableHead className="font-semibold text-foreground">Product Name</TableHead>
                 <TableHead className="font-semibold text-foreground">Category</TableHead>
                 <TableHead className="font-semibold text-foreground">Price</TableHead>
-                <TableHead className="font-semibold text-foreground">Visibility</TableHead>
+                <TableHead className="font-semibold text-foreground">Status</TableHead>
                 <TableHead className="font-semibold text-foreground">Stock</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
               </TableRow>
@@ -173,15 +173,15 @@ const ProductManagementPage = () => {
               ) : (
                 filteredProducts.map((product) => (
                   <TableRow key={product.id}>
-                    <TableCell className="font-bold text-foreground">{product.name}</TableCell>
+                    <TableCell className="font-bold text-foreground">{product.title}</TableCell>
                     <TableCell className="text-muted-foreground">{product.category || '-'}</TableCell>
-                    <TableCell className="tabular-nums">${product.price?.toFixed(2)}</TableCell>
+                    <TableCell className="tabular-nums">${Number(product.price_aud ?? 0).toFixed(2)}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="bg-background">
-                        {product.visibility === 'public' ? 'Shop + Market' : product.visibility === 'private' ? 'Shop Only' : 'Market Only'}
+                      <Badge variant="outline" className={`bg-background capitalize ${product.status === 'active' ? 'text-emerald-600 border-emerald-500/30' : product.status === 'draft' ? 'text-blue-600 border-blue-500/30' : 'text-muted-foreground'}`}>
+                        {product.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="tabular-nums">{product.stockQuantity ?? '-'}</TableCell>
+                    <TableCell className="tabular-nums">{product.stock_quantity ?? '-'}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
