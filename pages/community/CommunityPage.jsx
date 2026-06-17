@@ -202,7 +202,7 @@ const CommunityPage = () => {
         {/* Prev Arrow */}
         <button
           onClick={prevSlide}
-          className="absolute left-3 top-1/2 -translate-y-8 z-20 bg-black/40 hover:bg-black/60 text-white rounded-sm p-2 transition-colors backdrop-blur-sm"
+          className="absolute left-3 top-1/2 -translate-y-1/2 z-20 bg-black/40 hover:bg-black/60 text-white rounded-sm p-2 transition-colors backdrop-blur-sm"
           aria-label="Previous slide"
         >
           <ChevronLeft className="w-5 h-5" />
@@ -211,14 +211,14 @@ const CommunityPage = () => {
         {/* Next Arrow */}
         <button
           onClick={nextSlide}
-          className="absolute right-3 top-1/2 -translate-y-8 z-20 bg-black/40 hover:bg-black/60 text-white rounded-sm p-2 transition-colors backdrop-blur-sm"
+          className="absolute right-3 top-1/2 -translate-y-1/2 z-20 bg-black/40 hover:bg-black/60 text-white rounded-sm p-2 transition-colors backdrop-blur-sm"
           aria-label="Next slide"
         >
           <ChevronRight className="w-5 h-5" />
         </button>
 
-        {/* Dots */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
+        {/* Dots — kept above the angled divider overlap */}
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
           {Array.from({ length: TOTAL_SLIDES }).map((_, i) => (
             <button
               key={i}
