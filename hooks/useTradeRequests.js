@@ -89,11 +89,17 @@ export function useTradeRequests() {
         .eq('responder_id', currentUser?.id);
       if (error) throw error;
 
-      // Decline any other pending trades involving same listings
+      // Cancel any other still-proposed trade that involves either of the two
+      // listings, in either column — otherwise a card could be committed twice.
+      const a = trade.initiator_listing_id;
+      const b = trade.responder_listing_id;
       await supabase
         .from('trades')
         .update({ status: 'cancelled' })
-        .or(`initiator_listing_id.eq.${trade.initiator_listing_id},responder_listing_id.eq.${trade.responder_listing_id}`)
+        .or(
+          `initiator_listing_id.eq.${a},responder_listing_id.eq.${a},` +
+          `initiator_listing_id.eq.${b},responder_listing_id.eq.${b}`,
+        )
         .eq('status', 'proposed')
         .neq('id', trade.id);
 

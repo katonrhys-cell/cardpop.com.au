@@ -32,7 +32,7 @@ const SellerProfilePage = () => {
           .from('vault_items')
           .select('*, vault_images(*)')
           .eq('owner_id', sellerId)
-          .in('listing_type', ['fixed', 'trade', 'both'])
+          .neq('listing_type', 'Private')
           .eq('is_public', true)
           .order('created_at', { ascending: false })
           .limit(50);
