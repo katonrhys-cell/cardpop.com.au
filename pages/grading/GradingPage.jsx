@@ -48,6 +48,14 @@ const SECTIONS = [
       'Upload photos of your card and receive AI-generated preliminary grade estimates across PSA, BGS, CGC, ACE, and SGC. A helpful guide before you commit to a professional submission.',
     cta: 'TRY ESTIMATOR',
   },
+  {
+    href: '/grading/roi-calculator',
+    icon: TrendingUp,
+    title: 'Grading ROI Calculator',
+    description:
+      'Is it worth grading? Enter your card, raw cost, and grading service — and get a probability-weighted expected return powered by live eBay AU prices, gem-mint rates, and full cost breakdowns.',
+    cta: 'CALCULATE ROI',
+  },
 ];
 
 const AU_TIPS = [
