@@ -55,13 +55,32 @@ const CheckoutPage = () => {
             .eq('id', cardId)
             .single();
           if (error) throw error;
+
+          // You can only buy a vault item that has an active marketplace listing —
+          // that listing is the authoritative, server-priced entity to purchase.
+          const { data: listing } = await supabase
+            .from('listings')
+            .select('id, price_aud')
+            .eq('vault_item_id', cardId)
+            .eq('status', 'active')
+            .maybeSingle();
+
+          if (!listing) {
+            if (!cancelled) {
+              toast.error('This item is not currently for sale.');
+              navigate('/browse');
+            }
+            return;
+          }
+
           const images = card.vault_images || [];
           const imageUrl = images[0]?.image_url || resolveImg(images[0]?.image) || null;
           if (!cancelled) setDirectItem({
             product: {
-              id: card.id,
+              id: listing.id,
+              type: 'listing',
               title: card.card_name,
-              price: card.price_aud || card.estimated_value_aud || 0,
+              price: listing.price_aud || 0,
               image: imageUrl,
             },
             quantity: 1,
@@ -108,9 +127,33 @@ const CheckoutPage = () => {
     };
   });
 
-  const subtotal = flatItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
-  const tax = subtotal * 0.10;
-  const total = subtotal + tax;
+  // Typed line items the server can re-price from its own source of truth.
+  const serverItems = checkoutItems
+    .map(i => ({ type: i.product?.type || 'listing', id: i.product?.id, quantity: i.quantity ?? 1 }))
+    .filter(i => i.id);
+
+  // Authoritative totals come from the server so the displayed amount always
+  // matches what Stripe charges (no fabricated tax).
+  const [pricing, setPricing] = useState(null);
+  useEffect(() => {
+    if (serverItems.length === 0) { setPricing(null); return; }
+    let cancelled = false;
+    apiServerClient.fetch('/stripe/calculate-cart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items: serverItems }),
+    })
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => { if (!cancelled) setPricing(data); })
+      .catch(() => { if (!cancelled) setPricing(null); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartItems, directItem]);
+
+  const clientSubtotal = flatItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
+  const subtotal = pricing?.subtotalAud ?? clientSubtotal;
+  const tax = pricing ? (Number(pricing.commissionAud || 0) + Number(pricing.gstAud || 0)) : 0;
+  const total = pricing?.totalAud ?? clientSubtotal;
 
   const validateShipping = () => {
     const { firstName, lastName, address, suburb, state, postcode } = shippingData;
@@ -122,27 +165,19 @@ const CheckoutPage = () => {
   };
 
   const handleCheckoutConfirm = async () => {
+    if (serverItems.length === 0) { toast.error('Your cart is empty!'); return; }
     setProcessing(true);
-
-    const itemsPayload = flatItems.map(i => ({
-      name: i.name,
-      price: i.price,
-      quantity: i.quantity,
-    }));
 
     const name = [shippingData.firstName, shippingData.lastName].filter(Boolean).join(' ');
 
     try {
-      const res = await apiServerClient.fetch('/stripe/create-checkout', {
+      const res = await apiServerClient.fetch('/stripe/create-cart-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          items: itemsPayload,
-          total,
-          customerEmail: shippingData.email || currentUser?.email || '',
+          items: serverItems,
           successUrl: `${window.location.origin}/checkout-success?session_id={CHECKOUT_SESSION_ID}`,
           cancelUrl: window.location.href,
-          vaultItemId: cardId || null,
           shippingAddress: {
             name,
             address: shippingData.address || '',
@@ -153,8 +188,8 @@ const CheckoutPage = () => {
         }),
       });
 
-      if (!res.ok) throw new Error('Payment service unavailable. Please try again later.');
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Payment service unavailable. Please try again later.');
       if (!data?.url) throw new Error('No checkout URL returned from payment service.');
       window.location.href = data.url;
     } catch (err) {
