@@ -194,3 +194,96 @@ describe('POST /webhook', () => {
     expect(res.body.received).toBe(true);
   });
 });
+
+// ─── Multi-item cart checkout ─────────────────────────────────────────────────
+
+// priceCart reads gst_enabled then gst_rate_pct (via getPlatformSetting) before
+// looking up each item, so queue those first.
+const gstSettings = () => {
+  mockMaybeSingle
+    .mockResolvedValueOnce({ data: { value: true }, error: null })   // gst_enabled
+    .mockResolvedValueOnce({ data: { value: 10 }, error: null });    // gst_rate_pct
+};
+
+describe('POST /calculate-cart', () => {
+  it('returns 400 when items is empty', async () => {
+    const res = await request(app).post('/calculate-cart').send({ items: [] });
+    expect(res.status).toBe(400);
+  });
+
+  it('prices a shop product with GST only (no commission)', async () => {
+    gstSettings();
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: { id: 'p1', title: 'Booster Box', price_aud: 100, stock_quantity: 5, status: 'active' },
+      error: null,
+    });
+    const res = await request(app).post('/calculate-cart').send({ items: [{ type: 'shop', id: 'p1', quantity: 2 }] });
+    expect(res.status).toBe(200);
+    expect(res.body.subtotalAud).toBe(200);
+    expect(res.body.commissionAud).toBe(0);
+    expect(res.body.gstAud).toBe(20);
+    expect(res.body.totalAud).toBe(220);
+  });
+});
+
+describe('POST /create-cart-checkout', () => {
+  it('returns 400 when items is missing', async () => {
+    const res = await request(app).post('/create-cart-checkout').send({ successUrl: 'a', cancelUrl: 'b' });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 when successUrl/cancelUrl are missing', async () => {
+    const res = await request(app).post('/create-cart-checkout').send({ items: [{ type: 'shop', id: 'p1' }] });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 409 when a shop item is out of stock', async () => {
+    gstSettings();
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: { id: 'p1', title: 'Booster Box', price_aud: 100, stock_quantity: 0, status: 'active' },
+      error: null,
+    });
+    const res = await request(app).post('/create-cart-checkout').send({
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b',
+    });
+    expect(res.status).toBe(409);
+  });
+
+  it('returns 403 when buying your own listing', async () => {
+    gstSettings();
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: { id: 'l1', price_aud: 50, seller_id: 'user-123', status: 'active', vault_item: { card_name: 'X' }, seller: { seller_tier: 'none' } },
+      error: null,
+    });
+    const res = await request(app).post('/create-cart-checkout').send({
+      items: [{ type: 'listing', id: 'l1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b',
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('returns 400 for an unknown item type', async () => {
+    gstSettings();
+    const res = await request(app).post('/create-cart-checkout').send({
+      items: [{ type: 'mystery', id: 'x' }], successUrl: 'a', cancelUrl: 'b',
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it('creates a Stripe session and returns the URL for a valid shop cart', async () => {
+    gstSettings();
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: { id: 'p1', title: 'Booster Box', price_aud: 100, stock_quantity: 5, status: 'active' },
+      error: null,
+    });
+    mockStripe.checkout.sessions.create.mockResolvedValue({ id: 'cs_cart', url: 'https://stripe.com/pay/cs_cart' });
+
+    const res = await request(app).post('/create-cart-checkout').send({
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b',
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.url).toBe('https://stripe.com/pay/cs_cart');
+    expect(res.body.total).toBe(110);
+    expect(mockStripe.checkout.sessions.create).toHaveBeenCalled();
+  });
+});

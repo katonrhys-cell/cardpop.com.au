@@ -1,13 +1,18 @@
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
+import { authMiddleware } from '../middleware/auth.js';
 
 const router = Router();
+
+// Every buyer-protection endpoint operates on the authenticated user's claims,
+// so require a valid Bearer token for all routes (fails closed at the gate).
+router.use(authMiddleware);
 
 // Get user's claims
 router.get('/my-claims', async (req, res) => {
   try {
-    const userId = req.user?.id; // Assuming auth middleware sets req.user
-    
+    const userId = req.user?.id;
+
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -114,8 +119,11 @@ router.put('/:claimId/status', async (req, res) => {
       return res.status(400).json({ error: 'Invalid status' });
     }
 
-    // Check if user is admin (you may need to implement admin check)
-    // For now, we'll skip admin check for development
+    // Resolving/rejecting claims and setting refund amounts is an admin-only
+    // action. Trust the server-controlled JWT app_metadata, never the body.
+    if (req.user.app_metadata?.is_admin !== true) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
 
     const updateData = {
       status,

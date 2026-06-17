@@ -1,7 +1,12 @@
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
+import { optionalAuthMiddleware } from '../middleware/auth.js';
 
 const router = Router();
+
+// Populate req.user when a valid Bearer token is present so logged-in users
+// receive personalized recommendations; anonymous callers fall back to popular.
+router.use(optionalAuthMiddleware);
 
 // Get personalized recommendations for user
 router.get('/', async (req, res) => {

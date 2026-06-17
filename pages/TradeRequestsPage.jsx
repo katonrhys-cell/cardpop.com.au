@@ -189,7 +189,7 @@ const TradeRequestsPage = () => {
                   <TradeCard 
                     key={trade.id} 
                     trade={trade} 
-                    isSent={trade.offerer_id === currentUser?.id}
+                    isSent={trade.initiator_id === currentUser?.id}
                     isHistory={true}
                   />
                 ))

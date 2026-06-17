@@ -178,6 +178,8 @@ const ProductDetailPage = () => {
     const cartProduct = {
       id: product.id,
       source,
+      // Server-side checkout discriminator: shop products vs marketplace listings.
+      type: source === 'shop' ? 'shop' : 'listing',
       title: product.name,
       price: priceInCents / 100,
       image: product.images?.[0] || null,

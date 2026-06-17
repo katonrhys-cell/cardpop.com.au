@@ -2,22 +2,47 @@ import React, { useState } from 'react';
 import { CheckCircle2, XCircle, Clock, ArrowRightLeft, ImageOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/lib/supabaseClient.js';
+
+const resolveImageUrl = (path) => {
+  if (!path || typeof path !== 'string') return null;
+  if (path.startsWith('http')) return path;
+  return supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
+};
+
+// The trade row exposes a 'proposed' status while it awaits a response; older
+// data may use 'pending'. Both mean "awaiting action".
+const isActionableStatus = (status) => status === 'proposed' || status === 'pending';
+
+const getStatusConfig = (status) => {
+  switch (status) {
+    case 'accepted':
+      return { icon: <CheckCircle2 className="w-4 h-4" />, color: 'bg-primary/10 text-primary border-primary/20' };
+    case 'declined':
+    case 'cancelled':
+      return { icon: <XCircle className="w-4 h-4" />, color: 'bg-destructive/10 text-destructive border-destructive/20' };
+    default:
+      return { icon: <Clock className="w-4 h-4" />, color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' };
+  }
+};
 
 const TradeCard = ({ trade, isSent, isHistory, onAccept, onDecline, onCancel }) => {
   const [processing, setProcessing] = useState(false);
 
-  const getStatusConfig = (status) => {
-    switch (status) {
-      case 'accepted': return { icon: <CheckCircle2 className="w-4 h-4" />, color: 'bg-primary/10 text-primary border-primary/20' };
-      case 'declined': return { icon: <XCircle className="w-4 h-4" />, color: 'bg-destructive/10 text-destructive border-destructive/20' };
-      case 'pending': default: return { icon: <Clock className="w-4 h-4" />, color: 'bg-amber-500/10 text-amber-600 border-amber-500/20' };
-    }
-  };
-
   const statusConfig = getStatusConfig(trade.status);
+  const actionable = isActionableStatus(trade.status);
 
-  const renderCardSummary = (card, label, highlight) => {
-    if (!card) {
+  // Left card is always the initiator's listing, right is always the responder's.
+  // Only the labels change depending on whether the viewer sent the offer.
+  const offerListing = trade.initiator_listing;
+  const receiveListing = trade.responder_listing;
+  const offerValue = trade.initiator_trade_value_aud;
+  const receiveValue = trade.responder_trade_value_aud;
+  const cashTopup = Number(trade.cash_topup_aud || 0);
+
+  const renderCardSummary = (listing, value, label, highlight) => {
+    const vaultItem = listing?.vault_item;
+    if (!vaultItem) {
       return (
         <div className={`flex-1 p-4 rounded-xl border ${highlight ? 'bg-primary/5 border-primary/20' : 'bg-muted/30 border-border'} flex flex-col items-center justify-center text-center`}>
           <ImageOff className="w-8 h-8 text-muted-foreground opacity-50 mb-2" />
@@ -27,10 +52,14 @@ const TradeCard = ({ trade, isSent, isHistory, onAccept, onDecline, onCancel }) 
       );
     }
 
-    const rawImg = card.cardImage && card.cardImage.length > 0
-      ? (Array.isArray(card.cardImage) ? card.cardImage[0] : card.cardImage)
-      : null;
-    const imgUrl = rawImg && typeof rawImg === 'string' && rawImg.startsWith('http') ? rawImg : null;
+    const rawImg = vaultItem.vault_images?.[0]?.storage_path
+      || vaultItem.card_image
+      || vaultItem.vault_images?.[0]?.image_url
+      || vaultItem.image_url
+      || null;
+    const imgUrl = resolveImageUrl(rawImg);
+    const cardName = vaultItem.card_name || vaultItem.name || 'Unnamed card';
+    const displayValue = Number(value ?? vaultItem.estimated_value_aud ?? listing.price_aud ?? 0);
 
     return (
       <div className={`flex-1 p-4 rounded-xl border ${highlight ? 'bg-primary/5 border-primary/20' : 'bg-muted/30 border-border'} flex flex-col`}>
@@ -40,16 +69,16 @@ const TradeCard = ({ trade, isSent, isHistory, onAccept, onDecline, onCancel }) 
         <div className="flex gap-4 items-start">
           <div className="w-16 h-20 bg-background border border-border rounded-lg overflow-hidden shrink-0 shadow-sm flex items-center justify-center">
             {imgUrl ? (
-              <img src={imgUrl} alt={card.cardName} className="w-full h-full object-cover" />
+              <img src={imgUrl} alt={cardName} className="w-full h-full object-cover" />
             ) : (
               <ImageOff className="w-6 h-6 text-muted-foreground opacity-30" />
             )}
           </div>
           <div className="flex flex-col">
-            <h4 className="font-bold text-sm line-clamp-2 leading-tight mb-1">{card.cardName}</h4>
-            <span className="text-xs text-muted-foreground mb-2">{card.condition}</span>
+            <h4 className="font-bold text-sm line-clamp-2 leading-tight mb-1">{cardName}</h4>
+            <span className="text-xs text-muted-foreground mb-2">{vaultItem.condition}</span>
             <span className="text-lg font-bold tabular-nums text-foreground mt-auto">
-              ${Number(card.tradeValue || card.estimatedValue || 0).toFixed(2)}
+              ${displayValue.toFixed(2)}
             </span>
           </div>
         </div>
@@ -72,7 +101,7 @@ const TradeCard = ({ trade, isSent, isHistory, onAccept, onDecline, onCancel }) 
               {statusConfig.icon}
               {trade.status}
             </Badge>
-            {trade.status === 'pending' && (
+            {actionable && (
               <Badge variant="secondary" className="px-2.5 py-0.5">
                 {isSent ? 'You Offered' : 'Incoming Offer'}
               </Badge>
@@ -80,41 +109,30 @@ const TradeCard = ({ trade, isSent, isHistory, onAccept, onDecline, onCancel }) 
           </div>
           <p className="text-xs text-muted-foreground font-medium">Initiated: {new Date(trade.created_at || trade.created).toLocaleDateString()}</p>
         </div>
-        
-        <div className="text-right flex items-center gap-4 bg-muted/40 px-4 py-2 rounded-xl border border-border/50">
-          <div className="flex flex-col items-end">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5">Fee Deducted</span>
-            <span className="text-sm font-bold tabular-nums text-destructive">-${Number(trade.fee_amount || 0).toFixed(2)}</span>
+
+        {cashTopup > 0 && (
+          <div className="text-right flex items-center gap-4 bg-muted/40 px-4 py-2 rounded-xl border border-border/50">
+            <div className="flex flex-col items-end">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5">Cash Top-up</span>
+              <span className="text-lg font-bold tabular-nums text-foreground">${cashTopup.toFixed(2)}</span>
+            </div>
           </div>
-          <div className="w-px h-8 bg-border/80" />
-          <div className="flex flex-col items-end">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5">Final Value</span>
-            <span className="text-lg font-bold tabular-nums text-foreground">${Number(trade.final_amount || 0).toFixed(2)}</span>
-          </div>
-        </div>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 items-stretch mb-6">
-        {renderCardSummary(
-          isSent ? trade.offererCard : trade.offererCard, 
-          isSent ? "You Offer" : "They Offer", 
-          false
-        )}
-        
+        {renderCardSummary(offerListing, offerValue, isSent ? 'You Offer' : 'They Offer', false)}
+
         <div className="flex items-center justify-center shrink-0">
           <div className="w-10 h-10 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center shadow-sm">
             <ArrowRightLeft className="w-4 h-4" />
           </div>
         </div>
 
-        {renderCardSummary(
-          isSent ? trade.recipientCard : trade.recipientCard, 
-          isSent ? "They Provide" : "You Provide", 
-          true
-        )}
+        {renderCardSummary(receiveListing, receiveValue, isSent ? 'They Provide' : 'You Provide', true)}
       </div>
 
-      {!isHistory && trade.status === 'pending' && (
+      {!isHistory && actionable && (
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/50 mt-auto">
           {isSent ? (
             <Button variant="destructive" className="font-bold rounded-xl" onClick={() => handleAction(() => onCancel(trade.id))} disabled={processing}>

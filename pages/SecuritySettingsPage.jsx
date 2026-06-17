@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
@@ -10,15 +11,31 @@ import { ShieldCheck, ShieldAlert, KeyRound, Smartphone, LogOut, Download } from
 import { toast } from 'sonner';
 
 const SecuritySettingsPage = () => {
-  const { currentUser, enableMFA, disableMFA } = useAuth();
+  const { listMFAFactors, unenrollTOTP } = useAuth();
+  const navigate = useNavigate();
   const [sessions, setSessions] = useState([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [backupCodes, setBackupCodes] = useState([]);
   const [generatingCodes, setGeneratingCodes] = useState(false);
+  const [mfaFactor, setMfaFactor] = useState(null);
 
   useEffect(() => {
     fetchSessions();
   }, []);
+
+  // Reflect the real MFA state from Supabase rather than a non-existent field.
+  useEffect(() => {
+    let cancelled = false;
+    listMFAFactors()
+      .then((data) => {
+        if (cancelled) return;
+        setMfaFactor(data?.totp?.find(f => f.status === 'verified') ?? null);
+      })
+      .catch(() => { if (!cancelled) setMfaFactor(null); });
+    return () => { cancelled = true; };
+  }, [listMFAFactors]);
+
+  const mfaEnabled = !!mfaFactor;
 
   const fetchSessions = async () => {
     try {
@@ -35,18 +52,21 @@ const SecuritySettingsPage = () => {
   };
 
   const handleMfaToggle = async (checked) => {
+    // Enabling MFA requires the authenticator-app QR/enrollment flow, which
+    // lives on the dedicated security page — send the user there instead of
+    // pretending it happened here.
+    if (checked) {
+      navigate('/account/security');
+      return;
+    }
+    if (!mfaFactor) return;
+    if (!window.confirm('Are you sure you want to disable Two-Factor Authentication? This severely reduces account security.')) return;
     try {
-      if (checked) {
-        await enableMFA();
-        toast.success('Two-Factor Authentication enabled.');
-      } else {
-        if (window.confirm('Are you sure you want to disable Two-Factor Authentication? This severely reduces account security.')) {
-          await disableMFA();
-          toast.success('Two-Factor Authentication disabled.');
-        }
-      }
+      await unenrollTOTP(mfaFactor.id);
+      setMfaFactor(null);
+      toast.success('Two-Factor Authentication disabled.');
     } catch (error) {
-      toast.error('Failed to update MFA settings.');
+      toast.error(error.message || 'Failed to update MFA settings.');
     }
   };
 
@@ -96,10 +116,10 @@ const SecuritySettingsPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="md:col-span-1 space-y-6">
               {/* MFA Status Card */}
-              <Card className={`border-2 ${currentUser?.mfaEnabled ? 'border-[hsl(var(--success))]' : 'border-[hsl(var(--warning))]'}`}>
+              <Card className={`border-2 ${mfaEnabled ? 'border-[hsl(var(--success))]' : 'border-[hsl(var(--warning))]'}`}>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    {currentUser?.mfaEnabled ? (
+                    {mfaEnabled ? (
                       <ShieldCheck className="w-5 h-5 text-[hsl(var(--success))]" />
                     ) : (
                       <ShieldAlert className="w-5 h-5 text-[hsl(var(--warning))]" />
@@ -110,10 +130,10 @@ const SecuritySettingsPage = () => {
                 <CardContent>
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-semibold text-foreground">{currentUser?.mfaEnabled ? 'Enabled' : 'Disabled'}</p>
+                      <p className="font-semibold text-foreground">{mfaEnabled ? 'Enabled' : 'Disabled'}</p>
                       <p className="text-sm text-muted-foreground">Extra layer of security</p>
                     </div>
-                    <Switch checked={currentUser?.mfaEnabled} onCheckedChange={handleMfaToggle} />
+                    <Switch checked={mfaEnabled} onCheckedChange={handleMfaToggle} />
                   </div>
                 </CardContent>
               </Card>

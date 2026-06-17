@@ -11,6 +11,12 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession]         = useState(null);
   const [loading, setLoading]         = useState(true);
   const [profileLoading, setProfileLoading] = useState(true);
+  // MFA gating: when a session is only AAL1 but the user has a verified factor,
+  // the login MFA challenge is still outstanding and the session must NOT count
+  // as authenticated. checkedToken tracks which access token the AAL result
+  // applies to, so isAuthenticated never briefly flips true before we've checked.
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [checkedToken, setCheckedToken] = useState(null);
   const isMounted = useRef(true);
 
   const fetchProfile = async (userId) => {
@@ -83,6 +89,23 @@ export const AuthProvider = ({ children }) => {
     return () => { cancelled = true; };
   }, [currentUser?.id, profile]);
 
+  // Derive whether an MFA challenge is still outstanding for the current session
+  // from Supabase's assurance level. Runs whenever the access token changes
+  // (login, refresh, MFA upgrade) so a page reload mid-challenge can't bypass it.
+  useEffect(() => {
+    const token = session?.access_token ?? null;
+    if (!token) { setMfaRequired(false); setCheckedToken(null); return; }
+    let cancelled = false;
+    supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+      .then(({ data }) => {
+        if (cancelled || !isMounted.current) return;
+        setMfaRequired(data?.currentLevel === 'aal1' && data?.nextLevel === 'aal2');
+      })
+      .catch(() => { if (!cancelled && isMounted.current) setMfaRequired(false); })
+      .finally(() => { if (!cancelled && isMounted.current) setCheckedToken(token); });
+    return () => { cancelled = true; };
+  }, [session?.access_token]);
+
   const signup = async (email, password, fullName) => {
     const username = email.split('@')[0].replace(/[^a-z0-9_]/gi, '').toLowerCase();
     const { data, error } = await supabase.auth.signUp({
@@ -105,7 +128,9 @@ export const AuthProvider = ({ children }) => {
     const totpFactor = factors?.totp?.find(f => f.status === 'verified');
 
     if (totpFactor) {
-      // Eagerly set the AAL1 session so API calls work while MFA challenge is pending.
+      // The session is only AAL1 until the challenge is completed. Mark MFA as
+      // required so isAuthenticated stays false until verifyMFACode upgrades it.
+      setMfaRequired(true);
       if (data.session) {
         setSession(data.session);
         setCurrentUser(data.session.user);
@@ -133,6 +158,7 @@ export const AuthProvider = ({ children }) => {
     setCurrentUser(null);
     setProfile(null);
     setSession(null);
+    setMfaRequired(false);
     // Fire signOut in background — don't await so a hanging request
     // doesn't block the user from being logged out locally.
     supabase.auth.signOut().catch(e => console.error('[AuthContext] signOut failed:', e));
@@ -145,11 +171,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const resetPassword = async (email) => {
-    const base = window.location.hostname === 'localhost'
-      ? window.location.origin
-      : window.location.origin;
+    // Must point at a real, public route that renders PasswordResetPage so the
+    // recovery link resolves (there is no /account/reset-password route).
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/account/reset-password`,
+      redirectTo: `${window.location.origin}/reset-password`,
     });
     if (error) throw new Error(error.message);
     return true;
@@ -184,6 +209,7 @@ export const AuthProvider = ({ children }) => {
     if (data.session) {
       setSession(data.session);
       setCurrentUser(data.session.user);
+      setMfaRequired(false);
     }
     return data;
   };
@@ -214,6 +240,7 @@ export const AuthProvider = ({ children }) => {
     if (data.session) {
       setSession(data.session);
       setCurrentUser(data.session.user);
+      setMfaRequired(false);
     }
     return data;
   };
@@ -232,11 +259,16 @@ export const AuthProvider = ({ children }) => {
     profile,
     session,
     authToken:       session?.access_token ?? null,
-    isAuthenticated: !!session,
+    // A session with an outstanding MFA challenge (AAL1 while a verified factor
+    // exists) does not count as authenticated.
+    isAuthenticated: !!session && !mfaRequired,
+    mfaRequired,
     isAdmin,
     isVerified,
     isEmailVerified: isVerified,
-    loading,
+    // Keep loading until the MFA assurance level for the current token is known,
+    // so ProtectedRoute never flashes protected content before the check lands.
+    loading: loading || (!!session && checkedToken !== session.access_token),
     profileLoading,
     signup,
     login,
@@ -249,8 +281,6 @@ export const AuthProvider = ({ children }) => {
     confirmTOTP,
     unenrollTOTP,
     listMFAFactors,
-    enableMFA:              async () => {},
-    disableMFA:             async () => {},
     resendVerificationEmail,
     resetPassword,
     updatePassword,

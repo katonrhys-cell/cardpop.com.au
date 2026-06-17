@@ -75,6 +75,7 @@ const BrowseListingsPage = () => {
     const priceInCents = product.price ? Math.round(product.price * 100) : 0;
     const cartProduct = {
       id: product.id,
+      type: 'listing',
       title: product.name,
       price: priceInCents / 100,
       image: product.images?.[0] || product.vault_item?.vault_images?.[0]?.image_url || null,

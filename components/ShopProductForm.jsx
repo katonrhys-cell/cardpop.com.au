@@ -1,6 +1,6 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
+import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,136 +10,133 @@ import { toast } from 'sonner';
 import { Loader2, X, ImagePlus } from 'lucide-react';
 
 const INITIAL_STATE = {
-  name: '',
+  title: '',
   description: '',
-  price: '',
+  price_aud: '',
+  stock_quantity: '1',
   category: '',
-  subcategory: '',
-  condition: 'Mint',
-  grade: '',
-  stockQuantity: '1',
-  visibility: 'public',
+  product_type: 'sealed',
   status: 'active',
 };
 
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024; // 20MB
+
 const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
+  const { currentUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState(INITIAL_STATE);
-  const [selectedFiles, setSelectedFiles] = useState([]);
+  // Each entry is either a File (new upload) or { isExisting: true, url } (kept).
+  const [images, setImages] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
-  const [imagesToDelete, setImagesToDelete] = useState([]);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (product) {
       setFormData({
-        name: product.name || '',
+        title: product.title || '',
         description: product.description || '',
-        price: product.price ? String(product.price) : '',
+        price_aud: product.price_aud != null ? String(product.price_aud) : '',
+        stock_quantity: product.stock_quantity != null ? String(product.stock_quantity) : '0',
         category: product.category || '',
-        subcategory: product.subcategory || '',
-        condition: product.condition || 'Mint',
-        grade: product.grade || '',
-        stockQuantity: product.stockQuantity !== null ? String(product.stockQuantity) : '1',
-        visibility: product.visibility || 'public',
+        product_type: product.product_type || 'sealed',
         status: product.status || 'active',
       });
-      
-      if (product.images && product.images.length > 0) {
-        const urls = product.images.map(img => (typeof img === 'string' && img.startsWith('http') ? img : img));
-        setPreviewUrls(urls);
-        setSelectedFiles(product.images.map(img => ({ isExisting: true, filename: img })));
-      }
+      const existing = Array.isArray(product.images) && product.images.length
+        ? product.images
+        : (product.image_url ? [product.image_url] : []);
+      setImages(existing.map(url => ({ isExisting: true, url })));
+      setPreviewUrls(existing);
     } else {
       setFormData(INITIAL_STATE);
-      setSelectedFiles([]);
+      setImages([]);
       setPreviewUrls([]);
-      setImagesToDelete([]);
     }
   }, [product]);
 
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
+  const handleInputChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
 
   const handleFileChange = (e) => {
-    const files = Array.from(e.target.files);
+    const files = Array.from(e.target.files || []);
     if (!files.length) return;
-
-    const validFiles = [];
-    const newPreviewUrls = [];
-
+    const valid = [];
+    const urls = [];
     for (const file of files) {
-      if (file.size > 20971520) {
+      if (file.size > MAX_IMAGE_BYTES) {
         toast.error(`Image ${file.name} exceeds the 20MB limit.`);
         continue;
       }
-      validFiles.push(file);
-      newPreviewUrls.push(URL.createObjectURL(file));
+      valid.push(file);
+      urls.push(URL.createObjectURL(file));
     }
-
-    setSelectedFiles(prev => [...prev, ...validFiles]);
-    setPreviewUrls(prev => [...prev, ...newPreviewUrls]);
-    
+    setImages(prev => [...prev, ...valid]);
+    setPreviewUrls(prev => [...prev, ...urls]);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const removeFile = (index) => {
-    const fileToRemove = selectedFiles[index];
-    if (fileToRemove?.isExisting) {
-      setImagesToDelete(prev => [...prev, fileToRemove.filename]);
-    }
-    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  const removeImage = (index) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
     setPreviewUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const uploadNewImages = async () => {
+    const urls = [];
+    for (const entry of images) {
+      if (entry.isExisting) {
+        urls.push(entry.url);
+        continue;
+      }
+      const ext = entry.name?.split('.').pop() || 'jpg';
+      const path = `shop-products/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('media').upload(path, entry, { upsert: true });
+      if (upErr) throw new Error(`Image upload failed: ${upErr.message}`);
+      urls.push(supabase.storage.from('media').getPublicUrl(path).data.publicUrl);
+    }
+    return urls;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name.trim()) return toast.error('Product Name is required');
-    if (!formData.price || isNaN(formData.price)) return toast.error('A valid Price is required');
-    
+    if (!formData.title.trim()) return toast.error('Product Name is required');
+    const price = Number(formData.price_aud);
+    if (formData.price_aud === '' || Number.isNaN(price) || price < 0) {
+      return toast.error('A valid price is required');
+    }
+    const stock = parseInt(formData.stock_quantity, 10);
+
     setLoading(true);
     try {
-      const submitData = new FormData();
+      const imageUrls = await uploadNewImages();
 
-      Object.entries(formData).forEach(([key, value]) => {
-        if (value !== '' && value !== null) {
-          if (['price', 'stockQuantity'].includes(key)) {
-            submitData.append(key, Number(value));
-          } else {
-            submitData.append(key, value);
-          }
-        }
-      });
-
-      selectedFiles.forEach((file) => {
-        if (!file.isExisting) submitData.append('images', file);
-      });
-
-      if (product && imagesToDelete.length > 0) {
-        const remainingImages = selectedFiles
-          .filter(f => f.isExisting && !imagesToDelete.includes(f.filename))
-          .map(f => f.filename);
-        submitData.append('images', JSON.stringify(remainingImages));
-      }
-
-      // Convert FormData to plain object for Supabase
-      const dataObj = {};
-      submitData.forEach((value, key) => { dataObj[key] = value; });
+      const payload = {
+        title: formData.title.trim(),
+        description: formData.description.trim() || null,
+        price_aud: price,
+        stock_quantity: Number.isNaN(stock) ? 0 : Math.max(0, stock),
+        category: formData.category.trim() || null,
+        product_type: formData.product_type || null,
+        status: formData.status,
+        image_url: imageUrls[0] || null,
+        images: imageUrls,
+      };
 
       if (product) {
-        const { error } = await supabase.from('listings').update(dataObj).eq('id', product.id);
+        const { error } = await supabase
+          .from('shop_products')
+          .update({ ...payload, updated_at: new Date().toISOString() })
+          .eq('id', product.id);
         if (error) throw error;
-        toast.success('Shop product updated successfully!');
+        toast.success('Shop product updated.');
       } else {
-        const { error } = await supabase.from('listings').insert(dataObj);
+        const { error } = await supabase
+          .from('shop_products')
+          .insert({ ...payload, created_by: currentUser?.id ?? null });
         if (error) throw error;
-        toast.success('Product added to shop!');
+        toast.success('Product added to the shop.');
       }
-      
+
       if (onSuccess) onSuccess();
     } catch (error) {
-      console.error("Submission Error:", error);
+      console.error('Shop product save error:', error);
       toast.error(error.message || 'Failed to save product.');
     } finally {
       setLoading(false);
@@ -156,7 +153,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
               <img src={url} alt={`Preview ${index}`} className="w-full h-full object-cover" />
               <button
                 type="button"
-                onClick={() => removeFile(index)}
+                onClick={() => removeImage(index)}
                 className="absolute top-2 right-2 bg-black/60 hover:bg-destructive text-white p-1.5 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
               >
                 <X size={16} />
@@ -165,7 +162,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
           ))}
 
           {previewUrls.length < 10 && (
-            <div 
+            <div
               onClick={() => fileInputRef.current?.click()}
               className="aspect-[3/4] border-2 border-dashed border-border hover:border-primary/50 hover:bg-muted/50 transition-all rounded-xl flex flex-col items-center justify-center cursor-pointer bg-background"
             >
@@ -181,28 +178,17 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         <div className="space-y-5">
           <div className="space-y-2">
             <Label>Product Name <span className="text-destructive">*</span></Label>
-            <Input required value={formData.name} onChange={(e) => handleInputChange('name', e.target.value)} className="bg-background" />
+            <Input required value={formData.title} onChange={(e) => handleInputChange('title', e.target.value)} className="bg-background" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Price ($) <span className="text-destructive">*</span></Label>
-              <Input required type="number" step="0.01" value={formData.price} onChange={(e) => handleInputChange('price', e.target.value)} className="bg-background tabular-nums" />
+              <Label>Price ($AUD) <span className="text-destructive">*</span></Label>
+              <Input required type="number" step="0.01" min="0" value={formData.price_aud} onChange={(e) => handleInputChange('price_aud', e.target.value)} className="bg-background tabular-nums" />
             </div>
             <div className="space-y-2">
               <Label>Stock Quantity</Label>
-              <Input type="number" value={formData.stockQuantity} onChange={(e) => handleInputChange('stockQuantity', e.target.value)} className="bg-background tabular-nums" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Category</Label>
-              <Input value={formData.category} onChange={(e) => handleInputChange('category', e.target.value)} className="bg-background" />
-            </div>
-            <div className="space-y-2">
-              <Label>Subcategory</Label>
-              <Input value={formData.subcategory} onChange={(e) => handleInputChange('subcategory', e.target.value)} className="bg-background" />
+              <Input type="number" min="0" value={formData.stock_quantity} onChange={(e) => handleInputChange('stock_quantity', e.target.value)} className="bg-background tabular-nums" />
             </div>
           </div>
 
@@ -213,54 +199,34 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         </div>
 
         <div className="space-y-5">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Condition</Label>
-              <Select value={formData.condition} onValueChange={(v) => handleInputChange('condition', v)}>
-                <SelectTrigger className="bg-background"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Mint">Mint</SelectItem>
-                  <SelectItem value="Near Mint">Near Mint</SelectItem>
-                  <SelectItem value="Excellent">Excellent</SelectItem>
-                  <SelectItem value="Good">Good</SelectItem>
-                  <SelectItem value="Fair">Fair</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Grade (Optional)</Label>
-              <Input value={formData.grade} onChange={(e) => handleInputChange('grade', e.target.value)} placeholder="e.g. PSA 10" className="bg-background" />
-            </div>
+          <div className="space-y-2">
+            <Label>Category</Label>
+            <Input value={formData.category} onChange={(e) => handleInputChange('category', e.target.value)} placeholder="e.g. Pokémon, NBA" className="bg-background" />
           </div>
 
-          <div className="space-y-5 pt-4 border-t border-border">
-            <h3 className="font-bold text-lg">Visibility & Status</h3>
-            
-            <div className="space-y-2">
-              <Label>Visibility</Label>
-              <Select value={formData.visibility} onValueChange={(v) => handleInputChange('visibility', v)}>
-                <SelectTrigger className="bg-background font-medium h-11"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="public">Shop + Marketplace (Public)</SelectItem>
-                  <SelectItem value="private">Shop Only (Private)</SelectItem>
-                  <SelectItem value="marketplace-only">Marketplace Only</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2">
+            <Label>Product Type</Label>
+            <Select value={formData.product_type} onValueChange={(v) => handleInputChange('product_type', v)}>
+              <SelectTrigger className="bg-background font-medium h-11"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sealed">Sealed Box</SelectItem>
+                <SelectItem value="single">Single Card</SelectItem>
+                <SelectItem value="accessory">Accessory</SelectItem>
+                <SelectItem value="other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={formData.status} onValueChange={(v) => handleInputChange('status', v)}>
-                <SelectTrigger className="bg-background font-medium h-11"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="archived">Archived</SelectItem>
-                  <SelectItem value="sold">Sold Out</SelectItem>
-                  <SelectItem value="delisted">Delisted</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-2 pt-4 border-t border-border">
+            <Label>Status</Label>
+            <Select value={formData.status} onValueChange={(v) => handleInputChange('status', v)}>
+              <SelectTrigger className="bg-background font-medium h-11"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active (visible in shop)</SelectItem>
+                <SelectItem value="draft">Draft (hidden)</SelectItem>
+                <SelectItem value="archived">Archived</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
       </div>

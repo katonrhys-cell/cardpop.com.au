@@ -1,7 +1,14 @@
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
+import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
 
 const router = Router();
+
+// Reading a seller's ratings is public; writes require authentication and are
+// gated per-route below. The backend uses the service-role key (bypassing RLS),
+// so these checks are the only thing enforcing the schema's intended policy:
+// "auth.uid() = reviewer_id AND the reviewer participated in the order".
+router.use(optionalAuthMiddleware);
 
 // Get seller ratings and stats
 router.get('/:sellerId', async (req, res) => {
@@ -54,26 +61,44 @@ router.get('/:sellerId', async (req, res) => {
 });
 
 // Create a new rating
-router.post('/', async (req, res) => {
+router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { seller_id, reviewer_id, rating, comment, order_id } = req.body;
+    const { seller_id, rating, comment, order_id } = req.body;
+    // Never trust a client-supplied reviewer_id — derive it from the token.
+    const reviewer_id = req.user.id;
 
-    if (!seller_id || !reviewer_id || !rating) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    if (!seller_id || !rating || !order_id) {
+      return res.status(400).json({ error: 'seller_id, order_id and rating are required' });
     }
 
-    if (rating < 1 || rating > 5) {
-      return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Rating must be an integer between 1 and 5' });
+    }
+
+    if (seller_id === reviewer_id) {
+      return res.status(400).json({ error: 'You cannot rate yourself' });
+    }
+
+    // Verify the reviewer actually participated in this order as the buyer,
+    // and that the order belongs to the seller being rated.
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .select('buyer_id, seller_id')
+      .eq('id', order_id)
+      .maybeSingle();
+
+    if (orderError) throw orderError;
+    if (!order || order.buyer_id !== reviewer_id || order.seller_id !== seller_id) {
+      return res.status(403).json({ error: 'You can only rate sellers for your own completed orders' });
     }
 
     // Check if user already rated this seller for this order
-    const { data: existing, error: checkError } = await supabase
+    const { data: existing } = await supabase
       .from('seller_ratings')
       .select('id')
-      .eq('seller_id', seller_id)
       .eq('reviewer_id', reviewer_id)
       .eq('order_id', order_id)
-      .single();
+      .maybeSingle();
 
     if (existing) {
       return res.status(400).json({ error: 'You have already rated this seller for this order' });
@@ -87,7 +112,7 @@ router.post('/', async (req, res) => {
         reviewer_id,
         rating,
         comment: comment || null,
-        order_id: order_id || null
+        order_id
       })
       .select()
       .single();
@@ -128,9 +153,13 @@ async function updateSellerStats(sellerId) {
   }
 }
 
-// Update seller performance metrics
-router.put('/:sellerId/performance', async (req, res) => {
+// Update seller performance metrics — admin only (overwrites profile stats).
+router.put('/:sellerId/performance', authMiddleware, async (req, res) => {
   try {
+    if (req.user.app_metadata?.is_admin !== true) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
     const { sellerId } = req.params;
     const { response_time, successful_sales, total_sales } = req.body;
 
