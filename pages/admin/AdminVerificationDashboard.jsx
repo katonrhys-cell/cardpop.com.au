@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import {
   ShieldCheck, ShieldAlert, Clock, Eye, CheckCircle, XCircle,
-  Search, RefreshCw, Loader2, User, FileText, MessageSquare, AlertCircle,
+  Search, RefreshCw, Loader2, FileText, MessageSquare, AlertCircle,
+  TrendingUp, Users, Shield, ChevronRight,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
@@ -21,20 +23,39 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 import { format } from 'date-fns';
 
 const STATUS_CONFIG = {
-  pending:   { label: 'Pending',   cls: 'bg-amber-500/10 text-amber-700 border-amber-300',   icon: Clock },
-  approved:  { label: 'Approved',  cls: 'bg-emerald-500/10 text-emerald-700 border-emerald-300', icon: CheckCircle },
-  rejected:  { label: 'Rejected',  cls: 'bg-destructive/10 text-destructive border-destructive/30', icon: XCircle },
-  suspended: { label: 'Suspended', cls: 'bg-amber-500/10 text-amber-700 border-amber-300',   icon: ShieldAlert },
-  revoked:   { label: 'Revoked',   cls: 'bg-destructive/10 text-destructive border-destructive/30', icon: ShieldAlert },
+  pending:      { label: 'Pending',   cls: 'bg-amber-500/10 text-amber-700 border-amber-300 dark:text-amber-400',   icon: Clock },
+  approved:     { label: 'Approved',  cls: 'bg-emerald-500/10 text-emerald-700 border-emerald-300 dark:text-emerald-400', icon: CheckCircle },
+  rejected:     { label: 'Rejected',  cls: 'bg-red-500/10 text-red-700 border-red-300 dark:text-red-400',           icon: XCircle },
+  suspended:    { label: 'Suspended', cls: 'bg-amber-500/10 text-amber-700 border-amber-300 dark:text-amber-400',   icon: ShieldAlert },
+  revoked:      { label: 'Revoked',   cls: 'bg-red-500/10 text-red-700 border-red-300 dark:text-red-400',           icon: ShieldAlert },
 };
 
 const ACTIONS = [
-  { value: 'approved',   label: 'Approve Verification', color: 'emerald' },
-  { value: 'rejected',   label: 'Reject Verification',  color: 'destructive' },
-  { value: 'suspended',  label: 'Suspend Verification', color: 'amber' },
-  { value: 'revoked',    label: 'Revoke Verification',  color: 'destructive' },
-  { value: 'info_requested', label: 'Request More Info', color: 'blue' },
+  { value: 'approved',      label: 'Approve',          icon: CheckCircle,   btnCls: 'bg-emerald-500 hover:bg-emerald-600 text-white border-0' },
+  { value: 'rejected',      label: 'Reject',            icon: XCircle,       btnCls: 'border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-950' },
+  { value: 'suspended',     label: 'Suspend',           icon: ShieldAlert,   btnCls: 'border-amber-300 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950' },
+  { value: 'revoked',       label: 'Revoke',            icon: ShieldAlert,   btnCls: 'border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-950' },
+  { value: 'info_requested', label: 'Request Info',     icon: MessageSquare, btnCls: 'border-blue-300 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950' },
 ];
+
+const StatCard = ({ icon: Icon, label, value, accent, loading }) => (
+  <Card className="relative overflow-hidden border-border shadow-sm hover:shadow-md transition-all duration-300 hover:border-primary/40 group">
+    <CardContent className="p-5">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">{label}</span>
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${accent}`}>
+          <Icon className="w-4.5 h-4.5" />
+        </div>
+      </div>
+      {loading ? (
+        <Skeleton className="h-9 w-16" />
+      ) : (
+        <p className="text-4xl font-extrabold tabular-nums tracking-tight text-foreground">{value}</p>
+      )}
+      <div className={`absolute bottom-0 left-0 right-0 h-0.5 ${accent.replace('bg-', 'bg-').replace('/10', '/60').replace('text-', '')} opacity-0 group-hover:opacity-100 transition-opacity`} />
+    </CardContent>
+  </Card>
+);
 
 const AdminVerificationDashboard = () => {
   const { currentUser } = useAuth();
@@ -54,30 +75,23 @@ const AdminVerificationDashboard = () => {
 
   useEffect(() => {
     let cancelled = false;
-
     const run = async () => {
       setLoading(true);
       try {
         let query = supabase
           .from('user_verifications')
-          .select(`
-            *,
-            profile:profiles!user_id(display_name, username, email:id, is_verified, verification_status, created_at, total_sales, reviews_count, rating)
-          `)
+          .select(`*, profile:profiles!user_id(display_name, username, email:id, is_verified, verification_status, created_at, total_sales, reviews_count, rating)`)
           .order('submitted_at', { ascending: false });
-
         if (statusFilter !== 'all') query = query.eq('status', statusFilter);
-
         const { data, error } = await query;
         if (error) throw error;
         if (!cancelled) setVerifications(data ?? []);
-      } catch (err) {
+      } catch {
         toast.error('Failed to load verifications');
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
-
     fetchRef.current = run;
     run();
     return () => { cancelled = true; };
@@ -112,32 +126,26 @@ const AdminVerificationDashboard = () => {
     setSaving(true);
     try {
       const isInfoRequest = pendingAction === 'info_requested';
-
       const updateData = {
         admin_id: currentUser.id,
         admin_notes: adminNotes.trim() || null,
         reviewed_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-
       if (isInfoRequest) {
         updateData.additional_info_requested = additionalInfo.trim() || null;
       } else {
         updateData.status = pendingAction;
         updateData.additional_info_requested = null;
       }
-
       const { error } = await supabase.from('user_verifications').update(updateData).eq('id', selected.id);
       if (error) throw error;
-
-      // Log the action
       await supabase.from('verification_audit_log').insert({
         verification_id: selected.id,
         admin_id: currentUser.id,
         action: pendingAction,
         notes: adminNotes.trim() || null,
       });
-
       const labels = { approved: 'Approved', rejected: 'Rejected', suspended: 'Suspended', revoked: 'Revoked', info_requested: 'Info requested' };
       toast.success(`${labels[pendingAction]} successfully`);
       setActionOpen(false);
@@ -160,31 +168,68 @@ const AdminVerificationDashboard = () => {
     );
   });
 
-  const pendingCount = verifications.filter(v => v.status === 'pending').length;
+  const counts = {
+    pending:  verifications.filter(v => v.status === 'pending').length,
+    approved: verifications.filter(v => v.status === 'approved').length,
+    rejected: verifications.filter(v => v.status === 'rejected').length,
+  };
+
+  const pendingActionCfg = ACTIONS.find(a => a.value === pendingAction);
 
   return (
-    <div className="w-full space-y-6 animate-in fade-in duration-300 py-6 px-4 sm:px-6 md:px-8 max-w-7xl mx-auto">
+    <div className="w-full space-y-8 animate-in fade-in duration-300 py-6 px-4 sm:px-6 md:px-8 max-w-7xl mx-auto">
       <Helmet><title>Verification Management | Admin</title></Helmet>
 
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold">Verification Management</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            {pendingCount > 0 ? `${pendingCount} pending review${pendingCount !== 1 ? 's' : ''}` : 'No pending reviews'}
-          </p>
+      {/* ── Hero header ─────────────────────────────────────────── */}
+      <div className="relative overflow-hidden rounded-2xl bg-brand-charcoal text-white p-8">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-brand-red/40 via-brand-charcoal to-brand-charcoal pointer-events-none" />
+        <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full bg-brand-red/10 blur-2xl pointer-events-none" />
+        <div className="relative flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-10 h-10 rounded-xl bg-brand-red flex items-center justify-center shadow-lg shadow-brand-red/30">
+                <Shield className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-xs font-bold uppercase tracking-widest text-white/50">Admin Panel</span>
+            </div>
+            <h1 className="text-3xl font-extrabold tracking-tight mb-1">Verification Management</h1>
+            <p className="text-white/60 text-sm">
+              {counts.pending > 0
+                ? `${counts.pending} submission${counts.pending !== 1 ? 's' : ''} awaiting your review`
+                : 'All submissions are up to date'}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => fetchRef.current?.()}
+            disabled={loading}
+            className="rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          </Button>
         </div>
-        <Button variant="outline" onClick={() => fetchRef.current?.()} disabled={loading} className="rounded-xl h-10 px-4">
-          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
-        </Button>
       </div>
 
+      {/* ── Stat cards ──────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <StatCard icon={Clock}        label="Pending Review" value={counts.pending}  accent="bg-amber-500/10 text-amber-600"   loading={loading} />
+        <StatCard icon={CheckCircle}  label="Approved"       value={counts.approved} accent="bg-emerald-500/10 text-emerald-600" loading={loading} />
+        <StatCard icon={XCircle}      label="Rejected"       value={counts.rejected} accent="bg-red-500/10 text-red-600"        loading={loading} />
+      </div>
+
+      {/* ── Filters ─────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or username…" className="pl-9 h-10 rounded-xl" />
+          <Input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by name or username…"
+            className="pl-9 h-10 rounded-xl"
+          />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-[180px] h-10 rounded-xl">
+          <SelectTrigger className="w-full sm:w-[190px] h-10 rounded-xl">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -198,12 +243,17 @@ const AdminVerificationDashboard = () => {
         </Select>
       </div>
 
-      <div className="bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+      {/* ── Table ───────────────────────────────────────────────── */}
+      <Card className="shadow-sm border-border overflow-hidden">
         {loading ? (
-          <div className="p-6 space-y-3">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 rounded-xl" />)}</div>
+          <div className="p-6 space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-14 rounded-xl" />)}
+          </div>
         ) : filtered.length === 0 ? (
-          <div className="p-16 text-center">
-            <ShieldCheck className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-30" />
+          <div className="py-20 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+              <ShieldCheck className="w-8 h-8 text-primary/40" />
+            </div>
             <p className="font-bold text-lg mb-1">No verifications found</p>
             <p className="text-muted-foreground text-sm">No submissions match your current filter.</p>
           </div>
@@ -211,13 +261,13 @@ const AdminVerificationDashboard = () => {
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="px-6">User</TableHead>
-                  <TableHead>Legal Name</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Submitted</TableHead>
-                  <TableHead>Reviewed</TableHead>
-                  <TableHead className="px-6 text-right">Actions</TableHead>
+                <TableRow className="hover:bg-transparent border-b border-border bg-muted/30">
+                  <TableHead className="px-6 py-4 text-xs font-bold uppercase tracking-wider">User</TableHead>
+                  <TableHead className="py-4 text-xs font-bold uppercase tracking-wider">Legal Name</TableHead>
+                  <TableHead className="py-4 text-xs font-bold uppercase tracking-wider">Status</TableHead>
+                  <TableHead className="py-4 text-xs font-bold uppercase tracking-wider">Submitted</TableHead>
+                  <TableHead className="py-4 text-xs font-bold uppercase tracking-wider">Reviewed</TableHead>
+                  <TableHead className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -225,31 +275,58 @@ const AdminVerificationDashboard = () => {
                   const cfg = STATUS_CONFIG[v.status] || STATUS_CONFIG.pending;
                   const Icon = cfg.icon;
                   return (
-                    <TableRow key={v.id}>
-                      <TableCell className="px-6">
-                        <p className="font-bold text-sm">{v.profile?.display_name || v.profile?.username || '—'}</p>
-                        <p className="text-xs text-muted-foreground">@{v.profile?.username}</p>
+                    <TableRow key={v.id} className="hover:bg-muted/40 transition-colors group">
+                      <TableCell className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                            <span className="text-xs font-extrabold text-primary">
+                              {(v.profile?.display_name || v.profile?.username || '?')[0].toUpperCase()}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-bold text-sm">{v.profile?.display_name || v.profile?.username || '—'}</p>
+                            <p className="text-xs text-muted-foreground">@{v.profile?.username}</p>
+                          </div>
+                        </div>
                       </TableCell>
-                      <TableCell className="font-medium text-sm">{v.full_legal_name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={`font-bold text-xs ${cfg.cls}`}>
-                          <Icon className="w-3 h-3 mr-1 inline-block" />{cfg.label}
+                      <TableCell className="font-semibold text-sm py-4">{v.full_legal_name}</TableCell>
+                      <TableCell className="py-4">
+                        <Badge variant="outline" className={`font-bold text-xs gap-1 ${cfg.cls}`}>
+                          <Icon className="w-3 h-3" />{cfg.label}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground tabular-nums">
+                      <TableCell className="text-sm text-muted-foreground tabular-nums py-4">
                         {v.submitted_at ? format(new Date(v.submitted_at), 'dd MMM yyyy') : '—'}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground tabular-nums">
+                      <TableCell className="text-sm text-muted-foreground tabular-nums py-4">
                         {v.reviewed_at ? format(new Date(v.reviewed_at), 'dd MMM yyyy') : '—'}
                       </TableCell>
-                      <TableCell className="px-6">
+                      <TableCell className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2">
-                          <Button size="sm" variant="outline" onClick={() => openDetail(v)} className="h-8 rounded-lg text-xs gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openDetail(v)}
+                            className="h-8 rounded-lg text-xs gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
                             <Eye className="w-3.5 h-3.5" /> Review
                           </Button>
-                          {v.status === 'pending' && (
-                            <Button size="sm" onClick={() => openAction(v, 'approved')} className="h-8 rounded-lg text-xs bg-emerald-500 hover:bg-emerald-600 text-white gap-1">
+                          {v.status === 'pending' ? (
+                            <Button
+                              size="sm"
+                              onClick={() => openAction(v, 'approved')}
+                              className="h-8 rounded-lg text-xs bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5 shadow-sm shadow-emerald-500/30"
+                            >
                               <CheckCircle className="w-3.5 h-3.5" /> Approve
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => openDetail(v)}
+                              className="h-8 rounded-lg text-xs gap-1 text-muted-foreground"
+                            >
+                              View <ChevronRight className="w-3.5 h-3.5" />
                             </Button>
                           )}
                         </div>
@@ -261,126 +338,160 @@ const AdminVerificationDashboard = () => {
             </Table>
           </div>
         )}
-      </div>
+      </Card>
 
-      {/* Detail Modal */}
+      {/* ── Detail Modal ─────────────────────────────────────────── */}
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
         <DialogContent className="sm:max-w-2xl rounded-2xl p-0 overflow-hidden gap-0 max-h-[90vh] flex flex-col">
-          <div className="px-6 pt-6 pb-4 border-b border-border shrink-0">
-            <DialogHeader>
-              <DialogTitle>Verification Review</DialogTitle>
-              <DialogDescription>
-                {selected?.profile?.display_name || selected?.profile?.username} • Submitted {selected?.submitted_at ? format(new Date(selected.submitted_at), 'dd MMM yyyy, h:mm a') : ''}
-              </DialogDescription>
-            </DialogHeader>
+          {/* Modal header */}
+          <div className="relative bg-brand-charcoal text-white px-6 pt-6 pb-5 shrink-0">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-brand-red/30 via-brand-charcoal to-brand-charcoal pointer-events-none" />
+            <div className="relative">
+              <DialogHeader>
+                <DialogTitle className="text-white text-xl font-extrabold">Verification Review</DialogTitle>
+                <DialogDescription className="text-white/60 text-sm mt-0.5">
+                  {selected?.profile?.display_name || selected?.profile?.username}
+                  {selected?.submitted_at && (
+                    <> · Submitted {format(new Date(selected.submitted_at), 'dd MMM yyyy, h:mm a')}</>
+                  )}
+                </DialogDescription>
+              </DialogHeader>
+            </div>
           </div>
-          <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+
+          <div className="overflow-y-auto flex-1 px-6 py-6 space-y-5">
             {selected && (
               <>
-                {/* AI name extraction result */}
-                {(selected.id_extracted_name !== undefined && selected.id_extracted_name !== null) ? (
-                  <div className={`flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-medium border ${
+                {/* AI match banner */}
+                {selected.id_extracted_name !== undefined && selected.id_extracted_name !== null ? (
+                  <div className={`flex items-start gap-3 px-4 py-3.5 rounded-xl text-xs font-medium border ${
                     selected.name_match === true
                       ? 'bg-emerald-500/10 text-emerald-700 border-emerald-200'
-                      : selected.name_match === false
-                      ? 'bg-amber-500/10 text-amber-700 border-amber-200'
-                      : 'bg-muted text-muted-foreground border-border'
+                      : 'bg-amber-500/10 text-amber-700 border-amber-200'
                   }`}>
                     {selected.name_match === true
-                      ? <CheckCircle className="w-4 h-4 shrink-0" />
-                      : <AlertCircle className="w-4 h-4 shrink-0" />}
-                    <div className="flex-1 min-w-0">
-                      <span className="font-bold">AI Name Match{selected.name_match_confidence ? ` (${selected.name_match_confidence} confidence)` : ''}:</span>{' '}
+                      ? <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      : <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />}
+                    <div>
+                      <span className="font-bold">
+                        AI Name Match{selected.name_match_confidence ? ` · ${selected.name_match_confidence} confidence` : ''}:
+                      </span>{' '}
                       {selected.name_match === true
                         ? `Extracted "${selected.id_extracted_name}" — matches submitted name`
                         : `Extracted "${selected.id_extracted_name}" — does not match submitted name`}
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-medium border bg-muted text-muted-foreground border-border">
+                  <div className="flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-medium border bg-muted/50 text-muted-foreground border-border">
                     <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>No AI name extraction data available for this submission</span>
+                    No AI name extraction data available for this submission.
                   </div>
                 )}
 
+                {/* Personal details grid */}
                 <div className="grid grid-cols-2 gap-4">
                   {[
                     ['Full Legal Name', selected.full_legal_name],
-                    ['Date of Birth', selected.date_of_birth],
-                    ['Phone', selected.phone_number],
-                    ['Status', STATUS_CONFIG[selected.status]?.label],
-                  ].map(([k, v]) => (
-                    <div key={k}>
-                      <p className="text-xs text-muted-foreground font-medium mb-0.5">{k}</p>
-                      <p className="font-bold text-sm">{v || '—'}</p>
+                    ['Date of Birth',   selected.date_of_birth],
+                    ['Phone',           selected.phone_number],
+                    ['Status',          STATUS_CONFIG[selected.status]?.label],
+                  ].map(([k, val]) => (
+                    <div key={k} className="space-y-0.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{k}</p>
+                      <p className="font-bold text-sm">{val || '—'}</p>
                     </div>
                   ))}
-                  <div className="col-span-2">
-                    <p className="text-xs text-muted-foreground font-medium mb-0.5">Residential Address</p>
-                    <p className="font-bold text-sm">{selected.residential_address}</p>
+                  <div className="col-span-2 space-y-0.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Residential Address</p>
+                    <p className="font-bold text-sm">{selected.residential_address || '—'}</p>
                   </div>
                 </div>
 
+                {/* Document images */}
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border">
-                  {[
-                    ['Photo ID', selected.photo_id_path],
-                    ['Selfie', selected.selfie_path],
-                  ].map(([label, path]) => (
+                  {[['Photo ID', selected.photo_id_path], ['Selfie', selected.selfie_path]].map(([label, path]) => (
                     <div key={label}>
-                      <p className="text-xs text-muted-foreground font-medium mb-2">{label}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">{label}</p>
                       {path && docUrls[path] ? (
-                        <a href={docUrls[path]} target="_blank" rel="noopener noreferrer">
-                          <img src={docUrls[path]} alt={label} className="w-full h-40 object-cover rounded-xl border border-border hover:opacity-90 transition-opacity" />
+                        <a href={docUrls[path]} target="_blank" rel="noopener noreferrer" className="block">
+                          <img
+                            src={docUrls[path]}
+                            alt={label}
+                            className="w-full h-44 object-cover rounded-xl border border-border hover:opacity-90 transition-opacity shadow-sm"
+                          />
                         </a>
                       ) : path ? (
-                        <button onClick={() => getDocUrl(path)} className="w-full h-40 rounded-xl border border-dashed border-border flex items-center justify-center text-sm text-muted-foreground hover:bg-muted/30 transition-colors gap-2">
-                          <Eye className="w-4 h-4" /> Click to load document
+                        <button
+                          onClick={() => getDocUrl(path)}
+                          className="w-full h-44 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center text-sm text-muted-foreground hover:bg-muted/30 hover:border-primary/40 transition-all gap-2"
+                        >
+                          <Eye className="w-5 h-5 opacity-40" />
+                          <span className="text-xs">Click to load</span>
                         </button>
                       ) : (
-                        <div className="w-full h-40 rounded-xl border border-border bg-muted/30 flex items-center justify-center text-sm text-muted-foreground">Not provided</div>
+                        <div className="w-full h-44 rounded-xl border border-border bg-muted/30 flex items-center justify-center text-sm text-muted-foreground">
+                          Not provided
+                        </div>
                       )}
                     </div>
                   ))}
                 </div>
 
                 {selected.admin_notes && (
-                  <div className="p-3 bg-muted/50 rounded-xl border border-border">
-                    <p className="text-xs font-bold text-muted-foreground mb-1">Admin Notes</p>
+                  <div className="p-3.5 bg-muted/50 rounded-xl border border-border">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Admin Notes</p>
                     <p className="text-sm">{selected.admin_notes}</p>
                   </div>
                 )}
               </>
             )}
           </div>
-          <div className="px-6 pb-6 border-t border-border pt-4 flex flex-wrap gap-2 shrink-0">
-            {ACTIONS.map(a => (
-              <Button
-                key={a.value}
-                size="sm"
-                variant={a.value === 'approved' ? 'default' : 'outline'}
-                className={`rounded-xl text-xs font-bold gap-1 ${a.value === 'approved' ? 'bg-emerald-500 hover:bg-emerald-600 text-white' : a.value === 'rejected' || a.value === 'revoked' ? 'text-destructive border-destructive/30 hover:bg-destructive/10' : ''}`}
-                onClick={() => { setDetailOpen(false); openAction(selected, a.value); }}
-              >
-                {a.label}
-              </Button>
-            ))}
+
+          {/* Action buttons */}
+          <div className="px-6 pb-6 border-t border-border pt-4 shrink-0">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-3">Take Action</p>
+            <div className="flex flex-wrap gap-2">
+              {ACTIONS.map(a => {
+                const Icon = a.icon;
+                return (
+                  <Button
+                    key={a.value}
+                    size="sm"
+                    variant="outline"
+                    className={`rounded-xl text-xs font-bold gap-1.5 ${a.btnCls}`}
+                    onClick={() => { setDetailOpen(false); openAction(selected, a.value); }}
+                  >
+                    <Icon className="w-3.5 h-3.5" />{a.label}
+                  </Button>
+                );
+              })}
+            </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Action Confirmation Modal */}
+      {/* ── Action Confirmation Modal ────────────────────────────── */}
       <Dialog open={actionOpen} onOpenChange={setActionOpen}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>{ACTIONS.find(a => a.value === pendingAction)?.label}</DialogTitle>
-            <DialogDescription>
-              For: {selected?.full_legal_name} (@{selected?.profile?.username})
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
+        <DialogContent className="sm:max-w-md rounded-2xl p-0 overflow-hidden gap-0">
+          <div className="relative bg-brand-charcoal text-white px-6 pt-6 pb-5">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-brand-red/30 via-brand-charcoal to-brand-charcoal pointer-events-none" />
+            <div className="relative">
+              <DialogHeader>
+                <DialogTitle className="text-white text-lg font-extrabold flex items-center gap-2">
+                  {pendingActionCfg && <pendingActionCfg.icon className="w-5 h-5" />}
+                  {pendingActionCfg?.label}
+                </DialogTitle>
+                <DialogDescription className="text-white/60 text-sm">
+                  {selected?.full_legal_name} · @{selected?.profile?.username}
+                </DialogDescription>
+              </DialogHeader>
+            </div>
+          </div>
+
+          <div className="px-6 py-5 space-y-4">
             {pendingAction === 'info_requested' && (
               <div className="space-y-1.5">
-                <Label className="font-bold text-sm">Message to User *</Label>
+                <Label className="font-bold text-sm">Message to User <span className="text-destructive">*</span></Label>
                 <Textarea
                   value={additionalInfo}
                   onChange={e => setAdditionalInfo(e.target.value)}
@@ -391,7 +502,9 @@ const AdminVerificationDashboard = () => {
               </div>
             )}
             <div className="space-y-1.5">
-              <Label className="font-bold text-sm">Admin Notes <span className="font-normal text-muted-foreground">(optional)</span></Label>
+              <Label className="font-bold text-sm">
+                Admin Notes <span className="font-normal text-muted-foreground">(optional)</span>
+              </Label>
               <Textarea
                 value={adminNotes}
                 onChange={e => setAdminNotes(e.target.value)}
@@ -401,14 +514,23 @@ const AdminVerificationDashboard = () => {
               />
             </div>
           </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setActionOpen(false)} disabled={saving} className="rounded-xl">Cancel</Button>
+
+          <DialogFooter className="px-6 pb-6 gap-2 border-t border-border pt-4">
+            <Button variant="outline" onClick={() => setActionOpen(false)} disabled={saving} className="rounded-xl">
+              Cancel
+            </Button>
             <Button
               onClick={handleAction}
               disabled={saving || (pendingAction === 'info_requested' && !additionalInfo.trim())}
-              className={`rounded-xl font-bold gap-2 ${pendingAction === 'approved' ? 'bg-emerald-500 hover:bg-emerald-600 text-white' : ''}`}
+              className={`rounded-xl font-bold gap-2 ${
+                pendingAction === 'approved'
+                  ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm shadow-emerald-500/30'
+                  : pendingAction === 'rejected' || pendingAction === 'revoked'
+                  ? 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
+                  : ''
+              }`}
             >
-              {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : 'Confirm'}
+              {saving ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving…</> : `Confirm ${pendingActionCfg?.label || ''}`}
             </Button>
           </DialogFooter>
         </DialogContent>
