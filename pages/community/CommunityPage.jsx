@@ -114,13 +114,11 @@ const CommunityPage = () => {
               <div className="absolute -right-24 top-0 w-72 h-full bg-white/5" style={{ transform: 'skewX(-12deg)' }} />
               <div className="absolute -right-4 top-0 w-40 h-full bg-white/4" style={{ transform: 'skewX(-12deg)' }} />
             </div>
-            {/* Suit watermark */}
-            <div className="absolute -bottom-6 right-8 text-[180px] font-black leading-none text-white/5 select-none pointer-events-none">♠</div>
             <div className="relative z-10 flex flex-col items-center gap-3 max-w-2xl">
               <span className="bg-white text-blue-900 font-black text-xs px-4 py-1.5 uppercase tracking-widest rounded-sm shadow">
                 Limited Time
               </span>
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black leading-tight uppercase tracking-tight">
+              <h2 className="text-2xl sm:text-3xl font-black leading-tight uppercase tracking-tight">
                 30 Days Free.<br />No Card Required.
               </h2>
               <div className="w-12 h-1 bg-white/40 rounded-full" />
@@ -145,8 +143,6 @@ const CommunityPage = () => {
               <div className="absolute -left-16 top-0 w-56 h-full bg-yellow-400/8" style={{ transform: 'skewX(-12deg)' }} />
               <div className="absolute left-32 top-0 w-24 h-full bg-yellow-400/5" style={{ transform: 'skewX(-12deg)' }} />
             </div>
-            {/* W watermark */}
-            <div className="absolute -bottom-8 right-4 text-[200px] font-black leading-none text-yellow-400/8 select-none pointer-events-none" style={{ fontFamily: 'monospace' }}>W</div>
             <div className="relative z-10 flex flex-col items-center gap-3 max-w-2xl">
               <div className="flex items-center gap-3">
                 <WhatnotIcon className="w-10 h-10" />
@@ -154,7 +150,7 @@ const CommunityPage = () => {
                   Go Live
                 </span>
               </div>
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black leading-tight uppercase tracking-tight"
+              <h2 className="text-2xl sm:text-3xl font-black leading-tight uppercase tracking-tight"
                 style={{ textShadow: '0 0 60px rgba(250,204,21,0.25)' }}>
                 Promote Your<br />Whatnot Shows
               </h2>
@@ -181,13 +177,11 @@ const CommunityPage = () => {
               <div className="absolute -right-20 top-0 w-64 h-full bg-white/5" style={{ transform: 'skewX(-12deg)' }} />
               <div className="absolute right-36 top-0 w-20 h-full bg-white/4" style={{ transform: 'skewX(-12deg)' }} />
             </div>
-            {/* @ watermark */}
-            <div className="absolute top-1/2 right-6 -translate-y-1/2 text-[160px] font-black leading-none text-white/8 select-none pointer-events-none">@</div>
             <div className="relative z-10 flex flex-col items-center gap-3 max-w-2xl">
               <span className="border-2 border-white/50 text-white font-black text-xs px-4 py-1.5 uppercase tracking-widest rounded-sm">
                 Connect
               </span>
-              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black leading-tight uppercase tracking-tight"
+              <h2 className="text-2xl sm:text-3xl font-black leading-tight uppercase tracking-tight"
                 style={{ textShadow: '0 2px 30px rgba(0,0,0,0.35)' }}>
                 Share Your Pulls.<br />Build Your Name.
               </h2>
