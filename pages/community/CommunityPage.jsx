@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
-import { MessageSquare, Users, Store, ExternalLink, ShieldCheck, X, Sparkles } from 'lucide-react';
+import { MessageSquare, Users, Store, ExternalLink, ShieldCheck, ChevronLeft, ChevronRight, Instagram } from 'lucide-react';
 
 const WhatnotIcon = ({ className = 'w-4 h-4' }) => (
   <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" className={className}>
@@ -22,6 +22,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
+const TOTAL_SLIDES = 3;
+
 const CommunityPage = () => {
   const navigate = useNavigate();
   const [discussions, setDiscussions] = useState([]);
@@ -30,14 +32,24 @@ const CommunityPage = () => {
   const [loadingDiscussions, setLoadingDiscussions] = useState(true);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
   const [loadingRetailers, setLoadingRetailers] = useState(true);
-  const [bannerDismissed, setBannerDismissed] = useState(
-    () => sessionStorage.getItem('traderSaleBannerDismissed') === 'true'
-  );
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+  const [slideKey, setSlideKey] = useState(0);
 
-  const dismissBanner = () => {
-    sessionStorage.setItem('traderSaleBannerDismissed', 'true');
-    setBannerDismissed(true);
+  const goToSlide = (i) => {
+    setCurrentSlide(i);
+    setSlideKey(prev => prev + 1);
   };
+  const prevSlide = () => goToSlide((currentSlide - 1 + TOTAL_SLIDES) % TOTAL_SLIDES);
+  const nextSlide = () => goToSlide((currentSlide + 1) % TOTAL_SLIDES);
+
+  useEffect(() => {
+    if (isPaused) return;
+    const timer = setInterval(() => {
+      setCurrentSlide(prev => (prev + 1) % TOTAL_SLIDES);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [isPaused, slideKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -87,42 +99,149 @@ const CommunityPage = () => {
         </div>
       </section>
 
-      {!bannerDismissed && (
-        <div className="relative overflow-hidden bg-gradient-to-r from-brand-red via-rose-600 to-brand-blue text-white">
-          <div className="absolute inset-0 opacity-10 pointer-events-none"
-            style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)', backgroundSize: '40px 40px' }}
-          />
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center gap-4 relative">
-            <div className="flex-shrink-0 bg-white/20 rounded-full p-2.5">
-              <Sparkles className="w-6 h-6 text-white" />
+      {/* ── Promo Carousel ── */}
+      <section
+        className="relative overflow-hidden min-h-[300px] sm:min-h-[360px]"
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+      >
+        {/* Slide 1 — Free Trial */}
+        <div className={`absolute inset-0 transition-opacity duration-700 ${currentSlide === 0 ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+          <div className="relative h-full overflow-hidden text-white flex flex-col items-center justify-center px-4 pb-10 pt-12 text-center"
+            style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 55%, #2563eb 100%)' }}>
+            {/* Diagonal accent slab */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              <div className="absolute -right-24 top-0 w-72 h-full bg-white/5" style={{ transform: 'skewX(-12deg)' }} />
+              <div className="absolute -right-4 top-0 w-40 h-full bg-white/4" style={{ transform: 'skewX(-12deg)' }} />
             </div>
-            <div className="flex-1 text-center sm:text-left">
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mb-1">
-                <span className="bg-white text-brand-red font-bold text-xs px-2.5 py-0.5 rounded-full uppercase tracking-wide">
-                  Limited Offer
-                </span>
-                <span className="font-bold text-lg leading-tight">30 Days Free Trading — No Credit Card Required</span>
-              </div>
-              <p className="text-white/85 text-sm">
-                Local traders can now list and sell cards on CardPop completely free for 30 days. Join Australia's fastest-growing trading card community today.
+            {/* Suit watermark */}
+            <div className="absolute -bottom-6 right-8 text-[180px] font-black leading-none text-white/5 select-none pointer-events-none">♠</div>
+            <div className="relative z-10 flex flex-col items-center gap-3 max-w-2xl">
+              <span className="bg-white text-blue-900 font-black text-xs px-4 py-1.5 uppercase tracking-widest rounded-sm shadow">
+                Limited Time
+              </span>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black leading-tight uppercase tracking-tight">
+                30 Days Free.<br />No Card Required.
+              </h2>
+              <div className="w-12 h-1 bg-white/40 rounded-full" />
+              <p className="text-white/75 text-sm sm:text-base max-w-lg">
+                List and sell cards completely free for 30 days. Join Australia's fastest-growing trading card community.
               </p>
+              <Link
+                to="/signup"
+                className="mt-2 bg-white text-blue-900 font-black text-sm px-8 py-3 uppercase tracking-widest rounded-sm hover:bg-blue-50 transition-colors shadow-xl"
+              >
+                Register Free →
+              </Link>
             </div>
-            <Link
-              to="/signup"
-              className="flex-shrink-0 bg-white text-brand-red font-bold text-sm px-5 py-2.5 rounded-xl hover:bg-white/90 transition-colors whitespace-nowrap shadow-sm"
-            >
-              Register Free
-            </Link>
-            <button
-              onClick={dismissBanner}
-              aria-label="Dismiss banner"
-              className="absolute top-3 right-3 sm:static flex-shrink-0 text-white/70 hover:text-white transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
           </div>
         </div>
-      )}
+
+        {/* Slide 2 — Whatnot Shows */}
+        <div className={`absolute inset-0 transition-opacity duration-700 ${currentSlide === 1 ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+          <div className="relative h-full overflow-hidden bg-black text-white flex flex-col items-center justify-center px-4 pb-10 pt-12 text-center">
+            {/* Yellow diagonal accent */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              <div className="absolute -left-16 top-0 w-56 h-full bg-yellow-400/8" style={{ transform: 'skewX(-12deg)' }} />
+              <div className="absolute left-32 top-0 w-24 h-full bg-yellow-400/5" style={{ transform: 'skewX(-12deg)' }} />
+            </div>
+            {/* W watermark */}
+            <div className="absolute -bottom-8 right-4 text-[200px] font-black leading-none text-yellow-400/8 select-none pointer-events-none" style={{ fontFamily: 'monospace' }}>W</div>
+            <div className="relative z-10 flex flex-col items-center gap-3 max-w-2xl">
+              <div className="flex items-center gap-3">
+                <WhatnotIcon className="w-10 h-10" />
+                <span className="bg-yellow-400 text-black font-black text-xs px-4 py-1.5 uppercase tracking-widest rounded-sm shadow">
+                  Go Live
+                </span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black leading-tight uppercase tracking-tight"
+                style={{ textShadow: '0 0 60px rgba(250,204,21,0.25)' }}>
+                Promote Your<br />Whatnot Shows
+              </h2>
+              <div className="w-12 h-1 bg-yellow-400/60 rounded-full" />
+              <p className="text-white/70 text-sm sm:text-base max-w-lg">
+                Got live pack breaks and auctions? Sign up and list your shows on CardPop — reach thousands of Australian collectors.
+              </p>
+              <Link
+                to="/signup"
+                className="mt-2 bg-yellow-400 text-black font-black text-sm px-8 py-3 uppercase tracking-widest rounded-sm hover:bg-yellow-300 transition-colors shadow-xl"
+              >
+                Add Your Show →
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Slide 3 — Instagram / Socials */}
+        <div className={`absolute inset-0 transition-opacity duration-700 ${currentSlide === 2 ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
+          <div className="relative h-full overflow-hidden text-white flex flex-col items-center justify-center px-4 pb-10 pt-12 text-center"
+            style={{ background: 'linear-gradient(135deg, #4c1d95 0%, #be185d 50%, #ea580c 100%)' }}>
+            {/* Diagonal accents */}
+            <div className="absolute inset-0 pointer-events-none overflow-hidden">
+              <div className="absolute -right-20 top-0 w-64 h-full bg-white/5" style={{ transform: 'skewX(-12deg)' }} />
+              <div className="absolute right-36 top-0 w-20 h-full bg-white/4" style={{ transform: 'skewX(-12deg)' }} />
+            </div>
+            {/* @ watermark */}
+            <div className="absolute top-1/2 right-6 -translate-y-1/2 text-[160px] font-black leading-none text-white/8 select-none pointer-events-none">@</div>
+            <div className="relative z-10 flex flex-col items-center gap-3 max-w-2xl">
+              <span className="border-2 border-white/50 text-white font-black text-xs px-4 py-1.5 uppercase tracking-widest rounded-sm">
+                Connect
+              </span>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black leading-tight uppercase tracking-tight"
+                style={{ textShadow: '0 2px 30px rgba(0,0,0,0.35)' }}>
+                Share Your Pulls.<br />Build Your Name.
+              </h2>
+              <div className="w-12 h-1 bg-white/40 rounded-full" />
+              <p className="text-white/85 text-sm sm:text-base max-w-lg">
+                Link your Instagram to your CardPop profile. Get discovered, share your collection, and connect with breakers across Australia.
+              </p>
+              <Link
+                to="/signup"
+                className="mt-2 bg-white text-pink-700 font-black text-sm px-8 py-3 uppercase tracking-widest rounded-sm hover:bg-white/90 transition-colors shadow-xl"
+              >
+                Build Your Profile →
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Prev Arrow */}
+        <button
+          onClick={prevSlide}
+          className="absolute left-3 top-1/2 -translate-y-8 z-20 bg-black/40 hover:bg-black/60 text-white rounded-sm p-2 transition-colors backdrop-blur-sm"
+          aria-label="Previous slide"
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+
+        {/* Next Arrow */}
+        <button
+          onClick={nextSlide}
+          className="absolute right-3 top-1/2 -translate-y-8 z-20 bg-black/40 hover:bg-black/60 text-white rounded-sm p-2 transition-colors backdrop-blur-sm"
+          aria-label="Next slide"
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+
+        {/* Dots */}
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
+          {Array.from({ length: TOTAL_SLIDES }).map((_, i) => (
+            <button
+              key={i}
+              onClick={() => goToSlide(i)}
+              className={`h-1.5 rounded-sm transition-all duration-300 ${i === currentSlide ? 'w-8 bg-white' : 'w-3 bg-white/40 hover:bg-white/65'}`}
+              aria-label={`Go to slide ${i + 1}`}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* Angled edge below carousel */}
+      <div
+        aria-hidden="true"
+        className="relative -mt-6 h-6 z-10 bg-background pointer-events-none"
+        style={{ clipPath: 'polygon(0 100%, 100% 0, 100% 100%)' }}
+      />
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <Tabs defaultValue="forum">
