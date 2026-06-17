@@ -4,33 +4,33 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
-import { geocodeSuburb, STATE_CENTROIDS } from '@/lib/geocode.js';
+import { geocodeLocation, STATE_CENTROIDS } from '@/lib/geocode.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Navigation, Store, Calendar, Users, Filter, X, Loader2, Info } from 'lucide-react';
+import { MapPin, Navigation, Store, Calendar, Users, Filter, X, Loader2, Info, ExternalLink } from 'lucide-react';
 
-// ─── LEGEND CONFIG ───────────────────────────────────────────────────────────
+// ─── LEGEND CONFIG ────────────────────────────────────────────────────────────
+// No hobbyist/user location markers — only verified retail locations and
+// events where the organiser has explicitly added a venue address.
 
 const MARKER_TYPES = {
-  retailer:    { label: 'Retailer / LGS',     color: '#f59e0b', icon: '🏪' },
-  card_show:   { label: 'Card Show',           color: '#3b82f6', icon: '🃏' },
-  trade_event: { label: 'Trade Event',         color: '#8b5cf6', icon: '🤝' },
-  lgs_event:   { label: 'Store Event',         color: '#06b6d4', icon: '🏬' },
-  community_event: { label: 'Community Event', color: '#22c55e', icon: '🌟' },
-  hobbyist:    { label: 'Hobbyist / Trader',   color: '#ec4899', icon: '👤' },
+  retailer:        { label: 'Retailer / LGS',     color: '#f59e0b', icon: '🏪' },
+  card_show:       { label: 'Card Show',           color: '#3b82f6', icon: '🃏' },
+  trade_event:     { label: 'Trade Event',         color: '#8b5cf6', icon: '🤝' },
+  lgs_event:       { label: 'Store Event',         color: '#06b6d4', icon: '🏬' },
+  community_event: { label: 'Community Event',     color: '#22c55e', icon: '🌟' },
 };
 
 const STATES = ['All States', 'NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'];
 
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
+// ─── LEAFLET SETUP ────────────────────────────────────────────────────────────
 
-// Fix Leaflet default icon broken paths in bundlers
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
 function makeIcon(type) {
@@ -38,16 +38,14 @@ function makeIcon(type) {
   return L.divIcon({
     className: '',
     html: `<div style="
-      width:32px;height:32px;border-radius:50% 50% 50% 0;
-      transform:rotate(-45deg);
-      background:${cfg.color};
-      border:2px solid white;
-      box-shadow:0 2px 6px rgba(0,0,0,0.35);
+      width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
+      background:${cfg.color};border:2px solid white;
+      box-shadow:0 2px 8px rgba(0,0,0,0.4);
       display:flex;align-items:center;justify-content:center;
-    "><span style="transform:rotate(45deg);font-size:13px;line-height:1">${cfg.icon}</span></div>`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -36],
+    "><span style="transform:rotate(45deg);font-size:14px;line-height:1">${cfg.icon}</span></div>`,
+    iconSize: [34, 34],
+    iconAnchor: [17, 34],
+    popupAnchor: [0, -38],
   });
 }
 
@@ -57,12 +55,14 @@ function userIcon() {
     html: `<div style="
       width:20px;height:20px;border-radius:50%;
       background:#ef4444;border:3px solid white;
-      box-shadow:0 0 0 3px rgba(239,68,68,0.3),0 2px 6px rgba(0,0,0,0.4);
+      box-shadow:0 0 0 4px rgba(239,68,68,0.25),0 2px 6px rgba(0,0,0,0.4);
     "></div>`,
     iconSize: [20, 20],
     iconAnchor: [10, 10],
   });
 }
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
 
 function haversineKm([lat1, lon1], [lat2, lon2]) {
   const R = 6371;
@@ -73,70 +73,76 @@ function haversineKm([lat1, lon1], [lat2, lon2]) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// ─── FLY-TO COMPONENT ────────────────────────────────────────────────────────
+function formatDate(dateStr) {
+  if (!dateStr) return null;
+  return new Date(dateStr).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+// ─── FLY-TO COMPONENT ─────────────────────────────────────────────────────────
 
 function FlyTo({ coords }) {
   const map = useMap();
-  useEffect(() => { if (coords) map.flyTo(coords, 10, { duration: 1.2 }); }, [coords, map]);
+  useEffect(() => { if (coords) map.flyTo(coords, 13, { duration: 1.4 }); }, [coords, map]);
   return null;
 }
 
-// ─── POPUP CARD ──────────────────────────────────────────────────────────────
+// ─── POPUP CONTENT ────────────────────────────────────────────────────────────
 
 function MarkerPopup({ item, userCoords }) {
   const dist = userCoords && item.coords
     ? haversineKm(userCoords, item.coords).toFixed(1)
     : null;
-
   const cfg = MARKER_TYPES[item.type] || MARKER_TYPES.retailer;
 
   return (
-    <div style={{ minWidth: 200, maxWidth: 260, fontFamily: 'inherit' }}>
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-lg">{cfg.icon}</span>
+    <div style={{ minWidth: 210, maxWidth: 270, fontFamily: 'inherit' }}>
+      <div className="flex items-start gap-2 mb-2">
+        <span className="text-lg shrink-0 mt-0.5">{cfg.icon}</span>
         <div>
-          <p className="font-bold text-sm leading-tight">{item.name}</p>
-          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full" style={{ background: cfg.color + '22', color: cfg.color }}>
+          <p className="font-bold text-sm leading-tight mb-0.5">{item.name}</p>
+          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+            style={{ background: cfg.color + '22', color: cfg.color }}>
             {cfg.label}
           </span>
         </div>
       </div>
 
+      {item.venueName && (
+        <p className="text-xs font-medium text-gray-700 mb-0.5">{item.venueName}</p>
+      )}
+
       {item.location && (
-        <p className="text-xs text-gray-500 flex items-center gap-1 mb-1">
-          <MapPin size={11} /> {item.location}
+        <p className="text-xs text-gray-500 flex items-start gap-1 mb-1">
+          <MapPin size={11} className="mt-0.5 shrink-0" />
+          <span>{item.location}</span>
         </p>
       )}
 
       {item.date && (
         <p className="text-xs text-gray-500 flex items-center gap-1 mb-1">
-          <Calendar size={11} /> {item.date}
+          <Calendar size={11} />
+          {formatDate(item.date)}{item.endDate && item.endDate !== item.date ? ` – ${formatDate(item.endDate)}` : ''}
         </p>
       )}
 
       {item.description && (
-        <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 mb-2 leading-relaxed">
-          {item.description}
-        </p>
+        <p className="text-xs text-gray-600 line-clamp-2 mb-2 leading-relaxed">{item.description}</p>
       )}
 
       {dist && (
-        <p className="text-xs font-semibold text-blue-600 mb-2">
-          📍 {dist} km from your location
-        </p>
+        <p className="text-xs font-semibold text-blue-600 mb-2">📍 {dist} km from you</p>
       )}
 
-      <div className="flex gap-1.5 flex-wrap">
-        {item.url && (
-          <a href={item.url} target="_blank" rel="noopener noreferrer"
-            className="text-[11px] px-2 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 font-medium transition-colors">
-            Visit →
+      <div className="flex gap-1.5 flex-wrap mt-1">
+        {item.eventUrl && (
+          <a href={item.eventUrl} className="text-[11px] px-2 py-1 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 font-medium transition-colors">
+            Event details →
           </a>
         )}
-        {item.eventUrl && (
-          <a href={item.eventUrl} target="_blank" rel="noopener noreferrer"
-            className="text-[11px] px-2 py-1 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 font-medium transition-colors">
-            Event Info →
+        {item.url && (
+          <a href={item.url} target="_blank" rel="noopener noreferrer"
+            className="text-[11px] px-2 py-1 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100 font-medium transition-colors flex items-center gap-0.5">
+            Website <ExternalLink size={9} />
           </a>
         )}
       </div>
@@ -147,9 +153,9 @@ function MarkerPopup({ item, userCoords }) {
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 
 const LocalMapPage = () => {
-  const [rawItems, setRawItems] = useState([]);  // items without coords yet
-  const [markers, setMarkers] = useState([]);     // items with coords resolved
-  const [geocodingCount, setGeocodingCount] = useState(0);
+  const [rawItems, setRawItems] = useState([]);
+  const [markers, setMarkers] = useState([]);
+  const [geocodingTotal, setGeocodingTotal] = useState(0);
   const [geocodedCount, setGeocodedCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -157,10 +163,10 @@ const LocalMapPage = () => {
   const [userAddress, setUserAddress] = useState('');
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState('');
+  const [flyCoords, setFlyCoords] = useState(null);
 
   const [stateFilter, setStateFilter] = useState('All States');
   const [activeTypes, setActiveTypes] = useState(new Set(Object.keys(MARKER_TYPES)));
-  const [flyCoords, setFlyCoords] = useState(null);
 
   // ── Fetch raw data ──────────────────────────────────────────────────────────
 
@@ -170,74 +176,66 @@ const LocalMapPage = () => {
       setLoading(true);
       const results = [];
 
-      // Retailers with physical stores
+      // Retailers with a physical storefront
       try {
         const { data: retailers } = await supabase
           .from('business_profiles')
-          .select('id, business_name, store_suburb, store_state, store_address, store_postcode, specialises_in, website_url, logo_url')
+          .select('id, business_name, store_address, store_suburb, store_state, store_postcode, specialises_in, website_url, logo_url')
           .eq('has_physical_store', true)
-          .not('store_suburb', 'is', null);
+          .not('store_state', 'is', null);
 
         (retailers || []).forEach(r => {
+          const parts = [r.store_address, r.store_suburb, r.store_state, r.store_postcode].filter(Boolean);
           results.push({
             id: 'retailer-' + r.id,
             type: 'retailer',
             name: r.business_name || 'Card Store',
-            suburb: r.store_suburb,
-            state: r.store_state,
-            location: [r.store_address, r.store_suburb, r.store_state].filter(Boolean).join(', '),
+            geocodeParams: {
+              address: r.store_address,
+              suburb: r.store_suburb,
+              state: r.store_state,
+              postcode: r.store_postcode,
+            },
+            location: parts.join(', '),
             description: r.specialises_in?.length ? `Specialises in: ${r.specialises_in.join(', ')}` : null,
             url: r.website_url,
           });
         });
       } catch (e) { console.warn('retailers fetch:', e); }
 
-      // Upcoming / recent events
+      // Upcoming events — only those with at least a suburb/state so they can be placed
       try {
         const today = new Date().toISOString().split('T')[0];
         const { data: events } = await supabase
           .from('events_public')
           .select('id, title, event_type, venue_name, address, suburb, state, postcode, start_date, end_date, website_url, slug')
           .gte('start_date', today)
+          .not('state', 'is', null)
           .order('start_date', { ascending: true })
-          .limit(200);
+          .limit(300);
 
         (events || []).forEach(ev => {
+          const locParts = [ev.venue_name, ev.address, ev.suburb, ev.state, ev.postcode].filter(Boolean);
           results.push({
             id: 'event-' + ev.id,
             type: ev.event_type || 'community_event',
             name: ev.title,
-            suburb: ev.suburb,
-            state: ev.state,
-            location: [ev.venue_name, ev.address, ev.suburb, ev.state].filter(Boolean).join(', '),
+            venueName: ev.venue_name,
+            geocodeParams: {
+              address: ev.address,
+              venueName: ev.venue_name,
+              suburb: ev.suburb,
+              state: ev.state,
+              postcode: ev.postcode,
+            },
+            location: locParts.join(', '),
             date: ev.start_date,
+            endDate: ev.end_date,
             url: ev.website_url,
             eventUrl: ev.slug ? `/events/${ev.slug}` : `/events/${ev.id}`,
           });
         });
       } catch (e) { console.warn('events fetch:', e); }
-
-      // Verified hobbyists / traders with location
-      try {
-        const { data: traders } = await supabase
-          .from('profiles')
-          .select('id, display_name, username, location_suburb, location_state, is_verified')
-          .eq('is_verified', true)
-          .not('location_suburb', 'is', null)
-          .limit(100);
-
-        (traders || []).forEach(t => {
-          results.push({
-            id: 'hobbyist-' + t.id,
-            type: 'hobbyist',
-            name: t.display_name || t.username || 'Hobbyist',
-            suburb: t.location_suburb,
-            state: t.location_state,
-            location: [t.location_suburb, t.location_state].filter(Boolean).join(', '),
-            url: t.username ? `/community/user/${t.username}` : null,
-          });
-        });
-      } catch (e) { console.warn('traders fetch:', e); }
 
       if (!cancelled) {
         setRawItems(results);
@@ -248,35 +246,31 @@ const LocalMapPage = () => {
     return () => { cancelled = true; };
   }, []);
 
-  // ── Geocode raw items progressively ────────────────────────────────────────
+  // ── Geocode progressively — most precise address first ─────────────────────
 
   useEffect(() => {
     if (rawItems.length === 0) return;
     let cancelled = false;
 
-    const toGeocode = rawItems.filter(it => it.suburb && it.state);
-    setGeocodingCount(toGeocode.length);
+    setGeocodingTotal(rawItems.length);
     setGeocodedCount(0);
-
-    // Items without suburb fall back to state centroid immediately
-    const noGeo = rawItems.filter(it => !it.suburb || !it.state).map(it => ({
-      ...it,
-      coords: it.state ? STATE_CENTROIDS[it.state?.toUpperCase()] || null : null,
-    }));
-    if (!cancelled) setMarkers(noGeo);
+    setMarkers([]);
 
     let done = 0;
-    const resolved = [...noGeo];
+    const resolved = [];
 
     async function geocodeAll() {
-      for (const item of toGeocode) {
+      for (const item of rawItems) {
         if (cancelled) break;
-        const coords = await geocodeSuburb(item.suburb, item.state);
+        const coords = await geocodeLocation(item.geocodeParams);
         done++;
         if (!cancelled) {
           setGeocodedCount(done);
-          const stateCoords = item.state ? STATE_CENTROIDS[item.state?.toUpperCase()] : null;
-          resolved.push({ ...item, coords: coords || stateCoords });
+          // Fall back to state centroid only if exact geocoding failed
+          const fallback = item.geocodeParams.state
+            ? STATE_CENTROIDS[item.geocodeParams.state.toUpperCase()] || null
+            : null;
+          resolved.push({ ...item, coords: coords || fallback });
           setMarkers([...resolved]);
         }
       }
@@ -318,7 +312,7 @@ const LocalMapPage = () => {
         setUserCoords(coords);
         setFlyCoords(coords);
       } else {
-        setGeoError('Location not found. Try a suburb + state (e.g. "Parramatta NSW").');
+        setGeoError('Location not found. Try a suburb + state e.g. "Parramatta NSW".');
       }
     } catch {
       setGeoError('Search failed. Please try again.');
@@ -326,7 +320,7 @@ const LocalMapPage = () => {
     setGeoLoading(false);
   }, [userAddress]);
 
-  // ── Filtering ───────────────────────────────────────────────────────────────
+  // ── Type toggles ────────────────────────────────────────────────────────────
 
   const toggleType = useCallback(type => {
     setActiveTypes(prev => {
@@ -336,16 +330,15 @@ const LocalMapPage = () => {
     });
   }, []);
 
-  const filteredMarkers = useMemo(() => {
-    return markers.filter(m => {
-      if (!m.coords) return false;
-      if (!activeTypes.has(m.type)) return false;
-      if (stateFilter !== 'All States' && m.state?.toUpperCase() !== stateFilter) return false;
-      return true;
-    });
-  }, [markers, activeTypes, stateFilter]);
+  // ── Filtered + sorted markers ───────────────────────────────────────────────
 
-  // Sort by distance if user location set
+  const filteredMarkers = useMemo(() => markers.filter(m => {
+    if (!m.coords) return false;
+    if (!activeTypes.has(m.type)) return false;
+    if (stateFilter !== 'All States' && m.geocodeParams?.state?.toUpperCase() !== stateFilter) return false;
+    return true;
+  }), [markers, activeTypes, stateFilter]);
+
   const sortedMarkers = useMemo(() => {
     if (!userCoords) return filteredMarkers;
     return [...filteredMarkers].sort((a, b) =>
@@ -353,9 +346,10 @@ const LocalMapPage = () => {
     );
   }, [filteredMarkers, userCoords]);
 
-  const isGeocoding = geocodedCount < geocodingCount;
+  const isGeocoding = geocodedCount < geocodingTotal;
+  const pct = geocodingTotal > 0 ? Math.round((geocodedCount / geocodingTotal) * 100) : 0;
 
-  // ─── RENDER ─────────────────────────────────────────────────────────────────
+  // ─── RENDER ──────────────────────────────────────────────────────────────────
 
   return (
     <div className="min-h-screen bg-background">
@@ -373,7 +367,7 @@ const LocalMapPage = () => {
           <h1 className="text-4xl md:text-5xl font-bold font-serif mb-3">Card Community Map</h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Discover local card retailers, hobby stores, shows, and community events across Australia.
-            Filter by type, state, and your location.
+            Enter your location to see what's near you.
           </p>
         </div>
       </section>
@@ -381,16 +375,16 @@ const LocalMapPage = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
         {/* ── Controls ── */}
-        <div className="flex flex-col lg:flex-row gap-4 mb-6">
+        <div className="flex flex-col lg:flex-row gap-4 mb-5">
 
-          {/* Location input */}
+          {/* Location */}
           <div className="flex-1">
             <p className="text-xs font-semibold text-muted-foreground mb-1.5 flex items-center gap-1">
-              <Navigation className="w-3.5 h-3.5" /> Your Location (suburb or postcode)
+              <Navigation className="w-3.5 h-3.5" /> Your Location
             </p>
             <div className="flex gap-2">
               <Input
-                placeholder="e.g. Parramatta NSW or 2150"
+                placeholder="Suburb, postcode, or address…"
                 value={userAddress}
                 onChange={e => setUserAddress(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleAddressSearch()}
@@ -410,19 +404,16 @@ const LocalMapPage = () => {
           {/* State filter */}
           <div className="shrink-0">
             <p className="text-xs font-semibold text-muted-foreground mb-1.5 flex items-center gap-1">
-              <Filter className="w-3.5 h-3.5" /> Filter by State
+              <Filter className="w-3.5 h-3.5" /> State
             </p>
             <div className="flex flex-wrap gap-1.5">
               {STATES.map(s => (
-                <button
-                  key={s}
-                  onClick={() => setStateFilter(s)}
+                <button key={s} onClick={() => setStateFilter(s)}
                   className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
                     stateFilter === s
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'bg-muted text-muted-foreground hover:text-foreground'
-                  }`}
-                >
+                  }`}>
                   {s}
                 </button>
               ))}
@@ -430,90 +421,87 @@ const LocalMapPage = () => {
           </div>
         </div>
 
-        {/* ── Type toggles / Legend ── */}
+        {/* ── Legend / Type toggles ── */}
         <div className="mb-4">
           <p className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1">
-            <Info className="w-3.5 h-3.5" /> Show on map
+            <Info className="w-3.5 h-3.5" /> Legend — click to toggle
           </p>
           <div className="flex flex-wrap gap-2">
             {Object.entries(MARKER_TYPES).map(([type, cfg]) => {
               const isOn = activeTypes.has(type);
               return (
-                <button
-                  key={type}
-                  onClick={() => toggleType(type)}
+                <button key={type} onClick={() => toggleType(type)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border-2 transition-all ${
-                    isOn ? 'text-white shadow-sm' : 'bg-transparent text-muted-foreground border-border opacity-50'
+                    isOn ? 'text-white shadow-sm' : 'bg-transparent text-muted-foreground border-border opacity-40'
                   }`}
-                  style={isOn ? { background: cfg.color, borderColor: cfg.color } : { borderColor: cfg.color }}
-                >
+                  style={isOn ? { background: cfg.color, borderColor: cfg.color } : { borderColor: cfg.color }}>
                   <span>{cfg.icon}</span>
                   {cfg.label}
                 </button>
               );
             })}
-            <button
-              onClick={() => setActiveTypes(new Set(Object.keys(MARKER_TYPES)))}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-muted text-muted-foreground hover:text-foreground transition-all"
-            >
+            <button onClick={() => setActiveTypes(new Set(Object.keys(MARKER_TYPES)))}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold bg-muted text-muted-foreground hover:text-foreground transition-all">
               Show All
             </button>
           </div>
         </div>
 
         {/* ── Status bar ── */}
-        <div className="flex items-center gap-3 mb-3 text-xs text-muted-foreground">
+        <div className="flex items-center gap-3 mb-3 min-h-[24px]">
           {loading ? (
-            <span className="flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading locations…</span>
-          ) : isGeocoding ? (
-            <span className="flex items-center gap-1.5">
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
-              Mapping locations… {geocodedCount}/{geocodingCount}
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading locations…
             </span>
-          ) : null}
-          {!loading && (
-            <span className="font-medium text-foreground">
+          ) : isGeocoding ? (
+            <div className="flex items-center gap-2 flex-1">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500 shrink-0" />
+              <div className="flex-1 max-w-xs">
+                <div className="flex justify-between text-xs text-muted-foreground mb-0.5">
+                  <span>Pinpointing venues… {geocodedCount}/{geocodingTotal}</span>
+                  <span>{pct}%</span>
+                </div>
+                <div className="h-1 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            </div>
+          ) : (
+            <span className="text-xs font-medium text-foreground">
               {sortedMarkers.length} location{sortedMarkers.length !== 1 ? 's' : ''} shown
+              {!isGeocoding && markers.filter(m => !m.coords).length > 0 && (
+                <span className="text-muted-foreground font-normal ml-1">
+                  ({markers.filter(m => !m.coords).length} could not be placed)
+                </span>
+              )}
             </span>
           )}
           {userCoords && (
-            <button
-              onClick={() => { setUserCoords(null); setUserAddress(''); }}
-              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground ml-auto"
-            >
-              <X className="w-3.5 h-3.5" /> Clear my location
+            <button onClick={() => { setUserCoords(null); setUserAddress(''); setFlyCoords(null); }}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground ml-auto">
+              <X className="w-3.5 h-3.5" /> Clear location
             </button>
           )}
         </div>
 
         {/* ── Map ── */}
-        <div className="rounded-2xl overflow-hidden border border-border shadow-sm" style={{ height: 560 }}>
-          <MapContainer
-            center={[-25.2744, 133.7751]}
-            zoom={5}
-            style={{ height: '100%', width: '100%' }}
-            scrollWheelZoom
-          >
+        <div className="rounded-2xl overflow-hidden border border-border shadow-sm" style={{ height: 580 }}>
+          <MapContainer center={[-25.2744, 133.7751]} zoom={5} style={{ height: '100%', width: '100%' }} scrollWheelZoom>
             <TileLayer
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-
             {flyCoords && <FlyTo coords={flyCoords} />}
 
-            {/* User location marker */}
             {userCoords && (
               <Marker position={userCoords} icon={userIcon()}>
-                <Popup>
-                  <p className="text-sm font-bold">📍 Your Location</p>
-                </Popup>
+                <Popup><p className="text-sm font-bold">📍 Your Location</p></Popup>
               </Marker>
             )}
 
-            {/* Data markers */}
             {sortedMarkers.map(item => (
               <Marker key={item.id} position={item.coords} icon={makeIcon(item.type)}>
-                <Popup maxWidth={280}>
+                <Popup maxWidth={290}>
                   <MarkerPopup item={item} userCoords={userCoords} />
                 </Popup>
               </Marker>
@@ -521,12 +509,12 @@ const LocalMapPage = () => {
           </MapContainer>
         </div>
 
-        {/* ── Nearest locations list (when user location set) ── */}
+        {/* ── Nearest list (only when user location is set) ── */}
         {userCoords && sortedMarkers.length > 0 && (
           <div className="mt-6">
             <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
               <Navigation className="w-5 h-5 text-blue-500" />
-              Closest to You
+              Nearest to You
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {sortedMarkers.slice(0, 9).map(item => {
@@ -535,34 +523,35 @@ const LocalMapPage = () => {
                 return (
                   <div key={item.id} className="bg-card border border-border rounded-xl p-4 hover:shadow-sm transition-all">
                     <div className="flex items-start justify-between gap-2 mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-base">{cfg.icon}</span>
-                        <p className="font-semibold text-sm leading-tight">{item.name}</p>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-base shrink-0">{cfg.icon}</span>
+                        <p className="font-semibold text-sm leading-tight truncate">{item.name}</p>
                       </div>
-                      <Badge
-                        className="text-[10px] font-bold shrink-0 text-white"
-                        style={{ background: cfg.color }}
-                      >
+                      <Badge className="text-[10px] font-bold shrink-0 text-white border-0"
+                        style={{ background: cfg.color }}>
                         {dist} km
                       </Badge>
                     </div>
+                    {item.venueName && (
+                      <p className="text-xs font-medium text-foreground/70 mb-0.5">{item.venueName}</p>
+                    )}
                     {item.location && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
-                        <MapPin className="w-3 h-3 shrink-0" /> {item.location}
+                      <p className="text-xs text-muted-foreground flex items-start gap-1 mb-1">
+                        <MapPin className="w-3 h-3 shrink-0 mt-0.5" />
+                        <span className="line-clamp-1">{item.location}</span>
                       </p>
                     )}
                     {item.date && (
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Calendar className="w-3 h-3 shrink-0" /> {item.date}
+                      <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
+                        <Calendar className="w-3 h-3 shrink-0" />
+                        {formatDate(item.date)}
                       </p>
                     )}
-                    {(item.url || item.eventUrl) && (
-                      <a
-                        href={item.eventUrl || item.url}
+                    {(item.eventUrl || item.url) && (
+                      <a href={item.eventUrl || item.url}
                         target={item.eventUrl ? '_self' : '_blank'}
                         rel="noopener noreferrer"
-                        className="mt-2 inline-block text-xs font-semibold text-primary hover:underline"
-                      >
+                        className="mt-1.5 inline-block text-xs font-semibold text-primary hover:underline">
                         View details →
                       </a>
                     )}
@@ -573,29 +562,23 @@ const LocalMapPage = () => {
           </div>
         )}
 
-        {/* ── Info footer ── */}
+        {/* ── Footer CTA ── */}
         <div className="mt-10 bg-muted/40 border border-border rounded-2xl p-6 flex flex-col sm:flex-row gap-4 items-start">
-          <div className="shrink-0">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-              <Store className="w-5 h-5 text-white" />
-            </div>
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0">
+            <Store className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h3 className="font-bold mb-1">Are you a retailer, event organiser, or active trader?</h3>
+            <h3 className="font-bold mb-1">Are you a retailer or event organiser?</h3>
             <p className="text-sm text-muted-foreground mb-3 leading-relaxed">
-              Get your store, event, or profile listed on this map. Retailers can apply via the
-              Retailers page. Events can be submitted through the Events page. Hobbyists and traders
-              appear automatically once your profile is verified.
+              Get your store or event pinned on this map. Retailers apply via the Retailers page.
+              Events with a confirmed venue address appear automatically once approved.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button asChild size="sm" variant="outline" className="rounded-xl text-xs font-bold gap-1.5">
                 <a href="/community/retailers"><Store className="w-3.5 h-3.5" /> List Your Store</a>
               </Button>
               <Button asChild size="sm" variant="outline" className="rounded-xl text-xs font-bold gap-1.5">
-                <a href="/events"><Calendar className="w-3.5 h-3.5" /> Submit an Event</a>
-              </Button>
-              <Button asChild size="sm" variant="outline" className="rounded-xl text-xs font-bold gap-1.5">
-                <a href="/community/profiles"><Users className="w-3.5 h-3.5" /> Community Profiles</a>
+                <a href="/account/events"><Calendar className="w-3.5 h-3.5" /> Submit an Event</a>
               </Button>
             </div>
           </div>
