@@ -117,8 +117,10 @@ const CardHierarchySelector = ({
 
   const handleManufacturerChange = useCallback((mId) => {
     onManufacturerChange?.(mId);
-    onSetChange?.('', '');
-  }, [onManufacturerChange, onSetChange]);
+    // Don't clear the set — sets reload filtered by the new manufacturer.
+    // If the current set is in the filtered list it stays selected; if not,
+    // the dropdown shows as unselected and the user can re-pick.
+  }, [onManufacturerChange]);
 
   const handleSetChange = useCallback((sId) => {
     const found = sets.find(s => s.id === sId);
