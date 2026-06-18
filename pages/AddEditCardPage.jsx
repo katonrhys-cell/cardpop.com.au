@@ -86,6 +86,7 @@ const AddEditCardPage = () => {
   const [checkingQuality, setCheckingQuality] = useState(false);
   const [showAutoGuide, setShowAutoGuide]     = useState(false);
   const [showPatchGuide, setShowPatchGuide]   = useState(false);
+  const [showRelicGuide, setShowRelicGuide]   = useState(false);
 
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
@@ -111,6 +112,8 @@ const AddEditCardPage = () => {
     autoSigners:    1,
     patchType:      '',
     patchPieces:    1,
+    relicMaterial:  '',
+    relicSource:    '',
     // Grading
     gradingCompany: 'raw',
     grade:          '',
@@ -231,6 +234,8 @@ const AddEditCardPage = () => {
           autoSigners:    card.auto_signers   ?? 1,
           patchType:      card.patch_type     || '',
           patchPieces:    card.patch_pieces   ?? 1,
+          relicMaterial:  card.relic_material || '',
+          relicSource:    card.relic_source   || '',
           gradingCompany: card.grading_company || 'raw',
           grade:          card.grade          || '',
           certNumber:     card.cert_number    || '',
@@ -427,6 +432,8 @@ const AddEditCardPage = () => {
         auto_signers:        formData.variant.includes('Auto') ? (formData.autoSigners || 1) : null,
         patch_type:          formData.variant.includes('Patch') ? (formData.patchType || null) : null,
         patch_pieces:        formData.variant.includes('Patch') ? (formData.patchPieces || 1) : null,
+        relic_material:      formData.variant.includes('Relic / Jersey') ? (formData.relicMaterial || null) : null,
+        relic_source:        formData.variant.includes('Relic / Jersey') ? (formData.relicSource || null) : null,
         grading_company:     formData.gradingCompany,
         grade:               isGraded ? (formData.grade?.trim() || null) : null,
         cert_number:         isGraded ? (formData.certNumber?.trim() || null) : null,
@@ -1229,6 +1236,138 @@ const AddEditCardPage = () => {
                               >
                                 <span className="font-bold text-sm">{label}</span>
                                 <span className={`text-[10px] mt-0.5 ${formData.patchPieces === value ? 'text-emerald-600/70 dark:text-emerald-400/70' : 'text-muted-foreground'}`}>{sub}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Relic sub-details — shown when the "Relic / Jersey" attribute is
+                        selected in the Card Variant / Finish section (Attributes group). */}
+                    {formData.variant.includes('Relic / Jersey') && (
+                      <div className="mt-3 p-4 rounded-xl border-2 border-amber-400/30 bg-amber-400/5 space-y-4 animate-in fade-in slide-in-from-top-1">
+                        <p className="text-xs font-extrabold uppercase tracking-widest text-amber-700 dark:text-amber-400">Relic Details</p>
+
+                        {/* Relic material */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Relic Material</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { value: 'jersey',  label: 'Jersey / Swatch', desc: 'Single-colour fabric swatch from a uniform' },
+                              { value: 'bat',     label: 'Bat',             desc: 'A piece of wood from a game-used bat' },
+                              { value: 'ball',    label: 'Ball',            desc: 'Leather from a game-used ball' },
+                              { value: 'glove',   label: 'Glove',           desc: 'Material from a fielding glove or mitt' },
+                              { value: 'cleat',   label: 'Cleat / Shoe',    desc: 'A piece of a game-worn cleat or shoe' },
+                              { value: 'base',    label: 'Base',            desc: 'A swatch from a game-used base' },
+                              { value: 'cap',     label: 'Cap / Hat',       desc: "Fabric from a player's cap or helmet" },
+                              { value: 'pylon',   label: 'Pylon',           desc: 'A piece of a game-used end-zone pylon' },
+                              { value: 'net',     label: 'Net',             desc: 'A strand from a game-used basketball net' },
+                              { value: 'stadium', label: 'Stadium / Seat',  desc: 'Material from the ballpark or arena' },
+                              { value: 'dirt',    label: 'Dirt / Soil',     desc: 'Playing-surface dirt from a specific venue' },
+                              { value: 'other',   label: 'Other',           desc: 'Another type of game-used material' },
+                            ].map(({ value, label, desc }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('relicMaterial', formData.relicMaterial === value ? '' : value)}
+                                className={`flex flex-col items-start px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
+                                  formData.relicMaterial === value
+                                    ? 'border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-400 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                }`}
+                              >
+                                <span className="font-bold text-xs">{label}</span>
+                                <span className={`text-[10px] mt-0.5 leading-tight ${formData.relicMaterial === value ? 'text-amber-600/70 dark:text-amber-400/70' : 'text-muted-foreground'}`}>{desc}</span>
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Collapsible relic guide */}
+                          <div className="rounded-xl border border-amber-400/25 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setShowRelicGuide(v => !v)}
+                              className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-amber-400/5 transition-colors"
+                            >
+                              <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400">Not sure? View relic guide</span>
+                              <ChevronDown className={`h-3.5 w-3.5 text-amber-600 dark:text-amber-400 transition-transform duration-200 ${showRelicGuide ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showRelicGuide && (
+                              <div className="px-3 pb-3 divide-y divide-border/40">
+                                {[
+                                  {
+                                    title: 'Jersey / Swatch',
+                                    badge: 'Common',
+                                    badgeClass: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20',
+                                    body: 'A swatch of fabric from a uniform — the most common relic. Plain single-colour swatches are standard; multi-colour pieces with logos, numbers, or seams are classified as Patches and carry far higher value.',
+                                  },
+                                  {
+                                    title: 'Bat',
+                                    badge: 'Popular',
+                                    badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20',
+                                    body: 'A fragment of wood from a game-used bat. Highly popular for its direct connection to the player at the plate. Nameplate or barrel pieces are the most desirable.',
+                                  },
+                                  {
+                                    title: 'Ball & Base',
+                                    badge: 'Premium',
+                                    badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20',
+                                    body: 'Leather from a game-used ball or a swatch from a base. Often tied to a specific game or milestone, which can add a meaningful provenance premium.',
+                                  },
+                                  {
+                                    title: 'Glove, Cleat & Cap',
+                                    badge: 'Less Common',
+                                    badgeClass: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20',
+                                    body: 'Material from a glove, cleat/shoe, or cap. Less frequently produced than jersey swatches, which can make them a unique and collectible addition.',
+                                  },
+                                  {
+                                    title: 'Stadium, Dirt & Unusual',
+                                    badge: 'Novelty',
+                                    badgeClass: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-500/20',
+                                    body: 'Pieces of the playing surface, seats, pylons, nets, or even venue dirt. These novelty relics connect the card to a place or event rather than directly to the player.',
+                                  },
+                                  {
+                                    title: 'Game-Used vs Player-Worn',
+                                    badge: 'Value Driver',
+                                    badgeClass: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20',
+                                    body: 'Always check the card back. Game-Used material saw action in an official game and commands the highest premium. Player-Worn was worn off-field (e.g. a photo shoot) and is worth less. Event-Used comes from a specific event, while Manufactured pieces were never worn at all.',
+                                  },
+                                ].map(({ title, badge, badgeClass, body }) => (
+                                  <div key={title} className="py-2.5 first:pt-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-[11px] font-bold text-foreground">{title}</span>
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${badgeClass}`}>{badge}</span>
+                                    </div>
+                                    <p className="text-[10px] leading-relaxed text-muted-foreground">{body}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Relic source / authenticity */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Source</Label>
+                          <div className="flex gap-2">
+                            {[
+                              { value: 'game_used',    label: 'Game-Used',    sub: 'Used in a game' },
+                              { value: 'player_worn',  label: 'Player-Worn',  sub: 'Worn off-field' },
+                              { value: 'event_used',   label: 'Event-Used',   sub: 'From an event' },
+                              { value: 'manufactured', label: 'Manufactured', sub: 'Never worn' },
+                            ].map(({ value, label, sub }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('relicSource', formData.relicSource === value ? '' : value)}
+                                className={`flex-1 flex flex-col items-center px-2 py-2.5 rounded-xl border-2 text-center transition-all ${
+                                  formData.relicSource === value
+                                    ? 'border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-400 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                }`}
+                              >
+                                <span className="font-bold text-sm">{label}</span>
+                                <span className={`text-[10px] mt-0.5 ${formData.relicSource === value ? 'text-amber-600/70 dark:text-amber-400/70' : 'text-muted-foreground'}`}>{sub}</span>
                               </button>
                             ))}
                           </div>
