@@ -173,6 +173,12 @@ const HomePage = () => {
     CATEGORIES[(deskStart + i) % total]
   );
 
+  const [tickerIdx, setTickerIdx] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTickerIdx(i => (i + 1) % ACTIVITY_FEED.length), 4000);
+    return () => clearInterval(id);
+  }, []);
+
   const statsRef   = useRef(null);
   const statsInView = useInView(statsRef, { once: true, margin: '-80px' });
 
@@ -427,26 +433,23 @@ const HomePage = () => {
 
         {/* ── Live price ticker strip at hero bottom ── */}
         <div className="absolute bottom-0 left-0 right-0 overflow-hidden border-t" style={{ borderColor: 'rgba(255,255,255,0.07)', background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(12px)' }}>
-          <div className="py-2.5 relative">
-            {/* Fade edges */}
-            <div className="absolute left-0 top-0 bottom-0 w-16 z-10 pointer-events-none" style={{ background: 'linear-gradient(90deg, rgba(0,0,0,0.8), transparent)' }} />
-            <div className="absolute right-0 top-0 bottom-0 w-16 z-10 pointer-events-none" style={{ background: 'linear-gradient(-90deg, rgba(0,0,0,0.8), transparent)' }} />
-
-            <div
-              className="flex gap-8 w-max"
-              style={{ animation: 'price-ticker 35s linear infinite' }}
-            >
-              {[...ACTIVITY_FEED, ...ACTIVITY_FEED].map((item, i) => (
-                <div key={i} className="flex-shrink-0 flex items-center gap-2 text-xs">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
-                  <span className="font-bold text-zinc-200">{item.user}</span>
-                  <span className="text-zinc-500">{item.action}</span>
-                  <span className="font-black text-yellow-400">{item.price}</span>
-                  <span className="text-zinc-600">{item.time}</span>
-                  <span className="text-zinc-700 mx-2">·</span>
-                </div>
-              ))}
-            </div>
+          <div className="py-2.5 px-6 flex items-center justify-center" style={{ height: '32px' }}>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={tickerIdx}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.4 }}
+                className="flex items-center gap-2 text-xs"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0 animate-pulse" />
+                <span className="font-bold text-zinc-200">{ACTIVITY_FEED[tickerIdx].user}</span>
+                <span className="text-zinc-500">{ACTIVITY_FEED[tickerIdx].action}</span>
+                <span className="font-black text-yellow-400">{ACTIVITY_FEED[tickerIdx].price}</span>
+                <span className="text-zinc-600">{ACTIVITY_FEED[tickerIdx].time}</span>
+              </motion.div>
+            </AnimatePresence>
           </div>
         </div>
       </section>
