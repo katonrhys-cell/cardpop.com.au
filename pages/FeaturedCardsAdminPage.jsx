@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Helmet } from 'react-helmet';
 import { toast } from 'sonner';
-import { Search, Loader2, ImageOff } from 'lucide-react';
+import { Search, Loader2, ImageOff, Star } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 
 const FeaturedCardsAdminPage = () => {
   const [cards, setCards] = useState([]);
@@ -74,18 +75,18 @@ const FeaturedCardsAdminPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground py-12">
+    <div className="space-y-6 max-w-7xl">
       <Helmet>
         <title>Admin - Manage Featured Cards | CardPop</title>
       </Helmet>
-      
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight mb-2">Featured Cards Management</h1>
-          <p className="text-muted-foreground">Search and toggle which cards appear in the featured sections on the homepage.</p>
-        </div>
 
-        <div className="bg-card border border-border rounded-3xl shadow-sm overflow-hidden flex flex-col">
+      <AdminPageHeader
+        icon={Star}
+        title="Featured Cards Management"
+        subtitle="Search and toggle which cards appear in the featured sections on the homepage."
+      />
+
+      <div className="bg-card border border-border rounded-3xl shadow-sm overflow-hidden flex flex-col">
           {/* Controls Bar */}
           <div className="p-6 border-b border-border bg-card flex flex-col sm:flex-row gap-4 items-center justify-between">
             <div className="relative w-full sm:max-w-md">
@@ -193,7 +194,6 @@ const FeaturedCardsAdminPage = () => {
             <span className="hidden sm:inline">Toggle the switch to feature or unfeature a card.</span>
           </div>
         </div>
-      </div>
     </div>
   );
 };
