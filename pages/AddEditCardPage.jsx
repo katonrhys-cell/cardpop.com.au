@@ -85,6 +85,10 @@ const AddEditCardPage = () => {
   const [photoQuality, setPhotoQuality]       = useState(null);
   const [checkingQuality, setCheckingQuality] = useState(false);
   const [showAutoGuide, setShowAutoGuide]     = useState(false);
+  const [showPatchGuide, setShowPatchGuide]   = useState(false);
+  const [showRelicGuide, setShowRelicGuide]   = useState(false);
+  const [showNumberGuide, setShowNumberGuide] = useState(false);
+  const [showSpGuide, setShowSpGuide]         = useState(false);
 
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
@@ -108,6 +112,14 @@ const AddEditCardPage = () => {
     isAuto:         false,
     autoType:       '',
     autoSigners:    1,
+    patchType:      '',
+    patchPieces:    1,
+    relicMaterial:  '',
+    relicSource:    '',
+    serialPosition: '',
+    serialPrintRun: '',
+    spVariation:    '',
+    spTier:         '',
     // Grading
     gradingCompany: 'raw',
     grade:          '',
@@ -226,6 +238,14 @@ const AddEditCardPage = () => {
           isAuto:         card.is_auto        ?? false,
           autoType:       card.auto_type      || '',
           autoSigners:    card.auto_signers   ?? 1,
+          patchType:      card.patch_type     || '',
+          patchPieces:    card.patch_pieces   ?? 1,
+          relicMaterial:  card.relic_material || '',
+          relicSource:    card.relic_source   || '',
+          serialPosition: card.serial_position  != null ? String(card.serial_position)  : '',
+          serialPrintRun: card.serial_print_run != null ? String(card.serial_print_run) : '',
+          spVariation:    card.sp_variation    || '',
+          spTier:         card.sp_tier         || '',
           gradingCompany: card.grading_company || 'raw',
           grade:          card.grade          || '',
           certNumber:     card.cert_number    || '',
@@ -418,8 +438,16 @@ const AddEditCardPage = () => {
         is_refractor:        formData.isRefractor,
         serial_number:       formData.serialNumber?.trim() || null,
         is_auto:             formData.isAuto,
-        auto_type:           formData.isAuto ? (formData.autoType || null) : null,
-        auto_signers:        formData.isAuto ? (formData.autoSigners || 1) : null,
+        auto_type:           formData.variant.includes('Auto') ? (formData.autoType || null) : null,
+        auto_signers:        formData.variant.includes('Auto') ? (formData.autoSigners || 1) : null,
+        patch_type:          formData.variant.includes('Patch') ? (formData.patchType || null) : null,
+        patch_pieces:        formData.variant.includes('Patch') ? (formData.patchPieces || 1) : null,
+        relic_material:      formData.variant.includes('Relic / Jersey') ? (formData.relicMaterial || null) : null,
+        relic_source:        formData.variant.includes('Relic / Jersey') ? (formData.relicSource || null) : null,
+        serial_position:     formData.variant.includes('Numbered') && formData.serialPosition ? (parseInt(formData.serialPosition, 10) || null) : null,
+        serial_print_run:    formData.variant.includes('Numbered') && formData.serialPrintRun ? (parseInt(formData.serialPrintRun, 10) || null) : null,
+        sp_variation:        formData.variant.includes('Short Print (SP)') ? (formData.spVariation || null) : null,
+        sp_tier:             formData.variant.includes('Short Print (SP)') ? (formData.spTier || null) : null,
         grading_company:     formData.gradingCompany,
         grade:               isGraded ? (formData.grade?.trim() || null) : null,
         cert_number:         isGraded ? (formData.certNumber?.trim() || null) : null,
@@ -956,8 +984,9 @@ const AddEditCardPage = () => {
                       </div>
                     </div>
 
-                    {/* Auto sub-details — shown when Auto is toggled on */}
-                    {formData.isAuto && (
+                    {/* Auto sub-details — shown when the "Auto" attribute is selected
+                        in the Card Variant / Finish section (the Attributes group). */}
+                    {formData.variant.includes('Auto') && (
                       <div className="mt-3 p-4 rounded-xl border-2 border-blue-400/30 bg-blue-400/5 space-y-4 animate-in fade-in slide-in-from-top-1">
                         <p className="text-xs font-extrabold uppercase tracking-widest text-blue-700 dark:text-blue-400">Autograph Details</p>
 
@@ -1081,6 +1110,547 @@ const AddEditCardPage = () => {
                               >
                                 <span className="font-bold text-sm">{label}</span>
                                 <span className={`text-[10px] mt-0.5 ${formData.autoSigners === value ? 'text-blue-600/70 dark:text-blue-400/70' : 'text-muted-foreground'}`}>{sub}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Patch sub-details — shown when the "Patch" attribute is selected
+                        in the Card Variant / Finish section (the Attributes group). */}
+                    {formData.variant.includes('Patch') && (
+                      <div className="mt-3 p-4 rounded-xl border-2 border-emerald-400/30 bg-emerald-400/5 space-y-4 animate-in fade-in slide-in-from-top-1">
+                        <p className="text-xs font-extrabold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">Patch Details</p>
+
+                        {/* Patch type */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Patch Type</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { value: 'game_used',    label: 'Game-Used',          desc: 'Swatch from a jersey or gear worn in an official game' },
+                              { value: 'player_worn',  label: 'Player-Worn',        desc: 'Worn by the player off-field, not during a game' },
+                              { value: 'event_worn',   label: 'Event-Worn',         desc: 'Worn at a league event like the Rookie Premiere' },
+                              { value: 'rookie_patch', label: 'Rookie Patch Auto',  desc: 'Rookie card pairing a patch with an autograph (RPA)' },
+                              { value: 'prime',        label: 'Prime / Multi-Colour', desc: 'Premium patch showing logos, stripes or seams' },
+                              { value: 'laundry_tag',  label: 'Laundry Tag',        desc: 'Care tag cut from the jersey — usually a 1/1' },
+                              { value: 'nameplate',    label: 'Nameplate Letter',   desc: "A letter cut from the player's jersey nameplate" },
+                              { value: 'manufactured', label: 'Manufactured',       desc: 'Made by the manufacturer — never actually worn' },
+                            ].map(({ value, label, desc }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('patchType', formData.patchType === value ? '' : value)}
+                                className={`flex flex-col items-start px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
+                                  formData.patchType === value
+                                    ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                }`}
+                              >
+                                <span className="font-bold text-xs">{label}</span>
+                                <span className={`text-[10px] mt-0.5 leading-tight ${formData.patchType === value ? 'text-emerald-600/70 dark:text-emerald-400/70' : 'text-muted-foreground'}`}>{desc}</span>
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Collapsible patch type guide */}
+                          <div className="rounded-xl border border-emerald-400/25 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setShowPatchGuide(v => !v)}
+                              className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-emerald-400/5 transition-colors"
+                            >
+                              <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">Not sure which type? View guide</span>
+                              <ChevronDown className={`h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 transition-transform duration-200 ${showPatchGuide ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showPatchGuide && (
+                              <div className="px-3 pb-3 divide-y divide-border/40">
+                                {[
+                                  {
+                                    title: 'Game-Used Memorabilia',
+                                    badge: 'Authentic',
+                                    badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20',
+                                    body: 'A swatch cut from a jersey, glove, base, or other equipment actually worn or used by the player during an official game. Plain single-colour swatches are common, while multi-colour pieces showing seams or stripes command a premium.',
+                                  },
+                                  {
+                                    title: 'Player-Worn',
+                                    badge: 'Common',
+                                    badgeClass: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20',
+                                    body: 'Material worn by the player but not during a game — typically at a photo shoot or promotional appearance. Authentic to the player, but generally valued lower than true game-used pieces.',
+                                  },
+                                  {
+                                    title: 'Event-Worn',
+                                    badge: 'Premium',
+                                    badgeClass: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-500/20',
+                                    body: 'Worn at a specific league event such as the Rookie Premiere, Combine, or All-Star festivities. These jerseys are the source of many sought-after rookie patch cards.',
+                                  },
+                                  {
+                                    title: 'Rookie Patch Auto (RPA)',
+                                    badge: 'Grail',
+                                    badgeClass: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20',
+                                    body: "A rookie card that combines a memorabilia patch with the player's autograph. RPAs are among the most coveted and valuable modern cards, especially when serial-numbered or featuring a multi-colour prime patch.",
+                                  },
+                                  {
+                                    title: 'Prime Patch',
+                                    badge: 'High Value',
+                                    badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20',
+                                    body: 'A patch piece containing premium detail — team logos, jersey numbers, stripes, or seams — rather than a plain single colour. Prime patches are far rarer and significantly more valuable than standard swatches.',
+                                  },
+                                  {
+                                    title: 'Laundry Tag',
+                                    badge: '1/1',
+                                    badgeClass: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20',
+                                    body: 'The small care/wash tag sewn into a jersey. Because each jersey has only one, laundry-tag cards are typically unique 1/1s and are extremely rare and desirable.',
+                                  },
+                                  {
+                                    title: 'Nameplate Letter',
+                                    badge: 'Rare',
+                                    badgeClass: 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-500/20',
+                                    body: "A single letter cut from the player's jersey nameplate. The number of available cards is limited by the letters in the player's name, making these scarce and collectible.",
+                                  },
+                                  {
+                                    title: 'Manufactured / Commemorative',
+                                    badge: 'Decorative',
+                                    badgeClass: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20',
+                                    body: 'A patch created by the manufacturer — such as a commemorative logo, sleeve badge, or team crest — that was never actually worn. Visually striking but generally lower in collector value than worn memorabilia.',
+                                  },
+                                ].map(({ title, badge, badgeClass, body }) => (
+                                  <div key={title} className="py-2.5 first:pt-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-[11px] font-bold text-foreground">{title}</span>
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${badgeClass}`}>{badge}</span>
+                                    </div>
+                                    <p className="text-[10px] leading-relaxed text-muted-foreground">{body}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Number of memorabilia pieces */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Memorabilia Pieces</Label>
+                          <div className="flex gap-2">
+                            {[
+                              { value: 1, label: 'Single', sub: '1 swatch' },
+                              { value: 2, label: 'Dual',   sub: '2 swatches' },
+                              { value: 3, label: 'Triple', sub: '3 swatches' },
+                              { value: 4, label: 'Quad',   sub: '4+ swatches' },
+                            ].map(({ value, label, sub }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('patchPieces', value)}
+                                className={`flex-1 flex flex-col items-center px-2 py-2.5 rounded-xl border-2 text-center transition-all ${
+                                  formData.patchPieces === value
+                                    ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                }`}
+                              >
+                                <span className="font-bold text-sm">{label}</span>
+                                <span className={`text-[10px] mt-0.5 ${formData.patchPieces === value ? 'text-emerald-600/70 dark:text-emerald-400/70' : 'text-muted-foreground'}`}>{sub}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Relic sub-details — shown when the "Relic / Jersey" attribute is
+                        selected in the Card Variant / Finish section (Attributes group). */}
+                    {formData.variant.includes('Relic / Jersey') && (
+                      <div className="mt-3 p-4 rounded-xl border-2 border-amber-400/30 bg-amber-400/5 space-y-4 animate-in fade-in slide-in-from-top-1">
+                        <p className="text-xs font-extrabold uppercase tracking-widest text-amber-700 dark:text-amber-400">Relic Details</p>
+
+                        {/* Relic material */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Relic Material</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { value: 'jersey',  label: 'Jersey / Swatch', desc: 'Single-colour fabric swatch from a uniform' },
+                              { value: 'bat',     label: 'Bat',             desc: 'A piece of wood from a game-used bat' },
+                              { value: 'ball',    label: 'Ball',            desc: 'Leather from a game-used ball' },
+                              { value: 'glove',   label: 'Glove',           desc: 'Material from a fielding glove or mitt' },
+                              { value: 'cleat',   label: 'Cleat / Shoe',    desc: 'A piece of a game-worn cleat or shoe' },
+                              { value: 'base',    label: 'Base',            desc: 'A swatch from a game-used base' },
+                              { value: 'cap',     label: 'Cap / Hat',       desc: "Fabric from a player's cap or helmet" },
+                              { value: 'pylon',   label: 'Pylon',           desc: 'A piece of a game-used end-zone pylon' },
+                              { value: 'net',     label: 'Net',             desc: 'A strand from a game-used basketball net' },
+                              { value: 'stadium', label: 'Stadium / Seat',  desc: 'Material from the ballpark or arena' },
+                              { value: 'dirt',    label: 'Dirt / Soil',     desc: 'Playing-surface dirt from a specific venue' },
+                              { value: 'other',   label: 'Other',           desc: 'Another type of game-used material' },
+                            ].map(({ value, label, desc }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('relicMaterial', formData.relicMaterial === value ? '' : value)}
+                                className={`flex flex-col items-start px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
+                                  formData.relicMaterial === value
+                                    ? 'border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-400 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                }`}
+                              >
+                                <span className="font-bold text-xs">{label}</span>
+                                <span className={`text-[10px] mt-0.5 leading-tight ${formData.relicMaterial === value ? 'text-amber-600/70 dark:text-amber-400/70' : 'text-muted-foreground'}`}>{desc}</span>
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Collapsible relic guide */}
+                          <div className="rounded-xl border border-amber-400/25 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setShowRelicGuide(v => !v)}
+                              className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-amber-400/5 transition-colors"
+                            >
+                              <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400">Not sure? View relic guide</span>
+                              <ChevronDown className={`h-3.5 w-3.5 text-amber-600 dark:text-amber-400 transition-transform duration-200 ${showRelicGuide ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showRelicGuide && (
+                              <div className="px-3 pb-3 divide-y divide-border/40">
+                                {[
+                                  {
+                                    title: 'Jersey / Swatch',
+                                    badge: 'Common',
+                                    badgeClass: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20',
+                                    body: 'A swatch of fabric from a uniform — the most common relic. Plain single-colour swatches are standard; multi-colour pieces with logos, numbers, or seams are classified as Patches and carry far higher value.',
+                                  },
+                                  {
+                                    title: 'Bat',
+                                    badge: 'Popular',
+                                    badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20',
+                                    body: 'A fragment of wood from a game-used bat. Highly popular for its direct connection to the player at the plate. Nameplate or barrel pieces are the most desirable.',
+                                  },
+                                  {
+                                    title: 'Ball & Base',
+                                    badge: 'Premium',
+                                    badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20',
+                                    body: 'Leather from a game-used ball or a swatch from a base. Often tied to a specific game or milestone, which can add a meaningful provenance premium.',
+                                  },
+                                  {
+                                    title: 'Glove, Cleat & Cap',
+                                    badge: 'Less Common',
+                                    badgeClass: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20',
+                                    body: 'Material from a glove, cleat/shoe, or cap. Less frequently produced than jersey swatches, which can make them a unique and collectible addition.',
+                                  },
+                                  {
+                                    title: 'Stadium, Dirt & Unusual',
+                                    badge: 'Novelty',
+                                    badgeClass: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-500/20',
+                                    body: 'Pieces of the playing surface, seats, pylons, nets, or even venue dirt. These novelty relics connect the card to a place or event rather than directly to the player.',
+                                  },
+                                  {
+                                    title: 'Game-Used vs Player-Worn',
+                                    badge: 'Value Driver',
+                                    badgeClass: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20',
+                                    body: 'Always check the card back. Game-Used material saw action in an official game and commands the highest premium. Player-Worn was worn off-field (e.g. a photo shoot) and is worth less. Event-Used comes from a specific event, while Manufactured pieces were never worn at all.',
+                                  },
+                                ].map(({ title, badge, badgeClass, body }) => (
+                                  <div key={title} className="py-2.5 first:pt-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-[11px] font-bold text-foreground">{title}</span>
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${badgeClass}`}>{badge}</span>
+                                    </div>
+                                    <p className="text-[10px] leading-relaxed text-muted-foreground">{body}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Relic source / authenticity */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Source</Label>
+                          <div className="flex gap-2">
+                            {[
+                              { value: 'game_used',    label: 'Game-Used',    sub: 'Used in a game' },
+                              { value: 'player_worn',  label: 'Player-Worn',  sub: 'Worn off-field' },
+                              { value: 'event_used',   label: 'Event-Used',   sub: 'From an event' },
+                              { value: 'manufactured', label: 'Manufactured', sub: 'Never worn' },
+                            ].map(({ value, label, sub }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('relicSource', formData.relicSource === value ? '' : value)}
+                                className={`flex-1 flex flex-col items-center px-2 py-2.5 rounded-xl border-2 text-center transition-all ${
+                                  formData.relicSource === value
+                                    ? 'border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-400 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                }`}
+                              >
+                                <span className="font-bold text-sm">{label}</span>
+                                <span className={`text-[10px] mt-0.5 ${formData.relicSource === value ? 'text-amber-600/70 dark:text-amber-400/70' : 'text-muted-foreground'}`}>{sub}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Numbering sub-details — shown when the "Numbered" attribute is
+                        selected in the Card Variant / Finish section (Attributes group). */}
+                    {formData.variant.includes('Numbered') && (
+                      <div className="mt-3 p-4 rounded-xl border-2 border-violet-400/30 bg-violet-400/5 space-y-4 animate-in fade-in slide-in-from-top-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-extrabold uppercase tracking-widest text-violet-700 dark:text-violet-400">Numbering Details</p>
+                          {formData.serialPrintRun === '1' && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-500/15 text-violet-700 dark:text-violet-400 border border-violet-500/30">
+                              ★ One-of-One (1/1)
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Serial number — position / print run */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Serial Number</Label>
+                          <div className="flex items-end gap-2">
+                            <div className="flex-1 space-y-1">
+                              <span className="text-[10px] text-muted-foreground font-medium">Card #</span>
+                              <Input
+                                type="number"
+                                min={1}
+                                inputMode="numeric"
+                                placeholder="e.g. 23"
+                                value={formData.serialPosition}
+                                onChange={e => {
+                                  const v = e.target.value;
+                                  setFormData(f => ({
+                                    ...f,
+                                    serialPosition: v,
+                                    serialNumber: v && f.serialPrintRun ? `${v}/${f.serialPrintRun}` : f.serialNumber,
+                                  }));
+                                }}
+                                className="h-10 bg-background text-center"
+                              />
+                            </div>
+                            <span className="pb-2.5 text-lg font-bold text-muted-foreground">/</span>
+                            <div className="flex-1 space-y-1">
+                              <span className="text-[10px] text-muted-foreground font-medium">Print run</span>
+                              <Input
+                                type="number"
+                                min={1}
+                                inputMode="numeric"
+                                placeholder="e.g. 99"
+                                value={formData.serialPrintRun}
+                                onChange={e => {
+                                  const v = e.target.value;
+                                  setFormData(f => ({
+                                    ...f,
+                                    serialPrintRun: v,
+                                    serialNumber: f.serialPosition && v ? `${f.serialPosition}/${v}` : f.serialNumber,
+                                  }));
+                                }}
+                                className="h-10 bg-background text-center"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Quick-pick common print runs */}
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {[1, 5, 10, 25, 50, 75, 99, 150, 199, 299].map(run => {
+                              const active = formData.serialPrintRun === String(run);
+                              return (
+                                <button
+                                  key={run}
+                                  type="button"
+                                  onClick={() => setFormData(f => ({
+                                    ...f,
+                                    serialPrintRun: String(run),
+                                    serialNumber: f.serialPosition ? `${f.serialPosition}/${run}` : f.serialNumber,
+                                  }))}
+                                  className={`px-2.5 py-1 rounded-full border text-[11px] font-bold transition-all ${
+                                    active
+                                      ? 'border-violet-500 bg-violet-500/10 text-violet-700 dark:text-violet-400 shadow-sm'
+                                      : 'border-border bg-background text-foreground hover:border-muted-foreground/40'
+                                  }`}
+                                >
+                                  {run === 1 ? '1/1' : `/${run}`}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          <p className="text-[10px] text-muted-foreground leading-relaxed">
+                            Tip: if the card number matches the player's jersey number (e.g. 27/99 for a #27 player),
+                            it's a <span className="font-semibold text-foreground">jersey-number card</span> and usually sells at a premium.
+                          </p>
+
+                          {/* Collapsible numbering guide */}
+                          <div className="rounded-xl border border-violet-400/25 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setShowNumberGuide(v => !v)}
+                              className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-violet-400/5 transition-colors"
+                            >
+                              <span className="text-[11px] font-bold text-violet-700 dark:text-violet-400">How does numbering work? View guide</span>
+                              <ChevronDown className={`h-3.5 w-3.5 text-violet-600 dark:text-violet-400 transition-transform duration-200 ${showNumberGuide ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showNumberGuide && (
+                              <div className="px-3 pb-3 divide-y divide-border/40">
+                                {[
+                                  {
+                                    title: 'Reading a Serial Number',
+                                    badge: 'Basics',
+                                    badgeClass: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20',
+                                    body: 'Stamped as 23/99: the second number is the total print run (only 99 copies exist in the world), and the first is this specific copy. The smaller the print run, the rarer the card.',
+                                  },
+                                  {
+                                    title: 'One-of-One (1/1)',
+                                    badge: 'Rarest',
+                                    badgeClass: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-500/20',
+                                    body: 'Only a single copy exists. 1/1s are the most coveted parallels in the hobby and can command enormous premiums — often many times the value of any other version of the card.',
+                                  },
+                                  {
+                                    title: 'Jersey-Number Card',
+                                    badge: 'Premium',
+                                    badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20',
+                                    body: "When the card number matches the player's jersey number (e.g. 27/99 for a player who wears #27), collectors typically pay a 20–50% premium over other copies in the same run.",
+                                  },
+                                  {
+                                    title: 'Print Run & Value',
+                                    badge: 'Rarity',
+                                    badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20',
+                                    body: 'Value rises sharply as the run shrinks. Coloured parallels are often tiered — e.g. /299, /199, /99, /25, /10, down to a 1/1 — with each lower tier significantly scarcer and more valuable.',
+                                  },
+                                  {
+                                    title: 'First Off The Line (FOTL)',
+                                    badge: 'Special',
+                                    badgeClass: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20',
+                                    body: 'Some products release a small allotment early as "First Off The Line". These FOTL copies — and low positions like the first card printed — can carry extra collector cachet.',
+                                  },
+                                ].map(({ title, badge, badgeClass, body }) => (
+                                  <div key={title} className="py-2.5 first:pt-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-[11px] font-bold text-foreground">{title}</span>
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${badgeClass}`}>{badge}</span>
+                                    </div>
+                                    <p className="text-[10px] leading-relaxed text-muted-foreground">{body}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Short-print sub-details — shown when the "Short Print (SP)" attribute
+                        is selected in the Card Variant / Finish section (Attributes group). */}
+                    {formData.variant.includes('Short Print (SP)') && (
+                      <div className="mt-3 p-4 rounded-xl border-2 border-rose-400/30 bg-rose-400/5 space-y-4 animate-in fade-in slide-in-from-top-1">
+                        <p className="text-xs font-extrabold uppercase tracking-widest text-rose-700 dark:text-rose-400">Short Print Details</p>
+
+                        {/* Variation type */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Variation Type</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { value: 'photo',       label: 'Photo Variation',  desc: 'A completely different photo from the base card' },
+                              { value: 'image',       label: 'Image Variation',  desc: 'Alternate crop or background of the same shot' },
+                              { value: 'jersey',      label: 'Jersey / Colour',  desc: 'Different uniform or colour from the base' },
+                              { value: 'throwback',   label: 'Throwback',        desc: 'Retro or alternate-era uniform' },
+                              { value: 'celebration', label: 'Celebration',      desc: 'Candid or celebration moment' },
+                              { value: 'nickname',    label: 'Nickname / Name',  desc: 'Nickname instead of the given name' },
+                              { value: 'logo',        label: 'Logo / Mascot',    desc: 'Team logo or mascot variation' },
+                              { value: 'sp_base',     label: 'Short-Printed Base', desc: 'Same design, simply printed in lower quantity' },
+                              { value: 'other',       label: 'Other',            desc: 'Another short-print variation' },
+                            ].map(({ value, label, desc }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('spVariation', formData.spVariation === value ? '' : value)}
+                                className={`flex flex-col items-start px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
+                                  formData.spVariation === value
+                                    ? 'border-rose-500 bg-rose-500/10 text-rose-700 dark:text-rose-400 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                }`}
+                              >
+                                <span className="font-bold text-xs">{label}</span>
+                                <span className={`text-[10px] mt-0.5 leading-tight ${formData.spVariation === value ? 'text-rose-600/70 dark:text-rose-400/70' : 'text-muted-foreground'}`}>{desc}</span>
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Collapsible short-print guide */}
+                          <div className="rounded-xl border border-rose-400/25 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setShowSpGuide(v => !v)}
+                              className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-rose-400/5 transition-colors"
+                            >
+                              <span className="text-[11px] font-bold text-rose-700 dark:text-rose-400">What is a short print? View guide</span>
+                              <ChevronDown className={`h-3.5 w-3.5 text-rose-600 dark:text-rose-400 transition-transform duration-200 ${showSpGuide ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showSpGuide && (
+                              <div className="px-3 pb-3 divide-y divide-border/40">
+                                {[
+                                  {
+                                    title: 'Short Print (SP)',
+                                    badge: 'Scarce',
+                                    badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20',
+                                    body: 'A card deliberately printed in lower quantities than the standard base cards in the set. SPs are harder to pull and carry a premium, even when they are not serial-numbered.',
+                                  },
+                                  {
+                                    title: 'Super Short Print (SSP)',
+                                    badge: 'Very Rare',
+                                    badgeClass: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20',
+                                    body: 'Rarer still than an SP — typically fewer than ~100 copies produced. SSPs are among the toughest non-numbered cards to find and are highly sought after.',
+                                  },
+                                  {
+                                    title: 'Photo / Image Variation',
+                                    badge: 'Collector Favourite',
+                                    badgeClass: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-500/20',
+                                    body: 'Unlike parallels (same image, different finish), short-print variations use a completely different photo — a candid dugout shot, a celebration, an alternate jersey, or a nickname nameplate.',
+                                  },
+                                  {
+                                    title: 'How to Identify One',
+                                    badge: 'How To',
+                                    badgeClass: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20',
+                                    body: 'Turn the card over and check the small code on the back — the last few digits often reveal whether a card is a base, SP, or SSP. Comparing the front photo to the known base card also helps.',
+                                  },
+                                  {
+                                    title: 'Scarcity Hierarchy',
+                                    badge: 'Rarity',
+                                    badgeClass: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20',
+                                    body: 'From most common to rarest: Base → SP → SSP → Ultra / Case Hit. The scarcer the tier, the stronger the premium over the base card.',
+                                  },
+                                ].map(({ title, badge, badgeClass, body }) => (
+                                  <div key={title} className="py-2.5 first:pt-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-[11px] font-bold text-foreground">{title}</span>
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${badgeClass}`}>{badge}</span>
+                                    </div>
+                                    <p className="text-[10px] leading-relaxed text-muted-foreground">{body}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Scarcity tier */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Scarcity Tier</Label>
+                          <div className="flex gap-2">
+                            {[
+                              { value: 'sp',    label: 'SP',    sub: 'Short Print' },
+                              { value: 'ssp',   label: 'SSP',   sub: 'Super Short Print' },
+                              { value: 'ultra', label: 'Ultra', sub: 'Case Hit' },
+                            ].map(({ value, label, sub }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('spTier', formData.spTier === value ? '' : value)}
+                                className={`flex-1 flex flex-col items-center px-2 py-2.5 rounded-xl border-2 text-center transition-all ${
+                                  formData.spTier === value
+                                    ? 'border-rose-500 bg-rose-500/10 text-rose-700 dark:text-rose-400 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                }`}
+                              >
+                                <span className="font-bold text-sm">{label}</span>
+                                <span className={`text-[10px] mt-0.5 ${formData.spTier === value ? 'text-rose-600/70 dark:text-rose-400/70' : 'text-muted-foreground'}`}>{sub}</span>
                               </button>
                             ))}
                           </div>
