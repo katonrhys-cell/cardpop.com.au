@@ -47,23 +47,27 @@ router.post('/verify', authMiddleware, mfaLimiter, async (req, res) => {
     .eq('mfa_id', mfaId)
     .single();
 
-  if (error || !mfaRecord) throw new Error('MFA session not found');
-  if (new Date() > new Date(mfaRecord.expires_at)) throw new Error('MFA code expired');
+  // Expected failures return proper status codes — never throw (which would
+  // surface as a 500 and, in non-prod, leak internals via the error handler).
+  if (error || !mfaRecord) return res.status(404).json({ error: 'MFA session not found' });
+  if (new Date() > new Date(mfaRecord.expires_at)) return res.status(400).json({ error: 'MFA code expired' });
 
   const decrypted = decrypt(mfaRecord.encrypted_otp);
-  if (decrypted.code !== code) throw new Error('Invalid MFA code');
+  if (decrypted.code !== code) return res.status(401).json({ error: 'Invalid MFA code' });
 
   const [profileResult, mfaResult] = await Promise.all([
     supabase.from('profiles').update({ mfa_enabled: true }).eq('id', mfaRecord.user_id),
     supabase.from('mfa_sessions').update({ verified: true }).eq('id', mfaRecord.id),
-    supabase.from('audit_logs').insert({
-      user_id: mfaRecord.user_id,
-      event_type: 'mfa_verified',
-      description: 'MFA verification successful',
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent'],
-    }).catch(() => {}),
   ]);
+
+  // Audit logging is best-effort and must not block or fail the request.
+  supabase.from('audit_logs').insert({
+    user_id: mfaRecord.user_id,
+    event_type: 'mfa_verified',
+    description: 'MFA verification successful',
+    ip_address: req.ip,
+    user_agent: req.headers['user-agent'],
+  }).catch(() => {});
 
   if (profileResult.error) throw profileResult.error;
   if (mfaResult.error) throw mfaResult.error;

@@ -93,17 +93,17 @@ describe('POST /verify', () => {
     expect(res.body.success).toBe(true);
   });
 
-  it('returns 500 when code is invalid or already used', async () => {
+  it('returns 401 when code is invalid or already used', async () => {
     mockSupabase.from.mockReturnValue(makeBuilder({ data: { backup_codes: ENCRYPTED_CODES }, error: null }));
     const res = await request(app).post('/verify').send({ code: 'CODE2' }); // CODE2 is used
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(401);
     expect(res.body.error).toMatch(/invalid or already used/i);
   });
 
-  it('returns 500 when no backup codes are stored', async () => {
+  it('returns 404 when no backup codes are stored', async () => {
     mockSupabase.from.mockReturnValue(makeBuilder({ data: { backup_codes: null }, error: null }));
     const res = await request(app).post('/verify').send({ code: 'CODE1' });
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(404);
     expect(res.body.error).toMatch(/no backup codes found/i);
   });
 });

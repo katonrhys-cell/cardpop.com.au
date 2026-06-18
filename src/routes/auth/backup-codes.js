@@ -38,11 +38,12 @@ router.post('/verify', authMiddleware, backupCodeLimiter, async (req, res) => {
     .single();
 
   if (error) throw error;
-  if (!profile?.backup_codes) throw new Error('No backup codes found');
+  // Expected failures return proper status codes rather than throwing (500/leak).
+  if (!profile?.backup_codes) return res.status(404).json({ error: 'No backup codes found' });
 
   const decrypted = decrypt(profile.backup_codes);
   const codeEntry = decrypted.codes.find(c => c.code === code && !c.used);
-  if (!codeEntry) throw new Error('Invalid or already used backup code');
+  if (!codeEntry) return res.status(401).json({ error: 'Invalid or already used backup code' });
 
   const updatedEncrypted = encrypt({
     codes: decrypted.codes.map(c => c.code === code ? { ...c, used: true } : c),
