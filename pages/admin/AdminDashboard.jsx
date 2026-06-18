@@ -65,7 +65,7 @@ const ManagementBox = ({ title, description, icon: Icon, link }) => (
 const AdminDashboard = () => {
   const { getSystemHealth, isAdmin } = useAdmin();
   const { currentUser } = useAuth();
-  const { buildNameMap, getCategories, getSubcategoriesByCategory, getBrandsBySubcategory, getSeriesByBrand } = useCategories();
+  const { buildNameMap, getCategories } = useCategories();
   
   const [stats, setStats] = useState({ users: 0, listings: 0, revenue: 0, activeTrades: 0 });
   const [health, setHealth] = useState(null);
@@ -82,15 +82,8 @@ const AdminDashboard = () => {
   // Category Filtering
   const [nameMap, setNameMap] = useState({});
   const [filterCat, setFilterCat] = useState('');
-  const [filterSub, setFilterSub] = useState('');
-  const [filterBrand, setFilterBrand] = useState('');
-  const [filterSeries, setFilterSeries] = useState('');
-  const [filterListingType, setFilterListingType] = useState('');
-  
+
   const [catOpts, setCatOpts] = useState([]);
-  const [subOpts, setSubOpts] = useState([]);
-  const [brandOpts, setBrandOpts] = useState([]);
-  const [seriesOpts, setSeriesOpts] = useState([]);
 
   const fetchRef = useRef(null);
 
@@ -104,22 +97,6 @@ const AdminDashboard = () => {
     };
     if (isAdmin) init();
   }, [buildNameMap, getCategories, isAdmin]);
-
-  // Cascade Filtering
-  useEffect(() => {
-    if (filterCat) getSubcategoriesByCategory(filterCat).then(setSubOpts);
-    else { setSubOpts([]); setFilterSub(''); }
-  }, [filterCat, getSubcategoriesByCategory]);
-
-  useEffect(() => {
-    if (filterSub) getBrandsBySubcategory(filterSub).then(setBrandOpts);
-    else { setBrandOpts([]); setFilterBrand(''); }
-  }, [filterSub, getBrandsBySubcategory]);
-
-  useEffect(() => {
-    if (filterBrand) getSeriesByBrand(filterBrand).then(setSeriesOpts);
-    else { setSeriesOpts([]); setFilterSeries(''); }
-  }, [filterBrand, getSeriesByBrand]);
 
   useEffect(() => {
     if (!isAdmin) { setLoading(false); return; }
@@ -171,14 +148,10 @@ const AdminDashboard = () => {
     fetchRef.current = run;
     run();
     return () => { cancelled = true; };
-  }, [isAdmin, getSystemHealth, filterCat, filterSub, filterBrand, filterSeries, filterListingType]);
+  }, [isAdmin, getSystemHealth, filterCat]);
 
   const clearFilters = () => {
     setFilterCat('');
-    setFilterSub('');
-    setFilterBrand('');
-    setFilterSeries('');
-    setFilterListingType('');
   };
 
   const handleEditStatus = (product) => {
@@ -293,41 +266,20 @@ const AdminDashboard = () => {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <CardTitle className="font-serif text-xl">User Vault Products Tracker</CardTitle>
-              <CardDescription>Filter community vault items by hierarchy category</CardDescription>
+              <CardDescription>Filter community vault items by category</CardDescription>
             </div>
             
             <div className="flex flex-wrap gap-2">
-              <Select value={filterListingType} onValueChange={setFilterListingType}>
-                <SelectTrigger className="w-[150px] bg-background text-xs h-9 rounded-lg"><SelectValue placeholder="Listing Status" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="For Sale">For Sale</SelectItem>
-                  <SelectItem value="For Trade">For Trade</SelectItem>
-                  <SelectItem value="For Sale & Trade">For Sale &amp; Trade</SelectItem>
-                  <SelectItem value="Private">Private</SelectItem>
-                </SelectContent>
-              </Select>
               <Select value={filterCat} onValueChange={setFilterCat}>
                 <SelectTrigger className="w-[140px] bg-background text-xs h-9 rounded-lg"><SelectValue placeholder="Category" /></SelectTrigger>
                 <SelectContent>{catOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
-              <Select value={filterSub} onValueChange={setFilterSub} disabled={!filterCat}>
-                <SelectTrigger className="w-[140px] bg-background text-xs h-9 rounded-lg"><SelectValue placeholder="Subcategory" /></SelectTrigger>
-                <SelectContent>{subOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-              </Select>
-              <Select value={filterBrand} onValueChange={setFilterBrand} disabled={!filterSub}>
-                <SelectTrigger className="w-[140px] bg-background text-xs h-9 rounded-lg"><SelectValue placeholder="Brand" /></SelectTrigger>
-                <SelectContent>{brandOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-              </Select>
-              <Select value={filterSeries} onValueChange={setFilterSeries} disabled={!filterBrand}>
-                <SelectTrigger className="w-[140px] bg-background text-xs h-9 rounded-lg"><SelectValue placeholder="Series" /></SelectTrigger>
-                <SelectContent>{seriesOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-              </Select>
-              {(filterListingType || filterCat || filterSub || filterBrand || filterSeries) && (
+              {filterCat && (
                 <Button variant="ghost" size="sm" onClick={clearFilters} className="h-9 px-2 text-muted-foreground"><X className="w-4 h-4" /></Button>
               )}
             </div>
           </div>
-          {(filterListingType || filterCat || filterSub || filterBrand || filterSeries) && (
+          {filterCat && (
              <div className="mt-2 text-sm font-bold text-primary bg-primary/5 inline-block px-3 py-1 rounded-md">
                {filteredCount} item{filteredCount !== 1 ? 's' : ''} match{filteredCount === 1 ? 'es' : ''} current filters
              </div>

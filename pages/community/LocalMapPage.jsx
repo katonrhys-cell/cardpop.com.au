@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -575,10 +576,10 @@ const LocalMapPage = () => {
             </p>
             <div className="flex flex-wrap gap-2">
               <Button asChild size="sm" variant="outline" className="rounded-xl text-xs font-bold gap-1.5">
-                <a href="/community/retailers"><Store className="w-3.5 h-3.5" /> List Your Store</a>
+                <Link to="/community/retailers"><Store className="w-3.5 h-3.5" /> List Your Store</Link>
               </Button>
               <Button asChild size="sm" variant="outline" className="rounded-xl text-xs font-bold gap-1.5">
-                <a href="/account/events"><Calendar className="w-3.5 h-3.5" /> Submit an Event</a>
+                <Link to="/account/events"><Calendar className="w-3.5 h-3.5" /> Submit an Event</Link>
               </Button>
             </div>
           </div>
