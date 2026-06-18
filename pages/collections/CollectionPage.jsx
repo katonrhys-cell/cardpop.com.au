@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -18,6 +18,7 @@ import { COLLECTION_CONFIGS, resolveCollectionSlug } from '@/data/collectionConf
 import { useCollectionEras } from '@/hooks/useCollectionEras.js';
 import { slugify } from '@/lib/slugify.js';
 import { CARD_VARIANTS } from '@/lib/cardVariants.js';
+import NotFoundPage from '@/pages/NotFoundPage.jsx';
 
 // ─── Hero floating icon animation ───────────────────────────────────────────
 const floatVariants = {
@@ -211,7 +212,6 @@ const PikachuIcon = ({ className }) => (
 // ═══════════════════════════════════════════════════════════════════════════════
 const CollectionPage = () => {
   const { collectionSlug: rawSlug } = useParams();
-  const navigate = useNavigate();
   const browseGridRef = useRef(null);
 
   // Resolve config
@@ -298,13 +298,6 @@ const CollectionPage = () => {
   const { getCategories, getSubcategoriesByCategory, getBrandsBySubcategory, getSeriesByBrand } = useCategories();
 
   const LISTINGS_PER_PAGE = 24;
-
-  // ─── Redirect to 404 if unknown slug ─────────────────────────────────────
-  useEffect(() => {
-    if (rawSlug && !config) {
-      navigate('/not-found', { replace: true });
-    }
-  }, [rawSlug, config, navigate]);
 
   // ─── Resolve categoryId from DB ───────────────────────────────────────────
   useEffect(() => {
@@ -534,6 +527,10 @@ const CollectionPage = () => {
 
   const textColor = heroTextDark ? 'text-gray-900' : 'text-white';
   const textMuted = heroTextDark ? 'text-gray-700' : 'text-white/80';
+
+  // Unknown collection slug → render the 404 in place (keeps the requested URL
+  // rather than redirecting to a fake /not-found path).
+  if (rawSlug && !config) return <NotFoundPage />;
 
   return (
     <>

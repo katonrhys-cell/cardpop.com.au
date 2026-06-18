@@ -17,6 +17,10 @@ const CardMarketDetailPage = () => {
 
   useEffect(() => {
     const fetchCardDetails = async () => {
+      // Reset on cardId change so the previous card's data/error doesn't show
+      // during the refetch.
+      setLoading(true);
+      setError(null);
       try {
         const response = await apiServerClient.fetch(`/ebay/card-details/${cardId}`);
         if (!response.ok) throw new Error('Failed to fetch card details');
