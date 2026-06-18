@@ -199,7 +199,7 @@ const AccountSecurity = () => {
         </CardHeader>
         <CardContent>
           <Button variant="outline" asChild>
-            <Link to="/account/change-password">Change Password</Link>
+            <Link to="/reset-password">Change Password</Link>
           </Button>
         </CardContent>
       </Card>

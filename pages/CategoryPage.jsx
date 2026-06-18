@@ -77,9 +77,9 @@ const CategoryPage = () => {
             <SelectValue placeholder="Sort by" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="-created">Newest First</SelectItem>
-            <SelectItem value="price">Price: Low to High</SelectItem>
-            <SelectItem value="-price">Price: High to Low</SelectItem>
+            <SelectItem value="created_at_desc">Newest First</SelectItem>
+            <SelectItem value="price_aud_asc">Price: Low to High</SelectItem>
+            <SelectItem value="price_aud_desc">Price: High to Low</SelectItem>
           </SelectContent>
         </Select>
       </div>

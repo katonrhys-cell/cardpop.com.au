@@ -88,6 +88,10 @@ const EventsManagementPage = () => {
     try {
       const { error } = await supabase.from('events').update({ status: newStatus }).eq('id', event.id);
       if (error) throw error;
+      // Optimistically update locally so the row reflects the change even if the
+      // realtime subscription isn't delivering events. Idempotent with the
+      // realtime UPDATE handler (both key by id).
+      setEvents(prev => prev.map(ev => ev.id === event.id ? { ...ev, status: newStatus } : ev));
       toast.success(`Event ${newStatus === 'approved' ? 'published' : 'unpublished'}.`);
     } catch (err) {
       toast.error('Failed to update event status.');
@@ -99,6 +103,9 @@ const EventsManagementPage = () => {
       try {
         const { error } = await supabase.from('events').delete().eq('id', event.id);
         if (error) throw error;
+        // Optimistically remove locally in case realtime isn't delivering events.
+        // Idempotent with the realtime DELETE handler (both filter by id).
+        setEvents(prev => prev.filter(ev => ev.id !== event.id));
         toast.success('Event deleted.');
       } catch (err) {
         toast.error('Failed to delete event.');

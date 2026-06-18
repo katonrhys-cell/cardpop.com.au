@@ -234,7 +234,7 @@ const WhatnotShowsPage = () => {
         ) : (
           <div className="bg-muted/40 border border-border rounded-2xl p-5 mb-8 text-center">
             <p className="text-muted-foreground text-sm font-medium">
-              <a href="/login" className="text-primary font-bold hover:underline">Sign in</a> to advertise your upcoming Whatnot shows.
+              <Link to="/login" className="text-primary font-bold hover:underline">Sign in</Link> to advertise your upcoming Whatnot shows.
             </p>
           </div>
         )}

@@ -13,6 +13,8 @@ const MarketDetailPage = () => {
 
   useEffect(() => {
     const fetchMarket = async () => {
+      // Reset on market change so the previous market's data doesn't show during refetch.
+      setLoading(true);
       try {
         const { data: res } = await supabase.from('market_data').select('*').eq('id', market).maybeSingle();
         setData(res);

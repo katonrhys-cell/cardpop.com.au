@@ -51,7 +51,6 @@ const RouteErrorBoundary = ({ children }) => {
 
 // Marketplace
 const MarketplacePage = lazy(() => import('@/pages/marketplace/MarketplacePage.jsx'));
-const MarketplaceCategoryPage = lazy(() => import('@/pages/marketplace/MarketplaceCategoryPage.jsx'));
 const BrowseListingsPage = lazy(() => import('@/pages/BrowseListingsPage.jsx'));
 
 // Shop
@@ -59,6 +58,8 @@ const ShopPage = lazy(() => import('@/pages/shop/ShopPage.jsx'));
 const ShopSealedBoxesPage = lazy(() => import('@/pages/shop/ShopSealedBoxesPage.jsx'));
 const ShopSinglesPage = lazy(() => import('@/pages/shop/ShopSinglesPage.jsx'));
 const ShopCategoryPage = lazy(() => import('@/pages/shop/ShopCategoryPage.jsx'));
+// Remounts ShopCategoryPage when the category slug changes so pagination/filters reset
+const ShopCategoryRoute = () => { const { categorySlug } = useParams(); return <ShopCategoryPage key={categorySlug} />; };
 
 // Unified Product Details Route
 const ProductDetailPage = lazy(() => import('@/pages/ProductDetailPage.jsx'));
@@ -101,6 +102,10 @@ const SoleTraderStorePage = lazy(() => import('@/pages/SoleTraderStorePage.jsx')
 const MyVaultPage = lazy(() => import('@/pages/MyVaultPage.jsx'));
 const AddEditCardPage = lazy(() => import('@/pages/AddEditCardPage.jsx'));
 const VaultProfilePage = lazy(() => import('@/pages/VaultProfilePage.jsx'));
+// Forces AddEditCardPage to fully remount when switching between /vault/add and a
+// specific /vault/edit/:id (or between two different ids), resetting the form so
+// the previous card's data/images don't carry over.
+const AddEditCardRoute = () => { const { id } = useParams(); return <AddEditCardPage key={id ?? 'new'} />; };
 const TradeRequestsPage = lazy(() => import('@/pages/TradeRequestsPage.jsx'));
 const MessagingPage = lazy(() => import('@/pages/MessagingPage.jsx'));
 const TransactionHistoryPage = lazy(() => import('@/pages/TransactionHistoryPage.jsx'));
@@ -109,7 +114,6 @@ const TransactionHistoryPage = lazy(() => import('@/pages/TransactionHistoryPage
 const MarketsPage = lazy(() => import('@/pages/markets/MarketsPage.jsx'));
 const CardAnalyticsPage = lazy(() => import('@/pages/markets/CardAnalyticsPage.jsx'));
 const MarketDetailPage = lazy(() => import('@/pages/markets/MarketDetailPage.jsx'));
-const MarketCategoryPage = lazy(() => import('@/pages/markets/MarketCategoryPage.jsx'));
 const AustralianMarketsPage = lazy(() => import('@/pages/AustralianMarketsPage.jsx'));
 
 // Grading
@@ -166,6 +170,8 @@ const ListingsManagementPage = lazy(() => import('@/pages/ListingsManagementPage
 // Previously-orphaned pages now wired up
 const SalesHistoryPage = lazy(() => import('@/pages/SalesHistoryPage.jsx'));
 const CategoryPage = lazy(() => import('@/pages/CategoryPage.jsx'));
+// Remounts CategoryPage when the category changes so pagination/sort reset
+const CategoryRoute = () => { const { categoryId } = useParams(); return <CategoryPage key={categoryId} />; };
 const PublicCollectionsPage = lazy(() => import('@/pages/PublicCollectionsPage.jsx'));
 const CardMarketDetailPage = lazy(() => import('@/pages/CardMarketDetailPage.jsx'));
 const AddYourFirstCardPage = lazy(() => import('@/pages/AddYourFirstCardPage.jsx'));
@@ -227,7 +233,8 @@ const App = () => {
 
                         {/* Marketplace */}
                         <Route path="/marketplace" element={<MarketplacePage />} />
-                        <Route path="/marketplace/category/:category" element={<MarketplaceCategoryPage />} />
+                        {/* Orphaned category route (no inbound links, MarketplacePage doesn't read the param) — redirect to the base marketplace */}
+                        <Route path="/marketplace/category/:category" element={<Navigate to="/marketplace" replace />} />
                         <Route path="/browse" element={<BrowseListingsPage />} />
                         
                         {/* Public Profile Routes */}
@@ -241,7 +248,7 @@ const App = () => {
                         <Route path="/shop" element={<ShopPage />} />
                         <Route path="/shop/sealed-boxes" element={<ShopSealedBoxesPage />} />
                         <Route path="/shop/singles" element={<ShopSinglesPage />} />
-                        <Route path="/shop/category/:categorySlug" element={<ShopCategoryPage />} />
+                        <Route path="/shop/category/:categorySlug" element={<ShopCategoryRoute />} />
                         
                         {/* Checkout */}
                         <Route path="/checkout/:cardId?" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
@@ -278,8 +285,8 @@ const App = () => {
                         <Route path="/my-vault" element={<ProtectedRoute><MyVaultPage /></ProtectedRoute>} />
                         <Route path="/vault/welcome" element={<AddYourFirstCardPage />} />
                         <Route path="/vault/profile" element={<ProtectedRoute><VaultProfilePage /></ProtectedRoute>} />
-                        <Route path="/vault/add" element={<ProtectedRoute><AddEditCardPage /></ProtectedRoute>} />
-                        <Route path="/vault/edit/:id" element={<ProtectedRoute><AddEditCardPage /></ProtectedRoute>} />
+                        <Route path="/vault/add" element={<ProtectedRoute><AddEditCardRoute /></ProtectedRoute>} />
+                        <Route path="/vault/edit/:id" element={<ProtectedRoute><AddEditCardRoute /></ProtectedRoute>} />
                         <Route path="/trade-requests" element={<ProtectedRoute><TradeRequestsPage /></ProtectedRoute>} />
                         <Route path="/messaging" element={<ProtectedRoute><MessagingPage /></ProtectedRoute>} />
                         <Route path="/transactions" element={<ProtectedRoute><TransactionHistoryPage /></ProtectedRoute>} />
@@ -288,13 +295,14 @@ const App = () => {
                         {/* Markets & Analytics */}
                         <Route path="/analytics" element={<MarketsPage />} />
                         <Route path="/analytics/card" element={<CardAnalyticsPage />} />
-                        <Route path="/analytics/:category" element={<MarketCategoryPage />} />
+                        {/* Orphaned category route (no inbound links, MarketsPage has no category filter) — redirect to the base analytics page */}
+                        <Route path="/analytics/:category" element={<Navigate to="/analytics" replace />} />
                         <Route path="/analytics/:category/:market" element={<MarketDetailPage />} />
                         <Route path="/markets" element={<Navigate to="/analytics" replace />} />
                         <Route path="/markets/*" element={<Navigate to="/analytics" replace />} />
                         <Route path="/australian-markets" element={<AustralianMarketsPage />} />
                         <Route path="/card-market/:cardId" element={<CardMarketDetailPage />} />
-                        <Route path="/category/:categoryId" element={<CategoryPage />} />
+                        <Route path="/category/:categoryId" element={<CategoryRoute />} />
                         
                         {/* Grading */}
                         <Route path="/grading" element={<GradingPage />} />

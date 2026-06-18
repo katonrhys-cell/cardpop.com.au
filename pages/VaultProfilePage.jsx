@@ -215,7 +215,7 @@ const VaultProfilePage = () => {
               <p className="text-sm text-muted-foreground">Unverified accounts cannot initiate or accept trades.</p>
             </div>
             <Button asChild variant="outline" className="shrink-0">
-              <Link to="/security">Verify Now</Link>
+              <Link to="/verification-pending">Verify Now</Link>
             </Button>
           </div>
         )}
