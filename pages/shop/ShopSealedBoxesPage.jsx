@@ -32,14 +32,12 @@ const ShopSealedBoxesPage = () => {
       setLoading(true);
       try {
         let query = supabase
-          .from('listings')
+          .from('shop_products')
           .select('*', { count: 'exact' })
-          .eq('category', 'Sealed Boxes')
+          .eq('status', 'active')
+          .eq('product_type', 'sealed')
           .limit(48);
 
-        if (condition && condition !== 'all') {
-          query = query.eq('condition', condition);
-        }
         if (minPrice && !isNaN(minPrice)) {
           query = query.gte('price_aud', Number(minPrice));
         }
@@ -55,7 +53,7 @@ const ShopSealedBoxesPage = () => {
         if (error) throw error;
 
         if (isMounted) {
-          setProducts((data || []).map(p => ({ ...p, source: p.source || 'shop' })));
+          setProducts((data || []).map(p => ({ ...p, source: 'shop', type: 'shop' })));
           setTotalItems(count || 0);
         }
       } catch (err) {

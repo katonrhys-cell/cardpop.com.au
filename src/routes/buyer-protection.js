@@ -166,9 +166,10 @@ router.get('/:claimId', async (req, res) => {
       .from('buyer_protection_claims')
       .select('*, order:orders(*), seller:profiles(display_name, username), buyer:profiles(display_name, username)')
       .eq('id', claimId)
-      .single();
+      .maybeSingle();
 
     if (error) throw error;
+    if (!claim) return res.status(404).json({ error: 'Claim not found' });
 
     // Check if user is involved in the claim
     if (claim.buyer_id !== userId && claim.seller_id !== userId) {

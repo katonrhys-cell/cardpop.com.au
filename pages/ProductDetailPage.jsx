@@ -27,7 +27,7 @@ const ProductDetailPage = () => {
   const { source, id } = useParams();
   const navigate = useNavigate();
   const { addToCart, setIsCartOpen } = useCart();
-  const { currentUser, isAdmin } = useAuth();
+  const { currentUser, isAdmin, loading: authLoading } = useAuth();
   
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -96,12 +96,42 @@ const ProductDetailPage = () => {
           return;
         }
 
-        const table = source === 'shop' ? 'listings' : 'vault_items';
-        // vault_items uses owner_id; listings uses seller_id
-        const profileJoin = source === 'vault' ? 'owner:profiles!owner_id(*)' : 'seller:profiles!seller_id(*)';
+        if (source === 'shop') {
+          const { data, error: fetchError } = await supabase
+            .from('shop_products')
+            .select('*')
+            .eq('id', id)
+            .eq('status', 'active')
+            .maybeSingle();
+
+          if (fetchError) throw fetchError;
+          if (!isMounted) return;
+          if (!data) {
+            setError('Product not found or unavailable.');
+            setLoading(false);
+            return;
+          }
+
+          const images = Array.isArray(data.images) && data.images.length
+            ? data.images
+            : (data.image_url ? [data.image_url] : []);
+
+          setProduct({
+            ...data,
+            name: data.title,
+            price: data.price_aud ?? 0,
+            images,
+            stockQuantity: data.stock_quantity,
+            listing_type: 'For Sale',
+          });
+          setSeller({ business_name: 'CardPop Official Store', is_verified: true, type: 'official' });
+          return;
+        }
+
+        // Only the 'vault' source reaches here.
         const { data, error: fetchError } = await supabase
-          .from(table)
-          .select(`*, ${profileJoin}`)
+          .from('vault_items')
+          .select('*, owner:profiles!owner_id(*)')
           .eq('id', id)
           .single();
 
@@ -122,6 +152,11 @@ const ProductDetailPage = () => {
             return;
           }
 
+          // Don't decide ownership until auth has resolved — otherwise an owner
+          // can be shown a false 403 while currentUser is momentarily null.
+          // The effect re-runs (authLoading dep) once auth settles.
+          if (authLoading) return;
+
           const userRole = isAdmin ? 'admin' : 'user';
           const isAuthorized = canViewVaultProduct(currentUser?.id, data.owner_id, data.is_public, userRole);
           if (!isAuthorized) {
@@ -131,17 +166,6 @@ const ProductDetailPage = () => {
             }
             return;
           }
-        }
-
-        if (source === 'shop') {
-          setProduct({
-            ...data,
-            name: data.name || data.title || 'Untitled',
-            price: data.price ?? data.price_aud ?? 0,
-            images: data.images || [],
-          });
-          setSeller({ business_name: 'CardPop Official Store', is_verified: true, type: 'official' });
-          return;
         }
 
         setProduct(data);
@@ -170,7 +194,7 @@ const ProductDetailPage = () => {
 
     fetchProduct();
     return () => { isMounted = false; };
-  }, [id, source, currentUser, isAdmin]);
+  }, [id, source, currentUser?.id, isAdmin, authLoading]);
 
   const handleAddToCart = () => {
     if (!product) return;

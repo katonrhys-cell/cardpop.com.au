@@ -58,9 +58,11 @@ describe('POST /attempt', () => {
     expect(res.status).toBe(400);
   });
 
-  it('returns 400 when ipAddress is missing', async () => {
+  it('does not require a client-supplied ipAddress (derived server-side)', async () => {
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: null, error: null }));
     const res = await request(app).post('/attempt').send({ email: 'test@example.com' });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+    expect(res.body.allowed).toBe(true);
   });
 
   it('allows when no prior record', async () => {
@@ -137,20 +139,8 @@ describe('POST /record-success', () => {
   it('clears login attempts on success', async () => {
     const deleteBuilder = makeBuilder({ data: null, error: null });
     mockSupabase.from.mockReturnValue(deleteBuilder);
-    const res = await request(app).post('/record-success').send({ email: 'test@example.com', ipAddress: '1.2.3.4' });
+    const res = await request(app).post('/record-success').send({ email: 'test@example.com' });
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-  });
-
-  it('writes audit log when userId is provided', async () => {
-    const deleteBuilder = makeBuilder({ data: null, error: null });
-    const auditBuilder = makeBuilder({ data: null, error: null });
-    mockSupabase.from
-      .mockReturnValueOnce(deleteBuilder)
-      .mockReturnValueOnce(auditBuilder);
-    await request(app).post('/record-success').send({
-      email: 'test@example.com', ipAddress: '1.2.3.4', userId: 'user-1',
-    });
-    expect(auditBuilder.insert).toHaveBeenCalledWith(expect.objectContaining({ event_type: 'login' }));
   });
 });

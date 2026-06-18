@@ -20,7 +20,9 @@ export const getSearchHistory = () => {
  * Add a search term to history
  */
 export const addToSearchHistory = (term) => {
-  if (!term || term.trim().length < 2) return;
+  // Always return an array — callers store the result directly in state, so
+  // returning undefined here would crash the search dropdown on .length.
+  if (!term || term.trim().length < 2) return getSearchHistory();
 
   try {
     const history = getSearchHistory();

@@ -24,7 +24,7 @@ const resolveImageUrl = (path) => {
 
 const ProductCard = ({ product }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
-  const rawImg = product.images?.[0] || product.cardImage?.[0] || product.card_image || null;
+  const rawImg = product.images?.[0] || product.cardImage?.[0] || product.card_image || product.image_url || null;
   const imgSrc = resolveImageUrl(rawImg);
   const sellerId = product.seller_id || product.seller || product.owner_id || product.owner || product.user_id;
   const sellerObj = product.expand?.seller_id || product.expand?.seller || product.expand?.owner || product.expand?.user_id;
@@ -136,7 +136,7 @@ const ProductCard = ({ product }) => {
         <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-border">
           <div className="flex items-center justify-between">
             <span className="font-extrabold text-xl tabular-nums text-foreground">
-              ${(product.price || product.askingPrice || product.estimatedValue || 0).toFixed(2)}
+              ${Number(product.price ?? product.price_aud ?? product.askingPrice ?? product.estimatedValue ?? 0).toFixed(2)}
             </span>
           </div>
           

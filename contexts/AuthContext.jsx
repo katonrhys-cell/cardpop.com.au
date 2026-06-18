@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
 
 const AuthContext = createContext();
@@ -250,9 +250,13 @@ export const AuthProvider = ({ children }) => {
   // so that profile fields can never accidentally shadow it.
   const isVerified = session?.user?.email_confirmed_at != null;
 
-  const mergedUser = currentUser
-    ? { ...currentUser, ...profile, id: currentUser.id }
-    : null;
+  // Memoize so the reference is stable across re-renders that don't change the
+  // user/profile (e.g. loading/mfaRequired toggles). Consumers that key effects
+  // on currentUser would otherwise re-fire on every AuthProvider render.
+  const mergedUser = useMemo(
+    () => (currentUser ? { ...currentUser, ...profile, id: currentUser.id } : null),
+    [currentUser, profile],
+  );
 
   const value = {
     currentUser: mergedUser,

@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { integratedAiClient } from '@/lib/integratedAiClient';
 import { COLLECTIONS_LIST } from '@/components/Header.jsx';
+import { useIsMounted } from '@/hooks/useIsMounted.js';
 
 const SSEEventType = {
   Content: 'content',
@@ -12,6 +13,7 @@ const SSEEventType = {
 export function useCardOCR() {
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState(null);
+  const isMounted = useIsMounted();
 
   const scanCard = useCallback(async (imageFile) => {
     if (!imageFile) return;
@@ -71,7 +73,7 @@ export function useCardOCR() {
 
       const data = JSON.parse(jsonMatch[0]);
       const result = mapOCRResult(data);
-      setScanResult(result);
+      if (isMounted()) setScanResult(result);
       toast.success('Card scanned — review the extracted details before applying.');
       return result;
     } catch (err) {
@@ -80,9 +82,9 @@ export function useCardOCR() {
       console.warn('[useCardOCR] scan failed:', err.message);
       toast.error(err.message || 'Card scan failed. Please try again.');
     } finally {
-      setIsScanning(false);
+      if (isMounted()) setIsScanning(false);
     }
-  }, []);
+  }, [isMounted]);
 
   return {
     scanCard,

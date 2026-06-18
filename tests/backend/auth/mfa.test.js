@@ -107,12 +107,12 @@ describe('POST /verify', () => {
     expect(res.body.success).toBe(true);
   });
 
-  it('returns 500 when code is wrong', async () => {
+  it('returns 401 when code is wrong', async () => {
     const { decrypt } = await import('../../../src/utils/encryption.js');
     decrypt.mockReturnValueOnce({ code: 'WRONGCODE', expiresAt: new Date(Date.now() + 600000).toISOString() });
     mockSupabase.from.mockReturnValue(makeBuilder({ data: MFA_RECORD, error: null }));
     const res = await request(app).post('/verify').send({ mfaId: 'mfa_123', code: '99999999' });
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(401);
     expect(res.body.error).toMatch(/invalid mfa code/i);
   });
 });

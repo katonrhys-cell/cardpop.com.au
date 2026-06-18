@@ -13,14 +13,18 @@ export const useCollectionStats = () => {
     isGrowing:        true,
   });
 
-  const fetchStats = useCallback(async () => {
-    if (!currentUser?.id) { setLoading(false); return; }
+  const fetchStats = useCallback(async (isActive = () => true) => {
+    if (!currentUser?.id) { if (isActive()) setLoading(false); return; }
 
     try {
       const { data: items } = await supabase
         .from('vault_items')
         .select('id, estimated_value_aud, trade_value_aud, trade_value_locked')
         .eq('owner_id', currentUser.id);
+
+      // A newer fetch (user changed) or unmount has superseded this one — bail
+      // before touching state or the user-keyed localStorage history.
+      if (!isActive()) return;
 
       const records = items ?? [];
       const totalCards      = records.length;
@@ -63,11 +67,15 @@ export const useCollectionStats = () => {
     } catch (err) {
       console.error('Error fetching collection stats:', err);
     } finally {
-      setLoading(false);
+      if (isActive()) setLoading(false);
     }
   }, [currentUser?.id]);
 
-  useEffect(() => { fetchStats(); }, [fetchStats]);
+  useEffect(() => {
+    let active = true;
+    fetchStats(() => active);
+    return () => { active = false; };
+  }, [fetchStats]);
 
   return { stats, loading, refetch: fetchStats };
 };

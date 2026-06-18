@@ -65,44 +65,37 @@ async function clearLoginAttempts(email, ipAddress) {
   }
 }
 
-// Check if a login is allowed (rate-limit gate)
+// Check if a login is allowed (rate-limit gate). The IP is always taken from
+// the request server-side (never the body) — this prevents IP spoofing and,
+// because lockouts are keyed on (email, ip), stops an attacker from clearing or
+// poisoning a victim's lockout from a different IP.
 router.post('/attempt', async (req, res) => {
-  const { email, ipAddress } = req.body;
-  if (!email || !ipAddress) return res.status(400).json({ error: 'Email and IP address are required' });
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+  const ipAddress = req.ip || 'unknown';
 
-  const check = await checkLoginAttempts(email.trim().toLowerCase(), ipAddress.trim());
+  const check = await checkLoginAttempts(email.trim().toLowerCase(), ipAddress);
   if (!check.allowed) return res.status(429).json({ error: check.message, lockedUntil: check.lockedUntil });
   res.json({ allowed: true });
 });
 
 // Record a failed login
 router.post('/record-failure', async (req, res) => {
-  const { email, ipAddress } = req.body;
-  if (!email || !ipAddress) return res.status(400).json({ error: 'Email and IP address are required' });
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+  const ipAddress = req.ip || 'unknown';
 
-  await recordFailedAttempt(email.trim().toLowerCase(), ipAddress.trim());
+  await recordFailedAttempt(email.trim().toLowerCase(), ipAddress);
   res.json({ success: true });
 });
 
 // Clear failed attempts after successful login
 router.post('/record-success', async (req, res) => {
-  const { email, ipAddress } = req.body;
-  if (!email || !ipAddress) return res.status(400).json({ error: 'Email and IP address are required' });
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+  const ipAddress = req.ip || 'unknown';
 
-  await clearLoginAttempts(email.trim().toLowerCase(), ipAddress.trim());
-
-  // Optionally write an audit log if userId is provided
-  if (req.body.userId) {
-    await supabase.from('audit_logs').insert({
-      user_id: req.body.userId,
-      event_type: 'login',
-      description: 'User logged in successfully',
-      ip_address: ipAddress.trim(),
-      user_agent: req.headers['user-agent'] || 'unknown',
-      status: 'success',
-    }).catch(() => {});
-  }
-
+  await clearLoginAttempts(email.trim().toLowerCase(), ipAddress);
   res.json({ success: true });
 });
 

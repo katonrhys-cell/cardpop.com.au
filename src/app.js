@@ -9,7 +9,6 @@ import morgan from 'morgan';
 import routes from './routes/index.js';
 import { errorMiddleware } from './middleware/error.js';
 import { globalRateLimit } from './middleware/global-rate-limit.js';
-import { sessionTimeoutMiddleware } from './middleware/sessionTimeout.js';
 import { secureHeadersMiddleware } from './middleware/secureHeaders.js';
 import logger from './utils/logger.js';
 import { BodyLimit } from './constants/common.js';
@@ -61,7 +60,13 @@ app.use(cors({
 }));
 
 app.use(morgan('combined'));
-app.use(globalRateLimit);
+// Apply the global IP rate limit to everything except the Stripe webhook —
+// a burst of webhook retries from Stripe must never be throttled (the route
+// still has its own high-capacity stripeLimiter). Matches the JSON-skip below.
+app.use((req, res, next) => {
+	if (req.path.endsWith('/stripe/webhook')) return next();
+	return globalRateLimit(req, res, next);
+});
 
 logger.debug(`[MAIN] Configuring body parser with limit: ${BodyLimit} bytes`);
 // Stripe webhooks need the raw body buffer for signature verification — skip JSON
@@ -79,8 +84,6 @@ app.use((err, req, res, next) => {
 	}
 	next();
 });
-
-app.use(sessionTimeoutMiddleware);
 
 // Mount at / for local dev, /hcgi/api for Hostinger, and /api for Vercel.
 const apiRouter = routes();

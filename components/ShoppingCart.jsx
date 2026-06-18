@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { ShoppingBag, X, Plus, Minus, Loader2, ArrowRight, PackageOpen } from 'lucide-react';
 import { useCart } from '@/hooks/useCart.jsx';
-import { initializeCheckout, formatCurrency } from '@/api/EcommerceApi.js';
+import { formatCurrency } from '@/api/EcommerceApi.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -26,39 +26,17 @@ const ShoppingCart = () => {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const navigate = useNavigate();
 
-  const handleCheckout = async () => {
+  const handleCheckout = () => {
     if (cartItems.length === 0) return;
-
     setIsCheckingOut(true);
-    try {
-      const items = cartItems.map(item => ({
-        variant_id: item.variant?.id || item.product.id,
-        quantity: item.quantity
-      }));
-
-      const customer = currentUser ? {
-        external_id: currentUser.id,
-        email: currentUser.email
-      } : undefined;
-
-      const response = await initializeCheckout({
-        items,
-        successUrl: `${window.location.origin}/checkout-success`,
-        cancelUrl: `${window.location.origin}/shop`,
-        customer
-      });
-
-      if (response?.url) {
-        window.location.href = response.url;
-      } else {
-        throw new Error('No checkout URL returned');
-      }
-    } catch (error) {
-      console.error('Checkout error:', error);
-      toast.error('Failed to initiate checkout. Please try again.');
-    } finally {
-      setIsCheckingOut(false);
+    setIsCartOpen(false);
+    if (!currentUser) {
+      toast.error('Please sign in to check out.');
+      navigate('/login', { state: { from: { pathname: '/checkout' } } });
+      return;
     }
+    // The multi-step CheckoutPage handles shipping, review and Stripe payment.
+    navigate('/checkout');
   };
 
   const cartItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);

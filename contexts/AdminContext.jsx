@@ -20,7 +20,9 @@ export const AdminProvider = ({ children }) => {
     // is_admin comes from the profiles table via AuthContext mergedUser
     setIsAdmin(isAuthenticated && (currentUser?.is_admin === true));
     setLoading(false);
-  }, [currentUser, isAuthenticated, authLoading]);
+    // Depend on the primitive, not the whole user object, to avoid re-running
+    // on unrelated AuthProvider re-renders.
+  }, [currentUser?.is_admin, isAuthenticated, authLoading]);
 
   const logAdminAction = async (action, details = {}) => {
     if (!isAdmin) {

@@ -44,7 +44,11 @@ const ListingsManagementPage = () => {
   const fetchListings = useCallback(async () => {
     setLoading(true);
     try {
-      let query = supabase.from('listings').select('*', { count: 'exact' }).range((page - 1) * 20, page * 20 - 1).order('created_at', { ascending: false });
+      // Map the sort dropdown to real columns (was hardcoded created desc).
+      const sortColumn = sortOrder.includes('price') ? 'price_aud' : 'created_at';
+      const ascending = !sortOrder.startsWith('-');
+
+      let query = supabase.from('listings').select('*', { count: 'exact' }).range((page - 1) * 20, page * 20 - 1).order(sortColumn, { ascending });
 
       if (searchQuery) query = query.ilike('title', `%${searchQuery}%`);
       if (categoryFilter !== 'all') query = query.eq('category', categoryFilter);
@@ -90,7 +94,7 @@ const ListingsManagementPage = () => {
   };
 
   const handleDelete = async (listing) => {
-    if (!window.confirm(`Are you sure you want to delete "${listing.name}"?`)) return;
+    if (!window.confirm(`Are you sure you want to delete "${listing.title || listing.name || 'this listing'}"?`)) return;
     try {
       const { error } = await supabase.from('listings').delete().eq('id', listing.id);
       if (error) throw error;
