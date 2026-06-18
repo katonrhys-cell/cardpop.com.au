@@ -101,6 +101,10 @@ const SoleTraderStorePage = lazy(() => import('@/pages/SoleTraderStorePage.jsx')
 const MyVaultPage = lazy(() => import('@/pages/MyVaultPage.jsx'));
 const AddEditCardPage = lazy(() => import('@/pages/AddEditCardPage.jsx'));
 const VaultProfilePage = lazy(() => import('@/pages/VaultProfilePage.jsx'));
+// Forces AddEditCardPage to fully remount when switching between /vault/add and a
+// specific /vault/edit/:id (or between two different ids), resetting the form so
+// the previous card's data/images don't carry over.
+const AddEditCardRoute = () => { const { id } = useParams(); return <AddEditCardPage key={id ?? 'new'} />; };
 const TradeRequestsPage = lazy(() => import('@/pages/TradeRequestsPage.jsx'));
 const MessagingPage = lazy(() => import('@/pages/MessagingPage.jsx'));
 const TransactionHistoryPage = lazy(() => import('@/pages/TransactionHistoryPage.jsx'));
@@ -278,8 +282,8 @@ const App = () => {
                         <Route path="/my-vault" element={<ProtectedRoute><MyVaultPage /></ProtectedRoute>} />
                         <Route path="/vault/welcome" element={<AddYourFirstCardPage />} />
                         <Route path="/vault/profile" element={<ProtectedRoute><VaultProfilePage /></ProtectedRoute>} />
-                        <Route path="/vault/add" element={<ProtectedRoute><AddEditCardPage /></ProtectedRoute>} />
-                        <Route path="/vault/edit/:id" element={<ProtectedRoute><AddEditCardPage /></ProtectedRoute>} />
+                        <Route path="/vault/add" element={<ProtectedRoute><AddEditCardRoute /></ProtectedRoute>} />
+                        <Route path="/vault/edit/:id" element={<ProtectedRoute><AddEditCardRoute /></ProtectedRoute>} />
                         <Route path="/trade-requests" element={<ProtectedRoute><TradeRequestsPage /></ProtectedRoute>} />
                         <Route path="/messaging" element={<ProtectedRoute><MessagingPage /></ProtectedRoute>} />
                         <Route path="/transactions" element={<ProtectedRoute><TransactionHistoryPage /></ProtectedRoute>} />

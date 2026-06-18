@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { formatCurrency } from '@/api/EcommerceApi.js';
+import { supabase } from '@/lib/supabaseClient.js';
 
 const CartContext = createContext(null);
 
@@ -34,6 +35,23 @@ export const CartProvider = ({ children }) => {
       console.error('Failed to save cart to local storage:', error);
     }
   }, [cartItems]);
+
+  // Clear the cart on sign-out so it doesn't leak into a logged-out
+  // session or the next user who signs in on the same browser. The cart is
+  // stored in localStorage and is not tied to a user id, so without this a
+  // shared/public computer would expose (and let the next user check out)
+  // the previous user's cart.
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') {
+        setCartItems([]);
+        try {
+          localStorage.removeItem(CART_STORAGE_KEY);
+        } catch (_) { /* storage unavailable in some envs */ }
+      }
+    });
+    return () => subscription?.unsubscribe();
+  }, []);
 
   // Cross-tab synchronization
   useEffect(() => {

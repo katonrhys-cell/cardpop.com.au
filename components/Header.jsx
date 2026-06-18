@@ -900,8 +900,13 @@ const Header = () => {
   }, []);
 
   useEffect(() => {
+    // Reset counts up-front so a previous user's badges don't linger after
+    // logout or when a different user signs in on the same tab (the new
+    // user's query may not have resolved yet, and could even error).
+    setUnreadCount(0);
+    setTradeCount(0);
     if (!isAuthenticated || !currentUser) return;
-    
+
     let isMounted = true;
     
     const fetchData = async () => {
@@ -943,7 +948,7 @@ const Header = () => {
       supabase.removeChannel(msgChannel);
       supabase.removeChannel(tradeChannel);
     };
-  }, [isAuthenticated, currentUser]);
+  }, [isAuthenticated, currentUser?.id]);
 
   const cartItemCount = cartItems?.reduce((sum, item) => sum + item.quantity, 0) || 0;
 

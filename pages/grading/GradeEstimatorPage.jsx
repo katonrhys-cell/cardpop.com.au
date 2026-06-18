@@ -383,7 +383,7 @@ function ResultsView({ result, onReset }) {
             </p>
             <p>
               You acknowledge that by using this tool you agree to CardPop's{' '}
-              <Link to="/info/terms" className="underline hover:text-foreground">Terms of Service</Link>.
+              <Link to="/terms" className="underline hover:text-foreground">Terms of Service</Link>.
               Always seek professional assessment before making financial decisions based on any card's
               anticipated grade. CardPop Australia is not liable for any financial loss resulting from reliance
               on these estimates.
