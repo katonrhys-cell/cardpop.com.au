@@ -16,9 +16,11 @@ const TransactionHistoryPage = () => {
   useEffect(() => {
     const fetchTxs = async () => {
       try {
+        // order_items is a jsonb column on orders (not a related table), so
+        // select it directly rather than embedding a non-existent relationship.
         const { data } = await supabase
           .from('orders')
-          .select('*, order_items(*, vault_item:vault_items(card_name))')
+          .select('*')
           .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
           .order('created_at', { ascending: false })
           .limit(100);
@@ -32,7 +34,7 @@ const TransactionHistoryPage = () => {
     if (currentUser) fetchTxs(); else setLoading(false);
   }, [currentUser]);
 
-  const filteredTxs = txs.filter(tx => typeFilter === 'All' || tx.order_type === typeFilter.toLowerCase());
+  const filteredTxs = txs.filter(tx => typeFilter === 'All' || (tx.transaction_type === 'trade' ? 'trade' : 'sale') === typeFilter.toLowerCase());
 
   const totalCommissions = txs.reduce((acc, tx) => acc + (tx.platform_fee_aud ?? 0), 0);
 
@@ -96,15 +98,15 @@ const TransactionHistoryPage = () => {
                     <tr key={tx.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
                       <td className="p-4 tabular-nums text-muted-foreground whitespace-nowrap">{format(new Date(tx.created_at), 'MMM d, yyyy')}</td>
                       <td className="p-4">
-                        {tx.order_type === 'trade' ? (
+                        {tx.transaction_type === 'trade' ? (
                           <Badge variant="secondary" className="bg-primary/10 text-primary border-none"><ArrowRightLeft className="w-3 h-3 mr-1"/> Trade</Badge>
                         ) : (
                           <Badge variant="secondary" className="bg-accent/20 text-accent-foreground border-none"><CreditCard className="w-3 h-3 mr-1"/> Sale</Badge>
                         )}
                       </td>
                       <td className="p-4">
-                        {tx.order_items?.length > 0 ? (
-                          <span className="font-medium">{tx.order_items.map(i => i.vault_item?.card_name).filter(Boolean).join(', ')}</span>
+                        {Array.isArray(tx.order_items) && tx.order_items.length > 0 ? (
+                          <span className="font-medium">{tx.order_items.map(i => i.title).filter(Boolean).join(', ')}</span>
                         ) : (
                           <span className="text-muted-foreground italic">Store Purchase</span>
                         )}
