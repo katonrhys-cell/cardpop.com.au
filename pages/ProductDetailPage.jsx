@@ -27,7 +27,7 @@ const ProductDetailPage = () => {
   const { source, id } = useParams();
   const navigate = useNavigate();
   const { addToCart, setIsCartOpen } = useCart();
-  const { currentUser, isAdmin } = useAuth();
+  const { currentUser, isAdmin, loading: authLoading } = useAuth();
   
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -152,6 +152,11 @@ const ProductDetailPage = () => {
             return;
           }
 
+          // Don't decide ownership until auth has resolved — otherwise an owner
+          // can be shown a false 403 while currentUser is momentarily null.
+          // The effect re-runs (authLoading dep) once auth settles.
+          if (authLoading) return;
+
           const userRole = isAdmin ? 'admin' : 'user';
           const isAuthorized = canViewVaultProduct(currentUser?.id, data.owner_id, data.is_public, userRole);
           if (!isAuthorized) {
@@ -189,7 +194,7 @@ const ProductDetailPage = () => {
 
     fetchProduct();
     return () => { isMounted = false; };
-  }, [id, source, currentUser, isAdmin]);
+  }, [id, source, currentUser?.id, isAdmin, authLoading]);
 
   const handleAddToCart = () => {
     if (!product) return;

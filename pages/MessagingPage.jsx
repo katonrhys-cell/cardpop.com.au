@@ -60,25 +60,35 @@ const MessagingPage = () => {
     }
   }, [location.state, conversations.length]);
 
-  // Real-time subscription
+  // Keep the latest selected conversation in a ref so the realtime handler can
+  // read it without the subscription depending on (and thus recreating on)
+  // selectedUserId.
+  const selectedUserIdRef = useRef(selectedUserId);
+  useEffect(() => { selectedUserIdRef.current = selectedUserId; }, [selectedUserId]);
+
+  // Real-time subscription — created once per user (not per conversation switch),
+  // with a stable channel name, so incoming messages aren't missed during the
+  // unsubscribe/resubscribe gap.
   useEffect(() => {
-    if (!currentUser) return;
-    
-    const channel = supabase.channel(`messaging-page-${Date.now()}`)
+    if (!currentUser?.id) return;
+    const uid = currentUser.id;
+
+    const channel = supabase.channel(`messaging-page-${uid}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
         if (!isMounted.current) return;
         const record = payload.new;
-        const isRelevant = record.sender_id === currentUser.id || record.recipient_id === currentUser.id;
+        const isRelevant = record.sender_id === uid || record.recipient_id === uid;
         if (isRelevant) {
           fetchConversations();
+          const selectedUserId = selectedUserIdRef.current;
           if (selectedUserId && (record.sender_id === selectedUserId || record.recipient_id === selectedUserId)) {
             setMessages(prev => {
               if (prev.some(m => m.id === record.id)) return prev;
               return [...prev, record];
             });
             scrollToBottom();
-            if (record.recipient_id === currentUser.id) {
-              supabase.from('messages').update({ is_read: true }).eq('id', record.id).eq('recipient_id', currentUser.id).catch(console.error);
+            if (record.recipient_id === uid) {
+              supabase.from('messages').update({ is_read: true }).eq('id', record.id).eq('recipient_id', uid).catch(console.error);
             }
           }
         }
@@ -88,7 +98,7 @@ const MessagingPage = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentUser, selectedUserId]);
+  }, [currentUser?.id]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
