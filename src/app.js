@@ -9,7 +9,6 @@ import morgan from 'morgan';
 import routes from './routes/index.js';
 import { errorMiddleware } from './middleware/error.js';
 import { globalRateLimit } from './middleware/global-rate-limit.js';
-import { sessionTimeoutMiddleware } from './middleware/sessionTimeout.js';
 import { secureHeadersMiddleware } from './middleware/secureHeaders.js';
 import logger from './utils/logger.js';
 import { BodyLimit } from './constants/common.js';
@@ -85,8 +84,6 @@ app.use((err, req, res, next) => {
 	}
 	next();
 });
-
-app.use(sessionTimeoutMiddleware);
 
 // Mount at / for local dev, /hcgi/api for Hostinger, and /api for Vercel.
 const apiRouter = routes();
