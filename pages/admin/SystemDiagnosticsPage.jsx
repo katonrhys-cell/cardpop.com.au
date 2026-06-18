@@ -2,13 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { Activity, Database, Server, CheckCircle2, XCircle, AlertCircle, RefreshCw, ShieldCheck } from 'lucide-react';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import apiServerClient from '@/lib/apiServerClient.js';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import Breadcrumb from '@/components/Breadcrumb.jsx';
 
 const TABLES_TO_CHECK = [
   'profiles', 'vault_items', 'vault_images', 'listings', 'orders', 'order_items',
@@ -115,33 +115,24 @@ const SystemDiagnosticsPage = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 font-sans">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 font-sans space-y-8">
       <Helmet><title>System Diagnostics | Admin</title></Helmet>
-      
-      <Breadcrumb items={[
-        { label: 'Admin', path: '/admin' },
-        { label: 'System Diagnostics' }
-      ]} />
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-bold font-serif tracking-tight text-foreground flex items-center gap-3">
-            <Activity className="w-8 h-8 text-primary" />
-            System Diagnostics
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Real-time health check of backend services, APIs, and database collections.
-          </p>
-        </div>
-        <Button 
-          onClick={runDiagnostics} 
+      <AdminPageHeader
+        icon={Activity}
+        title="System Diagnostics"
+        subtitle="Real-time health check of backend services, APIs, and database collections."
+      >
+        <Button
+          onClick={runDiagnostics}
           disabled={isChecking}
-          className="rounded-xl font-bold shadow-sm"
+          variant="outline"
+          className="rounded-xl font-bold border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
         >
           <RefreshCw className={`w-4 h-4 mr-2 ${isChecking ? 'animate-spin' : ''}`} />
           {isChecking ? 'Running Checks...' : 'Run Diagnostics'}
         </Button>
-      </div>
+      </AdminPageHeader>
 
       {/* Core Services Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">

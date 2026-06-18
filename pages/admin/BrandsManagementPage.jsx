@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { Plus, Search, Edit, Trash2, Building2, AlertCircle, RefreshCw, ImageOff, ChevronLeft } from 'lucide-react';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -157,36 +158,20 @@ const BrandsManagementPage = () => {
         <title>Brand Management | Admin Portal</title>
       </Helmet>
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
-        <div className="flex items-start gap-3 w-full sm:w-auto">
-          <Button 
-            variant="ghost" 
-            onClick={() => navigate('/admin')}
-            className="h-10 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted mt-0.5 shrink-0 px-3"
-            aria-label="Go back to admin dashboard"
-          >
-            <ChevronLeft className="w-5 h-5 mr-1" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Brands</h1>
-            <p className="text-muted-foreground mt-1">Add and manage card game and sports brands.</p>
-            <p className="text-amber-600 dark:text-amber-400 text-sm font-medium mt-1">
-              This taxonomy level has been consolidated into Categories in the new schema.
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-3 w-full sm:w-auto">
-          <Button variant="outline" onClick={() => fetchBrands(true)} disabled={loading} className="rounded-xl h-10 px-4 flex-1 sm:flex-none">
-            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <Button onClick={openAddModal} className="rounded-xl h-10 px-4 font-bold shadow-sm flex-1 sm:flex-none">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Brand
-          </Button>
-        </div>
-      </div>
+      <AdminPageHeader
+        icon={Building2}
+        title="Brands"
+        subtitle="Add and manage card game and sports brands."
+      >
+        <Button variant="outline" onClick={() => fetchBrands(true)} disabled={loading} className="rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
+          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+        <Button variant="outline" onClick={openAddModal} className="rounded-xl h-10 px-4 font-bold border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
+          <Plus className="w-4 h-4 mr-2" />
+          Add Brand
+        </Button>
+      </AdminPageHeader>
 
       {error ? (
         <div className="bg-destructive/10 border border-destructive/20 text-destructive p-6 rounded-xl flex flex-col items-center justify-center text-center">

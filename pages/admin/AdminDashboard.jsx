@@ -6,8 +6,9 @@ import {
   ArrowUpRight, Server, Database, HardDrive, CheckCircle2,
   FolderTree, RefreshCw, ArrowRightLeft, Calendar,
   Tags, BarChart3, Building2, Layers, ShieldCheck, Lock, ShoppingCart, Filter, X,
-  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2
+  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard
 } from 'lucide-react';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -195,20 +196,19 @@ const AdminDashboard = () => {
 
   return (
     <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10 animate-in fade-in duration-300">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold font-serif tracking-tight text-foreground mb-2">Platform Overview</h1>
-          <p className="text-muted-foreground text-lg">System metrics and live administrative data.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setIsShopModalOpen(true)} className="rounded-xl font-bold">
-            <ShoppingCart className="w-4 h-4 mr-2" /> Add to Shop
-          </Button>
-          <Button variant="outline" onClick={() => fetchRef.current?.()} disabled={loading} className="rounded-xl">
-            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
-          </Button>
-        </div>
-      </div>
+      <AdminPageHeader
+        icon={LayoutDashboard}
+        title="Platform Overview"
+        subtitle="System metrics and live administrative data."
+        showBack={false}
+      >
+        <Button variant="outline" onClick={() => setIsShopModalOpen(true)} className="rounded-xl font-bold h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
+          <ShoppingCart className="w-4 h-4 mr-2" /> Add to Shop
+        </Button>
+        <Button variant="outline" onClick={() => fetchRef.current?.()} disabled={loading} className="rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
+          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
+        </Button>
+      </AdminPageHeader>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard title="Total Users" value={stats.users.toLocaleString()} icon={Users} loading={loading} />

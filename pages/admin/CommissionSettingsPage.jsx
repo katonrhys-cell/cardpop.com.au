@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DollarSign, TrendingUp, Download, RefreshCw, Pencil, Check, X, AlertCircle } from 'lucide-react';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { toast } from 'sonner';
 import { format, startOfMonth, subMonths } from 'date-fns';
 
@@ -236,15 +237,15 @@ const CommissionSettingsPage = () => {
     <div className="space-y-10">
       <Helmet><title>Commission Settings | CardPop Admin</title></Helmet>
 
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold font-heading mb-1">Commission & Revenue</h1>
-          <p className="text-muted-foreground">Manage platform fees, GST settings, and view revenue reports.</p>
-        </div>
-        <Button onClick={exportCsv} variant="outline" className="rounded-xl font-bold gap-2">
+      <AdminPageHeader
+        icon={DollarSign}
+        title="Commission & Revenue"
+        subtitle="Manage platform fees, GST settings, and view revenue reports."
+      >
+        <Button onClick={exportCsv} variant="outline" className="rounded-xl font-bold gap-2 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
           <Download className="w-4 h-4" /> Export CSV
         </Button>
-      </div>
+      </AdminPageHeader>
 
       {/* ── Revenue Stats ── */}
       <section className="space-y-4">

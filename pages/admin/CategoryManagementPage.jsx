@@ -4,6 +4,7 @@ import {
   ChevronRight, ChevronDown, Plus, Pencil, Trash2, Loader2,
   FolderTree, Tag, Factory, Check, X,
 } from 'lucide-react';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -213,23 +214,19 @@ const CategoryManagementPage = () => {
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <Helmet><title>Hierarchy Management | CardPop Admin</title></Helmet>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-serif font-bold flex items-center gap-2">
-            <FolderTree className="w-6 h-6" /> Hierarchy Management
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {rootCategories.length} categories · {franchiseCount} franchises · {mfrCount} manufacturers
-          </p>
-        </div>
+      <AdminPageHeader
+        icon={FolderTree}
+        title="Hierarchy Management"
+        subtitle={`${rootCategories.length} categories · ${franchiseCount} franchises · ${mfrCount} manufacturers`}
+      >
         <Button
-          size="sm"
+          variant="outline"
           onClick={() => setAddingUnder({ type: 'category', parentId: null })}
-          className="gap-1.5"
+          className="gap-1.5 rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
         >
           <Plus className="w-4 h-4" /> Add Category
         </Button>
-      </div>
+      </AdminPageHeader>
 
       {loading ? (
         <div className="flex items-center gap-2 text-muted-foreground py-12 justify-center">

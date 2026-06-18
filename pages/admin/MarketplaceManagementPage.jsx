@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Store, TrendingUp, AlertTriangle } from 'lucide-react';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -28,10 +29,11 @@ const MarketplaceManagementPage = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold font-heading">Marketplace Management</h1>
-        <p className="text-muted-foreground text-sm">Oversee user listings, disputes, and marketplace health.</p>
-      </div>
+      <AdminPageHeader
+        icon={Store}
+        title="Marketplace Management"
+        subtitle="Oversee user listings, disputes, and marketplace health."
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>

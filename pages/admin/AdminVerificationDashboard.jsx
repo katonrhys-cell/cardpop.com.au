@@ -5,6 +5,7 @@ import {
   Search, RefreshCw, Loader2, FileText, MessageSquare, AlertCircle,
   TrendingUp, Users, Shield, ChevronRight,
 } from 'lucide-react';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -180,35 +181,22 @@ const AdminVerificationDashboard = () => {
     <div className="w-full space-y-8 animate-in fade-in duration-300 py-6 px-4 sm:px-6 md:px-8 max-w-7xl mx-auto">
       <Helmet><title>Verification Management | Admin</title></Helmet>
 
-      {/* ── Hero header ─────────────────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-2xl bg-brand-charcoal text-white p-8">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-brand-red/40 via-brand-charcoal to-brand-charcoal pointer-events-none" />
-        <div className="absolute -top-10 -right-10 w-48 h-48 rounded-full bg-brand-red/10 blur-2xl pointer-events-none" />
-        <div className="relative flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <div className="flex items-center gap-2.5 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-brand-red flex items-center justify-center shadow-lg shadow-brand-red/30">
-                <Shield className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xs font-bold uppercase tracking-widest text-white/50">Admin Panel</span>
-            </div>
-            <h1 className="text-3xl font-extrabold tracking-tight mb-1">Verification Management</h1>
-            <p className="text-white/60 text-sm">
-              {counts.pending > 0
-                ? `${counts.pending} submission${counts.pending !== 1 ? 's' : ''} awaiting your review`
-                : 'All submissions are up to date'}
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => fetchRef.current?.()}
-            disabled={loading}
-            className="rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
-          >
-            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
-          </Button>
-        </div>
-      </div>
+      <AdminPageHeader
+        icon={Shield}
+        title="Verification Management"
+        subtitle={counts.pending > 0
+          ? `${counts.pending} submission${counts.pending !== 1 ? 's' : ''} awaiting your review`
+          : 'All submissions are up to date'}
+      >
+        <Button
+          variant="outline"
+          onClick={() => fetchRef.current?.()}
+          disabled={loading}
+          className="rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+        >
+          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
+        </Button>
+      </AdminPageHeader>
 
       {/* ── Stat cards ──────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

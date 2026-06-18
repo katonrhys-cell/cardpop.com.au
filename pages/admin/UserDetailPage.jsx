@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
-import { ChevronLeft, Mail, MapPin, Calendar, ShieldAlert, KeyRound, Trash2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Mail, MapPin, Calendar, ShieldAlert, KeyRound, Trash2, CheckCircle2, AlertCircle, User } from 'lucide-react';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -66,12 +67,12 @@ const UserDetailPage = () => {
     <div className="w-full space-y-8 animate-in fade-in duration-300 py-6 px-4 sm:px-6 md:px-8 max-w-7xl mx-auto">
       <Helmet><title>{displayName} | User Details</title></Helmet>
 
-      {/* Header Navigation */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" onClick={() => navigate('/admin/users')} className="h-10 rounded-xl px-3 shrink-0">
-          <ChevronLeft className="w-5 h-5 mr-1" /> Back to Users
-        </Button>
-      </div>
+      <AdminPageHeader
+        icon={User}
+        title={displayName}
+        subtitle={`@${user.username || user.id}`}
+        backTo="/admin/users"
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Profile Sidebar */}

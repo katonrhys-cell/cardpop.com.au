@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
-import { 
-  ChevronLeft, 
-  Users, 
-  DollarSign, 
+import {
+  ChevronLeft,
+  Users,
+  DollarSign,
   Package,
   Download,
   Calendar as CalendarIcon,
@@ -14,8 +14,10 @@ import {
   FolderTree,
   Building2,
   ShoppingCart,
-  AlertCircle
+  AlertCircle,
+  BarChart3,
 } from 'lucide-react';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -168,40 +170,27 @@ const AnalyticsReportsPage = () => {
         <title>Analytics & Reports | Admin Portal</title>
       </Helmet>
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
-        <div className="flex items-start gap-3 w-full sm:w-auto">
-          <Button 
-            variant="ghost" 
-            onClick={() => navigate('/admin')}
-            className="h-10 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted mt-0.5 shrink-0 px-3"
-            aria-label="Go back to admin dashboard"
-          >
-            <ChevronLeft className="w-5 h-5 mr-1" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Analytics & Reports</h1>
-            <p className="text-muted-foreground mt-1">View detailed platform statistics, sales data, and user growth.</p>
-          </div>
-        </div>
-        <div className="flex gap-3 w-full sm:w-auto">
-          <Select value={timeRange} onValueChange={setTimeRange}>
-            <SelectTrigger className="w-[160px] h-10 rounded-xl bg-background border-border">
-              <CalendarIcon className="w-4 h-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="Select range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="6m">Last 6 Months</SelectItem>
-              <SelectItem value="1y">Last Year</SelectItem>
-              <SelectItem value="all">All Time</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button className="rounded-xl h-10 px-4 font-bold shadow-sm flex-1 sm:flex-none">
-            <Download className="w-4 h-4 mr-2" />
-            Export Data
-          </Button>
-        </div>
-      </div>
+      <AdminPageHeader
+        icon={BarChart3}
+        title="Analytics & Reports"
+        subtitle="View detailed platform statistics, sales data, and user growth."
+      >
+        <Select value={timeRange} onValueChange={setTimeRange}>
+          <SelectTrigger className="w-[160px] h-10 rounded-xl border-white/20 bg-white/10 text-white">
+            <CalendarIcon className="w-4 h-4 mr-2 text-white/60" />
+            <SelectValue placeholder="Select range" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="6m">Last 6 Months</SelectItem>
+            <SelectItem value="1y">Last Year</SelectItem>
+            <SelectItem value="all">All Time</SelectItem>
+          </SelectContent>
+        </Select>
+        <Button className="rounded-xl h-10 px-4 font-bold border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white" variant="outline">
+          <Download className="w-4 h-4 mr-2" />
+          Export Data
+        </Button>
+      </AdminPageHeader>
 
       {error && (
         <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-xl flex items-center gap-3">

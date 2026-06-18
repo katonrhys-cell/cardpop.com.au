@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { Plus, Search, Edit, Trash2, FolderTree, AlertCircle, RefreshCw, ImageOff, ChevronLeft } from 'lucide-react';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -200,33 +201,20 @@ const SubcategoryManagementPage = () => {
         <title>Subcategory Management | Admin Portal</title>
       </Helmet>
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
-        <div className="flex items-start gap-3 w-full sm:w-auto">
-          <Button 
-            variant="ghost" 
-            onClick={() => navigate('/admin')}
-            className="h-10 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted mt-0.5 shrink-0 px-3"
-            aria-label="Go back to admin dashboard"
-          >
-            <ChevronLeft className="w-5 h-5 mr-1" />
-            Back
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Subcategories</h1>
-            <p className="text-muted-foreground mt-1">Manage nested product categories.</p>
-          </div>
-        </div>
-        <div className="flex gap-3 w-full sm:w-auto">
-          <Button variant="outline" onClick={() => fetchData(true)} disabled={loading} className="rounded-xl h-10 px-4 flex-1 sm:flex-none">
-            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <Button onClick={openAddModal} className="rounded-xl h-10 px-4 font-bold shadow-sm flex-1 sm:flex-none">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Subcategory
-          </Button>
-        </div>
-      </div>
+      <AdminPageHeader
+        icon={FolderTree}
+        title="Subcategories"
+        subtitle="Manage nested product categories."
+      >
+        <Button variant="outline" onClick={() => fetchData(true)} disabled={loading} className="rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
+          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+        <Button variant="outline" onClick={openAddModal} className="rounded-xl h-10 px-4 font-bold border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
+          <Plus className="w-4 h-4 mr-2" />
+          Add Subcategory
+        </Button>
+      </AdminPageHeader>
 
       {error ? (
         <div className="bg-destructive/10 border border-destructive/20 text-destructive p-6 rounded-xl flex flex-col items-center justify-center text-center">

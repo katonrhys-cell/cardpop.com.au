@@ -26,6 +26,7 @@ import {
   Plus, Pencil, Trash2, ArrowUp, ArrowDown, ChevronRight,
   Layers, GripVertical,
 } from 'lucide-react';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 
 // ─── Gradient palette (all classes already in codebase so Tailwind won't purge) ──
 const GRADIENT_OPTIONS = [
@@ -218,13 +219,11 @@ const CollectionsManagementPage = () => {
     <div className="min-h-screen bg-background p-6 lg:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
 
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Collections & Eras</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage the eras and sets displayed on each collection browse page and in the vault listing form.
-          </p>
-        </div>
+        <AdminPageHeader
+          icon={Layers}
+          title="Collections & Eras"
+          subtitle="Manage the eras and sets displayed on each collection browse page and in the vault listing form."
+        />
 
         <div className="flex flex-col lg:flex-row gap-6">
 
