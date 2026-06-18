@@ -23,7 +23,21 @@ const DialogOverlay = React.forwardRef(({ className, ...props }, ref) => (
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
-const DialogContent = React.forwardRef(({ className, children, ...props }, ref) => (
+const DialogContent = React.forwardRef(({ className, children, ...props }, ref) => {
+  // Safety net for a known Radix issue: when a Dialog is opened from within
+  // another overlay layer (e.g. a DropdownMenu item), the layers can race on
+  // restoring `pointer-events` and leave `pointer-events: none` stuck on the
+  // <body>, which silently blocks all clicks/navigation. Always clear it when
+  // this content unmounts.
+  React.useEffect(() => {
+    return () => {
+      if (document.body.style.pointerEvents === "none") {
+        document.body.style.pointerEvents = ""
+      }
+    }
+  }, [])
+
+  return (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
@@ -41,7 +55,8 @@ const DialogContent = React.forwardRef(({ className, children, ...props }, ref) 
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </DialogPortal>
-))
+  )
+})
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
 const DialogHeader = ({

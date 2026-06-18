@@ -134,7 +134,7 @@ const MyVaultPage = () => {
               <DropdownMenuItem onClick={() => navigate(`/vault/edit/${card.id}`)} className="cursor-pointer gap-2 font-medium">
                 <Edit className="w-4 h-4" /> Edit Details
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setListingModal({ open: true, card })} className="cursor-pointer gap-2 font-medium">
+              <DropdownMenuItem onClick={() => { setTimeout(() => setListingModal({ open: true, card }), 0); }} className="cursor-pointer gap-2 font-medium">
                 <ShoppingCart className="w-4 h-4" /> Manage Listing
               </DropdownMenuItem>
               <DropdownMenuSeparator />
