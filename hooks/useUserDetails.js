@@ -15,8 +15,11 @@ export const useUserDetails = (userId) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError]         = useState(null);
 
-  const fetchUserDetails = useCallback(async () => {
-    if (!userId) { setIsLoading(false); return; }
+  // isActive lets the caller abort stale results — when userId changes quickly,
+  // an in-flight request for the old id must not overwrite the newer data (or
+  // setState after unmount).
+  const fetchUserDetails = useCallback(async (isActive = () => true) => {
+    if (!userId) { if (isActive()) setIsLoading(false); return; }
 
     setIsLoading(true);
     setError(null);
@@ -38,6 +41,8 @@ export const useUserDetails = (userId) => {
         supabase.from('shipping_addresses').select('*').eq('user_id', userId),
       ]);
 
+      if (!isActive()) return;
+
       setData({
         user:           profileRes.status === 'fulfilled' ? profileRes.value.data : null,
         vaultProducts:  vaultRes.status === 'fulfilled'       ? (vaultRes.value.data ?? [])        : [],
@@ -50,13 +55,17 @@ export const useUserDetails = (userId) => {
       });
     } catch (err) {
       console.error('Error fetching user details:', err);
-      setError(err.message || 'Failed to load user details');
+      if (isActive()) setError(err.message || 'Failed to load user details');
     } finally {
-      setIsLoading(false);
+      if (isActive()) setIsLoading(false);
     }
   }, [userId]);
 
-  useEffect(() => { fetchUserDetails(); }, [fetchUserDetails]);
+  useEffect(() => {
+    let active = true;
+    fetchUserDetails(() => active);
+    return () => { active = false; };
+  }, [fetchUserDetails]);
 
-  return { ...data, isLoading, error, refetch: fetchUserDetails };
+  return { ...data, isLoading, error, refetch: () => fetchUserDetails() };
 };
