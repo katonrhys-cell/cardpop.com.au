@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { Search, MoreHorizontal, Shield, ChevronLeft, Users, X } from 'lucide-react';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -116,17 +117,11 @@ const UserManagementPage = () => {
     <div className="w-full space-y-6 animate-in fade-in duration-300 py-6 px-4 sm:px-6 md:px-8 max-w-7xl mx-auto">
       <Helmet><title>User Management | Admin Portal</title></Helmet>
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-start gap-3 w-full sm:w-auto">
-          <Button variant="ghost" onClick={() => navigate('/admin')} className="h-10 rounded-xl px-3 mt-0.5 shrink-0">
-            <ChevronLeft className="w-5 h-5 mr-1" /> Back
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold font-serif text-foreground">User Management</h1>
-            <p className="text-muted-foreground text-sm mt-1">Manage {totalItems} registered accounts.</p>
-          </div>
-        </div>
-      </div>
+      <AdminPageHeader
+        icon={Users}
+        title="User Management"
+        subtitle={`Manage ${totalItems} registered accounts.`}
+      />
 
       <Card className="p-0 border-border shadow-sm rounded-2xl overflow-hidden bg-card">
         <div className="p-4 border-b border-border bg-muted/20 flex flex-col lg:flex-row gap-4 items-center justify-between">

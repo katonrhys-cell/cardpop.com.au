@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Upload, Image as ImageIcon, Trash2, Copy, Check, AlertCircle, RefreshCcw } from 'lucide-react';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -121,10 +122,11 @@ const MediaLibraryPage = () => {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold font-heading text-foreground tracking-tight">Media Library</h1>
-        <p className="text-muted-foreground mt-1">Manage images and assets for your articles and content.</p>
-      </div>
+      <AdminPageHeader
+        icon={ImageIcon}
+        title="Media Library"
+        subtitle="Manage images and assets for your articles and content."
+      />
 
       {/* Upload Section */}
       <Card className="p-6 border-border shadow-sm bg-card">

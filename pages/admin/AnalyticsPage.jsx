@@ -1,20 +1,22 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BarChart3, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 
 const AnalyticsPage = () => {
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold font-heading">Analytics & Reports</h1>
-          <p className="text-muted-foreground text-sm">Deep dive into platform performance metrics.</p>
-        </div>
-        <Button variant="outline" className="gap-2">
+      <AdminPageHeader
+        icon={BarChart3}
+        title="Analytics & Reports"
+        subtitle="Deep dive into platform performance metrics."
+      >
+        <Button variant="outline" className="gap-2 rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
           <Download className="w-4 h-4" /> Export Report
         </Button>
-      </div>
+      </AdminPageHeader>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="min-h-[300px] flex flex-col items-center justify-center text-center p-6 border-dashed">

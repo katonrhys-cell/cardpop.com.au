@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { ChevronLeft, Save, Settings, Shield, Mail, CreditCard, MessageSquare, LayoutGrid, RefreshCcw, AlertCircle } from 'lucide-react';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -104,20 +105,15 @@ const AdminSettingsPage = () => {
     <div className="w-full space-y-6 animate-in fade-in duration-300 py-6 px-4 sm:px-6 md:px-8 max-w-5xl mx-auto">
       <Helmet><title>Platform Settings | Admin</title></Helmet>
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-start gap-3 w-full sm:w-auto">
-          <Button variant="ghost" onClick={() => navigate('/admin')} className="h-10 rounded-xl px-3 mt-0.5 shrink-0">
-            <ChevronLeft className="w-5 h-5 mr-1" /> Back
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold font-serif text-foreground">Platform Settings</h1>
-            <p className="text-muted-foreground text-sm mt-1">Configure global application parameters.</p>
-          </div>
-        </div>
-        <Button onClick={handleSave} disabled={saving} className="gap-2 font-bold rounded-xl h-10 px-6">
+      <AdminPageHeader
+        icon={Settings}
+        title="Platform Settings"
+        subtitle="Configure global application parameters."
+      >
+        <Button onClick={handleSave} disabled={saving} variant="outline" className="gap-2 font-bold rounded-xl h-10 px-6 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
           <Save className="w-4 h-4" /> {saving ? 'Saving…' : 'Save Changes'}
         </Button>
-      </div>
+      </AdminPageHeader>
 
       <Tabs defaultValue="general" className="w-full">
         <TabsList className="grid grid-cols-3 md:grid-cols-6 mb-6 bg-muted/50 p-1 rounded-xl h-auto">

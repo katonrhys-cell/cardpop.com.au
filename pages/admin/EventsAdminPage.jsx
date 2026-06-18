@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { supabase } from '@/lib/supabaseClient.js';
-import { 
-  Plus, 
-  MoreHorizontal, 
-  Edit, 
+import {
+  Plus,
+  MoreHorizontal,
+  Edit,
   Trash2,
   CalendarDays,
   Image as ImageIcon,
@@ -13,6 +13,7 @@ import {
   Clock,
   AlertCircle
 } from 'lucide-react';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -189,15 +190,15 @@ const EventsAdminPage = () => {
         <title>Manage Events | Admin Portal</title>
       </Helmet>
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold font-serif text-foreground">Events Management</h1>
-          <p className="text-muted-foreground mt-1 text-sm">Create and manage platform community events.</p>
-        </div>
-        <Button onClick={handleCreate} className="font-semibold shadow-sm gap-2 rounded-xl">
+      <AdminPageHeader
+        icon={CalendarDays}
+        title="Events Management"
+        subtitle="Create and manage platform community events."
+      >
+        <Button onClick={handleCreate} variant="outline" className="font-semibold gap-2 rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
           <Plus className="w-4 h-4" /> Create Event
         </Button>
-      </div>
+      </AdminPageHeader>
 
       <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto w-full">

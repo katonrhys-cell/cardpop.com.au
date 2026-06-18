@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, AlertCircle, RefreshCcw, Package, ChevronLeft, BarChart3 } from 'lucide-react';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -85,20 +86,15 @@ const ProductManagementPage = () => {
     <div className="w-full space-y-6 animate-in fade-in duration-300 py-6 px-4 sm:px-6 md:px-8">
       <Helmet><title>Official Shop Management | Admin</title></Helmet>
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex items-start gap-3 w-full sm:w-auto">
-          <Button variant="ghost" onClick={() => navigate('/admin')} className="h-10 rounded-xl px-3 mt-0.5 shrink-0">
-            <ChevronLeft className="w-5 h-5 mr-1" /> Back
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold font-serif text-foreground">Shop Products</h1>
-            <p className="text-muted-foreground text-sm mt-1">Manage official catalog and inventory.</p>
-          </div>
-        </div>
-        <Button className="gap-2 font-bold rounded-xl h-10 px-4" onClick={() => { setEditingProduct(null); setIsAddModalOpen(true); }}>
+      <AdminPageHeader
+        icon={Package}
+        title="Shop Products"
+        subtitle="Manage official catalog and inventory."
+      >
+        <Button variant="outline" className="gap-2 font-bold rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => { setEditingProduct(null); setIsAddModalOpen(true); }}>
           <Plus className="w-4 h-4" /> New Product
         </Button>
-      </div>
+      </AdminPageHeader>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card className="p-5 rounded-2xl bg-card border border-border shadow-sm flex items-center gap-4">

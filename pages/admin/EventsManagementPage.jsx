@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Wand2, Star } from 'lucide-react';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
@@ -110,20 +111,18 @@ const EventsManagementPage = () => {
     <div className="w-full space-y-6 animate-in fade-in duration-300 py-6 px-4 sm:px-6 md:px-8">
       <Helmet><title>Manage Events | Admin Portal</title></Helmet>
 
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-2">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Event Management</h1>
-          <p className="text-muted-foreground mt-1">Create, update, and manage community events.</p>
-        </div>
-        <div className="flex gap-3 w-full md:w-auto shrink-0">
-          <Button onClick={() => setIsScraperOpen(true)} variant="outline" className="font-bold rounded-xl h-11 px-4 shadow-sm flex-1 md:flex-auto">
-            <Wand2 className="w-4 h-4 mr-2" /> AI Event Scraper
-          </Button>
-          <Button onClick={() => handleOpenModal()} className="font-bold rounded-xl h-11 px-6 shadow-sm flex-1 md:flex-auto">
-            <Plus className="w-5 h-5 mr-2" /> Create Event
-          </Button>
-        </div>
-      </div>
+      <AdminPageHeader
+        icon={Calendar}
+        title="Event Management"
+        subtitle="Create, update, and manage community events."
+      >
+        <Button onClick={() => setIsScraperOpen(true)} variant="outline" className="font-bold rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
+          <Wand2 className="w-4 h-4 mr-2" /> AI Event Scraper
+        </Button>
+        <Button onClick={() => handleOpenModal()} variant="outline" className="font-bold rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
+          <Plus className="w-5 h-5 mr-2" /> Create Event
+        </Button>
+      </AdminPageHeader>
 
       <div className="bg-card border border-border rounded-3xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">

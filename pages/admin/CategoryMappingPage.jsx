@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Wand2 } from 'lucide-react';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { toast } from 'sonner';
 
 const CategoryMappingPage = () => {
@@ -59,14 +60,17 @@ const CategoryMappingPage = () => {
   return (
     <div className="space-y-6 max-w-5xl">
       <Helmet><title>Category Mapping Tools | Admin</title></Helmet>
-      
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold font-heading">Category Mapping Engine</h1>
-        <Button onClick={handleAutoMap} disabled={mappingLoading || stats.unmapped === 0} className="gap-2 font-bold">
+
+      <AdminPageHeader
+        icon={Wand2}
+        title="Category Mapping Engine"
+        subtitle="Auto-map listings to the correct product categories."
+      >
+        <Button onClick={handleAutoMap} disabled={mappingLoading || stats.unmapped === 0} variant="outline" className="gap-2 font-bold rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
           {mappingLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
           Auto-Map Unassigned
         </Button>
-      </div>
+      </AdminPageHeader>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-card p-6 rounded-xl border border-border shadow-sm">

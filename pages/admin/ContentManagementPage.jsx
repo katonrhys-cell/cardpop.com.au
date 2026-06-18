@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Search, Edit, Trash2, FileText, AlertCircle, RefreshCcw, FileCode2, Globe, EyeOff, ArrowLeft, BookOpen, PenLine } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -135,21 +136,15 @@ const ContentManagementPage = () => {
     <div className="min-h-screen bg-background text-foreground">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
-        {/* Back nav */}
-        <Button asChild variant="ghost" size="sm" className="gap-1.5 text-muted-foreground hover:text-foreground -ml-2">
-          <Link to="/admin"><ArrowLeft className="w-4 h-4" /> Back to Dashboard</Link>
-        </Button>
-
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-extrabold font-serif tracking-tight">Blog Management</h1>
-            <p className="text-muted-foreground mt-1">Manage content, metadata, and visibility of all blog articles.</p>
-          </div>
-          <Button onClick={handleCreateNew} className="gap-2 shrink-0 bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm">
+        <AdminPageHeader
+          icon={BookOpen}
+          title="Blog Management"
+          subtitle="Manage content, metadata, and visibility of all blog articles."
+        >
+          <Button onClick={handleCreateNew} variant="outline" className="gap-2 shrink-0 rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
             <Plus className="w-4 h-4" /> New Article
           </Button>
-        </div>
+        </AdminPageHeader>
 
         {/* Stats */}
         <div className="flex flex-wrap gap-3">
