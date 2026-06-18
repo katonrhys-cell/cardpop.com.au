@@ -85,6 +85,7 @@ const AddEditCardPage = () => {
   const [photoQuality, setPhotoQuality]       = useState(null);
   const [checkingQuality, setCheckingQuality] = useState(false);
   const [showAutoGuide, setShowAutoGuide]     = useState(false);
+  const [showPatchGuide, setShowPatchGuide]   = useState(false);
 
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
@@ -108,6 +109,8 @@ const AddEditCardPage = () => {
     isAuto:         false,
     autoType:       '',
     autoSigners:    1,
+    patchType:      '',
+    patchPieces:    1,
     // Grading
     gradingCompany: 'raw',
     grade:          '',
@@ -226,6 +229,8 @@ const AddEditCardPage = () => {
           isAuto:         card.is_auto        ?? false,
           autoType:       card.auto_type      || '',
           autoSigners:    card.auto_signers   ?? 1,
+          patchType:      card.patch_type     || '',
+          patchPieces:    card.patch_pieces   ?? 1,
           gradingCompany: card.grading_company || 'raw',
           grade:          card.grade          || '',
           certNumber:     card.cert_number    || '',
@@ -420,6 +425,8 @@ const AddEditCardPage = () => {
         is_auto:             formData.isAuto,
         auto_type:           formData.variant.includes('Auto') ? (formData.autoType || null) : null,
         auto_signers:        formData.variant.includes('Auto') ? (formData.autoSigners || 1) : null,
+        patch_type:          formData.variant.includes('Patch') ? (formData.patchType || null) : null,
+        patch_pieces:        formData.variant.includes('Patch') ? (formData.patchPieces || 1) : null,
         grading_company:     formData.gradingCompany,
         grade:               isGraded ? (formData.grade?.trim() || null) : null,
         cert_number:         isGraded ? (formData.certNumber?.trim() || null) : null,
@@ -1082,6 +1089,146 @@ const AddEditCardPage = () => {
                               >
                                 <span className="font-bold text-sm">{label}</span>
                                 <span className={`text-[10px] mt-0.5 ${formData.autoSigners === value ? 'text-blue-600/70 dark:text-blue-400/70' : 'text-muted-foreground'}`}>{sub}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Patch sub-details — shown when the "Patch" attribute is selected
+                        in the Card Variant / Finish section (the Attributes group). */}
+                    {formData.variant.includes('Patch') && (
+                      <div className="mt-3 p-4 rounded-xl border-2 border-emerald-400/30 bg-emerald-400/5 space-y-4 animate-in fade-in slide-in-from-top-1">
+                        <p className="text-xs font-extrabold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">Patch Details</p>
+
+                        {/* Patch type */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Patch Type</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { value: 'game_used',    label: 'Game-Used',          desc: 'Swatch from a jersey or gear worn in an official game' },
+                              { value: 'player_worn',  label: 'Player-Worn',        desc: 'Worn by the player off-field, not during a game' },
+                              { value: 'event_worn',   label: 'Event-Worn',         desc: 'Worn at a league event like the Rookie Premiere' },
+                              { value: 'rookie_patch', label: 'Rookie Patch Auto',  desc: 'Rookie card pairing a patch with an autograph (RPA)' },
+                              { value: 'prime',        label: 'Prime / Multi-Colour', desc: 'Premium patch showing logos, stripes or seams' },
+                              { value: 'laundry_tag',  label: 'Laundry Tag',        desc: 'Care tag cut from the jersey — usually a 1/1' },
+                              { value: 'nameplate',    label: 'Nameplate Letter',   desc: "A letter cut from the player's jersey nameplate" },
+                              { value: 'manufactured', label: 'Manufactured',       desc: 'Made by the manufacturer — never actually worn' },
+                            ].map(({ value, label, desc }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('patchType', formData.patchType === value ? '' : value)}
+                                className={`flex flex-col items-start px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
+                                  formData.patchType === value
+                                    ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                }`}
+                              >
+                                <span className="font-bold text-xs">{label}</span>
+                                <span className={`text-[10px] mt-0.5 leading-tight ${formData.patchType === value ? 'text-emerald-600/70 dark:text-emerald-400/70' : 'text-muted-foreground'}`}>{desc}</span>
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Collapsible patch type guide */}
+                          <div className="rounded-xl border border-emerald-400/25 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setShowPatchGuide(v => !v)}
+                              className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-emerald-400/5 transition-colors"
+                            >
+                              <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">Not sure which type? View guide</span>
+                              <ChevronDown className={`h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 transition-transform duration-200 ${showPatchGuide ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showPatchGuide && (
+                              <div className="px-3 pb-3 divide-y divide-border/40">
+                                {[
+                                  {
+                                    title: 'Game-Used Memorabilia',
+                                    badge: 'Authentic',
+                                    badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20',
+                                    body: 'A swatch cut from a jersey, glove, base, or other equipment actually worn or used by the player during an official game. Plain single-colour swatches are common, while multi-colour pieces showing seams or stripes command a premium.',
+                                  },
+                                  {
+                                    title: 'Player-Worn',
+                                    badge: 'Common',
+                                    badgeClass: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20',
+                                    body: 'Material worn by the player but not during a game — typically at a photo shoot or promotional appearance. Authentic to the player, but generally valued lower than true game-used pieces.',
+                                  },
+                                  {
+                                    title: 'Event-Worn',
+                                    badge: 'Premium',
+                                    badgeClass: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-500/20',
+                                    body: 'Worn at a specific league event such as the Rookie Premiere, Combine, or All-Star festivities. These jerseys are the source of many sought-after rookie patch cards.',
+                                  },
+                                  {
+                                    title: 'Rookie Patch Auto (RPA)',
+                                    badge: 'Grail',
+                                    badgeClass: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20',
+                                    body: "A rookie card that combines a memorabilia patch with the player's autograph. RPAs are among the most coveted and valuable modern cards, especially when serial-numbered or featuring a multi-colour prime patch.",
+                                  },
+                                  {
+                                    title: 'Prime Patch',
+                                    badge: 'High Value',
+                                    badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20',
+                                    body: 'A patch piece containing premium detail — team logos, jersey numbers, stripes, or seams — rather than a plain single colour. Prime patches are far rarer and significantly more valuable than standard swatches.',
+                                  },
+                                  {
+                                    title: 'Laundry Tag',
+                                    badge: '1/1',
+                                    badgeClass: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20',
+                                    body: 'The small care/wash tag sewn into a jersey. Because each jersey has only one, laundry-tag cards are typically unique 1/1s and are extremely rare and desirable.',
+                                  },
+                                  {
+                                    title: 'Nameplate Letter',
+                                    badge: 'Rare',
+                                    badgeClass: 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border border-orange-500/20',
+                                    body: "A single letter cut from the player's jersey nameplate. The number of available cards is limited by the letters in the player's name, making these scarce and collectible.",
+                                  },
+                                  {
+                                    title: 'Manufactured / Commemorative',
+                                    badge: 'Decorative',
+                                    badgeClass: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20',
+                                    body: 'A patch created by the manufacturer — such as a commemorative logo, sleeve badge, or team crest — that was never actually worn. Visually striking but generally lower in collector value than worn memorabilia.',
+                                  },
+                                ].map(({ title, badge, badgeClass, body }) => (
+                                  <div key={title} className="py-2.5 first:pt-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-[11px] font-bold text-foreground">{title}</span>
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${badgeClass}`}>{badge}</span>
+                                    </div>
+                                    <p className="text-[10px] leading-relaxed text-muted-foreground">{body}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Number of memorabilia pieces */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Memorabilia Pieces</Label>
+                          <div className="flex gap-2">
+                            {[
+                              { value: 1, label: 'Single', sub: '1 swatch' },
+                              { value: 2, label: 'Dual',   sub: '2 swatches' },
+                              { value: 3, label: 'Triple', sub: '3 swatches' },
+                              { value: 4, label: 'Quad',   sub: '4+ swatches' },
+                            ].map(({ value, label, sub }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('patchPieces', value)}
+                                className={`flex-1 flex flex-col items-center px-2 py-2.5 rounded-xl border-2 text-center transition-all ${
+                                  formData.patchPieces === value
+                                    ? 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                }`}
+                              >
+                                <span className="font-bold text-sm">{label}</span>
+                                <span className={`text-[10px] mt-0.5 ${formData.patchPieces === value ? 'text-emerald-600/70 dark:text-emerald-400/70' : 'text-muted-foreground'}`}>{sub}</span>
                               </button>
                             ))}
                           </div>
