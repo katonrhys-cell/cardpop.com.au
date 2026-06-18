@@ -418,8 +418,8 @@ const AddEditCardPage = () => {
         is_refractor:        formData.isRefractor,
         serial_number:       formData.serialNumber?.trim() || null,
         is_auto:             formData.isAuto,
-        auto_type:           formData.isAuto ? (formData.autoType || null) : null,
-        auto_signers:        formData.isAuto ? (formData.autoSigners || 1) : null,
+        auto_type:           formData.variant.includes('Auto') ? (formData.autoType || null) : null,
+        auto_signers:        formData.variant.includes('Auto') ? (formData.autoSigners || 1) : null,
         grading_company:     formData.gradingCompany,
         grade:               isGraded ? (formData.grade?.trim() || null) : null,
         cert_number:         isGraded ? (formData.certNumber?.trim() || null) : null,
@@ -956,8 +956,9 @@ const AddEditCardPage = () => {
                       </div>
                     </div>
 
-                    {/* Auto sub-details — shown when Auto is toggled on */}
-                    {formData.isAuto && (
+                    {/* Auto sub-details — shown when the "Auto" attribute is selected
+                        in the Card Variant / Finish section (the Attributes group). */}
+                    {formData.variant.includes('Auto') && (
                       <div className="mt-3 p-4 rounded-xl border-2 border-blue-400/30 bg-blue-400/5 space-y-4 animate-in fade-in slide-in-from-top-1">
                         <p className="text-xs font-extrabold uppercase tracking-widest text-blue-700 dark:text-blue-400">Autograph Details</p>
 
