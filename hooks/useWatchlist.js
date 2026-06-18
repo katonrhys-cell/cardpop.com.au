@@ -12,7 +12,11 @@ export const useWatchlist = () => {
   const { currentUser, isAuthenticated } = useAuth();
   const [ids, setIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
-  const optimisticRef = useRef(false);
+  // Number of toggles currently in flight. While > 0 we suppress realtime
+  // refetches (they'd clobber the optimistic state); once it returns to 0 we
+  // reconcile with the server to pick up anything that changed meanwhile.
+  const pendingRef = useRef(0);
+  const fetchRef = useRef(null);
 
   useEffect(() => {
     if (!isAuthenticated || !currentUser?.id) {
@@ -34,6 +38,7 @@ export const useWatchlist = () => {
         setLoading(false);
       }
     };
+    fetchRef.current = fetchIds;
 
     fetchIds();
 
@@ -41,12 +46,13 @@ export const useWatchlist = () => {
     const channel = supabase
       .channel(`watchlist-ids-${uid}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'watchlist', filter: `user_id=eq.${uid}` },
-        () => { if (!optimisticRef.current) fetchIds(); }
+        () => { if (pendingRef.current === 0) fetchIds(); }
       )
       .subscribe();
 
     return () => {
       cancelled = true;
+      fetchRef.current = null;
       supabase.removeChannel(channel);
     };
   }, [currentUser?.id, isAuthenticated]);
@@ -57,7 +63,7 @@ export const useWatchlist = () => {
     const already = ids.has(listingId);
 
     // Optimistic update
-    optimisticRef.current = true;
+    pendingRef.current += 1;
     setIds(prev => {
       const next = new Set(prev);
       if (already) next.delete(listingId);
@@ -82,7 +88,9 @@ export const useWatchlist = () => {
       });
       return already;
     } finally {
-      optimisticRef.current = false;
+      pendingRef.current = Math.max(0, pendingRef.current - 1);
+      // Once the last concurrent toggle settles, reconcile with server truth.
+      if (pendingRef.current === 0) fetchRef.current?.();
     }
   }, [currentUser?.id, ids]);
 
