@@ -109,9 +109,10 @@ router.get('/similar/:itemId', async (req, res) => {
       .from('listings')
       .select('category, vault_item:vault_items(category)')
       .eq('id', itemId)
-      .single();
+      .maybeSingle();
 
     if (itemError) throw itemError;
+    if (!item) return res.status(404).json({ error: 'Item not found' });
 
     const category = item.category || item.vault_item?.category;
 

@@ -244,7 +244,7 @@ const App = () => {
                         <Route path="/shop/category/:categorySlug" element={<ShopCategoryPage />} />
                         
                         {/* Checkout */}
-                        <Route path="/checkout/:cardId?" element={<CheckoutPage />} />
+                        <Route path="/checkout/:cardId?" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
                         <Route path="/checkout-success" element={<CheckoutSuccessPage />} />
                         <Route path="/success" element={<CheckoutSuccessPage />} />
                         
