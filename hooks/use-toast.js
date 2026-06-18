@@ -136,6 +136,9 @@ function useToast() {
   const [state, setState] = React.useState(memoryState)
 
   React.useEffect(() => {
+    // Register the listener once for the component's lifetime. Keying this on
+    // [state] (the buggy upstream version) tore down and re-added the listener
+    // on every dispatch, churning the shared array and risking missed updates.
     listeners.push(setState)
     return () => {
       const index = listeners.indexOf(setState)
@@ -143,7 +146,7 @@ function useToast() {
         listeners.splice(index, 1)
       }
     };
-  }, [state])
+  }, [])
 
   return {
     ...state,
