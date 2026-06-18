@@ -173,7 +173,6 @@ const SellerProfilePage = () => {
                     <ProductCard
                       key={product.id}
                       product={product}
-                      onViewDetails={() => window.location.href = `/card-details/${product.id}`}
                     />
                   ))}
                 </div>

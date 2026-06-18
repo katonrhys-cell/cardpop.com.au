@@ -272,8 +272,8 @@ const ProductLinesManagementPage = () => {
                     <TableRow key={line.id} className="group hover:bg-muted/40 transition-colors">
                       <TableCell className="text-center">
                         <div className="w-10 h-10 rounded-xl bg-background border border-border flex items-center justify-center mx-auto overflow-hidden shadow-sm p-1">
-                          {line.image ? (
-                            <img src={line.image_url || line.image} alt={line.name} className="w-full h-full object-contain" />
+                          {line.image_url ? (
+                            <img src={line.image_url} alt={line.name} className="w-full h-full object-contain" />
                           ) : (
                             <ImageOff className="w-4 h-4 text-muted-foreground opacity-50" />
                           )}

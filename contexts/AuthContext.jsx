@@ -89,6 +89,26 @@ export const AuthProvider = ({ children }) => {
     return () => { cancelled = true; };
   }, [currentUser?.id, profile]);
 
+  // Keep the profile (and therefore isAdmin) fresh while the app is open by
+  // subscribing to realtime UPDATEs on the current user's own profiles row.
+  // Without this, a mid-session change such as an admin being demoted would
+  // leave stale chrome (the Admin nav/links) visible until a full reload.
+  useEffect(() => {
+    const userId = currentUser?.id;
+    if (!userId) return;
+    const channel = supabase
+      .channel(`profile-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },
+        (payload) => {
+          if (isMounted.current && payload.new) setProfile(payload.new);
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [currentUser?.id]);
+
   // Derive whether an MFA challenge is still outstanding for the current session
   // from Supabase's assurance level. Runs whenever the access token changes
   // (login, refresh, MFA upgrade) so a page reload mid-challenge can't bypass it.

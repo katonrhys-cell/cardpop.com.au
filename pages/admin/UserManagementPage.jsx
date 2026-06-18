@@ -68,10 +68,10 @@ const UserManagementPage = () => {
     fetchUsers();
   }, [fetchUsers]);
 
-  // Reset page when filters change
-  useEffect(() => {
-    setPage(1);
-  }, [debouncedSearch, statusFilter, verificationFilter]);
+  // Page is reset to 1 inside the filter change handlers (search/role/verification/
+  // clear) rather than in an effect, so the filter change and the page reset land
+  // in the same batched render — fetchUsers is recreated once and fires a single
+  // query instead of first re-fetching the old page number under the new filter.
 
   const fetchRelatedCounts = async (userList) => {
     const newCounts = { ...userCounts };
@@ -111,6 +111,7 @@ const UserManagementPage = () => {
     setSearchTerm('');
     setStatusFilter('all');
     setVerificationFilter('all');
+    setPage(1);
   };
 
   return (
@@ -131,12 +132,12 @@ const UserManagementPage = () => {
               placeholder="Search by email, name, or username..." 
               className="pl-9 h-10 rounded-xl bg-background border-border"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
             />
           </div>
           
           <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
               <SelectTrigger className="w-[140px] h-10 rounded-xl bg-background">
                 <SelectValue placeholder="Role" />
               </SelectTrigger>
@@ -147,7 +148,7 @@ const UserManagementPage = () => {
               </SelectContent>
             </Select>
 
-            <Select value={verificationFilter} onValueChange={setVerificationFilter}>
+            <Select value={verificationFilter} onValueChange={(v) => { setVerificationFilter(v); setPage(1); }}>
               <SelectTrigger className="w-[140px] h-10 rounded-xl bg-background">
                 <SelectValue placeholder="Verification" />
               </SelectTrigger>

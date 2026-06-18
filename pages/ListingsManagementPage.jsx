@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, Filter, ArrowUpDown, Loader2, MoreHorizontal } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { useCategories } from '@/hooks/useCategories.js';
 import { formatCurrency } from '@/api/EcommerceApi.js';
 import { toast } from 'sonner';
 
@@ -23,10 +24,13 @@ const ListingsManagementPage = () => {
   const [listings, setListings] = useState([]);
   const [allListingsForAnalytics, setAllListingsForAnalytics] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
+  // Resolve vault_items.category_id → category name for display.
+  const { buildNameMap } = useCategories();
+  const [nameMap, setNameMap] = useState({});
+
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortOrder, setSortOrder] = useState('-created');
   
@@ -48,10 +52,15 @@ const ListingsManagementPage = () => {
       const sortColumn = sortOrder.includes('price') ? 'price_aud' : 'created_at';
       const ascending = !sortOrder.startsWith('-');
 
-      let query = supabase.from('listings').select('*', { count: 'exact' }).range((page - 1) * 20, page * 20 - 1).order(sortColumn, { ascending });
+      // listings has no display fields of its own — join the vault_item for the
+      // card name / image / category.
+      let query = supabase
+        .from('listings')
+        .select('*, vault_item:vault_items!inner(card_name, set_name, card_image, card_images, category_id)', { count: 'exact' })
+        .range((page - 1) * 20, page * 20 - 1)
+        .order(sortColumn, { ascending });
 
-      if (searchQuery) query = query.ilike('title', `%${searchQuery}%`);
-      if (categoryFilter !== 'all') query = query.eq('category', categoryFilter);
+      if (searchQuery) query = query.ilike('vault_items.card_name', `%${searchQuery}%`);
       if (statusFilter === 'active') query = query.eq('status', 'active');
       if (statusFilter === 'inactive') query = query.neq('status', 'active');
 
@@ -72,11 +81,15 @@ const ListingsManagementPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, searchQuery, categoryFilter, statusFilter, sortOrder]);
+  }, [page, searchQuery, statusFilter, sortOrder]);
 
   useEffect(() => {
     fetchListings();
   }, [fetchListings]);
+
+  useEffect(() => {
+    buildNameMap().then(setNameMap).catch(() => {});
+  }, [buildNameMap]);
 
   const handleSelectAll = (checked) => {
     if (checked) {
@@ -94,7 +107,7 @@ const ListingsManagementPage = () => {
   };
 
   const handleDelete = async (listing) => {
-    if (!window.confirm(`Are you sure you want to delete "${listing.title || listing.name || 'this listing'}"?`)) return;
+    if (!window.confirm(`Are you sure you want to delete "${listing.vault_item?.card_name || 'this listing'}"?`)) return;
     try {
       const { error } = await supabase.from('listings').delete().eq('id', listing.id);
       if (error) throw error;
@@ -180,18 +193,6 @@ const ListingsManagementPage = () => {
                 </SelectContent>
               </Select>
 
-              <Select value={categoryFilter} onValueChange={(v) => { setCategoryFilter(v); setPage(1); }}>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="Pokemon">Pokemon</SelectItem>
-                  <SelectItem value="Magic">Magic</SelectItem>
-                  <SelectItem value="Yu-Gi-Oh">Yu-Gi-Oh</SelectItem>
-                </SelectContent>
-              </Select>
-
               <Select value={sortOrder} onValueChange={(v) => { setSortOrder(v); setPage(1); }}>
                 <SelectTrigger className="w-[160px]">
                   <ArrowUpDown className="w-4 h-4 mr-2" />
@@ -244,10 +245,16 @@ const ListingsManagementPage = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  listings.map(listing => (
+                  listings.map(listing => {
+                    const vi = listing.vault_item;
+                    const rawImg = vi?.card_image || (Array.isArray(vi?.card_images) ? vi.card_images[0] : null);
+                    const imgSrc = rawImg
+                      ? (rawImg.startsWith('http') ? rawImg : supabase.storage.from('vault-images').getPublicUrl(rawImg).data.publicUrl)
+                      : null;
+                    return (
                     <TableRow key={listing.id} className="admin-table-row">
                       <TableCell className="text-center">
-                        <Checkbox 
+                        <Checkbox
                           checked={selectedItems.has(listing.id)}
                           onCheckedChange={(checked) => handleSelectItem(listing.id, checked)}
                         />
@@ -255,33 +262,30 @@ const ListingsManagementPage = () => {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded bg-muted flex items-center justify-center overflow-hidden shrink-0">
-                            {listing.image ? (
-                              <img src={listing.image_url || listing.image} alt={listing.name} className="w-full h-full object-cover" />
+                            {imgSrc ? (
+                              <img src={imgSrc} alt={vi?.card_name || 'Listing'} className="w-full h-full object-cover" />
                             ) : (
                               <span className="text-xs font-medium text-muted-foreground">Img</span>
                             )}
                           </div>
                           <div className="min-w-0">
-                            <p className="font-semibold text-sm truncate">{listing.name}</p>
-                            <p className="text-xs text-muted-foreground truncate font-mono">{listing.id}</p>
+                            <p className="font-semibold text-sm truncate">{vi?.card_name || 'Untitled'}</p>
+                            <p className="text-xs text-muted-foreground truncate">{vi?.set_name || ''}</p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="font-normal">{listing.collectionType}</Badge>
+                        <Badge variant="outline" className="font-normal">{nameMap[vi?.category_id] || '—'}</Badge>
                       </TableCell>
                       <TableCell>
-                        {listing.stockQuantity > 0 ? (
+                        {listing.status === 'active' ? (
                           <Badge className="bg-emerald-500/10 text-emerald-600 border-none">Active</Badge>
                         ) : (
-                          <Badge variant="secondary" className="bg-muted text-muted-foreground border-none">Out of Stock</Badge>
-                        )}
-                        {listing.moderationNotes && (
-                          <Badge variant="destructive" className="ml-2 text-[10px] px-1 py-0 h-4">!</Badge>
+                          <Badge variant="secondary" className="bg-muted text-muted-foreground border-none capitalize">{listing.status || 'inactive'}</Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        {formatCurrency(listing.price * 100)}
+                        {formatCurrency((listing.price_aud || 0) * 100)}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
@@ -303,7 +307,8 @@ const ListingsManagementPage = () => {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  ))
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

@@ -39,7 +39,9 @@ const FeaturedProductCard = ({ product, seller }) => {
 
   const handleCardClick = () => {
     if (product.id) {
-      navigate(`/product/${product.id}`);
+      // Unified product route requires a source segment (/product/:source/:id);
+      // featured cards come from vault_items, so default the source to 'vault'.
+      navigate(`/product/${product.source || 'vault'}/${product.id}`);
     }
   };
 

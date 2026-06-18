@@ -31,6 +31,9 @@ const STATUS_BADGE = {
 
 const REFUND_BADGE = {
   requested: { label: 'Refund Req.', cls: 'bg-amber-500/10 text-amber-700 border-amber-200' },
+  // refunds.status starts at 'pending' (orders.refund_status uses 'requested');
+  // include it so the refund dialog's status badge renders styled, not raw text.
+  pending:   { label: 'Pending Review', cls: 'bg-amber-500/10 text-amber-700 border-amber-200' },
   approved:  { label: 'Refund Appr.', cls: 'bg-blue-500/10 text-blue-700 border-blue-200' },
   processed: { label: 'Refunded',     cls: 'bg-emerald-500/10 text-emerald-700 border-emerald-200' },
   rejected:  { label: 'Req. Rejected', cls: 'bg-destructive/10 text-destructive border-destructive/20' },
@@ -221,6 +224,12 @@ const OrderManagementPage = () => {
 
   const openRefundDialog = async (order) => {
     const { data } = await supabase.from('refunds').select('*').eq('order_id', order.id).maybeSingle();
+    if (!data) {
+      // Order is flagged for refund but the refunds row is missing — surface it
+      // instead of silently doing nothing when "Review Refund Request" is clicked.
+      toast.error('No refund details found for this order.');
+      return;
+    }
     setSelectedOrder(order);
     setSelectedRefund(data);
   };
