@@ -3,7 +3,8 @@ import logger from './logger.js';
 
 function generateOTP() {
   const code = crypto.randomInt(10000000, 100000000).toString();
-  logger.debug(`[OTP] Generated OTP: ${code.substring(0, 4)}****`);
+  // Never log any part of the code — half an 8-digit OTP is meaningful material.
+  logger.debug('[OTP] Generated OTP');
   return code;
 }
 

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { optionalAuthMiddleware } from '../middleware/auth.js';
+import { getUsdToAudRate } from '../utils/exchangeRates.js';
 
 const router = Router();
 
@@ -129,8 +130,8 @@ router.get('/compare/:cardName', async (req, res) => {
       ? (sources.reduce((sum, item) => sum + (item.market_price || 0), 0) / sources.length).toFixed(2)
       : null;
 
-    // Convert to AUD (simplified conversion)
-    const audRate = 1.5; // Example conversion rate
+    // Convert to AUD using the live (cached) USD→AUD rate, not a hardcoded value.
+    const audRate = await getUsdToAudRate();
     const avgPriceAud = avgPrice ? (avgPrice * audRate).toFixed(2) : null;
 
     res.json({
