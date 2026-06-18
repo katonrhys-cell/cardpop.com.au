@@ -31,19 +31,21 @@ const ShopCategoryPage = () => {
         const from = (page - 1) * perPage;
 
         let query = supabase
-          .from('listings')
+          .from('shop_products')
           .select('*', { count: 'exact' })
+          .eq('status', 'active')
           .order('created_at', { ascending: false })
           .range(from, from + perPage - 1);
 
-        if (category) query = query.eq('category_id', category.id);
-        if (subcategory) query = query.eq('subcategory_id', subcategory.id);
-        // productTypeId has no direct mapping; omitted
+        // shop_products stores a free-text category; match the resolved
+        // subcategory/category name against it.
+        const categoryName = subcategory?.name || category?.name;
+        if (categoryName) query = query.ilike('category', `%${categoryName}%`);
 
         const { data, count, error } = await query;
         if (error) throw error;
 
-        setProducts((data || []).map(p => ({ ...p, source: p.source || 'shop' })));
+        setProducts((data || []).map(p => ({ ...p, source: 'shop', type: 'shop' })));
         setTotalItems(count || 0);
         setTotalPages(Math.ceil((count || 0) / perPage));
       } catch (error) {

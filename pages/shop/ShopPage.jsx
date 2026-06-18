@@ -28,13 +28,13 @@ const ShopPage = () => {
       setError(null);
       try {
         let query = supabase
-          .from('listings')
+          .from('shop_products')
           .select('*')
-          .in('status', ['active', 'For Sale'])
+          .eq('status', 'active')
           .limit(50);
 
         if (searchTerm) {
-          query = query.ilike('name', `%${searchTerm.replace(/'/g, '')}%`);
+          query = query.ilike('title', `%${searchTerm.replace(/'/g, '')}%`);
         }
 
         if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
@@ -45,7 +45,7 @@ const ShopPage = () => {
         if (fetchError) throw fetchError;
 
         if (!cancelled) {
-          setProducts((data || []).map(p => ({ ...p, source: 'shop' })));
+          setProducts((data || []).map(p => ({ ...p, source: 'shop', type: 'shop' })));
         }
       } catch (err) {
         if (!cancelled) {
