@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { apiServerClient } from '@/lib/apiServerClient';
+import { useIsMounted } from '@/hooks/useIsMounted.js';
 
 /**
  * Sends a card image to CardSight AI and returns identification,
@@ -14,6 +15,7 @@ import { apiServerClient } from '@/lib/apiServerClient';
 export function useCardSight() {
   const [isIdentifying, setIsIdentifying] = useState(false);
   const [result, setResult] = useState(null);
+  const isMounted = useIsMounted();
 
   const identify = useCallback(async (imageFile) => {
     if (!imageFile) return;
@@ -38,15 +40,15 @@ export function useCardSight() {
       }
 
       const data = await response.json();
-      setResult(data);
+      if (isMounted()) setResult(data);
       return data;
     } catch (err) {
       console.warn('[useCardSight] identify failed:', err.message);
       return { identified: false, apiError: true, message: err.message };
     } finally {
-      setIsIdentifying(false);
+      if (isMounted()) setIsIdentifying(false);
     }
-  }, []);
+  }, [isMounted]);
 
   /**
    * Fetch pricing for a known CardSight card ID (e.g. after editing a card

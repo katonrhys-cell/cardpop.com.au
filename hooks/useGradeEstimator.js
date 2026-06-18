@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { integratedAiClient } from '@/lib/integratedAiClient';
+import { useIsMounted } from '@/hooks/useIsMounted.js';
 
 const SSEEventType = {
   Content: 'content',
@@ -11,6 +12,7 @@ export function useGradeEstimator() {
   const [isAnalysing, setIsAnalysing] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const isMounted = useIsMounted();
 
   const estimateGrade = useCallback(async (imageFiles) => {
     if (!imageFiles?.length) return;
@@ -70,15 +72,15 @@ export function useGradeEstimator() {
       if (!jsonMatch) throw new Error('Could not extract grade data from analysis');
 
       const data = JSON.parse(jsonMatch[0]);
-      setResult(data);
+      if (isMounted()) setResult(data);
       return data;
     } catch (err) {
       const message = err.message || 'Grade estimation failed';
-      setError(message);
+      if (isMounted()) setError(message);
     } finally {
-      setIsAnalysing(false);
+      if (isMounted()) setIsAnalysing(false);
     }
-  }, []);
+  }, [isMounted]);
 
   return {
     estimateGrade,
