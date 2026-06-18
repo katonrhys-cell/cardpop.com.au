@@ -87,6 +87,7 @@ const AddEditCardPage = () => {
   const [showAutoGuide, setShowAutoGuide]     = useState(false);
   const [showPatchGuide, setShowPatchGuide]   = useState(false);
   const [showRelicGuide, setShowRelicGuide]   = useState(false);
+  const [showNumberGuide, setShowNumberGuide] = useState(false);
 
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
@@ -114,6 +115,8 @@ const AddEditCardPage = () => {
     patchPieces:    1,
     relicMaterial:  '',
     relicSource:    '',
+    serialPosition: '',
+    serialPrintRun: '',
     // Grading
     gradingCompany: 'raw',
     grade:          '',
@@ -236,6 +239,8 @@ const AddEditCardPage = () => {
           patchPieces:    card.patch_pieces   ?? 1,
           relicMaterial:  card.relic_material || '',
           relicSource:    card.relic_source   || '',
+          serialPosition: card.serial_position  != null ? String(card.serial_position)  : '',
+          serialPrintRun: card.serial_print_run != null ? String(card.serial_print_run) : '',
           gradingCompany: card.grading_company || 'raw',
           grade:          card.grade          || '',
           certNumber:     card.cert_number    || '',
@@ -434,6 +439,8 @@ const AddEditCardPage = () => {
         patch_pieces:        formData.variant.includes('Patch') ? (formData.patchPieces || 1) : null,
         relic_material:      formData.variant.includes('Relic / Jersey') ? (formData.relicMaterial || null) : null,
         relic_source:        formData.variant.includes('Relic / Jersey') ? (formData.relicSource || null) : null,
+        serial_position:     formData.variant.includes('Numbered') && formData.serialPosition ? (parseInt(formData.serialPosition, 10) || null) : null,
+        serial_print_run:    formData.variant.includes('Numbered') && formData.serialPrintRun ? (parseInt(formData.serialPrintRun, 10) || null) : null,
         grading_company:     formData.gradingCompany,
         grade:               isGraded ? (formData.grade?.trim() || null) : null,
         cert_number:         isGraded ? (formData.certNumber?.trim() || null) : null,
@@ -1370,6 +1377,153 @@ const AddEditCardPage = () => {
                                 <span className={`text-[10px] mt-0.5 ${formData.relicSource === value ? 'text-amber-600/70 dark:text-amber-400/70' : 'text-muted-foreground'}`}>{sub}</span>
                               </button>
                             ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Numbering sub-details — shown when the "Numbered" attribute is
+                        selected in the Card Variant / Finish section (Attributes group). */}
+                    {formData.variant.includes('Numbered') && (
+                      <div className="mt-3 p-4 rounded-xl border-2 border-violet-400/30 bg-violet-400/5 space-y-4 animate-in fade-in slide-in-from-top-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-extrabold uppercase tracking-widest text-violet-700 dark:text-violet-400">Numbering Details</p>
+                          {formData.serialPrintRun === '1' && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-violet-500/15 text-violet-700 dark:text-violet-400 border border-violet-500/30">
+                              ★ One-of-One (1/1)
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Serial number — position / print run */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Serial Number</Label>
+                          <div className="flex items-end gap-2">
+                            <div className="flex-1 space-y-1">
+                              <span className="text-[10px] text-muted-foreground font-medium">Card #</span>
+                              <Input
+                                type="number"
+                                min={1}
+                                inputMode="numeric"
+                                placeholder="e.g. 23"
+                                value={formData.serialPosition}
+                                onChange={e => {
+                                  const v = e.target.value;
+                                  setFormData(f => ({
+                                    ...f,
+                                    serialPosition: v,
+                                    serialNumber: v && f.serialPrintRun ? `${v}/${f.serialPrintRun}` : f.serialNumber,
+                                  }));
+                                }}
+                                className="h-10 bg-background text-center"
+                              />
+                            </div>
+                            <span className="pb-2.5 text-lg font-bold text-muted-foreground">/</span>
+                            <div className="flex-1 space-y-1">
+                              <span className="text-[10px] text-muted-foreground font-medium">Print run</span>
+                              <Input
+                                type="number"
+                                min={1}
+                                inputMode="numeric"
+                                placeholder="e.g. 99"
+                                value={formData.serialPrintRun}
+                                onChange={e => {
+                                  const v = e.target.value;
+                                  setFormData(f => ({
+                                    ...f,
+                                    serialPrintRun: v,
+                                    serialNumber: f.serialPosition && v ? `${f.serialPosition}/${v}` : f.serialNumber,
+                                  }));
+                                }}
+                                className="h-10 bg-background text-center"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Quick-pick common print runs */}
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {[1, 5, 10, 25, 50, 75, 99, 150, 199, 299].map(run => {
+                              const active = formData.serialPrintRun === String(run);
+                              return (
+                                <button
+                                  key={run}
+                                  type="button"
+                                  onClick={() => setFormData(f => ({
+                                    ...f,
+                                    serialPrintRun: String(run),
+                                    serialNumber: f.serialPosition ? `${f.serialPosition}/${run}` : f.serialNumber,
+                                  }))}
+                                  className={`px-2.5 py-1 rounded-full border text-[11px] font-bold transition-all ${
+                                    active
+                                      ? 'border-violet-500 bg-violet-500/10 text-violet-700 dark:text-violet-400 shadow-sm'
+                                      : 'border-border bg-background text-foreground hover:border-muted-foreground/40'
+                                  }`}
+                                >
+                                  {run === 1 ? '1/1' : `/${run}`}
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          <p className="text-[10px] text-muted-foreground leading-relaxed">
+                            Tip: if the card number matches the player's jersey number (e.g. 27/99 for a #27 player),
+                            it's a <span className="font-semibold text-foreground">jersey-number card</span> and usually sells at a premium.
+                          </p>
+
+                          {/* Collapsible numbering guide */}
+                          <div className="rounded-xl border border-violet-400/25 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setShowNumberGuide(v => !v)}
+                              className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-violet-400/5 transition-colors"
+                            >
+                              <span className="text-[11px] font-bold text-violet-700 dark:text-violet-400">How does numbering work? View guide</span>
+                              <ChevronDown className={`h-3.5 w-3.5 text-violet-600 dark:text-violet-400 transition-transform duration-200 ${showNumberGuide ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showNumberGuide && (
+                              <div className="px-3 pb-3 divide-y divide-border/40">
+                                {[
+                                  {
+                                    title: 'Reading a Serial Number',
+                                    badge: 'Basics',
+                                    badgeClass: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20',
+                                    body: 'Stamped as 23/99: the second number is the total print run (only 99 copies exist in the world), and the first is this specific copy. The smaller the print run, the rarer the card.',
+                                  },
+                                  {
+                                    title: 'One-of-One (1/1)',
+                                    badge: 'Rarest',
+                                    badgeClass: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-500/20',
+                                    body: 'Only a single copy exists. 1/1s are the most coveted parallels in the hobby and can command enormous premiums — often many times the value of any other version of the card.',
+                                  },
+                                  {
+                                    title: 'Jersey-Number Card',
+                                    badge: 'Premium',
+                                    badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20',
+                                    body: "When the card number matches the player's jersey number (e.g. 27/99 for a player who wears #27), collectors typically pay a 20–50% premium over other copies in the same run.",
+                                  },
+                                  {
+                                    title: 'Print Run & Value',
+                                    badge: 'Rarity',
+                                    badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20',
+                                    body: 'Value rises sharply as the run shrinks. Coloured parallels are often tiered — e.g. /299, /199, /99, /25, /10, down to a 1/1 — with each lower tier significantly scarcer and more valuable.',
+                                  },
+                                  {
+                                    title: 'First Off The Line (FOTL)',
+                                    badge: 'Special',
+                                    badgeClass: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20',
+                                    body: 'Some products release a small allotment early as "First Off The Line". These FOTL copies — and low positions like the first card printed — can carry extra collector cachet.',
+                                  },
+                                ].map(({ title, badge, badgeClass, body }) => (
+                                  <div key={title} className="py-2.5 first:pt-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-[11px] font-bold text-foreground">{title}</span>
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${badgeClass}`}>{badge}</span>
+                                    </div>
+                                    <p className="text-[10px] leading-relaxed text-muted-foreground">{body}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
