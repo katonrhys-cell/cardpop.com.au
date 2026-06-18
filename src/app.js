@@ -61,7 +61,13 @@ app.use(cors({
 }));
 
 app.use(morgan('combined'));
-app.use(globalRateLimit);
+// Apply the global IP rate limit to everything except the Stripe webhook —
+// a burst of webhook retries from Stripe must never be throttled (the route
+// still has its own high-capacity stripeLimiter). Matches the JSON-skip below.
+app.use((req, res, next) => {
+	if (req.path.endsWith('/stripe/webhook')) return next();
+	return globalRateLimit(req, res, next);
+});
 
 logger.debug(`[MAIN] Configuring body parser with limit: ${BodyLimit} bytes`);
 // Stripe webhooks need the raw body buffer for signature verification — skip JSON
