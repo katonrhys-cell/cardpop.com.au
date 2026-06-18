@@ -88,6 +88,7 @@ const AddEditCardPage = () => {
   const [showPatchGuide, setShowPatchGuide]   = useState(false);
   const [showRelicGuide, setShowRelicGuide]   = useState(false);
   const [showNumberGuide, setShowNumberGuide] = useState(false);
+  const [showSpGuide, setShowSpGuide]         = useState(false);
 
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
@@ -117,6 +118,8 @@ const AddEditCardPage = () => {
     relicSource:    '',
     serialPosition: '',
     serialPrintRun: '',
+    spVariation:    '',
+    spTier:         '',
     // Grading
     gradingCompany: 'raw',
     grade:          '',
@@ -241,6 +244,8 @@ const AddEditCardPage = () => {
           relicSource:    card.relic_source   || '',
           serialPosition: card.serial_position  != null ? String(card.serial_position)  : '',
           serialPrintRun: card.serial_print_run != null ? String(card.serial_print_run) : '',
+          spVariation:    card.sp_variation    || '',
+          spTier:         card.sp_tier         || '',
           gradingCompany: card.grading_company || 'raw',
           grade:          card.grade          || '',
           certNumber:     card.cert_number    || '',
@@ -441,6 +446,8 @@ const AddEditCardPage = () => {
         relic_source:        formData.variant.includes('Relic / Jersey') ? (formData.relicSource || null) : null,
         serial_position:     formData.variant.includes('Numbered') && formData.serialPosition ? (parseInt(formData.serialPosition, 10) || null) : null,
         serial_print_run:    formData.variant.includes('Numbered') && formData.serialPrintRun ? (parseInt(formData.serialPrintRun, 10) || null) : null,
+        sp_variation:        formData.variant.includes('Short Print (SP)') ? (formData.spVariation || null) : null,
+        sp_tier:             formData.variant.includes('Short Print (SP)') ? (formData.spTier || null) : null,
         grading_company:     formData.gradingCompany,
         grade:               isGraded ? (formData.grade?.trim() || null) : null,
         cert_number:         isGraded ? (formData.certNumber?.trim() || null) : null,
@@ -1524,6 +1531,128 @@ const AddEditCardPage = () => {
                                 ))}
                               </div>
                             )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Short-print sub-details — shown when the "Short Print (SP)" attribute
+                        is selected in the Card Variant / Finish section (Attributes group). */}
+                    {formData.variant.includes('Short Print (SP)') && (
+                      <div className="mt-3 p-4 rounded-xl border-2 border-rose-400/30 bg-rose-400/5 space-y-4 animate-in fade-in slide-in-from-top-1">
+                        <p className="text-xs font-extrabold uppercase tracking-widest text-rose-700 dark:text-rose-400">Short Print Details</p>
+
+                        {/* Variation type */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Variation Type</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { value: 'photo',       label: 'Photo Variation',  desc: 'A completely different photo from the base card' },
+                              { value: 'image',       label: 'Image Variation',  desc: 'Alternate crop or background of the same shot' },
+                              { value: 'jersey',      label: 'Jersey / Colour',  desc: 'Different uniform or colour from the base' },
+                              { value: 'throwback',   label: 'Throwback',        desc: 'Retro or alternate-era uniform' },
+                              { value: 'celebration', label: 'Celebration',      desc: 'Candid or celebration moment' },
+                              { value: 'nickname',    label: 'Nickname / Name',  desc: 'Nickname instead of the given name' },
+                              { value: 'logo',        label: 'Logo / Mascot',    desc: 'Team logo or mascot variation' },
+                              { value: 'sp_base',     label: 'Short-Printed Base', desc: 'Same design, simply printed in lower quantity' },
+                              { value: 'other',       label: 'Other',            desc: 'Another short-print variation' },
+                            ].map(({ value, label, desc }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('spVariation', formData.spVariation === value ? '' : value)}
+                                className={`flex flex-col items-start px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
+                                  formData.spVariation === value
+                                    ? 'border-rose-500 bg-rose-500/10 text-rose-700 dark:text-rose-400 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                }`}
+                              >
+                                <span className="font-bold text-xs">{label}</span>
+                                <span className={`text-[10px] mt-0.5 leading-tight ${formData.spVariation === value ? 'text-rose-600/70 dark:text-rose-400/70' : 'text-muted-foreground'}`}>{desc}</span>
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Collapsible short-print guide */}
+                          <div className="rounded-xl border border-rose-400/25 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setShowSpGuide(v => !v)}
+                              className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-rose-400/5 transition-colors"
+                            >
+                              <span className="text-[11px] font-bold text-rose-700 dark:text-rose-400">What is a short print? View guide</span>
+                              <ChevronDown className={`h-3.5 w-3.5 text-rose-600 dark:text-rose-400 transition-transform duration-200 ${showSpGuide ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showSpGuide && (
+                              <div className="px-3 pb-3 divide-y divide-border/40">
+                                {[
+                                  {
+                                    title: 'Short Print (SP)',
+                                    badge: 'Scarce',
+                                    badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20',
+                                    body: 'A card deliberately printed in lower quantities than the standard base cards in the set. SPs are harder to pull and carry a premium, even when they are not serial-numbered.',
+                                  },
+                                  {
+                                    title: 'Super Short Print (SSP)',
+                                    badge: 'Very Rare',
+                                    badgeClass: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20',
+                                    body: 'Rarer still than an SP — typically fewer than ~100 copies produced. SSPs are among the toughest non-numbered cards to find and are highly sought after.',
+                                  },
+                                  {
+                                    title: 'Photo / Image Variation',
+                                    badge: 'Collector Favourite',
+                                    badgeClass: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-500/20',
+                                    body: 'Unlike parallels (same image, different finish), short-print variations use a completely different photo — a candid dugout shot, a celebration, an alternate jersey, or a nickname nameplate.',
+                                  },
+                                  {
+                                    title: 'How to Identify One',
+                                    badge: 'How To',
+                                    badgeClass: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20',
+                                    body: 'Turn the card over and check the small code on the back — the last few digits often reveal whether a card is a base, SP, or SSP. Comparing the front photo to the known base card also helps.',
+                                  },
+                                  {
+                                    title: 'Scarcity Hierarchy',
+                                    badge: 'Rarity',
+                                    badgeClass: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20',
+                                    body: 'From most common to rarest: Base → SP → SSP → Ultra / Case Hit. The scarcer the tier, the stronger the premium over the base card.',
+                                  },
+                                ].map(({ title, badge, badgeClass, body }) => (
+                                  <div key={title} className="py-2.5 first:pt-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-[11px] font-bold text-foreground">{title}</span>
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${badgeClass}`}>{badge}</span>
+                                    </div>
+                                    <p className="text-[10px] leading-relaxed text-muted-foreground">{body}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Scarcity tier */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Scarcity Tier</Label>
+                          <div className="flex gap-2">
+                            {[
+                              { value: 'sp',    label: 'SP',    sub: 'Short Print' },
+                              { value: 'ssp',   label: 'SSP',   sub: 'Super Short Print' },
+                              { value: 'ultra', label: 'Ultra', sub: 'Case Hit' },
+                            ].map(({ value, label, sub }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('spTier', formData.spTier === value ? '' : value)}
+                                className={`flex-1 flex flex-col items-center px-2 py-2.5 rounded-xl border-2 text-center transition-all ${
+                                  formData.spTier === value
+                                    ? 'border-rose-500 bg-rose-500/10 text-rose-700 dark:text-rose-400 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                }`}
+                              >
+                                <span className="font-bold text-sm">{label}</span>
+                                <span className={`text-[10px] mt-0.5 ${formData.spTier === value ? 'text-rose-600/70 dark:text-rose-400/70' : 'text-muted-foreground'}`}>{sub}</span>
+                              </button>
+                            ))}
                           </div>
                         </div>
                       </div>
