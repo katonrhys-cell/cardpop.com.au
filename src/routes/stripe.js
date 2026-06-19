@@ -3,7 +3,7 @@ import express from 'express';
 import Stripe from 'stripe';
 import logger from '../utils/logger.js';
 import { supabase } from '../utils/supabaseClient.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import { sendOrderConfirmed, sendItemSold, sendRefundProcessed, sendRefundIssued } from '../utils/emailService.js';
 
 const router = express.Router();
@@ -833,8 +833,9 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
 router.post('/refund', authMiddleware, async (req, res) => {
   try {
-    // Admin check — use JWT app_metadata (server-controlled), never trust user_metadata or profile rows
-    if (req.user.app_metadata?.is_admin !== true) {
+    // Admin check via shared helper: accepts the JWT app_metadata claim and
+    // falls back to a server-side profiles.is_admin lookup.
+    if (!(await isAdminUser(req))) {
       return res.status(403).json({ error: 'Admin only' });
     }
 

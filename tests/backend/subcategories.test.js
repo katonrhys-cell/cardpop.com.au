@@ -12,6 +12,7 @@ vi.mock('../../src/utils/logger.js', () => ({
 }));
 vi.mock('../../src/middleware/auth.js', () => ({
   authMiddleware: (req, _res, next) => { req.user = { id: 'user-1', app_metadata: { is_admin: true } }; next(); },
+  isAdminUser: async (req) => req.user?.app_metadata?.is_admin === true,
 }));
 
 import subcatsRouter from '../../src/routes/subcategories.js';

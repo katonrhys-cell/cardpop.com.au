@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
-import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
+import { authMiddleware, optionalAuthMiddleware, isAdminUser } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -156,7 +156,7 @@ async function updateSellerStats(sellerId) {
 // Update seller performance metrics — admin only (overwrites profile stats).
 router.put('/:sellerId/performance', authMiddleware, async (req, res) => {
   try {
-    if (req.user.app_metadata?.is_admin !== true) {
+    if (!(await isAdminUser(req))) {
       return res.status(403).json({ error: 'Admin access required' });
     }
 

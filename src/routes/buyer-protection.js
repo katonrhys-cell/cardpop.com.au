@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -121,7 +121,7 @@ router.put('/:claimId/status', async (req, res) => {
 
     // Resolving/rejecting claims and setting refund amounts is an admin-only
     // action. Trust the server-controlled JWT app_metadata, never the body.
-    if (req.user.app_metadata?.is_admin !== true) {
+    if (!(await isAdminUser(req))) {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
