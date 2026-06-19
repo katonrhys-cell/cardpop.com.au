@@ -123,6 +123,9 @@ const CardHierarchySelector = ({
   }, [onManufacturerChange]);
 
   const handleSetChange = useCallback((sId) => {
+    // Radix Select forbids an empty-string item value, so the "not specified"
+    // option uses a sentinel — map it back to an empty selection.
+    if (sId === '__none__') { onSetChange?.('', ''); return; }
     const found = sets.find(s => s.id === sId);
     onSetChange?.(sId, found?.name ?? '');
   }, [sets, onSetChange]);
@@ -229,7 +232,7 @@ const CardHierarchySelector = ({
                 <SelectValue placeholder="Select set…" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">— Not specified —</SelectItem>
+                <SelectItem value="__none__">— Not specified —</SelectItem>
                 {seriesGroups.map(([series, items], gi) => (
                   <SelectGroup key={series}>
                     {gi > 0 && <SelectSeparator />}

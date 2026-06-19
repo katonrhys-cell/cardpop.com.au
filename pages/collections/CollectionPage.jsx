@@ -870,22 +870,22 @@ const CollectionPage = () => {
                     </SelectContent>
                   </Select>
 
-                  <Select value={filterVariant} onValueChange={setFilterVariant}>
+                  <Select value={filterVariant || 'all'} onValueChange={v => setFilterVariant(v === 'all' ? '' : v)}>
                     <SelectTrigger className="w-[160px] rounded-xl bg-background border-border font-medium">
                       <SelectValue placeholder="Card Variant" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Variants</SelectItem>
+                      <SelectItem value="all">All Variants</SelectItem>
                       {CARD_VARIANTS.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
                     </SelectContent>
                   </Select>
 
-                  <Select value={filterCondition} onValueChange={setFilterCondition}>
+                  <Select value={filterCondition || 'all'} onValueChange={v => setFilterCondition(v === 'all' ? '' : v)}>
                     <SelectTrigger className="w-[150px] rounded-xl bg-background border-border font-medium">
                       <SelectValue placeholder="Condition" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Conditions</SelectItem>
+                      <SelectItem value="all">All Conditions</SelectItem>
                       <SelectItem value="mint">Mint</SelectItem>
                       <SelectItem value="near_mint">Near Mint</SelectItem>
                       <SelectItem value="excellent">Excellent</SelectItem>
@@ -909,36 +909,36 @@ const CollectionPage = () => {
                   </Select>
 
                   {subOpts.length > 0 && (
-                    <Select value={filterSub} onValueChange={setFilterSub}>
+                    <Select value={filterSub || 'all'} onValueChange={v => setFilterSub(v === 'all' ? '' : v)}>
                       <SelectTrigger className="w-[160px] rounded-xl bg-background border-border font-medium">
                         <SelectValue placeholder="Subcategory" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All Subcategories</SelectItem>
+                        <SelectItem value="all">All Subcategories</SelectItem>
                         {subOpts.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   )}
 
                   {brandOpts.length > 0 && (
-                    <Select value={filterBrand} onValueChange={setFilterBrand}>
+                    <Select value={filterBrand || 'all'} onValueChange={v => setFilterBrand(v === 'all' ? '' : v)}>
                       <SelectTrigger className="w-[150px] rounded-xl bg-background border-border font-medium">
                         <SelectValue placeholder="Brand" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All Brands</SelectItem>
+                        <SelectItem value="all">All Brands</SelectItem>
                         {brandOpts.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   )}
 
                   {seriesOpts.length > 0 && (
-                    <Select value={filterSeries} onValueChange={setFilterSeries}>
+                    <Select value={filterSeries || 'all'} onValueChange={v => setFilterSeries(v === 'all' ? '' : v)}>
                       <SelectTrigger className="w-[150px] rounded-xl bg-background border-border font-medium">
                         <SelectValue placeholder="Series" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All Series</SelectItem>
+                        <SelectItem value="all">All Series</SelectItem>
                         {seriesOpts.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
