@@ -833,8 +833,20 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
 router.post('/refund', authMiddleware, async (req, res) => {
   try {
-    // Admin check — use JWT app_metadata (server-controlled), never trust user_metadata or profile rows
-    if (req.user.app_metadata?.is_admin !== true) {
+    // Admin check: accept the server-controlled JWT app_metadata claim, and fall
+    // back to a server-side profiles.is_admin lookup (defence-in-depth, matching
+    // vault.js). Admin is granted via profiles.is_admin and is not currently
+    // mirrored into app_metadata, so the JWT claim alone would reject real admins.
+    let isAdmin = req.user.app_metadata?.is_admin === true;
+    if (!isAdmin) {
+      const { data: adminProfile } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', req.user.id)
+        .maybeSingle();
+      isAdmin = adminProfile?.is_admin === true;
+    }
+    if (!isAdmin) {
       return res.status(403).json({ error: 'Admin only' });
     }
 
