@@ -12,23 +12,33 @@ const CONVICTION_COLOURS = ['', '#dc2626', '#ea580c', '#ca8a04', '#16a34a', '#15
 
 const ConvictionRating = ({ rating }) => {
   if (!rating || rating < 1 || rating > 5) return null;
-  const stars = Array.from({ length: 5 }, (_, i) => i < rating);
+  const colour = CONVICTION_COLOURS[rating];
   return (
-    <div className="flex items-center gap-2 mt-4 pt-4 border-t border-white/10">
-      <span className="text-[10px] font-bold tracking-widest uppercase text-white/40">
-        CardPop Conviction Rating™
-      </span>
-      <div className="flex items-center gap-0.5 ml-1">
-        {stars.map((filled, i) => (
-          <svg key={i} width="12" height="12" viewBox="0 0 12 12" fill={filled ? CONVICTION_COLOURS[rating] : 'none'}
-               stroke={filled ? CONVICTION_COLOURS[rating] : 'rgba(255,255,255,0.2)'} strokeWidth="1.2">
-            <polygon points="6,1 7.5,4.5 11,5 8.5,7.5 9.2,11 6,9.2 2.8,11 3.5,7.5 1,5 4.5,4.5" />
-          </svg>
-        ))}
+    <div className="mt-4 pt-4 border-t border-white/10">
+      {/* Heading + current reading */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2.5">
+        <span className="text-[10px] font-bold tracking-widest uppercase text-white/40">
+          CardPop Conviction Rating™
+        </span>
+        <span className="text-xs font-semibold" style={{ color: colour }}>
+          {rating}/5 &middot; {CONVICTION_LABELS[rating]}
+        </span>
       </div>
-      <span className="text-xs font-semibold" style={{ color: CONVICTION_COLOURS[rating] }}>
-        {CONVICTION_LABELS[rating]}
-      </span>
+
+      {/* Scale — 5 segments filled to the rating, with end-point meanings */}
+      <div className="max-w-[15rem]">
+        <div className="flex items-center gap-1" role="img"
+             aria-label={`Conviction ${rating} out of 5: ${CONVICTION_LABELS[rating]}`}>
+          {[1, 2, 3, 4, 5].map((i) => (
+            <span key={i} className="flex-1 h-1.5 rounded-full transition-colors"
+                  style={{ background: i <= rating ? colour : 'rgba(255,255,255,0.12)' }} />
+          ))}
+        </div>
+        <div className="flex justify-between mt-1.5">
+          <span className="text-[9px] uppercase tracking-wider text-white/35">High Risk</span>
+          <span className="text-[9px] uppercase tracking-wider text-white/35">Strong Buy</span>
+        </div>
+      </div>
     </div>
   );
 };
@@ -236,7 +246,7 @@ const BlogArticlePage = () => {
 
       {/* Parallel Report masthead — charcoal hero, CardPop Red accents */}
       <div className="bg-brand-charcoal text-white">
-        <div className="container-default max-w-4xl mx-auto pt-8 pb-10">
+        <div className="container-default max-w-4xl mx-auto pt-8 pb-6">
 
           {/* Back link */}
           <Link to="/blog" className="inline-flex items-center text-xs font-medium text-white/50 hover:text-white/90 transition-colors group mb-8">
@@ -309,7 +319,7 @@ const BlogArticlePage = () => {
       </div>
 
       {imageUrl && (
-        <div className="container-default max-w-4xl mx-auto mt-10 mb-4">
+        <div className="container-default max-w-4xl mx-auto mt-4 mb-4">
           <div className="aspect-[21/9] rounded-2xl overflow-hidden bg-muted shadow-lg">
              <img src={imageUrl} alt={article.title} className="w-full h-full object-cover" />
           </div>
