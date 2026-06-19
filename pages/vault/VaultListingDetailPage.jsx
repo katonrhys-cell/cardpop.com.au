@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { ShoppingCart, ShieldCheck, BarChart3 } from 'lucide-react';
 import PSAPopPanel from '@/components/PSAPopPanel.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
+import { getCardAttributeRows } from '@/lib/cardAttributeLabels.js';
 
 const VaultListingDetailPage = () => {
   const { itemId } = useParams();
@@ -154,18 +155,12 @@ const VaultListingDetailPage = () => {
               </div>
             )}
             {vi?.cert_number && <div className="flex justify-between"><span className="text-muted-foreground">Cert Number</span> <span className="font-medium">{vi.cert_number}</span></div>}
-            {vi?.is_auto && (
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Autograph</span>
-                <span className="font-medium text-right">
-                  {[
-                    vi.auto_signers > 1 ? ['Solo','Dual','Triple','Quad'][(vi.auto_signers - 1)] : null,
-                    {on_card:'On-Card',sticker:'Sticker',cut:'Cut Signature',licensed:'Licensed / Certified',in_person:'In-Person (IP)'}[vi.auto_type] ?? null,
-                    'Auto',
-                  ].filter(Boolean).join(' ')}
-                </span>
+            {getCardAttributeRows(vi).map(({ label, value }) => (
+              <div key={label} className="flex justify-between">
+                <span className="text-muted-foreground">{label}</span>
+                <span className="font-medium text-right">{value}</span>
               </div>
-            )}
+            ))}
 
             {/* Attributes */}
             {(vi?.is_foil || vi?.is_refractor || vi?.is_auto || vi?.is_rookie || vi?.is_sealed) && (

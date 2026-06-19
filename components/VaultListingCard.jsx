@@ -6,6 +6,7 @@ import ImageZoomModal from '@/components/ImageZoomModal.jsx';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { VARIANT_BADGES } from '@/lib/cardVariants.js';
+import { formatAutograph } from '@/lib/cardAttributeLabels.js';
 import { supabase } from '@/lib/supabaseClient.js';
 
 const getStatusBadge = (listingType) => {
@@ -124,11 +125,7 @@ const VaultListingCard = ({ vaultItem }) => {
             {vaultItem.is_refractor && <Badge variant="outline" className="text-[10px] font-bold border-indigo-400/50 text-indigo-700 bg-indigo-400/10">Refractor</Badge>}
             {vaultItem.is_auto && (
               <Badge variant="outline" className="text-[10px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10">
-                {[
-                  vaultItem.auto_signers > 1 ? ['','Dual','Triple','Quad'][vaultItem.auto_signers - 1] : null,
-                  {on_card:'On-Card',sticker:'Sticker',cut:'Cut Sig',licensed:'Licensed',in_person:'IP'}[vaultItem.auto_type] ?? null,
-                  'Auto',
-                ].filter(Boolean).join(' ')}
+                {formatAutograph(vaultItem) || 'Auto'}
               </Badge>
             )}
             {vaultItem.is_rookie && <Badge variant="outline" className="text-[10px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10">RC</Badge>}
