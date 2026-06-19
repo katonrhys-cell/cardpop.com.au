@@ -2,7 +2,7 @@
 
 Australian trading card marketplace — buy, sell, trade, and track the value of your collection.
 
-**Live site**: [cardpop.online](https://cardpop.online)
+**Live site**: [cardpop.com.au](https://cardpop.com.au)
 
 ## Stack
 
