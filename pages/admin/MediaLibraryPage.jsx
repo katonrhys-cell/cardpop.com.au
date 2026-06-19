@@ -25,6 +25,12 @@ const MediaLibraryPage = () => {
     description: ''
   });
   const [selectedFile, setSelectedFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+
+  // Revoke the object URL when it changes or the component unmounts to avoid leaks.
+  useEffect(() => {
+    return () => { if (previewUrl) URL.revokeObjectURL(previewUrl); };
+  }, [previewUrl]);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,6 +59,10 @@ const MediaLibraryPage = () => {
     const file = e.target.files[0];
     if (file) {
       setSelectedFile(file);
+      setPreviewUrl(prev => {
+        if (prev) URL.revokeObjectURL(prev);
+        return URL.createObjectURL(file);
+      });
       if (!uploadData.filename) {
         setUploadData(prev => ({ ...prev, filename: file.name }));
       }
@@ -89,6 +99,7 @@ const MediaLibraryPage = () => {
       toast.success("Media uploaded successfully.");
       setMedia([record, ...media]);
       setSelectedFile(null);
+      setPreviewUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
       setUploadData({ filename: '', description: '' });
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
@@ -146,7 +157,15 @@ const MediaLibraryPage = () => {
               />
               {selectedFile ? (
                 <div className="space-y-2">
-                  <ImageIcon className="w-10 h-10 text-primary mx-auto" />
+                  {previewUrl ? (
+                    <img
+                      src={previewUrl}
+                      alt={selectedFile.name}
+                      className="max-h-32 w-auto mx-auto rounded-lg object-contain"
+                    />
+                  ) : (
+                    <ImageIcon className="w-10 h-10 text-primary mx-auto" />
+                  )}
                   <p className="font-medium text-sm text-foreground truncate max-w-[200px]">{selectedFile.name}</p>
                   <p className="text-xs text-muted-foreground">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
                 </div>
