@@ -378,6 +378,22 @@ const AddEditCardPage = () => {
     if (!formData.cardName?.trim()) newErrors.cardName = 'Card name is required';
     if (!formData.estimatedValue || parseFloat(formData.estimatedValue) < 0)
       newErrors.estimatedValue = 'Enter a valid estimated value';
+    const yearVal = formData.year?.trim();
+    if (yearVal) {
+      const match = yearVal.match(/^(\d{4})(?:\/(\d{4}))?$/);
+      if (!match) {
+        newErrors.year = 'Enter a single year (e.g. 2025) or a range (e.g. 2025/2026)';
+      } else {
+        const maxYear = new Date().getFullYear() + 1;
+        const start = parseInt(match[1], 10);
+        const end = match[2] ? parseInt(match[2], 10) : null;
+        if (start < 1900 || start > maxYear) {
+          newErrors.year = `Year must be between 1900 and ${maxYear}`;
+        } else if (end !== null && end !== start + 1) {
+          newErrors.year = 'A season range must be two consecutive years (e.g. 2025/2026)';
+        }
+      }
+    }
     if (isEdit && lockedBaseValue !== null) {
       const ev = parseFloat(formData.estimatedValue) || 0;
       if (ev < lockedBaseValue)
@@ -438,7 +454,7 @@ const AddEditCardPage = () => {
         card_name:           formData.cardName.trim(),
         set_name:            formData.setName?.trim()     || null,
         card_number:         formData.cardNumber?.trim()  || null,
-        year:                formData.year ? parseInt(formData.year, 10) : null,
+        year:                formData.year?.trim() || null,
         variant:             formData.variant.length ? formData.variant.join(', ') : null,
         is_foil:             formData.isFoil,
         is_sealed:           formData.isSealed,
@@ -860,14 +876,15 @@ const AddEditCardPage = () => {
                     <Label htmlFor="year" className="font-bold">Year</Label>
                     <Input
                       id="year"
-                      type="number"
-                      min="1993"
-                      max={new Date().getFullYear() + 1}
+                      type="text"
+                      inputMode="numeric"
                       value={formData.year}
                       onChange={e => set('year', e.target.value)}
-                      placeholder={String(new Date().getFullYear())}
-                      className="h-11 bg-background"
+                      placeholder={`${new Date().getFullYear()} or ${new Date().getFullYear()}/${new Date().getFullYear() + 1}`}
+                      className={`h-11 bg-background ${errors.year ? 'border-destructive' : ''}`}
                     />
+                    <p className="text-muted-foreground text-xs">Enter a single year (e.g. 2025) or a season range (e.g. 2025/2026).</p>
+                    {errors.year && <p className="text-destructive text-xs">{errors.year}</p>}
                   </div>
 
                   {/* Variant / Finish — multi-select */}
