@@ -43,4 +43,24 @@ async function optionalAuthMiddleware(req, res, next) {
   next();
 }
 
-export { authMiddleware, optionalAuthMiddleware };
+// Returns true if the authenticated request belongs to an admin. Accepts the
+// server-controlled JWT app_metadata.is_admin claim, and falls back to a
+// server-side profiles.is_admin lookup (defence-in-depth). Admin is granted via
+// profiles.is_admin and is not currently mirrored into app_metadata, so the JWT
+// claim alone would reject real admins. Returns false for unauthenticated reqs.
+async function isAdminUser(req) {
+  if (req.user?.app_metadata?.is_admin === true) return true;
+  if (!req.user?.id) return false;
+  try {
+    const { data } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', req.user.id)
+      .maybeSingle();
+    return data?.is_admin === true;
+  } catch {
+    return false;
+  }
+}
+
+export { authMiddleware, optionalAuthMiddleware, isAdminUser };

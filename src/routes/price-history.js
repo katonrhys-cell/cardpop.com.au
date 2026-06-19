@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
-import { optionalAuthMiddleware } from '../middleware/auth.js';
+import { optionalAuthMiddleware, isAdminUser } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -60,7 +60,7 @@ router.get('/:itemId', async (req, res) => {
 // anyone from injecting arbitrary prices that feed valuations.
 router.post('/', async (req, res) => {
   try {
-    if (req.user?.app_metadata?.is_admin !== true) {
+    if (!(await isAdminUser(req))) {
       return res.status(403).json({ error: 'Admin access required' });
     }
 

@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import supabase from '../utils/supabaseClient.js';
-import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
+import { authMiddleware, optionalAuthMiddleware, isAdminUser } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -17,7 +17,7 @@ router.get('/products', authMiddleware, async (req, res) => {
 
   logger.info(`[VAULT] Fetching vault items for user ${req.user.id}`);
 
-  const isAdmin = req.user.app_metadata?.is_admin || false;
+  const isAdmin = await isAdminUser(req);
   let query = supabase.from('vault_items').select('*', { count: 'exact' });
 
   if (!isAdmin) query = query.eq('owner_id', req.user.id);
@@ -123,7 +123,7 @@ router.get('/:id', optionalAuthMiddleware, async (req, res) => {
   if (!req.user) return res.status(403).json({ error: 'Unauthorized' });
 
   const isOwner = product.owner_id === req.user.id;
-  const isAdmin = req.user.app_metadata?.is_admin || false;
+  const isAdmin = await isAdminUser(req);
   if (!isOwner && !isAdmin) return res.status(403).json({ error: 'Unauthorized' });
 
   res.json({

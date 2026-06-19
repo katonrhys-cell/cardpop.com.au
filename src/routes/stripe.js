@@ -3,7 +3,7 @@ import express from 'express';
 import Stripe from 'stripe';
 import logger from '../utils/logger.js';
 import { supabase } from '../utils/supabaseClient.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import { sendOrderConfirmed, sendItemSold, sendRefundProcessed, sendRefundIssued } from '../utils/emailService.js';
 
 const router = express.Router();
@@ -833,20 +833,9 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
 router.post('/refund', authMiddleware, async (req, res) => {
   try {
-    // Admin check: accept the server-controlled JWT app_metadata claim, and fall
-    // back to a server-side profiles.is_admin lookup (defence-in-depth, matching
-    // vault.js). Admin is granted via profiles.is_admin and is not currently
-    // mirrored into app_metadata, so the JWT claim alone would reject real admins.
-    let isAdmin = req.user.app_metadata?.is_admin === true;
-    if (!isAdmin) {
-      const { data: adminProfile } = await supabase
-        .from('profiles')
-        .select('is_admin')
-        .eq('id', req.user.id)
-        .maybeSingle();
-      isAdmin = adminProfile?.is_admin === true;
-    }
-    if (!isAdmin) {
+    // Admin check via shared helper: accepts the JWT app_metadata claim and
+    // falls back to a server-side profiles.is_admin lookup.
+    if (!(await isAdminUser(req))) {
       return res.status(403).json({ error: 'Admin only' });
     }
 

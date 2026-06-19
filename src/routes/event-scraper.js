@@ -4,7 +4,7 @@ import logger from '../utils/logger.js';
 import { stream } from '../api/integrated-ai.js';
 import { EventScraperPrompt } from '../constants/prompts.js';
 import supabase from '../utils/supabaseClient.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 
 const router = express.Router();
 const AI_PROCESSING_TIMEOUT = 60000;
@@ -318,7 +318,7 @@ router.post('/extract-event-from-content', authMiddleware, async (req, res) => {
 });
 
 router.post('/create-event-from-data', authMiddleware, async (req, res) => {
-  if (!req.user.app_metadata?.is_admin) return res.status(403).json({ error: 'Admin access required' });
+  if (!(await isAdminUser(req))) return res.status(403).json({ error: 'Admin access required' });
   logger.info('[EVENT_SCRAPER] Received create-event-from-data request');
 
   if (!req.body?.eventData) {
