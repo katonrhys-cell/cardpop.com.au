@@ -75,6 +75,7 @@ const AddEditCardPage = () => {
   const [selCategoryId, setSelCategoryId]     = useState('');
   const [franchiseId, setFranchiseId]         = useState('');
   const [manufacturerId, setManufacturerId]   = useState('');
+  const [teamId, setTeamId]                   = useState('');
   const [setId, setSetId]                     = useState('');
   const [parallelId, setParallelId]           = useState('');
   const [parallelOpts, setParallelOpts]       = useState([]);
@@ -208,6 +209,7 @@ const AddEditCardPage = () => {
         if (resolvedFranchise) setFranchiseId(resolvedFranchise);
         if (card.category_id) setSelCategoryId(card.category_id);
         if (card.manufacturer_id) setManufacturerId(card.manufacturer_id);
+        if (card.team_id) setTeamId(card.team_id);
         if (card.set_id) setSetId(card.set_id);
         if (card.parallel_id) setParallelId(card.parallel_id);
         if (card.subset_id) setSubsetId(card.subset_id);
@@ -423,6 +425,7 @@ const AddEditCardPage = () => {
         category_id:         selCategoryId || null,
         franchise_id:        franchiseId || null,
         manufacturer_id:     manufacturerId || null,
+        team_id:             teamId || null,
         set_id:              setId || null,
         parallel_id:         parallelId || null,
         subset_id:           subsetId   || null,
@@ -735,6 +738,7 @@ const AddEditCardPage = () => {
                     categoryId={selCategoryId}
                     franchiseId={franchiseId}
                     manufacturerId={manufacturerId}
+                    teamId={teamId}
                     setId={setId}
                     onCategoryChange={setSelCategoryId}
                     onFranchiseChange={(id, name) => {
@@ -742,6 +746,7 @@ const AddEditCardPage = () => {
                       set('collection', name);
                     }}
                     onManufacturerChange={setManufacturerId}
+                    onTeamChange={setTeamId}
                     onSetChange={(id, name) => {
                       setSetId(id);
                       if (name) set('setName', name);

@@ -26,10 +26,12 @@ const CardHierarchySelector = ({
   categoryId,
   franchiseId,
   manufacturerId,
+  teamId,
   setId,
   onCategoryChange,
   onFranchiseChange,
   onManufacturerChange,
+  onTeamChange,
   onSetChange,
   highlighted = false,
 }) => {
@@ -38,16 +40,19 @@ const CardHierarchySelector = ({
     getRootCategories,
     getFranchisesByCategory,
     getManufacturersByFranchise,
+    getTeamsByFranchise,
     getSetsByFranchiseAndManufacturer,
   } = useCategories();
 
   const [rootCategories, setRootCategories]       = useState([]);
   const [franchises, setFranchises]               = useState([]);
   const [manufacturers, setManufacturers]         = useState([]);
+  const [teams, setTeams]                         = useState([]);
   const [sets, setSets]                           = useState([]);
   const [loadingRoots, setLoadingRoots]           = useState(true);
   const [loadingFranchises, setLoadingFranchises] = useState(false);
   const [loadingManufacturers, setLoadingManufacturers] = useState(false);
+  const [loadingTeams, setLoadingTeams]           = useState(false);
   const [loadingSets, setLoadingSets]             = useState(false);
 
   // Load root categories once on mount
@@ -91,6 +96,16 @@ const CardHierarchySelector = ({
     }
   }, [franchiseId, categoryId, getManufacturersByFranchise, getCategories, getFranchisesByCategory, onCategoryChange]);
 
+  // Load teams whenever franchiseId changes (sports franchises only have teams)
+  useEffect(() => {
+    if (!franchiseId) { setTeams([]); return; }
+    setLoadingTeams(true);
+    getTeamsByFranchise(franchiseId)
+      .then(setTeams)
+      .catch(() => toast.error('Failed to load teams'))
+      .finally(() => setLoadingTeams(false));
+  }, [franchiseId, getTeamsByFranchise]);
+
   // Load sets whenever franchise or manufacturer changes
   useEffect(() => {
     if (!franchiseId) { setSets([]); return; }
@@ -105,15 +120,17 @@ const CardHierarchySelector = ({
     onCategoryChange?.(catId);
     onFranchiseChange?.('', '');
     onManufacturerChange?.('');
+    onTeamChange?.('');
     onSetChange?.('', '');
-  }, [onCategoryChange, onFranchiseChange, onManufacturerChange, onSetChange]);
+  }, [onCategoryChange, onFranchiseChange, onManufacturerChange, onTeamChange, onSetChange]);
 
   const handleFranchiseChange = useCallback((fId) => {
     const franchise = franchises.find(f => f.id === fId);
     onFranchiseChange?.(fId, franchise?.name ?? '');
     onManufacturerChange?.('');
+    onTeamChange?.('');
     onSetChange?.('', '');
-  }, [franchises, onFranchiseChange, onManufacturerChange, onSetChange]);
+  }, [franchises, onFranchiseChange, onManufacturerChange, onTeamChange, onSetChange]);
 
   const handleManufacturerChange = useCallback((mId) => {
     onManufacturerChange?.(mId);
@@ -121,6 +138,12 @@ const CardHierarchySelector = ({
     // If the current set is in the filtered list it stays selected; if not,
     // the dropdown shows as unselected and the user can re-pick.
   }, [onManufacturerChange]);
+
+  const handleTeamChange = useCallback((tId) => {
+    // Radix Select forbids an empty-string item value, so the "no team"
+    // option uses a sentinel — map it back to an empty selection.
+    onTeamChange?.(tId === '__none__' ? '' : tId);
+  }, [onTeamChange]);
 
   const handleSetChange = useCallback((sId) => {
     // Radix Select forbids an empty-string item value, so the "not specified"
@@ -218,7 +241,31 @@ const CardHierarchySelector = ({
         </div>
       </div>
 
-      {/* Row 2: Set — only shown once franchise is selected and sets exist */}
+      {/* Row 2: Team — only shown for franchises that have teams (sports) */}
+      {franchiseId && (teams.length > 0 || loadingTeams) && (
+        <div className="space-y-2">
+          <Label className="font-bold">Team</Label>
+          {loadingTeams ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground h-11">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading teams…
+            </div>
+          ) : (
+            <Select value={teamId || ''} onValueChange={handleTeamChange}>
+              <SelectTrigger className={`h-11 bg-background ${ring}`}>
+                <SelectValue placeholder="Select team…" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">— No team / Not specified —</SelectItem>
+                {teams.map(t => (
+                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+      )}
+
+      {/* Row 3: Set — only shown once franchise is selected and sets exist */}
       {franchiseId && (hasSets || loadingSets) && (
         <div className="space-y-2">
           <Label className="font-bold">Set</Label>
