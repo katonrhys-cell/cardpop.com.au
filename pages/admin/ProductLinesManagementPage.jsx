@@ -187,7 +187,7 @@ const ProductLinesManagementPage = () => {
   });
 
   return (
-    <div className="w-full space-y-6 animate-in fade-in duration-300 py-6 px-4 sm:px-6 md:px-8">
+    <div className="space-y-6 animate-in fade-in duration-300">
       <Helmet>
         <title>Product Lines Management | Admin Portal</title>
       </Helmet>

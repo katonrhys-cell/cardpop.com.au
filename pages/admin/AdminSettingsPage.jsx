@@ -81,7 +81,7 @@ const AdminSettingsPage = () => {
 
   if (loading) {
     return (
-      <div className="w-full space-y-6 py-6 px-4 sm:px-6 md:px-8 max-w-5xl mx-auto">
+      <div className="space-y-6">
         <Skeleton className="h-10 w-64" />
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-64 w-full rounded-xl" />
@@ -91,7 +91,7 @@ const AdminSettingsPage = () => {
 
   if (error) {
     return (
-      <div className="w-full py-16 text-center max-w-5xl mx-auto">
+      <div className="py-16 text-center">
         <AlertCircle className="w-10 h-10 text-destructive mx-auto mb-3" />
         <p className="text-foreground font-medium mb-4">{error}</p>
         <Button variant="outline" onClick={() => setReload(r => r + 1)} className="gap-2">

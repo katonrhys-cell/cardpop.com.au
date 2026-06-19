@@ -211,7 +211,7 @@ const CategoryManagementPage = () => {
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <div className="space-y-6">
       <Helmet><title>Hierarchy Management | CardPop Admin</title></Helmet>
 
       <AdminPageHeader

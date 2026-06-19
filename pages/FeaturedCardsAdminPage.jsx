@@ -75,7 +75,7 @@ const FeaturedCardsAdminPage = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl">
+    <div className="space-y-6">
       <Helmet>
         <title>Admin - Manage Featured Cards | CardPop</title>
       </Helmet>

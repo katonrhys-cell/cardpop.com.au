@@ -58,7 +58,7 @@ const CategoryMappingPage = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6">
       <Helmet><title>Category Mapping Tools | Admin</title></Helmet>
 
       <AdminPageHeader
