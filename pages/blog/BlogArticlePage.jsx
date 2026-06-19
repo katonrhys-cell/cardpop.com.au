@@ -332,7 +332,7 @@ const BlogArticlePage = () => {
           <div
             className="article-content w-full max-w-4xl mx-auto prose prose-neutral dark:prose-invert px-4"
             dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(htmlContent, { ADD_ATTR: ['target'] }) }}
-          />
+          ></div>
         ) : (
           <div className="container-default max-w-6xl mx-auto">
             <p className="text-muted-foreground italic">No content available for this article.</p>
