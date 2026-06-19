@@ -47,11 +47,11 @@ router.post('/slab-image', authMiddleware, upload.single('image'), async (req, r
     const compressedBuffer = await compressImage(slabImageBuffer, 85);
 
     // Upload to Supabase Storage
-    const fileName = `slab-${vaultItemId}-${Date.now()}.jpg`;
+    const fileName = `template-${vaultItemId}-${Date.now()}.webp`;
     const { error: uploadError } = await supabase.storage
       .from('vault-images')
       .upload(fileName, compressedBuffer, {
-        contentType: 'image/jpeg',
+        contentType: 'image/webp',
         upsert: false
       });
 

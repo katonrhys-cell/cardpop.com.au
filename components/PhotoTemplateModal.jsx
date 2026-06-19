@@ -14,13 +14,9 @@ const PhotoTemplateModal = ({
 }) => {
   const canvasRef = useRef(null);
 
-  const title = processType === 'slab'
-    ? 'Slab Template Preview'
-    : 'Background Removal Preview';
+  const title = 'Format Photo';
 
-  const description = processType === 'slab'
-    ? 'Your card will be centered on a white 1000×1400 template, perfect for slab display.'
-    : 'The background will be removed from your card image.';
+  const description = 'Your card will be centered on a white 1000×1400 template for professional marketplace display.';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -37,7 +33,7 @@ const PhotoTemplateModal = ({
                 <div className="text-center">
                   <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground">
-                    {processType === 'slab' ? 'Creating template...' : 'Removing background...'}
+                    Formatting your photo…
                   </p>
                 </div>
               </div>
@@ -51,14 +47,10 @@ const PhotoTemplateModal = ({
                   />
                 </div>
 
-                {processType === 'slab' && (
-                  <div className="text-xs text-muted-foreground text-center px-4">
-                    <p className="mb-2">
-                      <strong>CardPop recommends this for slabs</strong>
-                    </p>
-                    <p>Your card image will be centered on a white background at 1000×1400 pixels</p>
-                  </div>
-                )}
+                <div className="text-xs text-muted-foreground text-center px-4 space-y-1">
+                  <p className="font-medium">Export format:</p>
+                  <p>1000×1400 WEBP • White background • Centered card</p>
+                </div>
               </div>
             ) : null}
 
@@ -81,7 +73,7 @@ const PhotoTemplateModal = ({
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...
                   </>
                 ) : (
-                  `${processType === 'slab' ? 'Use Template' : 'Apply'}`
+                  'Apply Format'
                 )}
               </Button>
             </div>
@@ -92,10 +84,10 @@ const PhotoTemplateModal = ({
           <div className="space-y-4">
             <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
               <p className="text-sm font-medium text-emerald-700">
-                ✓ Image processed successfully!
+                ✓ Photo formatted successfully!
               </p>
               <p className="text-xs text-emerald-600 mt-1">
-                Your vault photo has been updated.
+                Your vault photo has been updated with the formatted version.
               </p>
             </div>
 
