@@ -24,6 +24,7 @@ const ConvictionRating = ({ rating }) => {
           {rating}/5 &middot; {CONVICTION_LABELS[rating]}
         </span>
       </div>
+      <p className="text-xs text-white/50 mb-3">Our confidence level in the card's investment thesis. 1 = High Risk, 5 = Strong Buy.</p>
 
       {/* Scale — 5 segments filled to the rating, with end-point meanings */}
       <div className="max-w-[15rem]">
