@@ -22,7 +22,7 @@ const AdminPageHeader = ({
             className="flex items-center gap-1 text-xs font-medium text-white/50 hover:text-white/80 transition-colors mb-4 group"
           >
             <ChevronLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
-            Admin Panel
+            Back
           </button>
         )}
         <div className="flex items-start justify-between gap-4 flex-wrap">
