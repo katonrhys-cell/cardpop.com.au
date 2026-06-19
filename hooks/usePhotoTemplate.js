@@ -125,7 +125,7 @@ export function usePhotoTemplate() {
         throw new Error(result.data.error || 'Upload failed');
       }
 
-      toast.success(`Image ${processType === 'slab' ? 'templated' : 'processed'} successfully!`);
+      toast.success('Photo formatted successfully!');
 
       // Clear state
       setPreviewUrl(null);

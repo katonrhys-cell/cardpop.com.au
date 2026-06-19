@@ -381,23 +381,13 @@ const AddEditCardPage = () => {
   };
 
   // ─── Photo template handlers ──────────────────────────────────────────────
-  const handleSlabImageEdit = async () => {
+  const handleFormatPhoto = async () => {
     if (!imageFile) return;
     try {
-      setPhotoTemplateModal({ open: true, processType: 'slab', step: 'preview' });
+      setPhotoTemplateModal({ open: true, processType: 'template', step: 'preview' });
       await createSlabImagePreview(imageFile);
     } catch (error) {
-      toast.error('Failed to create preview');
-    }
-  };
-
-  const handleRemoveBackground = async () => {
-    if (!imageFile) return;
-    try {
-      setPhotoTemplateModal({ open: true, processType: 'remove-bg', step: 'preview' });
-      await removeBackgroundPreview(imageFile);
-    } catch (error) {
-      toast.error('Failed to process image');
+      toast.error('Failed to format photo');
     }
   };
 
@@ -724,49 +714,44 @@ const AddEditCardPage = () => {
                   </div>
                 </div>
 
-                {/* Unified AI Analysis & Photo Templates */}
+                {/* Photo Template & Card Identification */}
                 <div className="mt-4 space-y-3">
-                  {imageFile && !isScanning && !isIdentifying && (
+                  {/* Format Photo Button - Always available when image is present */}
+                  {imageFile && !isPhotoProcessing && !isUploadingTemplate && (
                     <Button
                       type="button"
-                      variant="secondary"
-                      onClick={handleAnalyzeWithAI}
-                      className="w-full bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20"
+                      variant="outline"
+                      onClick={handleFormatPhoto}
+                      disabled={isPhotoProcessing || isUploadingTemplate}
+                      className="w-full"
                     >
-                      <Sparkles className="w-4 h-4 mr-2" /> Analyze with AI
+                      <Frame className="w-4 h-4 mr-2" />
+                      Format Photo
                     </Button>
                   )}
 
-                  {/* Photo Template Buttons — only show after saving (when in edit mode) */}
-                  {isEdit && imageFile && !isScanning && !isIdentifying && (
-                    <>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleSlabImageEdit}
-                        disabled={isPhotoProcessing || isUploadingTemplate}
-                        className="w-full"
-                      >
-                        <Frame className="w-4 h-4 mr-2" />
-                        {isPhotoProcessing ? 'Creating...' : 'Slab Image Edit'}
-                      </Button>
-                      <div className="text-xs text-muted-foreground text-center px-2">
-                        CardPop recommends this for slabs
-                      </div>
+                  {isPhotoProcessing || isUploadingTemplate ? (
+                    <div className="p-3 rounded-xl border border-border bg-muted/30 animate-in fade-in">
+                      <p className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Processing photo…
+                      </p>
+                    </div>
+                  ) : null}
 
+                  {/* Identify Card Button - AI analysis with recommended label */}
+                  {imageFile && !isScanning && !isIdentifying && !isPhotoProcessing && !isUploadingTemplate && (
+                    <div className="space-y-1">
                       <Button
                         type="button"
-                        variant="outline"
-                        onClick={handleRemoveBackground}
-                        disabled={isPhotoProcessing || isUploadingTemplate}
-                        className="w-full"
+                        variant="secondary"
+                        onClick={handleAnalyzeWithAI}
+                        className="w-full bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 border border-emerald-500/20 dark:text-emerald-400"
                       >
-                        <Wand2 className="w-4 h-4 mr-2" />
-                        {isPhotoProcessing ? 'Processing...' : 'Remove Background'}
+                        <Sparkles className="w-4 h-4 mr-2" /> Identify Card
                       </Button>
-                    </>
+                      <p className="text-xs text-center text-muted-foreground">(Recommended)</p>
+                    </div>
                   )}
-
 
                   {(isScanning || isIdentifying) && (
                     <div className="p-3 rounded-xl border border-border bg-muted/30 animate-in fade-in">

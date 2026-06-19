@@ -53,7 +53,7 @@ export async function createSlabImage(imageBuffer) {
           top: cardY
         }
       ])
-      .png()
+      .webp({ quality: 85 })
       .toBuffer();
 
     logger.info('[IMAGE] Created slab image successfully');
@@ -90,7 +90,7 @@ export async function removeBackground(imageBuffer, method = 'browser') {
 export async function compressImage(imageBuffer, quality = 80) {
   try {
     const compressed = await sharp(imageBuffer)
-      .jpeg({ quality, progressive: true })
+      .webp({ quality })
       .toBuffer();
 
     logger.info('[IMAGE] Image compressed successfully');
