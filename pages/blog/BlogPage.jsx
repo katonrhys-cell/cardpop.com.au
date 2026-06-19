@@ -245,11 +245,11 @@ const BlogPage = () => {
         {/* ── All / Filtered Articles ── */}
         <section>
           {activeCategory && (
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold">{activeCategory}</h2>
-              <Link to="/blog" className="text-sm text-primary font-semibold hover:underline">
+            <div className="mb-6">
+              <Link to="/blog" className="inline-flex items-center text-sm text-primary font-semibold hover:underline mb-3">
                 ← All Articles
               </Link>
+              <h2 className="text-2xl font-bold">{activeCategory}</h2>
             </div>
           )}
           {!activeCategory && !searchTerm && !loading && displayedArticles.length > 0 && (
