@@ -28,6 +28,7 @@ const MarketplacePage = () => {
     getRootCategories,
     getFranchisesByCategory,
     getManufacturersByFranchise,
+    getTeamsByFranchise,
     getSetsByFranchiseAndManufacturer,
     getParallelsByFranchise,
     getSubsetsBySet,
@@ -36,6 +37,7 @@ const MarketplacePage = () => {
   const [filterCat, setFilterCat]           = useState('');
   const [filterFranchise, setFilterFranchise] = useState('');
   const [filterMfr, setFilterMfr]           = useState('');
+  const [filterTeam, setFilterTeam]         = useState('');
   const [filterSet, setFilterSet]           = useState('');
   const [filterParallel, setFilterParallel] = useState('');
   const [filterSubset, setFilterSubset]     = useState('');
@@ -43,6 +45,7 @@ const MarketplacePage = () => {
   const [catOpts, setCatOpts]             = useState([]);
   const [franchiseOpts, setFranchiseOpts] = useState([]);
   const [mfrOpts, setMfrOpts]             = useState([]);
+  const [teamOpts, setTeamOpts]           = useState([]);
   const [setOpts, setSetOpts]             = useState([]);
   const [parallelOpts, setParallelOpts]   = useState([]);
   const [subsetOpts, setSubsetOpts]       = useState([]);
@@ -82,21 +85,22 @@ const MarketplacePage = () => {
 
   // Cascade: category → franchises
   useEffect(() => {
-    setFilterFranchise(''); setFilterMfr(''); setFilterSet(''); setFilterParallel(''); setFilterSubset('');
-    setFranchiseOpts([]); setMfrOpts([]); setSetOpts([]); setParallelOpts([]); setSubsetOpts([]);
+    setFilterFranchise(''); setFilterMfr(''); setFilterTeam(''); setFilterSet(''); setFilterParallel(''); setFilterSubset('');
+    setFranchiseOpts([]); setMfrOpts([]); setTeamOpts([]); setSetOpts([]); setParallelOpts([]); setSubsetOpts([]);
     if (filterCat) getFranchisesByCategory(filterCat).then(setFranchiseOpts);
   }, [filterCat, getFranchisesByCategory]);
 
-  // Cascade: franchise → manufacturers + sets + parallels
+  // Cascade: franchise → manufacturers + teams + sets + parallels
   useEffect(() => {
-    setFilterMfr(''); setFilterSet(''); setFilterParallel(''); setFilterSubset('');
-    setMfrOpts([]); setSetOpts([]); setParallelOpts([]); setSubsetOpts([]);
+    setFilterMfr(''); setFilterTeam(''); setFilterSet(''); setFilterParallel(''); setFilterSubset('');
+    setMfrOpts([]); setTeamOpts([]); setSetOpts([]); setParallelOpts([]); setSubsetOpts([]);
     if (filterFranchise) {
       getManufacturersByFranchise(filterFranchise).then(setMfrOpts);
+      getTeamsByFranchise(filterFranchise).then(setTeamOpts);
       getSetsByFranchiseAndManufacturer(filterFranchise, '').then(setSetOpts);
       getParallelsByFranchise(filterFranchise).then(setParallelOpts);
     }
-  }, [filterFranchise, getManufacturersByFranchise, getSetsByFranchiseAndManufacturer, getParallelsByFranchise]);
+  }, [filterFranchise, getManufacturersByFranchise, getTeamsByFranchise, getSetsByFranchiseAndManufacturer, getParallelsByFranchise]);
 
   // Cascade: manufacturer → refine sets
   useEffect(() => {
@@ -143,6 +147,7 @@ const MarketplacePage = () => {
         else if (filterFranchise) query = query.eq('vault_items.franchise_id', filterFranchise);
         else if (filterCat)       query = query.eq('vault_items.category_id', filterCat);
 
+        if (filterTeam)     query = query.eq('vault_items.team_id', filterTeam);
         if (filterParallel) query = query.eq('vault_items.parallel_id', filterParallel);
         if (filterSubset)   query = query.eq('vault_items.subset_id', filterSubset);
 
@@ -177,10 +182,10 @@ const MarketplacePage = () => {
     fetchRef.current = run;
     run();
     return () => { cancelled = true; };
-  }, [sort, filterMode, filterCat, filterFranchise, filterMfr, filterSet, filterParallel, filterSubset, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
+  }, [sort, filterMode, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
 
   const clearFilters = () => {
-    setFilterCat(''); setFilterFranchise(''); setFilterMfr(''); setFilterSet('');
+    setFilterCat(''); setFilterFranchise(''); setFilterMfr(''); setFilterTeam(''); setFilterSet('');
     setFilterParallel(''); setFilterSubset('');
     setFilterMode('All'); setFilterRookie(false);
     setSearch(''); setMinPrice(''); setMaxPrice('');
@@ -189,16 +194,17 @@ const MarketplacePage = () => {
   const getBreadcrumb = () => {
     const setName      = setOpts.find(s => s.id === filterSet)?.name;
     const mfrName      = mfrOpts.find(m => m.id === filterMfr)?.name;
+    const teamName     = teamOpts.find(t => t.id === filterTeam)?.name;
     const frName       = franchiseOpts.find(f => f.id === filterFranchise)?.name;
     const catName      = catNames[filterCat];
     const parallelName = parallelOpts.find(p => p.id === filterParallel)?.name;
     const subsetName   = subsetOpts.find(s => s.id === filterSubset)?.name;
-    const parts = [catName, frName, mfrName, setName, parallelName, subsetName].filter(Boolean);
+    const parts = [catName, frName, teamName, mfrName, setName, parallelName, subsetName].filter(Boolean);
     return parts.length ? `Filtering by: ${parts.join(' › ')}` : null;
   };
 
   const breadcrumbText = getBreadcrumb();
-  const hasActiveFilters = filterCat || filterFranchise || filterMfr || filterSet || filterParallel || filterSubset || filterMode !== 'All' || filterRookie || search || minPrice || maxPrice;
+  const hasActiveFilters = filterCat || filterFranchise || filterMfr || filterTeam || filterSet || filterParallel || filterSubset || filterMode !== 'All' || filterRookie || search || minPrice || maxPrice;
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans pb-20">
@@ -287,6 +293,18 @@ const MarketplacePage = () => {
                 </SelectTrigger>
                 <SelectContent>
                   {mfrOpts.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )}
+
+            {/* Team — only show if franchise has teams (sports) */}
+            {filterFranchise && teamOpts.length > 0 && (
+              <Select value={filterTeam} onValueChange={setFilterTeam}>
+                <SelectTrigger className="w-[200px] bg-background border-border rounded-xl font-medium">
+                  <SelectValue placeholder="Team" />
+                </SelectTrigger>
+                <SelectContent>
+                  {teamOpts.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             )}

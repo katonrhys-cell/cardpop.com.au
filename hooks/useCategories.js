@@ -65,6 +65,18 @@ export const useCategories = () => {
     return data ?? [];
   }, []);
 
+  // Teams linked to a specific franchise (sports only — e.g. NBA → NBA teams)
+  const getTeamsByFranchise = useCallback(async (franchiseId) => {
+    if (!franchiseId) return [];
+    const { data } = await supabase
+      .from('teams')
+      .select('*')
+      .eq('franchise_id', franchiseId)
+      .eq('is_active', true)
+      .order('sort_order');
+    return data ?? [];
+  }, []);
+
   // Sets for a franchise+manufacturer combo, grouped by series
   const getSetsByFranchiseAndManufacturer = useCallback(async (franchiseId, manufacturerId) => {
     if (!franchiseId) return [];
@@ -187,6 +199,7 @@ export const useCategories = () => {
     getRootCategories,
     getFranchisesByCategory,
     getManufacturersByFranchise,
+    getTeamsByFranchise,
     getSetsByFranchiseAndManufacturer,
     getCategoriesByGroup,
     getParallelsByFranchise,
