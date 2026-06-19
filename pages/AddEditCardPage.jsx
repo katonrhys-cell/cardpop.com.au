@@ -4,6 +4,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, ChevronDown, Sparkles, Loader2,
   Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X,
+  Frame, Wand2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -22,9 +23,11 @@ import { toast } from 'sonner';
 import { useCardOCR } from '@/hooks/useCardOCR.js';
 import { useEbayPriceLookup } from '@/hooks/useEbayPriceLookup.js';
 import { useCardSight, mapCardSightToFormFields } from '@/hooks/useCardSight.js';
+import { usePhotoTemplate } from '@/hooks/usePhotoTemplate.js';
 import PSAPopPanel from '@/components/PSAPopPanel.jsx';
 import { useCardsightPricing } from '@/hooks/useCardsightPricing.js';
 import PhotoQualityScore from '@/components/PhotoQualityScore.jsx';
+import PhotoTemplateModal from '@/components/PhotoTemplateModal.jsx';
 import { analyzePhotoQuality } from '@/utils/photoQuality.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
@@ -96,6 +99,11 @@ const AddEditCardPage = () => {
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
   const { identify: cardSightIdentify, isIdentifying, result: cardSightResult, clearResult: clearCardSight } = useCardSight();
   const { fetchPricingById, fetchPricingByName, isLoadingCsPrice, csPrice, clearCsPrice } = useCardsightPricing();
+  const { isProcessing: isPhotoProcessing, previewUrl, createSlabImagePreview, removeBackgroundPreview, uploadProcessedImage, reset: resetPhotoTemplate } = usePhotoTemplate();
+
+  // Photo template modal state
+  const [photoTemplateModal, setPhotoTemplateModal] = useState({ open: false, processType: null, step: 'preview' });
+  const [isUploadingTemplate, setIsUploadingTemplate] = useState(false);
 
   const emptyForm = {
     // Card identity
@@ -370,6 +378,66 @@ const AddEditCardPage = () => {
       setIsAutoFilled(true);
       // Success/failure feedback is surfaced by useCardOCR itself.
     }
+  };
+
+  // ─── Photo template handlers ──────────────────────────────────────────────
+  const handleSlabImageEdit = async () => {
+    if (!imageFile) return;
+    try {
+      setPhotoTemplateModal({ open: true, processType: 'slab', step: 'preview' });
+      await createSlabImagePreview(imageFile);
+    } catch (error) {
+      toast.error('Failed to create preview');
+    }
+  };
+
+  const handleRemoveBackground = async () => {
+    if (!imageFile) return;
+    try {
+      setPhotoTemplateModal({ open: true, processType: 'remove-bg', step: 'preview' });
+      await removeBackgroundPreview(imageFile);
+    } catch (error) {
+      toast.error('Failed to process image');
+    }
+  };
+
+  const handleConfirmTemplate = async () => {
+    if (!id) {
+      toast.error('Save your card first before applying templates');
+      return;
+    }
+
+    try {
+      setIsUploadingTemplate(true);
+      await uploadProcessedImage(id, photoTemplateModal.processType === 'slab' ? 'slab' : 'remove-bg');
+
+      setPhotoTemplateModal({ open: false, processType: null, step: 'preview' });
+      resetPhotoTemplate();
+
+      // Refresh the card data
+      const { data: updatedCard } = await supabase
+        .from('vault_items')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (updatedCard?.card_image) {
+        const imageUrl = updatedCard.card_image.startsWith('http')
+          ? updatedCard.card_image
+          : supabase.storage.from('vault-images').getPublicUrl(updatedCard.card_image).data.publicUrl;
+        setImagePreview(imageUrl);
+      }
+    } catch (error) {
+      console.error('Template upload error:', error);
+      toast.error('Failed to upload processed image');
+    } finally {
+      setIsUploadingTemplate(false);
+    }
+  };
+
+  const closePhotoTemplateModal = () => {
+    setPhotoTemplateModal({ open: false, processType: null, step: 'preview' });
+    resetPhotoTemplate();
   };
 
   // ─── Validation ───────────────────────────────────────────────────────────
@@ -656,7 +724,7 @@ const AddEditCardPage = () => {
                   </div>
                 </div>
 
-                {/* Unified AI Analysis */}
+                {/* Unified AI Analysis & Photo Templates */}
                 <div className="mt-4 space-y-3">
                   {imageFile && !isScanning && !isIdentifying && (
                     <Button
@@ -668,6 +736,37 @@ const AddEditCardPage = () => {
                       <Sparkles className="w-4 h-4 mr-2" /> Analyze with AI
                     </Button>
                   )}
+
+                  {/* Photo Template Buttons — only show after saving (when in edit mode) */}
+                  {isEdit && imageFile && !isScanning && !isIdentifying && (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleSlabImageEdit}
+                        disabled={isPhotoProcessing || isUploadingTemplate}
+                        className="w-full"
+                      >
+                        <Frame className="w-4 h-4 mr-2" />
+                        {isPhotoProcessing ? 'Creating...' : 'Slab Image Edit'}
+                      </Button>
+                      <div className="text-xs text-muted-foreground text-center px-2">
+                        CardPop recommends this for slabs
+                      </div>
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleRemoveBackground}
+                        disabled={isPhotoProcessing || isUploadingTemplate}
+                        className="w-full"
+                      >
+                        <Wand2 className="w-4 h-4 mr-2" />
+                        {isPhotoProcessing ? 'Processing...' : 'Remove Background'}
+                      </Button>
+                    </>
+                  )}
+
 
                   {(isScanning || isIdentifying) && (
                     <div className="p-3 rounded-xl border border-border bg-muted/30 animate-in fade-in">
@@ -2177,6 +2276,17 @@ const AddEditCardPage = () => {
           </div>
         </form>
       </div>
+
+      {/* Photo Template Modal */}
+      <PhotoTemplateModal
+        isOpen={photoTemplateModal.open}
+        onClose={closePhotoTemplateModal}
+        onConfirm={handleConfirmTemplate}
+        isProcessing={isPhotoProcessing || isUploadingTemplate}
+        previewUrl={previewUrl}
+        processType={photoTemplateModal.processType}
+        step={photoTemplateModal.step}
+      />
     </div>
   );
 };
