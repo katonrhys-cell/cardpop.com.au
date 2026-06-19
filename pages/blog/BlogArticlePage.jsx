@@ -24,6 +24,7 @@ const ConvictionRating = ({ rating }) => {
           {rating}/5 &middot; {CONVICTION_LABELS[rating]}
         </span>
       </div>
+      <p className="text-xs text-white/50 mb-3">Our confidence level in the card's investment thesis. 1 = High Risk, 5 = Strong Buy.</p>
 
       {/* Scale — 5 segments filled to the rating, with end-point meanings */}
       <div className="max-w-[15rem]">
@@ -299,15 +300,17 @@ const BlogArticlePage = () => {
           {/* Byline */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-medium text-white/55">
             <span>By <span className="font-bold text-white/90">{article.author || 'CardPop Research'}</span></span>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs" style={{ color: '#CE1126' }}>
+            <span>By <span className="font-semibold">{article.author || 'CardPop Research'}</span></span>
             {(article.published_at || article.created_at) && (
               <>
-                <span className="text-white/20">&bull;</span>
+                <span>&bull;</span>
                 <span>{formatPublishedDate(article.published_at || article.created_at)}</span>
               </>
             )}
             {article.read_time_minutes && (
               <>
-                <span className="text-white/20">&bull;</span>
+                <span>&bull;</span>
                 <span>{article.read_time_minutes} min read</span>
               </>
             )}

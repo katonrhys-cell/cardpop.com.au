@@ -4,6 +4,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, ChevronDown, Sparkles, Loader2,
   Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X,
+  Frame, Wand2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -22,9 +23,11 @@ import { toast } from 'sonner';
 import { useCardOCR } from '@/hooks/useCardOCR.js';
 import { useEbayPriceLookup } from '@/hooks/useEbayPriceLookup.js';
 import { useCardSight, mapCardSightToFormFields } from '@/hooks/useCardSight.js';
+import { usePhotoTemplate } from '@/hooks/usePhotoTemplate.js';
 import PSAPopPanel from '@/components/PSAPopPanel.jsx';
 import { useCardsightPricing } from '@/hooks/useCardsightPricing.js';
 import PhotoQualityScore from '@/components/PhotoQualityScore.jsx';
+import PhotoTemplateModal from '@/components/PhotoTemplateModal.jsx';
 import { analyzePhotoQuality } from '@/utils/photoQuality.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
@@ -96,6 +99,11 @@ const AddEditCardPage = () => {
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
   const { identify: cardSightIdentify, isIdentifying, result: cardSightResult, clearResult: clearCardSight } = useCardSight();
   const { fetchPricingById, fetchPricingByName, isLoadingCsPrice, csPrice, clearCsPrice } = useCardsightPricing();
+  const { isProcessing: isPhotoProcessing, previewUrl, createSlabImagePreview, removeBackgroundPreview, uploadProcessedImage, reset: resetPhotoTemplate } = usePhotoTemplate();
+
+  // Photo template modal state
+  const [photoTemplateModal, setPhotoTemplateModal] = useState({ open: false, processType: null, step: 'preview' });
+  const [isUploadingTemplate, setIsUploadingTemplate] = useState(false);
 
   const emptyForm = {
     // Card identity
@@ -370,6 +378,56 @@ const AddEditCardPage = () => {
       setIsAutoFilled(true);
       // Success/failure feedback is surfaced by useCardOCR itself.
     }
+  };
+
+  // ─── Photo template handlers ──────────────────────────────────────────────
+  const handleFormatPhoto = async () => {
+    if (!imageFile) return;
+    try {
+      setPhotoTemplateModal({ open: true, processType: 'template', step: 'preview' });
+      await createSlabImagePreview(imageFile);
+    } catch (error) {
+      toast.error('Failed to format photo');
+    }
+  };
+
+  const handleConfirmTemplate = async () => {
+    if (!id) {
+      toast.error('Save your card first before applying templates');
+      return;
+    }
+
+    try {
+      setIsUploadingTemplate(true);
+      await uploadProcessedImage(id, photoTemplateModal.processType === 'slab' ? 'slab' : 'remove-bg');
+
+      setPhotoTemplateModal({ open: false, processType: null, step: 'preview' });
+      resetPhotoTemplate();
+
+      // Refresh the card data
+      const { data: updatedCard } = await supabase
+        .from('vault_items')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (updatedCard?.card_image) {
+        const imageUrl = updatedCard.card_image.startsWith('http')
+          ? updatedCard.card_image
+          : supabase.storage.from('vault-images').getPublicUrl(updatedCard.card_image).data.publicUrl;
+        setImagePreview(imageUrl);
+      }
+    } catch (error) {
+      console.error('Template upload error:', error);
+      toast.error('Failed to upload processed image');
+    } finally {
+      setIsUploadingTemplate(false);
+    }
+  };
+
+  const closePhotoTemplateModal = () => {
+    setPhotoTemplateModal({ open: false, processType: null, step: 'preview' });
+    resetPhotoTemplate();
   };
 
   // ─── Validation ───────────────────────────────────────────────────────────
@@ -656,17 +714,43 @@ const AddEditCardPage = () => {
                   </div>
                 </div>
 
-                {/* Unified AI Analysis */}
+                {/* Photo Template & Card Identification */}
                 <div className="mt-4 space-y-3">
-                  {imageFile && !isScanning && !isIdentifying && (
+                  {/* Format Photo Button - Always available when image is present */}
+                  {imageFile && !isPhotoProcessing && !isUploadingTemplate && (
                     <Button
                       type="button"
-                      variant="secondary"
-                      onClick={handleAnalyzeWithAI}
-                      className="w-full bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20"
+                      variant="outline"
+                      onClick={handleFormatPhoto}
+                      disabled={isPhotoProcessing || isUploadingTemplate}
+                      className="w-full"
                     >
-                      <Sparkles className="w-4 h-4 mr-2" /> Analyze with AI
+                      <Frame className="w-4 h-4 mr-2" />
+                      Format Photo
                     </Button>
+                  )}
+
+                  {isPhotoProcessing || isUploadingTemplate ? (
+                    <div className="p-3 rounded-xl border border-border bg-muted/30 animate-in fade-in">
+                      <p className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Processing photo…
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {/* Identify Card Button - AI analysis with recommended label */}
+                  {imageFile && !isScanning && !isIdentifying && !isPhotoProcessing && !isUploadingTemplate && (
+                    <div className="space-y-1">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={handleAnalyzeWithAI}
+                        className="w-full bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 border border-emerald-500/20 dark:text-emerald-400"
+                      >
+                        <Sparkles className="w-4 h-4 mr-2" /> Identify Card
+                      </Button>
+                      <p className="text-xs text-center text-muted-foreground">(Recommended)</p>
+                    </div>
                   )}
 
                   {(isScanning || isIdentifying) && (
@@ -2177,6 +2261,17 @@ const AddEditCardPage = () => {
           </div>
         </form>
       </div>
+
+      {/* Photo Template Modal */}
+      <PhotoTemplateModal
+        isOpen={photoTemplateModal.open}
+        onClose={closePhotoTemplateModal}
+        onConfirm={handleConfirmTemplate}
+        isProcessing={isPhotoProcessing || isUploadingTemplate}
+        previewUrl={previewUrl}
+        processType={photoTemplateModal.processType}
+        step={photoTemplateModal.step}
+      />
     </div>
   );
 };

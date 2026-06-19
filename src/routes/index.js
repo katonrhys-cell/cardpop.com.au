@@ -16,6 +16,7 @@ import eventScraperRouter from './event-scraper.js';
 import categoriesRouter from './categories.js';
 import subcategoriesRouter from './subcategories.js';
 import vaultRouter from './vault.js';
+import photoTemplateRouter from './photo-template.js';
 import sitemapRouter from './sitemap.js';
 import searchSuggestionsRouter from './search-suggestions.js';
 import sellerRatingsRouter from './seller-ratings.js';
@@ -85,6 +86,10 @@ export default () => {
     // Vault security routes with API rate limiting
     router.use('/vault', apiLimiter);
     router.use('/vault', vaultRouter);
+
+    // Photo template routes with API rate limiting
+    router.use('/photo-template', apiLimiter);
+    router.use('/photo-template', photoTemplateRouter);
 
     // Marketplace feature routes with API rate limiting
     router.use('/seller-ratings', apiLimiter);
