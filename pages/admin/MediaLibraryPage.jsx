@@ -82,8 +82,11 @@ const MediaLibraryPage = () => {
 
     setIsUploading(true);
     try {
-      const ext = selectedFile.name.split('.').pop();
-      const path = `media/${Date.now()}-${uploadData.filename.trim().replace(/\s+/g, '_')}.${ext}`;
+      const ext = selectedFile.name.split('.').pop().toLowerCase();
+      // Strip any extension the user left on the filename so we don't end up
+      // with a doubled extension (e.g. "name.png.png") in the storage path/URL.
+      const base = uploadData.filename.trim().replace(/\.[^/.]+$/, '').replace(/\s+/g, '_');
+      const path = `media/${Date.now()}-${base}.${ext}`;
       const { error: upErr } = await supabase.storage.from('media').upload(path, selectedFile);
       if (upErr) throw upErr;
       const publicUrl = supabase.storage.from('media').getPublicUrl(path).data.publicUrl;

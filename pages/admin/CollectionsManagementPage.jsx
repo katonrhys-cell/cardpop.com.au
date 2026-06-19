@@ -216,8 +216,8 @@ const CollectionsManagementPage = () => {
   const selectedConfig = COLLECTION_CONFIGS[selectedSlug];
 
   return (
-    <div className="min-h-screen bg-background p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div>
+      <div className="space-y-6">
 
         <AdminPageHeader
           icon={Layers}

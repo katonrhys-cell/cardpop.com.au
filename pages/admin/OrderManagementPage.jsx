@@ -255,7 +255,7 @@ const OrderManagementPage = () => {
   const fmt = (val) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(val || 0);
 
   return (
-    <div className="w-full space-y-6 animate-in fade-in duration-300 py-6 px-4 sm:px-6 md:px-8">
+    <div className="space-y-6 animate-in fade-in duration-300">
       <Helmet><title>Order Management | Admin</title></Helmet>
 
       <AdminPageHeader
