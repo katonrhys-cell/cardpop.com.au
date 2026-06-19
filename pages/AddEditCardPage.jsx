@@ -89,6 +89,7 @@ const AddEditCardPage = () => {
   const [showRelicGuide, setShowRelicGuide]   = useState(false);
   const [showNumberGuide, setShowNumberGuide] = useState(false);
   const [showSpGuide, setShowSpGuide]         = useState(false);
+  const [showRookieGuide, setShowRookieGuide] = useState(false);
 
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
@@ -120,6 +121,8 @@ const AddEditCardPage = () => {
     serialPrintRun: '',
     spVariation:    '',
     spTier:         '',
+    rookieType:     '',
+    rookieLogo:     '',
     // Grading
     gradingCompany: 'raw',
     grade:          '',
@@ -246,6 +249,8 @@ const AddEditCardPage = () => {
           serialPrintRun: card.serial_print_run != null ? String(card.serial_print_run) : '',
           spVariation:    card.sp_variation    || '',
           spTier:         card.sp_tier         || '',
+          rookieType:     card.rookie_type     || '',
+          rookieLogo:     card.rookie_logo     || '',
           gradingCompany: card.grading_company || 'raw',
           grade:          card.grade          || '',
           certNumber:     card.cert_number    || '',
@@ -448,6 +453,8 @@ const AddEditCardPage = () => {
         serial_print_run:    formData.variant.includes('Numbered') && formData.serialPrintRun ? (parseInt(formData.serialPrintRun, 10) || null) : null,
         sp_variation:        formData.variant.includes('Short Print (SP)') ? (formData.spVariation || null) : null,
         sp_tier:             formData.variant.includes('Short Print (SP)') ? (formData.spTier || null) : null,
+        rookie_type:         formData.variant.includes('Rookie Card (RC)') ? (formData.rookieType || null) : null,
+        rookie_logo:         formData.variant.includes('Rookie Card (RC)') ? (formData.rookieLogo || null) : null,
         grading_company:     formData.gradingCompany,
         grade:               isGraded ? (formData.grade?.trim() || null) : null,
         cert_number:         isGraded ? (formData.certNumber?.trim() || null) : null,
@@ -983,6 +990,134 @@ const AddEditCardPage = () => {
                         />
                       </div>
                     </div>
+
+                    {/* Rookie sub-details — shown when the "Rookie Card (RC)" attribute
+                        is selected in the Card Variant / Finish section (Attributes group). */}
+                    {formData.variant.includes('Rookie Card (RC)') && (
+                      <div className="mt-3 p-4 rounded-xl border-2 border-teal-400/30 bg-teal-400/5 space-y-4 animate-in fade-in slide-in-from-top-1">
+                        <p className="text-xs font-extrabold uppercase tracking-widest text-teal-700 dark:text-teal-400">Rookie Card Details</p>
+
+                        {/* Rookie designation */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Rookie Designation</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { value: 'true_rc',      label: 'True RC',            desc: 'Base card with the official RC logo in a licensed flagship set' },
+                              { value: 'rc_logo',      label: 'RC Logo Card',       desc: 'Carries the cross-brand Rookie Card logo (2006+)' },
+                              { value: 'first_bowman', label: '1st Bowman / Prospect', desc: 'First licensed prospect card from the minors or college' },
+                              { value: 'pre_rookie',   label: 'Pre-Rookie (PRC)',   desc: 'A card issued before the recognised rookie card' },
+                              { value: 'xrc',          label: 'Extended RC (XRC)',  desc: 'Rookie from a traded / update set' },
+                              { value: 'rpa',          label: 'Rookie Patch Auto',  desc: 'Premium rookie with autograph + game-worn patch (RPA)' },
+                              { value: 'rated_rookie', label: 'Rated Rookie',       desc: "Donruss's branded rookie subset" },
+                              { value: 'rookie_ticket',label: 'Rookie Ticket',      desc: "Panini Contenders' autographed rookie subset" },
+                              { value: 'other',        label: 'Other Rookie',       desc: 'Another rookie-related card' },
+                            ].map(({ value, label, desc }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('rookieType', formData.rookieType === value ? '' : value)}
+                                className={`flex flex-col items-start px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
+                                  formData.rookieType === value
+                                    ? 'border-teal-500 bg-teal-500/10 text-teal-700 dark:text-teal-400 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                }`}
+                              >
+                                <span className="font-bold text-xs">{label}</span>
+                                <span className={`text-[10px] mt-0.5 leading-tight ${formData.rookieType === value ? 'text-teal-600/70 dark:text-teal-400/70' : 'text-muted-foreground'}`}>{desc}</span>
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Collapsible rookie guide */}
+                          <div className="rounded-xl border border-teal-400/25 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setShowRookieGuide(v => !v)}
+                              className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-teal-400/5 transition-colors"
+                            >
+                              <span className="text-[11px] font-bold text-teal-700 dark:text-teal-400">What counts as a rookie card? View guide</span>
+                              <ChevronDown className={`h-3.5 w-3.5 text-teal-600 dark:text-teal-400 transition-transform duration-200 ${showRookieGuide ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showRookieGuide && (
+                              <div className="px-3 pb-3 divide-y divide-border/40">
+                                {[
+                                  {
+                                    title: 'True Rookie Card',
+                                    badge: 'Most Valued',
+                                    badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20',
+                                    body: "The base card from a fully-licensed, nationally-distributed flagship set in the player's first year — not an insert, parallel, or redemption. This is the version the hobby usually recognises as the definitive RC.",
+                                  },
+                                  {
+                                    title: 'RC Logo',
+                                    badge: 'Marker',
+                                    badgeClass: 'bg-teal-500/10 text-teal-700 dark:text-teal-400 border border-teal-500/20',
+                                    body: 'Since 2006, first-year players carry a standardised cross-brand "ROOKIE CARD" logo. Useful for spotting rookies, but not every card bearing the logo is considered a true RC.',
+                                  },
+                                  {
+                                    title: '1st Bowman / Prospect',
+                                    badge: 'Pre-MLB',
+                                    badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20',
+                                    body: "A player's first licensed card, issued while still in the minors or college (often Bowman, with a 1st Bowman logo). Not an official RC, but frequently more sought-after than the eventual rookie.",
+                                  },
+                                  {
+                                    title: 'Pre-Rookie & XRC',
+                                    badge: 'Early Issue',
+                                    badgeClass: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20',
+                                    body: 'Pre-Rookie (PRC) is any card before the recognised RC. XRC (Extended Rookie Card) refers to rookies that appeared in 1980s traded/update sets ahead of a flagship rookie the following year.',
+                                  },
+                                  {
+                                    title: 'Rookie Patch Auto (RPA)',
+                                    badge: 'Premium',
+                                    badgeClass: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-500/20',
+                                    body: 'A premium rookie-year card pairing the player\'s autograph with a game-worn patch. Highly desirable, though not always recognised as the "true" RC unless it meets the licensed, pack-issued, widely-distributed criteria.',
+                                  },
+                                  {
+                                    title: 'Branded Rookies',
+                                    badge: 'Subset',
+                                    badgeClass: 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20',
+                                    body: 'Some sets brand their rookies — Donruss "Rated Rookie" and Panini Contenders "Rookie Ticket" are the best known. These are popular, recognisable rookie subsets in their own right.',
+                                  },
+                                ].map(({ title, badge, badgeClass, body }) => (
+                                  <div key={title} className="py-2.5 first:pt-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-[11px] font-bold text-foreground">{title}</span>
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${badgeClass}`}>{badge}</span>
+                                    </div>
+                                    <p className="text-[10px] leading-relaxed text-muted-foreground">{body}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* RC logo present on card */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Official RC Logo on Card?</Label>
+                          <div className="flex gap-2">
+                            {[
+                              { value: 'yes', label: 'Yes',  sub: 'Logo printed' },
+                              { value: 'no',  label: 'No',   sub: 'No RC logo' },
+                              { value: 'na',  label: 'N/A',  sub: 'Pre-2006 / vintage' },
+                            ].map(({ value, label, sub }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('rookieLogo', formData.rookieLogo === value ? '' : value)}
+                                className={`flex-1 flex flex-col items-center px-2 py-2.5 rounded-xl border-2 text-center transition-all ${
+                                  formData.rookieLogo === value
+                                    ? 'border-teal-500 bg-teal-500/10 text-teal-700 dark:text-teal-400 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                }`}
+                              >
+                                <span className="font-bold text-sm">{label}</span>
+                                <span className={`text-[10px] mt-0.5 ${formData.rookieLogo === value ? 'text-teal-600/70 dark:text-teal-400/70' : 'text-muted-foreground'}`}>{sub}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Auto sub-details — shown when the "Auto" attribute is selected
                         in the Card Variant / Finish section (the Attributes group). */}
