@@ -13,6 +13,15 @@ const normalizeSocialUrl = (u) => {
   if (!v) return null;
   return /^https?:\/\//i.test(v) ? v : `https://${v.replace(/^\/+/, '')}`;
 };
+
+// Map a trading-card condition / grade to a schema.org OfferItemCondition.
+const schemaItemCondition = (c) => {
+  const v = String(c || '').toLowerCase();
+  if (!v) return undefined;
+  if (/(gem|mint|sealed|brand new|\bnm\b|graded)/.test(v) || /\b(8|8\.5|9|9\.5|10)\b/.test(v)) return 'https://schema.org/NewCondition';
+  if (/(damaged|poor|heavily played|\bhp\b)/.test(v)) return 'https://schema.org/DamagedCondition';
+  return 'https://schema.org/UsedCondition';
+};
 import SellerTierBadge from '@/components/SellerTierBadge.jsx';
 import VerifiedBadge from '@/components/VerifiedBadge.jsx';
 import { Badge } from '@/components/ui/badge';
@@ -162,6 +171,7 @@ const SoleTraderStorePage = () => {
     const isMkt = item._type === 'marketplace';
     const name = (isMkt ? item.vault_item?.card_name : item.card_name) || 'Trading Card';
     const price = isMkt ? item.price_aud : item.estimated_value_aud;
+    const condition = schemaItemCondition(isMkt ? item.vault_item?.condition : item.condition);
     const url = isMkt
       ? `${SITE}/product/marketplace/${item.id}/${item.slug || 'listing'}`
       : `${SITE}/product/vault/${item.id}`;
@@ -177,6 +187,7 @@ const SoleTraderStorePage = () => {
             price: Number(price).toFixed(2),
             priceCurrency: 'AUD',
             availability: 'https://schema.org/InStock',
+            ...(condition ? { itemCondition: condition } : {}),
             url,
             seller: { '@type': 'Store', name: displayName },
           } }
