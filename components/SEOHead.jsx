@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet';
 
 const SEOHead = ({ title, description, canonicalUrl, ogImage, structuredData }) => {
   const siteName = "CardPop";
-  const defaultTitle = `${siteName} | Australia's Trading Card Marketplace | CardPop.online`;
+  const defaultTitle = `${siteName} | Australia's Trading Card Marketplace`;
   const defaultDescription = "Buy, sell, and trade authenticated trading cards in Australia. Browse Pokemon, Magic, Yu-Gi-Oh and more on CardPop.";
   const resolvedCanonical = canonicalUrl || (typeof window !== 'undefined' ? window.location.href.split('?')[0] : '');
   const resolvedTitle = title || defaultTitle;
