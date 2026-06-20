@@ -190,7 +190,7 @@ const LocalTradersPage = () => {
                         )}
                       </div>
                       {store.is_verified && (
-                        <div className="absolute -bottom-1.5 -right-1.5 bg-primary text-primary-foreground p-1 rounded-lg shadow-md border-2 border-card" title="Verified Dealer">
+                        <div className="absolute -bottom-1.5 -right-1.5 bg-emerald-500 text-white p-1 rounded-lg shadow-md border-2 border-card" title="Verified Dealer">
                           <BadgeCheck className="w-4 h-4" />
                         </div>
                       )}
@@ -206,7 +206,7 @@ const LocalTradersPage = () => {
                           </Badge>
                         )}
                         {store.is_verified && (
-                          <BadgeCheck className="w-4 h-4 text-primary shrink-0" title="Verified business" />
+                          <BadgeCheck className="w-4 h-4 text-emerald-500 shrink-0" title="Verified business" />
                         )}
                       </div>
                       {store.business_tagline && (
