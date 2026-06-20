@@ -392,8 +392,36 @@ const AddEditCardPage = () => {
   };
 
   const handleConfirmTemplate = async () => {
+    // ── New (unsaved) card ──────────────────────────────────────────────────
+    // The backend endpoint needs an existing vault item to update, which a
+    // brand-new card doesn't have yet. Rather than forcing a save first, apply
+    // the formatted preview to the in-memory image so it's uploaded as-is when
+    // the card is created.
     if (!id) {
-      toast.error('Save your card first before applying templates');
+      if (!previewUrl) {
+        toast.error('No formatted image to apply');
+        return;
+      }
+      try {
+        setIsUploadingTemplate(true);
+        const response = await fetch(previewUrl);
+        const blob = await response.blob();
+        const formattedFile = new File(
+          [blob],
+          `formatted-${Date.now()}.jpg`,
+          { type: blob.type || 'image/jpeg' }
+        );
+        setImageFile(formattedFile);
+        setImagePreview(previewUrl);
+        setPhotoTemplateModal({ open: false, processType: null, step: 'preview' });
+        resetPhotoTemplate();
+        toast.success('Photo formatted — it will be saved with your card.');
+      } catch (error) {
+        console.error('Local format error:', error);
+        toast.error('Failed to apply formatted photo');
+      } finally {
+        setIsUploadingTemplate(false);
+      }
       return;
     }
 
