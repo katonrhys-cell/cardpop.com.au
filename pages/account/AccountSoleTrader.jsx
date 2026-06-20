@@ -31,6 +31,14 @@ const TRUST_BADGES = [
   { key: 'returns_accepted',  label: 'Returns Accepted',     desc: '7-day returns on eligible items' },
 ];
 
+const slugify = (s) => String(s || '')
+  .toLowerCase()
+  .trim()
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/^-+|-+$/g, '')
+  .slice(0, 60)
+  .replace(/-+$/g, '');
+
 const AccountSoleTrader = () => {
   const { currentUser } = useAuth();
   const [loading, setLoading]           = useState(false);
@@ -50,12 +58,13 @@ const AccountSoleTrader = () => {
   const [logoPreview, setLogoPreview]   = useState(null);
   const [removeLogo, setRemoveLogo]     = useState(false);
   const [existingLogoUrl, setExistingLogoUrl] = useState(null);
+  const [storeSlug, setStoreSlug]       = useState(null);
 
   useEffect(() => {
     if (!currentUser?.id) { setPageLoading(false); return; }
     let cancelled = false;
     supabase.from('profiles')
-      .select('is_sole_trader, business_name, business_tagline, abn, business_logo_url, business_categories, dealer_trust_badges, dealer_shipping_policy')
+      .select('is_sole_trader, business_name, business_tagline, abn, business_logo_url, business_categories, dealer_trust_badges, dealer_shipping_policy, store_slug')
       .eq('id', currentUser.id)
       .single()
       .then(({ data }) => {
@@ -70,6 +79,7 @@ const AccountSoleTrader = () => {
         setSelectedCategories(data.business_categories ?? []);
         setSelectedBadges(data.dealer_trust_badges ?? []);
         setExistingLogoUrl(data.business_logo_url ?? null);
+        setStoreSlug(data.store_slug ?? null);
       })
       .finally(() => { if (!cancelled) setPageLoading(false); });
     return () => { cancelled = true; };
@@ -124,6 +134,22 @@ const AccountSoleTrader = () => {
         business_logo_url = null;
       }
 
+      // Generate a stable, human-readable store slug for the dealer's store URL
+      // (/dealer/<slug>) the first time they save a business name.
+      let finalSlug = storeSlug;
+      if (isSoleTrader && !finalSlug && formData.business_name.trim()) {
+        const base = slugify(formData.business_name) || `store-${currentUser.id.slice(0, 8)}`;
+        let candidate = base;
+        for (let n = 2; n <= 20; n++) {
+          const { data: clash } = await supabase
+            .from('profiles').select('id')
+            .eq('store_slug', candidate).neq('id', currentUser.id).maybeSingle();
+          if (!clash) break;
+          candidate = `${base}-${n}`;
+        }
+        finalSlug = candidate;
+      }
+
       const { error } = await supabase.from('profiles').update({
         is_sole_trader:         isSoleTrader,
         business_name:          formData.business_name,
@@ -133,6 +159,7 @@ const AccountSoleTrader = () => {
         business_categories:    selectedCategories,
         dealer_trust_badges:    selectedBadges,
         business_logo_url,
+        ...(finalSlug ? { store_slug: finalSlug } : {}),
       }).eq('id', currentUser.id);
 
       if (error) throw error;
@@ -140,6 +167,7 @@ const AccountSoleTrader = () => {
       setLogoFile(null);
       setRemoveLogo(false);
       setExistingLogoUrl(business_logo_url);
+      setStoreSlug(finalSlug);
       toast.success('Business profile saved!');
     } catch (err) {
       console.error(err);
@@ -173,7 +201,7 @@ const AccountSoleTrader = () => {
         </div>
         {isSoleTrader && currentUser?.id && (
           <Button asChild variant="outline" size="sm" className="rounded-xl font-bold self-start">
-            <Link to={`/dealer/${currentUser.id}`} target="_blank">
+            <Link to={`/dealer/${storeSlug || currentUser.id}`} target="_blank">
               <ExternalLink className="w-4 h-4 mr-2" /> View My Store
             </Link>
           </Button>

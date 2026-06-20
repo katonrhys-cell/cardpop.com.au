@@ -305,7 +305,7 @@ const LocalMapPage = () => {
       const q = encodeURIComponent(val + ', Australia');
       const res = await fetch(
         `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&countrycodes=au`,
-        { headers: { 'Accept-Language': 'en', 'User-Agent': 'CardPop.online/1.0' } }
+        { headers: { 'Accept-Language': 'en', 'User-Agent': 'CardPop.com.au/1.0' } }
       );
       const data = await res.json();
       if (data[0]) {

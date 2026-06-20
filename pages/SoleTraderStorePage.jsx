@@ -1,11 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import {
   Star, ShieldCheck, MapPin, Calendar, ExternalLink, ShieldAlert,
-  Package, MessageSquare, BadgeCheck, CheckCircle2, Truck, Heart, Zap, RotateCcw,
+  Package, MessageSquare, BadgeCheck, CheckCircle2, Truck, Heart, Zap, RotateCcw, Instagram,
 } from 'lucide-react';
+
+// Normalise a user-entered social link into an absolute URL.
+const normalizeSocialUrl = (u) => {
+  const v = String(u || '').trim();
+  if (!v) return null;
+  return /^https?:\/\//i.test(v) ? v : `https://${v.replace(/^\/+/, '')}`;
+};
+
+// Map a trading-card condition / grade to a schema.org OfferItemCondition.
+const schemaItemCondition = (c) => {
+  const v = String(c || '').toLowerCase();
+  if (!v) return undefined;
+  if (/(gem|mint|sealed|brand new|\bnm\b|graded)/.test(v) || /\b(8|8\.5|9|9\.5|10)\b/.test(v)) return 'https://schema.org/NewCondition';
+  if (/(damaged|poor|heavily played|\bhp\b)/.test(v)) return 'https://schema.org/DamagedCondition';
+  return 'https://schema.org/UsedCondition';
+};
 import SellerTierBadge from '@/components/SellerTierBadge.jsx';
 import VerifiedBadge from '@/components/VerifiedBadge.jsx';
 import { Badge } from '@/components/ui/badge';
@@ -23,8 +39,12 @@ const BADGE_META = {
   returns_accepted:   { label: 'Returns Accepted',    desc: '7-day returns on eligible items',                     Icon: RotateCcw    },
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const SoleTraderStorePage = () => {
-  const { userId } = useParams();
+  // Route param may be a store slug (preferred) or a legacy UUID.
+  const { userId: routeParam } = useParams();
+  const navigate = useNavigate();
   const [dealer, setDealer]   = useState(null);
   const [listings, setListings] = useState([]);
   const [stats, setStats]     = useState({ totalListings: 0, averageRating: 0, totalReviews: 0 });
@@ -32,33 +52,43 @@ const SoleTraderStorePage = () => {
   const [error, setError]     = useState(null);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!routeParam) return;
     let mounted = true;
 
     (async () => {
       try {
-        const { data: profile, error: profileErr } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .single();
+        // Resolve by slug, or by UUID for legacy/back-compat links.
+        const byUuid = UUID_RE.test(routeParam);
+        let profileQuery = supabase.from('profiles').select('*');
+        profileQuery = byUuid
+          ? profileQuery.eq('id', routeParam)
+          : profileQuery.eq('store_slug', routeParam);
+        const { data: profile, error: profileErr } = await profileQuery.maybeSingle();
 
         if (profileErr) throw profileErr;
+        if (!profile) throw new Error('Store not found.');
         if (!profile.is_sole_trader) throw new Error('This page is not a dealer store.');
         if (profile.is_public === false) throw new Error('This store is private.');
 
+        // Redirect legacy UUID links to the clean slug URL.
+        if (byUuid && profile.store_slug && mounted) {
+          navigate(`/dealer/${profile.store_slug}`, { replace: true });
+          return;
+        }
+
+        const resolvedId = profile.id;
         const [marketplaceRes, vaultRes, reviewsRes] = await Promise.all([
           supabase.from('listings')
             .select('*, vault_item:vault_items(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
-            .eq('seller_id', userId).eq('status', 'active')
+            .eq('seller_id', resolvedId).eq('status', 'active')
             .order('created_at', { ascending: false }).limit(24),
           supabase.from('vault_items')
             .select('*, vault_images(*), owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
-            .eq('owner_id', userId).eq('is_public', true).neq('listing_type', 'Private')
+            .eq('owner_id', resolvedId).eq('is_public', true).neq('listing_type', 'Private')
             .order('created_at', { ascending: false }).limit(24),
           supabase.from('reviews')
             .select('*', { count: 'exact' })
-            .eq('recipient_id', userId),
+            .eq('recipient_id', resolvedId),
         ]);
 
         if (!mounted) return;
@@ -85,7 +115,7 @@ const SoleTraderStorePage = () => {
     })();
 
     return () => { mounted = false; };
-  }, [userId]);
+  }, [routeParam, navigate]);
 
   if (loading) return (
     <div className="max-w-7xl mx-auto px-4 py-12 space-y-8 animate-in fade-in duration-500">
@@ -117,11 +147,95 @@ const SoleTraderStorePage = () => {
   const displayName  = dealer.business_name || dealer.display_name || 'Dealer';
   const location     = [dealer.location_suburb, dealer.location_state].filter(Boolean).join(', ');
 
+  // SEO: absolute logo URL + Store / BreadcrumbList JSON-LD describing this
+  // dealer's storefront so search engines can render it as a local business.
+  const SITE = 'https://cardpop.com.au';
+  const storeUrl = `${SITE}/dealer/${dealer.store_slug || dealer.id}`;
+  const absLogo = logoUrl
+    ? (logoUrl.startsWith('http') ? logoUrl : `${SITE}${logoUrl}`)
+    : undefined;
+
+  // Resolve a storage path / URL for a listing's primary image.
+  const resolveListingImage = (item) => {
+    const path = item._type === 'marketplace'
+      ? (item.vault_item?.vault_images?.[0]?.storage_path || item.vault_item?.card_image)
+      : (item.vault_images?.[0]?.storage_path || item.card_image);
+    if (!path) return undefined;
+    return path.startsWith('http')
+      ? path
+      : supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
+  };
+
+  // Product + Offer JSON-LD for each item shown in the store.
+  const productListLd = listings.map((item) => {
+    const isMkt = item._type === 'marketplace';
+    const name = (isMkt ? item.vault_item?.card_name : item.card_name) || 'Trading Card';
+    const price = isMkt ? item.price_aud : item.estimated_value_aud;
+    const condition = schemaItemCondition(isMkt ? item.vault_item?.condition : item.condition);
+    const url = isMkt
+      ? `${SITE}/product/marketplace/${item.id}/${item.slug || 'listing'}`
+      : `${SITE}/product/vault/${item.id}`;
+    const image = resolveListingImage(item);
+    return {
+      '@type': 'Product',
+      name,
+      url,
+      ...(image ? { image } : {}),
+      ...(price > 0
+        ? { offers: {
+            '@type': 'Offer',
+            price: Number(price).toFixed(2),
+            priceCurrency: 'AUD',
+            availability: 'https://schema.org/InStock',
+            ...(condition ? { itemCondition: condition } : {}),
+            url,
+            seller: { '@type': 'Store', name: displayName },
+          } }
+        : {}),
+    };
+  });
+
+  const structuredData = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Store',
+      name: displayName,
+      url: storeUrl,
+      ...(dealer.business_tagline ? { description: dealer.business_tagline } : {}),
+      ...(absLogo ? { image: absLogo, logo: absLogo } : {}),
+      ...(dealer.location_state ? { address: { '@type': 'PostalAddress', addressRegion: dealer.location_state, addressLocality: dealer.location_suburb || undefined, addressCountry: 'AU' } } : {}),
+      ...(stats.totalReviews > 0 && stats.averageRating > 0
+        ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: stats.averageRating.toFixed(1), reviewCount: stats.totalReviews } }
+        : {}),
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE}/` },
+        { '@type': 'ListItem', position: 2, name: 'Local Traders', item: `${SITE}/community/local-traders` },
+        { '@type': 'ListItem', position: 3, name: displayName, item: storeUrl },
+      ],
+    },
+    ...(productListLd.length > 0
+      ? [{
+          '@context': 'https://schema.org',
+          '@type': 'ItemList',
+          name: `${displayName} listings`,
+          numberOfItems: productListLd.length,
+          itemListElement: productListLd.map((p, i) => ({ '@type': 'ListItem', position: i + 1, item: p })),
+        }]
+      : []),
+  ];
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <SEOHead
         title={`${displayName} | CardPop Dealer`}
         description={dealer.business_tagline || `${displayName} — trading card dealer on CardPop Australia.`}
+        canonicalUrl={storeUrl}
+        ogImage={absLogo}
+        structuredData={structuredData}
       />
 
       {/* ── Hero Banner ─────────────────────────────────────────────────── */}
@@ -204,17 +318,39 @@ const SoleTraderStorePage = () => {
                   <MessageSquare className="w-4 h-4 mr-2" /> Message Dealer
                 </Button>
                 <Button asChild variant="outline" className="rounded-xl font-bold">
-                  <Link to={`/seller/${userId}`}>
+                  <Link to={`/seller/${dealer.id}`}>
                     <ExternalLink className="w-4 h-4 mr-2" /> Full Profile
                   </Link>
                 </Button>
-                {dealer.social_links && Object.entries(dealer.social_links).filter(([, v]) => v).map(([platform, link]) => (
-                  <a key={platform} href={link} target="_blank" rel="noopener noreferrer"
-                    title={platform.charAt(0).toUpperCase() + platform.slice(1)}
-                    className="p-2.5 text-muted-foreground hover:text-primary transition-colors bg-muted/50 rounded-xl border border-border">
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                ))}
+                {(() => {
+                  const socials = dealer.social_links || {};
+                  const items = [];
+                  if (socials.instagram) items.push({
+                    key: 'instagram', label: 'Instagram', href: normalizeSocialUrl(socials.instagram), icon: 'instagram',
+                    className: 'bg-gradient-to-br from-[#f58529] via-[#dd2a7b] to-[#8134af] text-white border-transparent hover:opacity-90',
+                  });
+                  if (socials.whatnot) items.push({
+                    key: 'whatnot', label: 'Whatnot', href: normalizeSocialUrl(socials.whatnot), icon: 'whatnot',
+                    className: 'bg-[#FFD800] text-black border-transparent hover:brightness-95',
+                  });
+                  // Any other configured platforms keep a neutral fallback.
+                  Object.entries(socials)
+                    .filter(([k, v]) => v && k !== 'instagram' && k !== 'whatnot')
+                    .forEach(([k, v]) => items.push({
+                      key: k, label: k.charAt(0).toUpperCase() + k.slice(1), href: normalizeSocialUrl(v), icon: 'link',
+                      className: 'bg-muted/50 text-muted-foreground border-border hover:text-primary',
+                    }));
+                  return items.filter(i => i.href).map(i => (
+                    <a key={i.key} href={i.href} target="_blank" rel="noopener noreferrer"
+                      title={i.label}
+                      className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold border transition-all ${i.className}`}>
+                      {i.icon === 'instagram' && <Instagram className="w-4 h-4" />}
+                      {i.icon === 'whatnot' && <span className="font-extrabold text-base leading-none">W</span>}
+                      {i.icon === 'link' && <ExternalLink className="w-4 h-4" />}
+                      {i.label}
+                    </a>
+                  ));
+                })()}
               </div>
             </div>
           </div>
