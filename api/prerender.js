@@ -63,7 +63,7 @@ ${bodyHtml}
 async function renderLocalTraders(supabase) {
   const { data } = await supabase
     .from('profiles')
-    .select('id, business_name, display_name, username, business_tagline, business_logo_url, location_state, location_suburb, rating, reviews_count, is_featured_seller')
+    .select('id, store_slug, business_name, display_name, username, business_tagline, business_logo_url, location_state, location_suburb, rating, reviews_count, is_featured_seller')
     .eq('is_sole_trader', true)
     .eq('is_public', true)
     .order('is_featured_seller', { ascending: false })
@@ -100,7 +100,7 @@ async function renderLocalTraders(supabase) {
           item: {
             '@type': 'Store',
             name,
-            url: `${BASE_URL}/dealer/${s.id}`,
+            url: `${BASE_URL}/dealer/${s.store_slug || s.id}`,
             ...(image ? { image } : {}),
             ...(s.reviews_count > 0 && s.rating > 0
               ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: Number(s.rating).toFixed(1), reviewCount: s.reviews_count } }
@@ -114,7 +114,7 @@ async function renderLocalTraders(supabase) {
   const items = stores.map(s => {
     const name = s.business_name || s.display_name || s.username || 'Store';
     const loc = [s.location_suburb, s.location_state].filter(Boolean).join(', ');
-    return `    <li><a href="${BASE_URL}/dealer/${esc(s.id)}"><strong>${esc(name)}</strong></a>`
+    return `    <li><a href="${BASE_URL}/dealer/${esc(s.store_slug || s.id)}"><strong>${esc(name)}</strong></a>`
       + `${s.business_tagline ? ` — ${esc(s.business_tagline)}` : ''}`
       + `${loc ? ` (${esc(loc)})` : ''}</li>`;
   }).join('\n');
@@ -132,14 +132,17 @@ ${items}
   return htmlDoc({ title, description, canonical, jsonLdItems, bodyHtml });
 }
 
-async function renderDealer(supabase, id) {
-  const { data: dealer } = await supabase
-    .from('profiles')
-    .select('id, business_name, display_name, username, business_tagline, bio, business_logo_url, avatar_url, location_state, location_suburb, rating, reviews_count, total_sales, is_sole_trader, is_public, created_at')
-    .eq('id', id)
-    .maybeSingle();
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  const canonical = `${BASE_URL}/dealer/${id}`;
+async function renderDealer(supabase, param) {
+  const byUuid = UUID_RE.test(param);
+  let dealerQuery = supabase
+    .from('profiles')
+    .select('id, store_slug, business_name, display_name, username, business_tagline, bio, business_logo_url, avatar_url, location_state, location_suburb, rating, reviews_count, total_sales, is_sole_trader, is_public, created_at');
+  dealerQuery = byUuid ? dealerQuery.eq('id', param) : dealerQuery.eq('store_slug', param);
+  const { data: dealer } = await dealerQuery.maybeSingle();
+
+  const canonical = `${BASE_URL}/dealer/${dealer?.store_slug || param}`;
 
   if (!dealer || !dealer.is_sole_trader || dealer.is_public === false) {
     return htmlDoc({
@@ -155,11 +158,11 @@ async function renderDealer(supabase, id) {
     supabase
       .from('listings')
       .select('id, slug, vault_item:vault_items(card_name)')
-      .eq('seller_id', id)
+      .eq('seller_id', dealer.id)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(50),
-    supabase.from('reviews').select('rating', { count: 'exact' }).eq('recipient_id', id),
+    supabase.from('reviews').select('rating', { count: 'exact' }).eq('recipient_id', dealer.id),
   ]);
 
   const reviewCount = reviewsRes.count ?? 0;
@@ -210,7 +213,7 @@ async function renderDealer(supabase, id) {
   ${dealer.business_tagline ? `<p>${esc(dealer.business_tagline)}</p>` : ''}
   ${location ? `<p>${esc(location)}</p>` : ''}
   ${dealer.bio ? `<p>${esc(dealer.bio)}</p>` : ''}
-  <p><a href="${BASE_URL}/seller/${esc(id)}">View full seller profile</a></p>
+  <p><a href="${BASE_URL}/seller/${esc(dealer.id)}">View full seller profile</a></p>
   <h2>Store Listings (${(listings || []).length})</h2>
   <ul>
 ${listingItems || '    <li>No active listings at the moment.</li>'}

@@ -90,7 +90,7 @@ export default async function handler(req, res) {
         .limit(500),
       supabase
         .from('profiles')
-        .select('id, updated_at')
+        .select('id, store_slug, updated_at')
         .eq('is_sole_trader', true)
         .eq('is_public', true)
         .limit(500),
@@ -120,7 +120,7 @@ export default async function handler(req, res) {
       parts.push('', `  <!-- Sole-trader dealer stores (${dealers.length}) -->`);
       for (const dealer of dealers) {
         const lastmod = (dealer.updated_at || TODAY).split('T')[0];
-        parts.push(xmlUrl(`${BASE_URL}/dealer/${dealer.id}`, lastmod, 'weekly', '0.6'));
+        parts.push(xmlUrl(`${BASE_URL}/dealer/${dealer.store_slug || dealer.id}`, lastmod, 'weekly', '0.6'));
       }
     }
 

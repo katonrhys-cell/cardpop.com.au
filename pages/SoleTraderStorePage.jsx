@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import {
@@ -30,8 +30,12 @@ const BADGE_META = {
   returns_accepted:   { label: 'Returns Accepted',    desc: '7-day returns on eligible items',                     Icon: RotateCcw    },
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const SoleTraderStorePage = () => {
-  const { userId } = useParams();
+  // Route param may be a store slug (preferred) or a legacy UUID.
+  const { userId: routeParam } = useParams();
+  const navigate = useNavigate();
   const [dealer, setDealer]   = useState(null);
   const [listings, setListings] = useState([]);
   const [stats, setStats]     = useState({ totalListings: 0, averageRating: 0, totalReviews: 0 });
@@ -39,33 +43,43 @@ const SoleTraderStorePage = () => {
   const [error, setError]     = useState(null);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!routeParam) return;
     let mounted = true;
 
     (async () => {
       try {
-        const { data: profile, error: profileErr } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .single();
+        // Resolve by slug, or by UUID for legacy/back-compat links.
+        const byUuid = UUID_RE.test(routeParam);
+        let profileQuery = supabase.from('profiles').select('*');
+        profileQuery = byUuid
+          ? profileQuery.eq('id', routeParam)
+          : profileQuery.eq('store_slug', routeParam);
+        const { data: profile, error: profileErr } = await profileQuery.maybeSingle();
 
         if (profileErr) throw profileErr;
+        if (!profile) throw new Error('Store not found.');
         if (!profile.is_sole_trader) throw new Error('This page is not a dealer store.');
         if (profile.is_public === false) throw new Error('This store is private.');
 
+        // Redirect legacy UUID links to the clean slug URL.
+        if (byUuid && profile.store_slug && mounted) {
+          navigate(`/dealer/${profile.store_slug}`, { replace: true });
+          return;
+        }
+
+        const resolvedId = profile.id;
         const [marketplaceRes, vaultRes, reviewsRes] = await Promise.all([
           supabase.from('listings')
             .select('*, vault_item:vault_items(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
-            .eq('seller_id', userId).eq('status', 'active')
+            .eq('seller_id', resolvedId).eq('status', 'active')
             .order('created_at', { ascending: false }).limit(24),
           supabase.from('vault_items')
             .select('*, vault_images(*), owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
-            .eq('owner_id', userId).eq('is_public', true).neq('listing_type', 'Private')
+            .eq('owner_id', resolvedId).eq('is_public', true).neq('listing_type', 'Private')
             .order('created_at', { ascending: false }).limit(24),
           supabase.from('reviews')
             .select('*', { count: 'exact' })
-            .eq('recipient_id', userId),
+            .eq('recipient_id', resolvedId),
         ]);
 
         if (!mounted) return;
@@ -92,7 +106,7 @@ const SoleTraderStorePage = () => {
     })();
 
     return () => { mounted = false; };
-  }, [userId]);
+  }, [routeParam, navigate]);
 
   if (loading) return (
     <div className="max-w-7xl mx-auto px-4 py-12 space-y-8 animate-in fade-in duration-500">
@@ -127,7 +141,7 @@ const SoleTraderStorePage = () => {
   // SEO: absolute logo URL + Store / BreadcrumbList JSON-LD describing this
   // dealer's storefront so search engines can render it as a local business.
   const SITE = 'https://cardpop.com.au';
-  const storeUrl = `${SITE}/dealer/${userId}`;
+  const storeUrl = `${SITE}/dealer/${dealer.store_slug || dealer.id}`;
   const absLogo = logoUrl
     ? (logoUrl.startsWith('http') ? logoUrl : `${SITE}${logoUrl}`)
     : undefined;
@@ -245,7 +259,7 @@ const SoleTraderStorePage = () => {
                   <MessageSquare className="w-4 h-4 mr-2" /> Message Dealer
                 </Button>
                 <Button asChild variant="outline" className="rounded-xl font-bold">
-                  <Link to={`/seller/${userId}`}>
+                  <Link to={`/seller/${dealer.id}`}>
                     <ExternalLink className="w-4 h-4 mr-2" /> Full Profile
                   </Link>
                 </Button>

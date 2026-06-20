@@ -83,7 +83,7 @@ const LocalTradersPage = () => {
     let cancelled = false;
     supabase
       .from('profiles')
-      .select('id, business_name, business_tagline, business_logo_url, avatar_url, business_categories, location_state, location_suburb, rating, reviews_count, total_sales, seller_tier, display_name, username, is_verified, is_featured_seller')
+      .select('id, store_slug, business_name, business_tagline, business_logo_url, avatar_url, business_categories, location_state, location_suburb, rating, reviews_count, total_sales, seller_tier, display_name, username, is_verified, is_featured_seller')
       .eq('is_sole_trader', true)
       .eq('is_public', true)
       // Promoted stores pinned to the top, then by rating. All sole traders
@@ -136,7 +136,7 @@ const LocalTradersPage = () => {
         const business = {
           '@type': 'Store',
           name,
-          url: `${SITE}/dealer/${s.id}`,
+          url: `${SITE}/dealer/${s.store_slug || s.id}`,
           ...(s.business_logo_url
             ? { image: s.business_logo_url.startsWith('http') ? s.business_logo_url : `${SITE}${s.business_logo_url}` }
             : {}),
@@ -216,7 +216,7 @@ const LocalTradersPage = () => {
                 return (
                   <Link
                     key={store.id}
-                    to={`/dealer/${store.id}`}
+                    to={`/dealer/${store.store_slug || store.id}`}
                     className="group relative overflow-hidden bg-card border border-border rounded-2xl p-5 flex gap-4 items-center hover:shadow-lg hover:-translate-y-0.5 hover:border-brand-red/40 transition-all"
                   >
                     {/* Logo / thumbnail */}
