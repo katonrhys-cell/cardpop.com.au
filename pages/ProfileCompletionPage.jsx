@@ -29,6 +29,7 @@ const ProfileCompletionPage = () => {
     location_suburb: '',
     location_state: '',
     bio: '',
+    instagram_url: '',
     whatnot_url: '',
     full_name: '',
     date_of_birth: '',
@@ -118,7 +119,7 @@ const ProfileCompletionPage = () => {
           location_suburb: formData.location_suburb,
           location_state: formData.location_state,
           bio: formData.bio,
-          social_links: { ...existingSocials, whatnot: formData.whatnot_url },
+          social_links: { ...existingSocials, instagram: formData.instagram_url, whatnot: formData.whatnot_url },
           full_name: formData.full_name,
           date_of_birth: formData.date_of_birth || null,
           phone_number: formData.phone_number,
@@ -260,6 +261,18 @@ const ProfileCompletionPage = () => {
                     onChange={handleChange}
                     className="bg-background resize-none min-h-[100px]"
                     placeholder="Tell the community about your collection..."
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="instagram_url" className="font-bold">Instagram URL <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <Input
+                    id="instagram_url"
+                    name="instagram_url"
+                    value={formData.instagram_url}
+                    onChange={handleChange}
+                    className="bg-background"
+                    placeholder="e.g. https://instagram.com/yourhandle"
                   />
                 </div>
 

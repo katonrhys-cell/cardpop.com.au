@@ -4,8 +4,15 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import {
   Star, ShieldCheck, MapPin, Calendar, ExternalLink, ShieldAlert,
-  Package, MessageSquare, BadgeCheck, CheckCircle2, Truck, Heart, Zap, RotateCcw,
+  Package, MessageSquare, BadgeCheck, CheckCircle2, Truck, Heart, Zap, RotateCcw, Instagram,
 } from 'lucide-react';
+
+// Normalise a user-entered social link into an absolute URL.
+const normalizeSocialUrl = (u) => {
+  const v = String(u || '').trim();
+  if (!v) return null;
+  return /^https?:\/\//i.test(v) ? v : `https://${v.replace(/^\/+/, '')}`;
+};
 import SellerTierBadge from '@/components/SellerTierBadge.jsx';
 import VerifiedBadge from '@/components/VerifiedBadge.jsx';
 import { Badge } from '@/components/ui/badge';
@@ -242,13 +249,35 @@ const SoleTraderStorePage = () => {
                     <ExternalLink className="w-4 h-4 mr-2" /> Full Profile
                   </Link>
                 </Button>
-                {dealer.social_links && Object.entries(dealer.social_links).filter(([, v]) => v).map(([platform, link]) => (
-                  <a key={platform} href={link} target="_blank" rel="noopener noreferrer"
-                    title={platform.charAt(0).toUpperCase() + platform.slice(1)}
-                    className="p-2.5 text-muted-foreground hover:text-primary transition-colors bg-muted/50 rounded-xl border border-border">
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
-                ))}
+                {(() => {
+                  const socials = dealer.social_links || {};
+                  const items = [];
+                  if (socials.instagram) items.push({
+                    key: 'instagram', label: 'Instagram', href: normalizeSocialUrl(socials.instagram), icon: 'instagram',
+                    className: 'bg-gradient-to-br from-[#f58529] via-[#dd2a7b] to-[#8134af] text-white border-transparent hover:opacity-90',
+                  });
+                  if (socials.whatnot) items.push({
+                    key: 'whatnot', label: 'Whatnot', href: normalizeSocialUrl(socials.whatnot), icon: 'whatnot',
+                    className: 'bg-[#FFD800] text-black border-transparent hover:brightness-95',
+                  });
+                  // Any other configured platforms keep a neutral fallback.
+                  Object.entries(socials)
+                    .filter(([k, v]) => v && k !== 'instagram' && k !== 'whatnot')
+                    .forEach(([k, v]) => items.push({
+                      key: k, label: k.charAt(0).toUpperCase() + k.slice(1), href: normalizeSocialUrl(v), icon: 'link',
+                      className: 'bg-muted/50 text-muted-foreground border-border hover:text-primary',
+                    }));
+                  return items.filter(i => i.href).map(i => (
+                    <a key={i.key} href={i.href} target="_blank" rel="noopener noreferrer"
+                      title={i.label}
+                      className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold border transition-all ${i.className}`}>
+                      {i.icon === 'instagram' && <Instagram className="w-4 h-4" />}
+                      {i.icon === 'whatnot' && <span className="font-extrabold text-base leading-none">W</span>}
+                      {i.icon === 'link' && <ExternalLink className="w-4 h-4" />}
+                      {i.label}
+                    </a>
+                  ));
+                })()}
               </div>
             </div>
           </div>
