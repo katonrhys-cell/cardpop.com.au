@@ -16,7 +16,7 @@ import { supabase } from '@/lib/supabaseClient.js';
 
 const DEFAULT_SETTINGS = {
   site_name: 'CardPop',
-  contact_email: 'support@cardpop.online',
+  contact_email: 'support@cardpop.com.au',
   maintenance_mode: false,
   platform_fee_percent: '5',
   stripe_enabled: true,
