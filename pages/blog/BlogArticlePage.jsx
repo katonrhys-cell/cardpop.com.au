@@ -406,7 +406,7 @@ const BlogArticlePage = () => {
       {relatedArticles.length > 0 && (
         <section className="bg-secondary/30 py-20 border-t border-border">
           <div className="container-default">
-            <h2 className="text-3xl font-bold mb-10 text-center">More from the Blog</h2>
+            <h2 className="text-3xl font-bold mb-10 text-center">More from Parallel Reports</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
               {relatedArticles.map((related) => {
                 const relImg = related.featured_image_url || null;
