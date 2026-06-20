@@ -83,13 +83,14 @@ const LocalTradersPage = () => {
     let cancelled = false;
     supabase
       .from('profiles')
-      .select('id, business_name, business_tagline, business_logo_url, avatar_url, business_categories, location_state, location_suburb, rating, reviews_count, total_sales, seller_tier, display_name, username')
+      .select('id, business_name, business_tagline, business_logo_url, avatar_url, business_categories, location_state, location_suburb, rating, reviews_count, total_sales, seller_tier, display_name, username, is_verified, is_featured_seller')
       .eq('is_sole_trader', true)
       .eq('is_public', true)
-      .eq('is_verified', true)
+      // Promoted stores pinned to the top, then by rating. All sole traders
+      // are shown — promotion/verification will become subscription perks.
       .order('is_featured_seller', { ascending: false })
       .order('rating', { ascending: false, nullsFirst: false })
-      .limit(12)
+      .limit(24)
       .then(({ data }) => { if (!cancelled) setStores(data || []); });
     return () => { cancelled = true; };
   }, []);
@@ -158,14 +159,14 @@ const LocalTradersPage = () => {
         {stores.length > 0 && (
           <div className="mb-12">
             <div className="flex items-center gap-2 mb-1">
-              <Sparkles className="w-4 h-4 text-brand-red" />
+              <Store className="w-4 h-4 text-brand-red" />
               <p className="text-xs font-extrabold uppercase tracking-widest text-brand-red">
-                Featured Stores
+                Trader Stores
               </p>
             </div>
             <p className="text-sm text-muted-foreground mb-4">
-              Verified sole-trader businesses with their own CardPop store. Tap a store to browse
-              everything they have listed on the marketplace.
+              Sole-trader businesses with their own CardPop store. Tap a store to browse everything
+              they have listed on the marketplace.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {stores.map(store => {
@@ -188,15 +189,25 @@ const LocalTradersPage = () => {
                           <Store className="w-8 h-8 text-muted-foreground" />
                         )}
                       </div>
-                      <div className="absolute -bottom-1.5 -right-1.5 bg-primary text-primary-foreground p-1 rounded-lg shadow-md border-2 border-card" title="Verified Dealer">
-                        <BadgeCheck className="w-4 h-4" />
-                      </div>
+                      {store.is_verified && (
+                        <div className="absolute -bottom-1.5 -right-1.5 bg-primary text-primary-foreground p-1 rounded-lg shadow-md border-2 border-card" title="Verified Dealer">
+                          <BadgeCheck className="w-4 h-4" />
+                        </div>
+                      )}
                     </div>
 
                     {/* Details */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 mb-0.5">
                         <span className="font-bold text-base truncate">{storeName}</span>
+                        {store.is_featured_seller && (
+                          <Badge className="bg-brand-red text-white rounded-md text-[10px] font-bold px-1.5 py-0 gap-0.5 shrink-0 hover:bg-brand-red">
+                            <Sparkles className="w-2.5 h-2.5" /> Promoted
+                          </Badge>
+                        )}
+                        {store.is_verified && (
+                          <BadgeCheck className="w-4 h-4 text-primary shrink-0" title="Verified business" />
+                        )}
                       </div>
                       {store.business_tagline && (
                         <p className="text-xs text-muted-foreground line-clamp-1 mb-1.5">{store.business_tagline}</p>
