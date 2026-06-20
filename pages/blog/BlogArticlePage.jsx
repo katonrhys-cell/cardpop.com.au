@@ -302,13 +302,13 @@ const BlogArticlePage = () => {
             <span>By <span className="font-bold">{article.author || 'CardPop Research'}</span></span>
             {(article.published_at || article.created_at) && (
               <>
-                <span>&bull;</span>
+                <span className="opacity-40">&bull;</span>
                 <span>{formatPublishedDate(article.published_at || article.created_at)}</span>
               </>
             )}
             {article.read_time_minutes && (
               <>
-                <span>&bull;</span>
+                <span className="opacity-40">&bull;</span>
                 <span>{article.read_time_minutes} min read</span>
               </>
             )}
