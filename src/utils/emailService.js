@@ -7,7 +7,7 @@ import {
   refundIssuedEmail,
 } from '../emails/templates.js';
 
-const FROM = 'CardPop <noreply@cardpop.online>';
+const FROM = 'CardPop <noreply@cardpop.com.au>';
 
 let _client = null;
 function getClient() {
