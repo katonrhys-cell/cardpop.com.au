@@ -157,7 +157,7 @@ async function renderDealer(supabase, param) {
   const [{ data: listings }, reviewsRes] = await Promise.all([
     supabase
       .from('listings')
-      .select('id, slug, vault_item:vault_items(card_name)')
+      .select('id, slug, price_aud, vault_item:vault_items(card_name, card_image, vault_images(storage_path))')
       .eq('seller_id', dealer.id)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
@@ -207,6 +207,30 @@ async function renderDealer(supabase, param) {
     return `    <li><a href="${BASE_URL}/product/marketplace/${esc(l.id)}/${esc(slug)}">${esc(cardName)}</a></li>`;
   }).join('\n');
 
+  // Product + Offer JSON-LD for each listing.
+  const productLd = (listings || []).map((l, i) => {
+    const cardName = l.vault_item?.card_name || 'Trading Card';
+    const url = `${BASE_URL}/product/marketplace/${l.id}/${l.slug || 'listing'}`;
+    const imgPath = l.vault_item?.vault_images?.[0]?.storage_path || l.vault_item?.card_image;
+    const img = imgPath
+      ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
+      : undefined;
+    const product = {
+      '@type': 'Product',
+      name: cardName,
+      url,
+      ...(img ? { image: img } : {}),
+      ...(l.price_aud > 0
+        ? { offers: { '@type': 'Offer', price: Number(l.price_aud).toFixed(2), priceCurrency: 'AUD', availability: 'https://schema.org/InStock', url, seller: { '@type': 'Store', name } } }
+        : {}),
+    };
+    return { '@type': 'ListItem', position: i + 1, item: product };
+  });
+
+  const productItemList = productLd.length > 0
+    ? { '@context': 'https://schema.org', '@type': 'ItemList', name: `${name} listings`, numberOfItems: productLd.length, itemListElement: productLd }
+    : null;
+
   const bodyHtml = `<main>
   <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/community/local-traders">Local Traders</a> / ${esc(name)}</nav>
   <h1>${esc(name)}</h1>
@@ -220,7 +244,7 @@ ${listingItems || '    <li>No active listings at the moment.</li>'}
   </ul>
 </main>`;
 
-  return htmlDoc({ title, description, canonical, ogImage: image, jsonLdItems: [store, breadcrumb], bodyHtml });
+  return htmlDoc({ title, description, canonical, ogImage: image, jsonLdItems: [store, breadcrumb, ...(productItemList ? [productItemList] : [])], bodyHtml });
 }
 
 export default async function handler(req, res) {

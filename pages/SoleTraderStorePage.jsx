@@ -145,6 +145,45 @@ const SoleTraderStorePage = () => {
   const absLogo = logoUrl
     ? (logoUrl.startsWith('http') ? logoUrl : `${SITE}${logoUrl}`)
     : undefined;
+
+  // Resolve a storage path / URL for a listing's primary image.
+  const resolveListingImage = (item) => {
+    const path = item._type === 'marketplace'
+      ? (item.vault_item?.vault_images?.[0]?.storage_path || item.vault_item?.card_image)
+      : (item.vault_images?.[0]?.storage_path || item.card_image);
+    if (!path) return undefined;
+    return path.startsWith('http')
+      ? path
+      : supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
+  };
+
+  // Product + Offer JSON-LD for each item shown in the store.
+  const productListLd = listings.map((item) => {
+    const isMkt = item._type === 'marketplace';
+    const name = (isMkt ? item.vault_item?.card_name : item.card_name) || 'Trading Card';
+    const price = isMkt ? item.price_aud : item.estimated_value_aud;
+    const url = isMkt
+      ? `${SITE}/product/marketplace/${item.id}/${item.slug || 'listing'}`
+      : `${SITE}/product/vault/${item.id}`;
+    const image = resolveListingImage(item);
+    return {
+      '@type': 'Product',
+      name,
+      url,
+      ...(image ? { image } : {}),
+      ...(price > 0
+        ? { offers: {
+            '@type': 'Offer',
+            price: Number(price).toFixed(2),
+            priceCurrency: 'AUD',
+            availability: 'https://schema.org/InStock',
+            url,
+            seller: { '@type': 'Store', name: displayName },
+          } }
+        : {}),
+    };
+  });
+
   const structuredData = [
     {
       '@context': 'https://schema.org',
@@ -167,6 +206,15 @@ const SoleTraderStorePage = () => {
         { '@type': 'ListItem', position: 3, name: displayName, item: storeUrl },
       ],
     },
+    ...(productListLd.length > 0
+      ? [{
+          '@context': 'https://schema.org',
+          '@type': 'ItemList',
+          name: `${displayName} listings`,
+          numberOfItems: productListLd.length,
+          itemListElement: productListLd.map((p, i) => ({ '@type': 'ListItem', position: i + 1, item: p })),
+        }]
+      : []),
   ];
 
   return (
