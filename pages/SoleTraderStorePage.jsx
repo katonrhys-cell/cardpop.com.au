@@ -117,11 +117,45 @@ const SoleTraderStorePage = () => {
   const displayName  = dealer.business_name || dealer.display_name || 'Dealer';
   const location     = [dealer.location_suburb, dealer.location_state].filter(Boolean).join(', ');
 
+  // SEO: absolute logo URL + Store / BreadcrumbList JSON-LD describing this
+  // dealer's storefront so search engines can render it as a local business.
+  const SITE = 'https://cardpop.com.au';
+  const storeUrl = `${SITE}/dealer/${userId}`;
+  const absLogo = logoUrl
+    ? (logoUrl.startsWith('http') ? logoUrl : `${SITE}${logoUrl}`)
+    : undefined;
+  const structuredData = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Store',
+      name: displayName,
+      url: storeUrl,
+      ...(dealer.business_tagline ? { description: dealer.business_tagline } : {}),
+      ...(absLogo ? { image: absLogo, logo: absLogo } : {}),
+      ...(dealer.location_state ? { address: { '@type': 'PostalAddress', addressRegion: dealer.location_state, addressLocality: dealer.location_suburb || undefined, addressCountry: 'AU' } } : {}),
+      ...(stats.totalReviews > 0 && stats.averageRating > 0
+        ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: stats.averageRating.toFixed(1), reviewCount: stats.totalReviews } }
+        : {}),
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE}/` },
+        { '@type': 'ListItem', position: 2, name: 'Local Traders', item: `${SITE}/community/local-traders` },
+        { '@type': 'ListItem', position: 3, name: displayName, item: storeUrl },
+      ],
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <SEOHead
         title={`${displayName} | CardPop Dealer`}
         description={dealer.business_tagline || `${displayName} — trading card dealer on CardPop Australia.`}
+        canonicalUrl={storeUrl}
+        ogImage={absLogo}
+        structuredData={structuredData}
       />
 
       {/* ── Hero Banner ─────────────────────────────────────────────────── */}
