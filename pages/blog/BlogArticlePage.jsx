@@ -298,17 +298,17 @@ const BlogArticlePage = () => {
           )}
 
           {/* Byline */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-medium text-white/70">
-            <span>By <span className="font-bold text-white/90">{article.author || 'CardPop Research'}</span></span>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-medium" style={{ color: '#CE1126' }}>
+            <span>By <span className="font-bold">{article.author || 'CardPop Research'}</span></span>
             {(article.published_at || article.created_at) && (
               <>
-                <span className="text-white/30">&bull;</span>
+                <span className="opacity-40">&bull;</span>
                 <span>{formatPublishedDate(article.published_at || article.created_at)}</span>
               </>
             )}
             {article.read_time_minutes && (
               <>
-                <span className="text-white/30">&bull;</span>
+                <span className="opacity-40">&bull;</span>
                 <span>{article.read_time_minutes} min read</span>
               </>
             )}
