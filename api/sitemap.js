@@ -23,6 +23,7 @@ const STATIC_PAGES = [
   { loc: '/grading',               lastmod: TODAY,       freq: 'weekly',  pri: '0.8' },
   { loc: '/community',             lastmod: TODAY,       freq: 'daily',   pri: '0.7' },
   { loc: '/community/events',      lastmod: TODAY,       freq: 'daily',   pri: '0.8' },
+  { loc: '/community/local-traders', lastmod: TODAY,     freq: 'daily',   pri: '0.7' },
   { loc: '/blog',                  lastmod: TODAY,       freq: 'weekly',  pri: '0.8' },
   { loc: '/about',                 lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
   { loc: '/contact',               lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
@@ -73,7 +74,7 @@ export default async function handler(req, res) {
       auth: { persistSession: false },
     });
 
-    const [articlesRes, listingsRes] = await Promise.all([
+    const [articlesRes, listingsRes, dealersRes] = await Promise.all([
       supabase
         .from('blog_articles')
         .select('slug, updated_at, published_at, created_at')
@@ -87,10 +88,17 @@ export default async function handler(req, res) {
         .eq('status', 'active')
         .order('created_at', { ascending: false })
         .limit(500),
+      supabase
+        .from('profiles')
+        .select('id, store_slug, updated_at')
+        .eq('is_sole_trader', true)
+        .eq('is_public', true)
+        .limit(500),
     ]);
 
     const articles = articlesRes.data ?? [];
     const listings = listingsRes.data ?? [];
+    const dealers = dealersRes.data ?? [];
 
     const parts = [
       '<?xml version="1.0" encoding="UTF-8"?>',
@@ -106,6 +114,14 @@ export default async function handler(req, res) {
     parts.push('', '  <!-- Event pages -->');
     for (const slug of EVENT_SLUGS) {
       parts.push(xmlUrl(`${BASE_URL}/community/events/${slug}`, '2026-06-11', 'weekly', '0.6'));
+    }
+
+    if (dealers.length > 0) {
+      parts.push('', `  <!-- Sole-trader dealer stores (${dealers.length}) -->`);
+      for (const dealer of dealers) {
+        const lastmod = (dealer.updated_at || TODAY).split('T')[0];
+        parts.push(xmlUrl(`${BASE_URL}/dealer/${dealer.store_slug || dealer.id}`, lastmod, 'weekly', '0.6'));
+      }
     }
 
     if (articles.length > 0) {

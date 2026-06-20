@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -83,7 +83,7 @@ const LocalTradersPage = () => {
     let cancelled = false;
     supabase
       .from('profiles')
-      .select('id, business_name, business_tagline, business_logo_url, avatar_url, business_categories, location_state, location_suburb, rating, reviews_count, total_sales, seller_tier, display_name, username, is_verified, is_featured_seller')
+      .select('id, store_slug, business_name, business_tagline, business_logo_url, avatar_url, business_categories, location_state, location_suburb, rating, reviews_count, total_sales, seller_tier, display_name, username, is_verified, is_featured_seller')
       .eq('is_sole_trader', true)
       .eq('is_public', true)
       // Promoted stores pinned to the top, then by rating. All sole traders
@@ -113,11 +113,50 @@ const LocalTradersPage = () => {
     ? (AU_STATES.find(s => s.code === selectedState)?.label ?? selectedState)
     : 'Australia';
 
+  // JSON-LD: breadcrumb trail + an ItemList of the trader stores so search
+  // engines can surface this as a structured directory of local businesses.
+  const SITE = 'https://cardpop.com.au';
+  const structuredData = useMemo(() => {
+    const breadcrumb = {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE}/` },
+        { '@type': 'ListItem', position: 2, name: 'Community', item: `${SITE}/community` },
+        { '@type': 'ListItem', position: 3, name: 'Local Traders', item: `${SITE}/community/local-traders` },
+      ],
+    };
+    if (stores.length === 0) return [breadcrumb];
+    const itemList = {
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: 'CardPop Trader Stores',
+      itemListElement: stores.map((s, i) => {
+        const name = s.business_name || s.display_name || s.username || 'Store';
+        const business = {
+          '@type': 'Store',
+          name,
+          url: `${SITE}/dealer/${s.store_slug || s.id}`,
+          ...(s.business_logo_url
+            ? { image: s.business_logo_url.startsWith('http') ? s.business_logo_url : `${SITE}${s.business_logo_url}` }
+            : {}),
+          ...(s.reviews_count > 0 && s.rating > 0
+            ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: Number(s.rating).toFixed(1), reviewCount: s.reviews_count } }
+            : {}),
+        };
+        return { '@type': 'ListItem', position: i + 1, item: business };
+      }),
+    };
+    return [breadcrumb, itemList];
+  }, [stores]);
+
   return (
     <div className="min-h-screen bg-background">
       <SEOHead
         title={`Local Traders${selectedState ? ` — ${stateLabel}` : ''} | CardPop`}
-        description={`Browse CardPop-endorsed trading card sellers in ${stateLabel}. Verified, trusted collectors you can buy and trade with confidence.`}
+        description={`Browse CardPop-endorsed trading card sellers and sole-trader stores in ${stateLabel}. Verified, trusted collectors and dealers you can buy and trade with confidence.`}
+        canonicalUrl={`${SITE}/community/local-traders`}
+        structuredData={structuredData}
       />
 
       {/* Hero */}
@@ -177,7 +216,7 @@ const LocalTradersPage = () => {
                 return (
                   <Link
                     key={store.id}
-                    to={`/dealer/${store.id}`}
+                    to={`/dealer/${store.store_slug || store.id}`}
                     className="group relative overflow-hidden bg-card border border-border rounded-2xl p-5 flex gap-4 items-center hover:shadow-lg hover:-translate-y-0.5 hover:border-brand-red/40 transition-all"
                   >
                     {/* Logo / thumbnail */}
