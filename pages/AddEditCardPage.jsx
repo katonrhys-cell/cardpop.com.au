@@ -404,8 +404,20 @@ const AddEditCardPage = () => {
       }
       try {
         setIsUploadingTemplate(true);
-        const response = await fetch(previewUrl);
-        const blob = await response.blob();
+        // Convert the preview into a File. The slab preview is a data: URL,
+        // and fetch() on large data: URLs is unreliable on mobile Safari, so
+        // decode it manually. Blob/object URLs still go through fetch.
+        let blob;
+        if (previewUrl.startsWith('data:')) {
+          const [header, base64] = previewUrl.split(',');
+          const mime = header.match(/:(.*?);/)?.[1] || 'image/jpeg';
+          const binary = atob(base64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          blob = new Blob([bytes], { type: mime });
+        } else {
+          blob = await (await fetch(previewUrl)).blob();
+        }
         const formattedFile = new File(
           [blob],
           `formatted-${Date.now()}.jpg`,
