@@ -9,7 +9,7 @@ import morgan from 'morgan';
 import routes from './routes/index.js';
 import { errorMiddleware } from './middleware/error.js';
 import { globalRateLimit } from './middleware/global-rate-limit.js';
-import { secureHeadersMiddleware } from './middleware/secureHeaders.js';
+import { secureHeadersMiddleware, noCacheHeaders } from './middleware/secureHeaders.js';
 import logger from './utils/logger.js';
 import { BodyLimit } from './constants/common.js';
 
@@ -87,9 +87,9 @@ app.use((err, req, res, next) => {
 
 // Mount at / for local dev, /hcgi/api for Hostinger, and /api for Vercel.
 const apiRouter = routes();
-app.use('/', apiRouter);
-app.use('/hcgi/api', apiRouter);
-app.use('/api', apiRouter);
+app.use('/', noCacheHeaders, apiRouter);
+app.use('/hcgi/api', noCacheHeaders, apiRouter);
+app.use('/api', noCacheHeaders, apiRouter);
 
 app.get('/.well-known/security.txt', (req, res) => {
 	res.type('text/plain').send(`Contact: mailto:support@cardpop.com.au
