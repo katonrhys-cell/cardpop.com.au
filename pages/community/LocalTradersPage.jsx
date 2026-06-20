@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { BadgeCheck, Search, MapPin, Star, Package, ArrowRight, ShieldCheck } from 'lucide-react';
+import { BadgeCheck, Search, MapPin, Star, Package, ArrowRight, ShieldCheck, Store, Sparkles } from 'lucide-react';
 
 const AU_STATES = [
   { code: 'NSW', label: 'New South Wales' },
@@ -24,6 +24,7 @@ const AU_STATES = [
 const LocalTradersPage = () => {
   const { isAuthenticated, currentUser } = useAuth();
   const [traders, setTraders] = useState([]);
+  const [stores, setStores] = useState([]);
   // undefined = still resolving user location; null = resolved, no state / show all
   const [selectedState, setSelectedState] = useState(undefined);
   const [search, setSearch] = useState('');
@@ -75,6 +76,23 @@ const LocalTradersPage = () => {
   }, [selectedState]);
 
   useEffect(() => { fetchTraders(); }, [fetchTraders]);
+
+  // Featured sole-trader stores (dealers). Shown regardless of state filter so
+  // their business acts as a promotional thumbnail across the whole directory.
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from('profiles')
+      .select('id, business_name, business_tagline, business_logo_url, avatar_url, business_categories, location_state, location_suburb, rating, reviews_count, total_sales, seller_tier, display_name, username')
+      .eq('is_sole_trader', true)
+      .eq('is_public', true)
+      .eq('is_verified', true)
+      .order('is_featured_seller', { ascending: false })
+      .order('rating', { ascending: false, nullsFirst: false })
+      .limit(12)
+      .then(({ data }) => { if (!cancelled) setStores(data || []); });
+    return () => { cancelled = true; };
+  }, []);
 
   const filtered = search.trim()
     ? traders.filter(t =>
@@ -135,6 +153,95 @@ const LocalTradersPage = () => {
       </section>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
+        {/* Featured Stores (sole-trader dealers) */}
+        {stores.length > 0 && (
+          <div className="mb-12">
+            <div className="flex items-center gap-2 mb-1">
+              <Sparkles className="w-4 h-4 text-brand-red" />
+              <p className="text-xs font-extrabold uppercase tracking-widest text-brand-red">
+                Featured Stores
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Verified sole-trader businesses with their own CardPop store. Tap a store to browse
+              everything they have listed on the marketplace.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {stores.map(store => {
+                const storeName = store.business_name || store.display_name || store.username || 'Store';
+                const logo = store.business_logo_url || resolveAvatar(store);
+                const storeLocation = [store.location_suburb, store.location_state].filter(Boolean).join(', ');
+                const cats = (store.business_categories || []).slice(0, 3);
+                return (
+                  <Link
+                    key={store.id}
+                    to={`/dealer/${store.id}`}
+                    className="group relative overflow-hidden bg-card border border-border rounded-2xl p-5 flex gap-4 items-center hover:shadow-lg hover:-translate-y-0.5 hover:border-brand-red/40 transition-all"
+                  >
+                    {/* Logo / thumbnail */}
+                    <div className="relative shrink-0">
+                      <div className="w-20 h-20 rounded-2xl bg-muted border border-border overflow-hidden flex items-center justify-center">
+                        {logo ? (
+                          <img src={logo} alt={storeName} className="w-full h-full object-cover" />
+                        ) : (
+                          <Store className="w-8 h-8 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="absolute -bottom-1.5 -right-1.5 bg-primary text-primary-foreground p-1 rounded-lg shadow-md border-2 border-card" title="Verified Dealer">
+                        <BadgeCheck className="w-4 h-4" />
+                      </div>
+                    </div>
+
+                    {/* Details */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="font-bold text-base truncate">{storeName}</span>
+                      </div>
+                      {store.business_tagline && (
+                        <p className="text-xs text-muted-foreground line-clamp-1 mb-1.5">{store.business_tagline}</p>
+                      )}
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {store.rating > 0 && (
+                          <span className="flex items-center gap-0.5 text-xs text-amber-500 font-bold">
+                            <Star className="w-3 h-3 fill-amber-500" />
+                            {Number(store.rating).toFixed(1)}
+                          </span>
+                        )}
+                        {store.total_sales > 0 && (
+                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Package className="w-3 h-3" />
+                            {store.total_sales} sales
+                          </span>
+                        )}
+                        {storeLocation && (
+                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <MapPin className="w-3 h-3" />
+                            {storeLocation}
+                          </span>
+                        )}
+                      </div>
+                      {cats.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {cats.map(cat => (
+                            <Badge key={cat} variant="secondary" className="rounded-md text-[10px] font-semibold px-1.5 py-0">
+                              {cat}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Visit arrow */}
+                    <div className="self-center text-muted-foreground group-hover:text-brand-red transition-colors">
+                      <ArrowRight className="w-5 h-5" />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* State selector */}
         <div className="mb-6">
