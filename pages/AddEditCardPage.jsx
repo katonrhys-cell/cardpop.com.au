@@ -504,6 +504,58 @@ const AddEditCardPage = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  // ─── Marketplace listing sync ─────────────────────────────────────────────
+  // The marketplace reads exclusively from the `listings` table, so choosing a
+  // public listing type here must create/update a matching listings row.
+  // Without this the card is only flagged on the vault_items row and never
+  // appears in the marketplace. Mirrors the logic in VaultListingModal.
+  const syncMarketplaceListing = async (cardId) => {
+    const isPublic = formData.listingType !== 'private';
+    const isSale   = formData.listingType === 'For Sale' || formData.listingType === 'For Sale & Trade';
+    try {
+      if (!isPublic) {
+        // Going private — archive any active listing.
+        await supabase
+          .from('listings')
+          .update({ status: 'archived' })
+          .eq('vault_item_id', cardId)
+          .eq('seller_id', currentUser.id)
+          .neq('status', 'archived');
+        return;
+      }
+
+      const listingPayload = {
+        vault_item_id: cardId,
+        seller_id:     currentUser.id,
+        listing_type:  isSale ? 'fixed' : 'trade',
+        status:        'active',
+        price_aud:     isSale ? (parseFloat(formData.estimatedValue) || null) : null,
+        listed_at:     new Date().toISOString(),
+      };
+
+      // Reuse an existing non-archived listing if one already exists.
+      const { data: existing } = await supabase
+        .from('listings')
+        .select('id')
+        .eq('vault_item_id', cardId)
+        .neq('status', 'archived')
+        .maybeSingle();
+
+      if (existing) {
+        await supabase
+          .from('listings')
+          .update(listingPayload)
+          .eq('id', existing.id)
+          .eq('seller_id', currentUser.id);
+      } else {
+        await supabase.from('listings').insert(listingPayload);
+      }
+    } catch (err) {
+      console.error('Listing sync error:', err);
+      toast.error('Card saved, but updating its marketplace listing failed. You can re-list it from your vault.');
+    }
+  };
+
   // ─── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -601,11 +653,13 @@ const AddEditCardPage = () => {
       if (isEdit) {
         const { error } = await supabase.from('vault_items').update(payload).eq('id', id).eq('owner_id', currentUser.id);
         if (error) throw error;
+        await syncMarketplaceListing(id);
         toast.success('Card updated successfully!');
         navigate('/vault');
       } else {
-        const { error } = await supabase.from('vault_items').insert(payload);
+        const { data: inserted, error } = await supabase.from('vault_items').insert(payload).select('id').single();
         if (error) throw error;
+        await syncMarketplaceListing(inserted.id);
         toast.success('Card added to your vault!', {
           action: {
             label: 'Add Another',
