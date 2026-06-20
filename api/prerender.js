@@ -28,6 +28,15 @@ const ldJson = (items) => {
 
 const absUrl = (u) => (!u ? undefined : (u.startsWith('http') ? u : `${BASE_URL}${u}`));
 
+// Map a trading-card condition / grade to a schema.org OfferItemCondition.
+const schemaItemCondition = (c) => {
+  const v = String(c || '').toLowerCase();
+  if (!v) return undefined;
+  if (/(gem|mint|sealed|brand new|\bnm\b|graded)/.test(v) || /\b(8|8\.5|9|9\.5|10)\b/.test(v)) return 'https://schema.org/NewCondition';
+  if (/(damaged|poor|heavily played|\bhp\b)/.test(v)) return 'https://schema.org/DamagedCondition';
+  return 'https://schema.org/UsedCondition';
+};
+
 function htmlDoc({ title, description, canonical, ogImage, robots, jsonLdItems = [], bodyHtml = '' }) {
   const ld = jsonLdItems.length
     ? `<script type="application/ld+json">${ldJson(jsonLdItems)}</script>`
@@ -157,7 +166,7 @@ async function renderDealer(supabase, param) {
   const [{ data: listings }, reviewsRes] = await Promise.all([
     supabase
       .from('listings')
-      .select('id, slug, price_aud, vault_item:vault_items(card_name, card_image, vault_images(storage_path))')
+      .select('id, slug, price_aud, vault_item:vault_items(card_name, condition, card_image, vault_images(storage_path))')
       .eq('seller_id', dealer.id)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
@@ -221,7 +230,15 @@ async function renderDealer(supabase, param) {
       url,
       ...(img ? { image: img } : {}),
       ...(l.price_aud > 0
-        ? { offers: { '@type': 'Offer', price: Number(l.price_aud).toFixed(2), priceCurrency: 'AUD', availability: 'https://schema.org/InStock', url, seller: { '@type': 'Store', name } } }
+        ? { offers: {
+            '@type': 'Offer',
+            price: Number(l.price_aud).toFixed(2),
+            priceCurrency: 'AUD',
+            availability: 'https://schema.org/InStock',
+            ...(schemaItemCondition(l.vault_item?.condition) ? { itemCondition: schemaItemCondition(l.vault_item?.condition) } : {}),
+            url,
+            seller: { '@type': 'Store', name },
+          } }
         : {}),
     };
     return { '@type': 'ListItem', position: i + 1, item: product };
