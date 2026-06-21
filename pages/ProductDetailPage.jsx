@@ -14,6 +14,15 @@ import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, Arro
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import EbayMarketSection from '@/components/EbayMarketSection.jsx';
 
+const GRADE_BADGE = {
+  psa:   'bg-red-600 text-white',
+  bgs:   'bg-blue-700 text-white',
+  cgc:   'bg-green-600 text-white',
+  ace:   'bg-orange-500 text-white',
+  sgc:   'bg-purple-600 text-white',
+  other: 'bg-slate-600 text-white',
+};
+
 const getStatusBadge = (listingType) => {
   switch (listingType) {
     case 'Private': return { className: 'badge-vault-private', icon: Lock };
@@ -360,9 +369,14 @@ const ProductDetailPage = () => {
                       {vi.condition.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                     </Badge>
                   )}
-                  {vi.grade && (
-                    <Badge variant="outline" className="text-[11px] font-bold border-purple-400/50 text-purple-700 bg-purple-400/10 dark:text-purple-300">
-                      {vi.grading_company ? `${vi.grading_company} ${vi.grade}` : vi.grade}
+                  {vi.grade && vi.grading_company && vi.grading_company !== 'raw' && (
+                    <Badge className={`text-[11px] font-bold border-none ${GRADE_BADGE[vi.grading_company.toLowerCase()] || GRADE_BADGE.other}`}>
+                      {vi.grading_company.toUpperCase()} {vi.grade}
+                    </Badge>
+                  )}
+                  {vi.grade && (!vi.grading_company || vi.grading_company === 'raw') && (
+                    <Badge variant="outline" className="text-[11px] font-bold border-gray-400/50 text-gray-700 bg-gray-400/10 dark:text-gray-300">
+                      {vi.grade}
                     </Badge>
                   )}
                   {vi.parallel?.name && (
