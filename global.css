@@ -19,6 +19,22 @@
   100% { transform: translateX(-50%); }
 }
 
+/* ── Hero card showcase (shelf → stand) ─────────────────────────────────── */
+@keyframes hero-spotlight-pulse {
+  0%, 100% { opacity: 0.85; transform: scaleX(1); }
+  50%       { opacity: 1;    transform: scaleX(1.04); }
+}
+
+@keyframes hero-stand-glow {
+  0%, 100% { opacity: 0.45; }
+  50%       { opacity: 0.75; }
+}
+
+@keyframes hero-shelf-shimmer {
+  0%, 100% { opacity: 0.35; }
+  50%       { opacity: 0.6; }
+}
+
 /* CardPop Australia — brand body font: Helvetica Neue */
 body {
   font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
