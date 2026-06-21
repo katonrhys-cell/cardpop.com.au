@@ -45,7 +45,7 @@ const MarketplaceListingPage = () => {
       setCsPriceLoading(true);
       try {
         const prRes = await apiServerClient.fetch(
-          `/catalog/pricing?name=${encodeURIComponent(listing.title)}`
+          `/ebay/price-estimate?name=${encodeURIComponent(listing.title)}`
         );
         if (!prRes.ok || cancelled) return;
         const prData = await prRes.json();
@@ -130,9 +130,9 @@ const MarketplaceListingPage = () => {
                   <Loader2 className="w-3 h-3 animate-spin" /> Loading market data…
                 </div>
               ) : (() => {
-                const avg = csPrice.avg_price ?? csPrice.average_price ?? csPrice.mean_price;
-                const min = csPrice.min_price ?? csPrice.minimum_price;
-                const max = csPrice.max_price ?? csPrice.maximum_price;
+                const avg = csPrice.avgPrice ?? csPrice.avg_price ?? csPrice.average_price ?? csPrice.mean_price;
+                const min = csPrice.minPrice ?? csPrice.min_price ?? csPrice.minimum_price;
+                const max = csPrice.maxPrice ?? csPrice.max_price ?? csPrice.maximum_price;
                 const count = csPrice.count ?? csPrice.total_count ?? csPrice.total;
                 if (!avg) return <p className="text-xs text-muted-foreground">No pricing data available.</p>;
                 const listingPrice = listing.price ?? 0;
