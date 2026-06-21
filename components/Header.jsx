@@ -380,8 +380,8 @@ const BlogDropdown = ({ onNavigate }) => {
 
 const COMMUNITY_ITEMS = [
   { href: '/community/forum',          label: 'Forum',                 desc: 'Discussions and community posts',        Icon: MessageSquare, gradient: 'from-violet-500 to-purple-600'  },
-  { href: '/community/profiles',       label: 'Profiles',              desc: 'Browse collector profiles',              Icon: Users,         gradient: 'from-sky-500 to-blue-600'      },
-  { href: '/community/local-traders',  label: 'Local Traders',         desc: 'Endorsed sellers near you',              Icon: BadgeCheck,    gradient: 'from-emerald-500 to-teal-600'  },
+  { href: '/community/profiles',       label: 'Profiles',              desc: 'Browse collector profiles',              Icon: Users,         gradient: 'from-emerald-500 to-teal-600'   },
+  { href: '/community/local-traders',  label: 'Local Traders',         desc: 'Endorsed sellers near you',              Icon: BadgeCheck,    gradient: 'from-blue-500 to-cyan-600'    },
   { href: '/community/retailers',      label: 'Retailers & Suppliers', desc: 'Find local shops and suppliers',         Icon: Store,         gradient: 'from-amber-500 to-orange-500'  },
   { href: '/community/map',            label: 'Community Map',         desc: 'Stores, shows & traders near you',       Icon: MapPin,        gradient: 'from-blue-500 to-indigo-600'   },
   { href: '/community/whatnot',        label: 'Whatnot',               desc: 'Live buying and selling shows',          Icon: WhatnotIcon,   gradient: 'from-green-500 to-emerald-600', isWhatnot: true },
@@ -429,7 +429,10 @@ const CommunityDropdown = ({ onNavigate }) => {
                 onClick={() => { setOpen(false); onNavigate?.(); }}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
               >
-                <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${item.isWhatnot ? '' : item.gradient} shrink-0 shadow-sm overflow-hidden`}>
+                <span
+                  className={`inline-flex items-center justify-center w-7 h-7 rounded-lg shrink-0 shadow-sm overflow-hidden ${item.isWhatnot ? '' : (item.label === 'Local Traders' ? '' : `bg-gradient-to-br ${item.gradient}`)}`}
+                  style={item.label === 'Local Traders' ? { backgroundImage: `linear-gradient(to bottom right, hsl(var(--verified-badge)), hsl(199 95% 35%))` } : {}}
+                >
                   <item.Icon className="w-4 h-4 text-white" />
                 </span>
                 <div className="min-w-0">
