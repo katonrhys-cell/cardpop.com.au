@@ -23,7 +23,16 @@ const FeaturedSellersCarousel = () => {
           .gt('total_sales', 0)
           .order('positive_feedback_pct', { ascending: false })
           .limit(4);
-        activeSellers = topUsers || [];
+
+        // Deduplicate by user id to prevent duplicates
+        const seen = new Set();
+        const uniqueSellers = (topUsers || []).filter(seller => {
+          if (seen.has(seller.id)) return false;
+          seen.add(seller.id);
+          return true;
+        });
+
+        activeSellers = uniqueSellers;
 
         if (isMounted) {
           setSellers(activeSellers);

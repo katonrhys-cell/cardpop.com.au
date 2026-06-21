@@ -69,7 +69,18 @@ const CommunityPage = () => {
       .select('*')
       .order('created_at', { ascending: false })
       .limit(50)
-      .then(({ data }) => { if (!cancelled) setProfiles(data || []); })
+      .then(({ data }) => {
+        if (!cancelled) {
+          // Deduplicate by user id to prevent duplicates
+          const seen = new Set();
+          const uniqueProfiles = (data || []).filter(profile => {
+            if (seen.has(profile.id)) return false;
+            seen.add(profile.id);
+            return true;
+          });
+          setProfiles(uniqueProfiles);
+        }
+      })
       .catch(console.error)
       .finally(() => { if (!cancelled) setLoadingProfiles(false); });
 
