@@ -28,6 +28,15 @@ const CardMicroscope = ({ isOpen, onClose, imageUrl, altText }) => {
   const MIN_SCALE = 1;
   const MAX_SCALE = 5;
 
+  // Reset to the full-card (fit) view each time the microscope opens.
+  useEffect(() => {
+    if (isOpen) {
+      setScale(1);
+      setPanX(0);
+      setPanY(0);
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -145,6 +154,7 @@ const CardMicroscope = ({ isOpen, onClose, imageUrl, altText }) => {
               ref={imageRef}
               src={imageUrl}
               alt={altText}
+              className="max-w-[90vw] max-h-[68vh] object-contain pointer-events-none select-none drop-shadow-2xl"
               className="max-w-none max-h-none object-contain pointer-events-none select-none drop-shadow-2xl"
               style={{
                 scale,
@@ -246,6 +256,10 @@ const CardMicroscope = ({ isOpen, onClose, imageUrl, altText }) => {
                 {Object.entries(PRESET_ZONES).map(([key, zone]) => (
                   <Button
                     key={key}
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => focusOnZone(zone)}
+                    className="text-xs font-medium h-8 px-2 rounded-lg border border-white/20 !bg-white/5 !text-white hover:!bg-white/20 transition-all"
                     variant="outline"
                     size="sm"
                     onClick={() => focusOnZone(zone)}
