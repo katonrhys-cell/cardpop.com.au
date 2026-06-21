@@ -30,86 +30,90 @@ const SellerCard = ({ seller }) => {
   };
 
   return (
-    <div 
+    <div
       onClick={handleCardClick}
       role="button"
       tabIndex={0}
-      className="group bg-card rounded-[12px] border border-border/50 p-[20px] flex flex-col sm:flex-row items-center sm:items-start gap-5 shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-200 cursor-pointer"
+      className="group bg-card rounded-2xl border border-border/50 p-6 flex flex-col items-center text-center shadow-sm hover:shadow-lg hover:border-primary/40 transition-all duration-200 cursor-pointer h-full"
     >
-      {/* 1. Circular Avatar (Left) */}
-      <div className="shrink-0 relative">
+      {/* Avatar */}
+      <div className="shrink-0 relative mb-4">
         {avatarUrl ? (
           <img
             src={avatarUrl}
-            alt={`${seller.name || 'Seller'} avatar`}
-            className="w-[80px] h-[80px] rounded-full object-cover ring-2 ring-offset-2 ring-transparent group-hover:ring-primary/20 transition-all"
+            alt={`${sellerName} avatar`}
+            className="w-20 h-20 rounded-full object-cover ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all"
             width="80"
             height="80"
           />
         ) : (
-          <div className="w-[80px] h-[80px] rounded-full bg-background flex items-center justify-center ring-2 ring-offset-2 ring-transparent group-hover:ring-primary/20 transition-all">
+          <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all">
             <User className="w-8 h-8 text-muted-foreground" />
           </div>
         )}
       </div>
 
-      {/* 2. Seller Info (Center) */}
-      <div className="flex-1 text-center sm:text-left min-w-0">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-1">
-          <h3 className="text-foreground font-bold text-lg leading-tight truncate group-hover:text-primary transition-colors">
-            {sellerName}
-          </h3>
-          {seller.is_verified && (
-            <span className="inline-flex items-center gap-1 text-green-600 text-xs font-bold bg-green-500/10 px-2 py-0.5 rounded-full">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              Verified
-            </span>
-          )}
-        </div>
-        
-        <p className="text-muted-foreground text-[11px] mb-2 font-medium">
-          Member since {memberSinceDate}
+      {/* Seller Name */}
+      <h3 className="text-foreground font-bold text-base leading-tight mb-1 line-clamp-2 group-hover:text-primary transition-colors">
+        {sellerName}
+      </h3>
+
+      {/* Verified Badge */}
+      {seller.is_verified && (
+        <span className="inline-flex items-center gap-1 text-emerald-600 text-xs font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full mb-2">
+          <CheckCircle2 className="w-3 h-3" />
+          Verified
+        </span>
+      )}
+
+      {/* Location */}
+      {location && (
+        <p className="text-muted-foreground text-xs mb-2">
+          {location}
         </p>
+      )}
 
-        <div className="flex items-center justify-center sm:justify-start gap-2 mb-3">
-          <div className="flex text-primary text-sm tracking-widest">
-            {seller.rating ? '★'.repeat(Math.round(seller.rating)) : '★★★★★'}
-          </div>
-          <span className="text-xs text-muted-foreground font-medium">
-            ({reviewCount} {reviewCount === 1 ? 'review' : 'reviews'})
-          </span>
+      {/* Member Since */}
+      <p className="text-muted-foreground text-xs font-medium mb-3">
+        Member since {memberSinceDate}
+      </p>
+
+      {/* Rating */}
+      <div className="flex items-center justify-center gap-1.5 mb-3">
+        <div className="flex text-primary text-sm">
+          {seller.rating ? '★'.repeat(Math.round(seller.rating)) : '★★★★★'}
         </div>
+        <span className="text-xs text-muted-foreground">
+          ({reviewCount})
+        </span>
+      </div>
 
-        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-4 gap-y-2 text-sm text-foreground font-bold">
-          <div className="flex items-baseline gap-1">
-            <span className="text-muted-foreground font-normal">Sold:</span>
-            {soldCount}
-          </div>
-          <div className="w-1 h-1 rounded-full bg-border hidden sm:block" />
-          <div className="flex items-baseline gap-1">
-            <span className="text-muted-foreground font-normal">Listed:</span>
-            {listedCount}
-          </div>
-          <div className="w-1 h-1 rounded-full bg-border hidden sm:block" />
-          <div className="flex items-baseline gap-1">
-            <span className="text-muted-foreground font-normal">Positive:</span>
-            {positivePercentage}%
-          </div>
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-2 mb-4 w-full text-xs">
+        <div className="bg-muted/50 rounded-lg p-2">
+          <div className="text-muted-foreground font-normal text-[10px] mb-0.5">Sold</div>
+          <div className="text-foreground font-bold">{soldCount}</div>
+        </div>
+        <div className="bg-muted/50 rounded-lg p-2">
+          <div className="text-muted-foreground font-normal text-[10px] mb-0.5">Listed</div>
+          <div className="text-foreground font-bold">{listedCount}</div>
+        </div>
+        <div className="bg-muted/50 rounded-lg p-2">
+          <div className="text-muted-foreground font-normal text-[10px] mb-0.5">Positive</div>
+          <div className="text-foreground font-bold">{positivePercentage}%</div>
         </div>
       </div>
 
-      {/* 3. View Store Button (Right) */}
-      <div className="shrink-0 w-full sm:w-auto mt-4 sm:mt-0 sm:self-center">
-        <Button 
-          onClick={(e) => {
-            e.stopPropagation();
-            navigate(`/seller/${seller.id}`);
-          }}
-          className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-lg px-6 py-2.5 shadow-sm active:scale-[0.98] transition-transform"
-        >
-          View Store
-        </Button>
-      </div>
+      {/* View Store Button */}
+      <Button
+        onClick={(e) => {
+          e.stopPropagation();
+          navigate(`/seller/${seller.id}`);
+        }}
+        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-lg py-2 shadow-sm active:scale-[0.98] transition-transform text-sm"
+      >
+        View Store
+      </Button>
     </div>
   );
 };
