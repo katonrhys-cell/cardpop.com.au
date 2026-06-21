@@ -324,7 +324,10 @@ export default defineConfig({
 				'@babel/parser',
 				'@babel/traverse',
 				'@babel/generator',
-				'@babel/types'
+				'@babel/types',
+				'onnxruntime-web',
+				'onnxruntime-web/webgpu',
+				'react-is'
 			],
 			output: {
 				manualChunks(id) {
