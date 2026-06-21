@@ -192,7 +192,7 @@ const MyVaultPage = () => {
           </DropdownMenu>
         </div>
 
-        <Link to={detailPath} className="aspect-[4/5] bg-muted/40 relative flex items-center justify-center border-b border-border/50 p-4 group-hover:opacity-95 transition-opacity">
+        <Link to={detailPath} className="aspect-[4/5] bg-muted/40 relative flex items-center justify-center border-b border-border/50 p-4 group-hover:opacity-95 transition-opacity overflow-hidden">
           {imageUrl ? (
             <img src={imageUrl} alt={card.card_name} className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" loading="lazy" />
           ) : (
