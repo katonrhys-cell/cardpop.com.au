@@ -298,7 +298,7 @@ const ProductDetailPage = () => {
   const hasCardDetails = !!vi && (
     variantChips.length > 0 || vi.is_foil || vi.is_refractor || vi.is_auto ||
     vi.is_rookie || vi.is_sealed || vi.serial_number || vi.parallel?.name ||
-    vi.subset?.name || vi.card_number
+    vi.subset?.name || vi.card_number || vi.condition
   );
 
   return (
@@ -357,6 +357,11 @@ const ProductDetailPage = () => {
               <div className="mb-6">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Card Details</p>
                 <div className="flex flex-wrap gap-1.5">
+                  {vi.condition && (
+                    <Badge variant="outline" className="text-[11px] font-bold border-emerald-400/50 text-emerald-700 bg-emerald-400/10 dark:text-emerald-300">
+                      {vi.condition.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                    </Badge>
+                  )}
                   {vi.parallel?.name && (
                     <Badge variant="outline" className="text-[11px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10 dark:text-amber-300">{vi.parallel.name}</Badge>
                   )}
