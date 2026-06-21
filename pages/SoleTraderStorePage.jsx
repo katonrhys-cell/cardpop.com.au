@@ -255,7 +255,7 @@ const SoleTraderStorePage = () => {
                 )}
               </div>
               {isDealer && (
-                <div className="absolute -bottom-2 -right-2 bg-[hsl(var(--verified-badge,214,100%,50%))] bg-primary text-primary-foreground p-2 rounded-xl shadow-lg border-2 border-card" title="Verified Dealer">
+                <div className="absolute -bottom-2 -right-2 text-white p-2 rounded-xl shadow-lg border-2 border-card" style={{ backgroundColor: `hsl(var(--verified-badge))` }} title="Verified Dealer">
                   <BadgeCheck className="w-6 h-6" />
                 </div>
               )}

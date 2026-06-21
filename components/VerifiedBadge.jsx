@@ -16,7 +16,8 @@ const VerifiedBadge = ({ size = 'sm', showLabel = false, className = '' }) => {
 
   return (
     <span
-      className={`inline-flex items-center ${s.gap} text-emerald-700 dark:text-emerald-400 ${className}`}
+      className={`inline-flex items-center ${s.gap} ${className}`}
+      style={{ color: `hsl(var(--verified-badge))` }}
       title="Identity Verified by CardPop"
     >
       <CheckCircle2 className={`${s.icon} shrink-0`} />
