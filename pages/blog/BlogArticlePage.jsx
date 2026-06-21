@@ -298,7 +298,7 @@ const BlogArticlePage = () => {
           )}
 
           {/* Byline */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-medium" style={{ color: '#CE1126' }}>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm font-bold" style={{ color: '#CE1126' }}>
             <span>By <span className="font-bold">{article.author || 'CardPop Research'}</span></span>
             {(article.published_at || article.created_at) && (
               <>
