@@ -20,6 +20,7 @@ import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 import PageLoader from '@/components/PageLoader.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
 import AdminLayout from '@/components/AdminLayout.jsx';
+import MarketplaceListingRedirect from '@/components/MarketplaceListingRedirect.jsx';
 
 // ==========================================
 // LAZY LOADED PAGES (Performance Optimized)
@@ -236,6 +237,8 @@ const App = () => {
                         <Route path="/marketplace" element={<MarketplacePage />} />
                         {/* Orphaned category route (no inbound links, MarketplacePage doesn't read the param) — redirect to the base marketplace */}
                         <Route path="/marketplace/category/:category" element={<Navigate to="/marketplace" replace />} />
+                        {/* Redirect old marketplace listing URL format to new product route */}
+                        <Route path="/marketplace/:id/:slug?" element={<MarketplaceListingRedirect />} />
                         <Route path="/marketplace/:id/:slug?" element={<MarketplaceListingPage />} />
                         <Route path="/browse" element={<BrowseListingsPage />} />
 
