@@ -341,7 +341,7 @@ const AddEditCardPage = () => {
     clearCardSight();
 
     // 1. Try CardSight catalog identification first (returns result directly)
-    const csResult = await cardSightIdentify(imageFile);
+    const csResult = await cardSightIdentify(imageFile, formData.collection);
 
     // If CardSight service is unavailable, fall through to OCR — don't bail out
     if (csResult?.identified) {
