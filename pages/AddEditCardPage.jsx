@@ -341,7 +341,7 @@ const AddEditCardPage = () => {
     clearCardSight();
 
     // 1. Try CardSight catalog identification first (returns result directly)
-    const csResult = await cardSightIdentify(imageFile);
+    const csResult = await cardSightIdentify(imageFile, formData.collection);
 
     // If CardSight service is unavailable, fall through to OCR — don't bail out
     if (csResult?.identified) {
@@ -873,9 +873,42 @@ const AddEditCardPage = () => {
                       <h4 className={`text-xs font-bold mb-2 flex items-center gap-1.5 ${cardSightResult?.identified ? 'text-emerald-700' : 'text-primary'}`}>
                         <Sparkles className="w-3.5 h-3.5" />
                         {cardSightResult?.identified
-                          ? `Catalog Match — ${cardSightResult.exactMatch ? 'Exact' : 'Set'} (${cardSightResult.confidence})`
+                          ? `Catalog Match — ${cardSightResult.exactMatch ? 'Exact' : 'Set'}`
                           : 'AI Analysis — fields auto-filled'}
                       </h4>
+
+                      {cardSightResult?.identified && cardSightResult.confidence !== undefined && (
+                        <div className="mb-2">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[10px] font-semibold text-muted-foreground">Match Confidence</span>
+                            <span className={`text-xs font-bold ${
+                              cardSightResult.confidence >= 0.95 ? 'text-emerald-700 dark:text-emerald-400' :
+                              cardSightResult.confidence >= 0.85 ? 'text-green-700 dark:text-green-400' :
+                              cardSightResult.confidence >= 0.7 ? 'text-amber-700 dark:text-amber-400' :
+                              'text-orange-700 dark:text-orange-400'
+                            }`}>
+                              {Math.round(cardSightResult.confidence * 100)}%
+                            </span>
+                          </div>
+                          <div className="w-full h-1.5 rounded-full bg-muted/50 overflow-hidden">
+                            <div
+                              className={`h-full transition-all ${
+                                cardSightResult.confidence >= 0.95 ? 'bg-emerald-500' :
+                                cardSightResult.confidence >= 0.85 ? 'bg-green-500' :
+                                cardSightResult.confidence >= 0.7 ? 'bg-amber-500' :
+                                'bg-orange-500'
+                              }`}
+                              style={{ width: `${Math.round(cardSightResult.confidence * 100)}%` }}
+                            />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {cardSightResult.confidence >= 0.95 ? 'Excellent match — high confidence in identification' :
+                             cardSightResult.confidence >= 0.85 ? 'Good match — confident in identification' :
+                             cardSightResult.confidence >= 0.7 ? 'Moderate match — review before saving' :
+                             'Low match — verify details are correct'}
+                          </p>
+                        </div>
+                      )}
 
                       {cardSightResult?.identified && (
                         <>

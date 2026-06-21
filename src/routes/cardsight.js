@@ -15,6 +15,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { integratedAiRateLimit } from '../middleware/integrated-ai-rate-limit.js';
 import supabase from '../utils/supabaseClient.js';
 import { refreshCardMarketData } from '../utils/marketDataService.js';
+import { getSegmentsForCollection } from '../utils/collectionSegmentMap.js';
 import logger from '../utils/logger.js';
 
 const router = Router();
@@ -56,10 +57,10 @@ router.post(
       { type: file.mimetype }
     );
 
-    // 1. Identify the card across all major segments in parallel.
-    // identify.card() defaults to baseball only — for a multi-sport marketplace
-    // we try each major segment and take the highest-confidence detection.
-    const SEGMENTS = ['basketball', 'baseball', 'football', 'soccer', 'pokemon', 'hockey', 'ufc', 'golf', 'tennis', 'cricket'];
+    // 1. Identify the card across relevant segments based on collection.
+    // If collection is specified, only search those segments; otherwise try all.
+    const collection = req.body?.collection || '';
+    const SEGMENTS = getSegmentsForCollection(collection);
     const segmentResults = await Promise.allSettled(
       SEGMENTS.map(seg => client.identify.cardBySegment(seg, image))
     );
@@ -75,7 +76,7 @@ router.post(
     }
 
     if (!allDetections.length) {
-      logger.info(`[CARDSIGHT] No detections across ${SEGMENTS.length} segments. messages=${JSON.stringify(serverMessages)}`);
+      logger.info(`[CARDSIGHT] No detections. collection=${collection} segments=[${SEGMENTS.join(', ')}] messages=${JSON.stringify(serverMessages)}`);
       return res.json({
         identified: false,
         message: 'No card detected in the image.',
@@ -147,7 +148,7 @@ router.post(
         if (summary) response.pricing = summary;
       }
 
-      logger.info(`[CARDSIGHT] Identified card ${cardId} (${response.card.name}) confidence=${best.confidence}`);
+      logger.info(`[CARDSIGHT] Identified card ${cardId} (${response.card.name}) confidence=${best.confidence} collection=${collection}`);
 
       // Background: persist market valuations for this card (CardSight + eBay + PSA)
       refreshCardMarketData({
@@ -170,7 +171,7 @@ router.post(
           .eq('owner_id', req.user.id);
       }
     } else {
-      logger.info(`[CARDSIGHT] Set-level or low-confidence match: setId=${best.card?.setId} confidence=${best.confidence}`);
+      logger.info(`[CARDSIGHT] Set-level or low-confidence match: setId=${best.card?.setId} confidence=${best.confidence} collection=${collection}`);
     }
 
     res.json(response);

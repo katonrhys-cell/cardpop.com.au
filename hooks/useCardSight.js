@@ -17,7 +17,7 @@ export function useCardSight() {
   const [result, setResult] = useState(null);
   const isMounted = useIsMounted();
 
-  const identify = useCallback(async (imageFile) => {
+  const identify = useCallback(async (imageFile, collection) => {
     if (!imageFile) return;
 
     setIsIdentifying(true);
@@ -26,6 +26,7 @@ export function useCardSight() {
     try {
       const formData = new FormData();
       formData.append('image', imageFile);
+      if (collection) formData.append('collection', collection);
 
       const response = await apiServerClient.fetch('/cardsight/identify', {
         method: 'POST',
