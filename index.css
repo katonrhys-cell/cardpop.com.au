@@ -503,3 +503,37 @@
   width: 100%;
   max-width: 100%;
 }
+
+/* Embedded media — videos and iframes */
+.article-content iframe,
+.article-content video {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Ensure wrapper divs don't overflow */
+.article-content > * {
+  overflow-x: auto;
+}
+
+/* Tables — responsive with horizontal scroll if needed */
+.article-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+}
+
+/* Code blocks and pre elements */
+.article-content pre {
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: 0.5rem;
+}
+
+/* Blockquotes */
+.article-content blockquote {
+  margin: 1.5rem 0;
+  padding-left: 1rem;
+  border-left: 3px solid hsl(var(--border));
+}
