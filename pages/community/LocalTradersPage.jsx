@@ -397,7 +397,7 @@ const LocalTradersPage = () => {
                 >
                   {/* Avatar + identity */}
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-12 w-12 flex-shrink-0 ring-2 ring-border transition-all" style={{ '--hover-ring': `hsl(var(--verified-badge) / 0.3)` } as any}>
+                    <Avatar className="h-12 w-12 flex-shrink-0 ring-2 ring-border transition-all" style={{ '--hover-ring': `hsl(var(--verified-badge) / 0.3)` }}>
                       <AvatarImage src={resolveAvatar(trader)} className="object-cover" />
                       <AvatarFallback className="font-bold text-base">
                         {name.charAt(0).toUpperCase()}
@@ -461,7 +461,7 @@ const LocalTradersPage = () => {
                     variant="outline"
                     size="sm"
                     className="mt-auto rounded-xl font-bold text-xs transition-colors gap-1.5"
-                    style={{ '--button-hover-color': `hsl(var(--verified-badge))` } as any}
+                    style={{ '--button-hover-color': `hsl(var(--verified-badge))` }}
                   >
                     <Link to={`/community/user/${trader.id}`}>
                       View Profile <ArrowRight className="w-3.5 h-3.5" />
