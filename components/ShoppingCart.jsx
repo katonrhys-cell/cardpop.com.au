@@ -91,7 +91,11 @@ const ShoppingCart = () => {
                   const imageUrl = resolveImg(rawImg);
 
                   const p = item.product;
-                  const productPath = `/product/${p.source || 'marketplace'}/${p.id}/${slugify(p.title || p.name || 'card')}`;
+                  const source = p.source || 'marketplace';
+                  const slug = slugify(p.title || p.name || 'card');
+                  const productPath = source === 'marketplace'
+                    ? `/marketplace/${p.id}/${slug}`
+                    : `/product/${source}/${p.id}/${slug}`;
                   const year = p.year || p.card_year || null;
                   const set = p.set || p.card_set || p.era || p.collection || null;
                   const gradingCompany = p.grading_company || p.gradingCompany || null;

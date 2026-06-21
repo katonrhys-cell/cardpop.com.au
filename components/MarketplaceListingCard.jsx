@@ -59,7 +59,7 @@ const MarketplaceListingCard = ({ listing }) => {
   const sellerObj = listing.seller;
   const sellerId = listing.seller_id || sellerObj?.id;
   const titleSlug = slugify(vaultItem?.card_name || listing.title || 'card');
-  const detailPath = `/product/marketplace/${listing.id}/${titleSlug}`;
+  const detailPath = `/marketplace/${listing.id}/${titleSlug}`;
 
   return (
     <div className={`group flex flex-col h-full bg-card rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 ${borderClass}`}>

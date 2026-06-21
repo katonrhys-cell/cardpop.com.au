@@ -150,7 +150,7 @@ const ProductDetailPage = () => {
             .maybeSingle();
 
           if (isMounted && activeListing) {
-            navigate(`/product/marketplace/${activeListing.id}`, { replace: true });
+            navigate(`/marketplace/${activeListing.id}`, { replace: true });
             return;
           }
 
