@@ -149,6 +149,7 @@ const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard.jsx'));
 const ProductManagementPage = lazy(() => import('@/pages/admin/ProductManagementPage.jsx'));
 const UserManagementPage = lazy(() => import('@/pages/admin/UserManagementPage.jsx'));
 const UserDetailPage = lazy(() => import('@/pages/admin/UserDetailPage.jsx'));
+const SellersManagementPage = lazy(() => import('@/pages/admin/SellersManagementPage.jsx'));
 const OrderManagementPage = lazy(() => import('@/pages/admin/OrderManagementPage.jsx'));
 const AdminSettingsPage = lazy(() => import('@/pages/admin/AdminSettingsPage.jsx'));
 const EventsAdminPage = lazy(() => import('@/pages/admin/EventsManagementPage.jsx'));
@@ -372,6 +373,7 @@ const App = () => {
                           <Route path="products" element={<ProductManagementPage />} />
                           <Route path="users" element={<UserManagementPage />} />
                           <Route path="users/:userId" element={<UserDetailPage />} />
+                          <Route path="sellers" element={<SellersManagementPage />} />
                           <Route path="orders" element={<OrderManagementPage />} />
                           <Route path="categories" element={<CategoryManagementPage />} />
                           <Route path="brands" element={<BrandsManagementPage />} />
