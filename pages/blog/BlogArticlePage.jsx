@@ -321,8 +321,8 @@ const BlogArticlePage = () => {
 
       {imageUrl && (
         <div className="container-default max-w-4xl mx-auto mt-4 mb-4">
-          <div className="aspect-[21/9] rounded-2xl overflow-hidden bg-muted shadow-lg">
-             <img src={imageUrl} alt={article.title} className="w-full h-full object-cover" />
+          <div className="rounded-2xl overflow-hidden bg-muted shadow-lg">
+             <img src={imageUrl} alt={article.title} className="block w-full h-auto" />
           </div>
         </div>
       )}
