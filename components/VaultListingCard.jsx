@@ -9,6 +9,15 @@ import { VARIANT_BADGES } from '@/lib/cardVariants.js';
 import { formatAutograph } from '@/lib/cardAttributeLabels.js';
 import { supabase } from '@/lib/supabaseClient.js';
 
+const GRADE_BADGE = {
+  psa:   'bg-red-600 text-white',
+  bgs:   'bg-blue-700 text-white',
+  cgc:   'bg-green-600 text-white',
+  ace:   'bg-orange-500 text-white',
+  sgc:   'bg-purple-600 text-white',
+  other: 'bg-slate-600 text-white',
+};
+
 const getStatusBadge = (listingType) => {
   switch (listingType) {
     case 'Private': return { className: 'badge-vault-private', icon: Lock };
@@ -25,14 +34,18 @@ const resolveImageUrl = (path) => {
   return supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
 };
 
-const VaultListingCard = ({ vaultItem }) => {
+const VaultListingCard = ({ vaultItem, listing }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
   const rawImg = vaultItem.vault_images?.[0]?.storage_path || vaultItem.card_image || vaultItem.vault_images?.[0]?.image_url || vaultItem.image_url || null;
   const imgSrc = resolveImageUrl(rawImg);
   const sellerId = vaultItem.user_id || vaultItem.owner_id;
   const sellerObj = vaultItem.profiles || vaultItem.expand?.user_id || null;
   const titleSlug = slugify(vaultItem.card_name || vaultItem.name || vaultItem.title || 'card');
-  const detailPath = `/product/vault/${vaultItem.id}/${titleSlug}`;
+
+  // Link to marketplace listing if available, otherwise to vault detail
+  const detailPath = listing
+    ? `/marketplace/${listing.id}/${titleSlug}`
+    : `/product/vault/${vaultItem.id}/${titleSlug}`;
 
   const badgeConfig = getStatusBadge(vaultItem.listing_type);
   const StatusIcon = badgeConfig.icon;
@@ -70,8 +83,15 @@ const VaultListingCard = ({ vaultItem }) => {
           </Badge>
         </div>
         {specialBadge && (
-          <div className={`absolute top-3 right-3 z-10 px-2 py-0.5 rounded-full text-[11px] font-extrabold shadow ${specialBadge[1].bg} ${specialBadge[1].text}`}>
+          <div className={`absolute top-3 right-3 z-10 px-2.5 py-1 rounded-full text-[11px] font-extrabold tracking-wide shadow-md ${specialBadge[1].bg} ${specialBadge[1].text}`}>
             {specialBadge[1].label}
+          </div>
+        )}
+
+        {/* Grade badge — bottom left (only for graded slabs) */}
+        {vaultItem?.grading_company && vaultItem.grading_company !== 'raw' && vaultItem?.grade && (
+          <div className={`absolute bottom-3 left-3 z-10 px-2.5 py-1 rounded-md text-[11px] font-extrabold tracking-wide shadow-lg ${GRADE_BADGE[vaultItem.grading_company] || GRADE_BADGE.other}`}>
+            {vaultItem.grading_company.toUpperCase()} {vaultItem.grade}
           </div>
         )}
 
