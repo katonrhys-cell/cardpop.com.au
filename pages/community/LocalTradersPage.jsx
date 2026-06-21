@@ -69,7 +69,16 @@ const LocalTradersPage = () => {
       }
 
       const { data } = await query;
-      setTraders(data || []);
+
+      // Deduplicate by user id to prevent duplicates
+      const seen = new Set();
+      const uniqueTraders = (data || []).filter(trader => {
+        if (seen.has(trader.id)) return false;
+        seen.add(trader.id);
+        return true;
+      });
+
+      setTraders(uniqueTraders);
     } catch (err) {
       console.error(err);
     }
@@ -91,7 +100,18 @@ const LocalTradersPage = () => {
       .order('is_featured_seller', { ascending: false })
       .order('rating', { ascending: false, nullsFirst: false })
       .limit(24)
-      .then(({ data }) => { if (!cancelled) setStores(data || []); });
+      .then(({ data }) => {
+        if (!cancelled) {
+          // Deduplicate by user id to prevent duplicates
+          const seen = new Set();
+          const uniqueStores = (data || []).filter(store => {
+            if (seen.has(store.id)) return false;
+            seen.add(store.id);
+            return true;
+          });
+          setStores(uniqueStores);
+        }
+      });
     return () => { cancelled = true; };
   }, []);
 

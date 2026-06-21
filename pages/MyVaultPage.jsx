@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   Plus, ShieldCheck, AlertCircle, MoreHorizontal, Edit,
   Trash2, ImageOff, Lock, ArrowRightLeft, X, ShoppingCart, Layers
@@ -16,10 +16,21 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 import VaultListingModal from '@/components/VaultListingModal.jsx';
+import { VARIANT_BADGES } from '@/lib/cardVariants.js';
+import { slugify } from '@/lib/slugify.js';
 
 const CONDITION_LABELS = {
   mint: 'Mint', near_mint: 'Near Mint', excellent: 'Excellent',
   good: 'Good', light_played: 'Light Played', played: 'Played', poor: 'Poor',
+};
+
+const GRADE_BADGE = {
+  psa:   'bg-red-600 text-white',
+  bgs:   'bg-blue-700 text-white',
+  cgc:   'bg-green-600 text-white',
+  ace:   'bg-orange-500 text-white',
+  sgc:   'bg-purple-600 text-white',
+  other: 'bg-slate-600 text-white',
 };
 
 const MyVaultPage = () => {
@@ -52,7 +63,31 @@ const MyVaultPage = () => {
 
       const { data, error: fetchError } = await query;
       if (fetchError) throw fetchError;
-      setCards(data || []);
+
+      // Fetch active listings for these vault items
+      const vaultItemIds = (data || []).map(item => item.id);
+      let listingMap = {};
+      if (vaultItemIds.length > 0) {
+        const { data: listings } = await supabase
+          .from('listings')
+          .select('id, vault_item_id, price_aud')
+          .in('vault_item_id', vaultItemIds)
+          .eq('status', 'active');
+
+        if (listings) {
+          listings.forEach(listing => {
+            listingMap[listing.vault_item_id] = listing;
+          });
+        }
+      }
+
+      // Attach listing data to vault items
+      const cardsWithListings = (data || []).map(card => ({
+        ...card,
+        listing: listingMap[card.id]
+      }));
+
+      setCards(cardsWithListings);
       setError(null);
     } catch (err) {
       console.error("Failed to fetch vault:", err);
@@ -120,6 +155,18 @@ const MyVaultPage = () => {
     }
 
     const isForTrade = card.listing_type === 'For Trade' || card.listing_type === 'For Sale & Trade';
+    const titleSlug = slugify(card.card_name || card.name || 'card');
+
+    // Determine detail path - link to marketplace listing if available, otherwise vault edit
+    const detailPath = card.listing
+      ? `/marketplace/${card.listing.id}/${titleSlug}`
+      : `/vault/edit/${card.id}`;
+
+    // Get variant badges
+    const rawVariants = card.variant
+      ? card.variant.split(',').map(s => s.trim()).filter(Boolean)
+      : (Array.isArray(card.cardVariants) ? card.cardVariants : (card.cardVariants ? [card.cardVariants] : []));
+    const specialBadge = Object.entries(VARIANT_BADGES).find(([key]) => rawVariants.includes(key));
 
     return (
       <div key={card.id} className="group bg-card border border-border rounded-2xl overflow-hidden shadow-sm hover:shadow-lg hover:border-primary/40 transition-all duration-300 flex flex-col h-full relative">
@@ -145,7 +192,7 @@ const MyVaultPage = () => {
           </DropdownMenu>
         </div>
 
-        <div className="aspect-[4/5] bg-muted/40 relative flex items-center justify-center border-b border-border/50 p-4">
+        <Link to={detailPath} className="aspect-[4/5] bg-muted/40 relative flex items-center justify-center border-b border-border/50 p-4 group-hover:opacity-95 transition-opacity overflow-hidden">
           {imageUrl ? (
             <img src={imageUrl} alt={card.card_name} className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" loading="lazy" />
           ) : (
@@ -157,6 +204,21 @@ const MyVaultPage = () => {
           <div className="absolute top-3 left-3 z-10 pointer-events-none flex flex-col gap-1.5 items-start">
             {getListingBadge(card)}
           </div>
+
+          {/* Special variant badge — top right */}
+          {specialBadge && (
+            <div className={`absolute top-3 right-3 z-10 px-2.5 py-1 rounded-full text-[11px] font-extrabold tracking-wide shadow-md ${specialBadge[1].bg} ${specialBadge[1].text}`}>
+              {specialBadge[1].label}
+            </div>
+          )}
+
+          {/* Grade badge — bottom left (only for graded slabs) */}
+          {card?.grading_company && card.grading_company !== 'raw' && card?.grade && (
+            <div className={`absolute bottom-3 left-3 z-10 px-2.5 py-1 rounded-md text-[11px] font-extrabold tracking-wide shadow-lg ${GRADE_BADGE[card.grading_company] || GRADE_BADGE.other}`}>
+              {card.grading_company.toUpperCase()} {card.grade}
+            </div>
+          )}
+
           {card.serial_number && (
             <div className="absolute bottom-3 right-3 z-10 pointer-events-none">
               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-extrabold tracking-wide bg-black/70 text-white backdrop-blur-sm border border-white/10 shadow-md">
@@ -164,10 +226,10 @@ const MyVaultPage = () => {
               </span>
             </div>
           )}
-        </div>
+        </Link>
 
-        <div className="p-4 flex flex-col flex-1">
-          <h3 className="font-bold text-base line-clamp-2 mb-1 leading-tight">{card.card_name}</h3>
+        <Link to={detailPath} className="p-4 flex flex-col flex-1">
+          <h3 className="font-bold text-base line-clamp-2 mb-1 leading-tight text-foreground group-hover:text-primary transition-colors">{card.card_name}</h3>
           {card.set_name && <p className="text-xs text-muted-foreground mb-2">{card.set_name}</p>}
 
           <div className="flex flex-wrap gap-1.5 mb-3">
@@ -178,9 +240,6 @@ const MyVaultPage = () => {
               <Badge key={v} variant="secondary" className="text-[10px] font-medium bg-violet-500/10 text-violet-700 border border-violet-200/50">{v}</Badge>
             ))}
             {card.condition && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{CONDITION_LABELS[card.condition] || card.condition}</Badge>}
-            {card.grading_company && card.grading_company !== 'raw' && (
-              <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground uppercase">{card.grading_company} {card.grade || ''}</Badge>
-            )}
           </div>
 
           <div className="mt-auto pt-3 border-t border-border flex items-end justify-between">
@@ -199,7 +258,7 @@ const MyVaultPage = () => {
               </div>
             )}
           </div>
-        </div>
+        </Link>
       </div>
     );
   };

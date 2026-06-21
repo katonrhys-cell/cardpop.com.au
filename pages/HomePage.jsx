@@ -194,7 +194,16 @@ const HomePage = () => {
 
         if (isMounted) {
           setFeaturedCards(listingsRes.data ?? []);
-          setFeaturedSellers(sellersRes.data ?? []);
+
+          // Deduplicate sellers by user id to prevent duplicates
+          const seen = new Set();
+          const uniqueSellers = (sellersRes.data ?? []).filter(seller => {
+            if (seen.has(seller.id)) return false;
+            seen.add(seller.id);
+            return true;
+          });
+
+          setFeaturedSellers(uniqueSellers);
         }
       } catch (error) {
         console.error('Failed to fetch homepage data:', error);

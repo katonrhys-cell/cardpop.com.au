@@ -9,14 +9,18 @@ const SellerRatingDisplay = ({ sellerId, compact = false, showPerformance = fals
   useEffect(() => {
     const fetchRatings = async () => {
       if (!sellerId) return;
-      
+
       setLoading(true);
       try {
         const response = await fetch(`/api/seller-ratings/${sellerId}`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch ratings: ${response.status}`);
+        }
         const data = await response.json();
         setRatings(data);
       } catch (error) {
         console.error('Error fetching seller ratings:', error);
+        setRatings(null);
       } finally {
         setLoading(false);
       }
@@ -29,7 +33,7 @@ const SellerRatingDisplay = ({ sellerId, compact = false, showPerformance = fals
     return <div className="animate-pulse bg-muted h-6 w-24 rounded" />;
   }
 
-  if (!ratings || ratings.stats.total === 0) {
+  if (!ratings || !ratings.stats || ratings.stats.total === 0) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Star className="w-4 h-4" />
