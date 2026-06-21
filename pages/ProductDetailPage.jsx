@@ -49,7 +49,7 @@ const ProductDetailPage = () => {
         if (source === 'marketplace') {
           const { data: listing, error: fetchError } = await supabase
             .from('listings')
-            .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified)')
+            .select('*, vault_item:vault_items!inner(*, vault_images(*), parallel:parallels(id,name,color), subset:subsets(id,name)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified)')
             .eq('id', id)
             .eq('status', 'active')
             .single();
@@ -71,6 +71,7 @@ const ProductDetailPage = () => {
 
           setProduct({
             ...listing,
+            vault_item: vi,
             name: vi?.card_name || listing.title || 'Untitled',
             price: listing.price_aud || 0,
             description: listing.description || vi?.notes || '',
@@ -281,6 +282,25 @@ const ProductDetailPage = () => {
     
   const StatusIcon = statusBadge.config.icon;
 
+  // Card attribute source: marketplace listings carry it under vault_item,
+  // a direct vault item is the product itself. Shop products have none.
+  const vi = isShop ? null : (product.vault_item || product);
+  const variantChips = vi?.variant
+    ? vi.variant.split(',').map(s => s.trim()).filter(Boolean)
+    : [];
+  const autoLabel = vi?.is_auto
+    ? [
+        vi.auto_signers > 1 ? ['', 'Dual', 'Triple', 'Quad'][vi.auto_signers - 1] : null,
+        { on_card: 'On-Card', sticker: 'Sticker', cut: 'Cut Sig', licensed: 'Licensed', in_person: 'IP' }[vi.auto_type] ?? null,
+        'Auto',
+      ].filter(Boolean).join(' ')
+    : null;
+  const hasCardDetails = !!vi && (
+    variantChips.length > 0 || vi.is_foil || vi.is_refractor || vi.is_auto ||
+    vi.is_rookie || vi.is_sealed || vi.serial_number || vi.parallel?.name ||
+    vi.subset?.name || vi.card_number
+  );
+
   return (
     <div className="bg-background min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
@@ -331,6 +351,30 @@ const ProductDetailPage = () => {
               <p className="text-muted-foreground text-sm mb-6">
                 {[product.year, product.set].filter(Boolean).join(' · ')}
               </p>
+            )}
+
+            {hasCardDetails && (
+              <div className="mb-6">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Card Details</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {vi.parallel?.name && (
+                    <Badge variant="outline" className="text-[11px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10 dark:text-amber-300">{vi.parallel.name}</Badge>
+                  )}
+                  {vi.subset?.name && (
+                    <Badge variant="outline" className="text-[11px] font-bold border-sky-400/50 text-sky-700 bg-sky-400/10 dark:text-sky-300">{vi.subset.name}</Badge>
+                  )}
+                  {vi.card_number && <Badge variant="secondary" className="text-[11px] font-medium">#{vi.card_number}</Badge>}
+                  {vi.serial_number && <Badge variant="secondary" className="text-[11px] font-bold">#{vi.serial_number}</Badge>}
+                  {vi.is_foil && <Badge variant="outline" className="text-[11px] font-bold border-yellow-400/50 text-yellow-700 bg-yellow-400/10 dark:text-yellow-300">Foil</Badge>}
+                  {vi.is_refractor && <Badge variant="outline" className="text-[11px] font-bold border-indigo-400/50 text-indigo-700 bg-indigo-400/10 dark:text-indigo-300">Refractor</Badge>}
+                  {vi.is_auto && <Badge variant="outline" className="text-[11px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10 dark:text-blue-300">{autoLabel}</Badge>}
+                  {vi.is_rookie && <Badge variant="outline" className="text-[11px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10 dark:text-amber-300">RC</Badge>}
+                  {vi.is_sealed && <Badge variant="outline" className="text-[11px] font-bold border-green-400/50 text-green-700 bg-green-400/10 dark:text-green-300">Sealed</Badge>}
+                  {variantChips.map(v => (
+                    <Badge key={v} variant="outline" className="text-[11px] font-bold border-primary/30 text-primary bg-primary/5">{v}</Badge>
+                  ))}
+                </div>
+              </div>
             )}
 
             <div className="mb-8">
