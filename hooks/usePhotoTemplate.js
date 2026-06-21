@@ -119,10 +119,15 @@ export function usePhotoTemplate() {
 
       const endpoint = '/photo-template/slab-image';
 
-      const result = await apiServerClient.post(endpoint, formData);
+      const response = await apiServerClient.fetch(endpoint, {
+        method: 'POST',
+        body: formData,
+      });
 
-      if (!result.data.success) {
-        throw new Error(result.data.error || 'Upload failed');
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Upload failed');
       }
 
       toast.success('Photo formatted successfully!');
@@ -131,7 +136,7 @@ export function usePhotoTemplate() {
       setPreviewUrl(null);
       setOriginalImageFile(null);
 
-      return result.data;
+      return result;
     } catch (error) {
       console.error('Upload error:', error);
       toast.error(error.message || 'Failed to upload image');
