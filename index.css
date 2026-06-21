@@ -92,7 +92,7 @@
     /* ── Profile Tokens ─────────────────────────────────────────────── */
     --profile-bg:       0 0% 100%;
     --rating-color:     43 96% 56%;
-    --verified-badge:   160 84% 30%;
+    --verified-badge:   199 97% 47%;          /* Twitter Blue #1d9bf0 */
     --section-divider:  202 16% 80%;           /* Soft Silver */
 
     /* ── Drag-and-Drop Tokens ───────────────────────────────────────── */
@@ -168,7 +168,7 @@
     /* ── Profile Tokens (Dark) ──────────────────────────────────────── */
     --profile-bg:       215 28% 13%;
     --rating-color:     43 96% 56%;
-    --verified-badge:   160 84% 45%;
+    --verified-badge:   199 97% 55%;          /* Twitter Blue lighter for dark mode */
     --section-divider:  215 20% 25%;
 
     /* ── Drag-and-Drop Tokens (Dark) ────────────────────────────────── */

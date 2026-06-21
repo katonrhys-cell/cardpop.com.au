@@ -229,7 +229,7 @@ const LocalTradersPage = () => {
                         )}
                       </div>
                       {store.is_verified && (
-                        <div className="absolute -bottom-1.5 -right-1.5 bg-[#1d9bf0] text-white p-1 rounded-lg shadow-md border-2 border-card" title="Verified Dealer">
+                        <div className="absolute -bottom-1.5 -right-1.5 text-white p-1 rounded-lg shadow-md border-2 border-card" style={{ backgroundColor: `hsl(var(--verified-badge))` }} title="Verified Dealer">
                           <BadgeCheck className="w-4 h-4" />
                         </div>
                       )}
@@ -245,7 +245,7 @@ const LocalTradersPage = () => {
                           </Badge>
                         )}
                         {store.is_verified && (
-                          <BadgeCheck className="w-4 h-4 text-[#1d9bf0] shrink-0" title="Verified business" />
+                          <BadgeCheck className="w-4 h-4 shrink-0" style={{ color: `hsl(var(--verified-badge))` }} title="Verified business" />
                         )}
                       </div>
                       {store.business_tagline && (
@@ -347,7 +347,7 @@ const LocalTradersPage = () => {
               {selectedState ? `in ${stateLabel}` : 'across Australia'}
             </p>
             <Badge variant="secondary" className="gap-1.5 font-bold">
-              <BadgeCheck className="w-3.5 h-3.5 text-emerald-500" />
+              <BadgeCheck className="w-3.5 h-3.5" style={{ color: `hsl(var(--verified-badge))` }} />
               CardPop Verified
             </Badge>
           </div>
@@ -380,7 +380,7 @@ const LocalTradersPage = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
                         <span className="font-bold text-sm truncate">{name}</span>
-                        <BadgeCheck className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                        <BadgeCheck className="w-4 h-4 flex-shrink-0" style={{ color: `hsl(var(--verified-badge))` }} />
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
                         {location && (
@@ -491,7 +491,7 @@ const LocalTradersPage = () => {
                   { icon: ShieldCheck,label: 'Safe to trade',     desc: 'Trusted by the community' },
                 ].map(({ icon: Icon, label, desc }) => (
                   <div key={label} className="bg-background/60 border border-border rounded-xl p-3">
-                    <Icon className="w-4 h-4 text-emerald-500 mb-2" />
+                    <Icon className="w-4 h-4 mb-2" style={{ color: `hsl(var(--verified-badge))` }} />
                     <p className="text-xs font-bold text-foreground">{label}</p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">{desc}</p>
                   </div>

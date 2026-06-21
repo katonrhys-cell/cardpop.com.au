@@ -402,7 +402,7 @@ const ProductDetailPage = () => {
                     <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-0.5">Owner / Seller</p>
                     <p className="font-bold text-base text-foreground flex items-center gap-1.5">
                       {seller.business_name}
-                      {seller.is_verified && <ShieldCheck className="w-4 h-4 text-emerald-500" />}
+                      {seller.is_verified && <ShieldCheck className="w-4 h-4" style={{ color: `hsl(var(--verified-badge))` }} />}
                     </p>
                   </div>
                 </div>
