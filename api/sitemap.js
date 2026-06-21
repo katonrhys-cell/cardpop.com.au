@@ -137,7 +137,7 @@ export default async function handler(req, res) {
       for (const listing of listings) {
         const lastmod = (listing.updated_at || listing.created_at || TODAY).split('T')[0];
         const urlSlug = listing.slug || 'listing';
-        parts.push(xmlUrl(`${BASE_URL}/product/marketplace/${listing.id}/${urlSlug}`, lastmod, 'weekly', '0.6'));
+        parts.push(xmlUrl(`${BASE_URL}/marketplace/${listing.id}/${urlSlug}`, lastmod, 'weekly', '0.6'));
       }
     }
 

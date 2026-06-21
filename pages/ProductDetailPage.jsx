@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, ArrowRightLeft, Layers } from 'lucide-react';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
+import EbayMarketSection from '@/components/EbayMarketSection.jsx';
 
 const getStatusBadge = (listingType) => {
   switch (listingType) {
@@ -149,7 +150,7 @@ const ProductDetailPage = () => {
             .maybeSingle();
 
           if (isMounted && activeListing) {
-            navigate(`/product/marketplace/${activeListing.id}`, { replace: true });
+            navigate(`/marketplace/${activeListing.id}`, { replace: true });
             return;
           }
 
@@ -298,7 +299,7 @@ const ProductDetailPage = () => {
   const hasCardDetails = !!vi && (
     variantChips.length > 0 || vi.is_foil || vi.is_refractor || vi.is_auto ||
     vi.is_rookie || vi.is_sealed || vi.serial_number || vi.parallel?.name ||
-    vi.subset?.name || vi.card_number
+    vi.subset?.name || vi.card_number || vi.condition
   );
 
   return (
@@ -330,13 +331,12 @@ const ProductDetailPage = () => {
                   Community Vault
                 </Badge>
               )}
-              
+
               <Badge className={`font-bold border-none shadow-sm px-2.5 py-1 ${statusBadge.config.className}`}>
                 <StatusIcon className="w-3 h-3 mr-1.5 inline-block" />
                 {statusBadge.label}
               </Badge>
 
-              {product.condition && <Badge variant="secondary" className="font-bold">{product.condition}</Badge>}
               {product.grade && <Badge variant="outline" className="border-primary/40 text-primary font-bold">Grade: {product.grade}</Badge>}
             </div>
 
@@ -357,6 +357,11 @@ const ProductDetailPage = () => {
               <div className="mb-6">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Card Details</p>
                 <div className="flex flex-wrap gap-1.5">
+                  {vi.condition && (
+                    <Badge variant="outline" className="text-[11px] font-bold border-emerald-400/50 text-emerald-700 bg-emerald-400/10 dark:text-emerald-300">
+                      {vi.condition.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                    </Badge>
+                  )}
                   {vi.parallel?.name && (
                     <Badge variant="outline" className="text-[11px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10 dark:text-amber-300">{vi.parallel.name}</Badge>
                   )}
@@ -458,6 +463,15 @@ const ProductDetailPage = () => {
                 <p className="text-muted-foreground italic text-sm">No detailed description provided.</p>
               )}
             </div>
+
+            {!isShop && (
+              <EbayMarketSection
+                cardName={product.name}
+                cardSet={vi?.set_name || product.set}
+                gradingService={vi?.grading_company}
+                gradeScore={vi?.grade}
+              />
+            )}
           </div>
         </div>
       </div>

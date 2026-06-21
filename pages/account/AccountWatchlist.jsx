@@ -81,7 +81,7 @@ const WatchlistRow = ({ entry, onRemove }) => {
   const imgSrc = imgPath
     ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
     : null;
-  const detailPath = `/product/marketplace/${listing.id}/${slugify(vi?.card_name || 'card')}`;
+  const detailPath = `/marketplace/${listing.id}/${slugify(vi?.card_name || 'card')}`;
   const statusCfg = getStatusCfg(listing);
   const isAuction = listing.listing_type === 'auction';
   const auctionLive = isAuction && listing.status === 'active' && listing.auction_end_at && new Date(listing.auction_end_at) > Date.now();

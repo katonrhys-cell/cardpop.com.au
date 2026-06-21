@@ -52,6 +52,7 @@ const RouteErrorBoundary = ({ children }) => {
 
 // Marketplace
 const MarketplacePage = lazy(() => import('@/pages/marketplace/MarketplacePage.jsx'));
+const MarketplaceListingPage = lazy(() => import('@/pages/marketplace/MarketplaceListingPage.jsx'));
 const BrowseListingsPage = lazy(() => import('@/pages/BrowseListingsPage.jsx'));
 
 // Shop
@@ -238,8 +239,9 @@ const App = () => {
                         <Route path="/marketplace/category/:category" element={<Navigate to="/marketplace" replace />} />
                         {/* Redirect old marketplace listing URL format to new product route */}
                         <Route path="/marketplace/:id/:slug?" element={<MarketplaceListingRedirect />} />
+                        <Route path="/marketplace/:id/:slug?" element={<MarketplaceListingPage />} />
                         <Route path="/browse" element={<BrowseListingsPage />} />
-                        
+
                         {/* Public Profile Routes */}
                         <Route path="/seller/:userId" element={<PublicSellerProfilePage />} />
                         <Route path="/dealer/:userId" element={<SoleTraderStorePage />} />
