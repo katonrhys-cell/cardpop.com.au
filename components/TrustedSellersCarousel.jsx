@@ -28,7 +28,16 @@ const TrustedSellersCarousel = () => {
           .gt('positive_feedback_pct', 0)
           .order('positive_feedback_pct', { ascending: false })
           .limit(20);
-        setSellers(response || []);
+
+        // Deduplicate by user id to prevent duplicates
+        const seen = new Set();
+        const uniqueSellers = (response || []).filter(seller => {
+          if (seen.has(seller.id)) return false;
+          seen.add(seller.id);
+          return true;
+        });
+
+        setSellers(uniqueSellers);
       } catch (err) {
         console.error("Failed to fetch sellers:", err);
         setError("Unable to load trusted sellers at this time.");
