@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient.js';
 import VaultListingCard from '@/components/VaultListingCard.jsx';
 import SellerCard from '@/components/SellerCard.jsx';
+import FeaturedSellerCard from '@/components/FeaturedSellerCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { HOMEPAGE_CATEGORIES } from '@/components/CategoryIcons.jsx';
@@ -774,7 +775,7 @@ const HomePage = () => {
             >
               {featuredSellers.map(seller => (
                 <motion.div key={seller.id} variants={itemVariants}>
-                  <SellerCard seller={seller} />
+                  <FeaturedSellerCard seller={seller} />
                 </motion.div>
               ))}
             </motion.div>
