@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, Tag, Heart, ZoomIn } from 'lucide-react';
+import { Heart, ZoomIn } from 'lucide-react';
 import ImageZoomModal from '@/components/ImageZoomModal.jsx';
 import { toast } from 'sonner';
 import VerifiedBadge from '@/components/VerifiedBadge.jsx';
@@ -13,7 +13,6 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { useWatchlist } from '@/hooks/useWatchlist.js';
 import SellerRatingDisplay from '@/components/SellerRatingDisplay.jsx';
-import WishlistButton from '@/components/WishlistButton.jsx';
 
 const GRADE_BADGE = {
   psa:   'bg-red-600 text-white',
@@ -80,14 +79,6 @@ const MarketplaceListingCard = ({ listing }) => {
             No Image
           </div>
         )}
-        {/* Marketplace label — top right */}
-        <div className="absolute top-3 right-3 z-10 flex gap-2">
-          <Badge className="shadow-sm font-bold bg-secondary text-secondary-foreground">
-            <Tag className="w-3 h-3 mr-1" /> Marketplace
-          </Badge>
-          <WishlistButton itemId={listing.id} itemType="listing" className="bg-white/90 backdrop-blur-sm shadow-sm" />
-        </div>
-
         {/* Special variant badge (RC, Auto, 1st Ed) — top right */}
         {specialBadge && (
           <div className={`absolute top-3 right-3 z-10 px-2.5 py-1 rounded-full text-[11px] font-extrabold tracking-wide shadow-md ${specialBadge[1].bg} ${specialBadge[1].text}`}>
