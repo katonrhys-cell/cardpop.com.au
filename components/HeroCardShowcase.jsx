@@ -22,8 +22,9 @@ import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 // One full cycle (travel + hold + handoff) in milliseconds.
 const CYCLE_MS = 6500;
 
-// Shelf x-offsets (from stage centre) for up to 5 cards, evenly spread.
-const SHELF_X = [-176, -88, 0, 88, 176];
+// Shelf card footprint (width + gap) used to work out where each card sits on
+// the shelf so the flying card can originate from its exact slot.
+const SHELF_SLOT = 80; // 68px card + 12px gap
 const SHELF_Y = -150;
 
 const HeroCardShowcase = ({ cards = [] }) => {
@@ -44,7 +45,9 @@ const HeroCardShowcase = ({ cards = [] }) => {
   if (count === 0) return null;
 
   const activeCard = cards[active];
-  const sx = SHELF_X[active] ?? 0;
+  // X-offset (from stage centre) of the active card's shelf slot, so the flying
+  // card lifts out of the right spot regardless of how many cards are on show.
+  const sx = (active - (count - 1) / 2) * SHELF_SLOT;
 
   // Keyframe timeline for the flying card. Shared `times` keeps every track
   // in lock-step across the 6 stages.

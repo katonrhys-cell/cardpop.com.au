@@ -168,6 +168,7 @@ const BrandsManagementPage = lazy(() => import('@/pages/admin/BrandsManagementPa
 const ProductLinesManagementPage = lazy(() => import('@/pages/admin/ProductLinesManagementPage.jsx'));
 const CollectionsManagementPage = lazy(() => import('@/pages/admin/CollectionsManagementPage.jsx'));
 const FeaturedCardsAdminPage = lazy(() => import('@/pages/FeaturedCardsAdminPage.jsx'));
+const HeroShowcaseAdminPage = lazy(() => import('@/pages/admin/HeroShowcaseAdminPage.jsx'));
 const ListingsManagementPage = lazy(() => import('@/pages/ListingsManagementPage.jsx'));
 
 // Previously-orphaned pages now wired up
@@ -392,6 +393,7 @@ const App = () => {
                           <Route path="product-lines" element={<ProductLinesManagementPage />} />
                           <Route path="collections" element={<CollectionsManagementPage />} />
                           <Route path="featured" element={<FeaturedCardsAdminPage />} />
+                          <Route path="hero-showcase" element={<HeroShowcaseAdminPage />} />
                           <Route path="all-listings" element={<ListingsManagementPage />} />
                         </Route>
                         
