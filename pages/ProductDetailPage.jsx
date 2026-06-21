@@ -330,13 +330,12 @@ const ProductDetailPage = () => {
                   Community Vault
                 </Badge>
               )}
-              
+
               <Badge className={`font-bold border-none shadow-sm px-2.5 py-1 ${statusBadge.config.className}`}>
                 <StatusIcon className="w-3 h-3 mr-1.5 inline-block" />
                 {statusBadge.label}
               </Badge>
 
-              {product.condition && <Badge variant="secondary" className="font-bold">{product.condition}</Badge>}
               {product.grade && <Badge variant="outline" className="border-primary/40 text-primary font-bold">Grade: {product.grade}</Badge>}
             </div>
 
