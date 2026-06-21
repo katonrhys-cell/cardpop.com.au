@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, ArrowRightLeft, Layers } from 'lucide-react';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
+import EbayMarketSection from '@/components/EbayMarketSection.jsx';
 
 const getStatusBadge = (listingType) => {
   switch (listingType) {
@@ -458,6 +459,15 @@ const ProductDetailPage = () => {
                 <p className="text-muted-foreground italic text-sm">No detailed description provided.</p>
               )}
             </div>
+
+            {!isShop && (
+              <EbayMarketSection
+                cardName={product.name}
+                cardSet={vi?.set_name || product.set}
+                gradingService={vi?.grading_company}
+                gradeScore={vi?.grade}
+              />
+            )}
           </div>
         </div>
       </div>
