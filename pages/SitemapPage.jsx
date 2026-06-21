@@ -21,7 +21,7 @@ const SitemapPage = () => {
           { label: 'Vault', path: '/vault' },
           { label: 'Shop', path: '/shop' },
           ...(vaultRes.data ?? []).map(i => ({ label: i.card_name || 'Vault Item', path: `/product/vault/${i.id}` })),
-          ...(shopRes.data ?? []).map(i => ({ label: i.title || 'Shop Item', path: `/product/marketplace/${i.id}` })),
+          ...(shopRes.data ?? []).map(i => ({ label: i.title || 'Marketplace Listing', path: `/marketplace/${i.id}/${i.slug || 'listing'}` })),
         ];
         
         setLinks(combined);
