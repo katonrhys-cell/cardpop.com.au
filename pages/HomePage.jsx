@@ -692,7 +692,7 @@ const HomePage = () => {
             >
               {featuredCards.map(card => (
                 <motion.div key={card.id} variants={itemVariants}>
-                  <VaultListingCard listing={card} />
+                  <VaultListingCard vaultItem={card} />
                 </motion.div>
               ))}
             </motion.div>
