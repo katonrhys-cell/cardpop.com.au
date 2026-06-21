@@ -56,7 +56,7 @@ const VaultCategoryPage = () => {
           // Query through listings table to filter by listing_type / accepts_offers
           let listingsQuery = supabase
             .from('listings')
-            .select('vault_item_id')
+            .select('vault_item_id, id, price_aud')
             .eq('status', 'active');
 
           if (filterMode === 'offer') {
@@ -78,6 +78,12 @@ const VaultCategoryPage = () => {
             return;
           }
 
+          // Create a map of vault_item_id -> listing for quick lookup
+          const listingMap = {};
+          (listingRows || []).forEach(r => {
+            listingMap[r.vault_item_id] = { id: r.id, price_aud: r.price_aud };
+          });
+
           let query = supabase
             .from('vault_items')
             .select('*, profiles:owner_id(name)', { count: 'exact' })
@@ -91,10 +97,27 @@ const VaultCategoryPage = () => {
           const { data, count, error } = await query;
           if (error) throw error;
 
-          setListings(data || []);
+          // Attach listing data to vault items
+          const itemsWithListings = (data || []).map(item => ({
+            ...item,
+            listing: listingMap[item.id]
+          }));
+
+          setListings(itemsWithListings);
           setTotalItems(count || 0);
           setTotalPages(Math.ceil((count || 0) / perPage));
         } else {
+          // Fetch all listings to get vault_item mappings
+          const { data: allListings } = await supabase
+            .from('listings')
+            .select('vault_item_id, id, price_aud')
+            .eq('status', 'active');
+
+          const listingMap = {};
+          (allListings || []).forEach(r => {
+            listingMap[r.vault_item_id] = { id: r.id, price_aud: r.price_aud };
+          });
+
           let query = supabase
             .from('vault_items')
             .select('*, profiles:owner_id(name)', { count: 'exact' })
@@ -107,7 +130,13 @@ const VaultCategoryPage = () => {
           const { data, count, error } = await query;
           if (error) throw error;
 
-          setListings(data || []);
+          // Attach listing data to vault items
+          const itemsWithListings = (data || []).map(item => ({
+            ...item,
+            listing: listingMap[item.id]
+          }));
+
+          setListings(itemsWithListings);
           setTotalItems(count || 0);
           setTotalPages(Math.ceil((count || 0) / perPage));
         }
