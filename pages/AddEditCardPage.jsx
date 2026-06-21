@@ -59,6 +59,20 @@ const SectionCard = ({ title, children, className = '' }) => (
   </div>
 );
 
+// Convert a preview URL (data: or blob:/object URL) into a Blob. fetch() on
+// large data: URLs is unreliable on mobile Safari, so decode those manually.
+const previewUrlToBlob = async (url) => {
+  if (url.startsWith('data:')) {
+    const [header, base64] = url.split(',');
+    const mime = header.match(/:(.*?);/)?.[1] || 'image/jpeg';
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new Blob([bytes], { type: mime });
+  }
+  return (await fetch(url)).blob();
+};
+
 const AddEditCardPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -99,7 +113,7 @@ const AddEditCardPage = () => {
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
   const { identify: cardSightIdentify, isIdentifying, result: cardSightResult, clearResult: clearCardSight } = useCardSight();
   const { fetchPricingById, fetchPricingByName, isLoadingCsPrice, csPrice, clearCsPrice } = useCardsightPricing();
-  const { isProcessing: isPhotoProcessing, previewUrl, createSlabImagePreview, removeBackgroundPreview, uploadProcessedImage, reset: resetPhotoTemplate } = usePhotoTemplate();
+  const { isProcessing: isPhotoProcessing, previewUrl, createSlabImagePreview, reset: resetPhotoTemplate } = usePhotoTemplate();
 
   // Photo template modal state
   const [photoTemplateModal, setPhotoTemplateModal] = useState({ open: false, processType: null, step: 'preview' });
@@ -392,32 +406,18 @@ const AddEditCardPage = () => {
   };
 
   const handleConfirmTemplate = async () => {
+    if (!previewUrl) {
+      toast.error('No formatted image to apply');
+      return;
+    }
+
     // ── New (unsaved) card ──────────────────────────────────────────────────
-    // The backend endpoint needs an existing vault item to update, which a
-    // brand-new card doesn't have yet. Rather than forcing a save first, apply
-    // the formatted preview to the in-memory image so it's uploaded as-is when
-    // the card is created.
+    // No vault item exists yet, so apply the formatted (cropped) preview to the
+    // in-memory image; it uploads when the card is created.
     if (!id) {
-      if (!previewUrl) {
-        toast.error('No formatted image to apply');
-        return;
-      }
       try {
         setIsUploadingTemplate(true);
-        // Convert the preview into a File. The slab preview is a data: URL,
-        // and fetch() on large data: URLs is unreliable on mobile Safari, so
-        // decode it manually. Blob/object URLs still go through fetch.
-        let blob;
-        if (previewUrl.startsWith('data:')) {
-          const [header, base64] = previewUrl.split(',');
-          const mime = header.match(/:(.*?);/)?.[1] || 'image/jpeg';
-          const binary = atob(base64);
-          const bytes = new Uint8Array(binary.length);
-          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-          blob = new Blob([bytes], { type: mime });
-        } else {
-          blob = await (await fetch(previewUrl)).blob();
-        }
+        const blob = await previewUrlToBlob(previewUrl);
         const formattedFile = new File(
           [blob],
           `formatted-${Date.now()}.jpg`,
@@ -437,26 +437,31 @@ const AddEditCardPage = () => {
       return;
     }
 
+    // ── Existing card ────────────────────────────────────────────────────────
+    // Persist the formatted (cropped) preview directly. This uploads the
+    // client-processed image rather than re-centering the original server-side,
+    // so the cropped/background-removed result is what's saved.
     try {
       setIsUploadingTemplate(true);
-      await uploadProcessedImage(id, photoTemplateModal.processType === 'slab' ? 'slab' : 'remove-bg');
+      const blob = await previewUrlToBlob(previewUrl);
+      const filePath = `${currentUser.id}/template-${id}-${Date.now()}.jpg`;
+      const { error: uploadError } = await supabase.storage
+        .from('vault-images')
+        .upload(filePath, blob, { upsert: true, contentType: blob.type || 'image/jpeg' });
+      if (uploadError) throw uploadError;
+
+      const { error: updateError } = await supabase
+        .from('vault_items')
+        .update({ card_image: filePath })
+        .eq('id', id)
+        .eq('owner_id', currentUser.id);
+      if (updateError) throw updateError;
 
       setPhotoTemplateModal({ open: false, processType: null, step: 'preview' });
       resetPhotoTemplate();
-
-      // Refresh the card data
-      const { data: updatedCard } = await supabase
-        .from('vault_items')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (updatedCard?.card_image) {
-        const imageUrl = updatedCard.card_image.startsWith('http')
-          ? updatedCard.card_image
-          : supabase.storage.from('vault-images').getPublicUrl(updatedCard.card_image).data.publicUrl;
-        setImagePreview(imageUrl);
-      }
+      setImageFile(null);
+      setImagePreview(supabase.storage.from('vault-images').getPublicUrl(filePath).data.publicUrl);
+      toast.success('Photo formatted successfully!');
     } catch (error) {
       console.error('Template upload error:', error);
       toast.error('Failed to upload processed image');
