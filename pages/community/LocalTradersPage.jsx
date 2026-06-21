@@ -162,7 +162,7 @@ const LocalTradersPage = () => {
       {/* Hero */}
       <section className="bg-card border-b border-border py-20 text-center">
         <div className="container-default">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 mb-6 shadow-lg">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-6 shadow-lg" style={{ backgroundImage: `linear-gradient(to bottom right, hsl(var(--verified-badge)), hsl(199 95% 35%))` }}>
             <BadgeCheck className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-4xl md:text-5xl font-bold font-serif mb-4">Local Traders</h1>
@@ -173,7 +173,7 @@ const LocalTradersPage = () => {
 
           {/* Location hint for logged-in users */}
           {isAuthenticated && userState && (
-            <div className="mt-5 inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-2 text-sm text-emerald-700 dark:text-emerald-400 font-medium">
+            <div className="mt-5 inline-flex items-center gap-2 border rounded-xl px-4 py-2 text-sm font-medium" style={{ backgroundColor: `hsl(var(--verified-badge) / 0.1)`, borderColor: `hsl(var(--verified-badge) / 0.2)`, color: `hsl(var(--verified-badge))` }}>
               <MapPin className="w-4 h-4" />
               Showing traders near you in {AU_STATES.find(s => s.code === userState)?.label ?? userState}
             </div>
@@ -317,9 +317,14 @@ const LocalTradersPage = () => {
                   selectedState === s.code
                     ? 'bg-primary text-primary-foreground shadow-sm'
                     : s.code === userState
-                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20'
+                      ? 'border'
                       : 'bg-muted text-muted-foreground hover:text-foreground'
                 }`}
+                style={s.code === userState ? {
+                  backgroundColor: `hsl(var(--verified-badge) / 0.1)`,
+                  color: `hsl(var(--verified-badge))`,
+                  borderColor: `hsl(var(--verified-badge) / 0.3)`,
+                } : {}}
               >
                 {s.code}
                 {s.code === userState && ' ★'}
@@ -367,11 +372,12 @@ const LocalTradersPage = () => {
               return (
                 <div
                   key={trader.id}
-                  className="bg-card border border-border rounded-2xl p-5 flex flex-col gap-3 hover:shadow-md hover:-translate-y-0.5 hover:border-emerald-500/30 transition-all group"
+                  className="bg-card border rounded-2xl p-5 flex flex-col gap-3 hover:shadow-md hover:-translate-y-0.5 transition-all group"
+                  style={{ borderColor: `hsl(var(--border))` }}
                 >
                   {/* Avatar + identity */}
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-12 w-12 flex-shrink-0 ring-2 ring-border group-hover:ring-emerald-500/30 transition-all">
+                    <Avatar className="h-12 w-12 flex-shrink-0 ring-2 ring-border transition-all" style={{ '--hover-ring': `hsl(var(--verified-badge) / 0.3)` } as any}>
                       <AvatarImage src={resolveAvatar(trader)} className="object-cover" />
                       <AvatarFallback className="font-bold text-base">
                         {name.charAt(0).toUpperCase()}
@@ -434,7 +440,8 @@ const LocalTradersPage = () => {
                     asChild
                     variant="outline"
                     size="sm"
-                    className="mt-auto rounded-xl font-bold text-xs group-hover:border-emerald-500/40 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors gap-1.5"
+                    className="mt-auto rounded-xl font-bold text-xs transition-colors gap-1.5"
+                    style={{ '--button-hover-color': `hsl(var(--verified-badge))` } as any}
                   >
                     <Link to={`/community/user/${trader.id}`}>
                       View Profile <ArrowRight className="w-3.5 h-3.5" />
@@ -472,9 +479,9 @@ const LocalTradersPage = () => {
         )}
 
         {/* Endorsement info panel */}
-        <div className="mt-12 bg-gradient-to-br from-emerald-500/10 to-teal-500/5 border border-emerald-500/20 rounded-2xl p-8">
+        <div className="mt-12 border rounded-2xl p-8" style={{ backgroundImage: `linear-gradient(to bottom right, hsl(var(--verified-badge) / 0.1), hsl(199 95% 45% / 0.05))`, borderColor: `hsl(var(--verified-badge) / 0.2)` }}>
           <div className="flex flex-col sm:flex-row gap-6 items-start">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-sm shrink-0">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl shadow-sm shrink-0" style={{ backgroundImage: `linear-gradient(to bottom right, hsl(var(--verified-badge)), hsl(199 95% 35%))` }}>
               <BadgeCheck className="w-6 h-6 text-white" />
             </div>
             <div className="flex-1">
