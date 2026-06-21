@@ -173,7 +173,7 @@ const SoleTraderStorePage = () => {
     const price = isMkt ? item.price_aud : item.estimated_value_aud;
     const condition = schemaItemCondition(isMkt ? item.vault_item?.condition : item.condition);
     const url = isMkt
-      ? `${SITE}/product/marketplace/${item.id}/${item.slug || 'listing'}`
+      ? `${SITE}/marketplace/${item.id}/${item.slug || 'listing'}`
       : `${SITE}/product/vault/${item.id}`;
     const image = resolveListingImage(item);
     return {

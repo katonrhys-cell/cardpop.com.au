@@ -213,13 +213,13 @@ async function renderDealer(supabase, param) {
   const listingItems = (listings || []).map(l => {
     const cardName = l.vault_item?.card_name || 'Trading Card';
     const slug = l.slug || 'listing';
-    return `    <li><a href="${BASE_URL}/product/marketplace/${esc(l.id)}/${esc(slug)}">${esc(cardName)}</a></li>`;
+    return `    <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(slug)}">${esc(cardName)}</a></li>`;
   }).join('\n');
 
   // Product + Offer JSON-LD for each listing.
   const productLd = (listings || []).map((l, i) => {
     const cardName = l.vault_item?.card_name || 'Trading Card';
-    const url = `${BASE_URL}/product/marketplace/${l.id}/${l.slug || 'listing'}`;
+    const url = `${BASE_URL}/marketplace/${l.id}/${l.slug || 'listing'}`;
     const imgPath = l.vault_item?.vault_images?.[0]?.storage_path || l.vault_item?.card_image;
     const img = imgPath
       ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
