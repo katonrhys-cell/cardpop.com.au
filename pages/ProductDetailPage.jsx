@@ -299,7 +299,7 @@ const ProductDetailPage = () => {
   const hasCardDetails = !!vi && (
     variantChips.length > 0 || vi.is_foil || vi.is_refractor || vi.is_auto ||
     vi.is_rookie || vi.is_sealed || vi.serial_number || vi.parallel?.name ||
-    vi.subset?.name || vi.card_number || vi.condition
+    vi.subset?.name || vi.card_number || vi.condition || vi.grade
   );
 
   return (
@@ -336,8 +336,6 @@ const ProductDetailPage = () => {
                 <StatusIcon className="w-3 h-3 mr-1.5 inline-block" />
                 {statusBadge.label}
               </Badge>
-
-              {product.grade && <Badge variant="outline" className="border-primary/40 text-primary font-bold">Grade: {product.grade}</Badge>}
             </div>
 
             <h1 className="text-3xl md:text-4xl font-serif font-bold text-foreground mb-3 leading-tight text-balance">
@@ -360,6 +358,11 @@ const ProductDetailPage = () => {
                   {vi.condition && (
                     <Badge variant="outline" className="text-[11px] font-bold border-emerald-400/50 text-emerald-700 bg-emerald-400/10 dark:text-emerald-300">
                       {vi.condition.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                    </Badge>
+                  )}
+                  {vi.grade && (
+                    <Badge variant="outline" className="text-[11px] font-bold border-purple-400/50 text-purple-700 bg-purple-400/10 dark:text-purple-300">
+                      {vi.grading_company ? `${vi.grading_company} ${vi.grade}` : vi.grade}
                     </Badge>
                   )}
                   {vi.parallel?.name && (
