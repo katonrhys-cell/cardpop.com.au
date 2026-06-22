@@ -141,6 +141,14 @@ const CardScanPanel = ({
 
         {!isScanning && scanResult && (
           <>
+            {scanResult.catalogueMatch && (
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 rounded-lg px-2.5 py-1.5 mb-3">
+                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                <span>
+                  Matched to catalogue{scanResult.catalogueMatch.source ? ` (${scanResult.catalogueMatch.source})` : ''} — set &amp; card number verified
+                </span>
+              </div>
+            )}
             {visibleFields.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-2">
                 No data could be extracted from this image.

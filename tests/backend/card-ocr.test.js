@@ -200,3 +200,56 @@ describe('POST /scan', () => {
     expect(res.text).toContain('network down');
   });
 });
+
+// ─── Confidence-gated escalation ───────────────────────────────────────────────
+
+describe('POST /scan — model escalation', () => {
+  it('does not escalate when the fast model is confident', async () => {
+    mockFiles = oneFile();
+    mockFetch.mockResolvedValue(anthropicOk('{"name":"Charizard","confidence":"high"}'));
+
+    await request(app).post('/scan');
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(mockFetch.mock.calls[0][1].body).model).toBe('claude-haiku-4-5-20251001');
+  });
+
+  it('escalates to the stronger model on low confidence and returns its result', async () => {
+    mockFiles = oneFile();
+    mockFetch
+      .mockResolvedValueOnce(anthropicOk('{"name":"Charizard","confidence":"low"}'))
+      .mockResolvedValueOnce(anthropicOk('{"name":"Charizard","cardSetName":"Base Set","confidence":"high"}'));
+
+    const res = await request(app).post('/scan');
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(mockFetch.mock.calls[1][1].body).model).toBe('claude-sonnet-4-6');
+    expect(res.text).toContain('Base Set');
+  });
+
+  it('escalates when the fast model returns no card name', async () => {
+    mockFiles = oneFile();
+    mockFetch
+      .mockResolvedValueOnce(anthropicOk('{"name":null}'))
+      .mockResolvedValueOnce(anthropicOk('{"name":"Pikachu","confidence":"high"}'));
+
+    const res = await request(app).post('/scan');
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(res.text).toContain('Pikachu');
+  });
+
+  it('falls back to the fast result when escalation fails', async () => {
+    mockFiles = oneFile();
+    mockFetch
+      .mockResolvedValueOnce(anthropicOk('{"name":"Charizard","confidence":"low"}'))
+      .mockRejectedValueOnce(new Error('sonnet overloaded'));
+
+    const res = await request(app).post('/scan');
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(res.text).toContain('Charizard');
+    expect(res.text).toContain('"type":"completed"');
+    expect(res.text).not.toContain('"type":"error"');
+  });
+});
