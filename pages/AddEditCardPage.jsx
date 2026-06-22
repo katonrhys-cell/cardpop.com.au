@@ -4,6 +4,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, ChevronDown, Sparkles, Loader2,
   Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X, Crop,
+  Frame, Wand2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -22,9 +23,11 @@ import { toast } from 'sonner';
 import { useCardOCR } from '@/hooks/useCardOCR.js';
 import { useEbayPriceLookup } from '@/hooks/useEbayPriceLookup.js';
 import { useCardSight, mapCardSightToFormFields } from '@/hooks/useCardSight.js';
+import { usePhotoTemplate } from '@/hooks/usePhotoTemplate.js';
 import PSAPopPanel from '@/components/PSAPopPanel.jsx';
 import { useCardsightPricing } from '@/hooks/useCardsightPricing.js';
 import PhotoQualityScore from '@/components/PhotoQualityScore.jsx';
+import PhotoTemplateModal from '@/components/PhotoTemplateModal.jsx';
 import { analyzePhotoQuality } from '@/utils/photoQuality.js';
 import { useCardCrop } from '@/hooks/useCardCrop.js';
 import CardCropPreview from '@/components/CardCropPreview.jsx';
@@ -57,6 +60,20 @@ const SectionCard = ({ title, children, className = '' }) => (
     {children}
   </div>
 );
+
+// Convert a preview URL (data: or blob:/object URL) into a Blob. fetch() on
+// large data: URLs is unreliable on mobile Safari, so decode those manually.
+const previewUrlToBlob = async (url) => {
+  if (url.startsWith('data:')) {
+    const [header, base64] = url.split(',');
+    const mime = header.match(/:(.*?);/)?.[1] || 'image/jpeg';
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new Blob([bytes], { type: mime });
+  }
+  return (await fetch(url)).blob();
+};
 
 const AddEditCardPage = () => {
   const { id } = useParams();
@@ -99,6 +116,11 @@ const AddEditCardPage = () => {
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
   const { identify: cardSightIdentify, isIdentifying, result: cardSightResult, clearResult: clearCardSight } = useCardSight();
   const { fetchPricingById, fetchPricingByName, isLoadingCsPrice, csPrice, clearCsPrice } = useCardsightPricing();
+  const { isProcessing: isPhotoProcessing, previewUrl, createSlabImagePreview, reset: resetPhotoTemplate } = usePhotoTemplate();
+
+  // Photo template modal state
+  const [photoTemplateModal, setPhotoTemplateModal] = useState({ open: false, processType: null, step: 'preview' });
+  const [isUploadingTemplate, setIsUploadingTemplate] = useState(false);
 
   const emptyForm = {
     // Card identity
@@ -346,7 +368,7 @@ const AddEditCardPage = () => {
     clearCardSight();
 
     // 1. Try CardSight catalog identification first (returns result directly)
-    const csResult = await cardSightIdentify(imageFile);
+    const csResult = await cardSightIdentify(imageFile, formData.collection);
 
     // If CardSight service is unavailable, fall through to OCR — don't bail out
     if (csResult?.identified) {
@@ -401,12 +423,109 @@ const AddEditCardPage = () => {
     }
   };
 
+  // ─── Photo template handlers ──────────────────────────────────────────────
+  const handleFormatPhoto = async () => {
+    if (!imageFile) return;
+    try {
+      setPhotoTemplateModal({ open: true, processType: 'template', step: 'preview' });
+      await createSlabImagePreview(imageFile);
+    } catch (error) {
+      toast.error('Failed to format photo');
+    }
+  };
+
+  const handleConfirmTemplate = async () => {
+    if (!previewUrl) {
+      toast.error('No formatted image to apply');
+      return;
+    }
+
+    // ── New (unsaved) card ──────────────────────────────────────────────────
+    // No vault item exists yet, so apply the formatted (cropped) preview to the
+    // in-memory image; it uploads when the card is created.
+    if (!id) {
+      try {
+        setIsUploadingTemplate(true);
+        const blob = await previewUrlToBlob(previewUrl);
+        const formattedFile = new File(
+          [blob],
+          `formatted-${Date.now()}.jpg`,
+          { type: blob.type || 'image/jpeg' }
+        );
+        setImageFile(formattedFile);
+        setImagePreview(previewUrl);
+        setPhotoTemplateModal({ open: false, processType: null, step: 'preview' });
+        resetPhotoTemplate();
+        toast.success('Photo formatted — it will be saved with your card.');
+      } catch (error) {
+        console.error('Local format error:', error);
+        toast.error('Failed to apply formatted photo');
+      } finally {
+        setIsUploadingTemplate(false);
+      }
+      return;
+    }
+
+    // ── Existing card ────────────────────────────────────────────────────────
+    // Persist the formatted (cropped) preview directly. This uploads the
+    // client-processed image rather than re-centering the original server-side,
+    // so the cropped/background-removed result is what's saved.
+    try {
+      setIsUploadingTemplate(true);
+      const blob = await previewUrlToBlob(previewUrl);
+      const filePath = `${currentUser.id}/template-${id}-${Date.now()}.jpg`;
+      const { error: uploadError } = await supabase.storage
+        .from('vault-images')
+        .upload(filePath, blob, { upsert: true, contentType: blob.type || 'image/jpeg' });
+      if (uploadError) throw uploadError;
+
+      const { error: updateError } = await supabase
+        .from('vault_items')
+        .update({ card_image: filePath })
+        .eq('id', id)
+        .eq('owner_id', currentUser.id);
+      if (updateError) throw updateError;
+
+      setPhotoTemplateModal({ open: false, processType: null, step: 'preview' });
+      resetPhotoTemplate();
+      setImageFile(null);
+      setImagePreview(supabase.storage.from('vault-images').getPublicUrl(filePath).data.publicUrl);
+      toast.success('Photo formatted successfully!');
+    } catch (error) {
+      console.error('Template upload error:', error);
+      toast.error('Failed to upload processed image');
+    } finally {
+      setIsUploadingTemplate(false);
+    }
+  };
+
+  const closePhotoTemplateModal = () => {
+    setPhotoTemplateModal({ open: false, processType: null, step: 'preview' });
+    resetPhotoTemplate();
+  };
+
   // ─── Validation ───────────────────────────────────────────────────────────
   const validateForm = () => {
     const newErrors = {};
     if (!formData.cardName?.trim()) newErrors.cardName = 'Card name is required';
     if (!formData.estimatedValue || parseFloat(formData.estimatedValue) < 0)
       newErrors.estimatedValue = 'Enter a valid estimated value';
+    const yearVal = formData.year?.trim();
+    if (yearVal) {
+      const match = yearVal.match(/^(\d{4})(?:\/(\d{4}))?$/);
+      if (!match) {
+        newErrors.year = 'Enter a single year (e.g. 2025) or a range (e.g. 2025/2026)';
+      } else {
+        const maxYear = new Date().getFullYear() + 1;
+        const start = parseInt(match[1], 10);
+        const end = match[2] ? parseInt(match[2], 10) : null;
+        if (start < 1900 || start > maxYear) {
+          newErrors.year = `Year must be between 1900 and ${maxYear}`;
+        } else if (end !== null && end !== start + 1) {
+          newErrors.year = 'A season range must be two consecutive years (e.g. 2025/2026)';
+        }
+      }
+    }
     if (isEdit && lockedBaseValue !== null) {
       const ev = parseFloat(formData.estimatedValue) || 0;
       if (ev < lockedBaseValue)
@@ -417,6 +536,58 @@ const AddEditCardPage = () => {
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  // ─── Marketplace listing sync ─────────────────────────────────────────────
+  // The marketplace reads exclusively from the `listings` table, so choosing a
+  // public listing type here must create/update a matching listings row.
+  // Without this the card is only flagged on the vault_items row and never
+  // appears in the marketplace. Mirrors the logic in VaultListingModal.
+  const syncMarketplaceListing = async (cardId) => {
+    const isPublic = formData.listingType !== 'private';
+    const isSale   = formData.listingType === 'For Sale' || formData.listingType === 'For Sale & Trade';
+    try {
+      if (!isPublic) {
+        // Going private — archive any active listing.
+        await supabase
+          .from('listings')
+          .update({ status: 'archived' })
+          .eq('vault_item_id', cardId)
+          .eq('seller_id', currentUser.id)
+          .neq('status', 'archived');
+        return;
+      }
+
+      const listingPayload = {
+        vault_item_id: cardId,
+        seller_id:     currentUser.id,
+        listing_type:  isSale ? 'fixed' : 'trade',
+        status:        'active',
+        price_aud:     isSale ? (parseFloat(formData.estimatedValue) || null) : null,
+        listed_at:     new Date().toISOString(),
+      };
+
+      // Reuse an existing non-archived listing if one already exists.
+      const { data: existing } = await supabase
+        .from('listings')
+        .select('id')
+        .eq('vault_item_id', cardId)
+        .neq('status', 'archived')
+        .maybeSingle();
+
+      if (existing) {
+        await supabase
+          .from('listings')
+          .update(listingPayload)
+          .eq('id', existing.id)
+          .eq('seller_id', currentUser.id);
+      } else {
+        await supabase.from('listings').insert(listingPayload);
+      }
+    } catch (err) {
+      console.error('Listing sync error:', err);
+      toast.error('Card saved, but updating its marketplace listing failed. You can re-list it from your vault.');
+    }
   };
 
   // ─── Submit ───────────────────────────────────────────────────────────────
@@ -467,7 +638,7 @@ const AddEditCardPage = () => {
         card_name:           formData.cardName.trim(),
         set_name:            formData.setName?.trim()     || null,
         card_number:         formData.cardNumber?.trim()  || null,
-        year:                formData.year ? parseInt(formData.year, 10) : null,
+        year:                formData.year?.trim() || null,
         variant:             formData.variant.length ? formData.variant.join(', ') : null,
         is_foil:             formData.isFoil,
         is_sealed:           formData.isSealed,
@@ -516,11 +687,13 @@ const AddEditCardPage = () => {
       if (isEdit) {
         const { error } = await supabase.from('vault_items').update(payload).eq('id', id).eq('owner_id', currentUser.id);
         if (error) throw error;
+        await syncMarketplaceListing(id);
         toast.success('Card updated successfully!');
         navigate('/vault');
       } else {
-        const { error } = await supabase.from('vault_items').insert(payload);
+        const { data: inserted, error } = await supabase.from('vault_items').insert(payload).select('id').single();
         if (error) throw error;
+        await syncMarketplaceListing(inserted.id);
         toast.success('Card added to your vault!', {
           action: {
             label: 'Add Another',
@@ -716,17 +889,43 @@ const AddEditCardPage = () => {
                   )}
                 </div>
 
-                {/* Unified AI Analysis */}
+                {/* Photo Template & Card Identification */}
                 <div className="mt-4 space-y-3">
-                  {imageFile && !isScanning && !isIdentifying && (
+                  {/* Format Photo Button - Always available when image is present */}
+                  {imageFile && !isPhotoProcessing && !isUploadingTemplate && (
                     <Button
                       type="button"
-                      variant="secondary"
-                      onClick={handleAnalyzeWithAI}
-                      className="w-full bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20"
+                      variant="outline"
+                      onClick={handleFormatPhoto}
+                      disabled={isPhotoProcessing || isUploadingTemplate}
+                      className="w-full"
                     >
-                      <Sparkles className="w-4 h-4 mr-2" /> Analyze with AI
+                      <Frame className="w-4 h-4 mr-2" />
+                      Format Photo
                     </Button>
+                  )}
+
+                  {isPhotoProcessing || isUploadingTemplate ? (
+                    <div className="p-3 rounded-xl border border-border bg-muted/30 animate-in fade-in">
+                      <p className="text-xs font-medium text-muted-foreground flex items-center gap-2">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Processing photo…
+                      </p>
+                    </div>
+                  ) : null}
+
+                  {/* Identify Card Button - AI analysis with recommended label */}
+                  {imageFile && !isScanning && !isIdentifying && !isPhotoProcessing && !isUploadingTemplate && (
+                    <div className="space-y-1">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={handleAnalyzeWithAI}
+                        className="w-full bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 border border-emerald-500/20 dark:text-emerald-400"
+                      >
+                        <Sparkles className="w-4 h-4 mr-2" /> Identify Card
+                      </Button>
+                      <p className="text-xs text-center text-muted-foreground">(Recommended)</p>
+                    </div>
                   )}
 
                   {(isScanning || isIdentifying) && (
@@ -750,9 +949,42 @@ const AddEditCardPage = () => {
                       <h4 className={`text-xs font-bold mb-2 flex items-center gap-1.5 ${cardSightResult?.identified ? 'text-emerald-700' : 'text-primary'}`}>
                         <Sparkles className="w-3.5 h-3.5" />
                         {cardSightResult?.identified
-                          ? `Catalog Match — ${cardSightResult.exactMatch ? 'Exact' : 'Set'} (${cardSightResult.confidence})`
+                          ? `Catalog Match — ${cardSightResult.exactMatch ? 'Exact' : 'Set'}`
                           : 'AI Analysis — fields auto-filled'}
                       </h4>
+
+                      {cardSightResult?.identified && cardSightResult.confidence !== undefined && (
+                        <div className="mb-2">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-[10px] font-semibold text-muted-foreground">Match Confidence</span>
+                            <span className={`text-xs font-bold ${
+                              cardSightResult.confidence >= 0.95 ? 'text-emerald-700 dark:text-emerald-400' :
+                              cardSightResult.confidence >= 0.85 ? 'text-green-700 dark:text-green-400' :
+                              cardSightResult.confidence >= 0.7 ? 'text-amber-700 dark:text-amber-400' :
+                              'text-orange-700 dark:text-orange-400'
+                            }`}>
+                              {Math.round(cardSightResult.confidence * 100)}%
+                            </span>
+                          </div>
+                          <div className="w-full h-1.5 rounded-full bg-muted/50 overflow-hidden">
+                            <div
+                              className={`h-full transition-all ${
+                                cardSightResult.confidence >= 0.95 ? 'bg-emerald-500' :
+                                cardSightResult.confidence >= 0.85 ? 'bg-green-500' :
+                                cardSightResult.confidence >= 0.7 ? 'bg-amber-500' :
+                                'bg-orange-500'
+                              }`}
+                              style={{ width: `${Math.round(cardSightResult.confidence * 100)}%` }}
+                            />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {cardSightResult.confidence >= 0.95 ? 'Excellent match — high confidence in identification' :
+                             cardSightResult.confidence >= 0.85 ? 'Good match — confident in identification' :
+                             cardSightResult.confidence >= 0.7 ? 'Moderate match — review before saving' :
+                             'Low match — verify details are correct'}
+                          </p>
+                        </div>
+                      )}
 
                       {cardSightResult?.identified && (
                         <>
@@ -944,14 +1176,15 @@ const AddEditCardPage = () => {
                     <Label htmlFor="year" className="font-bold">Year</Label>
                     <Input
                       id="year"
-                      type="number"
-                      min="1993"
-                      max={new Date().getFullYear() + 1}
+                      type="text"
+                      inputMode="numeric"
                       value={formData.year}
                       onChange={e => set('year', e.target.value)}
-                      placeholder={String(new Date().getFullYear())}
-                      className="h-11 bg-background"
+                      placeholder={`${new Date().getFullYear()} or ${new Date().getFullYear()}/${new Date().getFullYear() + 1}`}
+                      className={`h-11 bg-background ${errors.year ? 'border-destructive' : ''}`}
                     />
+                    <p className="text-muted-foreground text-xs">Enter a single year (e.g. 2025) or a season range (e.g. 2025/2026).</p>
+                    {errors.year && <p className="text-destructive text-xs">{errors.year}</p>}
                   </div>
 
                   {/* Variant / Finish — multi-select */}
@@ -1026,7 +1259,7 @@ const AddEditCardPage = () => {
                     <Label className="font-bold">Card Attributes</Label>
                     <div className="flex gap-3">
                       {[
-                        { key: 'isFoil',   label: '✨ Foil',          desc: 'Holographic / foil finish' },
+                        { key: 'isFoil',   label: '🃏 Individual Card (Single)', desc: 'A single individual card' },
                         { key: 'isSealed', label: '📦 Sealed Product', desc: 'Booster, box, or sealed item' },
                         { key: 'isRookie', label: '🏆 Rookie Card',    desc: 'First-year professional card' },
                       ].map(({ key, label, desc }) => (
@@ -1047,8 +1280,8 @@ const AddEditCardPage = () => {
                     </div>
                     <div className="flex gap-3 items-stretch">
                       {[
-                        { key: 'isRefractor', label: '🌈 Refractor',  desc: 'Refractor / prizm parallel' },
-                        { key: 'isAuto',      label: '✍️ Auto',        desc: 'Signed autograph card' },
+                        { key: 'isRefractor', label: '🎁 Bundles',  desc: '6 card max' },
+                        { key: 'isAuto',      label: '🗂️ Complete Set',  desc: 'A full / complete set' },
                       ].map(({ key, label, desc }) => (
                         <button
                           key={key}
@@ -2244,6 +2477,17 @@ const AddEditCardPage = () => {
           </div>
         </form>
       </div>
+
+      {/* Photo Template Modal */}
+      <PhotoTemplateModal
+        isOpen={photoTemplateModal.open}
+        onClose={closePhotoTemplateModal}
+        onConfirm={handleConfirmTemplate}
+        isProcessing={isPhotoProcessing || isUploadingTemplate}
+        previewUrl={previewUrl}
+        processType={photoTemplateModal.processType}
+        step={photoTemplateModal.step}
+      />
     </div>
   );
 };

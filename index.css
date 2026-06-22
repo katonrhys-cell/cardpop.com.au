@@ -92,7 +92,7 @@
     /* ── Profile Tokens ─────────────────────────────────────────────── */
     --profile-bg:       0 0% 100%;
     --rating-color:     43 96% 56%;
-    --verified-badge:   160 84% 30%;
+    --verified-badge:   199 97% 47%;          /* Twitter Blue #1d9bf0 */
     --section-divider:  202 16% 80%;           /* Soft Silver */
 
     /* ── Drag-and-Drop Tokens ───────────────────────────────────────── */
@@ -168,7 +168,7 @@
     /* ── Profile Tokens (Dark) ──────────────────────────────────────── */
     --profile-bg:       215 28% 13%;
     --rating-color:     43 96% 56%;
-    --verified-badge:   160 84% 45%;
+    --verified-badge:   199 97% 55%;          /* Twitter Blue lighter for dark mode */
     --section-divider:  215 20% 25%;
 
     /* ── Drag-and-Drop Tokens (Dark) ────────────────────────────────── */
@@ -297,12 +297,13 @@
 /* Section label — "SUMMARY", "MARKET DATA" etc. */
 .article-content .section-label {
   display: block;
-  font-size: 0.8rem;
+  font-size: 1.15rem;
+  line-height: 1.35;
   font-weight: 800;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #CE1126;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.875rem;
   font-family: var(--font-heading);
   -webkit-font-smoothing: antialiased;
 }
@@ -484,4 +485,55 @@
    backgrounds regardless of Tailwind class purge state.               */
 .article-content [style*="background:"] {
   color: white;
+}
+
+/* Images — constrain to container width with responsive sizing */
+.article-content img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 0.5rem;
+}
+
+/* Figures and picture elements */
+.article-content figure {
+  margin: 1.5rem 0;
+}
+.article-content figure img {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Embedded media — videos and iframes */
+.article-content iframe,
+.article-content video {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Ensure wrapper divs don't overflow */
+.article-content > * {
+  overflow-x: auto;
+}
+
+/* Tables — responsive with horizontal scroll if needed */
+.article-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5rem 0;
+}
+
+/* Code blocks and pre elements */
+.article-content pre {
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: 0.5rem;
+}
+
+/* Blockquotes */
+.article-content blockquote {
+  margin: 1.5rem 0;
+  padding-left: 1rem;
+  border-left: 3px solid hsl(var(--border));
 }

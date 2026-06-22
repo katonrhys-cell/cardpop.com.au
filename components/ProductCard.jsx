@@ -5,7 +5,7 @@ import { Star, ShieldCheck, ZoomIn } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { supabase } from '@/lib/supabaseClient.js';
-import ImageZoomModal from '@/components/ImageZoomModal.jsx';
+import CardMicroscope from '@/components/CardMicroscope.jsx';
 
 const GRADE_BADGE = {
   psa:   'bg-red-600 text-white',
@@ -95,7 +95,7 @@ const ProductCard = ({ product }) => {
         )}
       </Link>
 
-      <ImageZoomModal
+      <CardMicroscope
         isOpen={zoomOpen}
         onClose={() => setZoomOpen(false)}
         imageUrl={imgSrc}

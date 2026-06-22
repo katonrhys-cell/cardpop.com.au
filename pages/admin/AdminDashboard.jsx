@@ -6,7 +6,7 @@ import {
   ArrowUpRight, Server, Database, HardDrive, CheckCircle2,
   FolderTree, RefreshCw, ArrowRightLeft, Calendar,
   Tags, BarChart3, Building2, Layers, ShieldCheck, Lock, ShoppingCart, Filter, X,
-  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard
+  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star
 } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -240,6 +240,7 @@ const AdminDashboard = () => {
           <ManagementBox title="Product Lines" description="Manage product lines per brand." icon={Layers} link="/admin/product-lines" />
           <ManagementBox title="Collections & Eras" description="Manage eras and sets per collection." icon={Layers} link="/admin/collections" />
           <ManagementBox title="User Management" description="Review accounts and roles." icon={Users} link="/admin/users" />
+          <ManagementBox title="Sellers Management" description="Manage featured sellers and promotions." icon={Star} link="/admin/sellers" />
           <ManagementBox title="Order Management" description="Track and manage all orders." icon={ListOrdered} link="/admin/orders" />
           <ManagementBox title="Verification" description="Review user verification requests." icon={ShieldCheck} link="/admin/verification" />
           <ManagementBox title="Commissions & Revenue" description="Manage fee rates and view revenue reports." icon={DollarSign} link="/admin/commissions" />

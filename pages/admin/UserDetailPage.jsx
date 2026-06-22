@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
-import { ChevronLeft, Mail, MapPin, Calendar, ShieldAlert, KeyRound, Trash2, CheckCircle2, AlertCircle, User } from 'lucide-react';
+import { ChevronLeft, Mail, MapPin, Calendar, ShieldAlert, KeyRound, Trash2, CheckCircle2, AlertCircle, User, BadgeCheck, Sparkles, Store } from 'lucide-react';
+import { toast } from 'sonner';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,9 +32,28 @@ const UserDetailPage = () => {
   const { user, vaultProducts, ordersAsBuyer, ordersAsSeller, reviews, isLoading, error, refetch } = useUserDetails(userId);
   
   const [actionModal, setActionModal] = useState({ isOpen: false, type: null });
+  const [flagSaving, setFlagSaving] = useState(false);
 
   const openAction = (type) => setActionModal({ isOpen: true, type });
   const closeAction = () => setActionModal({ isOpen: false, type: null });
+
+  // Toggle a sole-trader store flag (verification / promotion). These appear on
+  // the public Local Traders directory and will later gate behind subscription tiers.
+  const toggleStoreFlag = async (updates, successMsg) => {
+    if (!userId) return;
+    setFlagSaving(true);
+    try {
+      const { error: updErr } = await supabase.from('profiles').update(updates).eq('id', userId);
+      if (updErr) throw updErr;
+      toast.success(successMsg);
+      refetch?.();
+    } catch (err) {
+      console.error(err);
+      toast.error(err.message || 'Failed to update store.');
+    } finally {
+      setFlagSaving(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -108,7 +128,37 @@ const UserDetailPage = () => {
 
             <div className="w-full mt-8 pt-6 border-t border-border space-y-3">
               <h3 className="text-sm font-semibold text-left text-muted-foreground uppercase tracking-wider mb-2">Admin Actions</h3>
-              <Button 
+              {user.is_sole_trader && (
+                <>
+                  <Button
+                    variant={user.is_verified ? 'outline' : 'default'}
+                    className="w-full justify-start"
+                    disabled={flagSaving}
+                    onClick={() => toggleStoreFlag(
+                      user.is_verified
+                        ? { is_verified: false }
+                        : { is_verified: true, verification_status: 'approved' },
+                      user.is_verified ? 'Business verification removed.' : 'Business verified.'
+                    )}
+                  >
+                    <BadgeCheck className={`w-4 h-4 mr-2 ${user.is_verified ? 'text-blue-600' : ''}`} />
+                    {user.is_verified ? 'Unverify Business' : 'Verify Business'}
+                  </Button>
+                  <Button
+                    variant={user.is_featured_seller ? 'outline' : 'default'}
+                    className="w-full justify-start"
+                    disabled={flagSaving}
+                    onClick={() => toggleStoreFlag(
+                      { is_featured_seller: !user.is_featured_seller },
+                      user.is_featured_seller ? 'Store removed from promoted.' : 'Store promoted to top.'
+                    )}
+                  >
+                    <Sparkles className={`w-4 h-4 mr-2 ${user.is_featured_seller ? 'text-brand-red' : ''}`} />
+                    {user.is_featured_seller ? 'Remove Promotion' : 'Promote Store'}
+                  </Button>
+                </>
+              )}
+              <Button
                 variant={user.is_active !== false ? "outline" : "default"} 
                 className="w-full justify-start"
                 onClick={() => openAction(user.is_active !== false ? 'suspend' : 'unsuspend')}

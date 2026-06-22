@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { BadgeCheck, Search, MapPin, Star, Package, ArrowRight, ShieldCheck } from 'lucide-react';
+import { BadgeCheck, Search, MapPin, Star, Package, ArrowRight, ShieldCheck, Store, Sparkles } from 'lucide-react';
 
 const AU_STATES = [
   { code: 'NSW', label: 'New South Wales' },
@@ -24,6 +24,7 @@ const AU_STATES = [
 const LocalTradersPage = () => {
   const { isAuthenticated, currentUser } = useAuth();
   const [traders, setTraders] = useState([]);
+  const [stores, setStores] = useState([]);
   // undefined = still resolving user location; null = resolved, no state / show all
   const [selectedState, setSelectedState] = useState(undefined);
   const [search, setSearch] = useState('');
@@ -68,13 +69,51 @@ const LocalTradersPage = () => {
       }
 
       const { data } = await query;
-      setTraders(data || []);
+
+      // Deduplicate by user id to prevent duplicates
+      const seen = new Set();
+      const uniqueTraders = (data || []).filter(trader => {
+        if (seen.has(trader.id)) return false;
+        seen.add(trader.id);
+        return true;
+      });
+
+      setTraders(uniqueTraders);
     } catch (err) {
       console.error(err);
     }
   }, [selectedState]);
 
   useEffect(() => { fetchTraders(); }, [fetchTraders]);
+
+  // Featured sole-trader stores (dealers). Shown regardless of state filter so
+  // their business acts as a promotional thumbnail across the whole directory.
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from('profiles')
+      .select('id, store_slug, business_name, business_tagline, business_logo_url, avatar_url, business_categories, location_state, location_suburb, rating, reviews_count, total_sales, seller_tier, display_name, username, is_verified, is_featured_seller')
+      .eq('is_sole_trader', true)
+      .eq('is_public', true)
+      // Promoted stores pinned to the top, then by rating. All sole traders
+      // are shown — promotion/verification will become subscription perks.
+      .order('is_featured_seller', { ascending: false })
+      .order('rating', { ascending: false, nullsFirst: false })
+      .limit(24)
+      .then(({ data }) => {
+        if (!cancelled) {
+          // Deduplicate by user id to prevent duplicates
+          const seen = new Set();
+          const uniqueStores = (data || []).filter(store => {
+            if (seen.has(store.id)) return false;
+            seen.add(store.id);
+            return true;
+          });
+          setStores(uniqueStores);
+        }
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const filtered = search.trim()
     ? traders.filter(t =>
@@ -94,17 +133,56 @@ const LocalTradersPage = () => {
     ? (AU_STATES.find(s => s.code === selectedState)?.label ?? selectedState)
     : 'Australia';
 
+  // JSON-LD: breadcrumb trail + an ItemList of the trader stores so search
+  // engines can surface this as a structured directory of local businesses.
+  const SITE = 'https://cardpop.com.au';
+  const structuredData = useMemo(() => {
+    const breadcrumb = {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE}/` },
+        { '@type': 'ListItem', position: 2, name: 'Community', item: `${SITE}/community` },
+        { '@type': 'ListItem', position: 3, name: 'Local Traders', item: `${SITE}/community/local-traders` },
+      ],
+    };
+    if (stores.length === 0) return [breadcrumb];
+    const itemList = {
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: 'CardPop Trader Stores',
+      itemListElement: stores.map((s, i) => {
+        const name = s.business_name || s.display_name || s.username || 'Store';
+        const business = {
+          '@type': 'Store',
+          name,
+          url: `${SITE}/dealer/${s.store_slug || s.id}`,
+          ...(s.business_logo_url
+            ? { image: s.business_logo_url.startsWith('http') ? s.business_logo_url : `${SITE}${s.business_logo_url}` }
+            : {}),
+          ...(s.reviews_count > 0 && s.rating > 0
+            ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: Number(s.rating).toFixed(1), reviewCount: s.reviews_count } }
+            : {}),
+        };
+        return { '@type': 'ListItem', position: i + 1, item: business };
+      }),
+    };
+    return [breadcrumb, itemList];
+  }, [stores]);
+
   return (
     <div className="min-h-screen bg-background">
       <SEOHead
         title={`Local Traders${selectedState ? ` — ${stateLabel}` : ''} | CardPop`}
-        description={`Browse CardPop-endorsed trading card sellers in ${stateLabel}. Verified, trusted collectors you can buy and trade with confidence.`}
+        description={`Browse CardPop-endorsed trading card sellers and sole-trader stores in ${stateLabel}. Verified, trusted collectors and dealers you can buy and trade with confidence.`}
+        canonicalUrl={`${SITE}/community/local-traders`}
+        structuredData={structuredData}
       />
 
       {/* Hero */}
       <section className="bg-card border-b border-border py-20 text-center">
         <div className="container-default">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 mb-6 shadow-lg">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-6 shadow-lg" style={{ backgroundImage: `linear-gradient(to bottom right, hsl(var(--verified-badge)), hsl(199 95% 35%))` }}>
             <BadgeCheck className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-4xl md:text-5xl font-bold font-serif mb-4">Local Traders</h1>
@@ -115,7 +193,7 @@ const LocalTradersPage = () => {
 
           {/* Location hint for logged-in users */}
           {isAuthenticated && userState && (
-            <div className="mt-5 inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-2 text-sm text-emerald-700 dark:text-emerald-400 font-medium">
+            <div className="mt-5 inline-flex items-center gap-2 border rounded-xl px-4 py-2 text-sm font-medium" style={{ backgroundColor: `hsl(var(--verified-badge) / 0.1)`, borderColor: `hsl(var(--verified-badge) / 0.2)`, color: `hsl(var(--verified-badge))` }}>
               <MapPin className="w-4 h-4" />
               Showing traders near you in {AU_STATES.find(s => s.code === userState)?.label ?? userState}
             </div>
@@ -135,6 +213,105 @@ const LocalTradersPage = () => {
       </section>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
+        {/* Featured Stores (sole-trader dealers) */}
+        {stores.length > 0 && (
+          <div className="mb-12">
+            <div className="flex items-center gap-2 mb-1">
+              <Store className="w-4 h-4 text-brand-red" />
+              <p className="text-xs font-extrabold uppercase tracking-widest text-brand-red">
+                Trader Stores
+              </p>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">
+              Sole-trader businesses with their own CardPop store. Tap a store to browse everything
+              they have listed on the marketplace.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {stores.map(store => {
+                const storeName = store.business_name || store.display_name || store.username || 'Store';
+                const logo = store.business_logo_url || resolveAvatar(store);
+                const storeLocation = [store.location_suburb, store.location_state].filter(Boolean).join(', ');
+                const cats = (store.business_categories || []).slice(0, 3);
+                return (
+                  <Link
+                    key={store.id}
+                    to={`/dealer/${store.store_slug || store.id}`}
+                    className="group relative overflow-hidden bg-card border border-border rounded-2xl p-5 flex gap-4 items-center hover:shadow-lg hover:-translate-y-0.5 hover:border-brand-red/40 transition-all"
+                  >
+                    {/* Logo / thumbnail */}
+                    <div className="relative shrink-0">
+                      <div className="w-20 h-20 rounded-2xl bg-muted border border-border overflow-hidden flex items-center justify-center">
+                        {logo ? (
+                          <img src={logo} alt={storeName} className="w-full h-full object-cover" />
+                        ) : (
+                          <Store className="w-8 h-8 text-muted-foreground" />
+                        )}
+                      </div>
+                      {store.is_verified && (
+                        <div className="absolute -bottom-1.5 -right-1.5 text-white p-1 rounded-lg shadow-md border-2 border-card" style={{ backgroundColor: `hsl(var(--verified-badge))` }} title="Verified Dealer">
+                          <BadgeCheck className="w-4 h-4" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Details */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="font-bold text-base truncate">{storeName}</span>
+                        {store.is_featured_seller && (
+                          <Badge className="bg-brand-red text-white rounded-md text-[10px] font-bold px-1.5 py-0 gap-0.5 shrink-0 hover:bg-brand-red">
+                            <Sparkles className="w-2.5 h-2.5" /> Promoted
+                          </Badge>
+                        )}
+                        {store.is_verified && (
+                          <BadgeCheck className="w-4 h-4 shrink-0" style={{ color: `hsl(var(--verified-badge))` }} title="Verified business" />
+                        )}
+                      </div>
+                      {store.business_tagline && (
+                        <p className="text-xs text-muted-foreground line-clamp-1 mb-1.5">{store.business_tagline}</p>
+                      )}
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {store.rating > 0 && (
+                          <span className="flex items-center gap-0.5 text-xs text-amber-500 font-bold">
+                            <Star className="w-3 h-3 fill-amber-500" />
+                            {Number(store.rating).toFixed(1)}
+                          </span>
+                        )}
+                        {store.total_sales > 0 && (
+                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Package className="w-3 h-3" />
+                            {store.total_sales} sales
+                          </span>
+                        )}
+                        {storeLocation && (
+                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <MapPin className="w-3 h-3" />
+                            {storeLocation}
+                          </span>
+                        )}
+                      </div>
+                      {cats.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {cats.map(cat => (
+                            <Badge key={cat} variant="secondary" className="rounded-md text-[10px] font-semibold px-1.5 py-0">
+                              {cat}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Visit arrow */}
+                    <div className="self-center text-muted-foreground group-hover:text-brand-red transition-colors">
+                      <ArrowRight className="w-5 h-5" />
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* State selector */}
         <div className="mb-6">
@@ -160,9 +337,14 @@ const LocalTradersPage = () => {
                   selectedState === s.code
                     ? 'bg-primary text-primary-foreground shadow-sm'
                     : s.code === userState
-                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20'
+                      ? 'border'
                       : 'bg-muted text-muted-foreground hover:text-foreground'
                 }`}
+                style={s.code === userState ? {
+                  backgroundColor: `hsl(var(--verified-badge) / 0.1)`,
+                  color: `hsl(var(--verified-badge))`,
+                  borderColor: `hsl(var(--verified-badge) / 0.3)`,
+                } : {}}
               >
                 {s.code}
                 {s.code === userState && ' ★'}
@@ -190,7 +372,7 @@ const LocalTradersPage = () => {
               {selectedState ? `in ${stateLabel}` : 'across Australia'}
             </p>
             <Badge variant="secondary" className="gap-1.5 font-bold">
-              <BadgeCheck className="w-3.5 h-3.5 text-emerald-500" />
+              <BadgeCheck className="w-3.5 h-3.5" style={{ color: `hsl(var(--verified-badge))` }} />
               CardPop Verified
             </Badge>
           </div>
@@ -210,11 +392,12 @@ const LocalTradersPage = () => {
               return (
                 <div
                   key={trader.id}
-                  className="bg-card border border-border rounded-2xl p-5 flex flex-col gap-3 hover:shadow-md hover:-translate-y-0.5 hover:border-emerald-500/30 transition-all group"
+                  className="bg-card border rounded-2xl p-5 flex flex-col gap-3 hover:shadow-md hover:-translate-y-0.5 transition-all group"
+                  style={{ borderColor: `hsl(var(--border))` }}
                 >
                   {/* Avatar + identity */}
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-12 w-12 flex-shrink-0 ring-2 ring-border group-hover:ring-emerald-500/30 transition-all">
+                    <Avatar className="h-12 w-12 flex-shrink-0 ring-2 ring-border transition-all">
                       <AvatarImage src={resolveAvatar(trader)} className="object-cover" />
                       <AvatarFallback className="font-bold text-base">
                         {name.charAt(0).toUpperCase()}
@@ -223,7 +406,7 @@ const LocalTradersPage = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
                         <span className="font-bold text-sm truncate">{name}</span>
-                        <BadgeCheck className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                        <BadgeCheck className="w-4 h-4 flex-shrink-0" style={{ color: `hsl(var(--verified-badge))` }} />
                       </div>
                       <div className="flex items-center gap-2 flex-wrap">
                         {location && (
@@ -277,7 +460,7 @@ const LocalTradersPage = () => {
                     asChild
                     variant="outline"
                     size="sm"
-                    className="mt-auto rounded-xl font-bold text-xs group-hover:border-emerald-500/40 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors gap-1.5"
+                    className="mt-auto rounded-xl font-bold text-xs transition-colors gap-1.5"
                   >
                     <Link to={`/community/user/${trader.id}`}>
                       View Profile <ArrowRight className="w-3.5 h-3.5" />
@@ -315,9 +498,9 @@ const LocalTradersPage = () => {
         )}
 
         {/* Endorsement info panel */}
-        <div className="mt-12 bg-gradient-to-br from-emerald-500/10 to-teal-500/5 border border-emerald-500/20 rounded-2xl p-8">
+        <div className="mt-12 border rounded-2xl p-8" style={{ backgroundImage: `linear-gradient(to bottom right, hsl(var(--verified-badge) / 0.1), hsl(199 95% 45% / 0.05))`, borderColor: `hsl(var(--verified-badge) / 0.2)` }}>
           <div className="flex flex-col sm:flex-row gap-6 items-start">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-sm shrink-0">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl shadow-sm shrink-0" style={{ backgroundImage: `linear-gradient(to bottom right, hsl(var(--verified-badge)), hsl(199 95% 35%))` }}>
               <BadgeCheck className="w-6 h-6 text-white" />
             </div>
             <div className="flex-1">
@@ -334,7 +517,7 @@ const LocalTradersPage = () => {
                   { icon: ShieldCheck,label: 'Safe to trade',     desc: 'Trusted by the community' },
                 ].map(({ icon: Icon, label, desc }) => (
                   <div key={label} className="bg-background/60 border border-border rounded-xl p-3">
-                    <Icon className="w-4 h-4 text-emerald-500 mb-2" />
+                    <Icon className="w-4 h-4 mb-2" style={{ color: `hsl(var(--verified-badge))` }} />
                     <p className="text-xs font-bold text-foreground">{label}</p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">{desc}</p>
                   </div>

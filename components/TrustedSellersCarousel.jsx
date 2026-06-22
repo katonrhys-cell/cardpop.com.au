@@ -28,7 +28,16 @@ const TrustedSellersCarousel = () => {
           .gt('positive_feedback_pct', 0)
           .order('positive_feedback_pct', { ascending: false })
           .limit(20);
-        setSellers(response || []);
+
+        // Deduplicate by user id to prevent duplicates
+        const seen = new Set();
+        const uniqueSellers = (response || []).filter(seller => {
+          if (seen.has(seller.id)) return false;
+          seen.add(seller.id);
+          return true;
+        });
+
+        setSellers(uniqueSellers);
       } catch (err) {
         console.error("Failed to fetch sellers:", err);
         setError("Unable to load trusted sellers at this time.");
@@ -168,7 +177,7 @@ const TrustedSellersCarousel = () => {
                   {seller.avatar_url ? (
                     <img
                       src={seller.avatar_url}
-                      alt={`${seller.name || 'Seller'} avatar`}
+                      alt={`${seller.display_name || seller.name || 'Seller'} avatar`}
                       className="w-24 h-24 rounded-2xl object-cover shadow-sm ring-4 ring-background"
                       width="96"
                       height="96"
@@ -178,7 +187,7 @@ const TrustedSellersCarousel = () => {
                       <User className="w-10 h-10 text-muted-foreground/50" />
                     </div>
                   )}
-                  {seller.verified && (
+                  {seller.is_verified && (
                     <div className="absolute -bottom-2 -right-2 bg-background rounded-full p-0.5 shadow-sm">
                       <CheckCircle2 className="w-6 h-6 text-primary fill-background" />
                     </div>
@@ -186,22 +195,26 @@ const TrustedSellersCarousel = () => {
                 </div>
                 
                 <h3 className="font-bold text-xl text-foreground mb-2">
-                  {seller.name || 'Anonymous Collector'}
+                  {seller.display_name || seller.name || 'Anonymous Collector'}
                 </h3>
-                
+
                 <div className="flex flex-col gap-2 items-center w-full mb-6">
                   <div className="flex items-center gap-1.5 text-sm font-medium bg-muted/50 px-3 py-1 rounded-full">
                     <Star className="w-4 h-4 text-amber-500 fill-amber-500" aria-hidden="true" />
                     <span className="text-foreground">{seller.rating ? seller.rating.toFixed(1) : 'New'}</span>
                     <span className="text-muted-foreground ml-1">
-                      ({seller.reviewsCount || 0} reviews)
+                      ({seller.reviews_count || 0} reviews)
                     </span>
                   </div>
-                  
-                  {seller.location && (
+
+                  {(seller.location_suburb || seller.location_state) && (
                     <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                       <MapPin className="w-3.5 h-3.5" />
-                      <span>{seller.location}</span>
+                      <span>
+                        {seller.location_suburb && seller.location_state
+                          ? `${seller.location_suburb}, ${seller.location_state}`
+                          : seller.location_state || seller.location_suburb}
+                      </span>
                     </div>
                   )}
                 </div>

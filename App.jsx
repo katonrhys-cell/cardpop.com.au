@@ -20,6 +20,7 @@ import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 import PageLoader from '@/components/PageLoader.jsx';
 import ShoppingCart from '@/components/ShoppingCart.jsx';
 import AdminLayout from '@/components/AdminLayout.jsx';
+import MarketplaceListingRedirect from '@/components/MarketplaceListingRedirect.jsx';
 
 // ==========================================
 // LAZY LOADED PAGES (Performance Optimized)
@@ -51,6 +52,7 @@ const RouteErrorBoundary = ({ children }) => {
 
 // Marketplace
 const MarketplacePage = lazy(() => import('@/pages/marketplace/MarketplacePage.jsx'));
+const MarketplaceListingPage = lazy(() => import('@/pages/marketplace/MarketplaceListingPage.jsx'));
 const BrowseListingsPage = lazy(() => import('@/pages/BrowseListingsPage.jsx'));
 
 // Shop
@@ -147,6 +149,7 @@ const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard.jsx'));
 const ProductManagementPage = lazy(() => import('@/pages/admin/ProductManagementPage.jsx'));
 const UserManagementPage = lazy(() => import('@/pages/admin/UserManagementPage.jsx'));
 const UserDetailPage = lazy(() => import('@/pages/admin/UserDetailPage.jsx'));
+const SellersManagementPage = lazy(() => import('@/pages/admin/SellersManagementPage.jsx'));
 const OrderManagementPage = lazy(() => import('@/pages/admin/OrderManagementPage.jsx'));
 const AdminSettingsPage = lazy(() => import('@/pages/admin/AdminSettingsPage.jsx'));
 const EventsAdminPage = lazy(() => import('@/pages/admin/EventsManagementPage.jsx'));
@@ -235,8 +238,11 @@ const App = () => {
                         <Route path="/marketplace" element={<MarketplacePage />} />
                         {/* Orphaned category route (no inbound links, MarketplacePage doesn't read the param) — redirect to the base marketplace */}
                         <Route path="/marketplace/category/:category" element={<Navigate to="/marketplace" replace />} />
+                        {/* Redirect old marketplace listing URL format to new product route */}
+                        <Route path="/marketplace/:id/:slug?" element={<MarketplaceListingRedirect />} />
+                        <Route path="/marketplace/:id/:slug?" element={<MarketplaceListingPage />} />
                         <Route path="/browse" element={<BrowseListingsPage />} />
-                        
+
                         {/* Public Profile Routes */}
                         <Route path="/seller/:userId" element={<PublicSellerProfilePage />} />
                         <Route path="/dealer/:userId" element={<SoleTraderStorePage />} />
@@ -367,6 +373,7 @@ const App = () => {
                           <Route path="products" element={<ProductManagementPage />} />
                           <Route path="users" element={<UserManagementPage />} />
                           <Route path="users/:userId" element={<UserDetailPage />} />
+                          <Route path="sellers" element={<SellersManagementPage />} />
                           <Route path="orders" element={<OrderManagementPage />} />
                           <Route path="categories" element={<CategoryManagementPage />} />
                           <Route path="brands" element={<BrandsManagementPage />} />

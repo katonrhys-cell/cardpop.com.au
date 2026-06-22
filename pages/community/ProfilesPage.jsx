@@ -31,7 +31,16 @@ const ProfilesPage = () => {
       if (activeFilter === 'Verified') query = query.eq('is_verified', true);
 
       const { data } = await query;
-      setProfiles(data || []);
+
+      // Deduplicate by user id to prevent duplicates
+      const seen = new Set();
+      const uniqueProfiles = (data || []).filter(profile => {
+        if (seen.has(profile.id)) return false;
+        seen.add(profile.id);
+        return true;
+      });
+
+      setProfiles(uniqueProfiles);
     } catch (err) {
       console.error(err);
     } finally {

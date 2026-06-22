@@ -119,7 +119,7 @@ const AccountListings = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 space-y-6 animate-in fade-in duration-300">
       <Helmet>
         <title>My Listings | CardPop</title>
       </Helmet>
@@ -185,8 +185,8 @@ const AccountListings = () => {
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="px-6">Card / Item</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Grade</TableHead>
                   <TableHead>Price</TableHead>
-                  <TableHead>Condition</TableHead>
                   <TableHead>Listed</TableHead>
                   <TableHead className="px-6 text-right">Actions</TableHead>
                 </TableRow>
@@ -197,11 +197,16 @@ const AccountListings = () => {
                   const StatusIcon = cfg.icon;
                   return (
                     <TableRow key={listing.id}>
-                      <TableCell className="font-bold px-6 max-w-[220px] truncate">
-                        {listing.card_name || listing.title || '—'}
-                        {listing.set_name && (
-                          <p className="text-xs text-muted-foreground font-normal mt-0.5">{listing.set_name}</p>
-                        )}
+                      <TableCell className="font-bold px-6">
+                        <div className="max-w-[240px]">
+                          <p className="truncate">{listing.card_name || listing.title || '—'}</p>
+                          {listing.set_name && (
+                            <p className="text-xs text-muted-foreground font-normal mt-0.5">{listing.set_name}</p>
+                          )}
+                          {listing.card_number && (
+                            <p className="text-xs text-muted-foreground font-normal mt-0.5">#{listing.card_number}</p>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
@@ -216,11 +221,17 @@ const AccountListings = () => {
                           )}
                         </div>
                       </TableCell>
+                      <TableCell className="text-sm">
+                        {listing.grading_company && listing.grading_company !== 'raw' ? (
+                          <Badge variant="secondary" className="text-[11px] font-bold bg-muted/50 text-muted-foreground uppercase">
+                            {listing.grading_company} {listing.grade || ''}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground capitalize">{listing.condition?.replace(/_/g, ' ') || '—'}</span>
+                        )}
+                      </TableCell>
                       <TableCell className="tabular-nums font-medium">
                         {listing.price_aud != null ? `$${Number(listing.price_aud).toFixed(2)}` : '—'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm capitalize">
-                        {listing.condition?.replace(/_/g, ' ') || '—'}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm tabular-nums">
                         {listing.created_at ? new Date(listing.created_at).toLocaleDateString() : '—'}

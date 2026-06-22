@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient.js';
 import VaultListingCard from '@/components/VaultListingCard.jsx';
 import SellerCard from '@/components/SellerCard.jsx';
+import FeaturedSellerCard from '@/components/FeaturedSellerCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import { HOMEPAGE_CATEGORIES } from '@/components/CategoryIcons.jsx';
@@ -194,7 +195,16 @@ const HomePage = () => {
 
         if (isMounted) {
           setFeaturedCards(listingsRes.data ?? []);
-          setFeaturedSellers(sellersRes.data ?? []);
+
+          // Deduplicate sellers by user id to prevent duplicates
+          const seen = new Set();
+          const uniqueSellers = (sellersRes.data ?? []).filter(seller => {
+            if (seen.has(seller.id)) return false;
+            seen.add(seller.id);
+            return true;
+          });
+
+          setFeaturedSellers(uniqueSellers);
         }
       } catch (error) {
         console.error('Failed to fetch homepage data:', error);
@@ -692,7 +702,7 @@ const HomePage = () => {
             >
               {featuredCards.map(card => (
                 <motion.div key={card.id} variants={itemVariants}>
-                  <VaultListingCard listing={card} />
+                  <VaultListingCard vaultItem={card} />
                 </motion.div>
               ))}
             </motion.div>
@@ -765,7 +775,7 @@ const HomePage = () => {
             >
               {featuredSellers.map(seller => (
                 <motion.div key={seller.id} variants={itemVariants}>
-                  <SellerCard seller={seller} />
+                  <FeaturedSellerCard seller={seller} />
                 </motion.div>
               ))}
             </motion.div>

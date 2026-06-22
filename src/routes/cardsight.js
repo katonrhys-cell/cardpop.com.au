@@ -15,6 +15,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { integratedAiRateLimit } from '../middleware/integrated-ai-rate-limit.js';
 import supabase from '../utils/supabaseClient.js';
 import { refreshCardMarketData } from '../utils/marketDataService.js';
+import { getSegmentsForCollection } from '../utils/collectionSegmentMap.js';
 import logger from '../utils/logger.js';
 
 const router = Router();
@@ -47,133 +48,133 @@ router.post(
 
     try {
       const file = req.files[0];
-    // Wrap the buffer in a File so the multipart part carries the validated
-    // MIME type and a filename — a bare buffer is sent as application/octet-stream,
-    // which CardSight can fail to process.
-    const image = new File(
-      [file.buffer],
-      file.originalname || `card.${file.detectedExt ?? 'jpg'}`,
-      { type: file.mimetype }
-    );
+      // Wrap the buffer in a File so the multipart part carries the validated
+      // MIME type and a filename — a bare buffer is sent as application/octet-stream,
+      // which CardSight can fail to process.
+      const image = new File(
+        [file.buffer],
+        file.originalname || `card.${file.detectedExt ?? 'jpg'}`,
+        { type: file.mimetype }
+      );
 
-    // 1. Identify the card across all major segments in parallel.
-    // identify.card() defaults to baseball only — for a multi-sport marketplace
-    // we try each major segment and take the highest-confidence detection.
-    const SEGMENTS = ['basketball', 'baseball', 'football', 'soccer', 'pokemon', 'hockey', 'ufc', 'golf', 'tennis', 'cricket'];
-    const segmentResults = await Promise.allSettled(
-      SEGMENTS.map(seg => client.identify.cardBySegment(seg, image))
-    );
+      // 1. Identify the card across relevant segments based on collection.
+      // If collection is specified, only search those segments; otherwise try all.
+      const collection = req.body?.collection || '';
+      const SEGMENTS = getSegmentsForCollection(collection);
+      const segmentResults = await Promise.allSettled(
+        SEGMENTS.map(seg => client.identify.cardBySegment(seg, image))
+      );
 
-    // Merge all detections from every segment that returned successfully
-    let allDetections = [];
-    let serverMessages = [];
-    for (const r of segmentResults) {
-      if (r.status === 'fulfilled' && r.value?.data) {
-        allDetections = allDetections.concat(r.value.data.detections ?? []);
-        serverMessages = serverMessages.concat(r.value.data.messages ?? []);
-      }
-    }
-
-    if (!allDetections.length) {
-      logger.info(`[CARDSIGHT] No detections across ${SEGMENTS.length} segments. messages=${JSON.stringify(serverMessages)}`);
-      return res.json({
-        identified: false,
-        message: 'No card detected in the image.',
-        serverMessages,
-      });
-    }
-
-    // Pick the highest-confidence detection across all segments
-    const syntheticResult = { detections: allDetections };
-    const best = getHighestConfidenceDetection(syntheticResult);
-    if (!best) {
-      return res.json({ identified: false, message: 'Could not identify card with sufficient confidence.' });
-    }
-
-    const segmentName = await getSegmentName(best.card?.segmentId);
-
-    const response = {
-      identified: true,
-      confidence: best.confidence,
-      exactMatch: isExactMatch(best),
-      setLevelMatch: isSetLevelMatch(best),
-      card: {
-        id: best.card?.id ?? null,
-        name: best.card?.name ?? null,
-        year: best.card?.year ?? null,
-        setName: best.card?.setName ?? null,
-        setId: best.card?.setId ?? null,
-        cardNumber: best.card?.number ?? null,
-        manufacturer: best.card?.manufacturer ?? null,
-        segment: segmentName,
-        rarity: getFieldValue(best, 'Rarity') ?? null,
-        hp: getFieldValue(best, 'HP') ?? null,
-        artist: getFieldValue(best, 'Artist') ?? null,
-      },
-      grading: hasGrading(best)
-        ? {
-            company: best.grading.company?.name ?? null,
-            grade: best.grading.grade?.value ?? null,
-            condition: best.grading.grade?.condition ?? null,
-          }
-        : null,
-      parallel: hasParallel(best) ? getParallelInfo(best) : null,
-    };
-
-    // 2. If we have an exact card match, fetch catalog detail + pricing
-    if (isExactMatch(best) && best.card?.id) {
-      const cardId = best.card.id;
-      const [catalogResult, pricingResult] = await Promise.allSettled([
-        client.catalog.cards.get(cardId),
-        client.pricing.get(cardId),
-      ]);
-
-      if (catalogResult.status === 'fulfilled' && catalogResult.value.data) {
-        const c = catalogResult.value.data;
-        response.catalog = {
-          id: c.id,
-          name: c.name,
-          year: c.releaseYear ?? null,
-          setName: c.setName ?? null,
-          releaseName: c.releaseName ?? null,
-          cardNumber: c.number ?? null,
-          numberedTo: c.numberedTo ?? null,
-          parallels: c.parallels ?? [],
-        };
+      // Merge all detections from every segment that returned successfully
+      let allDetections = [];
+      let serverMessages = [];
+      for (const r of segmentResults) {
+        if (r.status === 'fulfilled' && r.value?.data) {
+          allDetections = allDetections.concat(r.value.data.detections ?? []);
+          serverMessages = serverMessages.concat(r.value.data.messages ?? []);
+        }
       }
 
-      if (pricingResult.status === 'fulfilled') {
-        const summary = await summarisePricingAud(pricingResult.value.data);
-        if (summary) response.pricing = summary;
+      if (!allDetections.length) {
+        logger.info(`[CARDSIGHT] No detections. collection=${collection} segments=[${SEGMENTS.join(', ')}] messages=${JSON.stringify(serverMessages)}`);
+        return res.json({
+          identified: false,
+          message: 'No card detected in the image.',
+          serverMessages,
+        });
       }
 
-      logger.info(`[CARDSIGHT] Identified card ${cardId} (${response.card.name}) confidence=${best.confidence}`);
-
-      // Background: persist market valuations for this card (CardSight + eBay + PSA)
-      refreshCardMarketData({
-        cardId,
-        cardName: response.card.name  ?? null,
-        setName:  response.card.setName ?? null,
-      }).catch(err => logger.warn(`[CARDSIGHT] Background market refresh failed: ${err.message}`));
-
-      // Optionally persist cardsight_card_id to a vault_item if caller passes one
-      const vaultItemId = req.body?.vault_item_id;
-      if (vaultItemId && req.user.id) {
-        await supabase
-          .from('vault_items')
-          .update({
-            cardsight_card_id: cardId,
-            cardsight_set_id: best.card?.setId ?? null,
-            cardsight_identified_at: new Date().toISOString(),
-          })
-          .eq('id', vaultItemId)
-          .eq('owner_id', req.user.id);
+      // Pick the highest-confidence detection across all segments
+      const syntheticResult = { detections: allDetections };
+      const best = getHighestConfidenceDetection(syntheticResult);
+      if (!best) {
+        return res.json({ identified: false, message: 'Could not identify card with sufficient confidence.' });
       }
-    } else {
-      logger.info(`[CARDSIGHT] Set-level or low-confidence match: setId=${best.card?.setId} confidence=${best.confidence}`);
-    }
 
-    res.json(response);
+      const segmentName = await getSegmentName(best.card?.segmentId);
+
+      const response = {
+        identified: true,
+        confidence: best.confidence,
+        exactMatch: isExactMatch(best),
+        setLevelMatch: isSetLevelMatch(best),
+        card: {
+          id: best.card?.id ?? null,
+          name: best.card?.name ?? null,
+          year: best.card?.year ?? null,
+          setName: best.card?.setName ?? null,
+          setId: best.card?.setId ?? null,
+          cardNumber: best.card?.number ?? null,
+          manufacturer: best.card?.manufacturer ?? null,
+          segment: segmentName,
+          rarity: getFieldValue(best, 'Rarity') ?? null,
+          hp: getFieldValue(best, 'HP') ?? null,
+          artist: getFieldValue(best, 'Artist') ?? null,
+        },
+        grading: hasGrading(best)
+          ? {
+              company: best.grading.company?.name ?? null,
+              grade: best.grading.grade?.value ?? null,
+              condition: best.grading.grade?.condition ?? null,
+            }
+          : null,
+        parallel: hasParallel(best) ? getParallelInfo(best) : null,
+      };
+
+      // 2. If we have an exact card match, fetch catalog detail + pricing
+      if (isExactMatch(best) && best.card?.id) {
+        const cardId = best.card.id;
+        const [catalogResult, pricingResult] = await Promise.allSettled([
+          client.catalog.cards.get(cardId),
+          client.pricing.get(cardId),
+        ]);
+
+        if (catalogResult.status === 'fulfilled' && catalogResult.value.data) {
+          const c = catalogResult.value.data;
+          response.catalog = {
+            id: c.id,
+            name: c.name,
+            year: c.releaseYear ?? null,
+            setName: c.setName ?? null,
+            releaseName: c.releaseName ?? null,
+            cardNumber: c.number ?? null,
+            numberedTo: c.numberedTo ?? null,
+            parallels: c.parallels ?? [],
+          };
+        }
+
+        if (pricingResult.status === 'fulfilled') {
+          const summary = await summarisePricingAud(pricingResult.value.data);
+          if (summary) response.pricing = summary;
+        }
+
+        logger.info(`[CARDSIGHT] Identified card ${cardId} (${response.card.name}) confidence=${best.confidence} collection=${collection}`);
+
+        // Background: persist market valuations for this card (CardSight + eBay + PSA)
+        refreshCardMarketData({
+          cardId,
+          cardName: response.card.name  ?? null,
+          setName:  response.card.setName ?? null,
+        }).catch(err => logger.warn(`[CARDSIGHT] Background market refresh failed: ${err.message}`));
+
+        // Optionally persist cardsight_card_id to a vault_item if caller passes one
+        const vaultItemId = req.body?.vault_item_id;
+        if (vaultItemId && req.user.id) {
+          await supabase
+            .from('vault_items')
+            .update({
+              cardsight_card_id: cardId,
+              cardsight_set_id: best.card?.setId ?? null,
+              cardsight_identified_at: new Date().toISOString(),
+            })
+            .eq('id', vaultItemId)
+            .eq('owner_id', req.user.id);
+        }
+      } else {
+        logger.info(`[CARDSIGHT] Set-level or low-confidence match: setId=${best.card?.setId} confidence=${best.confidence} collection=${collection}`);
+      }
+
+      res.json(response);
     } catch (err) {
       logger.error(`[CARDSIGHT] identify error: ${err.message}`, err.stack);
       return res.status(502).json({ identified: false, apiError: true, message: `Card identification failed: ${err.message}` });

@@ -37,6 +37,7 @@
 - [Security Settings | Card Pop](/securitysettings): No description available
 - [Security Settings | CardPop](/accountsecurity): No description available
 - [Seller Tier | CardPop](/accountsellertier): No description available
+- [Sellers Management | Admin Portal](/sellersmanagement): No description available
 - [Sole Trader Account | CardPop](/accountsoletrader): No description available
 - [Subcategory Management | Admin Portal](/subcategorymanagement): No description available
 - [System Diagnostics | Admin](/systemdiagnostics): No description available

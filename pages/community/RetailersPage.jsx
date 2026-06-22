@@ -214,7 +214,7 @@ const RetailersPage = () => {
             CardPop partners with verified retailers to build trust in the hobby.
           </p>
           <Button asChild className="rounded-xl font-bold gap-2 shadow-sm">
-            <a href="mailto:hello@cardpop.online">
+            <a href="mailto:hello@cardpop.com.au">
               <Mail className="w-4 h-4" /> Get Listed
             </a>
           </Button>
