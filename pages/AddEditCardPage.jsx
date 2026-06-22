@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, ChevronDown, Sparkles, Loader2,
-  Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X, CheckCircle2,
+  Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X, Crop,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -26,7 +26,8 @@ import PSAPopPanel from '@/components/PSAPopPanel.jsx';
 import { useCardsightPricing } from '@/hooks/useCardsightPricing.js';
 import PhotoQualityScore from '@/components/PhotoQualityScore.jsx';
 import { analyzePhotoQuality } from '@/utils/photoQuality.js';
-import { detectAndCropCard } from '@/utils/detectCard.js';
+import { useCardCrop } from '@/hooks/useCardCrop.js';
+import CardCropPreview from '@/components/CardCropPreview.jsx';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -86,8 +87,7 @@ const AddEditCardPage = () => {
   const [psaPopData, setPsaPopData]           = useState(null);
   const [photoQuality, setPhotoQuality]       = useState(null);
   const [checkingQuality, setCheckingQuality] = useState(false);
-  const [cropCandidate, setCropCandidate]     = useState(null);
-  const [detectingCard, setDetectingCard]     = useState(false);
+  const { detectingKey, candidate: cropCandidate, detect: detectCrop, clear: clearCrop } = useCardCrop();
   const [showAutoGuide, setShowAutoGuide]     = useState(false);
   const [showPatchGuide, setShowPatchGuide]   = useState(false);
   const [showRelicGuide, setShowRelicGuide]   = useState(false);
@@ -316,32 +316,27 @@ const AddEditCardPage = () => {
     // Clear any previous analysis results when a new image is selected
     clearScan();
     clearCardSight();
+    clearCrop();
     runPhotoQuality(file);
-
-    // Detect the card outline and offer a deskewed, 5:7-cropped version.
-    // Best-effort and non-blocking — if nothing card-like is found we say nothing.
-    setCropCandidate(null);
-    setDetectingCard(true);
-    detectAndCropCard(file)
-      .then((res) => {
-        if (res?.found && res.blob) {
-          const base = file.name.replace(/\.[^.]+$/, '');
-          const croppedFile = new File([res.blob], `${base}-cropped.jpg`, { type: 'image/jpeg' });
-          setCropCandidate({ croppedFile, croppedUrl: res.url });
-        }
-      })
-      .catch(() => { /* detection is optional — ignore failures */ })
-      .finally(() => setDetectingCard(false));
   };
 
-  // Replace the uploaded image with the auto-cropped version.
-  const applyCrop = () => {
+  // Replace the main image with its auto-cropped version.
+  const applyMainCrop = () => {
     if (!cropCandidate) return;
     setImageFile(cropCandidate.croppedFile);
     setImagePreview(cropCandidate.croppedUrl);
     runPhotoQuality(cropCandidate.croppedFile);
-    setCropCandidate(null);
+    clearCrop();
     toast.success('Using the cropped card image.');
+  };
+
+  // Replace extra photo `idx` with its auto-cropped version.
+  const applyExtraCrop = (idx) => {
+    if (!cropCandidate) return;
+    const nf = [...extraFiles]; nf[idx] = cropCandidate.croppedFile; setExtraFiles(nf);
+    const np = [...extraPreviews]; np[idx] = cropCandidate.croppedUrl; setExtraPreviews(np);
+    clearCrop();
+    toast.success('Using the cropped image.');
   };
 
   // ─── Unified AI analysis ──────────────────────────────────────────────────
@@ -537,7 +532,7 @@ const AddEditCardPage = () => {
               setExtraPreviews([null, null, null, null, null]);
               setErrors({});
               setIsAutoFilled(false);
-              setCropCandidate(null);
+              clearCrop();
               clearScan();
               // Keep franchise/manufacturer selected for fast repeat entry
               window.scrollTo(0, 0);
@@ -621,39 +616,29 @@ const AddEditCardPage = () => {
                   />
                 </div>
 
-                {/* Auto-crop: detecting / preview + confirm */}
-                {detectingCard && (
-                  <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-                    Detecting card edges…
-                  </div>
+                {/* Auto-crop (opt-in): button → detecting → preview + confirm */}
+                {imageFile && !(cropCandidate?.key === 'main') && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => detectCrop('main', imageFile)}
+                    disabled={detectingKey !== null}
+                    className="mt-3 w-full gap-1.5"
+                  >
+                    {detectingKey === 'main'
+                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Detecting card edges…</>
+                      : <><Crop className="w-3.5 h-3.5" /> Straighten &amp; crop to card</>}
+                  </Button>
                 )}
 
-                {!detectingCard && cropCandidate && (
-                  <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 p-3 animate-in fade-in">
-                    <p className="text-xs font-semibold text-primary mb-2 flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5" />
-                      Card detected — straightened &amp; cropped to size
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 mb-3">
-                      <div>
-                        <p className="text-[10px] text-muted-foreground mb-1">Original</p>
-                        <img src={imagePreview} alt="Original" className="w-full aspect-[5/7] object-cover rounded-lg border border-border" />
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-muted-foreground mb-1">Cropped</p>
-                        <img src={cropCandidate.croppedUrl} alt="Cropped card" className="w-full aspect-[5/7] object-cover rounded-lg border border-primary/40" />
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button type="button" size="sm" onClick={applyCrop} className="flex-1 font-semibold gap-1.5">
-                        <CheckCircle2 className="w-4 h-4" /> Use cropped
-                      </Button>
-                      <Button type="button" size="sm" variant="outline" onClick={() => setCropCandidate(null)} className="flex-1">
-                        Keep original
-                      </Button>
-                    </div>
-                  </div>
+                {cropCandidate?.key === 'main' && (
+                  <CardCropPreview
+                    originalUrl={imagePreview}
+                    croppedUrl={cropCandidate.croppedUrl}
+                    onApply={applyMainCrop}
+                    onDismiss={clearCrop}
+                  />
                 )}
 
                 {/* Extra image slots — up to 5 additional photos */}
@@ -675,10 +660,22 @@ const AddEditCardPage = () => {
                                 const nf = [...extraFiles]; nf[idx] = null;
                                 const np = [...extraPreviews]; np[idx] = null;
                                 setExtraFiles(nf); setExtraPreviews(np);
+                                if (cropCandidate?.key === idx) clearCrop();
                               }}
                               className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                             >
                               <X className="w-2.5 h-2.5 text-white" />
+                            </button>
+                            <button
+                              type="button"
+                              title="Straighten & crop to card"
+                              onClick={() => detectCrop(idx, extraFiles[idx])}
+                              disabled={detectingKey !== null}
+                              className="absolute bottom-0.5 left-0.5 bg-black/60 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-40"
+                            >
+                              {detectingKey === idx
+                                ? <Loader2 className="w-2.5 h-2.5 text-white animate-spin" />
+                                : <Crop className="w-2.5 h-2.5 text-white" />}
                             </button>
                           </div>
                         ) : (
@@ -708,6 +705,15 @@ const AddEditCardPage = () => {
                       </div>
                     ))}
                   </div>
+
+                  {typeof cropCandidate?.key === 'number' && (
+                    <CardCropPreview
+                      originalUrl={extraPreviews[cropCandidate.key]}
+                      croppedUrl={cropCandidate.croppedUrl}
+                      onApply={() => applyExtraCrop(cropCandidate.key)}
+                      onDismiss={clearCrop}
+                    />
+                  )}
                 </div>
 
                 {/* Unified AI Analysis */}
