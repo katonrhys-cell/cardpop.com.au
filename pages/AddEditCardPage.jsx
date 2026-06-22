@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, ChevronDown, Sparkles, Loader2,
-  Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X,
+  Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X, CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -26,6 +26,7 @@ import PSAPopPanel from '@/components/PSAPopPanel.jsx';
 import { useCardsightPricing } from '@/hooks/useCardsightPricing.js';
 import PhotoQualityScore from '@/components/PhotoQualityScore.jsx';
 import { analyzePhotoQuality } from '@/utils/photoQuality.js';
+import { detectAndCropCard } from '@/utils/detectCard.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -85,6 +86,8 @@ const AddEditCardPage = () => {
   const [psaPopData, setPsaPopData]           = useState(null);
   const [photoQuality, setPhotoQuality]       = useState(null);
   const [checkingQuality, setCheckingQuality] = useState(false);
+  const [cropCandidate, setCropCandidate]     = useState(null);
+  const [detectingCard, setDetectingCard]     = useState(false);
   const [showAutoGuide, setShowAutoGuide]     = useState(false);
   const [showPatchGuide, setShowPatchGuide]   = useState(false);
   const [showRelicGuide, setShowRelicGuide]   = useState(false);
@@ -292,6 +295,16 @@ const AddEditCardPage = () => {
   }, [id, currentUser?.id, navigate, isEdit]);
 
   // ─── Image handling ───────────────────────────────────────────────────────
+  // Score a photo against the CardPop Photography Standard (advisory only).
+  const runPhotoQuality = (file) => {
+    setPhotoQuality(null);
+    setCheckingQuality(true);
+    analyzePhotoQuality(file)
+      .then(setPhotoQuality)
+      .catch(() => setPhotoQuality(null))
+      .finally(() => setCheckingQuality(false));
+  };
+
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -303,13 +316,32 @@ const AddEditCardPage = () => {
     // Clear any previous analysis results when a new image is selected
     clearScan();
     clearCardSight();
-    // Score the photo against the CardPop Photography Standard (advisory only)
-    setPhotoQuality(null);
-    setCheckingQuality(true);
-    analyzePhotoQuality(file)
-      .then(setPhotoQuality)
-      .catch(() => setPhotoQuality(null))
-      .finally(() => setCheckingQuality(false));
+    runPhotoQuality(file);
+
+    // Detect the card outline and offer a deskewed, 5:7-cropped version.
+    // Best-effort and non-blocking — if nothing card-like is found we say nothing.
+    setCropCandidate(null);
+    setDetectingCard(true);
+    detectAndCropCard(file)
+      .then((res) => {
+        if (res?.found && res.blob) {
+          const base = file.name.replace(/\.[^.]+$/, '');
+          const croppedFile = new File([res.blob], `${base}-cropped.jpg`, { type: 'image/jpeg' });
+          setCropCandidate({ croppedFile, croppedUrl: res.url });
+        }
+      })
+      .catch(() => { /* detection is optional — ignore failures */ })
+      .finally(() => setDetectingCard(false));
+  };
+
+  // Replace the uploaded image with the auto-cropped version.
+  const applyCrop = () => {
+    if (!cropCandidate) return;
+    setImageFile(cropCandidate.croppedFile);
+    setImagePreview(cropCandidate.croppedUrl);
+    runPhotoQuality(cropCandidate.croppedFile);
+    setCropCandidate(null);
+    toast.success('Using the cropped card image.');
   };
 
   // ─── Unified AI analysis ──────────────────────────────────────────────────
@@ -505,6 +537,7 @@ const AddEditCardPage = () => {
               setExtraPreviews([null, null, null, null, null]);
               setErrors({});
               setIsAutoFilled(false);
+              setCropCandidate(null);
               clearScan();
               // Keep franchise/manufacturer selected for fast repeat entry
               window.scrollTo(0, 0);
@@ -587,6 +620,41 @@ const AddEditCardPage = () => {
                     className="absolute inset-0 opacity-0 cursor-pointer"
                   />
                 </div>
+
+                {/* Auto-crop: detecting / preview + confirm */}
+                {detectingCard && (
+                  <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                    Detecting card edges…
+                  </div>
+                )}
+
+                {!detectingCard && cropCandidate && (
+                  <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 p-3 animate-in fade-in">
+                    <p className="text-xs font-semibold text-primary mb-2 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      Card detected — straightened &amp; cropped to size
+                    </p>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <div>
+                        <p className="text-[10px] text-muted-foreground mb-1">Original</p>
+                        <img src={imagePreview} alt="Original" className="w-full aspect-[5/7] object-cover rounded-lg border border-border" />
+                      </div>
+                      <div>
+                        <p className="text-[10px] text-muted-foreground mb-1">Cropped</p>
+                        <img src={cropCandidate.croppedUrl} alt="Cropped card" className="w-full aspect-[5/7] object-cover rounded-lg border border-primary/40" />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button type="button" size="sm" onClick={applyCrop} className="flex-1 font-semibold gap-1.5">
+                        <CheckCircle2 className="w-4 h-4" /> Use cropped
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={() => setCropCandidate(null)} className="flex-1">
+                        Keep original
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Extra image slots — up to 5 additional photos */}
                 <div className="mt-4">
