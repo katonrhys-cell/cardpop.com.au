@@ -1,8 +1,27 @@
-import sharp from 'sharp';
 import logger from './logger.js';
+
+// sharp is a native module that loads a platform-specific binary at import
+// time. Importing it at module top level means any binary-load failure (e.g.
+// the Vercel serverless bundle missing @img/sharp-linux-x64) throws while the
+// app is initialising — which crashes the ENTIRE Express function, taking down
+// every API route rather than just the image endpoints. Loading it lazily
+// keeps such a failure contained to the routes that actually use sharp.
+let _sharpPromise = null;
+function getSharp() {
+  if (!_sharpPromise) {
+    _sharpPromise = import('sharp')
+      .then(mod => mod.default ?? mod)
+      .catch(err => {
+        _sharpPromise = null; // let a later call retry
+        throw err;
+      });
+  }
+  return _sharpPromise;
+}
 
 export async function createSlabImage(imageBuffer) {
   try {
+    const sharp = await getSharp();
     // Get original image dimensions
     const metadata = await sharp(imageBuffer).metadata();
     const originalWidth = metadata.width;
@@ -74,6 +93,7 @@ export async function removeBackground(imageBuffer, method = 'browser') {
     }
 
     // For browser method, we just validate and return
+    const sharp = await getSharp();
     const metadata = await sharp(imageBuffer).metadata();
     if (!metadata.width || !metadata.height) {
       throw new Error('Invalid image');
@@ -89,6 +109,7 @@ export async function removeBackground(imageBuffer, method = 'browser') {
 
 export async function compressImage(imageBuffer, quality = 80) {
   try {
+    const sharp = await getSharp();
     const compressed = await sharp(imageBuffer)
       .webp({ quality })
       .toBuffer();
