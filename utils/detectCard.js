@@ -36,8 +36,41 @@ function drawToCanvas(image, w, h) {
 }
 
 /**
- * Finds the largest 4-point contour in the downscaled image and returns its
- * corners as [[x, y] × 4] in downscaled coordinates, or null if none qualifies.
+ * Reduces a contour to a 4-point quad. First tries approxPolyDP at increasing
+ * epsilons to land on a clean quadrilateral; if the contour is too noisy to
+ * approximate to four points (common with busy/low-contrast backgrounds), falls
+ * back to its rotated min-area rectangle — which still corrects rotation and
+ * gives a usable crop. Returns [[x, y] × 4].
+ */
+function quadFromContour(cv, contour) {
+  const peri = cv.arcLength(contour, true);
+  for (const k of [0.02, 0.03, 0.04, 0.05]) {
+    const approx = new cv.Mat();
+    cv.approxPolyDP(contour, approx, k * peri, true);
+    if (approx.rows === 4) {
+      const pts = [
+        [approx.data32S[0], approx.data32S[1]],
+        [approx.data32S[2], approx.data32S[3]],
+        [approx.data32S[4], approx.data32S[5]],
+        [approx.data32S[6], approx.data32S[7]],
+      ];
+      approx.delete();
+      return pts;
+    }
+    approx.delete();
+  }
+  // Fallback: rotated bounding rectangle of the contour.
+  const rect = cv.minAreaRect(contour);
+  return cv.RotatedRect.points(rect).map(p => [p.x, p.y]);
+}
+
+/**
+ * Finds the card quad in the downscaled image. Considers every contour large
+ * enough to be the card (biggest first) and returns the first one that reduces
+ * to a plausible card-shaped quad. This is far more tolerant of textured or
+ * low-contrast backgrounds than requiring a single clean 4-point contour, since
+ * a card border broken up by background edges can still be recovered via its
+ * rotated bounding rectangle. Returns [[x, y] × 4] or null.
  */
 function findCardQuad(cv, canvas) {
   const src = cv.imread(canvas);
@@ -46,44 +79,35 @@ function findCardQuad(cv, canvas) {
   const contours = new cv.MatVector();
   const hierarchy = new cv.Mat();
   let kernel = null;
+  const large = [];
 
   try {
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
     cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0);
-    cv.Canny(gray, edges, 50, 150);
-    // Close small gaps so the card border forms a single contour.
-    kernel = cv.Mat.ones(3, 3, cv.CV_8U);
-    cv.dilate(edges, edges, kernel);
+    cv.Canny(gray, edges, 40, 120);
+    // Morphological close (larger kernel than a plain dilate) bridges gaps so a
+    // card edge interrupted by a textured background still forms one contour.
+    kernel = cv.Mat.ones(5, 5, cv.CV_8U);
+    cv.morphologyEx(edges, edges, cv.MORPH_CLOSE, kernel);
 
     cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
-    const imgArea = canvas.width * canvas.height;
-    let best = null;
-    let bestArea = 0;
-
+    const minArea = 0.12 * canvas.width * canvas.height;
     for (let i = 0; i < contours.size(); i++) {
       const contour = contours.get(i);
-      const approx = new cv.Mat();
-      const peri = cv.arcLength(contour, true);
-      cv.approxPolyDP(contour, approx, 0.02 * peri, true);
-
-      if (approx.rows === 4) {
-        const area = cv.contourArea(approx);
-        if (area > bestArea && area > 0.12 * imgArea) {
-          best = [
-            [approx.data32S[0], approx.data32S[1]],
-            [approx.data32S[2], approx.data32S[3]],
-            [approx.data32S[4], approx.data32S[5]],
-            [approx.data32S[6], approx.data32S[7]],
-          ];
-          bestArea = area;
-        }
-      }
-      approx.delete();
-      contour.delete();
+      if (cv.contourArea(contour) >= minArea) large.push(contour);
+      else contour.delete();
     }
-    return best;
+    // Biggest first — the card is normally the largest foreground object.
+    large.sort((a, b) => cv.contourArea(b) - cv.contourArea(a));
+
+    for (const contour of large) {
+      const quad = quadFromContour(cv, contour);
+      if (quad && isPlausibleCard(quad, canvas.width, canvas.height)) return quad;
+    }
+    return null;
   } finally {
+    for (const contour of large) contour.delete();
     src.delete();
     gray.delete();
     edges.delete();
