@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, ChevronDown, Sparkles, Loader2,
-  Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X,
+  Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X, Crop,
   Frame, Wand2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -29,6 +29,8 @@ import { useCardsightPricing } from '@/hooks/useCardsightPricing.js';
 import PhotoQualityScore from '@/components/PhotoQualityScore.jsx';
 import PhotoTemplateModal from '@/components/PhotoTemplateModal.jsx';
 import { analyzePhotoQuality } from '@/utils/photoQuality.js';
+import { useCardCrop } from '@/hooks/useCardCrop.js';
+import CardCropPreview from '@/components/CardCropPreview.jsx';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -102,6 +104,7 @@ const AddEditCardPage = () => {
   const [psaPopData, setPsaPopData]           = useState(null);
   const [photoQuality, setPhotoQuality]       = useState(null);
   const [checkingQuality, setCheckingQuality] = useState(false);
+  const { detectingKey, candidate: cropCandidate, detect: detectCrop, clear: clearCrop } = useCardCrop();
   const [showAutoGuide, setShowAutoGuide]     = useState(false);
   const [showPatchGuide, setShowPatchGuide]   = useState(false);
   const [showRelicGuide, setShowRelicGuide]   = useState(false);
@@ -314,6 +317,16 @@ const AddEditCardPage = () => {
   }, [id, currentUser?.id, navigate, isEdit]);
 
   // ─── Image handling ───────────────────────────────────────────────────────
+  // Score a photo against the CardPop Photography Standard (advisory only).
+  const runPhotoQuality = (file) => {
+    setPhotoQuality(null);
+    setCheckingQuality(true);
+    analyzePhotoQuality(file)
+      .then(setPhotoQuality)
+      .catch(() => setPhotoQuality(null))
+      .finally(() => setCheckingQuality(false));
+  };
+
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -325,13 +338,27 @@ const AddEditCardPage = () => {
     // Clear any previous analysis results when a new image is selected
     clearScan();
     clearCardSight();
-    // Score the photo against the CardPop Photography Standard (advisory only)
-    setPhotoQuality(null);
-    setCheckingQuality(true);
-    analyzePhotoQuality(file)
-      .then(setPhotoQuality)
-      .catch(() => setPhotoQuality(null))
-      .finally(() => setCheckingQuality(false));
+    clearCrop();
+    runPhotoQuality(file);
+  };
+
+  // Replace the main image with its auto-cropped version.
+  const applyMainCrop = () => {
+    if (!cropCandidate) return;
+    setImageFile(cropCandidate.croppedFile);
+    setImagePreview(cropCandidate.croppedUrl);
+    runPhotoQuality(cropCandidate.croppedFile);
+    clearCrop();
+    toast.success('Using the cropped card image.');
+  };
+
+  // Replace extra photo `idx` with its auto-cropped version.
+  const applyExtraCrop = (idx) => {
+    if (!cropCandidate) return;
+    const nf = [...extraFiles]; nf[idx] = cropCandidate.croppedFile; setExtraFiles(nf);
+    const np = [...extraPreviews]; np[idx] = cropCandidate.croppedUrl; setExtraPreviews(np);
+    clearCrop();
+    toast.success('Using the cropped image.');
   };
 
   // ─── Unified AI analysis ──────────────────────────────────────────────────
@@ -678,6 +705,7 @@ const AddEditCardPage = () => {
               setExtraPreviews([null, null, null, null, null]);
               setErrors({});
               setIsAutoFilled(false);
+              clearCrop();
               clearScan();
               // Keep franchise/manufacturer selected for fast repeat entry
               window.scrollTo(0, 0);
@@ -761,6 +789,31 @@ const AddEditCardPage = () => {
                   />
                 </div>
 
+                {/* Auto-crop (opt-in): button → detecting → preview + confirm */}
+                {imageFile && !(cropCandidate?.key === 'main') && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => detectCrop('main', imageFile)}
+                    disabled={detectingKey !== null}
+                    className="mt-3 w-full gap-1.5"
+                  >
+                    {detectingKey === 'main'
+                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Detecting card edges…</>
+                      : <><Crop className="w-3.5 h-3.5" /> Straighten &amp; crop to card</>}
+                  </Button>
+                )}
+
+                {cropCandidate?.key === 'main' && (
+                  <CardCropPreview
+                    originalUrl={imagePreview}
+                    croppedUrl={cropCandidate.croppedUrl}
+                    onApply={applyMainCrop}
+                    onDismiss={clearCrop}
+                  />
+                )}
+
                 {/* Extra image slots — up to 5 additional photos */}
                 <div className="mt-4">
                   <p className="text-xs font-semibold text-muted-foreground mb-2">Additional Photos (up to 5)</p>
@@ -780,10 +833,22 @@ const AddEditCardPage = () => {
                                 const nf = [...extraFiles]; nf[idx] = null;
                                 const np = [...extraPreviews]; np[idx] = null;
                                 setExtraFiles(nf); setExtraPreviews(np);
+                                if (cropCandidate?.key === idx) clearCrop();
                               }}
                               className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
                             >
                               <X className="w-2.5 h-2.5 text-white" />
+                            </button>
+                            <button
+                              type="button"
+                              title="Straighten & crop to card"
+                              onClick={() => detectCrop(idx, extraFiles[idx])}
+                              disabled={detectingKey !== null}
+                              className="absolute bottom-0.5 left-0.5 bg-black/60 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-40"
+                            >
+                              {detectingKey === idx
+                                ? <Loader2 className="w-2.5 h-2.5 text-white animate-spin" />
+                                : <Crop className="w-2.5 h-2.5 text-white" />}
                             </button>
                           </div>
                         ) : (
@@ -813,6 +878,15 @@ const AddEditCardPage = () => {
                       </div>
                     ))}
                   </div>
+
+                  {typeof cropCandidate?.key === 'number' && (
+                    <CardCropPreview
+                      originalUrl={extraPreviews[cropCandidate.key]}
+                      croppedUrl={cropCandidate.croppedUrl}
+                      onApply={() => applyExtraCrop(cropCandidate.key)}
+                      onDismiss={clearCrop}
+                    />
+                  )}
                 </div>
 
                 {/* Photo Template & Card Identification */}
