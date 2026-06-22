@@ -187,9 +187,51 @@ export async function detectAndCropCard(file) {
       url: outCanvas.toDataURL('image/jpeg', JPEG_QUALITY),
       width: outCanvas.width,
       height: outCanvas.height,
+      // Detected corners in full-resolution image coordinates, so the manual
+      // adjuster can be seeded with the auto-detected quad.
+      corners: quadFull,
     };
   } catch {
     return { found: false };
+  } finally {
+    if (bitmap && typeof bitmap.close === 'function') bitmap.close();
+  }
+}
+
+/**
+ * Warps `file` using an explicit set of 4 corners (full-resolution image
+ * coordinates), e.g. from the manual corner adjuster. Returns the cropped
+ * image, or { ok: false } if OpenCV is unavailable or the warp fails.
+ * @returns {Promise<{ ok: false } | { ok: true, blob: Blob, url: string, width: number, height: number }>}
+ */
+export async function warpCardWithCorners(file, corners) {
+  let cv;
+  try {
+    cv = await loadOpenCV();
+  } catch {
+    return { ok: false };
+  }
+
+  let bitmap;
+  try {
+    bitmap = await decodeImage(file);
+    const naturalW = bitmap.naturalWidth ?? bitmap.width;
+    const naturalH = bitmap.naturalHeight ?? bitmap.height;
+
+    const fullCanvas = drawToCanvas(bitmap, naturalW, naturalH);
+    const outCanvas = warpCard(cv, fullCanvas, corners);
+    const blob = await canvasToBlob(outCanvas);
+    if (!blob) return { ok: false };
+
+    return {
+      ok: true,
+      blob,
+      url: outCanvas.toDataURL('image/jpeg', JPEG_QUALITY),
+      width: outCanvas.width,
+      height: outCanvas.height,
+    };
+  } catch {
+    return { ok: false };
   } finally {
     if (bitmap && typeof bitmap.close === 'function') bitmap.close();
   }

@@ -5,6 +5,7 @@ import {
   quadSides,
   isPlausibleCard,
   outputDimsFor,
+  defaultCorners,
   OUTPUT,
 } from '@/utils/cardCrop.js';
 
@@ -93,5 +94,21 @@ describe('outputDimsFor', () => {
   it('returns landscape dimensions for a landscape card', () => {
     const landscape = [[100, 100], [800, 100], [800, 600], [100, 600]]; // 700×500
     expect(outputDimsFor(landscape)).toEqual({ width: OUTPUT.height, height: OUTPUT.width });
+  });
+});
+
+describe('defaultCorners', () => {
+  it('returns an inset rectangle ordered [tl, tr, br, bl]', () => {
+    // 8% inset of a 1000×1000 image → 80..920
+    expect(defaultCorners(1000, 1000)).toEqual([[80, 80], [920, 80], [920, 920], [80, 920]]);
+  });
+
+  it('respects a custom inset', () => {
+    expect(defaultCorners(1000, 2000, 0.1)).toEqual([[100, 200], [900, 200], [900, 1800], [100, 1800]]);
+  });
+
+  it('produces a plausible card quad for a portrait frame', () => {
+    // A 1000×1400 frame inset 8% is ~840×1288 → ratio ~0.65, within card range.
+    expect(isPlausibleCard(defaultCorners(1000, 1400), 1000, 1400)).toBe(true);
   });
 });
