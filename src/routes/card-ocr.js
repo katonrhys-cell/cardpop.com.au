@@ -21,6 +21,62 @@ function sseWrite(res, type, content) {
 	res.write(`data: ${JSON.stringify({ type, data: { content } })}\n\n`);
 }
 
+// Cheap model handles most scans; escalate to the stronger model only when the
+// cheap one is unsure — keeps cost low while lifting accuracy on hard cards.
+const OCR_MODEL_FAST = 'claude-haiku-4-5-20251001';
+const OCR_MODEL_STRONG = 'claude-sonnet-4-6';
+
+// Per-call timeouts are tightened so a fast call + an escalation still fit
+// inside the 30s serverless function budget (see vercel.json maxDuration).
+const OCR_TIMEOUT_FAST = 12_000;
+const OCR_TIMEOUT_STRONG = 15_000;
+
+async function requestOcr({ apiKey, model, system, promptText, imageBlocks, timeoutMs }) {
+	const res = await fetch('https://api.anthropic.com/v1/messages', {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'x-api-key': apiKey,
+			'anthropic-version': '2023-06-01',
+		},
+		body: JSON.stringify({
+			model,
+			max_tokens: 1024,
+			system,
+			messages: [{
+				role: 'user',
+				content: [
+					{ type: 'text', text: promptText },
+					...imageBlocks,
+				],
+			}],
+		}),
+		signal: AbortSignal.timeout(timeoutMs),
+	});
+
+	if (!res.ok) {
+		const errBody = await res.text().catch(() => '');
+		throw new Error(`Anthropic API error ${res.status}: ${errBody}`);
+	}
+
+	const data = await res.json();
+	return data.content?.[0]?.text ?? '';
+}
+
+// Decides whether the fast model's result warrants a second pass with the
+// stronger model: unreadable JSON, no card name, or self-reported low confidence.
+function shouldEscalate(content) {
+	try {
+		const match = content.match(/\{[\s\S]*\}/);
+		if (!match) return true;
+		const data = JSON.parse(match[0]);
+		if (!data.name) return true;
+		return String(data.confidence ?? '').toLowerCase() === 'low';
+	} catch {
+		return true;
+	}
+}
+
 router.post('/scan', integratedAiRateLimit, requireAuth, uploadFiles({
 	allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
 	fieldName: 'images',
@@ -55,35 +111,22 @@ router.post('/scan', integratedAiRateLimit, requireAuth, uploadFiles({
 			? `Analyze this trading card and extract all visible information as JSON. ${req.files.length} images are provided: the first is the card front; the remaining images are the back and/or additional angles — use them to read set codes, collector numbers and copyright text.`
 			: 'Analyze this trading card and extract all visible information as JSON.';
 
-		const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'x-api-key': apiKey,
-				'anthropic-version': '2023-06-01',
-			},
-			body: JSON.stringify({
-				model: 'claude-haiku-4-5-20251001',
-				max_tokens: 1024,
-				system: CardOCRPrompt,
-				messages: [{
-					role: 'user',
-					content: [
-						{ type: 'text', text: promptText },
-						...imageBlocks,
-					],
-				}],
-			}),
-			signal: AbortSignal.timeout(25_000),
-		});
+		const ocrArgs = { apiKey, system: CardOCRPrompt, promptText, imageBlocks };
 
-		if (!anthropicRes.ok) {
-			const errBody = await anthropicRes.text().catch(() => '');
-			throw new Error(`Anthropic API error ${anthropicRes.status}: ${errBody}`);
+		let content = await requestOcr({ ...ocrArgs, model: OCR_MODEL_FAST, timeoutMs: OCR_TIMEOUT_FAST });
+
+		// Confidence-gated escalation: only pay for the stronger model when the
+		// fast model couldn't confidently identify the card.
+		if (shouldEscalate(content)) {
+			logger.info('[CARD_OCR] Low-confidence fast result — escalating to stronger model');
+			try {
+				const stronger = await requestOcr({ ...ocrArgs, model: OCR_MODEL_STRONG, timeoutMs: OCR_TIMEOUT_STRONG });
+				if (stronger) content = stronger;
+			} catch (err) {
+				// Keep the fast result rather than failing the whole scan.
+				logger.warn(`[CARD_OCR] Escalation failed, using fast result: ${err.message}`);
+			}
 		}
-
-		const anthropicData = await anthropicRes.json();
-		const content = anthropicData.content?.[0]?.text ?? '';
 
 		sseWrite(res, 'content', content);
 		sseWrite(res, 'completed', '[COMPLETED]');
