@@ -1175,7 +1175,7 @@ const AddEditCardPage = () => {
                     <Label className="font-bold">Card Attributes</Label>
                     <div className="flex gap-3">
                       {[
-                        { key: 'isFoil',   label: '✨ Foil',          desc: 'Holographic / foil finish' },
+                        { key: 'isFoil',   label: '🃏 Individual Card (Single)', desc: 'A single individual card' },
                         { key: 'isSealed', label: '📦 Sealed Product', desc: 'Booster, box, or sealed item' },
                         { key: 'isRookie', label: '🏆 Rookie Card',    desc: 'First-year professional card' },
                       ].map(({ key, label, desc }) => (
@@ -1196,8 +1196,8 @@ const AddEditCardPage = () => {
                     </div>
                     <div className="flex gap-3 items-stretch">
                       {[
-                        { key: 'isRefractor', label: '🌈 Refractor',  desc: 'Refractor / prizm parallel' },
-                        { key: 'isAuto',      label: '✍️ Auto',        desc: 'Signed autograph card' },
+                        { key: 'isRefractor', label: '🎁 Bundles',  desc: '6 card max' },
+                        { key: 'isAuto',      label: '🗂️ Complete Set',  desc: 'A full / complete set' },
                       ].map(({ key, label, desc }) => (
                         <button
                           key={key}
