@@ -4,7 +4,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, ChevronDown, Sparkles, Loader2,
   Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X, Crop,
-  Frame, Wand2,
+  Frame, Wand2, SlidersHorizontal,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -31,6 +31,8 @@ import PhotoTemplateModal from '@/components/PhotoTemplateModal.jsx';
 import { analyzePhotoQuality } from '@/utils/photoQuality.js';
 import { useCardCrop } from '@/hooks/useCardCrop.js';
 import CardCropPreview from '@/components/CardCropPreview.jsx';
+import CardCornerAdjuster from '@/components/CardCornerAdjuster.jsx';
+import { warpCardWithCorners } from '@/utils/detectCard.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -105,6 +107,7 @@ const AddEditCardPage = () => {
   const [photoQuality, setPhotoQuality]       = useState(null);
   const [checkingQuality, setCheckingQuality] = useState(false);
   const { detectingKey, candidate: cropCandidate, detect: detectCrop, clear: clearCrop } = useCardCrop();
+  const [adjusting, setAdjusting]             = useState(null); // { key, file, imageUrl, initialCorners }
   const [showAutoGuide, setShowAutoGuide]     = useState(false);
   const [showPatchGuide, setShowPatchGuide]   = useState(false);
   const [showRelicGuide, setShowRelicGuide]   = useState(false);
@@ -339,26 +342,54 @@ const AddEditCardPage = () => {
     clearScan();
     clearCardSight();
     clearCrop();
+    setAdjusting(null);
     runPhotoQuality(file);
   };
 
-  // Replace the main image with its auto-cropped version.
-  const applyMainCrop = () => {
-    if (!cropCandidate) return;
-    setImageFile(cropCandidate.croppedFile);
-    setImagePreview(cropCandidate.croppedUrl);
-    runPhotoQuality(cropCandidate.croppedFile);
+  // Apply a cropped image to the given slot ('main' or an extra-photo index).
+  const applyCropResult = (key, croppedFile, croppedUrl) => {
+    if (key === 'main') {
+      setImageFile(croppedFile);
+      setImagePreview(croppedUrl);
+      runPhotoQuality(croppedFile);
+    } else {
+      const nf = [...extraFiles]; nf[key] = croppedFile; setExtraFiles(nf);
+      const np = [...extraPreviews]; np[key] = croppedUrl; setExtraPreviews(np);
+    }
     clearCrop();
     toast.success('Using the cropped card image.');
   };
 
-  // Replace extra photo `idx` with its auto-cropped version.
-  const applyExtraCrop = (idx) => {
-    if (!cropCandidate) return;
-    const nf = [...extraFiles]; nf[idx] = cropCandidate.croppedFile; setExtraFiles(nf);
-    const np = [...extraPreviews]; np[idx] = cropCandidate.croppedUrl; setExtraPreviews(np);
-    clearCrop();
-    toast.success('Using the cropped image.');
+  const applyMainCrop = () =>
+    cropCandidate && applyCropResult('main', cropCandidate.croppedFile, cropCandidate.croppedUrl);
+  const applyExtraCrop = (idx) =>
+    cropCandidate && applyCropResult(idx, cropCandidate.croppedFile, cropCandidate.croppedUrl);
+
+  // Open the manual corner adjuster for a slot, seeded with detected corners
+  // when available (otherwise the editor falls back to an inset rectangle).
+  const openAdjuster = (key, file, imageUrl, initialCorners = null) => {
+    if (!file) return;
+    setAdjusting({ key, file, imageUrl, initialCorners });
+  };
+
+  // Auto-detect first; if nothing is found, drop straight into manual adjust.
+  const cropOrAdjust = async (key, file, imageUrl) => {
+    const found = await detectCrop(key, file);
+    if (!found) openAdjuster(key, file, imageUrl);
+  };
+
+  // Warp the image with the user-adjusted corners and apply the result.
+  const handleAdjustApply = async (corners) => {
+    if (!adjusting) return;
+    const res = await warpCardWithCorners(adjusting.file, corners);
+    if (!res?.ok || !res.blob) {
+      toast.error('Could not crop with those corners. Try again.');
+      return;
+    }
+    const base = (adjusting.file.name || 'card').replace(/\.[^.]+$/, '');
+    const croppedFile = new File([res.blob], `${base}-cropped.jpg`, { type: 'image/jpeg' });
+    applyCropResult(adjusting.key, croppedFile, res.url);
+    setAdjusting(null);
   };
 
   // ─── Unified AI analysis ──────────────────────────────────────────────────
@@ -706,6 +737,7 @@ const AddEditCardPage = () => {
               setErrors({});
               setIsAutoFilled(false);
               clearCrop();
+              setAdjusting(null);
               clearScan();
               // Keep franchise/manufacturer selected for fast repeat entry
               window.scrollTo(0, 0);
@@ -791,18 +823,31 @@ const AddEditCardPage = () => {
 
                 {/* Auto-crop (opt-in): button → detecting → preview + confirm */}
                 {imageFile && !(cropCandidate?.key === 'main') && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => detectCrop('main', imageFile)}
-                    disabled={detectingKey !== null}
-                    className="mt-3 w-full gap-1.5"
-                  >
-                    {detectingKey === 'main'
-                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Detecting card edges…</>
-                      : <><Crop className="w-3.5 h-3.5" /> Straighten &amp; crop to card</>}
-                  </Button>
+                  <div className="mt-3 flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => cropOrAdjust('main', imageFile, imagePreview)}
+                      disabled={detectingKey !== null}
+                      className="flex-1 gap-1.5"
+                    >
+                      {detectingKey === 'main'
+                        ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Detecting card edges…</>
+                        : <><Crop className="w-3.5 h-3.5" /> Straighten &amp; crop to card</>}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => openAdjuster('main', imageFile, imagePreview)}
+                      disabled={detectingKey !== null}
+                      title="Adjust crop corners manually"
+                      className="gap-1.5"
+                    >
+                      <SlidersHorizontal className="w-3.5 h-3.5" /> Adjust
+                    </Button>
+                  </div>
                 )}
 
                 {cropCandidate?.key === 'main' && (
@@ -810,6 +855,7 @@ const AddEditCardPage = () => {
                     originalUrl={imagePreview}
                     croppedUrl={cropCandidate.croppedUrl}
                     onApply={applyMainCrop}
+                    onAdjust={() => openAdjuster('main', imageFile, imagePreview, cropCandidate.corners)}
                     onDismiss={clearCrop}
                   />
                 )}
@@ -842,7 +888,7 @@ const AddEditCardPage = () => {
                             <button
                               type="button"
                               title="Straighten & crop to card"
-                              onClick={() => detectCrop(idx, extraFiles[idx])}
+                              onClick={() => cropOrAdjust(idx, extraFiles[idx], extraPreviews[idx])}
                               disabled={detectingKey !== null}
                               className="absolute bottom-0.5 left-0.5 bg-black/60 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-40"
                             >
@@ -884,10 +930,20 @@ const AddEditCardPage = () => {
                       originalUrl={extraPreviews[cropCandidate.key]}
                       croppedUrl={cropCandidate.croppedUrl}
                       onApply={() => applyExtraCrop(cropCandidate.key)}
+                      onAdjust={() => openAdjuster(cropCandidate.key, extraFiles[cropCandidate.key], extraPreviews[cropCandidate.key], cropCandidate.corners)}
                       onDismiss={clearCrop}
                     />
                   )}
                 </div>
+
+                {adjusting && (
+                  <CardCornerAdjuster
+                    imageUrl={adjusting.imageUrl}
+                    initialCorners={adjusting.initialCorners}
+                    onApply={handleAdjustApply}
+                    onCancel={() => setAdjusting(null)}
+                  />
+                )}
 
                 {/* Photo Template & Card Identification */}
                 <div className="mt-4 space-y-3">

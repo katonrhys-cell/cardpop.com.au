@@ -1,12 +1,13 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Sparkles, CheckCircle2 } from 'lucide-react';
+import { Sparkles, CheckCircle2, SlidersHorizontal } from 'lucide-react';
 
 /**
  * Original-vs-cropped confirmation panel for the card auto-crop feature.
- * Shown after detection succeeds; the user chooses to apply or keep the original.
+ * Shown after detection succeeds; the user chooses to apply, fine-tune the
+ * corners, or keep the original.
  */
-const CardCropPreview = ({ originalUrl, croppedUrl, onApply, onDismiss }) => (
+const CardCropPreview = ({ originalUrl, croppedUrl, onApply, onAdjust, onDismiss }) => (
   <div className="mt-3 rounded-xl border border-primary/20 bg-primary/5 p-3 animate-in fade-in">
     <p className="text-xs font-semibold text-primary mb-2 flex items-center gap-1.5">
       <Sparkles className="w-3.5 h-3.5" />
@@ -26,6 +27,11 @@ const CardCropPreview = ({ originalUrl, croppedUrl, onApply, onDismiss }) => (
       <Button type="button" size="sm" onClick={onApply} className="flex-1 font-semibold gap-1.5">
         <CheckCircle2 className="w-4 h-4" /> Use cropped
       </Button>
+      {onAdjust && (
+        <Button type="button" size="sm" variant="outline" onClick={onAdjust} className="flex-1 gap-1.5">
+          <SlidersHorizontal className="w-3.5 h-3.5" /> Adjust
+        </Button>
+      )}
       <Button type="button" size="sm" variant="outline" onClick={onDismiss} className="flex-1">
         Keep original
       </Button>
