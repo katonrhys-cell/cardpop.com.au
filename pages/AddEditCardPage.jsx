@@ -1197,7 +1197,7 @@ const AddEditCardPage = () => {
                     <div className="flex gap-3 items-stretch">
                       {[
                         { key: 'isRefractor', label: '🎁 Bundles',  desc: '6 card max' },
-                        { key: 'isAuto',      label: '✍️ Auto',        desc: 'Signed autograph card' },
+                        { key: 'isAuto',      label: '🗂️ Complete Set',  desc: 'A full / complete set' },
                       ].map(({ key, label, desc }) => (
                         <button
                           key={key}
