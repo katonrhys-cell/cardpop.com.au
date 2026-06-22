@@ -345,7 +345,9 @@ const AddEditCardPage = () => {
     };
     const gradingCompanyMap = { 'PSA': 'psa', 'BGS': 'bgs', 'CGC': 'cgc', 'SGC': 'sgc', 'ACE': 'ace' };
 
-    const ocrResult = await scanCard(imageFile);
+    // Pass the front plus any back/extra images so OCR can read set codes and
+    // collector numbers that are clearer (or only present) on the back.
+    const ocrResult = await scanCard([imageFile, ...extraFiles.filter(Boolean)].slice(0, 3));
     if (ocrResult) {
       setFormData(prev => ({
         ...prev,
@@ -701,14 +703,22 @@ const AddEditCardPage = () => {
                       )}
 
                       {scanResult && !cardSightResult?.identified && (
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-foreground/80 mb-2">
-                          {scanResult.name && <div className="col-span-2"><strong className="text-foreground">Name:</strong> {scanResult.name}</div>}
-                          {scanResult.collectionType && <div><strong className="text-foreground">Category:</strong> {scanResult.collectionType}</div>}
-                          {scanResult.condition && <div><strong className="text-foreground">Condition:</strong> {scanResult.condition}</div>}
-                          {scanResult.cardSetName && <div><strong className="text-foreground">Set:</strong> {scanResult.cardSetName}</div>}
-                          {scanResult.gradeScore && <div><strong className="text-foreground">Grade:</strong> {scanResult.gradeScore}</div>}
-                          {scanResult.rarity && <div className="col-span-2"><strong className="text-foreground">Rarity:</strong> {scanResult.rarity}</div>}
-                        </div>
+                        <>
+                          {scanResult.catalogueMatch && (
+                            <div className="text-[11px] font-semibold text-emerald-700 bg-emerald-500/10 rounded-lg px-2.5 py-1.5 mb-2">
+                              ✓ Matched to catalogue ({scanResult.catalogueMatch.source}) — set &amp; card number verified
+                            </div>
+                          )}
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-foreground/80 mb-2">
+                            {scanResult.name && <div className="col-span-2"><strong className="text-foreground">Name:</strong> {scanResult.name}</div>}
+                            {scanResult.collectionType && <div><strong className="text-foreground">Category:</strong> {scanResult.collectionType}</div>}
+                            {scanResult.condition && <div><strong className="text-foreground">Condition:</strong> {scanResult.condition}</div>}
+                            {scanResult.cardSetName && <div><strong className="text-foreground">Set:</strong> {scanResult.cardSetName}</div>}
+                            {scanResult.cardNumber && <div><strong className="text-foreground">No:</strong> {scanResult.cardNumber}</div>}
+                            {scanResult.gradeScore && <div><strong className="text-foreground">Grade:</strong> {scanResult.gradeScore}</div>}
+                            {scanResult.rarity && <div className="col-span-2"><strong className="text-foreground">Rarity:</strong> {scanResult.rarity}</div>}
+                          </div>
+                        </>
                       )}
 
                       <div className="pt-2 border-t border-border/50">

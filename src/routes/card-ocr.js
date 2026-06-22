@@ -50,6 +50,11 @@ router.post('/scan', integratedAiRateLimit, requireAuth, uploadFiles({
 			},
 		}));
 
+		// Tell the model how to read multiple images: first = front, rest = back/extra.
+		const promptText = req.files.length > 1
+			? `Analyze this trading card and extract all visible information as JSON. ${req.files.length} images are provided: the first is the card front; the remaining images are the back and/or additional angles — use them to read set codes, collector numbers and copyright text.`
+			: 'Analyze this trading card and extract all visible information as JSON.';
+
 		const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
 			method: 'POST',
 			headers: {
@@ -64,7 +69,7 @@ router.post('/scan', integratedAiRateLimit, requireAuth, uploadFiles({
 				messages: [{
 					role: 'user',
 					content: [
-						{ type: 'text', text: 'Analyze this trading card and extract all visible information as JSON.' },
+						{ type: 'text', text: promptText },
 						...imageBlocks,
 					],
 				}],

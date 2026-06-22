@@ -48,6 +48,13 @@ VALID COLLECTION TYPES (use exactly as written if applicable):
 TCG: Pokemon, Magic: The Gathering, Yu-Gi-Oh, Digimon, Riftbound, TMNT, Final Fantasy, Disney Lorcana, One Piece, Flesh and Blood, Dragon Ball Super, Star Wars Unlimited, Weiss Schwarz, Cardfight!! Vanguard
 SPORTS: NBA, NFL, MLB, Cricket, NRL, NHL, Formula 1, Wrestling, Golf, Soccer, AFL, AFLW, Rugby Union, Boxing, MMA, Tennis, UFC
 
+WHERE TO LOOK — the details that identify a card are small and easily misread. Inspect these regions deliberately:
+- SET SYMBOL: the small icon near the bottom of the art (Pokemon) or set code stamped on the card — it pins down the exact set/expansion.
+- COLLECTOR NUMBER: usually a bottom corner, formatted "x/y" (e.g. 4/102) or a set code + number (e.g. SWSH114, TG12/TG30). Transcribe it EXACTLY, including the part after the slash.
+- COPYRIGHT / YEAR LINE: the fine print along the bottom edge (e.g. "©2023 Pokémon") — use it for releaseYear and to confirm the era.
+- EDITION / PRINT MARKERS: "1st Edition" stamps, "Shadowless", "Unlimited", foil/holo pattern, full-art or alternate-art treatment.
+- If multiple images are provided, the FIRST is the card front; use the BACK and any additional images to read set codes, numbers and copyright text that are clearer or only present there.
+
 GRADING SLABS: If a graded slab is visible, identify PSA / BGS / CGC and extract the numeric grade and cert number from the label.
 
 Return ONLY valid JSON with these exact fields (use null for anything not clearly visible):
@@ -65,12 +72,15 @@ Return ONLY valid JSON with these exact fields (use null for anything not clearl
   "cardType": "e.g. Holographic, Foil, Full Art, Regular, Reverse Holo, First Edition",
   "brand": "manufacturer e.g. The Pokemon Company, Wizards of the Coast, Topps, Panini, Upper Deck",
   "series": "broader series or product line name",
-  "description": "brief description including notable details, special attributes, edition markers, print run"
+  "description": "brief description including notable details, special attributes, edition markers, print run",
+  "confidence": "high | medium | low — your confidence in the name + set + number identification",
+  "candidateSets": ["up to 3 best-guess set/expansion names, most likely first, when the set is not certain — else []"]
 }
 
 IMPORTANT:
 - Only include information CLEARLY VISIBLE in the image
-- If a field is uncertain, use null
+- If a field is uncertain, use null (but always provide "confidence", and "candidateSets" as an array)
+- Do NOT guess a set name with false confidence — if unsure, lower "confidence" and list possibilities in "candidateSets"
 - Return ONLY the JSON object — no markdown, no code blocks, no explanatory text`;
 
 export const EventScraperPrompt = `You are an expert event information extractor and SEO copywriter specialising in Australian trading card and collectibles events. Analyse the provided webpage content and extract ALL available event information, then GENERATE high-quality SEO content for fields not present in the source.
