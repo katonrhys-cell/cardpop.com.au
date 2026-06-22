@@ -12,10 +12,10 @@ export async function createSlabImage(imageBuffer) {
     const templateWidth = 1000;
     const templateHeight = 1400;
 
-    // Calculate scaling to fit card in template while maintaining aspect ratio
-    // Leave 80px padding on each side for card centering
-    const cardMaxWidth = templateWidth - 160;
-    const cardMaxHeight = templateHeight - 200;
+    // Calculate scaling so the card fills 95% of the template while
+    // maintaining its aspect ratio.
+    const cardMaxWidth = Math.round(templateWidth * 0.95);
+    const cardMaxHeight = Math.round(templateHeight * 0.95);
 
     let cardWidth = cardMaxWidth;
     let cardHeight = (cardMaxWidth / originalWidth) * originalHeight;
@@ -27,7 +27,7 @@ export async function createSlabImage(imageBuffer) {
 
     // Center card in template
     const cardX = Math.round((templateWidth - cardWidth) / 2);
-    const cardY = Math.round((templateHeight - cardHeight) / 2 - 50); // Shift up slightly
+    const cardY = Math.round((templateHeight - cardHeight) / 2);
 
     // Resize and composite the card onto white background
     const resizedCard = await sharp(imageBuffer)
