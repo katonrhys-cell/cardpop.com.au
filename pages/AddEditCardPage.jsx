@@ -1175,7 +1175,7 @@ const AddEditCardPage = () => {
                     <Label className="font-bold">Card Attributes</Label>
                     <div className="flex gap-3">
                       {[
-                        { key: 'isFoil',   label: '✨ Foil',          desc: 'Holographic / foil finish' },
+                        { key: 'isFoil',   label: '🃏 Individual Card (Single)', desc: 'A single individual card' },
                         { key: 'isSealed', label: '📦 Sealed Product', desc: 'Booster, box, or sealed item' },
                         { key: 'isRookie', label: '🏆 Rookie Card',    desc: 'First-year professional card' },
                       ].map(({ key, label, desc }) => (
