@@ -92,8 +92,9 @@ export function usePhotoTemplate() {
           const img = new Image();
 
           img.onload = () => {
-            const cardMaxWidth = TEMPLATE_W - 160;
-            const cardMaxHeight = TEMPLATE_H - 200;
+            // The card should fill 95% of the template in both dimensions.
+            const cardMaxWidth = Math.round(TEMPLATE_W * 0.95);
+            const cardMaxHeight = Math.round(TEMPLATE_H * 0.95);
 
             // Detect the card and crop to it; fall back to the whole image.
             let sx = 0, sy = 0, sw = img.width, sh = img.height, bgColor = null;
@@ -131,7 +132,7 @@ export function usePhotoTemplate() {
               cardWidth = (cardMaxHeight / sh) * sw;
             }
             const cardX = Math.round((TEMPLATE_W - cardWidth) / 2);
-            const cardY = Math.round((TEMPLATE_H - cardHeight) / 2 - 50);
+            const cardY = Math.round((TEMPLATE_H - cardHeight) / 2);
 
             const canvas = document.createElement('canvas');
             canvas.width = TEMPLATE_W;
