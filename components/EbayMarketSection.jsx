@@ -19,7 +19,9 @@ const EbayMarketSection = ({ cardName, cardSet, gradingService, gradeScore }) =>
     const fetchEbayData = async () => {
       try {
         const params = new URLSearchParams();
-        params.append('name', cardName);
+        // Sanitize card name: remove special chars that confuse search (hyphens, dashes)
+        const sanitizedName = cardName.replace(/[-–—]/g, ' ').replace(/\s+/g, ' ').trim();
+        params.append('name', sanitizedName);
         if (cardSet) params.append('set', cardSet);
         if (gradingService && gradingService !== 'None') {
           params.append('gradingService', gradingService);
