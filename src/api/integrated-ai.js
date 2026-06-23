@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { NodeEnv } from '../constants/common.js';
 import logger from '../utils/logger.js';
 import { supabase } from '../utils/supabaseClient.js';
+import { compressImageBuffer } from '../utils/compressImageBuffer.js';
 
 dotenv.config();
 
@@ -159,8 +160,10 @@ export async function uploadImagesToSupabase({ images }) {
 		const ext = file.originalname.split('.').pop() || 'jpg';
 		const path = `ocr/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-		const { error } = await supabase.storage.from('ai-images').upload(path, file.buffer, {
-			contentType: file.mimetype,
+		const { buffer, contentType } = await compressImageBuffer(file.buffer, file.mimetype);
+
+		const { error } = await supabase.storage.from('ai-images').upload(path, buffer, {
+			contentType,
 			upsert: true,
 		});
 		if (error) throw new Error(`Image upload failed: ${error.message}`);
