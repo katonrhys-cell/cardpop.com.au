@@ -58,6 +58,31 @@ export async function verifyGradingNumber({ gradingNumber, company = 'psa' }) {
   }
 }
 
+/**
+ * Read a verification result from the cache only — never queries the external
+ * API. Returns the same shape as verifyGradingNumber when a valid cache entry
+ * exists, or null when there is no (valid) cached result.
+ */
+export async function getCachedVerification({ gradingNumber, company = 'psa' }) {
+  if (!gradingNumber || typeof gradingNumber !== 'string') {
+    throw new Error('gradingNumber is required');
+  }
+  if (company !== 'psa' && company !== 'beckett') {
+    throw new Error('company must be either "psa" or "beckett"');
+  }
+
+  const cached = await getFromCache(gradingNumber.trim(), company);
+  if (!cached || !isCacheValid(cached)) return null;
+
+  return {
+    verified: cached.verified,
+    company,
+    details: cached.details,
+    cached: true,
+    cachedAt: cached.verified_at,
+  };
+}
+
 async function getFromCache(gradingNumber, company) {
   try {
     const { data, error } = await supabase

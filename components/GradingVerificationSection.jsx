@@ -37,14 +37,21 @@ const GradingVerificationSection = ({ gradingNumber, gradingCompany = 'psa', gra
 
   if (!gradingNumber) return null;
 
+  // Only assert verification once the lookup has actually confirmed the cert.
+  // Showing "Verified by CardPop" for an unverified/not-found/errored cert would
+  // mislead buyers on public listing pages.
+  const isVerified = !loading && !error && result?.verified === true;
+
   return (
     <div className="pt-4 border-t border-border space-y-4">
       <div className="flex items-center gap-2">
         <ShieldCheck className="w-5 h-5 text-primary" />
         <h4 className="font-bold text-sm uppercase tracking-wide">Certification Verification</h4>
-        <Badge variant="outline" className="ml-auto text-[10px] font-bold border-emerald-400/50 text-emerald-700 bg-emerald-400/10">
-          Verified by CardPop
-        </Badge>
+        {isVerified && (
+          <Badge variant="outline" className="ml-auto text-[10px] font-bold border-emerald-400/50 text-emerald-700 bg-emerald-400/10">
+            Verified by CardPop
+          </Badge>
+        )}
       </div>
 
       <div className="space-y-2 text-sm">
@@ -105,9 +112,19 @@ const GradingVerificationSection = ({ gradingNumber, gradingCompany = 'psa', gra
         </div>
       </div>
 
-      <p className="text-xs text-muted-foreground pt-2 border-t border-border/50">
-        This certificate number has been verified against the official {gradingCompany.toUpperCase()} database to confirm authenticity and accuracy of the grade and card details.
-      </p>
+      {isVerified ? (
+        <p className="text-xs text-muted-foreground pt-2 border-t border-border/50">
+          This certificate number has been verified against the official {gradingCompany.toUpperCase()} database to confirm authenticity and accuracy of the grade and card details.
+        </p>
+      ) : (
+        <p className="text-xs text-muted-foreground pt-2 border-t border-border/50">
+          {error
+            ? `We couldn't reach the ${gradingCompany.toUpperCase()} database to verify this certificate. Please try again later.`
+            : result
+              ? `This certificate number could not be found in the official ${gradingCompany.toUpperCase()} database. Confirm the details directly with ${gradingCompany.toUpperCase()} before purchasing.`
+              : `Checking this certificate number against the official ${gradingCompany.toUpperCase()} database…`}
+        </p>
+      )}
     </div>
   );
 };
