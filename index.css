@@ -537,3 +537,18 @@
   padding-left: 1rem;
   border-left: 3px solid hsl(var(--border));
 }
+
+/* Accessibility: respect users who prefer reduced motion.
+   Only active when the OS-level "reduce motion" setting is on. It tames the
+   site's transitions/animations (hover zooms, fades, shimmers, framer-motion)
+   for people prone to motion sickness or vestibular issues. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

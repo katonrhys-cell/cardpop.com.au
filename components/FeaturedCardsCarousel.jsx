@@ -233,6 +233,7 @@ const FeaturedCardsCarousel = () => {
                         <img
                           src={card.image_urls[0]}
                           alt={card.card_name || card.cardName || 'Trading Card'}
+                          decoding="async"
                           className="w-full h-full object-contain drop-shadow-xl group-hover/card:scale-[1.03] transition-transform duration-500"
                         />
                       ) : (
