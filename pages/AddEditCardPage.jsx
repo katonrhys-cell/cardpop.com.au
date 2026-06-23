@@ -138,7 +138,6 @@ const AddEditCardPage = () => {
     isFoil:         false,
     isSealed:       false,
     isRookie:       false,
-    isRefractor:    false,
     serialNumber:   '',
     isAuto:         false,
     autoType:       '',
@@ -269,7 +268,6 @@ const AddEditCardPage = () => {
           isFoil:         card.is_foil        ?? false,
           isSealed:       card.is_sealed      ?? false,
           isRookie:       card.is_rookie      ?? false,
-          isRefractor:    card.is_refractor   ?? false,
           serialNumber:   card.serial_number  || '',
           isAuto:         card.is_auto        ?? false,
           autoType:       card.auto_type      || '',
@@ -679,7 +677,7 @@ const AddEditCardPage = () => {
         is_foil:             formData.isFoil,
         is_sealed:           formData.isSealed,
         is_rookie:           formData.isRookie,
-        is_refractor:        formData.isRefractor,
+        is_refractor:        formData.variant.includes('Refractor'),
         serial_number:       formData.serialNumber?.trim() || null,
         is_auto:             formData.isAuto,
         auto_type:           formData.variant.includes('Auto') ? (formData.autoType || null) : null,
@@ -1343,7 +1341,6 @@ const AddEditCardPage = () => {
                     </div>
                     <div className="flex gap-3 items-stretch">
                       {[
-                        { key: 'isRefractor', label: '🎁 Bundles',  desc: '6 card max' },
                         { key: 'isAuto',      label: '🗂️ Complete Set',  desc: 'A full / complete set' },
                       ].map(({ key, label, desc }) => (
                         <button

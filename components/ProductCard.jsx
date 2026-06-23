@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Star, ShieldCheck, ZoomIn } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
+import { getRefractorLabel } from '@/lib/cardAttributeLabels.js';
 import { supabase } from '@/lib/supabaseClient.js';
 import CardMicroscope from '@/components/CardMicroscope.jsx';
 
@@ -124,10 +125,10 @@ const ProductCard = ({ product }) => {
               <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground capitalize">{product.condition.replace(/_/g, ' ')}</Badge>
             )}
             {(product.is_foil || product.isFoil) && <Badge variant="outline" className="text-[10px] font-bold border-yellow-400/50 text-yellow-700 bg-yellow-400/10">Foil</Badge>}
-            {(product.is_refractor || product.isRefractor) && <Badge variant="outline" className="text-[10px] font-bold border-indigo-400/50 text-indigo-700 bg-indigo-400/10">Refractor</Badge>}
+            {getRefractorLabel(product) && <Badge variant="outline" className="text-[10px] font-bold border-indigo-400/50 text-indigo-700 bg-indigo-400/10">{getRefractorLabel(product)}</Badge>}
             {(product.is_auto || product.isAuto) && <Badge variant="outline" className="text-[10px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10">Auto</Badge>}
             {(product.is_sealed || product.isSealed) && <Badge variant="outline" className="text-[10px] font-bold border-green-400/50 text-green-700 bg-green-400/10">Sealed</Badge>}
-            {(product.variant || product.cardVariant) && (product.variant || product.cardVariant).split(',').map(v => v.trim()).filter(Boolean).map(v => (
+            {(product.variant || product.cardVariant) && (product.variant || product.cardVariant).split(',').map(v => v.trim()).filter(v => v && v !== 'Refractor').map(v => (
               <Badge key={v} variant="outline" className="text-[10px] font-bold border-primary/30 text-primary bg-primary/5">{v}</Badge>
             ))}
           </div>

@@ -9,6 +9,7 @@ import SellerTierBadge from '@/components/SellerTierBadge.jsx';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { VARIANT_BADGES } from '@/lib/cardVariants.js';
+import { getRefractorLabel } from '@/lib/cardAttributeLabels.js';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { useWatchlist } from '@/hooks/useWatchlist.js';
@@ -166,7 +167,7 @@ const MarketplaceListingCard = ({ listing }) => {
               <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground capitalize">{vaultItem.condition.replace(/_/g, ' ')}</Badge>
             )}
             {vaultItem?.is_foil && <Badge variant="outline" className="text-[10px] font-bold border-yellow-400/50 text-yellow-700 bg-yellow-400/10">Foil</Badge>}
-            {vaultItem?.is_refractor && <Badge variant="outline" className="text-[10px] font-bold border-indigo-400/50 text-indigo-700 bg-indigo-400/10">Refractor</Badge>}
+            {getRefractorLabel(vaultItem) && <Badge variant="outline" className="text-[10px] font-bold border-indigo-400/50 text-indigo-700 bg-indigo-400/10">{getRefractorLabel(vaultItem)}</Badge>}
             {vaultItem?.is_auto && (
               <Badge variant="outline" className="text-[10px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10">
                 {[
@@ -178,7 +179,7 @@ const MarketplaceListingCard = ({ listing }) => {
             )}
             {vaultItem?.is_rookie && <Badge variant="outline" className="text-[10px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10">RC</Badge>}
             {vaultItem?.is_sealed && <Badge variant="outline" className="text-[10px] font-bold border-green-400/50 text-green-700 bg-green-400/10">Sealed</Badge>}
-            {variants.map(v => (
+            {variants.filter(v => v !== 'Refractor').map(v => (
               <Badge key={v} variant="outline" className="text-[10px] font-bold border-primary/30 text-primary bg-primary/5">{v}</Badge>
             ))}
           </div>
