@@ -23,7 +23,7 @@ const MarketplaceListingPage = () => {
       try {
         const { data, error } = await supabase
           .from('listings')
-          .select('*, seller:profiles!seller_id(*)')
+          .select('*, vault_item:vault_items(*), seller:profiles!seller_id(*)')
           .eq('id', id)
           .single();
         if (error) throw error;
@@ -125,7 +125,7 @@ const MarketplaceListingPage = () => {
             <GradingVerificationSection
               gradingNumber={listing.grading_number}
               gradingCompany={listing.grading_company || 'psa'}
-              grade={listing.grade}
+              grade={listing.vault_item?.grade}
             />
           )}
 
