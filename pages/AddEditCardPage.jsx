@@ -629,7 +629,19 @@ const AddEditCardPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isEdit && !imageFile) { toast.error('Card image is required'); return; }
-    if (!validateForm()) { toast.error('Please fix the errors in the form'); return; }
+    if (!validateForm()) {
+      toast.error('Please fix the errors in the form');
+      // Jump to the first problem — on a long form (especially mobile) the
+      // errored field may be far off-screen.
+      setTimeout(() => {
+        const el = document.querySelector('.border-destructive');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.focus?.();
+        }
+      }, 50);
+      return;
+    }
 
     setSaving(true);
     try {
@@ -1191,7 +1203,7 @@ const AddEditCardPage = () => {
                       value={formData.cardName}
                       onChange={e => set('cardName', e.target.value)}
                       placeholder="e.g. Charizard"
-                      className={`h-11 bg-background ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''}`}
+                      className={`h-11 bg-background ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''} ${errors.cardName ? 'border-destructive' : ''}`}
                     />
                     {errors.cardName && <p className="text-destructive text-xs">{errors.cardName}</p>}
                   </div>
