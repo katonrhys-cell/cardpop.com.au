@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
+import { compressImage } from '@/utils/compressImage.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -131,11 +132,12 @@ const WhatnotShowsPage = () => {
       let preview_image_url = null;
 
       if (imageFile) {
-        const ext = imageFile.name.split('.').pop();
+        const compressed = await compressImage(imageFile);
+        const ext = compressed.name.split('.').pop();
         const path = `whatnot-shows/${currentUser.id}/${Date.now()}.${ext}`;
         const { error: uploadErr } = await supabase.storage
           .from('vault-images')
-          .upload(path, imageFile, { upsert: true });
+          .upload(path, compressed, { upsert: true });
         if (uploadErr) throw uploadErr;
         preview_image_url = supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
       }

@@ -135,7 +135,7 @@ const MarketplacePage = () => {
       try {
         let query = supabase
           .from('listings')
-          .select('*, vault_item:vault_items!inner(*, vault_images(*), parallel:parallels(id,name,color), subset:subsets(id,name)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
+          .select('*, vault_item:vault_items!inner(*, vault_images(storage_path), parallel:parallels(id,name,color), subset:subsets(id,name)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
           .eq('status', 'active')
           .neq('listing_type', 'vault')
           .limit(100);
@@ -214,10 +214,10 @@ const MarketplacePage = () => {
         canonicalUrl="https://cardpop.com.au/marketplace"
       />
 
-      <section className="bg-card border-b border-border py-20 text-center">
+      <section className="bg-card border-b border-border py-12 md:py-20 text-center">
         <div className="container-default">
-          <Users className="w-12 h-12 text-primary mx-auto mb-6" />
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">The Marketplace</h1>
+          <Users className="w-10 h-10 md:w-12 md:h-12 text-primary mx-auto mb-4 md:mb-6" />
+          <h1 className="text-3xl md:text-5xl font-bold mb-4">The Marketplace</h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Discover cards directly from other collectors' vaults alongside official CardPop listings.
           </p>
@@ -267,7 +267,7 @@ const MarketplacePage = () => {
           <div className="flex flex-wrap items-center gap-3">
             {/* Category */}
             <Select value={filterCat} onValueChange={setFilterCat}>
-              <SelectTrigger className="w-[160px] bg-background border-border rounded-xl font-medium">
+              <SelectTrigger className="w-full sm:w-[160px] bg-background border-border rounded-xl font-medium">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
@@ -277,7 +277,7 @@ const MarketplacePage = () => {
 
             {/* Franchise */}
             <Select value={filterFranchise} onValueChange={setFilterFranchise} disabled={!filterCat}>
-              <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium">
+              <SelectTrigger className="w-full sm:w-[180px] bg-background border-border rounded-xl font-medium">
                 <SelectValue placeholder={filterCat ? 'Franchise' : '— select category —'} />
               </SelectTrigger>
               <SelectContent>
@@ -288,7 +288,7 @@ const MarketplacePage = () => {
             {/* Manufacturer — only show if franchise has manufacturers */}
             {filterFranchise && mfrOpts.length > 0 && (
               <Select value={filterMfr} onValueChange={setFilterMfr}>
-                <SelectTrigger className="w-[200px] bg-background border-border rounded-xl font-medium">
+                <SelectTrigger className="w-full sm:w-[200px] bg-background border-border rounded-xl font-medium">
                   <SelectValue placeholder="Manufacturer" />
                 </SelectTrigger>
                 <SelectContent>
@@ -300,7 +300,7 @@ const MarketplacePage = () => {
             {/* Team — only show if franchise has teams (sports) */}
             {filterFranchise && teamOpts.length > 0 && (
               <Select value={filterTeam} onValueChange={setFilterTeam}>
-                <SelectTrigger className="w-[200px] bg-background border-border rounded-xl font-medium">
+                <SelectTrigger className="w-full sm:w-[200px] bg-background border-border rounded-xl font-medium">
                   <SelectValue placeholder="Team" />
                 </SelectTrigger>
                 <SelectContent>
@@ -312,7 +312,7 @@ const MarketplacePage = () => {
             {/* Set — only show if franchise selected and sets exist */}
             {filterFranchise && setOpts.length > 0 && (
               <Select value={filterSet} onValueChange={setFilterSet}>
-                <SelectTrigger className="w-[240px] bg-background border-border rounded-xl font-medium">
+                <SelectTrigger className="w-full sm:w-[240px] bg-background border-border rounded-xl font-medium">
                   <SelectValue placeholder="Set / Release" />
                 </SelectTrigger>
                 <SelectContent>
@@ -332,7 +332,7 @@ const MarketplacePage = () => {
             {/* Parallel — only show when franchise has parallels */}
             {filterFranchise && parallelOpts.length > 0 && (
               <Select value={filterParallel} onValueChange={setFilterParallel}>
-                <SelectTrigger className="w-[200px] bg-background border-border rounded-xl font-medium">
+                <SelectTrigger className="w-full sm:w-[200px] bg-background border-border rounded-xl font-medium">
                   <SelectValue placeholder="Parallel / Variation" />
                 </SelectTrigger>
                 <SelectContent>
@@ -348,7 +348,7 @@ const MarketplacePage = () => {
             {/* Subset — only show when a set is selected and it has subsets */}
             {filterSet && subsetOpts.length > 0 && (
               <Select value={filterSubset} onValueChange={setFilterSubset}>
-                <SelectTrigger className="w-[200px] bg-background border-border rounded-xl font-medium">
+                <SelectTrigger className="w-full sm:w-[200px] bg-background border-border rounded-xl font-medium">
                   <SelectValue placeholder="Subset / Insert" />
                 </SelectTrigger>
                 <SelectContent>
