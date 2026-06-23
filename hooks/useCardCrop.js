@@ -28,7 +28,8 @@ export function useCardCrop() {
       if (res?.found && res.blob) {
         const base = (file.name || 'card').replace(/\.[^.]+$/, '');
         const croppedFile = new File([res.blob], `${base}-cropped.jpg`, { type: 'image/jpeg' });
-        setCandidate({ key, croppedFile, croppedUrl: res.url });
+        // Keep the detected corners so the manual adjuster can be seeded with them.
+        setCandidate({ key, croppedFile, croppedUrl: res.url, corners: res.corners ?? null });
         return true;
       }
       toast.info('No card outline detected — keeping the original.');

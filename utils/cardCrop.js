@@ -84,3 +84,16 @@ export function outputDimsFor(quad) {
     ? { width: OUTPUT.height, height: OUTPUT.width }
     : { width: OUTPUT.width, height: OUTPUT.height };
 }
+
+/**
+ * A sensible starting quad for the manual adjuster when there's no detected
+ * card to seed from: a rectangle inset `inset` (fraction) from each edge,
+ * ordered [tl, tr, br, bl] in image coordinates.
+ */
+export function defaultCorners(width, height, inset = 0.08) {
+  const x0 = width * inset;
+  const x1 = width * (1 - inset);
+  const y0 = height * inset;
+  const y1 = height * (1 - inset);
+  return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+}
