@@ -6,7 +6,7 @@ import ImageZoomModal from '@/components/ImageZoomModal.jsx';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { VARIANT_BADGES } from '@/lib/cardVariants.js';
-import { formatAutograph, getRefractorLabel } from '@/lib/cardAttributeLabels.js';
+import { formatAutograph, getRefractorLabel, getRefractorBadgeClass } from '@/lib/cardAttributeLabels.js';
 import { supabase } from '@/lib/supabaseClient.js';
 
 const GRADE_BADGE = {
@@ -142,7 +142,7 @@ const VaultListingCard = ({ vaultItem, listing }) => {
               <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground capitalize">{vaultItem.condition.replace(/_/g, ' ')}</Badge>
             )}
             {vaultItem.is_foil && <Badge variant="outline" className="text-[10px] font-bold border-yellow-400/50 text-yellow-700 bg-yellow-400/10">Foil</Badge>}
-            {getRefractorLabel(vaultItem) && <Badge variant="outline" className="text-[10px] font-bold border-indigo-400/50 text-indigo-700 bg-indigo-400/10">{getRefractorLabel(vaultItem)}</Badge>}
+            {getRefractorLabel(vaultItem) && <Badge variant="outline" className={`text-[10px] font-bold ${getRefractorBadgeClass(vaultItem)}`}>{getRefractorLabel(vaultItem)}</Badge>}
             {vaultItem.is_auto && (
               <Badge variant="outline" className="text-[10px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10">
                 {formatAutograph(vaultItem) || 'Auto'}
