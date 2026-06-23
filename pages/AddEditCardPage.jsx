@@ -12,7 +12,7 @@ import { useCategories } from '@/hooks/useCategories.js';
 import CardHierarchySelector from '@/components/CardHierarchySelector.jsx';
 import { COLLECTION_CONFIGS } from '@/data/collectionConfigs.js';
 import { useCollectionEras } from '@/hooks/useCollectionEras.js';
-import { VARIANT_GROUPS } from '@/lib/cardVariants.js';
+import { getVariantGroups } from '@/lib/cardVariants.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -1257,32 +1257,54 @@ const AddEditCardPage = () => {
                         </button>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground -mt-1">Select all that apply — scroll to see more</p>
+                    <p className="text-xs text-muted-foreground -mt-1">
+                      {formData.collection
+                        ? `Showing foils & variants for ${formData.collection} — select all that apply`
+                        : 'Select all that apply — scroll to see more'}
+                    </p>
                     <div className="max-h-52 overflow-y-auto rounded-xl border border-border bg-muted/20 p-3 space-y-3">
-                      {VARIANT_GROUPS.map(group => (
-                        <div key={group.label}>
-                          <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground mb-1.5">{group.label}</p>
-                          <div className="flex flex-wrap gap-2">
-                            {group.variants.map(v => {
-                              const active = formData.variant.includes(v);
-                              return (
-                                <button
-                                  key={v}
-                                  type="button"
-                                  onClick={() => set('variant', active ? formData.variant.filter(x => x !== v) : [...formData.variant, v])}
-                                  className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
-                                    active
-                                      ? 'border-primary bg-primary/10 text-primary shadow-sm'
-                                      : 'border-border bg-background text-foreground hover:border-muted-foreground/40'
-                                  }`}
-                                >
-                                  {active && <span className="mr-1">✓</span>}{v}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
+                      {(() => {
+                        const variantGroups = getVariantGroups(formData.collection);
+                        const known = new Set(variantGroups.flatMap(g => g.variants));
+                        const otherSelected = formData.variant.filter(v => !known.has(v));
+                        const renderChip = (v) => {
+                          const active = formData.variant.includes(v);
+                          return (
+                            <button
+                              key={v}
+                              type="button"
+                              onClick={() => set('variant', active ? formData.variant.filter(x => x !== v) : [...formData.variant, v])}
+                              className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
+                                active
+                                  ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                                  : 'border-border bg-background text-foreground hover:border-muted-foreground/40'
+                              }`}
+                            >
+                              {active && <span className="mr-1">✓</span>}{v}
+                            </button>
+                          );
+                        };
+                        return (
+                          <>
+                            {variantGroups.map(group => (
+                              <div key={group.label}>
+                                <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground mb-1.5">{group.label}</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {group.variants.map(renderChip)}
+                                </div>
+                              </div>
+                            ))}
+                            {otherSelected.length > 0 && (
+                              <div>
+                                <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground mb-1.5">Also Selected</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {otherSelected.map(renderChip)}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                     {formData.variant.length > 0 && (
                       <p className="text-xs text-primary font-medium">
