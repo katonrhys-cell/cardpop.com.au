@@ -156,7 +156,8 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
               <button
                 type="button"
                 onClick={() => removeImage(index)}
-                className="absolute top-2 right-2 bg-black/60 hover:bg-destructive text-white p-1.5 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                aria-label="Remove image"
+                className="absolute top-2 right-2 bg-black/60 hover:bg-destructive text-white p-1.5 rounded-lg transition-colors opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
               >
                 <X size={16} />
               </button>

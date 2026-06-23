@@ -901,16 +901,18 @@ const AddEditCardPage = () => {
                                 setExtraFiles(nf); setExtraPreviews(np);
                                 if (cropCandidate?.key === idx) clearCrop();
                               }}
-                              className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                              aria-label="Remove photo"
+                              className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                             >
                               <X className="w-2.5 h-2.5 text-white" />
                             </button>
                             <button
                               type="button"
                               title="Straighten & crop to card"
+                              aria-label="Straighten and crop to card"
                               onClick={() => cropOrAdjust(idx, extraFiles[idx], extraPreviews[idx])}
                               disabled={detectingKey !== null}
-                              className="absolute bottom-0.5 left-0.5 bg-black/60 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-40"
+                              className="absolute bottom-0.5 left-0.5 bg-black/60 rounded-full p-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity disabled:opacity-40"
                             >
                               {detectingKey === idx
                                 ? <Loader2 className="w-2.5 h-2.5 text-white animate-spin" />
