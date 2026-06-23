@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, UploadCloud, X, Wand2, Trash2, Plus, Tag } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
+import { compressImage } from '@/utils/compressImage.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { slugify } from '@/lib/slugify.js';
 import { toast } from 'sonner';
@@ -279,9 +280,10 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       let image_url = event?.image_url ?? null;
 
       if (imageFile) {
-        const ext = imageFile.name.split('.').pop() || 'jpg';
+        const compressed = await compressImage(imageFile);
+        const ext = compressed.name.split('.').pop() || 'jpg';
         const path = `events/${Date.now()}.${ext}`;
-        const { error: upErr } = await supabase.storage.from('events').upload(path, imageFile, { upsert: true });
+        const { error: upErr } = await supabase.storage.from('events').upload(path, compressed, { upsert: true });
         if (!upErr) {
           image_url = supabase.storage.from('events').getPublicUrl(path).data.publicUrl;
         }

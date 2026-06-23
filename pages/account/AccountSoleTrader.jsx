@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { Save, Upload, Trash2, Store, ExternalLink, Building2, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
+import { compressImage } from '@/utils/compressImage.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -125,9 +126,10 @@ const AccountSoleTrader = () => {
       let business_logo_url = existingLogoUrl;
 
       if (logoFile) {
-        const ext  = logoFile.name.split('.').pop();
+        const compressed = await compressImage(logoFile, { maxDimension: 512, quality: 0.85 });
+        const ext  = compressed.name.split('.').pop();
         const path = `business-logos/${currentUser.id}.${ext}`;
-        const { error: uploadErr } = await supabase.storage.from('avatars').upload(path, logoFile, { upsert: true });
+        const { error: uploadErr } = await supabase.storage.from('avatars').upload(path, compressed, { upsert: true });
         if (uploadErr) throw uploadErr;
         business_logo_url = supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
       } else if (removeLogo) {

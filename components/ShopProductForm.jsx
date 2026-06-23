@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import { compressImage } from '@/utils/compressImage.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -85,9 +86,10 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         urls.push(entry.url);
         continue;
       }
-      const ext = entry.name?.split('.').pop() || 'jpg';
+      const compressed = await compressImage(entry);
+      const ext = compressed.name?.split('.').pop() || 'jpg';
       const path = `shop-products/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('media').upload(path, entry, { upsert: true });
+      const { error: upErr } = await supabase.storage.from('media').upload(path, compressed, { upsert: true });
       if (upErr) throw new Error(`Image upload failed: ${upErr.message}`);
       urls.push(supabase.storage.from('media').getPublicUrl(path).data.publicUrl);
     }

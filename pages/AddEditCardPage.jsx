@@ -29,6 +29,7 @@ import { useCardsightPricing } from '@/hooks/useCardsightPricing.js';
 import PhotoQualityScore from '@/components/PhotoQualityScore.jsx';
 import PhotoTemplateModal from '@/components/PhotoTemplateModal.jsx';
 import { analyzePhotoQuality } from '@/utils/photoQuality.js';
+import { compressImage } from '@/utils/compressImage.js';
 import { useCardCrop } from '@/hooks/useCardCrop.js';
 import CardCropPreview from '@/components/CardCropPreview.jsx';
 import CardCornerAdjuster from '@/components/CardCornerAdjuster.jsx';
@@ -634,11 +635,12 @@ const AddEditCardPage = () => {
     try {
       let cardImagePath = null;
       if (imageFile) {
-        const fileExt = imageFile.name.split('.').pop();
+        const compressed = await compressImage(imageFile);
+        const fileExt = compressed.name.split('.').pop();
         const filePath = `${currentUser.id}/${Date.now()}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from('vault-images')
-          .upload(filePath, imageFile, { upsert: true });
+          .upload(filePath, compressed, { upsert: true });
         if (uploadError) throw uploadError;
         cardImagePath = filePath;
       }
@@ -646,11 +648,12 @@ const AddEditCardPage = () => {
       const extraImagePaths = [];
       for (const file of extraFiles) {
         if (!file) continue;
-        const fileExt = file.name.split('.').pop();
+        const compressed = await compressImage(file);
+        const fileExt = compressed.name.split('.').pop();
         const filePath = `${currentUser.id}/${Date.now()}-extra-${Math.random().toString(36).slice(2)}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from('vault-images')
-          .upload(filePath, file, { upsert: true });
+          .upload(filePath, compressed, { upsert: true });
         if (uploadError) throw uploadError;
         extraImagePaths.push(filePath);
       }
