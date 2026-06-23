@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, ArrowRightLeft, Layers } from 'lucide-react';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import EbayMarketSection from '@/components/EbayMarketSection.jsx';
+import GradingVerificationSection from '@/components/GradingVerificationSection.jsx';
 
 const GRADE_BADGE = {
   psa:   'bg-red-600 text-white',
@@ -480,6 +481,15 @@ const ProductDetailPage = () => {
                 <p className="text-muted-foreground italic text-sm">No detailed description provided.</p>
               )}
             </div>
+
+            {/* Grading Verification Section */}
+            {source === 'marketplace' && (vi?.cert_number || product.grading_company) && (
+              <GradingVerificationSection
+                gradingNumber={vi?.cert_number}
+                gradingCompany={vi?.grading_company || 'psa'}
+                grade={vi?.grade}
+              />
+            )}
 
             {!isShop && (
               <EbayMarketSection
