@@ -6,6 +6,7 @@ import { formatCurrency } from '@/api/EcommerceApi';
 import { Button } from '@/components/ui/button';
 import { ShieldCheck, MessageCircle, User, TrendingUp, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import GradingVerificationSection from '@/components/GradingVerificationSection.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
 
 const MarketplaceListingPage = () => {
@@ -22,7 +23,7 @@ const MarketplaceListingPage = () => {
       try {
         const { data, error } = await supabase
           .from('listings')
-          .select('*, seller:profiles!seller_id(*)')
+          .select('*, vault_item:vault_items(*), seller:profiles!seller_id(*)')
           .eq('id', id)
           .single();
         if (error) throw error;
@@ -118,6 +119,15 @@ const MarketplaceListingPage = () => {
                <span className="font-medium text-emerald-600 flex items-center gap-1"><ShieldCheck className="w-4 h-4"/> Covered</span>
              </div>
           </div>
+
+          {/* Grading Verification Section */}
+          {(listing?.grading_number || listing?.vault_item?.cert_number) && (
+            <GradingVerificationSection
+              gradingNumber={listing.grading_number || listing.vault_item?.cert_number}
+              gradingCompany={listing.grading_company || listing.vault_item?.grading_company || 'psa'}
+              grade={listing.vault_item?.grade}
+            />
+          )}
 
           {/* CardSight market price reference */}
           {(csPriceLoading || csPrice) && (
