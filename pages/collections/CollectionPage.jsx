@@ -17,7 +17,7 @@ import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import { COLLECTION_CONFIGS, resolveCollectionSlug } from '@/data/collectionConfigs.js';
 import { useCollectionEras } from '@/hooks/useCollectionEras.js';
 import { slugify } from '@/lib/slugify.js';
-import { CARD_VARIANTS } from '@/lib/cardVariants.js';
+import { getCardVariants } from '@/lib/cardVariants.js';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
 
 // ─── Hero floating icon animation ───────────────────────────────────────────
@@ -466,8 +466,12 @@ const CollectionPage = () => {
         .eq('vault_items.category_id', categoryId)
         .range(from, from + perPage - 1);
 
-      if (activeEra) q = q.eq('vault_items.set_name', activeEra);
+      // Era pills carry a short label (e.g. "Topps Chrome") while real set
+      // names are fuller strings ("2023-24 Topps Chrome Basketball"), so match
+      // on a substring rather than exact equality.
+      if (activeEra) q = q.ilike('vault_items.set_name', `%${activeEra}%`);
       if (filterCondition) q = q.eq('vault_items.condition', filterCondition);
+      if (filterVariant) q = q.contains('vault_items.cardVariants', [filterVariant]);
 
       if (filterType === 'For Sale') {
         q = q.in('listing_type', ['fixed', 'auction']);
@@ -876,7 +880,7 @@ const CollectionPage = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Variants</SelectItem>
-                      {CARD_VARIANTS.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                      {getCardVariants(slug).map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
                     </SelectContent>
                   </Select>
 

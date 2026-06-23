@@ -127,7 +127,6 @@ const AccountDashboard = () => {
     fetchVaultRef.current = (page) => run(page ?? vaultPageRef.current);
     run(vaultPage);
     return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id, vaultPage]);
 
   // ── Realtime subscription (stable — never torn down while user is logged in)

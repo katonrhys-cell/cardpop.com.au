@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { ShieldCheck, Upload, ArrowRight, ArrowLeft, CheckCircle, Clock } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
+import { compressImage } from '@/utils/compressImage.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -115,11 +116,13 @@ const VerificationSubmissionPage = () => {
       // 1. Upload ID photo to storage
       let idPhotoPath = null;
       if (idPhoto) {
-        const fileExt = idPhoto.name.split('.').pop();
+        // Keep IDs large and high quality so details stay legible for review.
+        const compressed = await compressImage(idPhoto, { maxDimension: 2200, quality: 0.9 });
+        const fileExt = compressed.name.split('.').pop();
         const filePath = `verification/${currentUser.id}/id.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from('vault-images')
-          .upload(filePath, idPhoto, { upsert: true });
+          .upload(filePath, compressed, { upsert: true });
         if (uploadError) throw uploadError;
         idPhotoPath = filePath;
       }
@@ -127,11 +130,12 @@ const VerificationSubmissionPage = () => {
       // 2. Upload profile photo if provided
       let profilePhotoPath = null;
       if (profilePhoto) {
-        const fileExt = profilePhoto.name.split('.').pop();
+        const compressed = await compressImage(profilePhoto, { maxDimension: 512, quality: 0.85 });
+        const fileExt = compressed.name.split('.').pop();
         const filePath = `avatars/${currentUser.id}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from('vault-images')
-          .upload(filePath, profilePhoto, { upsert: true });
+          .upload(filePath, compressed, { upsert: true });
         if (uploadError) throw uploadError;
         profilePhotoPath = filePath;
       }

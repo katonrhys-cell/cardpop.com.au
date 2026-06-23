@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { Save, Upload, Trash2, Eye, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
+import { compressImage } from '@/utils/compressImage.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -88,9 +89,10 @@ const AccountProfile = () => {
       let avatar_url = currentUser?.avatar_url ?? null;
 
       if (avatarFile) {
-        const ext = avatarFile.name.split('.').pop();
+        const compressed = await compressImage(avatarFile, { maxDimension: 512, quality: 0.85 });
+        const ext = compressed.name.split('.').pop();
         const path = `avatars/${currentUser.id}.${ext}`;
-        const { error: uploadErr } = await supabase.storage.from('avatars').upload(path, avatarFile, { upsert: true });
+        const { error: uploadErr } = await supabase.storage.from('avatars').upload(path, compressed, { upsert: true });
         if (uploadErr) throw uploadErr;
         avatar_url = supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
       } else if (removeAvatar) {

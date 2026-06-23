@@ -36,13 +36,15 @@ const FeaturedSellerCard = ({ seller }) => {
       {/* Avatar/Logo */}
       <div className="shrink-0 relative mb-4">
         {avatarUrl ? (
-          <img
-            src={avatarUrl}
-            alt={`${sellerName} logo`}
-            className="w-20 h-20 rounded-full object-cover ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all"
-            width="80"
-            height="80"
-          />
+          <div className="w-20 h-20 rounded-full bg-white flex items-center justify-center overflow-hidden ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all">
+            <img
+              src={avatarUrl}
+              alt={`${sellerName} logo`}
+              className="w-full h-full rounded-full object-contain p-1.5"
+              width="80"
+              height="80"
+            />
+          </div>
         ) : (
           <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all">
             <User className="w-8 h-8 text-muted-foreground" />
