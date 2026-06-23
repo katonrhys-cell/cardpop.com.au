@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Star, ShieldCheck, Lock, ShoppingCart, ArrowRightLeft, Layers, ZoomIn } from 'lucide-react';
 import ImageZoomModal from '@/components/ImageZoomModal.jsx';
-import GradingVerificationBadgeSmall from '@/components/GradingVerificationBadgeSmall.jsx';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { VARIANT_BADGES } from '@/lib/cardVariants.js';
@@ -89,19 +88,10 @@ const VaultListingCard = ({ vaultItem, listing }) => {
           </div>
         )}
 
-        {/* Grade badge + verification — bottom left (only for graded slabs) */}
+        {/* Grade badge — bottom left (only for graded slabs) */}
         {vaultItem?.grading_company && vaultItem.grading_company !== 'raw' && vaultItem?.grade && (
-          <div className="absolute bottom-3 left-3 z-10 flex items-center gap-2">
-            <div className={`px-2.5 py-1 rounded-md text-[11px] font-extrabold tracking-wide shadow-lg ${GRADE_BADGE[vaultItem.grading_company] || GRADE_BADGE.other}`}>
-              {vaultItem.grading_company.toUpperCase()} {vaultItem.grade}
-            </div>
-            {listing?.grading_number && (
-              <GradingVerificationBadgeSmall
-                gradingNumber={listing.grading_number}
-                company={listing.grading_company || 'psa'}
-                size="sm"
-              />
-            )}
+          <div className={`absolute bottom-3 left-3 z-10 px-2.5 py-1 rounded-md text-[11px] font-extrabold tracking-wide shadow-lg ${GRADE_BADGE[vaultItem.grading_company] || GRADE_BADGE.other}`}>
+            {vaultItem.grading_company.toUpperCase()} {vaultItem.grade}
           </div>
         )}
 
