@@ -6,6 +6,7 @@ import ImageZoomModal from '@/components/ImageZoomModal.jsx';
 import { toast } from 'sonner';
 import VerifiedBadge from '@/components/VerifiedBadge.jsx';
 import SellerTierBadge from '@/components/SellerTierBadge.jsx';
+import GradingVerificationBadgeSmall from '@/components/GradingVerificationBadgeSmall.jsx';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { VARIANT_BADGES } from '@/lib/cardVariants.js';
@@ -86,10 +87,19 @@ const MarketplaceListingCard = ({ listing }) => {
           </div>
         )}
 
-        {/* Grade badge — bottom left (only for graded slabs) */}
+        {/* Grade badge + verification — bottom left (only for graded slabs) */}
         {vaultItem?.grading_company && vaultItem.grading_company !== 'raw' && vaultItem?.grade && (
-          <div className={`absolute bottom-3 left-3 z-10 px-2.5 py-1 rounded-md text-[11px] font-extrabold tracking-wide shadow-lg ${GRADE_BADGE[vaultItem.grading_company] || GRADE_BADGE.other}`}>
-            {vaultItem.grading_company.toUpperCase()} {vaultItem.grade}
+          <div className="absolute bottom-3 left-3 z-10 flex items-center gap-2">
+            <div className={`px-2.5 py-1 rounded-md text-[11px] font-extrabold tracking-wide shadow-lg ${GRADE_BADGE[vaultItem.grading_company] || GRADE_BADGE.other}`}>
+              {vaultItem.grading_company.toUpperCase()} {vaultItem.grade}
+            </div>
+            {listing.grading_number && (
+              <GradingVerificationBadgeSmall
+                gradingNumber={listing.grading_number}
+                company={listing.grading_company || 'psa'}
+                size="sm"
+              />
+            )}
           </div>
         )}
 
