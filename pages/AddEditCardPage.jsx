@@ -114,6 +114,7 @@ const AddEditCardPage = () => {
   const [showNumberGuide, setShowNumberGuide] = useState(false);
   const [showSpGuide, setShowSpGuide]         = useState(false);
   const [showRookieGuide, setShowRookieGuide] = useState(false);
+  const [showRefractorGuide, setShowRefractorGuide] = useState(false);
 
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
@@ -137,7 +138,6 @@ const AddEditCardPage = () => {
     isFoil:         false,
     isSealed:       false,
     isRookie:       false,
-    isRefractor:    false,
     serialNumber:   '',
     isAuto:         false,
     autoType:       '',
@@ -152,6 +152,8 @@ const AddEditCardPage = () => {
     spTier:         '',
     rookieType:     '',
     rookieLogo:     '',
+    refractorType:  '',
+    refractorColor: '',
     // Grading
     gradingCompany: 'raw',
     grade:          '',
@@ -266,7 +268,6 @@ const AddEditCardPage = () => {
           isFoil:         card.is_foil        ?? false,
           isSealed:       card.is_sealed      ?? false,
           isRookie:       card.is_rookie      ?? false,
-          isRefractor:    card.is_refractor   ?? false,
           serialNumber:   card.serial_number  || '',
           isAuto:         card.is_auto        ?? false,
           autoType:       card.auto_type      || '',
@@ -281,6 +282,8 @@ const AddEditCardPage = () => {
           spTier:         card.sp_tier         || '',
           rookieType:     card.rookie_type     || '',
           rookieLogo:     card.rookie_logo     || '',
+          refractorType:  card.refractor_type  || '',
+          refractorColor: card.refractor_color || '',
           gradingCompany: card.grading_company || 'raw',
           grade:          card.grade          || '',
           certNumber:     card.cert_number    || '',
@@ -674,7 +677,7 @@ const AddEditCardPage = () => {
         is_foil:             formData.isFoil,
         is_sealed:           formData.isSealed,
         is_rookie:           formData.isRookie,
-        is_refractor:        formData.isRefractor,
+        is_refractor:        formData.variant.includes('Refractor'),
         serial_number:       formData.serialNumber?.trim() || null,
         is_auto:             formData.isAuto,
         auto_type:           formData.variant.includes('Auto') ? (formData.autoType || null) : null,
@@ -689,6 +692,8 @@ const AddEditCardPage = () => {
         sp_tier:             formData.variant.includes('Short Print (SP)') ? (formData.spTier || null) : null,
         rookie_type:         formData.variant.includes('Rookie Card (RC)') ? (formData.rookieType || null) : null,
         rookie_logo:         formData.variant.includes('Rookie Card (RC)') ? (formData.rookieLogo || null) : null,
+        refractor_type:      formData.variant.includes('Refractor') ? (formData.refractorType || null) : null,
+        refractor_color:     formData.variant.includes('Refractor') ? (formData.refractorColor || null) : null,
         grading_company:     formData.gradingCompany,
         grade:               isGraded ? (formData.grade?.trim() || null) : null,
         cert_number:         isGraded ? (formData.certNumber?.trim() || null) : null,
@@ -1358,7 +1363,6 @@ const AddEditCardPage = () => {
                     </div>
                     <div className="flex gap-3 items-stretch">
                       {[
-                        { key: 'isRefractor', label: '🎁 Bundles',  desc: '6 card max' },
                         { key: 'isAuto',      label: '🗂️ Complete Set',  desc: 'A full / complete set' },
                       ].map(({ key, label, desc }) => (
                         <button
@@ -1390,6 +1394,152 @@ const AddEditCardPage = () => {
                         />
                       </div>
                     </div>
+
+                    {/* Refractor sub-details — shown when the "Refractor" finish is
+                        selected in the Card Variant / Finish section (Finish group). */}
+                    {formData.variant.includes('Refractor') && (
+                      <div className="mt-3 p-4 rounded-xl border-2 border-fuchsia-400/30 bg-fuchsia-400/5 space-y-4 animate-in fade-in slide-in-from-top-1">
+                        <p className="text-xs font-extrabold uppercase tracking-widest text-fuchsia-700 dark:text-fuchsia-400">Refractor Details</p>
+
+                        {/* Refractor type / pattern */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Refractor Type</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { value: 'base',         label: 'Base Refractor',     desc: 'Standard rainbow-shine refractor finish' },
+                              { value: 'xfractor',     label: 'X-Fractor',          desc: 'Checkerboard / mosaic background pattern' },
+                              { value: 'atomic',       label: 'Atomic Refractor',   desc: "Cracked-ice 'atomic' finish — scarcer than base" },
+                              { value: 'prism',        label: 'Prism Refractor',    desc: 'Prismatic light-beam pattern' },
+                              { value: 'pulsar',       label: 'Pulsar Refractor',   desc: 'Starburst / pulsar burst pattern' },
+                              { value: 'mojo',         label: 'Mojo Refractor',     desc: "Rippling 'mojo' wave finish" },
+                              { value: 'wave',         label: 'Wave Refractor',     desc: 'Flowing wave-line pattern' },
+                              { value: 'mini_diamond', label: 'Mini-Diamond',       desc: 'Tiny repeating diamond texture' },
+                              { value: 'speckle',      label: 'Speckle Refractor',  desc: 'Speckled / sparkle finish' },
+                              { value: 'shimmer',      label: 'Shimmer Refractor',  desc: 'High-gloss shimmer finish' },
+                              { value: 'raywave',      label: 'RayWave Refractor',  desc: 'Topps Finest ray-wave pattern' },
+                              { value: 'negative',     label: 'Negative Refractor', desc: 'Inverted / negative colour finish' },
+                              { value: 'sepia',        label: 'Sepia Refractor',    desc: 'Reddish-brown monochrome tone' },
+                              { value: 'superfractor', label: 'Superfractor (1/1)', desc: 'The one-of-one gold swirl — rarest of all' },
+                              { value: 'other',        label: 'Other Refractor',    desc: 'Another refractor-style parallel' },
+                            ].map(({ value, label, desc }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('refractorType', formData.refractorType === value ? '' : value)}
+                                className={`flex flex-col items-start px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
+                                  formData.refractorType === value
+                                    ? 'border-fuchsia-500 bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                }`}
+                              >
+                                <span className="font-bold text-xs">{label}</span>
+                                <span className={`text-[10px] mt-0.5 leading-tight ${formData.refractorType === value ? 'text-fuchsia-600/70 dark:text-fuchsia-400/70' : 'text-muted-foreground'}`}>{desc}</span>
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Collapsible refractor guide */}
+                          <div className="rounded-xl border border-fuchsia-400/25 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setShowRefractorGuide(v => !v)}
+                              className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-fuchsia-400/5 transition-colors"
+                            >
+                              <span className="text-[11px] font-bold text-fuchsia-700 dark:text-fuchsia-400">How do refractors work? View guide</span>
+                              <ChevronDown className={`h-3.5 w-3.5 text-fuchsia-600 dark:text-fuchsia-400 transition-transform duration-200 ${showRefractorGuide ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showRefractorGuide && (
+                              <div className="px-3 pb-3 divide-y divide-border/40">
+                                {[
+                                  {
+                                    title: 'What is a refractor?',
+                                    badge: 'Basics',
+                                    badgeClass: 'bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400 border border-fuchsia-500/20',
+                                    body: "A refractor is a chromium parallel (pioneered by Topps Finest in 1993) with a reflective coating that throws a rainbow shine when tilted under light. The same card design is printed across many refractor 'parallels' that differ by colour and pattern.",
+                                  },
+                                  {
+                                    title: 'Colour = rarity',
+                                    badge: 'Hierarchy',
+                                    badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20',
+                                    body: 'Colour usually signals scarcity. Base and Green/Blue are the most common; Gold is typically /50, Orange /25, Black /10 and Red /5. Exact print runs vary by set and year, so always check the back for the serial number.',
+                                  },
+                                  {
+                                    title: 'Superfractor',
+                                    badge: '1-of-1',
+                                    badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20',
+                                    body: 'The rarest refractor of all — a serial-numbered 1/1 with a swirling gold finish. Only a single copy of each card exists, making Superfractors among the most coveted cards in the hobby.',
+                                  },
+                                  {
+                                    title: 'X-Fractor & Atomic',
+                                    badge: 'Patterns',
+                                    badgeClass: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20',
+                                    body: "X-Fractors carry a checkerboard / mosaic background, while Atomic Refractors (Bowman's Best) use a cracked-ice texture and are typically far scarcer than the base refractor.",
+                                  },
+                                  {
+                                    title: 'Modern patterns',
+                                    badge: 'Modern',
+                                    badgeClass: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-500/20',
+                                    body: 'Newer releases add pattern refractors such as Prism, Pulsar, Mojo, Wave, Speckle, Shimmer and RayWave — each a distinct texture layered over the refractor finish.',
+                                  },
+                                  {
+                                    title: 'Negative & Sepia',
+                                    badge: 'Monochrome',
+                                    badgeClass: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20',
+                                    body: 'Negative Refractors invert the card colours for a dark, high-contrast look, while Sepia Refractors drop the colour for a reddish-brown monochrome tone.',
+                                  },
+                                ].map(({ title, badge, badgeClass, body }) => (
+                                  <div key={title} className="py-2.5 first:pt-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-[11px] font-bold text-foreground">{title}</span>
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${badgeClass}`}>{badge}</span>
+                                    </div>
+                                    <p className="text-[10px] leading-relaxed text-muted-foreground">{body}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Refractor colour / parallel */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Refractor Colour / Parallel</Label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[
+                              { value: 'standard', label: 'Standard', sub: 'Unnumbered',  dot: 'bg-gradient-to-br from-cyan-300 via-fuchsia-300 to-amber-300' },
+                              { value: 'green',    label: 'Green',    sub: 'often /99',   dot: 'bg-green-500' },
+                              { value: 'purple',   label: 'Purple',   sub: 'scarce',      dot: 'bg-purple-500' },
+                              { value: 'blue',     label: 'Blue',     sub: 'often /150',  dot: 'bg-blue-500' },
+                              { value: 'aqua',     label: 'Aqua',     sub: 'retail',      dot: 'bg-cyan-400' },
+                              { value: 'pink',     label: 'Pink',     sub: 'retail',      dot: 'bg-pink-400' },
+                              { value: 'yellow',   label: 'Yellow',   sub: 'set-based',   dot: 'bg-yellow-400' },
+                              { value: 'gold',     label: 'Gold',     sub: 'often /50',   dot: 'bg-amber-400' },
+                              { value: 'orange',   label: 'Orange',   sub: 'often /25',   dot: 'bg-orange-500' },
+                              { value: 'black',    label: 'Black',    sub: 'often /10',   dot: 'bg-neutral-900 border border-white/40' },
+                              { value: 'red',      label: 'Red',      sub: 'often /5',    dot: 'bg-red-500' },
+                            ].map(({ value, label, sub, dot }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('refractorColor', formData.refractorColor === value ? '' : value)}
+                                className={`flex items-center gap-2 px-2.5 py-2 rounded-xl border-2 text-left transition-all ${
+                                  formData.refractorColor === value
+                                    ? 'border-fuchsia-500 bg-fuchsia-500/10 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40'
+                                }`}
+                              >
+                                <span className={`h-4 w-4 rounded-full shrink-0 ${dot}`} aria-hidden="true" />
+                                <span className="flex flex-col leading-tight">
+                                  <span className={`font-bold text-xs ${formData.refractorColor === value ? 'text-fuchsia-700 dark:text-fuchsia-400' : 'text-foreground'}`}>{label}</span>
+                                  <span className={`text-[10px] ${formData.refractorColor === value ? 'text-fuchsia-600/70 dark:text-fuchsia-400/70' : 'text-muted-foreground'}`}>{sub}</span>
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground leading-relaxed">Print runs vary by set and year — the values shown are typical guides. Use the Serial # field above to record the exact numbering.</p>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Rookie sub-details — shown when the "Rookie Card (RC)" attribute
                         is selected in the Card Variant / Finish section (Attributes group). */}
