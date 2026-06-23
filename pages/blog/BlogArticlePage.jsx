@@ -59,6 +59,28 @@ const formatPublishedDate = (dateStr) => {
 };
 
 const FAQ_DATA = {
+  'the-cardpop-investors-guide-to-nba-rookie-cards-2026-27': [
+    {
+      question: 'Does the best basketball player always have the most valuable rookie cards?',
+      answer: 'No. On-court production is one input, but card values are driven by a combination of superstar potential, marketability, scarcity, autograph desirability, social media presence and narrative. A player can score 25 a night and still generate limited hobby demand if collectors do not connect with their story. You are buying future demand, not statistics.'
+    },
+    {
+      question: 'What made Victor Wembanyama’s autographs so sought after?',
+      answer: 'Alongside standard signatures, Wembanyama released autographs featuring alien-themed sketches, inscriptions and personalised variations. These reinforced his "Alien" brand, felt instantly recognisable and stood apart from standard signatures, so collectors often chased them more aggressively than standard versions of comparable rarity. It is a clear example of unique, story-driven cards outperforming.'
+    },
+    {
+      question: 'Which 2026-27 rookies are the top hobby prospects?',
+      answer: 'CardPop’s Tier One prospects are AJ Dybantsa, Cameron Boozer and Darryn Peterson. Tier Two emerging stars include Caleb Wilson, Mikel Brown Jr. and Kingston Flemings, while Tier Three high-upside sleepers feature Karim Lopez, Darius Acuff Jr. and Nate Ament. Rankings are a starting point — draft position, team fit and early performance can reshape the board quickly.'
+    },
+    {
+      question: 'Which rookie card types carry the highest conviction?',
+      answer: 'The highest-conviction targets are National Treasures and Immaculate Rookie Patch Autographs (RPAs), Prizm Gold, Prizm Black Gold, Select Courtside Gold and on-card autographs. Prizm Silver, Optic Holo, Select Courtside and numbered colour parallels sit in the medium tier. Base rookies, mass-produced inserts and unnumbered parallels carry the lowest conviction.'
+    },
+    {
+      question: 'Where can Australians buy and sell NBA rookie cards?',
+      answer: 'CardPop is Australia’s dedicated trading card marketplace — built for local collectors with a 3% fee versus eBay’s 13.4%, and no international shipping hassles. For price research, eBay.com.au sold listings remain the benchmark.'
+    }
+  ],
   'psa-grading-guide-for-australian-collectors-2026': [
     {
       question: 'How much does PSA grading cost in Australia?',
