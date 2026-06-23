@@ -121,10 +121,10 @@ const MarketplaceListingPage = () => {
           </div>
 
           {/* Grading Verification Section */}
-          {listing?.grading_number && (
+          {(listing?.grading_number || listing?.vault_item?.cert_number) && (
             <GradingVerificationSection
-              gradingNumber={listing.grading_number}
-              gradingCompany={listing.grading_company || 'psa'}
+              gradingNumber={listing.grading_number || listing.vault_item?.cert_number}
+              gradingCompany={listing.grading_company || listing.vault_item?.grading_company || 'psa'}
               grade={listing.vault_item?.grade}
             />
           )}
