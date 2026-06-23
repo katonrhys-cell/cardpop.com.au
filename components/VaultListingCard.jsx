@@ -102,7 +102,7 @@ const VaultListingCard = ({ vaultItem, listing }) => {
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setZoomOpen(true); }}
             aria-label="Zoom image"
-            className={`absolute z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm text-foreground flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-background ${vaultItem.serial_number ? 'bottom-11 right-3' : 'bottom-3 right-3'}`}
+            className={`absolute z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm text-foreground flex items-center justify-center shadow-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 hover:bg-background ${vaultItem.serial_number ? 'bottom-11 right-3' : 'bottom-3 right-3'}`}
           >
             <ZoomIn className="w-4 h-4" />
           </button>
