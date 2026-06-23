@@ -6,6 +6,7 @@ import { formatCurrency } from '@/api/EcommerceApi';
 import { Button } from '@/components/ui/button';
 import { ShieldCheck, MessageCircle, User, TrendingUp, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import GradingVerificationSection from '@/components/GradingVerificationSection.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
 
 const MarketplaceListingPage = () => {
@@ -118,6 +119,15 @@ const MarketplaceListingPage = () => {
                <span className="font-medium text-emerald-600 flex items-center gap-1"><ShieldCheck className="w-4 h-4"/> Covered</span>
              </div>
           </div>
+
+          {/* Grading Verification Section */}
+          {listing?.grading_number && (
+            <GradingVerificationSection
+              gradingNumber={listing.grading_number}
+              gradingCompany={listing.grading_company || 'psa'}
+              grade={listing.grade}
+            />
+          )}
 
           {/* CardSight market price reference */}
           {(csPriceLoading || csPrice) && (

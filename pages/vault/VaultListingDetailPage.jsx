@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { ShoppingCart, ShieldCheck, BarChart3 } from 'lucide-react';
 import PSAPopPanel from '@/components/PSAPopPanel.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
+import GradingVerificationSection from '@/components/GradingVerificationSection.jsx';
 import { getCardAttributeRows } from '@/lib/cardAttributeLabels.js';
 
 const VaultListingDetailPage = () => {
@@ -200,6 +201,15 @@ const VaultListingDetailPage = () => {
               <div className="pt-4 border-t border-border">
                 <PSAPopPanel rawData={psaData} />
               </div>
+            )}
+
+            {/* Grading Verification Section */}
+            {listing?.grading_number && (
+              <GradingVerificationSection
+                gradingNumber={listing.grading_number}
+                gradingCompany={listing.grading_company || 'psa'}
+                grade={vi?.grade}
+              />
             )}
           </div>
 
