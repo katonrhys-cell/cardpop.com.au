@@ -38,8 +38,8 @@ const VaultListingCard = ({ vaultItem, listing }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
   const rawImg = vaultItem.vault_images?.[0]?.storage_path || vaultItem.card_image || vaultItem.vault_images?.[0]?.image_url || vaultItem.image_url || null;
   const imgSrc = resolveImageUrl(rawImg);
-  const sellerId = vaultItem.user_id || vaultItem.owner_id;
-  const sellerObj = vaultItem.profiles || vaultItem.expand?.user_id || null;
+  const sellerObj = vaultItem.profiles || vaultItem.owner || vaultItem.seller || vaultItem.expand?.user_id || null;
+  const sellerId = vaultItem.user_id || vaultItem.owner_id || sellerObj?.id;
   const titleSlug = slugify(vaultItem.card_name || vaultItem.name || vaultItem.title || 'card');
 
   // Link to marketplace listing if available, otherwise to vault detail
@@ -180,7 +180,7 @@ const VaultListingCard = ({ vaultItem, listing }) => {
                   <span className="text-sm font-bold text-foreground truncate group-hover/seller:text-primary transition-colors">
                     {sellerObj?.display_name || sellerObj?.name || 'Vault Owner'}
                   </span>
-                  {sellerObj?.is_verified === 'true' && (
+                  {(sellerObj?.is_verified === true || sellerObj?.is_verified === 'true') && (
                     <ShieldCheck className="w-3.5 h-3.5 text-[hsl(var(--verified-badge))] shrink-0" />
                   )}
                 </div>
