@@ -155,7 +155,6 @@ const CardMicroscope = ({ isOpen, onClose, imageUrl, altText }) => {
               src={imageUrl}
               alt={altText}
               className="max-w-[90vw] max-h-[68vh] object-contain pointer-events-none select-none drop-shadow-2xl"
-              className="max-w-none max-h-none object-contain pointer-events-none select-none drop-shadow-2xl"
               style={{
                 scale,
                 x: panX,

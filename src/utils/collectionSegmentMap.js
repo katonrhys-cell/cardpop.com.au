@@ -32,7 +32,6 @@ export const COLLECTION_SEGMENT_MAP = {
   'AFL': [], // Australian Football — not supported
   'AFLW': [], // Australian Football Women — not supported
   'Rugby Union': [], // Not supported by CardSight
-  'Cricket': ['cricket'],
 };
 
 /**
