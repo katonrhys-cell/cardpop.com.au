@@ -27,6 +27,7 @@ import priceHistoryRouter from './price-history.js';
 import newsletterRouter from './newsletter.js';
 import marketDataRouter from './market-data.js';
 import catalogRouter from './catalog.js';
+import gradingVerificationRouter from './grading-verification.js';
 
 const router = Router();
 
@@ -90,6 +91,10 @@ export default () => {
     // Photo template routes with API rate limiting
     router.use('/photo-template', apiLimiter);
     router.use('/photo-template', photoTemplateRouter);
+
+    // Grading verification routes with API rate limiting
+    router.use('/grading-verification', apiLimiter);
+    router.use('/grading-verification', gradingVerificationRouter);
 
     // Marketplace feature routes with API rate limiting
     router.use('/seller-ratings', apiLimiter);

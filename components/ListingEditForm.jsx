@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Loader2, UploadCloud } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient.js';
+import GradingInput from '@/components/GradingInput.jsx';
 
 const TCG_COLLECTIONS = ['Pokemon', 'Magic', 'Yu-Gi-Oh', 'Digimon', 'Riftbound', 'Disney Lorcana', 'One Piece'];
 
@@ -20,6 +21,8 @@ const ListingEditForm = ({ listing, onSuccess, onCancel }) => {
     collectionType: listing?.collectionType || '',
     condition: listing?.condition || '',
     grade: listing?.grade || '',
+    gradingNumber: listing?.grading_number || '',
+    gradingCompany: listing?.grading_company || 'psa',
     price: listing?.price || 0,
     description: listing?.description || '',
     stockQuantity: listing?.stockQuantity || 0,
@@ -65,6 +68,10 @@ const ListingEditForm = ({ listing, onSuccess, onCancel }) => {
       // Build plain object from FormData
       const dataObj = {};
       data.forEach((value, key) => { dataObj[key] = value; });
+
+      // Add grading fields
+      dataObj.grading_number = formData.gradingNumber || null;
+      dataObj.grading_company = formData.gradingCompany || 'psa';
 
       if (listing?.id) {
         const { data: updatedData, error } = await supabase
@@ -162,11 +169,18 @@ const ListingEditForm = ({ listing, onSuccess, onCancel }) => {
         </div>
 
         <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="grade">Grade (Optional)</Label>
-          <Input 
-            id="grade" name="grade" 
-            value={formData.grade} onChange={handleChange} 
-            placeholder="e.g. PSA 10" 
+          <GradingInput
+            gradingNumber={formData.gradingNumber}
+            company={formData.gradingCompany}
+            onGradingNumberChange={(value) => handleSelectChange('gradingNumber', value)}
+            onCompanyChange={(value) => handleSelectChange('gradingCompany', value)}
+            placeholder="e.g., 12345678"
+          />
+          <Label htmlFor="grade" className="block mt-4">Grade (Optional)</Label>
+          <Input
+            id="grade" name="grade"
+            value={formData.grade} onChange={handleChange}
+            placeholder="e.g. PSA 10"
           />
         </div>
 
