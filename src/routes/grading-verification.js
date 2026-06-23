@@ -1,5 +1,5 @@
 import express from 'express';
-import { verifyGradingNumber } from '../services/gradingVerificationService.js';
+import { verifyGradingNumber, getCachedVerification } from '../services/gradingVerificationService.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -83,9 +83,10 @@ router.get('/:gradingNumber', async (req, res) => {
 
   try {
     logger.info(`[GRADING_VERIFICATION] Fetching cached result for ${gradingNumber}`);
-    const result = await verifyGradingNumber({ gradingNumber, company });
+    // Cache-only read — this endpoint must not trigger a live external API call.
+    const result = await getCachedVerification({ gradingNumber, company });
 
-    if (!result.cached) {
+    if (!result) {
       return res.status(404).json({ error: 'No cached verification found' });
     }
 
