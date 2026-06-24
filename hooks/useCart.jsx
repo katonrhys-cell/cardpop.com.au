@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { formatCurrency } from '@/api/EcommerceApi.js';
 import { supabase } from '@/lib/supabaseClient.js';
 
@@ -26,6 +26,12 @@ export const CartProvider = ({ children }) => {
       return [];
     }
   });
+
+  // Mirror the latest items in a ref so addToCart can read current state
+  // synchronously (the setCartItems updater runs on a later render, so its
+  // result isn't observable inside the same call).
+  const cartItemsRef = useRef(cartItems);
+  useEffect(() => { cartItemsRef.current = cartItems; }, [cartItems]);
 
   // Sync to local storage
   useEffect(() => {
@@ -71,34 +77,27 @@ export const CartProvider = ({ children }) => {
   const addToCart = useCallback((product, variant = product.variants?.[0] || product, quantity = 1, availableQuantity = 999) => {
     return new Promise((resolve, reject) => {
       const itemId = variant?.id || product.id;
-      let inventoryError = null;
+      const prevItems = cartItemsRef.current;
+      const existingItem = prevItems.find(item => (item.variant?.id || item.product.id) === itemId);
 
-      setCartItems(prevItems => {
-        if (variant?.manage_inventory) {
-          const existingItem = prevItems.find(item => (item.variant?.id || item.product.id) === itemId);
-          const currentCartQuantity = existingItem ? existingItem.quantity : 0;
-          if ((currentCartQuantity + quantity) > availableQuantity) {
-            inventoryError = new Error(`Not enough stock for ${product.title || product.name}. Only ${availableQuantity} left.`);
-            return prevItems;
-          }
+      if (variant?.manage_inventory) {
+        const currentCartQuantity = existingItem ? existingItem.quantity : 0;
+        if ((currentCartQuantity + quantity) > availableQuantity) {
+          reject(new Error(`Not enough stock for ${product.title || product.name}. Only ${availableQuantity} left.`));
+          return;
         }
+      }
 
-        const existingItem = prevItems.find(item => (item.variant?.id || item.product.id) === itemId);
-        if (existingItem) {
-          return prevItems.map(item =>
+      const nextItems = existingItem
+        ? prevItems.map(item =>
             (item.variant?.id || item.product.id) === itemId
               ? { ...item, quantity: item.quantity + quantity }
               : item
-          );
-        }
-        return [...prevItems, { product, variant, quantity }];
-      });
+          )
+        : [...prevItems, { product, variant, quantity }];
 
-      if (inventoryError) {
-        reject(inventoryError);
-        return;
-      }
-
+      cartItemsRef.current = nextItems;
+      setCartItems(nextItems);
       setIsCartOpen(true);
       resolve();
     });
