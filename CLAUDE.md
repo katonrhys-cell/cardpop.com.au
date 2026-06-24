@@ -110,7 +110,7 @@ Tests are split into two Vitest projects configured in `vitest.config.js`:
 - **eBay** (`src/routes/ebay.js`, `src/utils/ebayClient.js`): Market price lookups with caching (`src/utils/ebayCache.js`).
 - **Stripe** (`src/routes/stripe.js`): Payment processing and checkout.
 - **Kit.com** (`src/routes/newsletter.js`): Newsletter subscriptions via the Kit v4 API. Requires `KIT_API_KEY` and `KIT_FORM_ID` env vars.
-- **Hostinger Ecommerce API** (`api/EcommerceApi.js`): Shop product catalogue (sealed boxes, singles) — connects to `https://api-ecommerce.hostinger.com`. This is the Hostinger shop product API, unrelated to hosting.
+- **Shop catalogue**: Product data, pricing, stock and checkout run entirely on Supabase (`shop_products` table) and the Stripe endpoints (`src/routes/stripe.js`). The former Hostinger/Online-Store product API has been removed; `api/EcommerceApi.js` now only exports a `formatCurrency` helper and makes no external calls.
 
 ### Deployment
 
