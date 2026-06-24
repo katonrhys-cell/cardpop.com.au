@@ -185,4 +185,25 @@ describe('Header body pointer-events failsafe', () => {
       { timeout: 1500 },
     );
   });
+
+  it('does not run the body-style sweep after the component unmounts', async () => {
+    const { unmount } = renderHeader();
+
+    // A body style mutation makes the MutationObserver schedule a 350ms
+    // settle timeout. Unmounting before it fires must cancel it — otherwise
+    // the callback runs against a torn-down document and throws.
+    document.body.style.overflow = 'hidden';
+    // Let the observer deliver and schedule its timeout.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const querySpy = vi.spyOn(document, 'querySelector');
+    unmount();
+
+    // Wait past the 350ms settle delay and the 500ms periodic sweep.
+    await new Promise((resolve) => setTimeout(resolve, 600));
+
+    expect(querySpy).not.toHaveBeenCalled();
+    querySpy.mockRestore();
+    document.body.style.overflow = '';
+  });
 });

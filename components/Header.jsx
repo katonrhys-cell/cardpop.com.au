@@ -862,9 +862,14 @@ const Header = () => {
       }
     };
 
-    // Watch for any style change on body and fix it after animations settle
+    // Watch for any style change on body and fix it after animations settle.
+    // Debounce into a single tracked timeout so rapid mutations don't pile up
+    // and so the pending timeout can be cancelled on unmount (otherwise it can
+    // fire after the component/document is gone).
+    let settleTimeout = null;
     const observer = new MutationObserver(() => {
-      setTimeout(clearStaleBodyStyles, 350);
+      clearTimeout(settleTimeout);
+      settleTimeout = setTimeout(clearStaleBodyStyles, 350);
     });
     observer.observe(document.body, { attributes: true, attributeFilter: ['style'] });
 
@@ -874,6 +879,7 @@ const Header = () => {
     return () => {
       observer.disconnect();
       clearInterval(interval);
+      clearTimeout(settleTimeout);
     };
   }, []);
 
