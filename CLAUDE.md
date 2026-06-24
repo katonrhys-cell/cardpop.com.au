@@ -91,11 +91,9 @@ Routes are registered in `src/routes/index.js`. Each domain has its own router f
 
 Supabase hosts the PostgreSQL database and provides Auth. The project URL is `https://odoglvswwymyjuwlonkf.supabase.co`.
 
-- **Migrations** (`pb_migrations/`): Legacy JavaScript migration files — kept for reference but Supabase schema changes should now be made via the Supabase dashboard or the Supabase CLI.
+- **Migrations**: Schema changes are made via the Supabase dashboard or the Supabase CLI.
 - **Frontend client** (`lib/supabaseClient.js`): Uses the public anon key. Security is enforced by RLS policies on the database.
 - **Backend client** (`src/utils/supabaseClient.js`): Uses the service role key — bypasses RLS. Never expose this key client-side.
-
-> Note: `lib/pocketbaseClient.js` and `pb_hooks/` are legacy files from a previous architecture. They are not used by the active application (the one active import in `CheckoutPage.jsx` is a leftover to be cleaned up).
 
 ### Tests
 
@@ -110,7 +108,7 @@ Tests are split into two Vitest projects configured in `vitest.config.js`:
 - **eBay** (`src/routes/ebay.js`, `src/utils/ebayClient.js`): Market price lookups with caching (`src/utils/ebayCache.js`).
 - **Stripe** (`src/routes/stripe.js`): Payment processing and checkout.
 - **Kit.com** (`src/routes/newsletter.js`): Newsletter subscriptions via the Kit v4 API. Requires `KIT_API_KEY` and `KIT_FORM_ID` env vars.
-- **Hostinger Ecommerce API** (`api/EcommerceApi.js`): Shop product catalogue (sealed boxes, singles) — connects to `https://api-ecommerce.hostinger.com`. This is the Hostinger shop product API, unrelated to hosting.
+- **Shop catalogue**: Product data, pricing, stock and checkout run entirely on Supabase (`shop_products` table) and the Stripe endpoints (`src/routes/stripe.js`). The former Hostinger/Online-Store product API has been removed; `api/EcommerceApi.js` now only exports a `formatCurrency` helper and makes no external calls.
 
 ### Deployment
 

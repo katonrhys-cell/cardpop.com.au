@@ -2,31 +2,66 @@ import React, { useState, useEffect } from 'react';
 import { Star, Clock, ShoppingCart, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
+// Shared across every instance so a seller's ratings are fetched at most once,
+// even when they appear on many listing cards or after navigating away and back.
+// Listing pages used to fire one request per card; this collapses repeats.
+const ratingsCache = new Map(); // sellerId -> data
+const inflight = new Map(); // sellerId -> Promise
+
+const fetchSellerRatings = (sellerId) => {
+  if (ratingsCache.has(sellerId)) return Promise.resolve(ratingsCache.get(sellerId));
+  if (inflight.has(sellerId)) return inflight.get(sellerId);
+
+  const promise = fetch(`/api/seller-ratings/${sellerId}`)
+    .then((response) => {
+      if (!response.ok) throw new Error(`Failed to fetch ratings: ${response.status}`);
+      return response.json();
+    })
+    .then((data) => {
+      ratingsCache.set(sellerId, data);
+      inflight.delete(sellerId);
+      return data;
+    })
+    .catch((error) => {
+      inflight.delete(sellerId);
+      throw error;
+    });
+
+  inflight.set(sellerId, promise);
+  return promise;
+};
+
 const SellerRatingDisplay = ({ sellerId, compact = false, showPerformance = false }) => {
-  const [ratings, setRatings] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Seed from cache so repeat sellers render instantly without a loading flash.
+  const [ratings, setRatings] = useState(() => (sellerId ? ratingsCache.get(sellerId) ?? null : null));
+  const [loading, setLoading] = useState(() => (sellerId ? !ratingsCache.has(sellerId) : false));
 
   useEffect(() => {
-    const fetchRatings = async () => {
-      if (!sellerId) return;
+    if (!sellerId) return;
 
-      setLoading(true);
-      try {
-        const response = await fetch(`/api/seller-ratings/${sellerId}`);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch ratings: ${response.status}`);
-        }
-        const data = await response.json();
-        setRatings(data);
-      } catch (error) {
+    if (ratingsCache.has(sellerId)) {
+      setRatings(ratingsCache.get(sellerId));
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    fetchSellerRatings(sellerId)
+      .then((data) => {
+        if (!cancelled) setRatings(data);
+      })
+      .catch((error) => {
         console.error('Error fetching seller ratings:', error);
-        setRatings(null);
-      } finally {
-        setLoading(false);
-      }
-    };
+        if (!cancelled) setRatings(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
-    fetchRatings();
+    return () => {
+      cancelled = true;
+    };
   }, [sellerId]);
 
   if (loading) {

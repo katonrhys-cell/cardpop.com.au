@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Star, ShieldCheck, ImageOff } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { formatCurrency } from '@/api/EcommerceApi.js';
+import { formatCurrency } from '@/utils/formatCurrency.js';
 
 const FeaturedProductCard = ({ product, seller }) => {
   const navigate = useNavigate();

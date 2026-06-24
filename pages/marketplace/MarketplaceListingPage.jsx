@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
-import { formatCurrency } from '@/api/EcommerceApi';
+import { formatCurrency } from '@/utils/formatCurrency.js';
 import { Button } from '@/components/ui/button';
 import { ShieldCheck, MessageCircle, User, TrendingUp, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,7 +23,7 @@ const MarketplaceListingPage = () => {
       try {
         const { data, error } = await supabase
           .from('listings')
-          .select('*, vault_item:vault_items(*), seller:profiles!seller_id(*)')
+          .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(*)')
           .eq('id', id)
           .single();
         if (error) throw error;

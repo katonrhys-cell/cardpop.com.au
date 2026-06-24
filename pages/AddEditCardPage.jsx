@@ -29,6 +29,7 @@ import { useCardsightPricing } from '@/hooks/useCardsightPricing.js';
 import PhotoQualityScore from '@/components/PhotoQualityScore.jsx';
 import PhotoTemplateModal from '@/components/PhotoTemplateModal.jsx';
 import { analyzePhotoQuality } from '@/utils/photoQuality.js';
+import { compressImage } from '@/utils/compressImage.js';
 import { useCardCrop } from '@/hooks/useCardCrop.js';
 import CardCropPreview from '@/components/CardCropPreview.jsx';
 import CardCornerAdjuster from '@/components/CardCornerAdjuster.jsx';
@@ -628,17 +629,30 @@ const AddEditCardPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isEdit && !imageFile) { toast.error('Card image is required'); return; }
-    if (!validateForm()) { toast.error('Please fix the errors in the form'); return; }
+    if (!validateForm()) {
+      toast.error('Please fix the errors in the form');
+      // Jump to the first problem — on a long form (especially mobile) the
+      // errored field may be far off-screen.
+      setTimeout(() => {
+        const el = document.querySelector('.border-destructive');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.focus?.();
+        }
+      }, 50);
+      return;
+    }
 
     setSaving(true);
     try {
       let cardImagePath = null;
       if (imageFile) {
-        const fileExt = imageFile.name.split('.').pop();
+        const compressed = await compressImage(imageFile);
+        const fileExt = compressed.name.split('.').pop();
         const filePath = `${currentUser.id}/${Date.now()}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from('vault-images')
-          .upload(filePath, imageFile, { upsert: true });
+          .upload(filePath, compressed, { upsert: true });
         if (uploadError) throw uploadError;
         cardImagePath = filePath;
       }
@@ -646,11 +660,12 @@ const AddEditCardPage = () => {
       const extraImagePaths = [];
       for (const file of extraFiles) {
         if (!file) continue;
-        const fileExt = file.name.split('.').pop();
+        const compressed = await compressImage(file);
+        const fileExt = compressed.name.split('.').pop();
         const filePath = `${currentUser.id}/${Date.now()}-extra-${Math.random().toString(36).slice(2)}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from('vault-images')
-          .upload(filePath, file, { upsert: true });
+          .upload(filePath, compressed, { upsert: true });
         if (uploadError) throw uploadError;
         extraImagePaths.push(filePath);
       }
@@ -886,16 +901,18 @@ const AddEditCardPage = () => {
                                 setExtraFiles(nf); setExtraPreviews(np);
                                 if (cropCandidate?.key === idx) clearCrop();
                               }}
-                              className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                              aria-label="Remove photo"
+                              className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                             >
                               <X className="w-2.5 h-2.5 text-white" />
                             </button>
                             <button
                               type="button"
                               title="Straighten & crop to card"
+                              aria-label="Straighten and crop to card"
                               onClick={() => cropOrAdjust(idx, extraFiles[idx], extraPreviews[idx])}
                               disabled={detectingKey !== null}
-                              className="absolute bottom-0.5 left-0.5 bg-black/60 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-40"
+                              className="absolute bottom-0.5 left-0.5 bg-black/60 rounded-full p-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity disabled:opacity-40"
                             >
                               {detectingKey === idx
                                 ? <Loader2 className="w-2.5 h-2.5 text-white animate-spin" />
@@ -1188,7 +1205,7 @@ const AddEditCardPage = () => {
                       value={formData.cardName}
                       onChange={e => set('cardName', e.target.value)}
                       placeholder="e.g. Charizard"
-                      className={`h-11 bg-background ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''}`}
+                      className={`h-11 bg-background ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''} ${errors.cardName ? 'border-destructive' : ''}`}
                     />
                     {errors.cardName && <p className="text-destructive text-xs">{errors.cardName}</p>}
                   </div>

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Star, ShieldCheck, Lock, ShoppingCart, ArrowRightLeft, Layers, ZoomIn } from 'lucide-react';
 import ImageZoomModal from '@/components/ImageZoomModal.jsx';
+import CardImage from '@/components/CardImage.jsx';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { VARIANT_BADGES } from '@/lib/cardVariants.js';
@@ -62,21 +63,13 @@ const VaultListingCard = ({ vaultItem, listing }) => {
   return (
     <div className={`group flex flex-col h-full bg-card rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 ${borderClass}`}>
       <Link to={detailPath} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
-        {imgSrc ? (
-          <img
-            src={imgSrc}
-            alt={vaultItem.card_name || vaultItem.name || 'Vault Image'}
-            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500 p-2"
-            loading="lazy"
-            decoding="async"
-            width="400"
-            height="500"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm font-medium">
-            No Image
-          </div>
-        )}
+        <CardImage
+          src={imgSrc}
+          alt={vaultItem.card_name || vaultItem.name || 'Vault Image'}
+          imgClassName="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500 p-2"
+          width="400"
+          height="500"
+        />
         <div className="absolute top-3 left-3 z-10">
           <Badge className={`shadow-sm font-bold ${badgeConfig.className}`}>
             <StatusIcon className="w-3 h-3 mr-1.5" /> {vaultItem.listing_type || 'Private'}
@@ -109,7 +102,7 @@ const VaultListingCard = ({ vaultItem, listing }) => {
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setZoomOpen(true); }}
             aria-label="Zoom image"
-            className={`absolute z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm text-foreground flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-background ${vaultItem.serial_number ? 'bottom-11 right-3' : 'bottom-3 right-3'}`}
+            className={`absolute z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm text-foreground flex items-center justify-center shadow-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 hover:bg-background ${vaultItem.serial_number ? 'bottom-11 right-3' : 'bottom-3 right-3'}`}
           >
             <ZoomIn className="w-4 h-4" />
           </button>

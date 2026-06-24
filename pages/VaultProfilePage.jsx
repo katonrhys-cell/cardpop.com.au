@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { Camera, MapPin, Calendar, Star, Package, TrendingUp, ShieldCheck, Edit2, Save, X, Eye } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { compressImage } from '@/utils/compressImage.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -121,11 +122,12 @@ const VaultProfilePage = () => {
       };
 
       if (avatarFile) {
-        const fileExt = avatarFile.name.split('.').pop();
+        const compressed = await compressImage(avatarFile, { maxDimension: 512, quality: 0.85 });
+        const fileExt = compressed.name.split('.').pop();
         const filePath = `avatars/${currentUser.id}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from('vault-images')
-          .upload(filePath, avatarFile, { upsert: true });
+          .upload(filePath, compressed, { upsert: true });
         if (uploadError) throw uploadError;
         updatePayload.avatar = filePath;
       }

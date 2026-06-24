@@ -1,13 +1,13 @@
 import { Router } from 'express';
-import { ContentBlockType, stream, uploadImagesToPocketBase } from '../api/integrated-ai.js';
+import { ContentBlockType, stream, uploadImagesToSupabase } from '../api/integrated-ai.js';
 import { SystemPrompt } from '../constants/prompts.js';
 import { uploadFiles } from '../middleware/file-upload.js';
 import { integratedAiRateLimit } from '../middleware/integrated-ai-rate-limit.js';
-import { supabaseAuth as pocketbaseAuth } from '../middleware/pocketbase-auth.js';
+import { supabaseAuth } from '../middleware/supabase-auth.js';
 
 const router = Router();
 
-router.use(pocketbaseAuth);
+router.use(supabaseAuth);
 
 router.post('/stream', integratedAiRateLimit, uploadFiles({
 	allowedMimeTypes: [
@@ -35,7 +35,7 @@ router.post('/stream', integratedAiRateLimit, uploadFiles({
 	}
 
 	if (req.files?.length > 0) {
-		const imageUrls = await uploadImagesToPocketBase({ images: req.files });
+		const imageUrls = await uploadImagesToSupabase({ images: req.files });
 		imageUrls.forEach((url) => {
 			parsedMessage.push({ type: ContentBlockType.Image, image: url });
 		});

@@ -15,10 +15,7 @@ export default defineConfig({
       exclude: [
         'node_modules/**',
         'dist/**',
-        'pb_migrations/**',
-        'pb_hooks/**',
         'tools/**',
-        'plugins/**',
         'tests/**',
         'public/**',
         'styles/**',

@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { NodeEnv } from '../constants/common.js';
 import logger from '../utils/logger.js';
 import { supabase } from '../utils/supabaseClient.js';
+import { compressImageBuffer } from '../utils/compressImageBuffer.js';
 
 dotenv.config();
 
@@ -159,8 +160,10 @@ export async function uploadImagesToSupabase({ images }) {
 		const ext = file.originalname.split('.').pop() || 'jpg';
 		const path = `ocr/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-		const { error } = await supabase.storage.from('ai-images').upload(path, file.buffer, {
-			contentType: file.mimetype,
+		const { buffer, contentType } = await compressImageBuffer(file.buffer, file.mimetype);
+
+		const { error } = await supabase.storage.from('ai-images').upload(path, buffer, {
+			contentType,
 			upsert: true,
 		});
 		if (error) throw new Error(`Image upload failed: ${error.message}`);
@@ -171,9 +174,6 @@ export async function uploadImagesToSupabase({ images }) {
 
 	return Promise.all(uploadPromises);
 }
-
-// Backward-compatible alias
-export const uploadImagesToPocketBase = uploadImagesToSupabase;
 
 /**
  * One-shot AI call without conversation history or persistence.
@@ -222,7 +222,7 @@ export async function streamOneShot({ systemPrompt, userMessage }) {
 
 /**
  * Sends a message to the AI proxy and pipes SSE events to the client.
- * Assistant message is saved to PocketBase when the stream ends.
+ * Assistant message is saved to the conversation history when the stream ends.
  * This method should be used for text/text, image/text, image/image, text/image combinations.
  *
  * @param {{ userId: string, systemPrompt: string, userMessage: ContentBlock[] }} params
@@ -273,7 +273,7 @@ export async function stream({ userId, systemPrompt, userMessage }) {
 
 /**
  * Consumes an SSE stream branch, parses history-relevant events,
- * and saves the assistant message to PocketBase.
+ * and saves the assistant message to the conversation history.
  *
  * @param {{ userId: string, stream: ReadableStream, userMessage: ContentBlock[] }} params
  * @returns {Promise<void>}

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, ZoomIn } from 'lucide-react';
 import ImageZoomModal from '@/components/ImageZoomModal.jsx';
+import CardImage from '@/components/CardImage.jsx';
 import { toast } from 'sonner';
 import VerifiedBadge from '@/components/VerifiedBadge.jsx';
 import SellerTierBadge from '@/components/SellerTierBadge.jsx';
@@ -65,21 +66,13 @@ const MarketplaceListingCard = ({ listing }) => {
   return (
     <div className={`group flex flex-col h-full bg-card rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 ${borderClass}`}>
       <Link to={detailPath} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
-        {imgSrc ? (
-          <img
-            src={imgSrc}
-            alt={listing.title || 'Listing Image'}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            loading="lazy"
-            decoding="async"
-            width="400"
-            height="500"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm font-medium">
-            No Image
-          </div>
-        )}
+        <CardImage
+          src={imgSrc}
+          alt={listing.title || 'Listing Image'}
+          imgClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          width="400"
+          height="500"
+        />
         {/* Special variant badge (RC, Auto, 1st Ed) — top right */}
         {specialBadge && (
           <div className={`absolute top-3 right-3 z-10 px-2.5 py-1 rounded-full text-[11px] font-extrabold tracking-wide shadow-md ${specialBadge[1].bg} ${specialBadge[1].text}`}>
@@ -121,7 +114,7 @@ const MarketplaceListingCard = ({ listing }) => {
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setZoomOpen(true); }}
             aria-label="Zoom image"
-            className="absolute bottom-3 left-3 z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm text-foreground flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-background"
+            className="absolute bottom-3 left-3 z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm text-foreground flex items-center justify-center shadow-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 hover:bg-background"
           >
             <ZoomIn className="w-4 h-4" />
           </button>

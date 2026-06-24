@@ -7,6 +7,7 @@ import { slugify } from '@/lib/slugify.js';
 import { getRefractorLabel, getRefractorBadgeClass } from '@/lib/cardAttributeLabels.js';
 import { supabase } from '@/lib/supabaseClient.js';
 import CardMicroscope from '@/components/CardMicroscope.jsx';
+import CardImage from '@/components/CardImage.jsx';
 
 const GRADE_BADGE = {
   psa:   'bg-red-600 text-white',
@@ -37,21 +38,13 @@ const ProductCard = ({ product }) => {
   return (
     <div className="group flex flex-col h-full bg-card rounded-2xl border border-border overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
       <Link to={detailPath} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
-        {imgSrc ? (
-          <img
-            src={imgSrc}
-            alt={product.name || product.cardName || 'Product Image'}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            loading="lazy"
-            decoding="async"
-            width="400"
-            height="500"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-sm font-medium">
-            No Image
-          </div>
-        )}
+        <CardImage
+          src={imgSrc}
+          alt={product.name || product.cardName || 'Product Image'}
+          imgClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          width="400"
+          height="500"
+        />
         {/* Rookie badge — top left */}
         {(product.is_rookie || product.isRookie) && (
           <div className="absolute top-3 left-3 z-10 px-2 py-1 rounded-md text-[11px] font-extrabold tracking-wide bg-amber-400 text-amber-900 shadow-md">
@@ -89,7 +82,7 @@ const ProductCard = ({ product }) => {
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setZoomOpen(true); }}
             aria-label="Zoom image"
-            className="absolute bottom-3 right-3 z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm text-foreground flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-background"
+            className="absolute bottom-3 right-3 z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm text-foreground flex items-center justify-center shadow-md opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-200 hover:bg-background"
           >
             <ZoomIn className="w-4 h-4" />
           </button>

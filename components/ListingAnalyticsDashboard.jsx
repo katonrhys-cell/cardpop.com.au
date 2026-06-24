@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Package, TrendingUp, Tags, AlertCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { supabase } from '@/lib/supabaseClient.js';
-import { formatCurrency } from '@/api/EcommerceApi';
+import { formatCurrency } from '@/utils/formatCurrency.js';
 
 const ListingAnalyticsDashboard = ({ listings = [] }) => {
   const analytics = useMemo(() => {
