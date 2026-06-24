@@ -19,6 +19,30 @@ function getSharp() {
   return _sharpPromise;
 }
 
+// SVG for the professional "studio" backdrop: a near-black canvas with a soft
+// radial spotlight and a vignette. Rasterised by sharp so the look matches the
+// client-side formatter in hooks/usePhotoTemplate.js.
+function studioBackdropSvg(width, height) {
+  return Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+      <defs>
+        <radialGradient id="glow" cx="50%" cy="42%" r="78%">
+          <stop offset="0%" stop-color="#3c3c45"/>
+          <stop offset="45%" stop-color="#202027"/>
+          <stop offset="100%" stop-color="#0a0a0d"/>
+        </radialGradient>
+        <radialGradient id="vignette" cx="50%" cy="50%" r="72%">
+          <stop offset="0%" stop-color="#000000" stop-opacity="0"/>
+          <stop offset="100%" stop-color="#000000" stop-opacity="0.55"/>
+        </radialGradient>
+      </defs>
+      <rect width="100%" height="100%" fill="#0a0a0d"/>
+      <rect width="100%" height="100%" fill="url(#glow)"/>
+      <rect width="100%" height="100%" fill="url(#vignette)"/>
+    </svg>`
+  );
+}
+
 export async function createSlabImage(imageBuffer) {
   try {
     const sharp = await getSharp();
@@ -31,10 +55,10 @@ export async function createSlabImage(imageBuffer) {
     const templateWidth = 1000;
     const templateHeight = 1400;
 
-    // Calculate scaling so the card fills 95% of the template while
+    // Scale the card to leave margin so the spotlight reads around it, while
     // maintaining its aspect ratio.
-    const cardMaxWidth = Math.round(templateWidth * 0.95);
-    const cardMaxHeight = Math.round(templateHeight * 0.95);
+    const cardMaxWidth = Math.round(templateWidth * 0.84);
+    const cardMaxHeight = Math.round(templateHeight * 0.88);
 
     let cardWidth = cardMaxWidth;
     let cardHeight = (cardMaxWidth / originalWidth) * originalHeight;
@@ -48,23 +72,21 @@ export async function createSlabImage(imageBuffer) {
     const cardX = Math.round((templateWidth - cardWidth) / 2);
     const cardY = Math.round((templateHeight - cardHeight) / 2);
 
-    // Resize and composite the card onto white background
+    // Resize the card (preserve any transparency so the backdrop shows through).
     const resizedCard = await sharp(imageBuffer)
       .resize(Math.round(cardWidth), Math.round(cardHeight), {
         fit: 'contain',
-        background: { r: 255, g: 255, b: 255, alpha: 1 }
+        background: { r: 0, g: 0, b: 0, alpha: 0 }
       })
+      .png()
       .toBuffer();
 
-    // Create white canvas
-    const composite = await sharp({
-      create: {
-        width: templateWidth,
-        height: templateHeight,
-        channels: 3,
-        background: { r: 255, g: 255, b: 255 }
-      }
-    })
+    // Rasterise the studio backdrop, then composite the card centred on it.
+    const backdrop = await sharp(studioBackdropSvg(templateWidth, templateHeight))
+      .png()
+      .toBuffer();
+
+    const composite = await sharp(backdrop)
       .composite([
         {
           input: resizedCard,
