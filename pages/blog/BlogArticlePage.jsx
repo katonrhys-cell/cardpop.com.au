@@ -133,6 +133,15 @@ const FAQ_DATA = {
 
 const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
+// vault_items.card_image stores a Supabase Storage path, not a full URL.
+// Resolve it to a public URL (already-absolute http URLs are passed through).
+const resolveCardImage = (path) => {
+  if (!path) return null;
+  return path.startsWith('http')
+    ? path
+    : supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
+};
+
 const BlogArticlePage = () => {
   const { id, slug } = useParams();
   const navigate = useNavigate();
@@ -398,6 +407,7 @@ const BlogArticlePage = () => {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {marketplaceCards.map((listing) => {
                 const card = listing.vault_items;
+                const cardImageUrl = resolveCardImage(card?.card_image);
                 const href = listing.slug ? `/marketplace/${listing.slug}` : `/marketplace/listing/${listing.id}`;
                 return (
                   <Link
@@ -406,8 +416,8 @@ const BlogArticlePage = () => {
                     className="group flex flex-col bg-card border border-border rounded-xl overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
                   >
                     <div className="aspect-[3/4] bg-muted relative overflow-hidden">
-                      {card?.card_image ? (
-                        <img src={card.card_image} alt={card.card_name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      {cardImageUrl ? (
+                        <img src={cardImageUrl} alt={card.card_name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center">
                           <FileText className="w-8 h-8 text-muted-foreground opacity-20" />
