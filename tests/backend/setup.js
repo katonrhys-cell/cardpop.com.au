@@ -9,3 +9,4 @@ process.env.SUPABASE_URL = 'https://vitest-dummy.supabase.co';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpdGVzdC1kdW1teSIsInJvbGUiOiJzZXJ2aWNlX3JvbGUiLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MjAwMDAwMDAwMH0.vitest_dummy_signature';
 process.env.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpdGVzdC1kdW1teSIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjIwMDAwMDAwMDB9.vitest_dummy_signature';
 process.env.ENCRYPTION_KEY = 'vitest_dummy_encryption_key_32ch';
+process.env.PSA_API_TOKEN = 'vitest_dummy_psa_token';
