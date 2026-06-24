@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { eventPath, eventTypeLabel, formatEventDate, formatEventTime, formatEventLocation } from '@/lib/eventSeo.js';
-import { toast } from 'sonner';
+import EventRsvp from '@/components/EventRsvp.jsx';
 
 const EVENT_TYPE_STYLES = {
   card_show:       { gradient: 'from-red-500 to-rose-600',       Icon: Ticket    },
@@ -22,13 +22,6 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete }) => {
 
   const rawImageUrl = event.image_url || event.image || null;
   const [imgError, setImgError] = useState(false);
-
-  const handleRsvp = (e) => {
-    e.stopPropagation();
-    toast('RSVP Feature coming soon.', {
-      description: 'We are working on adding attendee management.',
-    });
-  };
 
   return (
     <Card className="flex flex-col overflow-hidden h-full shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl group border-border">
@@ -94,31 +87,20 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete }) => {
       </CardContent>
 
       <CardFooter className="pt-4 border-t border-border flex flex-col gap-3">
-        <div className="w-full flex items-center justify-between text-sm text-muted-foreground mb-1">
-          <span className="flex items-center gap-1.5">
-            <Users className="w-4 h-4" /> 0 Attendees
-          </span>
-        </div>
-        
+        <EventRsvp event={event} variant="card" />
+
         <div className="flex w-full items-center gap-2">
           {onView ? (
-            <Button variant="default" className="flex-1 gap-2 font-semibold" onClick={() => onView(event)}>
+            <Button variant="secondary" className="flex-1 gap-2 font-semibold" onClick={() => onView(event)}>
               <Info className="w-4 h-4" /> Details
             </Button>
           ) : (
-            <Button variant="default" className="flex-1 gap-2 font-semibold" asChild>
+            <Button variant="secondary" className="flex-1 gap-2 font-semibold" asChild>
               <Link to={eventPath(event)}>
                 <Info className="w-4 h-4" /> Details
               </Link>
             </Button>
           )}
-          <Button 
-            variant="secondary" 
-            className="flex-1 font-semibold opacity-50 cursor-not-allowed" 
-            onClick={handleRsvp}
-          >
-            RSVP
-          </Button>
         </div>
 
         {isAdmin && (

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, MapPin, Clock, Info, Ticket, ExternalLink } from 'lucide-react';
 import { eventPath, eventTypeLabel, formatEventDate, formatEventTime, formatEventLocation } from '@/lib/eventSeo.js';
+import EventRsvp from '@/components/EventRsvp.jsx';
 
 const EventDetailModal = ({ isOpen, onClose, event }) => {
   if (!event) return null;
@@ -80,6 +81,11 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
                 {event.address && <p className="text-xs text-muted-foreground">{event.address}</p>}
               </div>
             </div>
+          </div>
+
+          <div className="bg-secondary/50 p-4 rounded-xl border border-border">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3">Attending?</h3>
+            <EventRsvp event={event} variant="detail" />
           </div>
 
           <div>
