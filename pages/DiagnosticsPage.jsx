@@ -24,7 +24,7 @@ const DiagnosticsPage = () => {
         timestamp: new Date().toISOString(),
         overallHealth: 'critical',
         services: {
-          pocketbase: { status: 'failed', error: 'Diagnostic script failed to run' },
+          supabase: { status: 'failed', error: 'Diagnostic script failed to run' },
           apiServer: { status: 'failed', error: 'Diagnostic script failed to run' },
           network: { status: 'failed', error: 'Diagnostic script failed to run' }
         }
@@ -206,21 +206,21 @@ const DiagnosticsPage = () => {
               )}
             </Card>
 
-            {/* PocketBase Card */}
+            {/* Supabase Card */}
             <Card className="bg-[#111111] border-white/10 shadow-none overflow-hidden">
               <CardHeader className="border-b border-white/5 bg-white/[0.02]">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${getStatusColor(report.services.pocketbase.status)}`}>
+                    <div className={`p-2 rounded-lg ${getStatusColor(report.services.supabase.status)}`}>
                       <Database className="w-5 h-5" />
                     </div>
                     <div>
-                      <CardTitle className="text-lg font-medium text-white">PocketBase Database</CardTitle>
-                      <CardDescription className="text-slate-400">{report.services.pocketbase.url}</CardDescription>
+                      <CardTitle className="text-lg font-medium text-white">Supabase Database</CardTitle>
+                      <CardDescription className="text-slate-400">{report.services.supabase.url}</CardDescription>
                     </div>
                   </div>
-                  <Badge variant="outline" className={`capitalize px-3 py-1 ${getStatusColor(report.services.pocketbase.status)}`}>
-                    {report.services.pocketbase.status}
+                  <Badge variant="outline" className={`capitalize px-3 py-1 ${getStatusColor(report.services.supabase.status)}`}>
+                    {report.services.supabase.status}
                   </Badge>
                 </div>
               </CardHeader>
@@ -228,22 +228,22 @@ const DiagnosticsPage = () => {
                 <div className="p-6 space-y-4">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-400">Response Latency</span>
-                    <span className="font-mono text-slate-200">{report.services.pocketbase.latency} ms</span>
+                    <span className="font-mono text-slate-200">{report.services.supabase.latency} ms</span>
                   </div>
                   
-                  {report.services.pocketbase.error && (
+                  {report.services.supabase.error && (
                     <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/20 mt-4">
                       <p className="text-sm font-medium text-destructive mb-1">Connection Error</p>
-                      <p className="text-sm text-destructive/80 font-mono">{report.services.pocketbase.error}</p>
+                      <p className="text-sm text-destructive/80 font-mono">{report.services.supabase.error}</p>
                     </div>
                   )}
 
-                  {report.services.pocketbase.details?.length > 0 && (
+                  {report.services.supabase.details?.length > 0 && (
                     <div className="mt-4">
                       <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Diagnostic Logs</p>
                       <ScrollArea className="h-32 rounded-xl bg-black/50 border border-white/5 p-4">
                         <ul className="space-y-2 font-mono text-[13px] text-slate-300">
-                          {report.services.pocketbase.details.map((detail, idx) => (
+                          {report.services.supabase.details.map((detail, idx) => (
                             <li key={idx} className="flex gap-2">
                               <span className="text-slate-600 shrink-0">&gt;</span>
                               <span>{detail}</span>
@@ -255,10 +255,10 @@ const DiagnosticsPage = () => {
                   )}
                 </div>
               </CardContent>
-              {report.services.pocketbase.status === 'failed' && (
+              {report.services.supabase.status === 'failed' && (
                 <CardFooter className="bg-white/[0.02] border-t border-white/5 p-4">
                   <p className="text-sm text-slate-400">
-                    <strong className="text-slate-200">Suggested fix:</strong> Verify PocketBase is actively running. Check if the URL <code>{report.services.pocketbase.url}</code> is correct and accessible. Look for proxy or firewall issues blocking the connection.
+                    <strong className="text-slate-200">Suggested fix:</strong> Verify the Supabase project is active. Check if the URL <code>{report.services.supabase.url}</code> is correct and accessible. Look for proxy or firewall issues blocking the connection.
                   </p>
                 </CardFooter>
               )}

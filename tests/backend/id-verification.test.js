@@ -20,7 +20,7 @@ vi.mock('../../src/middleware/file-upload.js', () => ({
 vi.mock('../../src/middleware/integrated-ai-rate-limit.js', () => ({
   integratedAiRateLimit: (_req, _res, next) => next(),
 }));
-vi.mock('../../src/middleware/pocketbase-auth.js', () => ({
+vi.mock('../../src/middleware/supabase-auth.js', () => ({
   supabaseAuth: (req, _res, next) => { req.userId = state.userId; next(); },
 }));
 

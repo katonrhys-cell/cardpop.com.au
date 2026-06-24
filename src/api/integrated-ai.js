@@ -175,9 +175,6 @@ export async function uploadImagesToSupabase({ images }) {
 	return Promise.all(uploadPromises);
 }
 
-// Backward-compatible alias
-export const uploadImagesToPocketBase = uploadImagesToSupabase;
-
 /**
  * One-shot AI call without conversation history or persistence.
  * Intended for structured extraction tasks like card OCR.
@@ -225,7 +222,7 @@ export async function streamOneShot({ systemPrompt, userMessage }) {
 
 /**
  * Sends a message to the AI proxy and pipes SSE events to the client.
- * Assistant message is saved to PocketBase when the stream ends.
+ * Assistant message is saved to the conversation history when the stream ends.
  * This method should be used for text/text, image/text, image/image, text/image combinations.
  *
  * @param {{ userId: string, systemPrompt: string, userMessage: ContentBlock[] }} params
@@ -276,7 +273,7 @@ export async function stream({ userId, systemPrompt, userMessage }) {
 
 /**
  * Consumes an SSE stream branch, parses history-relevant events,
- * and saves the assistant message to PocketBase.
+ * and saves the assistant message to the conversation history.
  *
  * @param {{ userId: string, stream: ReadableStream, userMessage: ContentBlock[] }} params
  * @returns {Promise<void>}

@@ -10,12 +10,12 @@ vi.mock('../../src/utils/logger.js', () => ({
 // Controllable auth: tests can clear authState.userId to simulate an
 // unauthenticated request (supabaseAuth passes through without setting userId)
 const authState = vi.hoisted(() => ({ userId: 'user-1' }));
-vi.mock('../../src/middleware/pocketbase-auth.js', () => {
+vi.mock('../../src/middleware/supabase-auth.js', () => {
   const middleware = (req, _res, next) => {
     if (authState.userId) req.userId = authState.userId;
     next();
   };
-  return { supabaseAuth: middleware, pocketbaseAuth: middleware };
+  return { supabaseAuth: middleware };
 });
 
 vi.mock('../../src/middleware/integrated-ai-rate-limit.js', () => ({
