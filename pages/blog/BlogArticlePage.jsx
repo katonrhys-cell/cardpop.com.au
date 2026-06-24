@@ -59,6 +59,50 @@ const formatPublishedDate = (dateStr) => {
 };
 
 const FAQ_DATA = {
+  'understanding-card-parallels-the-complete-guide-2026': [
+    {
+      question: 'What is a parallel card in simple terms?',
+      answer: 'A parallel is an alternate version of a base card — the same player, photo and design, but with a different foil finish, colour or serial number that makes it rarer. Because parallels are printed in smaller quantities than the base card, collectors pay more for them.'
+    },
+    {
+      question: 'What does a serial number like 23/99 mean?',
+      answer: 'It means your card is number 23 of only 99 ever printed of that exact parallel. The second number (99) is the total print run, so the lower it is, the scarcer the card. A stamp of 1/1 means it is the only copy in existence.'
+    },
+    {
+      question: 'What is the difference between a Prizm and a Refractor?',
+      answer: 'They are the same concept from different manufacturers. "Prizm" is Panini’s name for its chrome parallels (the base one is the Silver Prizm); "Refractor" is Topps’ name for its chrome parallels (the base one is simply the Refractor). Both are the entry-level chrome parallel that anchors a player’s market.'
+    },
+    {
+      question: 'Which parallel colour is the rarest?',
+      answer: 'It depends on the set, but the top of the ladder is almost always a 1/1 — the Superfractor (Topps), Gold Vinyl, or Black Finite (Panini). Below that, Gold is typically numbered to /10, making it the rarest of the standard colour tiers. Always check the specific product, as print runs change year to year.'
+    },
+    {
+      question: 'Are parallels worth more than base cards?',
+      answer: 'Almost always, yes — because they are scarcer. The same rookie can be worth a few dollars as a base card and hundreds or thousands as a numbered colour parallel. That said, scarcity only matters when there is demand for the player, and condition still affects price, so a parallel in a high PSA grade carries an additional premium.'
+    }
+  ],
+  'the-cardpop-investors-guide-to-nba-rookie-cards-2026-27': [
+    {
+      question: 'Does the best basketball player always have the most valuable rookie cards?',
+      answer: 'No. On-court production is one input, but card values are driven by a combination of superstar potential, marketability, scarcity, autograph desirability, social media presence and narrative. A player can score 25 a night and still generate limited hobby demand if collectors do not connect with their story. You are buying future demand, not statistics.'
+    },
+    {
+      question: 'What made Victor Wembanyama’s autographs so sought after?',
+      answer: 'Alongside standard signatures, Wembanyama released autographs featuring alien-themed sketches, inscriptions and personalised variations. These reinforced his "Alien" brand, felt instantly recognisable and stood apart from standard signatures, so collectors often chased them more aggressively than standard versions of comparable rarity. It is a clear example of unique, story-driven cards outperforming.'
+    },
+    {
+      question: 'Which 2026-27 rookies are the top hobby prospects?',
+      answer: 'CardPop’s Tier One prospects are AJ Dybantsa, Cameron Boozer and Darryn Peterson. Tier Two emerging stars include Caleb Wilson, Mikel Brown Jr. and Kingston Flemings, while Tier Three high-upside sleepers feature Karim Lopez, Darius Acuff Jr. and Nate Ament. Rankings are a starting point — draft position, team fit and early performance can reshape the board quickly.'
+    },
+    {
+      question: 'Which rookie card types carry the highest conviction?',
+      answer: 'The highest-conviction targets are National Treasures and Immaculate Rookie Patch Autographs (RPAs), Prizm Gold, Prizm Black Gold, Select Courtside Gold and on-card autographs. Prizm Silver, Optic Holo, Select Courtside and numbered colour parallels sit in the medium tier. Base rookies, mass-produced inserts and unnumbered parallels carry the lowest conviction.'
+    },
+    {
+      question: 'Where can Australians buy and sell NBA rookie cards?',
+      answer: 'CardPop is Australia’s dedicated trading card marketplace — built for local collectors with a 3% fee versus eBay’s 13.4%, and no international shipping hassles. For price research, eBay.com.au sold listings remain the benchmark.'
+    }
+  ],
   'psa-grading-guide-for-australian-collectors-2026': [
     {
       question: 'How much does PSA grading cost in Australia?',
