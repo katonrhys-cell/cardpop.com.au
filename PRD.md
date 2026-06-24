@@ -197,7 +197,7 @@ The following auction-adjacent code already exists and must be built on — not 
 | Deployment | **GitHub Actions → Vercel** (auto-deploy on push to `main`) |
 | Domain | `cardpop.online` — DNS via Hostinger, resolves to Vercel |
 
-> **Architecture note (June 2026):** The platform previously used PocketBase alongside Supabase. PocketBase has been removed as a runtime dependency. All data, auth, real-time, file storage, and server-side automation now run on Supabase. The codebase contains legacy `pb_migrations/` and `pb_hooks/` directories kept for reference only — they are not active. Any remaining `pb` imports are cleanup items.
+> **Architecture note (June 2026):** The platform previously used PocketBase alongside Supabase. PocketBase has been fully removed — its client, the `pb_migrations/` and `pb_hooks/` directories, and the `pocketbase` npm dependency are all gone. All data, auth, real-time, file storage, and server-side automation now run on Supabase.
 
 ### 3.5 Supabase Core Schema (Current)
 
@@ -432,13 +432,13 @@ Outbid notification queued for previous highest bidder
 
 > Foundational cleanup. Run in parallel with Phase 1. The core application already runs on Supabase — this phase removes remaining legacy artefacts.
 
-**Remaining cleanup items:**
-- [ ] Remove `lib/pocketbaseClient.js` and the one remaining `pb` import in `CheckoutPage.jsx`
-- [ ] Remove `pb_migrations/` and `pb_hooks/` directories (kept for reference until confirmed redundant)
+**Cleanup items:**
+- [x] Remove `lib/pocketbaseClient.js` and the remaining `pb` import in `CheckoutPage.jsx`
+- [x] Remove `pb_migrations/` and `pb_hooks/` directories
 - [ ] Verify all collections previously in PocketBase are represented in Supabase schema
 - [ ] Confirm all email automation is running via Supabase Edge Functions (not legacy hooks)
-- [ ] Remove `pocketbase` npm dependency from `package.json` if still present
-- [ ] Remove any comments referencing `localhost:8090`
+- [x] Remove `pocketbase` npm dependency from `package.json`
+- [x] Remove any comments referencing `localhost:8090`
 
 ---
 
