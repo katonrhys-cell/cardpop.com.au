@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Loader2, PackageX } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
-import { formatCurrency } from '@/api/EcommerceApi.js';
+import { formatCurrency } from '@/utils/formatCurrency.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/ProductCard.jsx';

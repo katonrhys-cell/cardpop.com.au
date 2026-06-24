@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { formatCurrency } from '@/api/EcommerceApi.js';
+import { formatCurrency } from '@/utils/formatCurrency.js';
 import { supabase } from '@/lib/supabaseClient.js';
 
 const CartContext = createContext(null);

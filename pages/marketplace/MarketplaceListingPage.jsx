@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
-import { formatCurrency } from '@/api/EcommerceApi';
+import { formatCurrency } from '@/utils/formatCurrency.js';
 import { Button } from '@/components/ui/button';
 import { ShieldCheck, MessageCircle, User, TrendingUp, Loader2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
