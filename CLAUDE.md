@@ -91,11 +91,9 @@ Routes are registered in `src/routes/index.js`. Each domain has its own router f
 
 Supabase hosts the PostgreSQL database and provides Auth. The project URL is `https://odoglvswwymyjuwlonkf.supabase.co`.
 
-- **Migrations** (`pb_migrations/`): Legacy JavaScript migration files — kept for reference but Supabase schema changes should now be made via the Supabase dashboard or the Supabase CLI.
+- **Migrations**: Schema changes are made via the Supabase dashboard or the Supabase CLI.
 - **Frontend client** (`lib/supabaseClient.js`): Uses the public anon key. Security is enforced by RLS policies on the database.
 - **Backend client** (`src/utils/supabaseClient.js`): Uses the service role key — bypasses RLS. Never expose this key client-side.
-
-> Note: `lib/pocketbaseClient.js` and `pb_hooks/` are legacy files from a previous architecture. They are not used by the active application (the one active import in `CheckoutPage.jsx` is a leftover to be cleaned up).
 
 ### Tests
 

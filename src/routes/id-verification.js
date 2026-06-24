@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { ContentBlockType, streamOneShot, uploadImagesToSupabase } from '../api/integrated-ai.js';
 import { uploadFiles } from '../middleware/file-upload.js';
 import { integratedAiRateLimit } from '../middleware/integrated-ai-rate-limit.js';
-import { supabaseAuth } from '../middleware/pocketbase-auth.js';
+import { supabaseAuth } from '../middleware/supabase-auth.js';
 
 const router = Router();
 

@@ -17,6 +17,3 @@ export async function supabaseAuth(req, res, next) {
     return next(new Error(error.message));
   }
 }
-
-// Keep backward-compatible alias
-export const pocketbaseAuth = supabaseAuth;

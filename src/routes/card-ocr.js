@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { CardOCRPrompt } from '../constants/prompts.js';
 import { uploadFiles } from '../middleware/file-upload.js';
 import { integratedAiRateLimit } from '../middleware/integrated-ai-rate-limit.js';
-import { supabaseAuth } from '../middleware/pocketbase-auth.js';
+import { supabaseAuth } from '../middleware/supabase-auth.js';
 import logger from '../utils/logger.js';
 
 const router = Router();

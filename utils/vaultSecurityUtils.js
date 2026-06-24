@@ -44,10 +44,10 @@ export const canEditVaultProduct = (userId, productOwnerId, userRole) => {
 };
 
 /**
- * Generates a PocketBase filter string to retrieve vault products securely.
+ * Generates a row-filter string to retrieve vault products securely.
  * @param {string} userId - The ID of the currently authenticated user.
  * @param {string} userRole - The role of the currently authenticated user ('user' | 'admin').
- * @returns {string} The filter string for the PocketBase query.
+ * @returns {string} The filter string scoping the query to the user's own rows.
  */
 export const getVaultProductsForUser = (userId, userRole) => {
   // Admins can fetch all vault products, no restrictive filter needed

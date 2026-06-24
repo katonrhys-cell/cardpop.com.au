@@ -10,7 +10,7 @@ import {
 } from 'cardsightai';
 import { getCardSightClient, summarisePricingAud, getSegmentName } from '../utils/cardSightClient.js';
 import { uploadFiles } from '../middleware/file-upload.js';
-import { supabaseAuth } from '../middleware/pocketbase-auth.js';
+import { supabaseAuth } from '../middleware/supabase-auth.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { integratedAiRateLimit } from '../middleware/integrated-ai-rate-limit.js';
 import supabase from '../utils/supabaseClient.js';

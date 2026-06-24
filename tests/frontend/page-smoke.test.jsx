@@ -230,7 +230,6 @@ const NEEDS_FIXTURE = new Set([
   'AustralianMarketsPage.jsx', // indexes statsData.totalSalesVolume from a populated stats payload
   'CardMarketDetailPage.jsx',  // detail page keyed by a route :slug + card payload
   'CategoryPage.jsx',          // reads a :categorySlug route param (slug.replace(...))
-  'DiagnosticsPage.jsx',       // renders a populated diagnostics/health payload
 ]);
 
 describe('every page module imports and exports a component', () => {

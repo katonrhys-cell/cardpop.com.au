@@ -7,8 +7,7 @@ vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-vi.mock('../../src/middleware/pocketbase-auth.js', () => ({
-  pocketbaseAuth: (req, _res, next) => { req.userId = 'user-1'; next(); },
+vi.mock('../../src/middleware/supabase-auth.js', () => ({
   supabaseAuth: (req, _res, next) => { req.userId = 'user-1'; next(); },
 }));
 
@@ -25,13 +24,12 @@ vi.mock('../../src/middleware/file-upload.js', () => ({
 }));
 
 const mockStream = vi.hoisted(() => vi.fn());
-const mockUploadImagesToPocketBase = vi.hoisted(() => vi.fn());
+const mockUploadImagesToSupabase = vi.hoisted(() => vi.fn());
 vi.mock('../../src/api/integrated-ai.js', () => ({
   ContentBlockType: { Text: 'text', Image: 'image' },
   stream: mockStream,
-  uploadImagesToPocketBase: mockUploadImagesToPocketBase,
+  uploadImagesToSupabase: mockUploadImagesToSupabase,
   streamOneShot: vi.fn(),
-  uploadImagesToSupabase: vi.fn(),
 }));
 
 vi.mock('../../src/constants/prompts.js', () => ({
@@ -118,13 +116,13 @@ describe('POST /stream', () => {
 
   it('appends image content blocks when files are present', async () => {
     mockFiles = [{ buffer: Buffer.from('img'), mimetype: 'image/jpeg', originalname: 'card.jpg' }];
-    mockUploadImagesToPocketBase.mockResolvedValue(['https://storage.example.com/card.jpg']);
+    mockUploadImagesToSupabase.mockResolvedValue(['https://storage.example.com/card.jpg']);
     mockStream.mockResolvedValue(makeSseStream());
 
     const userMessage = [{ type: 'text', text: 'What is this card?' }];
     await request(app).post('/stream').send({ message: JSON.stringify(userMessage) });
 
-    expect(mockUploadImagesToPocketBase).toHaveBeenCalledWith({ images: mockFiles });
+    expect(mockUploadImagesToSupabase).toHaveBeenCalledWith({ images: mockFiles });
     const { userMessage: sent } = mockStream.mock.calls[0][0];
     expect(sent).toHaveLength(2);
     expect(sent[1]).toEqual(
@@ -132,13 +130,13 @@ describe('POST /stream', () => {
     );
   });
 
-  it('does not call uploadImagesToPocketBase when no files', async () => {
+  it('does not call uploadImagesToSupabase when no files', async () => {
     const userMessage = [{ type: 'text', text: 'Hello' }];
     mockStream.mockResolvedValue(makeSseStream());
 
     await request(app).post('/stream').send({ message: JSON.stringify(userMessage) });
 
-    expect(mockUploadImagesToPocketBase).not.toHaveBeenCalled();
+    expect(mockUploadImagesToSupabase).not.toHaveBeenCalled();
   });
 
   it('returns 500 when stream throws', async () => {
