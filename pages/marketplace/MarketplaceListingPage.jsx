@@ -23,7 +23,7 @@ const MarketplaceListingPage = () => {
       try {
         const { data, error } = await supabase
           .from('listings')
-          .select('*, vault_item:vault_items(*), seller:profiles!seller_id(*)')
+          .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(*)')
           .eq('id', id)
           .single();
         if (error) throw error;
