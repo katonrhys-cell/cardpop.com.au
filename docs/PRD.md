@@ -449,12 +449,12 @@ Outbid notification queued for previous highest bidder
 - All existing PocketBase records → Supabase via one-time migration script
 - Supabase Storage for all file/image assets currently on PocketBase file storage
 
-**Decommission:**
-- Remove `pocketbase` npm dependency from `package.json`
-- Remove `lib/pocketbaseClient.js` and all `pb` imports across the frontend
-- Replace all `pb.collection(...)` calls with `supabase.from(...)` equivalents
-- Remove `pb_migrations/` and `pb_hooks/` directories once migration is validated
-- Remove Express backend calls to `localhost:8090`
+**Decommission:** (completed — PocketBase has been fully removed)
+- [x] Remove `pocketbase` npm dependency from `package.json`
+- [x] Remove `lib/pocketbaseClient.js` and all `pb` imports across the frontend
+- [x] Replace all `pb.collection(...)` calls with `supabase.from(...)` equivalents
+- [x] Remove `pb_migrations/` and `pb_hooks/` directories
+- [x] Remove Express backend calls to `localhost:8090`
 
 ---
 
