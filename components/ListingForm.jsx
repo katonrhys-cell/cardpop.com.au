@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
+import GradingInput from '@/components/GradingInput.jsx';
 
 const ListingForm = ({ product, onSuccess, onCancel }) => {
   const { currentUser } = useAuth();
@@ -24,6 +25,8 @@ const ListingForm = ({ product, onSuccess, onCancel }) => {
     cardType: product?.cardType || 'Graded Cards',
     condition: product?.condition || 'Mint',
     grade: product?.grade || '',
+    gradingNumber: product?.grading_number || '',
+    gradingCompany: product?.grading_company || 'psa',
     price: product?.price || '',
     status: product?.status || 'For Sale',
   });
@@ -61,6 +64,8 @@ const ListingForm = ({ product, onSuccess, onCancel }) => {
         card_type: formData.cardType,
         condition: formData.condition,
         grade: formData.grade,
+        grading_number: formData.gradingNumber || null,
+        grading_company: formData.gradingCompany || 'psa',
         price_aud: formData.price,
         status: formData.status,
         seller_id: currentUser.id
@@ -156,8 +161,15 @@ const ListingForm = ({ product, onSuccess, onCancel }) => {
           </Select>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="grade">Grade (Optional)</Label>
+        <div className="space-y-2 md:col-span-2">
+          <GradingInput
+            gradingNumber={formData.gradingNumber}
+            company={formData.gradingCompany}
+            onGradingNumberChange={(value) => handleChange('gradingNumber', value)}
+            onCompanyChange={(value) => handleChange('gradingCompany', value)}
+            placeholder="e.g., 12345678"
+          />
+          <Label htmlFor="grade" className="block mt-4">Grade (Optional)</Label>
           <Input
             id="grade"
             value={formData.grade}

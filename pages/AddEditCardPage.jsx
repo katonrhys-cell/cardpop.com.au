@@ -3,8 +3,8 @@ import { Helmet } from 'react-helmet';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, ChevronDown, Sparkles, Loader2,
-  Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X,
-  Frame, Wand2,
+  Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X, Crop,
+  Frame, Wand2, SlidersHorizontal,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -12,7 +12,7 @@ import { useCategories } from '@/hooks/useCategories.js';
 import CardHierarchySelector from '@/components/CardHierarchySelector.jsx';
 import { COLLECTION_CONFIGS } from '@/data/collectionConfigs.js';
 import { useCollectionEras } from '@/hooks/useCollectionEras.js';
-import { VARIANT_GROUPS } from '@/lib/cardVariants.js';
+import { getVariantGroups } from '@/lib/cardVariants.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,6 +29,11 @@ import { useCardsightPricing } from '@/hooks/useCardsightPricing.js';
 import PhotoQualityScore from '@/components/PhotoQualityScore.jsx';
 import PhotoTemplateModal from '@/components/PhotoTemplateModal.jsx';
 import { analyzePhotoQuality } from '@/utils/photoQuality.js';
+import { compressImage } from '@/utils/compressImage.js';
+import { useCardCrop } from '@/hooks/useCardCrop.js';
+import CardCropPreview from '@/components/CardCropPreview.jsx';
+import CardCornerAdjuster from '@/components/CardCornerAdjuster.jsx';
+import { warpCardWithCorners } from '@/utils/detectCard.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -102,12 +107,15 @@ const AddEditCardPage = () => {
   const [psaPopData, setPsaPopData]           = useState(null);
   const [photoQuality, setPhotoQuality]       = useState(null);
   const [checkingQuality, setCheckingQuality] = useState(false);
+  const { detectingKey, candidate: cropCandidate, detect: detectCrop, clear: clearCrop } = useCardCrop();
+  const [adjusting, setAdjusting]             = useState(null); // { key, file, imageUrl, initialCorners }
   const [showAutoGuide, setShowAutoGuide]     = useState(false);
   const [showPatchGuide, setShowPatchGuide]   = useState(false);
   const [showRelicGuide, setShowRelicGuide]   = useState(false);
   const [showNumberGuide, setShowNumberGuide] = useState(false);
   const [showSpGuide, setShowSpGuide]         = useState(false);
   const [showRookieGuide, setShowRookieGuide] = useState(false);
+  const [showRefractorGuide, setShowRefractorGuide] = useState(false);
 
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
@@ -131,7 +139,6 @@ const AddEditCardPage = () => {
     isFoil:         false,
     isSealed:       false,
     isRookie:       false,
-    isRefractor:    false,
     serialNumber:   '',
     isAuto:         false,
     autoType:       '',
@@ -146,6 +153,8 @@ const AddEditCardPage = () => {
     spTier:         '',
     rookieType:     '',
     rookieLogo:     '',
+    refractorType:  '',
+    refractorColor: '',
     // Grading
     gradingCompany: 'raw',
     grade:          '',
@@ -260,7 +269,6 @@ const AddEditCardPage = () => {
           isFoil:         card.is_foil        ?? false,
           isSealed:       card.is_sealed      ?? false,
           isRookie:       card.is_rookie      ?? false,
-          isRefractor:    card.is_refractor   ?? false,
           serialNumber:   card.serial_number  || '',
           isAuto:         card.is_auto        ?? false,
           autoType:       card.auto_type      || '',
@@ -275,6 +283,8 @@ const AddEditCardPage = () => {
           spTier:         card.sp_tier         || '',
           rookieType:     card.rookie_type     || '',
           rookieLogo:     card.rookie_logo     || '',
+          refractorType:  card.refractor_type  || '',
+          refractorColor: card.refractor_color || '',
           gradingCompany: card.grading_company || 'raw',
           grade:          card.grade          || '',
           certNumber:     card.cert_number    || '',
@@ -314,6 +324,16 @@ const AddEditCardPage = () => {
   }, [id, currentUser?.id, navigate, isEdit]);
 
   // ─── Image handling ───────────────────────────────────────────────────────
+  // Score a photo against the CardPop Photography Standard (advisory only).
+  const runPhotoQuality = (file) => {
+    setPhotoQuality(null);
+    setCheckingQuality(true);
+    analyzePhotoQuality(file)
+      .then(setPhotoQuality)
+      .catch(() => setPhotoQuality(null))
+      .finally(() => setCheckingQuality(false));
+  };
+
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -325,13 +345,55 @@ const AddEditCardPage = () => {
     // Clear any previous analysis results when a new image is selected
     clearScan();
     clearCardSight();
-    // Score the photo against the CardPop Photography Standard (advisory only)
-    setPhotoQuality(null);
-    setCheckingQuality(true);
-    analyzePhotoQuality(file)
-      .then(setPhotoQuality)
-      .catch(() => setPhotoQuality(null))
-      .finally(() => setCheckingQuality(false));
+    clearCrop();
+    setAdjusting(null);
+    runPhotoQuality(file);
+  };
+
+  // Apply a cropped image to the given slot ('main' or an extra-photo index).
+  const applyCropResult = (key, croppedFile, croppedUrl) => {
+    if (key === 'main') {
+      setImageFile(croppedFile);
+      setImagePreview(croppedUrl);
+      runPhotoQuality(croppedFile);
+    } else {
+      const nf = [...extraFiles]; nf[key] = croppedFile; setExtraFiles(nf);
+      const np = [...extraPreviews]; np[key] = croppedUrl; setExtraPreviews(np);
+    }
+    clearCrop();
+    toast.success('Using the cropped card image.');
+  };
+
+  const applyMainCrop = () =>
+    cropCandidate && applyCropResult('main', cropCandidate.croppedFile, cropCandidate.croppedUrl);
+  const applyExtraCrop = (idx) =>
+    cropCandidate && applyCropResult(idx, cropCandidate.croppedFile, cropCandidate.croppedUrl);
+
+  // Open the manual corner adjuster for a slot, seeded with detected corners
+  // when available (otherwise the editor falls back to an inset rectangle).
+  const openAdjuster = (key, file, imageUrl, initialCorners = null) => {
+    if (!file) return;
+    setAdjusting({ key, file, imageUrl, initialCorners });
+  };
+
+  // Auto-detect first; if nothing is found, drop straight into manual adjust.
+  const cropOrAdjust = async (key, file, imageUrl) => {
+    const found = await detectCrop(key, file);
+    if (!found) openAdjuster(key, file, imageUrl);
+  };
+
+  // Warp the image with the user-adjusted corners and apply the result.
+  const handleAdjustApply = async (corners) => {
+    if (!adjusting) return;
+    const res = await warpCardWithCorners(adjusting.file, corners);
+    if (!res?.ok || !res.blob) {
+      toast.error('Could not crop with those corners. Try again.');
+      return;
+    }
+    const base = (adjusting.file.name || 'card').replace(/\.[^.]+$/, '');
+    const croppedFile = new File([res.blob], `${base}-cropped.jpg`, { type: 'image/jpeg' });
+    applyCropResult(adjusting.key, croppedFile, res.url);
+    setAdjusting(null);
   };
 
   // ─── Unified AI analysis ──────────────────────────────────────────────────
@@ -367,7 +429,9 @@ const AddEditCardPage = () => {
     };
     const gradingCompanyMap = { 'PSA': 'psa', 'BGS': 'bgs', 'CGC': 'cgc', 'SGC': 'sgc', 'ACE': 'ace' };
 
-    const ocrResult = await scanCard(imageFile);
+    // Pass the front plus any back/extra images so OCR can read set codes and
+    // collector numbers that are clearer (or only present) on the back.
+    const ocrResult = await scanCard([imageFile, ...extraFiles.filter(Boolean)].slice(0, 3));
     if (ocrResult) {
       setFormData(prev => ({
         ...prev,
@@ -565,17 +629,30 @@ const AddEditCardPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isEdit && !imageFile) { toast.error('Card image is required'); return; }
-    if (!validateForm()) { toast.error('Please fix the errors in the form'); return; }
+    if (!validateForm()) {
+      toast.error('Please fix the errors in the form');
+      // Jump to the first problem — on a long form (especially mobile) the
+      // errored field may be far off-screen.
+      setTimeout(() => {
+        const el = document.querySelector('.border-destructive');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          el.focus?.();
+        }
+      }, 50);
+      return;
+    }
 
     setSaving(true);
     try {
       let cardImagePath = null;
       if (imageFile) {
-        const fileExt = imageFile.name.split('.').pop();
+        const compressed = await compressImage(imageFile);
+        const fileExt = compressed.name.split('.').pop();
         const filePath = `${currentUser.id}/${Date.now()}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from('vault-images')
-          .upload(filePath, imageFile, { upsert: true });
+          .upload(filePath, compressed, { upsert: true });
         if (uploadError) throw uploadError;
         cardImagePath = filePath;
       }
@@ -583,11 +660,12 @@ const AddEditCardPage = () => {
       const extraImagePaths = [];
       for (const file of extraFiles) {
         if (!file) continue;
-        const fileExt = file.name.split('.').pop();
+        const compressed = await compressImage(file);
+        const fileExt = compressed.name.split('.').pop();
         const filePath = `${currentUser.id}/${Date.now()}-extra-${Math.random().toString(36).slice(2)}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from('vault-images')
-          .upload(filePath, file, { upsert: true });
+          .upload(filePath, compressed, { upsert: true });
         if (uploadError) throw uploadError;
         extraImagePaths.push(filePath);
       }
@@ -614,7 +692,7 @@ const AddEditCardPage = () => {
         is_foil:             formData.isFoil,
         is_sealed:           formData.isSealed,
         is_rookie:           formData.isRookie,
-        is_refractor:        formData.isRefractor,
+        is_refractor:        formData.variant.includes('Refractor'),
         serial_number:       formData.serialNumber?.trim() || null,
         is_auto:             formData.isAuto,
         auto_type:           formData.variant.includes('Auto') ? (formData.autoType || null) : null,
@@ -629,6 +707,8 @@ const AddEditCardPage = () => {
         sp_tier:             formData.variant.includes('Short Print (SP)') ? (formData.spTier || null) : null,
         rookie_type:         formData.variant.includes('Rookie Card (RC)') ? (formData.rookieType || null) : null,
         rookie_logo:         formData.variant.includes('Rookie Card (RC)') ? (formData.rookieLogo || null) : null,
+        refractor_type:      formData.variant.includes('Refractor') ? (formData.refractorType || null) : null,
+        refractor_color:     formData.variant.includes('Refractor') ? (formData.refractorColor || null) : null,
         grading_company:     formData.gradingCompany,
         grade:               isGraded ? (formData.grade?.trim() || null) : null,
         cert_number:         isGraded ? (formData.certNumber?.trim() || null) : null,
@@ -676,6 +756,8 @@ const AddEditCardPage = () => {
               setExtraPreviews([null, null, null, null, null]);
               setErrors({});
               setIsAutoFilled(false);
+              clearCrop();
+              setAdjusting(null);
               clearScan();
               // Keep franchise/manufacturer selected for fast repeat entry
               window.scrollTo(0, 0);
@@ -759,6 +841,45 @@ const AddEditCardPage = () => {
                   />
                 </div>
 
+                {/* Auto-crop (opt-in): button → detecting → preview + confirm */}
+                {imageFile && !(cropCandidate?.key === 'main') && (
+                  <div className="mt-3 flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => cropOrAdjust('main', imageFile, imagePreview)}
+                      disabled={detectingKey !== null}
+                      className="flex-1 gap-1.5"
+                    >
+                      {detectingKey === 'main'
+                        ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Detecting card edges…</>
+                        : <><Crop className="w-3.5 h-3.5" /> Straighten &amp; crop to card</>}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => openAdjuster('main', imageFile, imagePreview)}
+                      disabled={detectingKey !== null}
+                      title="Adjust crop corners manually"
+                      className="gap-1.5"
+                    >
+                      <SlidersHorizontal className="w-3.5 h-3.5" /> Adjust
+                    </Button>
+                  </div>
+                )}
+
+                {cropCandidate?.key === 'main' && (
+                  <CardCropPreview
+                    originalUrl={imagePreview}
+                    croppedUrl={cropCandidate.croppedUrl}
+                    onApply={applyMainCrop}
+                    onAdjust={() => openAdjuster('main', imageFile, imagePreview, cropCandidate.corners)}
+                    onDismiss={clearCrop}
+                  />
+                )}
+
                 {/* Extra image slots — up to 5 additional photos */}
                 <div className="mt-4">
                   <p className="text-xs font-semibold text-muted-foreground mb-2">Additional Photos (up to 5)</p>
@@ -778,10 +899,24 @@ const AddEditCardPage = () => {
                                 const nf = [...extraFiles]; nf[idx] = null;
                                 const np = [...extraPreviews]; np[idx] = null;
                                 setExtraFiles(nf); setExtraPreviews(np);
+                                if (cropCandidate?.key === idx) clearCrop();
                               }}
-                              className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                              aria-label="Remove photo"
+                              className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                             >
                               <X className="w-2.5 h-2.5 text-white" />
+                            </button>
+                            <button
+                              type="button"
+                              title="Straighten & crop to card"
+                              aria-label="Straighten and crop to card"
+                              onClick={() => cropOrAdjust(idx, extraFiles[idx], extraPreviews[idx])}
+                              disabled={detectingKey !== null}
+                              className="absolute bottom-0.5 left-0.5 bg-black/60 rounded-full p-0.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity disabled:opacity-40"
+                            >
+                              {detectingKey === idx
+                                ? <Loader2 className="w-2.5 h-2.5 text-white animate-spin" />
+                                : <Crop className="w-2.5 h-2.5 text-white" />}
                             </button>
                           </div>
                         ) : (
@@ -811,7 +946,26 @@ const AddEditCardPage = () => {
                       </div>
                     ))}
                   </div>
+
+                  {typeof cropCandidate?.key === 'number' && (
+                    <CardCropPreview
+                      originalUrl={extraPreviews[cropCandidate.key]}
+                      croppedUrl={cropCandidate.croppedUrl}
+                      onApply={() => applyExtraCrop(cropCandidate.key)}
+                      onAdjust={() => openAdjuster(cropCandidate.key, extraFiles[cropCandidate.key], extraPreviews[cropCandidate.key], cropCandidate.corners)}
+                      onDismiss={clearCrop}
+                    />
+                  )}
                 </div>
+
+                {adjusting && (
+                  <CardCornerAdjuster
+                    imageUrl={adjusting.imageUrl}
+                    initialCorners={adjusting.initialCorners}
+                    onApply={handleAdjustApply}
+                    onCancel={() => setAdjusting(null)}
+                  />
+                )}
 
                 {/* Photo Template & Card Identification */}
                 <div className="mt-4 space-y-3">
@@ -933,14 +1087,22 @@ const AddEditCardPage = () => {
                       )}
 
                       {scanResult && !cardSightResult?.identified && (
-                        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-foreground/80 mb-2">
-                          {scanResult.name && <div className="col-span-2"><strong className="text-foreground">Name:</strong> {scanResult.name}</div>}
-                          {scanResult.collectionType && <div><strong className="text-foreground">Category:</strong> {scanResult.collectionType}</div>}
-                          {scanResult.condition && <div><strong className="text-foreground">Condition:</strong> {scanResult.condition}</div>}
-                          {scanResult.cardSetName && <div><strong className="text-foreground">Set:</strong> {scanResult.cardSetName}</div>}
-                          {scanResult.gradeScore && <div><strong className="text-foreground">Grade:</strong> {scanResult.gradeScore}</div>}
-                          {scanResult.rarity && <div className="col-span-2"><strong className="text-foreground">Rarity:</strong> {scanResult.rarity}</div>}
-                        </div>
+                        <>
+                          {scanResult.catalogueMatch && (
+                            <div className="text-[11px] font-semibold text-emerald-700 bg-emerald-500/10 rounded-lg px-2.5 py-1.5 mb-2">
+                              ✓ Matched to catalogue ({scanResult.catalogueMatch.source}) — set &amp; card number verified
+                            </div>
+                          )}
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-foreground/80 mb-2">
+                            {scanResult.name && <div className="col-span-2"><strong className="text-foreground">Name:</strong> {scanResult.name}</div>}
+                            {scanResult.collectionType && <div><strong className="text-foreground">Category:</strong> {scanResult.collectionType}</div>}
+                            {scanResult.condition && <div><strong className="text-foreground">Condition:</strong> {scanResult.condition}</div>}
+                            {scanResult.cardSetName && <div><strong className="text-foreground">Set:</strong> {scanResult.cardSetName}</div>}
+                            {scanResult.cardNumber && <div><strong className="text-foreground">No:</strong> {scanResult.cardNumber}</div>}
+                            {scanResult.gradeScore && <div><strong className="text-foreground">Grade:</strong> {scanResult.gradeScore}</div>}
+                            {scanResult.rarity && <div className="col-span-2"><strong className="text-foreground">Rarity:</strong> {scanResult.rarity}</div>}
+                          </div>
+                        </>
                       )}
 
                       <div className="pt-2 border-t border-border/50">
@@ -1043,7 +1205,7 @@ const AddEditCardPage = () => {
                       value={formData.cardName}
                       onChange={e => set('cardName', e.target.value)}
                       placeholder="e.g. Charizard"
-                      className={`h-11 bg-background ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''}`}
+                      className={`h-11 bg-background ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''} ${errors.cardName ? 'border-destructive' : ''}`}
                     />
                     {errors.cardName && <p className="text-destructive text-xs">{errors.cardName}</p>}
                   </div>
@@ -1117,32 +1279,54 @@ const AddEditCardPage = () => {
                         </button>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground -mt-1">Select all that apply — scroll to see more</p>
+                    <p className="text-xs text-muted-foreground -mt-1">
+                      {formData.collection
+                        ? `Showing foils & variants for ${formData.collection} — select all that apply`
+                        : 'Select all that apply — scroll to see more'}
+                    </p>
                     <div className="max-h-52 overflow-y-auto rounded-xl border border-border bg-muted/20 p-3 space-y-3">
-                      {VARIANT_GROUPS.map(group => (
-                        <div key={group.label}>
-                          <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground mb-1.5">{group.label}</p>
-                          <div className="flex flex-wrap gap-2">
-                            {group.variants.map(v => {
-                              const active = formData.variant.includes(v);
-                              return (
-                                <button
-                                  key={v}
-                                  type="button"
-                                  onClick={() => set('variant', active ? formData.variant.filter(x => x !== v) : [...formData.variant, v])}
-                                  className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
-                                    active
-                                      ? 'border-primary bg-primary/10 text-primary shadow-sm'
-                                      : 'border-border bg-background text-foreground hover:border-muted-foreground/40'
-                                  }`}
-                                >
-                                  {active && <span className="mr-1">✓</span>}{v}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      ))}
+                      {(() => {
+                        const variantGroups = getVariantGroups(formData.collection);
+                        const known = new Set(variantGroups.flatMap(g => g.variants));
+                        const otherSelected = formData.variant.filter(v => !known.has(v));
+                        const renderChip = (v) => {
+                          const active = formData.variant.includes(v);
+                          return (
+                            <button
+                              key={v}
+                              type="button"
+                              onClick={() => set('variant', active ? formData.variant.filter(x => x !== v) : [...formData.variant, v])}
+                              className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
+                                active
+                                  ? 'border-primary bg-primary/10 text-primary shadow-sm'
+                                  : 'border-border bg-background text-foreground hover:border-muted-foreground/40'
+                              }`}
+                            >
+                              {active && <span className="mr-1">✓</span>}{v}
+                            </button>
+                          );
+                        };
+                        return (
+                          <>
+                            {variantGroups.map(group => (
+                              <div key={group.label}>
+                                <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground mb-1.5">{group.label}</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {group.variants.map(renderChip)}
+                                </div>
+                              </div>
+                            ))}
+                            {otherSelected.length > 0 && (
+                              <div>
+                                <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground mb-1.5">Also Selected</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {otherSelected.map(renderChip)}
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                     {formData.variant.length > 0 && (
                       <p className="text-xs text-primary font-medium">
@@ -1175,7 +1359,7 @@ const AddEditCardPage = () => {
                     <Label className="font-bold">Card Attributes</Label>
                     <div className="flex gap-3">
                       {[
-                        { key: 'isFoil',   label: '✨ Foil',          desc: 'Holographic / foil finish' },
+                        { key: 'isFoil',   label: '🃏 Individual Card (Single)', desc: 'A single individual card' },
                         { key: 'isSealed', label: '📦 Sealed Product', desc: 'Booster, box, or sealed item' },
                         { key: 'isRookie', label: '🏆 Rookie Card',    desc: 'First-year professional card' },
                       ].map(({ key, label, desc }) => (
@@ -1196,8 +1380,7 @@ const AddEditCardPage = () => {
                     </div>
                     <div className="flex gap-3 items-stretch">
                       {[
-                        { key: 'isRefractor', label: '🌈 Refractor',  desc: 'Refractor / prizm parallel' },
-                        { key: 'isAuto',      label: '✍️ Auto',        desc: 'Signed autograph card' },
+                        { key: 'isAuto',      label: '🗂️ Complete Set',  desc: 'A full / complete set' },
                       ].map(({ key, label, desc }) => (
                         <button
                           key={key}
@@ -1228,6 +1411,152 @@ const AddEditCardPage = () => {
                         />
                       </div>
                     </div>
+
+                    {/* Refractor sub-details — shown when the "Refractor" finish is
+                        selected in the Card Variant / Finish section (Finish group). */}
+                    {formData.variant.includes('Refractor') && (
+                      <div className="mt-3 p-4 rounded-xl border-2 border-fuchsia-400/30 bg-fuchsia-400/5 space-y-4 animate-in fade-in slide-in-from-top-1">
+                        <p className="text-xs font-extrabold uppercase tracking-widest text-fuchsia-700 dark:text-fuchsia-400">Refractor Details</p>
+
+                        {/* Refractor type / pattern */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Refractor Type</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { value: 'base',         label: 'Base Refractor',     desc: 'Standard rainbow-shine refractor finish' },
+                              { value: 'xfractor',     label: 'X-Fractor',          desc: 'Checkerboard / mosaic background pattern' },
+                              { value: 'atomic',       label: 'Atomic Refractor',   desc: "Cracked-ice 'atomic' finish — scarcer than base" },
+                              { value: 'prism',        label: 'Prism Refractor',    desc: 'Prismatic light-beam pattern' },
+                              { value: 'pulsar',       label: 'Pulsar Refractor',   desc: 'Starburst / pulsar burst pattern' },
+                              { value: 'mojo',         label: 'Mojo Refractor',     desc: "Rippling 'mojo' wave finish" },
+                              { value: 'wave',         label: 'Wave Refractor',     desc: 'Flowing wave-line pattern' },
+                              { value: 'mini_diamond', label: 'Mini-Diamond',       desc: 'Tiny repeating diamond texture' },
+                              { value: 'speckle',      label: 'Speckle Refractor',  desc: 'Speckled / sparkle finish' },
+                              { value: 'shimmer',      label: 'Shimmer Refractor',  desc: 'High-gloss shimmer finish' },
+                              { value: 'raywave',      label: 'RayWave Refractor',  desc: 'Topps Finest ray-wave pattern' },
+                              { value: 'negative',     label: 'Negative Refractor', desc: 'Inverted / negative colour finish' },
+                              { value: 'sepia',        label: 'Sepia Refractor',    desc: 'Reddish-brown monochrome tone' },
+                              { value: 'superfractor', label: 'Superfractor (1/1)', desc: 'The one-of-one gold swirl — rarest of all' },
+                              { value: 'other',        label: 'Other Refractor',    desc: 'Another refractor-style parallel' },
+                            ].map(({ value, label, desc }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('refractorType', formData.refractorType === value ? '' : value)}
+                                className={`flex flex-col items-start px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
+                                  formData.refractorType === value
+                                    ? 'border-fuchsia-500 bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                }`}
+                              >
+                                <span className="font-bold text-xs">{label}</span>
+                                <span className={`text-[10px] mt-0.5 leading-tight ${formData.refractorType === value ? 'text-fuchsia-600/70 dark:text-fuchsia-400/70' : 'text-muted-foreground'}`}>{desc}</span>
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Collapsible refractor guide */}
+                          <div className="rounded-xl border border-fuchsia-400/25 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setShowRefractorGuide(v => !v)}
+                              className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-fuchsia-400/5 transition-colors"
+                            >
+                              <span className="text-[11px] font-bold text-fuchsia-700 dark:text-fuchsia-400">How do refractors work? View guide</span>
+                              <ChevronDown className={`h-3.5 w-3.5 text-fuchsia-600 dark:text-fuchsia-400 transition-transform duration-200 ${showRefractorGuide ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showRefractorGuide && (
+                              <div className="px-3 pb-3 divide-y divide-border/40">
+                                {[
+                                  {
+                                    title: 'What is a refractor?',
+                                    badge: 'Basics',
+                                    badgeClass: 'bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-400 border border-fuchsia-500/20',
+                                    body: "A refractor is a chromium parallel (pioneered by Topps Finest in 1993) with a reflective coating that throws a rainbow shine when tilted under light. The same card design is printed across many refractor 'parallels' that differ by colour and pattern.",
+                                  },
+                                  {
+                                    title: 'Colour = rarity',
+                                    badge: 'Hierarchy',
+                                    badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20',
+                                    body: 'Colour usually signals scarcity. Base and Green/Blue are the most common; Gold is typically /50, Orange /25, Black /10 and Red /5. Exact print runs vary by set and year, so always check the back for the serial number.',
+                                  },
+                                  {
+                                    title: 'Superfractor',
+                                    badge: '1-of-1',
+                                    badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20',
+                                    body: 'The rarest refractor of all — a serial-numbered 1/1 with a swirling gold finish. Only a single copy of each card exists, making Superfractors among the most coveted cards in the hobby.',
+                                  },
+                                  {
+                                    title: 'X-Fractor & Atomic',
+                                    badge: 'Patterns',
+                                    badgeClass: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20',
+                                    body: "X-Fractors carry a checkerboard / mosaic background, while Atomic Refractors (Bowman's Best) use a cracked-ice texture and are typically far scarcer than the base refractor.",
+                                  },
+                                  {
+                                    title: 'Modern patterns',
+                                    badge: 'Modern',
+                                    badgeClass: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-500/20',
+                                    body: 'Newer releases add pattern refractors such as Prism, Pulsar, Mojo, Wave, Speckle, Shimmer and RayWave — each a distinct texture layered over the refractor finish.',
+                                  },
+                                  {
+                                    title: 'Negative & Sepia',
+                                    badge: 'Monochrome',
+                                    badgeClass: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20',
+                                    body: 'Negative Refractors invert the card colours for a dark, high-contrast look, while Sepia Refractors drop the colour for a reddish-brown monochrome tone.',
+                                  },
+                                ].map(({ title, badge, badgeClass, body }) => (
+                                  <div key={title} className="py-2.5 first:pt-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-[11px] font-bold text-foreground">{title}</span>
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${badgeClass}`}>{badge}</span>
+                                    </div>
+                                    <p className="text-[10px] leading-relaxed text-muted-foreground">{body}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Refractor colour / parallel */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Refractor Colour / Parallel</Label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[
+                              { value: 'standard', label: 'Standard', sub: 'Unnumbered',  dot: 'bg-gradient-to-br from-cyan-300 via-fuchsia-300 to-amber-300' },
+                              { value: 'green',    label: 'Green',    sub: 'often /99',   dot: 'bg-green-500' },
+                              { value: 'purple',   label: 'Purple',   sub: 'scarce',      dot: 'bg-purple-500' },
+                              { value: 'blue',     label: 'Blue',     sub: 'often /150',  dot: 'bg-blue-500' },
+                              { value: 'aqua',     label: 'Aqua',     sub: 'retail',      dot: 'bg-cyan-400' },
+                              { value: 'pink',     label: 'Pink',     sub: 'retail',      dot: 'bg-pink-400' },
+                              { value: 'yellow',   label: 'Yellow',   sub: 'set-based',   dot: 'bg-yellow-400' },
+                              { value: 'gold',     label: 'Gold',     sub: 'often /50',   dot: 'bg-amber-400' },
+                              { value: 'orange',   label: 'Orange',   sub: 'often /25',   dot: 'bg-orange-500' },
+                              { value: 'black',    label: 'Black',    sub: 'often /10',   dot: 'bg-neutral-900 border border-white/40' },
+                              { value: 'red',      label: 'Red',      sub: 'often /5',    dot: 'bg-red-500' },
+                            ].map(({ value, label, sub, dot }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('refractorColor', formData.refractorColor === value ? '' : value)}
+                                className={`flex items-center gap-2 px-2.5 py-2 rounded-xl border-2 text-left transition-all ${
+                                  formData.refractorColor === value
+                                    ? 'border-fuchsia-500 bg-fuchsia-500/10 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40'
+                                }`}
+                              >
+                                <span className={`h-4 w-4 rounded-full shrink-0 ${dot}`} aria-hidden="true" />
+                                <span className="flex flex-col leading-tight">
+                                  <span className={`font-bold text-xs ${formData.refractorColor === value ? 'text-fuchsia-700 dark:text-fuchsia-400' : 'text-foreground'}`}>{label}</span>
+                                  <span className={`text-[10px] ${formData.refractorColor === value ? 'text-fuchsia-600/70 dark:text-fuchsia-400/70' : 'text-muted-foreground'}`}>{sub}</span>
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground leading-relaxed">Print runs vary by set and year — the values shown are typical guides. Use the Serial # field above to record the exact numbering.</p>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Rookie sub-details — shown when the "Rookie Card (RC)" attribute
                         is selected in the Card Variant / Finish section (Attributes group). */}

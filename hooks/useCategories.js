@@ -126,6 +126,13 @@ export const useCategories = () => {
     return data ?? [];
   }, []);
 
+  // Legacy aliases retained for backward compatibility with older brand/series
+  // filters. The flat category model no longer has separate brand/series tables,
+  // so these resolve to empty lists — but they must be stable (useCallback) so
+  // consumers can list them in effect deps without causing re-render loops.
+  const getBrandsBySubcategory = useCallback(async () => [], []);
+  const getSeriesByBrand = useCallback(async () => [], []);
+
   // Admin CRUD
   const createCategory = async (data) => {
     setLoading(true);
@@ -205,9 +212,10 @@ export const useCategories = () => {
     getParallelsByFranchise,
     getSubsetsBySet,
     getSubcategoriesByCategory,
-    // Legacy aliases
-    getBrandsBySubcategory:  async () => [],
-    getSeriesByBrand:        async () => [],
+    // Legacy aliases — must be stable refs so consumers can safely list them in
+    // effect dependency arrays without triggering an infinite render loop.
+    getBrandsBySubcategory,
+    getSeriesByBrand,
     createNode,
     updateNode,
     deleteNode,

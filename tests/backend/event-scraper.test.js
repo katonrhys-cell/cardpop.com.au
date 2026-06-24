@@ -17,7 +17,7 @@ vi.mock('../../src/api/integrated-ai.js', () => ({
   stream: mockAiStream,
   streamOneShot: vi.fn(),
   uploadImagesToSupabase: vi.fn(),
-  uploadImagesToPocketBase: vi.fn(),
+  uploadImagesToSupabase: vi.fn(),
   ContentBlockType: { Text: 'text', Image: 'image' },
 }));
 

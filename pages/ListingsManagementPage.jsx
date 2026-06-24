@@ -3,7 +3,7 @@ import { Plus, Search, Filter, ArrowUpDown, Loader2, MoreHorizontal } from 'luci
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCategories } from '@/hooks/useCategories.js';
-import { formatCurrency } from '@/api/EcommerceApi.js';
+import { formatCurrency } from '@/utils/formatCurrency.js';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';

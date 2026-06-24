@@ -9,7 +9,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { ShoppingBag, X, Plus, Minus, Loader2, ArrowRight, PackageOpen } from 'lucide-react';
 import { useCart } from '@/hooks/useCart.jsx';
-import { formatCurrency } from '@/api/EcommerceApi.js';
+import { formatCurrency } from '@/utils/formatCurrency.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient.js';

@@ -36,12 +36,15 @@ async function getFeeConfig(sellerTier, transactionType) {
     .maybeSingle();
 
   if (!data) {
-    // Fall back to 'none' tier
+    // Fall back to the 'none' tier — but still scoped to this transaction type,
+    // matching the primary query, so we never apply a fee config that doesn't
+    // cover the transaction type being charged.
     const { data: fallback } = await supabase
       .from('fee_config')
       .select('id, fee_pct')
       .eq('seller_tier', 'none')
       .eq('is_active', true)
+      .contains('applies_to', [transactionType])
       .maybeSingle();
     data = fallback;
   }
@@ -546,9 +549,19 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
             ? session.payment_intent
             : (session.payment_intent?.id ?? null);
 
-          await supabase.from('orders')
+          // Atomic claim: only the delivery that flips pending → payment_confirmed
+          // proceeds. A concurrent webhook retry will update 0 rows and bail, so
+          // listings/stock/notifications are never processed twice.
+          const { data: claimed } = await supabase.from('orders')
             .update({ status: 'payment_confirmed', stripe_payment_intent_id: cartPaymentIntentId })
-            .eq('id', existing.id);
+            .eq('id', existing.id)
+            .eq('status', 'pending')
+            .select('id');
+
+          if (!claimed || claimed.length === 0) {
+            logger.info(`[STRIPE] Cart order ${existing.id} already confirmed concurrently for session ${session.id}, skipping`);
+            break;
+          }
 
           const lines = Array.isArray(existing.order_items) ? existing.order_items : [];
           const sellerIds = new Set();
@@ -650,6 +663,14 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           });
 
         if (insertError) {
+          // Unique violation on stripe_session_id → a concurrent webhook delivery
+          // already recorded this order. Treat as idempotent success and skip the
+          // rest (listing update, offer accept, notifications, and crucially the
+          // seller payout) so we never double-pay or double-process.
+          if (insertError.code === '23505') {
+            logger.info(`[STRIPE] Order for session ${session.id} already inserted concurrently, skipping`);
+            break;
+          }
           logger.error(`[STRIPE] Order insert failed: ${insertError.message}`);
           throw insertError;
         }

@@ -2,9 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 
 const mockStream = vi.hoisted(() => vi.fn());
+const mockFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/integratedAiClient', () => ({
-  integratedAiClient: { stream: mockStream },
-  default: { stream: mockStream },
+  integratedAiClient: { stream: mockStream, fetch: mockFetch },
+  default: { stream: mockStream, fetch: mockFetch },
 }));
 
 const mockToast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
@@ -67,6 +68,8 @@ async function runScan(cardJson, streamOpts = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // Default: catalogue lookup finds nothing, so OCR fields pass through unchanged.
+  mockFetch.mockResolvedValue({ results: [] });
 });
 
 // ─── Happy path & stream handling ────────────────────────────────────────────
@@ -104,6 +107,8 @@ describe('useCardOCR — scanning', () => {
       cardType: 'Fire',
       brand: 'Wizards of the Coast',
       series: 'Base Set',
+      confidence: null,
+      candidateSets: [],
     });
     expect(mockToast.success).toHaveBeenCalled();
     expect(result.current.isScanning).toBe(false);
@@ -235,6 +240,59 @@ describe('useCardOCR — failure modes', () => {
     await act(async () => { await result.current.scanCard(FILE); });
 
     expect(result.current.scanResult.name).toBe('Gengar');
+  });
+});
+
+// ─── Catalogue grounding ─────────────────────────────────────────────────────
+
+describe('useCardOCR — catalogue bridge', () => {
+  it('overlays authoritative set/number/year on a confident match', async () => {
+    mockFetch.mockResolvedValue({
+      results: [{
+        id: 'base1-4', name: 'Charizard', setName: 'Base Set', year: 1999,
+        cardNumber: '4', rarity: 'Rare Holo', imageUrl: 'http://img/x.png', source: 'pokemon-tcg',
+      }],
+    });
+
+    const result = await runScan({
+      name: 'Charizard', cardNumber: '4/102', collectionType: 'Pokemon',
+    });
+
+    expect(result.current.scanResult.cardSetName).toBe('Base Set');
+    expect(result.current.scanResult.cardNumber).toBe('4');
+    expect(result.current.scanResult.releaseYear).toBe('1999');
+    expect(result.current.scanResult.catalogueMatch).toMatchObject({
+      id: 'base1-4', source: 'pokemon-tcg', imageUrl: 'http://img/x.png',
+    });
+  });
+
+  it('sends the mapped collection as the catalogue collection param', async () => {
+    await runScan({ name: 'Charizard', collectionType: 'Pokemon' });
+    const url = mockFetch.mock.calls[0][0];
+    expect(url).toContain('/catalog/search?');
+    expect(url).toContain('collection=pokemon');
+  });
+
+  it('does not override fields on a weak match but still exposes candidates', async () => {
+    mockFetch.mockResolvedValue({
+      results: [{ id: 'x', name: 'Pikachu', setName: 'Jungle', year: 1999, cardNumber: '60', source: 'pokemon-tcg' }],
+    });
+
+    const result = await runScan({ name: 'Charizard', cardSetName: 'My Guess', collectionType: 'Pokemon' });
+
+    expect(result.current.scanResult.catalogueMatch).toBeUndefined();
+    expect(result.current.scanResult.cardSetName).toBe('My Guess');
+    expect(result.current.scanResult.catalogueCandidates).toHaveLength(1);
+  });
+
+  it('falls back to the raw OCR result when the catalogue lookup fails', async () => {
+    mockFetch.mockRejectedValue(new Error('network down'));
+
+    const result = await runScan({ name: 'Charizard', cardSetName: 'Base Set', collectionType: 'Pokemon' });
+
+    expect(result.current.scanResult.name).toBe('Charizard');
+    expect(result.current.scanResult.cardSetName).toBe('Base Set');
+    expect(result.current.scanResult.catalogueMatch).toBeUndefined();
   });
 });
 

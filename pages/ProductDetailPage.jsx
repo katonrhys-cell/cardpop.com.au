@@ -13,6 +13,8 @@ import { toast } from 'sonner';
 import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, ArrowRightLeft, Layers } from 'lucide-react';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import EbayMarketSection from '@/components/EbayMarketSection.jsx';
+import GradingVerificationSection from '@/components/GradingVerificationSection.jsx';
+import { getRefractorLabel, getRefractorBadgeClass } from '@/lib/cardAttributeLabels.js';
 
 const GRADE_BADGE = {
   psa:   'bg-red-600 text-white',
@@ -296,7 +298,7 @@ const ProductDetailPage = () => {
   // a direct vault item is the product itself. Shop products have none.
   const vi = isShop ? null : (product.vault_item || product);
   const variantChips = vi?.variant
-    ? vi.variant.split(',').map(s => s.trim()).filter(Boolean)
+    ? vi.variant.split(',').map(s => s.trim()).filter(v => v && v !== 'Refractor')
     : [];
   const autoLabel = vi?.is_auto
     ? [
@@ -388,7 +390,7 @@ const ProductDetailPage = () => {
                   {vi.card_number && <Badge variant="secondary" className="text-[11px] font-medium">#{vi.card_number}</Badge>}
                   {vi.serial_number && <Badge variant="secondary" className="text-[11px] font-bold">#{vi.serial_number}</Badge>}
                   {vi.is_foil && <Badge variant="outline" className="text-[11px] font-bold border-yellow-400/50 text-yellow-700 bg-yellow-400/10 dark:text-yellow-300">Foil</Badge>}
-                  {vi.is_refractor && <Badge variant="outline" className="text-[11px] font-bold border-indigo-400/50 text-indigo-700 bg-indigo-400/10 dark:text-indigo-300">Refractor</Badge>}
+                  {getRefractorLabel(vi) && <Badge variant="outline" className={`text-[11px] font-bold ${getRefractorBadgeClass(vi)}`}>{getRefractorLabel(vi)}</Badge>}
                   {vi.is_auto && <Badge variant="outline" className="text-[11px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10 dark:text-blue-300">{autoLabel}</Badge>}
                   {vi.is_rookie && <Badge variant="outline" className="text-[11px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10 dark:text-amber-300">RC</Badge>}
                   {vi.is_sealed && <Badge variant="outline" className="text-[11px] font-bold border-green-400/50 text-green-700 bg-green-400/10 dark:text-green-300">Sealed</Badge>}
@@ -480,6 +482,15 @@ const ProductDetailPage = () => {
                 <p className="text-muted-foreground italic text-sm">No detailed description provided.</p>
               )}
             </div>
+
+            {/* Grading Verification Section */}
+            {source === 'marketplace' && (vi?.cert_number || product.grading_company) && (
+              <GradingVerificationSection
+                gradingNumber={vi?.cert_number}
+                gradingCompany={vi?.grading_company || 'psa'}
+                grade={vi?.grade}
+              />
+            )}
 
             {!isShop && (
               <EbayMarketSection

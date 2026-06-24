@@ -75,6 +75,95 @@ function detectCardRegion(img) {
   };
 }
 
+// Load an image source (data URL, object URL, or Blob) into an HTMLImageElement.
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+// Paint the professional "studio" backdrop: a near-black canvas with a soft
+// radial spotlight behind where the card sits, plus a vignette. This is what
+// gives formatted photos the premium dark-gradient look.
+function drawStudioBackground(ctx, W, H) {
+  ctx.fillStyle = '#0a0a0d';
+  ctx.fillRect(0, 0, W, H);
+
+  // Spotlight, centred slightly above the middle so the card is well lit.
+  const glow = ctx.createRadialGradient(
+    W / 2, H * 0.42, Math.min(W, H) * 0.04,
+    W / 2, H * 0.5, Math.max(W, H) * 0.78
+  );
+  glow.addColorStop(0, '#3c3c45');
+  glow.addColorStop(0.45, '#202027');
+  glow.addColorStop(1, '#0a0a0d');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
+
+  // Vignette to darken the corners.
+  const vignette = ctx.createRadialGradient(
+    W / 2, H / 2, Math.min(W, H) * 0.3,
+    W / 2, H / 2, Math.max(W, H) * 0.72
+  );
+  vignette.addColorStop(0, 'rgba(0,0,0,0)');
+  vignette.addColorStop(1, 'rgba(0,0,0,0.55)');
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, W, H);
+}
+
+// Crop a canvas down to its non-transparent bounding box so a cut-out card
+// fills the frame without large empty margins. Returns the original canvas if
+// it has no usable alpha (e.g. a fully opaque rectangle).
+function trimToAlpha(canvas) {
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  let data;
+  try { data = ctx.getImageData(0, 0, canvas.width, canvas.height).data; }
+  catch { return canvas; }
+
+  const { width: w, height: h } = canvas;
+  let minX = w, minY = h, maxX = -1, maxY = -1;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (data[(y * w + x) * 4 + 3] > 12) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < 0 || (maxX - minX) < w * 0.05 || (maxY - minY) < h * 0.05) return canvas;
+
+  const tw = maxX - minX + 1, th = maxY - minY + 1;
+  const out = document.createElement('canvas');
+  out.width = tw; out.height = th;
+  out.getContext('2d').drawImage(canvas, minX, minY, tw, th, 0, 0, tw, th);
+  return out;
+}
+
+// Wrap an opaque (rectangular) card image in a canvas with rounded corners so
+// the fallback path still drops a card-shaped silhouette (with shadow) onto the
+// backdrop rather than a hard rectangle.
+function roundedCardCanvas(source, sw, sh) {
+  const out = document.createElement('canvas');
+  out.width = sw; out.height = sh;
+  const ctx = out.getContext('2d');
+  const r = Math.max(6, Math.round(Math.min(sw, sh) * 0.035));
+  ctx.beginPath();
+  ctx.moveTo(r, 0);
+  ctx.arcTo(sw, 0, sw, sh, r);
+  ctx.arcTo(sw, sh, 0, sh, r);
+  ctx.arcTo(0, sh, 0, 0, r);
+  ctx.arcTo(0, 0, sw, 0, r);
+  ctx.closePath();
+  ctx.clip();
+  ctx.drawImage(source, 0, 0, sw, sh);
+  return out;
+}
+
 export function usePhotoTemplate() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -85,73 +174,71 @@ export function usePhotoTemplate() {
       setIsProcessing(true);
       setOriginalImageFile(imageFile);
 
-      // Read the image file
-      const reader = new FileReader();
-      reader.onload = async (e) => {
+      // Build the foreground: ideally a clean, transparent cut-out of the card
+      // via the ML background remover; if that's unavailable or fails, fall back
+      // to colour-based card detection so the feature still works offline.
+      let foreground = null; // a canvas containing the card with transparency
+      try {
+        const { removeBackground } = await import('@imgly/background-removal');
+        const cutoutBlob = await removeBackground(imageFile);
+        const cutoutUrl = URL.createObjectURL(cutoutBlob);
         try {
-          const img = new Image();
-
-          img.onload = () => {
-            const cardMaxWidth = TEMPLATE_W - 160;
-            const cardMaxHeight = TEMPLATE_H - 200;
-
-            // Detect the card and crop to it; fall back to the whole image.
-            let sx = 0, sy = 0, sw = img.width, sh = img.height, bgColor = null;
-            const region = detectCardRegion(img);
-            if (region) {
-              sx = region.sx; sy = region.sy; sw = region.sw; sh = region.sh;
-              bgColor = region.bg;
-            }
-
-            // Draw the cropped card onto its own canvas.
-            const crop = document.createElement('canvas');
-            crop.width = sw; crop.height = sh;
-            const cctx = crop.getContext('2d', { willReadFrequently: true });
-            cctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-
-            // Remove background: whiten pixels close to the estimated bg colour.
-            if (bgColor) {
-              try {
-                const cd = cctx.getImageData(0, 0, sw, sh);
-                const a = cd.data;
-                const WT = 42, WT2 = WT * WT;
-                for (let i = 0; i < a.length; i += 4) {
-                  const dr = a[i] - bgColor[0], dg = a[i + 1] - bgColor[1], db = a[i + 2] - bgColor[2];
-                  if (dr * dr + dg * dg + db * db < WT2) { a[i] = 255; a[i + 1] = 255; a[i + 2] = 255; }
-                }
-                cctx.putImageData(cd, 0, 0);
-              } catch { /* tainted canvas — skip whitening */ }
-            }
-
-            // Scale the cropped card to fit the template, centered.
-            let cardWidth = cardMaxWidth;
-            let cardHeight = (cardMaxWidth / sw) * sh;
-            if (cardHeight > cardMaxHeight) {
-              cardHeight = cardMaxHeight;
-              cardWidth = (cardMaxHeight / sh) * sw;
-            }
-            const cardX = Math.round((TEMPLATE_W - cardWidth) / 2);
-            const cardY = Math.round((TEMPLATE_H - cardHeight) / 2 - 50);
-
-            const canvas = document.createElement('canvas');
-            canvas.width = TEMPLATE_W;
-            canvas.height = TEMPLATE_H;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#FFFFFF';
-            ctx.fillRect(0, 0, TEMPLATE_W, TEMPLATE_H);
-            ctx.drawImage(crop, cardX, cardY, cardWidth, cardHeight);
-
-            setPreviewUrl(canvas.toDataURL('image/jpeg', 0.92));
-          };
-
-          img.src = e.target.result;
-        } catch (error) {
-          console.error('Error creating preview:', error);
-          toast.error('Failed to create preview');
+          const cutImg = await loadImage(cutoutUrl);
+          const c = document.createElement('canvas');
+          c.width = cutImg.naturalWidth; c.height = cutImg.naturalHeight;
+          c.getContext('2d').drawImage(cutImg, 0, 0);
+          foreground = trimToAlpha(c);
+        } finally {
+          URL.revokeObjectURL(cutoutUrl);
         }
-      };
+      } catch (err) {
+        console.warn('[PhotoTemplate] ML cut-out unavailable, using fallback', err);
+      }
 
-      reader.readAsDataURL(imageFile);
+      if (!foreground) {
+        const dataUrl = await new Promise((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = (e) => resolve(e.target.result);
+          r.onerror = reject;
+          r.readAsDataURL(imageFile);
+        });
+        const img = await loadImage(dataUrl);
+        const region = detectCardRegion(img);
+        const sx = region ? region.sx : 0;
+        const sy = region ? region.sy : 0;
+        const sw = region ? region.sw : img.width;
+        const sh = region ? region.sh : img.height;
+        const crop = document.createElement('canvas');
+        crop.width = sw; crop.height = sh;
+        crop.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+        foreground = roundedCardCanvas(crop, sw, sh);
+      }
+
+      // Compose the card, centred on the studio backdrop, leaving margin so the
+      // spotlight reads around it. A soft drop shadow lifts it off the canvas.
+      const canvas = document.createElement('canvas');
+      canvas.width = TEMPLATE_W;
+      canvas.height = TEMPLATE_H;
+      const ctx = canvas.getContext('2d');
+      drawStudioBackground(ctx, TEMPLATE_W, TEMPLATE_H);
+
+      const maxW = TEMPLATE_W * 0.84;
+      const maxH = TEMPLATE_H * 0.88;
+      let dw = maxW;
+      let dh = (maxW / foreground.width) * foreground.height;
+      if (dh > maxH) { dh = maxH; dw = (maxH / foreground.height) * foreground.width; }
+      const dx = Math.round((TEMPLATE_W - dw) / 2);
+      const dy = Math.round((TEMPLATE_H - dh) / 2);
+
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,0.55)';
+      ctx.shadowBlur = 48;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 26;
+      ctx.drawImage(foreground, dx, dy, dw, dh);
+      ctx.restore();
+
+      setPreviewUrl(canvas.toDataURL('image/jpeg', 0.92));
     } catch (error) {
       console.error('Error processing image:', error);
       toast.error('Failed to process image');

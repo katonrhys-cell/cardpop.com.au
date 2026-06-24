@@ -23,12 +23,11 @@ import SearchBar from '@/components/SearchBar.jsx';
 import NotificationBell from '@/components/NotificationBell.jsx';
 
 const WhatnotIcon = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" className={className}>
-    <rect width="32" height="32" rx="8" fill="#000000" />
+  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
     <path
-      d="M5 9l4.5 14 4-9.5 2.5 5.5 2.5-5.5 4 9.5L27 9"
+      d="M2 5l4.1 14 3.6-9.5L12 15l2.3-5.5L17.9 19 22 5"
       stroke="#FFDF00"
-      strokeWidth="2.8"
+      strokeWidth="2.4"
       strokeLinecap="round"
       strokeLinejoin="round"
     />
@@ -430,7 +429,7 @@ const CommunityDropdown = ({ onNavigate }) => {
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
               >
                 <span
-                  className={`inline-flex items-center justify-center w-7 h-7 rounded-lg shrink-0 shadow-sm overflow-hidden ${item.isWhatnot ? '' : (item.label === 'Local Traders' ? '' : `bg-gradient-to-br ${item.gradient}`)}`}
+                  className={`inline-flex items-center justify-center w-7 h-7 rounded-lg shrink-0 shadow-sm overflow-hidden ${item.isWhatnot ? 'bg-black' : (item.label === 'Local Traders' ? '' : `bg-gradient-to-br ${item.gradient}`)}`}
                   style={item.label === 'Local Traders' ? { backgroundImage: `linear-gradient(to bottom right, hsl(var(--verified-badge)), hsl(199 95% 35%))` } : {}}
                 >
                   <item.Icon className="w-4 h-4 text-white" />
@@ -705,7 +704,7 @@ const MobileCommunitySection = ({ onNavigate }) => {
                 onClick={onNavigate}
                 className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
               >
-                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${item.isWhatnot ? '' : item.gradient} shrink-0 overflow-hidden`}>
+                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg shrink-0 overflow-hidden ${item.isWhatnot ? 'bg-black' : `bg-gradient-to-br ${item.gradient}`}`}>
                   <item.Icon className="w-3.5 h-3.5 text-white" />
                 </span>
                 <span className="text-xs font-semibold text-foreground truncate">{item.label}</span>
@@ -863,9 +862,14 @@ const Header = () => {
       }
     };
 
-    // Watch for any style change on body and fix it after animations settle
+    // Watch for any style change on body and fix it after animations settle.
+    // Debounce into a single tracked timeout so rapid mutations don't pile up
+    // and so the pending timeout can be cancelled on unmount (otherwise it can
+    // fire after the component/document is gone).
+    let settleTimeout = null;
     const observer = new MutationObserver(() => {
-      setTimeout(clearStaleBodyStyles, 350);
+      clearTimeout(settleTimeout);
+      settleTimeout = setTimeout(clearStaleBodyStyles, 350);
     });
     observer.observe(document.body, { attributes: true, attributeFilter: ['style'] });
 
@@ -875,6 +879,7 @@ const Header = () => {
     return () => {
       observer.disconnect();
       clearInterval(interval);
+      clearTimeout(settleTimeout);
     };
   }, []);
 

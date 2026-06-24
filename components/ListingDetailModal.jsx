@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Edit, Trash2, Power, History, Image as ImageIcon } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
-import { formatCurrency } from '@/api/EcommerceApi';
+import { formatCurrency } from '@/utils/formatCurrency.js';
 import ListingEditForm from './ListingEditForm.jsx';
 import ModerationPanel from './ModerationPanel.jsx';
 

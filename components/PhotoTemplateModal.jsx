@@ -16,7 +16,7 @@ const PhotoTemplateModal = ({
 
   const title = 'Format Photo';
 
-  const description = 'Your card will be centered on a white 1000×1400 template for professional marketplace display.';
+  const description = 'Your card is cut out and centered on a studio dark-gradient 1000×1400 backdrop for professional marketplace display.';
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -49,7 +49,7 @@ const PhotoTemplateModal = ({
 
                 <div className="text-xs text-muted-foreground text-center px-4 space-y-1">
                   <p className="font-medium">Export format:</p>
-                  <p>1000×1400 WEBP • White background • Centered card</p>
+                  <p>1000×1400 • Studio dark-gradient backdrop • Centered card</p>
                 </div>
               </div>
             ) : null}

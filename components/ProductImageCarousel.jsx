@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { cn } from '@/lib/utils.js';
 import CardMicroscope from '@/components/CardMicroscope.jsx';
 
-const ProductImageCarousel = ({ images = [], record = null }) => {
+const ProductImageCarousel = ({ images = [], record = null, frameClassName = 'bg-white dark:bg-zinc-950' }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [microscopeOpen, setMicroscopeOpen] = useState(false);
 
@@ -40,7 +40,7 @@ const ProductImageCarousel = ({ images = [], record = null }) => {
       {/* Main Image with Microscope */}
       <div
         onClick={() => setMicroscopeOpen(true)}
-        className="relative w-full aspect-[4/5] md:aspect-square rounded-3xl border border-border overflow-hidden bg-white dark:bg-zinc-950 cursor-zoom-in group shadow-sm"
+        className={cn("relative w-full aspect-[4/5] md:aspect-square rounded-3xl border border-border overflow-hidden cursor-zoom-in group shadow-sm", frameClassName)}
       >
         <img
           src={currentImage}
@@ -71,7 +71,8 @@ const ProductImageCarousel = ({ images = [], record = null }) => {
               key={idx}
               onClick={() => setActiveIndex(idx)}
               className={cn(
-                "relative w-20 h-20 shrink-0 rounded-xl overflow-hidden border-2 bg-white dark:bg-zinc-950 transition-all duration-200 snap-start",
+                "relative w-20 h-20 shrink-0 rounded-xl overflow-hidden border-2 transition-all duration-200 snap-start",
+                frameClassName,
                 activeIndex === idx
                   ? "border-primary ring-2 ring-primary/20 ring-offset-2 ring-offset-background"
                   : "border-border hover:border-primary/50 opacity-70 hover:opacity-100"

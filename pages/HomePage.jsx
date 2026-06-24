@@ -192,7 +192,7 @@ const HomePage = () => {
     const fetchHomeData = async () => {
       try {
         const [listingsRes, sellersRes] = await Promise.all([
-          supabase.from('vault_items').select('*, owner:profiles!owner_id(id, display_name, username, avatar_url), vault_images(*)').eq('is_public', true).neq('listing_type', 'Private').order('created_at', { ascending: false }).limit(4),
+          supabase.from('vault_items').select('*, owner:profiles!owner_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count), vault_images(*)').eq('is_public', true).neq('listing_type', 'Private').order('created_at', { ascending: false }).limit(4),
           supabase.from('profiles').select('*').eq('is_featured_seller', true).eq('is_active', true).limit(4),
         ]);
 

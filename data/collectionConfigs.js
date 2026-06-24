@@ -3,7 +3,7 @@
  * Each entry drives the CollectionPage template — hero theme, SEO copy,
  * era/brand strips, and page accent colours.
  *
- * categoryName must match the `name` field in the PocketBase `categories`
+ * categoryName must match the `name` field in the Supabase `categories`
  * collection (case-sensitive).  Add aliases in the `categoryAliases` array
  * if the DB uses alternate spellings.
  */

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { supabase } from '@/lib/supabaseClient.js';
+import { compressImage } from '@/utils/compressImage.js';
 import {
   Plus,
   MoreHorizontal,
@@ -139,8 +140,9 @@ const EventsAdminPage = () => {
     try {
       let image_url = selectedEvent?.image_url ?? null;
       if (imageFile) {
-        const path = `events/${Date.now()}-${imageFile.name}`;
-        const { error: upErr } = await supabase.storage.from('events').upload(path, imageFile, { upsert: true });
+        const compressed = await compressImage(imageFile);
+        const path = `events/${Date.now()}-${compressed.name}`;
+        const { error: upErr } = await supabase.storage.from('events').upload(path, compressed, { upsert: true });
         if (!upErr) image_url = supabase.storage.from('events').getPublicUrl(path).data.publicUrl;
       }
 

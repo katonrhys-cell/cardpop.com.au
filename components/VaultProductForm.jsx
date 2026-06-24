@@ -14,7 +14,7 @@ import { useCardOCR } from '@/hooks/useCardOCR.js';
 import { useEbayPriceLookup } from '@/hooks/useEbayPriceLookup.js';
 import CardScanPanel from '@/components/CardScanPanel.jsx';
 import { COLLECTIONS_LIST } from '@/components/Header.jsx';
-import { VARIANT_GROUPS } from '@/lib/cardVariants.js';
+import { getVariantGroups } from '@/lib/cardVariants.js';
 
 const INITIAL_STATE = {
   name: '',
@@ -338,7 +338,8 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
               <button
                 type="button"
                 onClick={() => removeFile(index)}
-                className="absolute top-2 right-2 bg-black/60 hover:bg-destructive text-white p-1.5 rounded-lg transition-colors backdrop-blur-sm opacity-0 group-hover:opacity-100"
+                aria-label="Remove image"
+                className="absolute top-2 right-2 bg-black/60 hover:bg-destructive text-white p-1.5 rounded-lg transition-colors backdrop-blur-sm opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
               >
                 <X size={16} />
               </button>
@@ -537,37 +538,59 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
           <div className="space-y-4 pt-4 border-t border-border mt-6">
             <div>
               <h3 className="font-bold text-lg text-foreground">Card Variants / Attributes</h3>
-              <p className="text-sm text-muted-foreground mt-1">Select all that apply — e.g. Rookie Card, Refractor, Holo.</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {formData.collectionType
+                  ? `Foils & variants for ${formData.collectionType}. Select all that apply.`
+                  : 'Select a Collection Type above to see game-specific foils & variants.'}
+              </p>
             </div>
-            {VARIANT_GROUPS.map(group => (
-              <div key={group.label}>
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">{group.label}</p>
-                <div className="flex flex-wrap gap-2">
-                  {group.variants.map(variant => {
-                    const active = formData.cardVariants.includes(variant);
-                    return (
-                      <button
-                        key={variant}
-                        type="button"
-                        onClick={() => {
-                          const next = active
-                            ? formData.cardVariants.filter(v => v !== variant)
-                            : [...formData.cardVariants, variant];
-                          handleInputChange('cardVariants', next);
-                        }}
-                        className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${
-                          active
-                            ? 'bg-primary text-primary-foreground border-primary'
-                            : 'bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground'
-                        }`}
-                      >
-                        {variant}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
+            {(() => {
+              const variantGroups = getVariantGroups(formData.collectionType);
+              const known = new Set(variantGroups.flatMap(g => g.variants));
+              const otherSelected = formData.cardVariants.filter(v => !known.has(v));
+              const renderChip = (variant) => {
+                const active = formData.cardVariants.includes(variant);
+                return (
+                  <button
+                    key={variant}
+                    type="button"
+                    onClick={() => {
+                      const next = active
+                        ? formData.cardVariants.filter(v => v !== variant)
+                        : [...formData.cardVariants, variant];
+                      handleInputChange('cardVariants', next);
+                    }}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${
+                      active
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-background text-muted-foreground border-border hover:border-primary/50 hover:text-foreground'
+                    }`}
+                  >
+                    {variant}
+                  </button>
+                );
+              };
+              return (
+                <>
+                  {variantGroups.map(group => (
+                    <div key={group.label}>
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">{group.label}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {group.variants.map(renderChip)}
+                      </div>
+                    </div>
+                  ))}
+                  {otherSelected.length > 0 && (
+                    <div>
+                      <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-2">Also Selected</p>
+                      <div className="flex flex-wrap gap-2">
+                        {otherSelected.map(renderChip)}
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
             {formData.cardVariants.length > 0 && (
               <button
                 type="button"
