@@ -21,7 +21,14 @@ Sentry.init({
 
 const app = express();
 
-app.set('trust proxy', true);
+// Trust proxy controls how req.ip is derived from X-Forwarded-For, which every
+// IP-based control depends on (global rate limit, login lockout keyed on
+// (email, ip), audit logs). Trusting the entire chain ('true') lets a client
+// spoof X-Forwarded-For and bypass those controls, so trust only the known
+// number of front proxies instead. On Vercel that is a single hop (default 1);
+// override with TRUST_PROXY_HOPS if the deployment adds more proxies.
+const trustProxyHops = Number.parseInt(process.env.TRUST_PROXY_HOPS ?? '1', 10);
+app.set('trust proxy', Number.isNaN(trustProxyHops) ? 1 : trustProxyHops);
 
 app.use(secureHeadersMiddleware);
 app.use(helmet({
