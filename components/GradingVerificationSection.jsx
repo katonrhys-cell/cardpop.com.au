@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, AlertCircle, Loader2, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Loader2, ShieldCheck, BadgeCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { verifyGradingNumber } from '@/lib/gradingVerification.js';
 
@@ -44,11 +44,15 @@ const GradingVerificationSection = ({ gradingNumber, gradingCompany = 'psa', gra
 
   return (
     <div className="pt-4 border-t border-border space-y-4">
-      <div className="flex items-center gap-2">
-        <ShieldCheck className="w-5 h-5 text-primary" />
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+        <ShieldCheck className="w-5 h-5 text-primary shrink-0" />
         <h4 className="font-bold text-sm uppercase tracking-wide">Certification Verification</h4>
         {isVerified && (
-          <Badge variant="outline" className="ml-auto text-[10px] font-bold border-emerald-400/50 text-emerald-700 bg-emerald-400/10">
+          <Badge
+            variant="outline"
+            className="ml-auto shrink-0 inline-flex items-center gap-1.5 whitespace-nowrap px-2.5 py-1 text-[11px] font-semibold border-emerald-500/30 text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 shadow-sm"
+          >
+            <BadgeCheck className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
             Verified by CardPop
           </Badge>
         )}
