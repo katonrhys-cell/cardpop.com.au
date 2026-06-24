@@ -4,6 +4,7 @@ import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linked
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatEntryFee } from '@/lib/eventSeo.js';
+import EventRsvp from '@/components/EventRsvp.jsx';
 import { toast } from 'sonner';
 
 const EVENT_TYPE_STYLES = {
@@ -158,6 +159,11 @@ const EventDetailCard = ({ event }) => {
                   </div>
                 </div>
               )}
+            </div>
+
+            <div className="space-y-3 pt-4 border-t border-border">
+              <h3 className="font-bold text-lg uppercase tracking-wider text-muted-foreground pb-1">Attending?</h3>
+              <EventRsvp event={event} variant="detail" />
             </div>
 
             <div className="space-y-3 pt-4">
