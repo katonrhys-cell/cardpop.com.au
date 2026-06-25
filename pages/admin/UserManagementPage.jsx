@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient.js';
+import { apiServerClient as apiClient } from '@/lib/apiServerClient.js';
 import { toast } from 'sonner';
 import { useAdmin } from '@/contexts/AdminContext.jsx';
 import { useDebounce } from '@/hooks/useDebounce.js';
@@ -97,8 +98,17 @@ const UserManagementPage = () => {
 
   const handleRoleChange = async (userId, makeAdmin) => {
     try {
-      const { error } = await supabase.from('profiles').update({ is_admin: makeAdmin }).eq('id', userId);
-      if (error) throw error;
+      // Privileged write: go through the admin-checked backend endpoint, never a
+      // direct client-side profiles update (which would let any user self-promote).
+      const res = await apiClient.fetch(`/admin/users/${userId}/role`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_admin: makeAdmin }),
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error || 'Failed to update admin status');
+      }
       toast.success(`User ${makeAdmin ? 'granted admin' : 'revoked admin'} access.`);
       logAdminAction('update_user_admin', { userId, is_admin: makeAdmin });
       setUsers(users.map(u => u.id === userId ? { ...u, is_admin: makeAdmin } : u));

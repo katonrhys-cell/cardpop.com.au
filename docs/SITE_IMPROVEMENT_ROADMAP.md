@@ -21,7 +21,8 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 - [x] Code-level authz audit → `docs/SECURITY_AUDIT.md` (backend routes: PASS; frontend direct-DB: 85 sites / ~25 tables, RLS-only)
 - [~] Identified 3 critical escalation candidates: `profiles.is_admin`, `user_verifications.status`, `refunds.status` (admin-gated in UI only — RLS unverified)
 - [ ] Run Supabase **security advisors** + the verification SQL in the audit (needs live-DB access/approval)
-- [ ] Harden: move privileged writes (is_admin / verification approval / refund approval) to backend admin endpoints + tighten RLS so clients can't write them
+- [x] App-layer hardening: moved is_admin / verification-approval / refund-approval to admin-checked backend endpoints (`src/routes/admin.js`) + repointed admin UI (defence in depth)
+- [ ] DB-layer hardening: apply the RLS template in SECURITY_AUDIT.md §4b so clients can't write those fields directly (needs live-DB access)
 - [ ] Column-level protection on `profiles` (is_admin, tier, rating, balances)
 - [ ] Add RLS regression tests (sign in as normal user, assert escalation writes rejected)
 - [ ] Audit remaining sensitive tables (orders, listings, offers, taxonomy) for admin/ownership RLS

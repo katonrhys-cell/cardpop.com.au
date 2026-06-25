@@ -111,6 +111,63 @@ WHERE schemaname='public' AND tablename='profiles';
 
 ---
 
+## 4a. App-layer hardening — DONE
+
+The three escalation writes have been moved server-side behind `isAdminUser`
+(`src/routes/admin.js`, mounted at `/admin`), and the admin UI now calls those
+endpoints instead of writing to Supabase directly:
+
+| Endpoint | Replaces | Page |
+|---|---|---|
+| `PATCH /admin/users/:userId/role` | `profiles.update({ is_admin })` | UserManagementPage |
+| `PATCH /admin/verifications/:id` | `user_verifications.update({ status })` + audit-log insert | AdminVerificationDashboard |
+| `PATCH /admin/refunds/:id` | `refunds.update({ status })` (+ order/notification) | OrderManagementPage |
+
+This is **defence in depth, not a complete fix** — it removes the privileged
+writes from the legitimate client path, but an attacker can still hit the
+Supabase REST API directly until RLS forbids those writes (§4b).
+
+## 4b. RLS hardening — TEMPLATE (review against your schema before applying)
+
+> Do NOT run blind. Confirm column/policy names against §3's output first.
+> RLS cannot restrict *columns*, so `is_admin` needs a column GRANT or a trigger.
+
+```sql
+-- profiles: users may update their own row, but NOT privileged columns.
+-- 1) Remove blanket update grant, then grant only the safe columns.
+REVOKE UPDATE ON public.profiles FROM authenticated;
+GRANT  UPDATE (display_name, username, avatar_url, bio /* …safe cols… */)
+  ON public.profiles TO authenticated;
+-- is_admin, seller_tier, rating, reviews_count, balances stay backend-only.
+
+-- user_verifications: a user may insert their own pending submission and read
+-- their own rows, but only an admin may change status.
+ALTER TABLE public.user_verifications ENABLE ROW LEVEL SECURITY;
+CREATE POLICY uv_insert_self ON public.user_verifications
+  FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
+CREATE POLICY uv_select_self ON public.user_verifications
+  FOR SELECT TO authenticated USING (user_id = auth.uid() OR public.is_admin(auth.uid()));
+CREATE POLICY uv_update_admin ON public.user_verifications
+  FOR UPDATE TO authenticated USING (public.is_admin(auth.uid()));
+
+-- refunds: a buyer may request (insert) a refund on their own order; only an
+-- admin may approve/reject (update).
+CREATE POLICY refunds_insert_buyer ON public.refunds
+  FOR INSERT TO authenticated WITH CHECK (buyer_id = auth.uid());
+CREATE POLICY refunds_update_admin ON public.refunds
+  FOR UPDATE TO authenticated USING (public.is_admin(auth.uid()));
+
+-- taxonomy (categories, manufacturers, events, collection_eras): admin-only writes.
+-- Repeat for each:
+CREATE POLICY categories_write_admin ON public.categories
+  FOR ALL TO authenticated USING (public.is_admin(auth.uid())) WITH CHECK (public.is_admin(auth.uid()));
+```
+
+`public.is_admin(uuid)` should be a `SECURITY DEFINER` helper that reads
+`profiles.is_admin` for the given id, so policies can reference the admin claim
+without recursive RLS. Add a small RLS regression test (sign in as a normal user,
+attempt each escalation write, assert it's rejected by the database).
+
 ## 5. Other items
 
 - `verification.js` `POST /resend-verification` is unauthenticated — confirm it's
