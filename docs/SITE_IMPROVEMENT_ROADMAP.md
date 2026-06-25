@@ -18,12 +18,16 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 - [ ] Cache the build, run tests sharded if CI time grows
 
 ### 2. Security — money + PII marketplace
-- [ ] Run Supabase **security advisors** and fix every finding (missing RLS, SECURITY DEFINER views, etc.)
-- [ ] Audit RLS policies table-by-table (profiles, listings, vault_items, orders, trades, wallets, addresses)
-- [ ] Pen-test authz on trade / vault / wallet / payment endpoints (can user A act on user B's data?)
+- [x] Code-level authz audit → `docs/SECURITY_AUDIT.md` (backend routes: PASS; frontend direct-DB: 85 sites / ~25 tables, RLS-only)
+- [~] Identified 3 critical escalation candidates: `profiles.is_admin`, `user_verifications.status`, `refunds.status` (admin-gated in UI only — RLS unverified)
+- [ ] Run Supabase **security advisors** + the verification SQL in the audit (needs live-DB access/approval)
+- [ ] Harden: move privileged writes (is_admin / verification approval / refund approval) to backend admin endpoints + tighten RLS so clients can't write them
+- [ ] Column-level protection on `profiles` (is_admin, tier, rating, balances)
+- [ ] Add RLS regression tests (sign in as normal user, assert escalation writes rejected)
+- [ ] Audit remaining sensitive tables (orders, listings, offers, taxonomy) for admin/ownership RLS
 - [ ] Verify the service-role key is never reachable client-side; rotate if ever exposed
-- [ ] Secrets hygiene: confirm all secrets are in Vercel/Actions secrets, none committed
 - [ ] Enable Supabase leaked-password protection + MFA enforcement options
+- [ ] Confirm `POST /resend-verification` (unauthenticated) is rate-limited
 - [ ] Security headers / CSP review in production (helmet config vs. real responses)
 
 ### 3. End-to-end testing
