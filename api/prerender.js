@@ -28,6 +28,21 @@ const ldJson = (items) => {
 
 const absUrl = (u) => (!u ? undefined : (u.startsWith('http') ? u : `${BASE_URL}${u}`));
 
+// Strip <script>/<style> blocks from admin-authored article HTML before
+// embedding it in the prerendered body. Content is trusted (our own CMS), but
+// removing executable tags keeps the bot-only document inert and well-formed.
+const sanitizeArticleHtml = (html = '') => String(html)
+  .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
+  .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '');
+
+// Collapse HTML to a plain-text snippet for meta descriptions.
+const toText = (html = '', max = 300) => {
+  const text = String(html).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+};
+
+const isoDate = (d) => (d ? new Date(d).toISOString() : undefined);
+
 // Map a trading-card condition / grade to a schema.org OfferItemCondition.
 const schemaItemCondition = (c) => {
   const v = String(c || '').toLowerCase();
@@ -37,7 +52,7 @@ const schemaItemCondition = (c) => {
   return 'https://schema.org/UsedCondition';
 };
 
-function htmlDoc({ title, description, canonical, ogImage, robots, jsonLdItems = [], bodyHtml = '' }) {
+function htmlDoc({ title, description, canonical, ogImage, robots, ogType = 'website', headExtra = '', jsonLdItems = [], bodyHtml = '' }) {
   const ld = jsonLdItems.length
     ? `<script type="application/ld+json">${ldJson(jsonLdItems)}</script>`
     : '';
@@ -52,7 +67,7 @@ ${robots ? `<meta name="robots" content="${esc(robots)}" />` : ''}
 <link rel="canonical" href="${esc(canonical)}" />
 <meta property="og:title" content="${esc(title)}" />
 <meta property="og:description" content="${esc(description)}" />
-<meta property="og:type" content="website" />
+<meta property="og:type" content="${esc(ogType)}" />
 <meta property="og:site_name" content="CardPop" />
 <meta property="og:url" content="${esc(canonical)}" />
 ${ogImage ? `<meta property="og:image" content="${esc(ogImage)}" />` : ''}
@@ -60,6 +75,7 @@ ${ogImage ? `<meta property="og:image" content="${esc(ogImage)}" />` : ''}
 <meta name="twitter:title" content="${esc(title)}" />
 <meta name="twitter:description" content="${esc(description)}" />
 ${ogImage ? `<meta name="twitter:image" content="${esc(ogImage)}" />` : ''}
+${headExtra}
 ${ld}
 </head>
 <body>
@@ -264,6 +280,178 @@ ${listingItems || '    <li>No active listings at the moment.</li>'}
   return htmlDoc({ title, description, canonical, ogImage: image, jsonLdItems: [store, breadcrumb, ...(productItemList ? [productItemList] : [])], bodyHtml });
 }
 
+async function renderBlogArticle(supabase, param) {
+  const byUuid = UUID_RE.test(param);
+  let query = supabase
+    .from('blog_articles')
+    .select('id, slug, title, seo_title, seo_description, excerpt, content_html, content, featured_image_url, author, category, published_at, created_at, updated_at, read_time_minutes, is_published');
+  query = byUuid ? query.eq('id', param) : query.eq('slug', param);
+  const { data: article } = await query.maybeSingle();
+
+  if (!article || article.is_published === false) {
+    return htmlDoc({
+      title: 'Article Not Found | CardPop',
+      description: 'This article could not be found on CardPop.',
+      canonical: `${BASE_URL}/blog/${param}`,
+      robots: 'noindex, follow',
+      bodyHtml: '<main><h1>Article Not Found</h1><p>This article is not available.</p></main>',
+    });
+  }
+
+  // Canonical always points at the clean slug URL (the SPA redirects id/UUID URLs there too).
+  const canonical = `${BASE_URL}/blog/${article.slug || article.id}`;
+  const title = article.seo_title || `${article.title} | The Parallel Report`;
+  const bodyContent = sanitizeArticleHtml(article.content_html || article.content || '');
+  const description = article.seo_description || article.excerpt || toText(bodyContent) || `Read ${article.title} on The Parallel Report — CardPop's trading card blog.`;
+  const image = absUrl(article.featured_image_url);
+  const published = isoDate(article.published_at || article.created_at);
+  const modified = isoDate(article.updated_at || article.published_at || article.created_at);
+  const author = article.author || 'CardPop Research';
+
+  const blogPosting = {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: article.title,
+    ...(image ? { image } : {}),
+    author: { '@type': 'Person', name: author },
+    publisher: {
+      '@type': 'Organization',
+      name: 'CardPop',
+      logo: { '@type': 'ImageObject', url: `${BASE_URL}/og-image.jpg` },
+    },
+    ...(published ? { datePublished: published } : {}),
+    ...(modified ? { dateModified: modified } : {}),
+    description,
+    mainEntityOfPage: { '@type': 'WebPage', '@id': canonical },
+    url: canonical,
+  };
+
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'The Parallel Report', item: `${BASE_URL}/blog` },
+      ...(article.category ? [{ '@type': 'ListItem', position: 3, name: article.category, item: `${BASE_URL}/blog/category/${encodeURIComponent(article.category)}` }] : []),
+      { '@type': 'ListItem', position: article.category ? 4 : 3, name: article.title, item: canonical },
+    ],
+  };
+
+  const headExtra = [
+    `<meta property="article:published_time" content="${esc(published || '')}" />`,
+    `<meta property="article:modified_time" content="${esc(modified || '')}" />`,
+    `<meta property="article:author" content="${esc(author)}" />`,
+    article.category ? `<meta property="article:section" content="${esc(article.category)}" />` : '',
+  ].filter(Boolean).join('\n');
+
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/blog">The Parallel Report</a> / ${esc(article.title)}</nav>
+  <article>
+    <h1>${esc(article.title)}</h1>
+    <p><em>By ${esc(author)}${published ? ` — ${esc(new Date(published).toISOString().split('T')[0])}` : ''}${article.read_time_minutes ? ` · ${esc(String(article.read_time_minutes))} min read` : ''}</em></p>
+    ${article.excerpt ? `<p>${esc(article.excerpt)}</p>` : ''}
+    ${image ? `<img src="${esc(image)}" alt="${esc(article.title)}" />` : ''}
+    ${bodyContent || `<p>${esc(description)}</p>`}
+  </article>
+</main>`;
+
+  return htmlDoc({ title, description, canonical, ogImage: image, ogType: 'article', headExtra, jsonLdItems: [blogPosting, breadcrumb], bodyHtml });
+}
+
+async function renderListing(supabase, id, slugParam) {
+  if (!UUID_RE.test(id)) {
+    return htmlDoc({
+      title: 'CardPop Marketplace',
+      description: 'Buy, sell and trade trading cards on CardPop.',
+      canonical: `${BASE_URL}/marketplace`,
+      robots: 'noindex, follow',
+      bodyHtml: '<main><h1>CardPop Marketplace</h1></main>',
+    });
+  }
+
+  const { data: listing } = await supabase
+    .from('listings')
+    .select('id, slug, title, description, price, price_aud, category, condition, grade, grading_company, status, images, accepts_offers, created_at, updated_at, seller_id, vault_item:vault_items(card_name, set_name, year, condition, grade, grading_company, card_image, vault_images(storage_path)), seller:profiles!seller_id(username, display_name, business_name, store_slug)')
+    .eq('id', id)
+    .maybeSingle();
+
+  const canonical = `${BASE_URL}/marketplace/${id}/${listing?.slug || slugParam || 'listing'}`;
+
+  if (!listing || listing.status !== 'active') {
+    return htmlDoc({
+      title: 'Listing Unavailable | CardPop',
+      description: 'This marketplace listing is no longer available on CardPop.',
+      canonical,
+      robots: 'noindex, follow',
+      bodyHtml: '<main><h1>Listing Unavailable</h1><p>This listing is sold or no longer active.</p></main>',
+    });
+  }
+
+  const card = listing.vault_item || {};
+  const cardName = listing.title || card.card_name || 'Trading Card';
+  const imgPath = listing.images?.[0] || card.vault_images?.[0]?.storage_path || card.card_image;
+  const image = imgPath
+    ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
+    : undefined;
+  const price = listing.price_aud ?? listing.price;
+  const condition = listing.condition || card.condition;
+  const grade = listing.grade || card.grade;
+  const gradingCompany = listing.grading_company || card.grading_company;
+  const sellerName = listing.seller?.business_name || listing.seller?.display_name || listing.seller?.username || 'CardPop Seller';
+  const title = `${cardName} | CardPop Marketplace`;
+  const setLine = [card.set_name, card.year].filter(Boolean).join(' · ');
+  const description = listing.description
+    || `${cardName}${setLine ? ` (${setLine})` : ''}${grade ? ` — ${gradingCompany || ''} ${grade}`.trimEnd() : ''} for sale on CardPop, Australia's trading card marketplace.`;
+
+  const product = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: cardName,
+    ...(image ? { image } : {}),
+    description,
+    ...(card.set_name ? { category: card.set_name } : {}),
+    ...(grade ? { additionalProperty: [{ '@type': 'PropertyValue', name: 'Grade', value: `${gradingCompany || ''} ${grade}`.trim() }] } : {}),
+    ...(price > 0
+      ? { offers: {
+          '@type': 'Offer',
+          price: Number(price).toFixed(2),
+          priceCurrency: 'AUD',
+          availability: 'https://schema.org/InStock',
+          ...(schemaItemCondition(condition) ? { itemCondition: schemaItemCondition(condition) } : {}),
+          url: canonical,
+          seller: { '@type': 'Organization', name: sellerName },
+        } }
+      : {}),
+  };
+
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'Marketplace', item: `${BASE_URL}/marketplace` },
+      { '@type': 'ListItem', position: 3, name: cardName, item: canonical },
+    ],
+  };
+
+  const sellerHref = listing.seller?.store_slug ? `${BASE_URL}/dealer/${esc(listing.seller.store_slug)}` : null;
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/marketplace">Marketplace</a> / ${esc(cardName)}</nav>
+  <h1>${esc(cardName)}</h1>
+  ${image ? `<img src="${esc(image)}" alt="${esc(cardName)}" />` : ''}
+  ${price > 0 ? `<p><strong>A$${esc(Number(price).toFixed(2))}</strong>${listing.accepts_offers ? ' (offers accepted)' : ''}</p>` : ''}
+  ${setLine ? `<p>${esc(setLine)}</p>` : ''}
+  <ul>
+    ${condition ? `<li>Condition: ${esc(condition)}</li>` : ''}
+    ${grade ? `<li>Grade: ${esc(`${gradingCompany || ''} ${grade}`.trim())}</li>` : ''}
+    <li>Seller: ${sellerHref ? `<a href="${sellerHref}">${esc(sellerName)}</a>` : esc(sellerName)}</li>
+  </ul>
+  ${listing.description ? `<p>${esc(listing.description)}</p>` : ''}
+</main>`;
+
+  return htmlDoc({ title, description, canonical, ogImage: image, jsonLdItems: [product, breadcrumb], bodyHtml });
+}
+
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
@@ -281,6 +469,19 @@ export default async function handler(req, res) {
     if (dealerMatch) {
       const id = decodeURIComponent(dealerMatch[1]);
       return res.status(200).send(await renderDealer(supabase, id));
+    }
+
+    const listingMatch = rawPath.match(/^\/marketplace\/([^/?#]+)(?:\/([^/?#]+))?/);
+    if (listingMatch) {
+      const id = decodeURIComponent(listingMatch[1]);
+      const slug = listingMatch[2] ? decodeURIComponent(listingMatch[2]) : undefined;
+      return res.status(200).send(await renderListing(supabase, id, slug));
+    }
+
+    const blogMatch = rawPath.match(/^\/blog\/([^/?#]+)/);
+    if (blogMatch && decodeURIComponent(blogMatch[1]) !== 'category') {
+      const param = decodeURIComponent(blogMatch[1]);
+      return res.status(200).send(await renderBlogArticle(supabase, param));
     }
 
     // Unknown path — return a minimal, non-indexable document.
