@@ -45,11 +45,14 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 ## Tier 2 — Blocks "world-class"
 
 ### 4. SEO & rendering (SPA ceiling)
-- [ ] Decide: prerender (cheap) vs SSR/meta-framework migration (big) — the app is currently a CSR SPA
-- [ ] JSON-LD structured data for listings (Product/Offer), org, breadcrumbs
-- [ ] Per-listing meta/OG tags rendered for crawlers
-- [ ] Validate sitemaps are submitted + indexed; robots.txt correct
-- [ ] Canonical URLs, pagination handling for category pages
+- [x] SEO assessment written (`docs/SEO_ASSESSMENT.md`) — current state + rendering options + recommendation
+- [x] Product/Offer + BreadcrumbList JSON-LD on the main MarketplaceListingPage (was missing) + canonical + og:image
+- [x] Confirmed strong static head meta, WebSite+SearchAction / Organization / OnlineStore JSON-LD, robots.txt, served sitemap
+- [ ] **Decision needed**: rendering strategy for dynamic pages (edge meta injection vs prerender vs SSR) — see assessment §Options
+- [ ] Category pages: ItemList/CollectionPage JSON-LD + unique meta
+- [ ] Per-listing dynamic OG images
+- [ ] Submit sitemap in Search Console; monitor coverage + CWV
+- [ ] Verify with Google Rich Results Test / URL Inspection
 
 ### 5. Performance / Core Web Vitals
 - [x] Bundle-size budget enforced in CI (`tools/check-bundle-size.js`, `check:bundle`, wired into ci + deploy verify) — initial JS now **313 KB gzip** (budget 400)
