@@ -32,11 +32,13 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 - [ ] Security headers / CSP review in production (helmet config vs. real responses)
 
 ### 3. End-to-end testing
-- [ ] Stand up Playwright (already pre-installed in this env)
-- [ ] E2E: sign up → verify → list a card → appears in marketplace
-- [ ] E2E: add to cart → checkout → Stripe session (test mode)
-- [ ] E2E: propose trade → accept → both parties notified
-- [ ] Run E2E against Vercel preview deploys in CI
+- [x] Stand up Playwright (`playwright.config.js`, `e2e/`, `test:e2e` script)
+- [x] Real-browser smoke suite against the production build: app boots, marketplace/shop routes render, login form shows, no uncaught errors
+- [x] E2E CI workflow (`.github/workflows/e2e.yml`, runs on PRs)
+- [ ] Authenticated flows (need a seeded test env + backend): sign up → list → marketplace
+- [ ] add to cart → checkout → Stripe session (test mode)
+- [ ] propose trade → accept → both parties notified
+- [ ] Run E2E against Vercel preview deploys (vs. local build) for true prod parity
 
 ---
 
