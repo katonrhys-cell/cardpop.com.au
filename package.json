@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "check:bundle": "node tools/check-bundle-size.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

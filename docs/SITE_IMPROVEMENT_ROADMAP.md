@@ -52,11 +52,13 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 - [ ] Canonical URLs, pagination handling for category pages
 
 ### 5. Performance / Core Web Vitals
-- [ ] Add a bundle-size budget to CI; track over time
-- [ ] opencv (11 MB) — confirm it only loads on scan flows; consider WASM/worker + smaller model
+- [x] Bundle-size budget enforced in CI (`tools/check-bundle-size.js`, `check:bundle`, wired into ci + deploy verify) — initial JS now **313 KB gzip** (budget 400)
+- [x] Deferred Sentry Session Replay via `lazyLoadIntegration` → **−37.7 KB gzip** off the critical path (error capture unaffected)
+- [x] Confirmed opencv (11 MB) is lazy (not in the initial chunk) — only loads on scan flows
+- [ ] Further trims: split/lazy `vendor-radix` (86 KB) and `vendor-motion` (37 KB) below-the-fold
 - [ ] Image pipeline: responsive sizes, AVIF/WebP, lazy-load, CDN; audit largest LCP images
 - [ ] Measure + set budgets for LCP / INP / CLS (Lighthouse CI)
-- [ ] Route-level code splitting audit; preload critical chunks
+- [ ] Consider moving opencv card-detection into a Web Worker (off main thread)
 
 ### 6. Trust & safety (the actual marketplace product)
 - [ ] Card authentication / grading verification — is PSA/Beckett check enforced on high-value listings?
