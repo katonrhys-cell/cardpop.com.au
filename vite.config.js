@@ -72,7 +72,11 @@ export default defineConfig({
 					// because every component imports jsx-runtime the entry then statically
 					// pulls that whole chunk — dragging framer-motion onto the critical
 					// path. Keeping React isolated lets framer-motion stay lazy-only.
-					if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/')) return 'vendor-react';
+					// Match the actual react / react-dom / scheduler packages only —
+					// NOT scoped packages whose path merely contains "/react/" (e.g.
+					// @sentry/react), which a loose includes('/react/') would wrongly
+					// pull into vendor-react and drag onto the critical path.
+					if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'vendor-react';
 					// NOTE: framer-motion is deliberately NOT forced into its own manual
 					// chunk. When it was, rolldown hoisted a shared react/jsx-runtime
 					// helper into that chunk, and because the eager entry needs jsx-runtime
