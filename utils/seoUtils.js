@@ -206,7 +206,8 @@ export const generateBlogPostingSchema = (blogPost) => {
     "image": blogPost.image || blogPost.featuredImage,
     "author": {
       "@type": "Person",
-      "name": blogPost.author || "CardPop Team"
+      "name": blogPost.author || "CardPop Team",
+      "url": "https://cardpop.com.au/blog"
     },
     "datePublished": blogPost.publishedAt || blogPost.created,
     "dateModified": blogPost.updated,

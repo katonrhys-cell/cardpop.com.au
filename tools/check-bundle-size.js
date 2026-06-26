@@ -15,8 +15,11 @@ import path from 'node:path';
 
 // Budget for the gzipped initial JS payload. Tighten over time; raise only with
 // a deliberate justification. Ratcheted 400→300 after evicting framer-motion
-// (~37 KB) from the critical path; current initial load ≈ 276 KB.
-const BUDGET_KB = 300;
+// (~37 KB) from the critical path. Raised 300→320 once React was split into its
+// own counted initial chunk (vendor-react ≈86 KB) alongside vendor-radix ≈86 KB
+// — both are unavoidable on first paint, putting the realistic floor at ~314 KB
+// (Sentry is already fully lazy-loaded). Re-tighten if Radix/dates are deferred.
+const BUDGET_KB = 320;
 
 const distDir = 'dist';
 const indexHtml = readFileSync(path.join(distDir, 'index.html'), 'utf8');
