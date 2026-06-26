@@ -125,7 +125,25 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 - [ ] Consider moving opencv card-detection into a Web Worker (off main thread)
 
 ### 6. Trust & safety (the actual marketplace product)
-- [ ] Card authentication / grading verification — is PSA/Beckett check enforced on high-value listings?
+- [~] Card authentication / grading verification. **AUDIT:** the PSA client is
+      real (`api.psacard.com`), but verification was (a) view-time only, not bound
+      to the listing, and (b) `verified = !!details` — it only checked the cert
+      **exists**, never that the **claimed grade matched it**. So a genuine PSA 9
+      cert could be relabelled "PSA 10" and still render "Verified by CardPop…
+      accuracy of the grade confirmed" (a false claim + a real scam vector).
+      - **Done:** grade-match enforcement. `verifyGradingNumber` now extracts the
+        cert's real grade and compares it to the seller's claimed grade
+        (`gradeMatch`: true / false / null-inconclusive). `/verify` accepts
+        `expectedGrade`; `GradingVerificationSection` shows a red **"Grade
+        mismatch"** warning (and withholds the verified badge) when the claim
+        contradicts the cert, only confirms the grade when it actually matches,
+        and softens copy when inconclusive. Tests: service grade-match unit +
+        route passthrough + component states.
+      - **Next (needs schema + listing-flow change):** verify at listing-creation
+        time and persist a tamper-proof `grade_verified` on the vault_item (RLS:
+        clients can't self-set it), so grids/badges reflect stored truth and
+        high-value graded listings can require a passing check before going live.
+        Beckett verification is still a stub (`not yet implemented`).
 - [ ] Seller vetting / tiers / verification badges — define and enforce
 - [~] Dispute resolution + escrow: **AUDIT FINDING — the "escrow" claim was
       false.** `src/routes/stripe.js` transfers seller proceeds (Stripe Connect
