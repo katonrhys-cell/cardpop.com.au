@@ -324,7 +324,7 @@ async function renderBlogArticle(supabase, param) {
     '@type': 'BlogPosting',
     headline: article.title,
     ...(image ? { image } : {}),
-    author: { '@type': 'Person', name: author },
+    author: { '@type': 'Person', name: author, url: `${BASE_URL}/blog` },
     publisher: {
       '@type': 'Organization',
       name: 'CardPop',
