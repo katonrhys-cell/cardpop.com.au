@@ -342,6 +342,9 @@ const ProductDetailPage = () => {
     sellerName: seller?.business_name,
     brand: isShop ? 'CardPop' : undefined,
     category: product.category,
+    cardNumber: vi?.card_number,
+    setName: vi?.set_name || vi?.card_set,
+    sku: product.sku,
   });
   const breadcrumbSchema = generateBreadcrumbStructuredData(
     isShop

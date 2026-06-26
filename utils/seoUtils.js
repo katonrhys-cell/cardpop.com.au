@@ -166,10 +166,15 @@ export const mapItemCondition = (c) => {
 export const generateProductSchema = ({
   name, image, description, url, price, currency = 'AUD',
   condition, availability = 'InStock', sellerName, brand, category,
+  cardNumber, setName, sku, identifier,
 } = {}) => {
   if (!name) return null;
 
   const images = (Array.isArray(image) ? image : [image]).filter(Boolean);
+
+  // Build identifier: prefer explicit identifier, fall back to card number or set+card combo
+  const gtin = identifier || (cardNumber && setName ? `${setName}-${cardNumber}` : cardNumber) || undefined;
+
   const data = {
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -178,6 +183,8 @@ export const generateProductSchema = ({
     ...(description ? { description } : {}),
     ...(category ? { category } : {}),
     ...(brand ? { brand: { '@type': 'Brand', name: brand } } : {}),
+    ...(gtin ? { gtin } : {}),
+    ...(sku ? { sku } : {}),
   };
 
   if (price > 0) {
