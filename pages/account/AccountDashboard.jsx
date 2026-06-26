@@ -343,11 +343,15 @@ const AccountDashboard = () => {
                         <TableCell className="font-medium">{item.card_name}</TableCell>
                         <TableCell className="text-muted-foreground text-sm">{item.set_name || '—'}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="capitalize">
-                            {item.grading_company && item.grade
-                              ? `${item.grading_company} ${item.grade}`
-                              : item.condition?.replace(/_/g, ' ') || 'Unknown'}
-                          </Badge>
+                          {item.grading_company && item.grade ? (
+                            <Badge variant="outline" className="whitespace-nowrap uppercase">
+                              {`${item.grading_company} ${item.grade}`}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="whitespace-nowrap capitalize">
+                              {item.condition?.replace(/_/g, ' ') || 'Unknown'}
+                            </Badge>
+                          )}
                         </TableCell>
                         <TableCell className="text-right font-medium">
                           {item.estimated_value_aud != null ? `$${Number(item.estimated_value_aud).toFixed(2)}` : '—'}
