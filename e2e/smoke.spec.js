@@ -49,3 +49,13 @@ test('shop route renders', async ({ page }) => {
   await expect(page.locator('#root')).not.toBeEmpty();
   expect(errors, `Uncaught page errors:\n${errors.join('\n')}`).toEqual([]);
 });
+
+test('cart drawer lazy-loads and opens when the cart button is clicked', async ({ page }) => {
+  // The cart UI is code-split (framer-motion + Radix) and only mounted after the
+  // first open. This guards that the lazy chunk loads and the drawer renders.
+  const errors = trackPageErrors(page);
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: 'Cart' }).first().click();
+  await expect(page.getByRole('heading', { name: 'Your Cart', exact: true })).toBeVisible();
+  expect(errors, `Uncaught page errors:\n${errors.join('\n')}`).toEqual([]);
+});

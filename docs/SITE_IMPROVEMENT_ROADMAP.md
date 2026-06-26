@@ -55,10 +55,22 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 - [ ] Verify with Google Rich Results Test / URL Inspection
 
 ### 5. Performance / Core Web Vitals
-- [x] Bundle-size budget enforced in CI (`tools/check-bundle-size.js`, `check:bundle`, wired into ci + deploy verify) — initial JS now **313 KB gzip** (budget 400)
+- [x] Bundle-size budget enforced in CI (`tools/check-bundle-size.js`, `check:bundle`, wired into ci + deploy verify) — initial JS now **276 KB gzip**, budget ratcheted 400→**300**
 - [x] Deferred Sentry Session Replay via `lazyLoadIntegration` → **−37.7 KB gzip** off the critical path (error capture unaffected)
 - [x] Confirmed opencv (11 MB) is lazy (not in the initial chunk) — only loads on scan flows
-- [ ] Further trims: split/lazy `vendor-radix` (86 KB) and `vendor-motion` (37 KB) below-the-fold
+- [x] Evicted **framer-motion (~37 KB gzip)** from the initial load (313→276 KB, −12%):
+      - root cause was a chunking artifact — forcing framer-motion into its own
+        manual chunk made rolldown hoist a shared `react/jsx-runtime` helper into
+        it, so the eager entry statically imported the whole motion chunk. Letting
+        rolldown auto-split framer-motion + giving React core its own `vendor-react`
+        chunk keeps animation code on-demand (loads with the pages that use it).
+      - lazy-loaded the cart drawer (`ShoppingCartLazy.jsx`) — it was the only
+        eager framer-motion importer; now mounts on first open (idle-prefetched),
+        with an E2E test asserting it still opens.
+- [~] `vendor-radix` (86 KB): investigated auto-splitting — only ~10 KB is
+      lazy-only (Header's Sheet/Dialog + Button's Slot are genuinely eager), and
+      dropping the manual chunk merged radix into `vendor-react` (worse caching).
+      Left as-is; revisit if Header's Radix surface shrinks.
 - [ ] Image pipeline: responsive sizes, AVIF/WebP, lazy-load, CDN; audit largest LCP images
 - [ ] Measure + set budgets for LCP / INP / CLS (Lighthouse CI)
 - [ ] Consider moving opencv card-detection into a Web Worker (off main thread)
