@@ -108,4 +108,23 @@ describe('POST /resend-verification', () => {
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
   });
+
+  it('rate-limits repeated resends to the same email (anti-bombing)', async () => {
+    mockSupabase.auth.admin.generateLink.mockResolvedValue({ error: null });
+    const email = 'bomb-target@example.com';
+    const statuses = [];
+    for (let i = 0; i < 4; i++) {
+      const res = await request(app).post('/resend-verification').send({ email });
+      statuses.push(res.status);
+    }
+    // first 3 allowed, 4th throttled
+    expect(statuses.slice(0, 3)).toEqual([200, 200, 200]);
+    expect(statuses[3]).toBe(429);
+  });
+
+  it('limits per target email, so a different email is unaffected', async () => {
+    mockSupabase.auth.admin.generateLink.mockResolvedValue({ error: null });
+    const res = await request(app).post('/resend-verification').send({ email: 'fresh-user@example.com' });
+    expect(res.status).toBe(200);
+  });
 });

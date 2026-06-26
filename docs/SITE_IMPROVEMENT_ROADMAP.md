@@ -28,7 +28,10 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 - [ ] Audit remaining sensitive tables (orders, listings, offers, taxonomy) for admin/ownership RLS
 - [ ] Verify the service-role key is never reachable client-side; rotate if ever exposed
 - [ ] Enable Supabase leaked-password protection + MFA enforcement options
-- [ ] Confirm `POST /resend-verification` (unauthenticated) is rate-limited
+- [x] `POST /resend-verification` (unauthenticated, sends an email) is now rate-
+      limited per **target email** (3 / 15 min) — closes an inbox-bombing /
+      email-quota-abuse vector the global IP limiter (100/5min) didn't cover.
+      `resendVerificationLimiter` in `endpoint-rate-limit.js`; 2 tests.
 - [ ] Security headers / CSP review in production (helmet config vs. real responses)
 
 ### 3. End-to-end testing
