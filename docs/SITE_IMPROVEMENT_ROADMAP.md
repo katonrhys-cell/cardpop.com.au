@@ -190,11 +190,18 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
         **fails open** so an outage never blocks all payments. 429 +
         `velocity_limit` code with a "verify your identity to lift this" message.
         8 backend tests.
+      - **Chargeback handling DONE:** `charge.dispute.created` / `closed` webhooks
+        (`src/services/disputeService.js`) now freeze the order payout
+        (`payout_status='frozen'`), reverse an already-sent Stripe transfer or
+        claw back a wallet credit, record the dispute in `payment_disputes`
+        (migration `20260626000002`), and notify admins + the seller. All
+        best-effort/never-throws so the webhook always ack's. ⚠️ migration must be
+        applied. 5 tests.
       - **Next:** listing-creation velocity is still open — listings are created
         client-side (`supabase.from('listings').insert`), so a new account can
         spam scam listings. Needs a backend listing endpoint or RLS rate rules.
-        Also: chargeback webhook handling (`charge.dispute.created`) + auto-freeze
-        of seller payout on dispute.
+        Also: admin UI over `payment_disputes` + a flow to release a payout that
+        was frozen then won.
 - [ ] Clear, enforced policies (returns, authenticity guarantee, prohibited items)
 
 ---
