@@ -21,12 +21,12 @@ const InsiderTradingPage = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
-    brandName: '',
+    brand_name: '',
     description: '',
-    logoUrl: '',
-    affiliateLink: '',
+    logo_url: '',
+    affiliate_link: '',
     category: '',
-    isActive: true
+    is_active: true
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -68,12 +68,12 @@ const InsiderTradingPage = () => {
 
   const resetForm = () => {
     setFormData({
-      brandName: '',
+      brand_name: '',
       description: '',
-      logoUrl: '',
-      affiliateLink: '',
+      logo_url: '',
+      affiliate_link: '',
       category: '',
-      isActive: true
+      is_active: true
     });
     setIsEditing(false);
     setEditingId(null);
@@ -81,16 +81,21 @@ const InsiderTradingPage = () => {
 
   const handleEdit = (retailer) => {
     setFormData({
-      brandName: retailer.brandName,
+      brand_name: retailer.brand_name || '',
       description: retailer.description || '',
-      logoUrl: retailer.logoUrl || '',
-      affiliateLink: retailer.affiliateLink,
+      logo_url: retailer.logo_url || '',
+      affiliate_link: retailer.affiliate_link || '',
       category: retailer.category || '',
-      isActive: retailer.isActive
+      is_active: retailer.is_active ?? true
     });
     setEditingId(retailer.id);
     setIsEditing(true);
-    window.scrollTo({ top: document.getElementById('admin-section').offsetTop - 100, behavior: 'smooth' });
+    // admin-section only exists while authenticated; guard against a null element
+    // (e.g. if auth state flips between render and click).
+    const adminSection = document.getElementById('admin-section');
+    if (adminSection) {
+      window.scrollTo({ top: adminSection.offsetTop - 100, behavior: 'smooth' });
+    }
   };
 
   const handleDelete = async (id) => {
@@ -198,14 +203,14 @@ const InsiderTradingPage = () => {
                 <Card className="h-full flex flex-col group hover:border-primary hover:shadow-lg transition-all duration-300">
                   <CardHeader className="pb-4">
                     <div className="h-16 w-16 rounded-xl bg-muted flex items-center justify-center mb-4 overflow-hidden border border-border group-hover:border-primary/30 transition-colors">
-                      {retailer.logoUrl ? (
-                        <img src={retailer.logoUrl} alt={retailer.brandName} className="h-full w-full object-cover" />
+                      {retailer.logo_url ? (
+                        <img src={retailer.logo_url} alt={retailer.brand_name} className="h-full w-full object-cover" />
                       ) : (
                         <Store className="h-8 w-8 text-muted-foreground" />
                       )}
                     </div>
                     <CardTitle className="text-xl group-hover:text-primary transition-colors">
-                      {retailer.brandName}
+                      {retailer.brand_name}
                     </CardTitle>
                     {retailer.category && (
                       <span className="inline-block px-2 py-1 bg-secondary/10 text-secondary text-xs font-medium rounded-md mt-2 w-fit">
@@ -222,7 +227,7 @@ const InsiderTradingPage = () => {
                     <div className="flex w-full gap-2">
                       <Button 
                         className="flex-1 bg-secondary hover:bg-primary text-white transition-colors"
-                        onClick={() => window.open(retailer.affiliateLink, '_blank')}
+                        onClick={() => window.open(retailer.affiliate_link, '_blank')}
                       >
                         <ExternalLink className="h-4 w-4 mr-2" />
                         Shop Now
@@ -230,7 +235,7 @@ const InsiderTradingPage = () => {
                       <Button 
                         variant="outline" 
                         size="icon"
-                        onClick={() => handleCopy(retailer.affiliateLink, retailer.id)}
+                        onClick={() => handleCopy(retailer.affiliate_link, retailer.id)}
                         className="shrink-0 hover:text-primary hover:border-primary"
                         title="Copy Link"
                       >
@@ -275,12 +280,12 @@ const InsiderTradingPage = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-foreground">Brand Name *</label>
-                      <Input 
-                        name="brandName" 
-                        value={formData.brandName} 
-                        onChange={handleInputChange} 
-                        placeholder="e.g. Amazon" 
-                        required 
+                      <Input
+                        name="brand_name"
+                        value={formData.brand_name}
+                        onChange={handleInputChange}
+                        placeholder="e.g. Amazon"
+                        required
                         className="text-foreground"
                       />
                     </div>
@@ -298,25 +303,25 @@ const InsiderTradingPage = () => {
                   
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground">Affiliate Link *</label>
-                    <Input 
-                      name="affiliateLink" 
+                    <Input
+                      name="affiliate_link"
                       type="url"
-                      value={formData.affiliateLink} 
-                      onChange={handleInputChange} 
-                      placeholder="https://..." 
-                      required 
+                      value={formData.affiliate_link}
+                      onChange={handleInputChange}
+                      placeholder="https://..."
+                      required
                       className="text-foreground"
                     />
                   </div>
 
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground">Logo URL</label>
-                    <Input 
-                      name="logoUrl" 
+                    <Input
+                      name="logo_url"
                       type="url"
-                      value={formData.logoUrl} 
-                      onChange={handleInputChange} 
-                      placeholder="https://.../logo.png" 
+                      value={formData.logo_url}
+                      onChange={handleInputChange}
+                      placeholder="https://.../logo.png"
                       className="text-foreground"
                     />
                   </div>

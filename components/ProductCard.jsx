@@ -60,7 +60,7 @@ const ProductCard = ({ product }) => {
 
         {/* Grade badge — bottom left (only for graded slabs) */}
         {isGraded && (
-          <div className={`absolute bottom-3 left-3 z-10 px-2.5 py-1 rounded-md text-[11px] font-extrabold tracking-wide shadow-lg ${GRADE_BADGE[gradingCompany] || GRADE_BADGE.other}`}>
+          <div className={`absolute bottom-3 left-3 z-10 px-2.5 py-1 rounded-md text-[11px] font-extrabold tracking-wide shadow-lg ${GRADE_BADGE[gradingCompany.toLowerCase()] || GRADE_BADGE.other}`}>
             {gradingCompany.toUpperCase()} {product.grade}
           </div>
         )}
@@ -148,7 +148,7 @@ const ProductCard = ({ product }) => {
                   <span className="text-sm font-bold text-foreground truncate group-hover/seller:text-primary transition-colors">
                     {sellerObj?.display_name || sellerObj?.name || 'Community Seller'}
                   </span>
-                  {sellerObj?.is_verified === 'true' && (
+                  {(sellerObj?.is_verified === true || sellerObj?.is_verified === 'true') && (
                     <ShieldCheck className="w-3.5 h-3.5 text-[hsl(var(--verified-badge))] shrink-0" />
                   )}
                 </div>

@@ -59,7 +59,8 @@ describe('useWatchlist', () => {
 
     let returned;
     await act(async () => { returned = await result.current.toggle('l9'); });
-    expect(returned).toBe(true);
+    // Returns { success, watchlisted } — success on a clean write, now watchlisted.
+    expect(returned).toEqual({ success: true, watchlisted: true });
     expect(mockInsert).toHaveBeenCalledWith({ user_id: 'u1', listing_id: 'l9' });
   });
 
@@ -70,11 +71,13 @@ describe('useWatchlist', () => {
 
     let returned;
     await act(async () => { returned = await result.current.toggle('l1'); });
-    expect(returned).toBe(false);
+    // A successful removal reports success:true (previously a bare false here was
+    // ambiguous with failure).
+    expect(returned).toEqual({ success: true, watchlisted: false });
     expect(mockDelete).toHaveBeenCalledWith('listing_id', 'l1');
   });
 
-  it('returns the prior state when the write fails', async () => {
+  it('reports failure and the prior state when the write fails', async () => {
     h.fetchData = [];
     h.insertError = new Error('write failed');
     const { result } = renderHook(() => useWatchlist());
@@ -82,8 +85,8 @@ describe('useWatchlist', () => {
 
     let returned;
     await act(async () => { returned = await result.current.toggle('l9'); });
-    // Was not previously watchlisted; on failure it reports the unchanged (false) state.
-    expect(returned).toBe(false);
+    // Was not previously watchlisted; on failure success:false and state unchanged.
+    expect(returned).toEqual({ success: false, watchlisted: false });
   });
 
   it('toggle is a no-op without a user', async () => {
@@ -91,7 +94,7 @@ describe('useWatchlist', () => {
     const { result } = renderHook(() => useWatchlist());
     let returned;
     await act(async () => { returned = await result.current.toggle('l1'); });
-    expect(returned).toBe(false);
+    expect(returned).toEqual({ success: false, watchlisted: false });
     expect(mockInsert).not.toHaveBeenCalled();
   });
 });
