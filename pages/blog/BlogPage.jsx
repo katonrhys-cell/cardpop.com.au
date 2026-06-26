@@ -165,12 +165,15 @@ const BlogPage = () => {
 
   const activeCategory = categoryParam ? CATEGORY_MAP[categoryParam] : null;
   const pageTitle = activeCategory ? `${activeCategory} | Blog` : 'The Parallel Report | CardPop';
+  const pageDescription = activeCategory
+    ? `${activeCategory} from The Parallel Report by CardPop — trading card analysis, guides and insights for Australian Pokémon, MTG and sports card collectors.`
+    : 'The Parallel Report by CardPop — trading card news, market analysis, grading guides and investment insights for Australian Pokémon, MTG and sports card collectors.';
 
   return (
     <div className="min-h-[100dvh] bg-background">
       <SEOHead
         title={pageTitle}
-        description="The Parallel Report by CardPop — trading card news, market analysis, grading guides and investment insights for Australian Pokémon, MTG and sports card collectors."
+        description={pageDescription}
         canonicalUrl={categoryParam ? `https://cardpop.com.au/blog/category/${categoryParam}` : 'https://cardpop.com.au/blog'}
       />
 

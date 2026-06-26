@@ -8,6 +8,7 @@ import { ShieldCheck, MessageCircle, User, TrendingUp, Loader2 } from 'lucide-re
 import { Skeleton } from '@/components/ui/skeleton';
 import GradingVerificationSection from '@/components/GradingVerificationSection.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
+import { generateProductSchema, generateBreadcrumbStructuredData } from '@/utils/seoUtils.js';
 
 const MarketplaceListingPage = () => {
   const { id } = useParams();
@@ -70,9 +71,37 @@ const MarketplaceListingPage = () => {
   );
   if (!listing) return <div className="container-default section-padding text-center">Listing not found</div>;
 
+  const canonicalUrl = `https://cardpop.com.au/marketplace/${id}${listing.slug ? `/${listing.slug}` : ''}`;
+  const cardName = listing.title || listing.vault_item?.card_name || 'Trading Card';
+  const listingImage = listing.images?.[0];
+  const seoDescription = listing.description
+    || `${cardName} for sale on CardPop — Australia's trading card marketplace.`;
+  const productSchema = generateProductSchema({
+    name: cardName,
+    image: listingImage,
+    description: seoDescription,
+    url: canonicalUrl,
+    price: listing.price_aud ?? listing.price,
+    condition: listing.condition || listing.vault_item?.condition,
+    sellerName: listing.seller?.full_name || listing.seller?.username || 'CardPop Seller',
+    category: listing.category,
+  });
+  const breadcrumbSchema = generateBreadcrumbStructuredData([
+    { name: 'Home', url: 'https://cardpop.com.au/' },
+    { name: 'Marketplace', url: 'https://cardpop.com.au/marketplace' },
+    { name: cardName, url: canonicalUrl },
+  ]);
+  const structuredData = [productSchema, breadcrumbSchema].filter(Boolean);
+
   return (
     <div className="container-default section-padding min-h-[80vh]">
-      <SEOHead title={listing ? `${listing.title} | CardPop Marketplace` : 'CardPop Marketplace'} description={listing?.description || listing?.title || 'View this marketplace listing on CardPop'} />
+      <SEOHead
+        title={`${cardName} | CardPop Marketplace`}
+        description={seoDescription}
+        canonicalUrl={canonicalUrl}
+        ogImage={listingImage || undefined}
+        structuredData={structuredData}
+      />
       
       <div className="flex flex-col lg:flex-row gap-12">
         <div className="w-full lg:w-3/5">

@@ -4,6 +4,8 @@ import {
   generateMetaDescription,
   generateStructuredData,
   generateSitemap,
+  mapItemCondition,
+  generateProductSchema,
 } from '@/utils/seoUtils.js';
 
 // ─── generateMetaTitle ────────────────────────────────────────────────────────
@@ -202,6 +204,71 @@ describe('generateStructuredData', () => {
   it('sets seller name to "CardPop Marketplace"', () => {
     const data = generateStructuredData({ title: 'Card', price: 10, condition: 'Good' });
     expect(data.offers.seller.name).toBe('CardPop Marketplace');
+  });
+});
+
+// ─── mapItemCondition ─────────────────────────────────────────────────────────
+
+describe('mapItemCondition', () => {
+  it('returns null for an empty condition', () => {
+    expect(mapItemCondition('')).toBeNull();
+    expect(mapItemCondition(null)).toBeNull();
+  });
+
+  it('maps mint/graded/high-grade conditions to NewCondition', () => {
+    expect(mapItemCondition('Gem Mint')).toBe('https://schema.org/NewCondition');
+    expect(mapItemCondition('PSA 10')).toBe('https://schema.org/NewCondition');
+    expect(mapItemCondition('Sealed')).toBe('https://schema.org/NewCondition');
+    expect(mapItemCondition('NM')).toBe('https://schema.org/NewCondition');
+  });
+
+  it('maps damaged conditions to DamagedCondition', () => {
+    expect(mapItemCondition('Damaged')).toBe('https://schema.org/DamagedCondition');
+    expect(mapItemCondition('Heavily Played')).toBe('https://schema.org/DamagedCondition');
+  });
+
+  it('falls back to UsedCondition for mid-grade conditions', () => {
+    expect(mapItemCondition('Lightly Played')).toBe('https://schema.org/UsedCondition');
+    expect(mapItemCondition('Good')).toBe('https://schema.org/UsedCondition');
+  });
+});
+
+// ─── generateProductSchema ────────────────────────────────────────────────────
+
+describe('generateProductSchema', () => {
+  it('returns null without a name', () => {
+    expect(generateProductSchema({ price: 10 })).toBeNull();
+    expect(generateProductSchema()).toBeNull();
+  });
+
+  it('builds a Product with a nested Offer when a price is set', () => {
+    const data = generateProductSchema({
+      name: 'Charizard', image: 'https://cdn.test/c.jpg', description: 'A holo.',
+      url: 'https://cardpop.com.au/marketplace/1/charizard', price: 1499.95,
+      condition: 'PSA 9', sellerName: 'Ash Cards', category: 'Pokémon',
+    });
+    expect(data['@type']).toBe('Product');
+    expect(data.image).toEqual(['https://cdn.test/c.jpg']);
+    expect(data.offers.price).toBe('1499.95');
+    expect(data.offers.priceCurrency).toBe('AUD');
+    expect(data.offers.availability).toBe('https://schema.org/InStock');
+    expect(data.offers.itemCondition).toBe('https://schema.org/NewCondition');
+    expect(data.offers.seller.name).toBe('Ash Cards');
+  });
+
+  it('omits the Offer entirely when there is no price', () => {
+    const data = generateProductSchema({ name: 'Mystery Card' });
+    expect(data.offers).toBeUndefined();
+  });
+
+  it('honours an OutOfStock availability', () => {
+    const data = generateProductSchema({ name: 'Box', price: 50, availability: 'OutOfStock' });
+    expect(data.offers.availability).toBe('https://schema.org/OutOfStock');
+  });
+
+  it('accepts an array of images and drops falsy entries', () => {
+    const data = generateProductSchema({ name: 'Card', image: ['https://a.jpg', null, undefined] });
+    expect(data.image).toEqual(['https://a.jpg']);
   });
 });
 
