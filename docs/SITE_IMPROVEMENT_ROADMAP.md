@@ -141,8 +141,12 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
         (`src/routes/reports.js`, 16 backend tests).
       - `ReportModal.jsx` + a "Report this listing" control on the marketplace
         listing page (4 frontend tests). Reusable for users/reviews/events.
-      - **Next:** an admin moderation-queue UI over `GET/PATCH /reports`; wire
-        report buttons onto cards, seller profiles, reviews.
+      - Admin moderation queue (`pages/admin/ReportsModerationPage.jsx`,
+        `/admin/reports`, linked from the dashboard) — reads/triages via the
+        backend (RLS denies client reads), high-risk reasons flagged, deep-links
+        to the reported target (4 frontend tests).
+      - **Next:** wire report buttons onto cards/seller profiles/reviews;
+        notify/auto-flag targets after N independent reports.
 - [ ] Chargeback & fraud handling; velocity limits on new accounts
 - [ ] Clear, enforced policies (returns, authenticity guarantee, prohibited items)
 
