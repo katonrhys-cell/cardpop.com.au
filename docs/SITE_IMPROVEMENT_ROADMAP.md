@@ -147,7 +147,21 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
         clients can't self-set it), so grids/badges reflect stored truth and
         high-value graded listings can require a passing check before going live.
         Beckett verification is still a stub (`not yet implemented`).
-- [ ] Seller vetting / tiers / verification badges — define and enforce
+- [~] Seller vetting / tiers / verification badges — define and enforce.
+      **AUDIT FINDINGS + fixes:**
+      - The admin verification-review endpoint (`PATCH /admin/verifications/:id`)
+        updated `user_verifications.status` but **never touched the profile**, and
+        there's no DB trigger — so approving an identity verification through the
+        dashboard didn't actually grant verified status (the badge reads
+        `profiles.is_verified`). **Fixed:** the endpoint now syncs
+        `is_verified` + `verification_status` (+ `verified_at`) to the profile on
+        approve/reject/suspend/revoke. 2 tests.
+      - `is_verified` is a boolean, but several views compared it to the string
+        `'true'`, so verified sellers showed **no badge** on product cards and the
+        community page. **Fixed:** shared `utils/verification.js` `isVerified()`
+        (accepts both) wired into those spots. 1 test.
+      - **Next:** sweep remaining `=== 'true'` checks to the helper; define what
+        each seller tier unlocks and gate accordingly.
 - [~] Dispute resolution + escrow: **AUDIT FINDING — the "escrow" claim was
       false.** `src/routes/stripe.js` transfers seller proceeds (Stripe Connect
       transfer or wallet credit) on `checkout.session.completed` — i.e. the

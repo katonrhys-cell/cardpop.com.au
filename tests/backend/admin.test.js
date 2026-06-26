@@ -91,14 +91,27 @@ describe('PATCH /users/:userId/role', () => {
 // ─── PATCH /verifications/:id ──────────────────────────────────────────────────
 
 describe('PATCH /verifications/:id', () => {
-  it('applies a status decision and writes the audit log', async () => {
-    const updateBuilder = makeBuilder({ data: { id: 'v1', status: 'approved' }, error: null });
-    queueFrom(updateBuilder, makeBuilder()); // update + audit insert
+  it('approves, grants verified status on the profile, and writes the audit log', async () => {
+    const updateBuilder = makeBuilder({ data: { id: 'v1', user_id: 'u9', status: 'approved' }, error: null });
+    const profileBuilder = makeBuilder({ error: null });
+    queueFrom(updateBuilder, profileBuilder, makeBuilder()); // verification update + profile sync + audit insert
     const res = await request(app).patch('/admin/verifications/v1').send({ status: 'approved', admin_notes: 'looks good' });
     expect(res.status).toBe(200);
     expect(res.body.verification).toMatchObject({ status: 'approved' });
     // admin_id comes from the token, status from the body.
     expect(updateBuilder.update).toHaveBeenCalledWith(expect.objectContaining({ admin_id: 'admin-1', status: 'approved' }));
+    // the user's profile is marked verified
+    expect(profileBuilder.update).toHaveBeenCalledWith(expect.objectContaining({ is_verified: true, verification_status: 'approved' }));
+    expect(profileBuilder.eq).toHaveBeenCalledWith('id', 'u9');
+  });
+
+  it('revokes verified status on the profile when rejected', async () => {
+    const updateBuilder = makeBuilder({ data: { id: 'v1', user_id: 'u9', status: 'rejected' }, error: null });
+    const profileBuilder = makeBuilder({ error: null });
+    queueFrom(updateBuilder, profileBuilder, makeBuilder());
+    const res = await request(app).patch('/admin/verifications/v1').send({ status: 'rejected' });
+    expect(res.status).toBe(200);
+    expect(profileBuilder.update).toHaveBeenCalledWith(expect.objectContaining({ is_verified: false, verification_status: 'rejected' }));
   });
 
   it('rejects an invalid status', async () => {
