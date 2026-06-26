@@ -126,12 +126,16 @@ describe('GET /price-estimate', () => {
   });
 
   it('returns price statistics on success', async () => {
-    mockCallEbayApi.mockResolvedValue({
-      itemSummaries: [
-        { itemId: 'i1', title: 'Card A', price: { value: '100' }, condition: '3000', itemWebUrl: '', image: {} },
-        { itemId: 'i2', title: 'Card B', price: { value: '200' }, condition: '3000', itemWebUrl: '', image: {} },
-      ],
-    });
+    // /price-estimate queries two marketplaces (AU then US). Mock the AU call with
+    // two AUD listings and the US call empty so the combined stats are clean.
+    mockCallEbayApi
+      .mockResolvedValueOnce({
+        itemSummaries: [
+          { itemId: 'i1', title: 'Card A', price: { value: '100' }, condition: '3000', itemWebUrl: '', image: {} },
+          { itemId: 'i2', title: 'Card B', price: { value: '200' }, condition: '3000', itemWebUrl: '', image: {} },
+        ],
+      })
+      .mockResolvedValueOnce({ itemSummaries: [] });
     const res = await request(app).get('/price-estimate?name=Charizard');
     expect(res.status).toBe(200);
     expect(res.body.count).toBe(2);

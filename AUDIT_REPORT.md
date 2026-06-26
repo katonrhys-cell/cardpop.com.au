@@ -149,13 +149,16 @@ discussion / session transcript.)
   admin-configured cards. Switching the decorative stack to `heroCards` would
   break the layout — left as-is.
 
-## ⚠️ Pre-existing — out of scope
+## ✅ Fixed — pre-existing eBay test failures + a masked outage bug
 
-- `tests/backend/ebay.test.js` — 2 failures (`returns price statistics on success`,
-  `returns 502 when the eBay API throws`) fail on a clean checkout of this branch,
-  before any change here. The `callEbayApi` mock isn't intercepting the cached
-  client (the route returns 4 results / status 200 instead of the mocked 2 / 502).
-  A test-harness/mocking issue, unrelated to this audit.
+The two `tests/backend/ebay.test.js` failures (`returns price statistics on
+success`, `returns 502 when the eBay API throws`) failed on a clean checkout of
+this branch. Root cause was a behaviour drift: `/price-estimate` now queries two
+marketplaces (AU + US) via `Promise.allSettled`, which never rejects — so a
+**total** eBay outage fell through as `count: 0` / HTTP 200, masking "eBay is
+down" as "no listings found". Fixed the route to return 502 only when *both*
+marketplaces fail (single-marketplace failures still degrade gracefully), and
+updated the stale tests to the dual-fetch shape. Full suite is now green.
 
 ---
 
