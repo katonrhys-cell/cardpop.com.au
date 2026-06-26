@@ -157,12 +157,16 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
       - **Done now:** corrected all user-facing copy to describe what actually
         exists — secure Stripe payments + the 14-day **Buyer Protection**
         refund flow (no "escrow"/"funds held" language).
-      - **Decision needed (real escrow is a build):** hold funds until delivery
-        confirmation. Options: Stripe manual-capture / separate charges &
-        transfers with a delayed transfer, or hold in the platform balance and
-        transfer on buyer confirmation / auto-release after N days. Pair with a
-        dispute state machine (open → evidence → resolve) — the refunds table +
-        admin approval is the seed.
+      - **DECISION (owner):** real escrow is **deferred to a future third-party
+        escrow provider**. The current model stays: pay the seller at checkout +
+        a **Buyer Protection refund** flow for recourse. Don't build custom
+        fund-holding.
+      - **Done (makes the current model financially sound):** the Buyer
+        Protection refund now **claws the seller's payout back** when a refund is
+        processed (`reverseSellerPayout` in `payoutService.js`) — reverses the
+        Connect transfer or debits the wallet, so the platform isn't left
+        covering a refund it issued to the buyer. Shared with the chargeback
+        path (same helper). 4 tests.
 - [~] Counterfeit / scam **reporting flow** — was entirely missing (the
       `ModerationPanel` was just admin notes on catalog cards). Added an
       end-to-end vertical slice:
