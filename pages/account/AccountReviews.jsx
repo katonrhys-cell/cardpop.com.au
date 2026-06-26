@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { Star, ShieldCheck, RefreshCw } from 'lucide-react';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
+import { isVerified } from '@/utils/verification.js';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -40,7 +41,7 @@ const ReviewCard = ({ review }) => {
           <div>
             <div className="flex items-center gap-1.5">
               <p className="font-bold text-sm">{author?.display_name || author?.username || 'Anonymous'}</p>
-              {author?.is_verified && <ShieldCheck className="w-3.5 h-3.5 text-blue-500" />}
+              {isVerified(author?.is_verified) && <ShieldCheck className="w-3.5 h-3.5 text-blue-500" />}
             </div>
             <div className="flex items-center gap-2 mt-0.5">
               <StarRating rating={review.rating} />

@@ -160,8 +160,13 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
         `'true'`, so verified sellers showed **no badge** on product cards and the
         community page. **Fixed:** shared `utils/verification.js` `isVerified()`
         (accepts both) wired into those spots. 1 test.
-      - **Next:** sweep remaining `=== 'true'` checks to the helper; define what
-        each seller tier unlocks and gate accordingly.
+      - Swept all profile-verification display reads (~14 sites: seller cards,
+        carousels, community/profile pages, account pages, admin badges) to the
+        shared `isVerified()` helper, eliminating the boolean-vs-`'true'`
+        inconsistency. Left non-profile entities (stores/retailers), form-data,
+        the auth-context `isVerified`, and the backend (reads the DB boolean).
+      - **Next:** define what each seller tier unlocks and gate accordingly
+        (currently the tier is a display badge only).
 - [~] Dispute resolution + escrow: **AUDIT FINDING — the "escrow" claim was
       false.** `src/routes/stripe.js` transfers seller proceeds (Stripe Connect
       transfer or wallet credit) on `checkout.session.completed` — i.e. the

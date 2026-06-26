@@ -15,6 +15,7 @@ import { useUserDetails } from '@/hooks/useUserDetails.js';
 import UserStatsCard from '@/components/admin/UserStatsCard.jsx';
 import UserActionsModal from '@/components/admin/UserActionsModal.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { isVerified } from '@/utils/verification.js';
 
 /**
  * DATA RELATIONSHIPS DOCUMENTATION:
@@ -107,7 +108,7 @@ const UserDetailPage = () => {
             
             <div className="flex flex-wrap justify-center gap-2 mb-6">
               <Badge variant="secondary" className="bg-secondary text-secondary-foreground">{user.community_type || user.user_type || 'collector'}</Badge>
-              {user.is_verified && <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-200">Verified</Badge>}
+              {isVerified(user.is_verified) && <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-200">Verified</Badge>}
               {user.is_active === false && <Badge variant="destructive">Suspended</Badge>}
             </div>
 
@@ -131,18 +132,18 @@ const UserDetailPage = () => {
               {user.is_sole_trader && (
                 <>
                   <Button
-                    variant={user.is_verified ? 'outline' : 'default'}
+                    variant={isVerified(user.is_verified) ? 'outline' : 'default'}
                     className="w-full justify-start"
                     disabled={flagSaving}
                     onClick={() => toggleStoreFlag(
-                      user.is_verified
+                      isVerified(user.is_verified)
                         ? { is_verified: false }
                         : { is_verified: true, verification_status: 'approved' },
-                      user.is_verified ? 'Business verification removed.' : 'Business verified.'
+                      isVerified(user.is_verified) ? 'Business verification removed.' : 'Business verified.'
                     )}
                   >
-                    <BadgeCheck className={`w-4 h-4 mr-2 ${user.is_verified ? 'text-blue-600' : ''}`} />
-                    {user.is_verified ? 'Unverify Business' : 'Verify Business'}
+                    <BadgeCheck className={`w-4 h-4 mr-2 ${isVerified(user.is_verified) ? 'text-blue-600' : ''}`} />
+                    {isVerified(user.is_verified) ? 'Unverify Business' : 'Verify Business'}
                   </Button>
                   <Button
                     variant={user.is_featured_seller ? 'outline' : 'default'}

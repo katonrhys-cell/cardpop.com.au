@@ -5,6 +5,7 @@ import { Heart, ZoomIn } from 'lucide-react';
 import ImageZoomModal from '@/components/ImageZoomModal.jsx';
 import CardImage from '@/components/CardImage.jsx';
 import { getCardImage, CARD_GRID_SIZES } from '@/utils/imageUrl.js';
+import { isVerified } from '@/utils/verification.js';
 import { toast } from 'sonner';
 import VerifiedBadge from '@/components/VerifiedBadge.jsx';
 import SellerTierBadge from '@/components/SellerTierBadge.jsx';
@@ -203,7 +204,7 @@ const MarketplaceListingCard = ({ listing }) => {
                   <span className="text-sm font-bold text-foreground truncate group-hover/seller:text-primary transition-colors">
                     {sellerObj?.display_name || sellerObj?.username || 'Community Seller'}
                   </span>
-                  {sellerObj?.is_verified && <VerifiedBadge size="sm" />}
+                  {isVerified(sellerObj?.is_verified) && <VerifiedBadge size="sm" />}
                   {sellerObj?.seller_tier && sellerObj.seller_tier !== 'none' && (
                     <SellerTierBadge tier={sellerObj.seller_tier} size="xs" />
                   )}
