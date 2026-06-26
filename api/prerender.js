@@ -43,6 +43,17 @@ const toText = (html = '', max = 300) => {
 
 const isoDate = (d) => (d ? new Date(d).toISOString() : undefined);
 
+// Mirror of lib/slugify.js — kept inline so the serverless function has no
+// dependency on the frontend bundle.
+const slugify = (str = '') => String(str)
+  .toLowerCase()
+  .normalize('NFD')
+  .replace(/[̀-ͯ]/g, '')
+  .replace(/[^a-z0-9\s-]/g, ' ')
+  .trim()
+  .replace(/\s+/g, '-')
+  .replace(/-+/g, '-');
+
 // Map a trading-card condition / grade to a schema.org OfferItemCondition.
 const schemaItemCondition = (c) => {
   const v = String(c || '').toLowerCase();
@@ -452,6 +463,193 @@ async function renderListing(supabase, id, slugParam) {
   return htmlDoc({ title, description, canonical, ogImage: image, jsonLdItems: [product, breadcrumb], bodyHtml });
 }
 
+async function renderShopProduct(supabase, id, slugParam) {
+  if (!UUID_RE.test(id)) {
+    return htmlDoc({
+      title: 'CardPop Shop',
+      description: 'Shop official CardPop sealed products, singles and accessories.',
+      canonical: `${BASE_URL}/shop`,
+      robots: 'noindex, follow',
+      bodyHtml: '<main><h1>CardPop Shop</h1></main>',
+    });
+  }
+
+  const { data: product } = await supabase
+    .from('shop_products')
+    .select('id, title, description, price_aud, stock_quantity, category, product_type, images, image_url, status, created_at, updated_at')
+    .eq('id', id)
+    .maybeSingle();
+
+  const slug = product?.title ? slugify(product.title) : (slugParam || 'product');
+  const canonical = `${BASE_URL}/product/shop/${id}/${slug}`;
+
+  if (!product || product.status !== 'active') {
+    return htmlDoc({
+      title: 'Product Unavailable | CardPop',
+      description: 'This product is no longer available in the CardPop shop.',
+      canonical,
+      robots: 'noindex, follow',
+      bodyHtml: '<main><h1>Product Unavailable</h1><p>This product is sold out or no longer listed.</p></main>',
+    });
+  }
+
+  const name = product.title || 'Trading Card Product';
+  const image = absUrl(product.images?.[0] || product.image_url);
+  const price = product.price_aud;
+  const inStock = product.stock_quantity == null || product.stock_quantity > 0;
+  const description = product.description
+    || `${name}${product.category ? ` — ${product.category}` : ''} available from the CardPop official store. Fast shipping across Australia.`;
+
+  const productLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name,
+    ...(image ? { image } : {}),
+    description: toText(description, 500),
+    ...(product.category ? { category: product.category } : {}),
+    brand: { '@type': 'Brand', name: 'CardPop' },
+    ...(price > 0
+      ? { offers: {
+          '@type': 'Offer',
+          price: Number(price).toFixed(2),
+          priceCurrency: 'AUD',
+          availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+          itemCondition: 'https://schema.org/NewCondition',
+          url: canonical,
+          seller: { '@type': 'Organization', name: 'CardPop' },
+        } }
+      : {}),
+  };
+
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'Shop', item: `${BASE_URL}/shop` },
+      { '@type': 'ListItem', position: 3, name, item: canonical },
+    ],
+  };
+
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/shop">Shop</a> / ${esc(name)}</nav>
+  <h1>${esc(name)}</h1>
+  ${image ? `<img src="${esc(image)}" alt="${esc(name)}" />` : ''}
+  ${price > 0 ? `<p><strong>A$${esc(Number(price).toFixed(2))}</strong> — ${inStock ? 'In stock' : 'Out of stock'}</p>` : ''}
+  ${product.category ? `<p>${esc(product.category)}</p>` : ''}
+  ${product.description ? `<p>${esc(toText(product.description, 600))}</p>` : ''}
+</main>`;
+
+  return htmlDoc({ title: `${name} | CardPop`, description: toText(description, 300), canonical, ogImage: image, jsonLdItems: [productLd, breadcrumb], bodyHtml });
+}
+
+// Exact-match landing/category pages. `source` selects the data set; the rest is copy.
+const LANDINGS = {
+  '/shop': {
+    title: 'The Shop | CardPop', h1: 'The Card Shop', breadcrumb: 'Shop', source: 'shop',
+    description: 'Shop official CardPop sealed products, singles and accessories. Fast shipping across Australia.',
+    intro: 'Curated premium sealed boxes, rare singles, and exclusive drops sourced and verified by our experts.',
+  },
+  '/shop/sealed-boxes': {
+    title: 'Sealed Boxes | CardPop Shop', h1: 'Sealed Boxes', breadcrumb: 'Sealed Boxes', source: 'shop', productType: 'sealed',
+    description: 'Shop official sealed booster boxes and products. Fast shipping across Australia.',
+    intro: 'Factory-sealed booster boxes and cases, sourced and verified by CardPop.',
+  },
+  '/shop/singles': {
+    title: 'Singles | CardPop Shop', h1: 'Premium Singles', breadcrumb: 'Singles', source: 'shop', productType: 'single',
+    description: 'Shop individual trading card singles from the CardPop official store. Find the exact card you need.',
+    intro: 'Hand-picked individual cards from the CardPop official store.',
+  },
+  '/marketplace': {
+    title: 'Buy & Sell Trading Cards Online Australia | CardPop Marketplace', h1: 'The Marketplace', breadcrumb: 'Marketplace', source: 'listings',
+    description: 'Browse thousands of Pokémon, Magic: The Gathering, Yu-Gi-Oh and sports cards listed by Australian sellers. Filter by game, grade, price and more. Free to list — buy and sell trading cards online in Australia.',
+    intro: "Discover cards directly from other collectors' vaults alongside official CardPop listings.",
+  },
+  '/browse': {
+    title: 'Browse Listings | CardPop', h1: 'Browse Cards', breadcrumb: 'Browse', source: 'listings',
+    description: 'Browse all trading card listings on CardPop — Pokemon, Magic, Yu-Gi-Oh, sports cards and more.',
+    intro: 'Every active trading card listing on CardPop, from Pokémon to sports cards.',
+  },
+};
+
+async function renderLanding(supabase, path) {
+  const cfg = LANDINGS[path];
+  const canonical = `${BASE_URL}${path}`;
+
+  let items = [];
+  if (cfg.source === 'shop') {
+    let q = supabase.from('shop_products').select('id, title, price_aud, images, image_url').eq('status', 'active');
+    if (cfg.productType) q = q.eq('product_type', cfg.productType);
+    const { data } = await q.order('created_at', { ascending: false }).limit(50);
+    items = (data || []).map(p => ({
+      name: p.title || 'Product',
+      url: `${BASE_URL}/product/shop/${p.id}/${slugify(p.title || 'product')}`,
+      price: p.price_aud,
+      image: absUrl(p.images?.[0] || p.image_url),
+    }));
+  } else {
+    const { data } = await supabase
+      .from('listings')
+      .select('id, slug, title, price_aud, vault_item:vault_items(card_name, card_image, vault_images(storage_path))')
+      .eq('status', 'active')
+      .neq('listing_type', 'vault')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    items = (data || []).map(l => {
+      const imgPath = l.vault_item?.vault_images?.[0]?.storage_path || l.vault_item?.card_image;
+      const image = imgPath
+        ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
+        : undefined;
+      return {
+        name: l.title || l.vault_item?.card_name || 'Trading Card',
+        url: `${BASE_URL}/marketplace/${l.id}/${l.slug || 'listing'}`,
+        price: l.price_aud,
+        image,
+      };
+    });
+  }
+
+  const collectionPage = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: cfg.title,
+    description: cfg.description,
+    url: canonical,
+  };
+
+  const itemList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: cfg.h1,
+    numberOfItems: items.length,
+    itemListElement: items.map((it, i) => ({ '@type': 'ListItem', position: i + 1, name: it.name, url: it.url })),
+  };
+
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: cfg.breadcrumb, item: canonical },
+    ],
+  };
+
+  const itemsHtml = items.map(it =>
+    `    <li><a href="${esc(it.url)}">${esc(it.name)}</a>${it.price > 0 ? ` — A$${esc(Number(it.price).toFixed(2))}` : ''}</li>`
+  ).join('\n');
+
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / ${esc(cfg.breadcrumb)}</nav>
+  <h1>${esc(cfg.h1)}</h1>
+  <p>${esc(cfg.intro)}</p>
+  <ul>
+${itemsHtml || '    <li>No items available right now.</li>'}
+  </ul>
+</main>`;
+
+  return htmlDoc({ title: cfg.title, description: cfg.description, canonical, jsonLdItems: [collectionPage, itemList, breadcrumb], bodyHtml });
+}
+
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
@@ -463,6 +661,17 @@ export default async function handler(req, res) {
 
     if (rawPath === '/community/local-traders') {
       return res.status(200).send(await renderLocalTraders(supabase));
+    }
+
+    if (LANDINGS[rawPath]) {
+      return res.status(200).send(await renderLanding(supabase, rawPath));
+    }
+
+    const shopProductMatch = rawPath.match(/^\/product\/shop\/([^/?#]+)(?:\/([^/?#]+))?/);
+    if (shopProductMatch) {
+      const id = decodeURIComponent(shopProductMatch[1]);
+      const slug = shopProductMatch[2] ? decodeURIComponent(shopProductMatch[2]) : undefined;
+      return res.status(200).send(await renderShopProduct(supabase, id, slug));
     }
 
     const dealerMatch = rawPath.match(/^\/dealer\/([^/?#]+)/);
