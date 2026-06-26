@@ -5,7 +5,8 @@ import { generateStructuredData, generateBreadcrumbStructuredData } from '@/util
 import { supabase } from '@/lib/supabaseClient.js';
 import { formatCurrency } from '@/utils/formatCurrency.js';
 import { Button } from '@/components/ui/button';
-import { ShieldCheck, MessageCircle, User, TrendingUp, Loader2 } from 'lucide-react';
+import { ShieldCheck, MessageCircle, User, TrendingUp, Loader2, Flag } from 'lucide-react';
+import ReportModal from '@/components/ReportModal.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import GradingVerificationSection from '@/components/GradingVerificationSection.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
@@ -213,6 +214,17 @@ const MarketplaceListingPage = () => {
             <Button size="lg" variant="secondary" className="w-full text-lg h-14 radius-btn">
               <MessageCircle className="w-5 h-5 mr-2" /> Make an Offer
             </Button>
+            <div className="flex justify-center pt-1">
+              <ReportModal
+                targetType="listing"
+                targetId={listing.id}
+                trigger={
+                  <button type="button" className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-destructive transition-colors">
+                    <Flag className="w-3.5 h-3.5" /> Report this listing
+                  </button>
+                }
+              />
+            </div>
           </div>
         </div>
       </div>

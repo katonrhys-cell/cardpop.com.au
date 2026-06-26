@@ -128,7 +128,21 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 - [ ] Card authentication / grading verification — is PSA/Beckett check enforced on high-value listings?
 - [ ] Seller vetting / tiers / verification badges — define and enforce
 - [ ] Dispute resolution + escrow: is buyer money actually held until delivery confirmed?
-- [ ] Counterfeit / scam detection signals; reporting flow
+- [~] Counterfeit / scam **reporting flow** — was entirely missing (the
+      `ModerationPanel` was just admin notes on catalog cards). Added an
+      end-to-end vertical slice:
+      - `content_reports` table (`supabase/migrations/20260626000001_*.sql`) —
+        RLS denies client reads (reports are accusations); writes go only via the
+        backend; unique partial index enforces one open report per reporter/target.
+        ⚠️ **Migration must be applied** (Supabase CLI/dashboard) before the
+        endpoint works in prod.
+      - `POST /reports` (auth + per-user rate limit `reportLimiter` 10/hr +
+        app-layer de-dupe) and admin `GET/PATCH /reports` to triage the queue
+        (`src/routes/reports.js`, 16 backend tests).
+      - `ReportModal.jsx` + a "Report this listing" control on the marketplace
+        listing page (4 frontend tests). Reusable for users/reviews/events.
+      - **Next:** an admin moderation-queue UI over `GET/PATCH /reports`; wire
+        report buttons onto cards, seller profiles, reviews.
 - [ ] Chargeback & fraud handling; velocity limits on new accounts
 - [ ] Clear, enforced policies (returns, authenticity guarantee, prohibited items)
 
