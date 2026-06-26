@@ -26,12 +26,23 @@ const STATIC_PAGES = [
   { loc: '/shop',                  lastmod: TODAY,       freq: 'daily',   pri: '0.9' },
   { loc: '/shop/sealed-boxes',     lastmod: TODAY,       freq: 'daily',   pri: '0.8' },
   { loc: '/shop/singles',          lastmod: TODAY,       freq: 'daily',   pri: '0.8' },
-  { loc: '/markets',               lastmod: TODAY,       freq: 'daily',   pri: '0.8' },
+  { loc: '/analytics',             lastmod: TODAY,       freq: 'daily',   pri: '0.8' },
   { loc: '/australian-markets',    lastmod: TODAY,       freq: 'daily',   pri: '0.8' },
   { loc: '/insider-trading',       lastmod: TODAY,       freq: 'weekly',  pri: '0.7' },
   { loc: '/grading',               lastmod: TODAY,       freq: 'weekly',  pri: '0.8' },
+  { loc: '/grading/what-is-grading', lastmod: TODAY,    freq: 'monthly',  pri: '0.7' },
+  { loc: '/grading/scales',        lastmod: TODAY,       freq: 'monthly',  pri: '0.7' },
+  { loc: '/grading/companies',     lastmod: TODAY,       freq: 'monthly',  pri: '0.7' },
+  { loc: '/grading/local-graders', lastmod: TODAY,       freq: 'monthly',  pri: '0.7' },
+  { loc: '/grading/submission-partners', lastmod: TODAY, freq: 'monthly',  pri: '0.7' },
+  { loc: '/grading/estimator',     lastmod: TODAY,       freq: 'weekly',   pri: '0.8' },
+  { loc: '/grading/roi-calculator', lastmod: TODAY,      freq: 'weekly',   pri: '0.8' },
   { loc: '/community',             lastmod: TODAY,       freq: 'daily',   pri: '0.7' },
-  { loc: '/community/events',      lastmod: TODAY,       freq: 'daily',   pri: '0.8' },
+  { loc: '/events',                lastmod: TODAY,       freq: 'daily',   pri: '0.8' },
+  { loc: '/events/card-shows',     lastmod: TODAY,       freq: 'daily',   pri: '0.8' },
+  { loc: '/events/trade-events',   lastmod: TODAY,       freq: 'daily',   pri: '0.8' },
+  { loc: '/events/community-events', lastmod: TODAY,     freq: 'daily',   pri: '0.8' },
+  { loc: '/events/store-events',   lastmod: TODAY,       freq: 'daily',   pri: '0.8' },
   { loc: '/community/local-traders', lastmod: TODAY,     freq: 'daily',   pri: '0.7' },
   { loc: '/blog',                  lastmod: TODAY,       freq: 'weekly',  pri: '0.8' },
   { loc: '/about',                 lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
@@ -45,34 +56,6 @@ const STATIC_PAGES = [
   { loc: '/accessibility',         lastmod: '2026-05-31', freq: 'yearly',  pri: '0.3' },
 ];
 
-const EVENT_SLUGS = [
-  'supanova-comic-con-sydney-2026',
-  'big-boyz-card-show-seven-hills-june-2026',
-  'tcxpo-trading-card-expo-oran-park-june-2026',
-  'perth-card-fest-claremont-july-2026',
-  'hobby-con-au-glebe-july-2026',
-  'big-boyz-card-show-seven-hills-july-2026',
-  'collector-con-penrith-july-2026',
-  'tcxpo-trading-card-expo-oran-park-august-2026',
-  'cardverse-adelaide-trading-card-show-august-2026',
-  'trading-card-show-australia-adelaide-2026',
-  'card-fest-melbourne-reservoir-august-2026',
-  'oz-national-trading-card-show-melbourne-2026',
-  'brisbane-trading-card-show-october-2026',
-  'sa-card-show-adelaide-october-2026',
-  'treasurecon-perth-december-2026',
-  'tcxpo-trading-card-expo-oran-park-december-2026',
-  'melbourne-comic-toy-fair-scoresby-july-2026',
-  'gundam-card-game-melbourne-regional-championship-2026',
-  'cardcon-melbourne-2026',
-  'collector-con-newcastle-august-2026',
-  'cardcon-mega-sydney-olympic-park-2026',
-  'the-tcg-expo-malvern-october-2026',
-  'big-boyz-card-show-wollongong-november-2026',
-  'hobby-hangout-xl-brisbane-2026',
-  'hobby-hangout-xl-sydney-2026',
-  'hobby-hangout-xl-melbourne-2027',
-];
 
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/xml; charset=utf-8');
@@ -83,7 +66,7 @@ export default async function handler(req, res) {
       auth: { persistSession: false },
     });
 
-    const [articlesRes, listingsRes, dealersRes, productsRes] = await Promise.all([
+    const [articlesRes, listingsRes, dealersRes, productsRes, eventsRes] = await Promise.all([
       supabase
         .from('blog_articles')
         .select('slug, updated_at, published_at, created_at')
@@ -109,12 +92,20 @@ export default async function handler(req, res) {
         .eq('status', 'active')
         .order('created_at', { ascending: false })
         .limit(500),
+      supabase
+        .from('events')
+        .select('id, slug, updated_at, created_at')
+        .eq('is_published', true)
+        .gt('start_date', TODAY)
+        .order('start_date', { ascending: true })
+        .limit(500),
     ]);
 
     const articles = articlesRes.data ?? [];
     const listings = listingsRes.data ?? [];
     const dealers = dealersRes.data ?? [];
     const products = productsRes.data ?? [];
+    const events = eventsRes.data ?? [];
 
     const parts = [
       '<?xml version="1.0" encoding="UTF-8"?>',
@@ -127,9 +118,12 @@ export default async function handler(req, res) {
       parts.push(xmlUrl(`${BASE_URL}${p.loc}`, p.lastmod, p.freq, p.pri));
     }
 
-    parts.push('', '  <!-- Event pages -->');
-    for (const slug of EVENT_SLUGS) {
-      parts.push(xmlUrl(`${BASE_URL}/community/events/${slug}`, '2026-06-11', 'weekly', '0.6'));
+    if (events.length > 0) {
+      parts.push('', `  <!-- Event pages (${events.length}) -->`);
+      for (const event of events) {
+        const lastmod = (event.updated_at || event.created_at || TODAY).split('T')[0];
+        parts.push(xmlUrl(`${BASE_URL}/events/${event.id}`, lastmod, 'weekly', '0.6'));
+      }
     }
 
     if (dealers.length > 0) {
@@ -174,7 +168,6 @@ export default async function handler(req, res) {
       '<?xml version="1.0" encoding="UTF-8"?>',
       '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
       ...STATIC_PAGES.map(p => xmlUrl(`${BASE_URL}${p.loc}`, p.lastmod, p.freq, p.pri)),
-      ...EVENT_SLUGS.map(slug => xmlUrl(`${BASE_URL}/community/events/${slug}`, '2026-06-11', 'weekly', '0.6')),
       '</urlset>',
     ];
     return res.status(200).send(fallbackParts.join('\n'));
