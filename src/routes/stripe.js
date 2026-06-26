@@ -1,15 +1,15 @@
 import 'dotenv/config';
 import express from 'express';
-import Stripe from 'stripe';
+import stripe from '../utils/stripeClient.js';
 import logger from '../utils/logger.js';
 import { supabase } from '../utils/supabaseClient.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import { sendOrderConfirmed, sendItemSold, sendRefundProcessed, sendRefundIssued } from '../utils/emailService.js';
 import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
 import { handleDisputeCreated, handleDisputeClosed } from '../services/disputeService.js';
+import { payoutSeller } from '../services/payoutService.js';
 
 const router = express.Router();
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
 // ─── Commission Helpers ──────────────────────────────────────────────────────
@@ -777,67 +777,14 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           });
         }
 
-        // ── Stripe Connect: transfer seller proceeds if they have a connected account ──
+        // ── Pay the seller their proceeds (Connect transfer, or wallet credit) ──
         if (sellerId && sellerProceeds > 0) {
-          const { data: sellerProfile } = await supabase
-            .from('profiles')
-            .select('stripe_connect_account_id, stripe_connect_onboarded, wallet_balance_aud')
-            .eq('id', sellerId)
-            .maybeSingle();
-
-          if (sellerProfile?.stripe_connect_account_id && sellerProfile?.stripe_connect_onboarded) {
-            try {
-              const transfer = await stripe.transfers.create({
-                amount: Math.round(sellerProceeds * 100), // cents
-                currency: 'aud',
-                destination: sellerProfile.stripe_connect_account_id,
-                metadata: {
-                  order_id: newOrder?.id || '',
-                  listing_id: listingId || '',
-                  seller_id: sellerId,
-                },
-              });
-              logger.info(`[STRIPE CONNECT] Transfer created: ${transfer.id} → $${sellerProceeds} AUD to ${sellerProfile.stripe_connect_account_id}`);
-
-              // Record transfer ID on the order
-              if (newOrder?.id) {
-                await supabase
-                  .from('orders')
-                  .update({ stripe_transfer_id: transfer.id, payout_status: 'transferred' })
-                  .eq('id', newOrder.id);
-              }
-            } catch (transferErr) {
-              // Don't fail the whole webhook — log and credit wallet as fallback
-              logger.error(`[STRIPE CONNECT] Transfer failed: ${transferErr.message} — crediting wallet instead`);
-              await supabase
-                .from('profiles')
-                .update({ wallet_balance_aud: (sellerProfile.wallet_balance_aud || 0) + sellerProceeds })
-                .eq('id', sellerId);
-
-              if (newOrder?.id) {
-                await supabase
-                  .from('orders')
-                  .update({ payout_status: 'wallet_credited' })
-                  .eq('id', newOrder.id);
-              }
-            }
-          } else {
-            // Seller not connected — credit their CardPop wallet balance
-            const currentBalance = sellerProfile?.wallet_balance_aud || 0;
-            await supabase
-              .from('profiles')
-              .update({ wallet_balance_aud: currentBalance + sellerProceeds })
-              .eq('id', sellerId);
-
-            if (newOrder?.id) {
-              await supabase
-                .from('orders')
-                .update({ payout_status: 'wallet_credited' })
-                .eq('id', newOrder.id);
-            }
-
-            logger.info(`[STRIPE CONNECT] Seller ${sellerId} not connected — credited wallet $${sellerProceeds} AUD`);
-          }
+          await payoutSeller(stripe, {
+            sellerId,
+            sellerProceeds,
+            orderId: newOrder?.id || null,
+            listingId,
+          });
         }
 
         logger.info(`[STRIPE] Order recorded for session ${session.id} — commission: $${commissionAud} (${commissionPct}%)`);

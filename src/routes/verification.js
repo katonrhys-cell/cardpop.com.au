@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { resendVerificationLimiter } from '../middleware/endpoint-rate-limit.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -49,7 +50,9 @@ router.post('/send-verification-email', authMiddleware, async (req, res) => {
 });
 
 // POST /resend-verification
-router.post('/resend-verification', async (req, res) => {
+// Unauthenticated + sends an email → rate-limited per target email to prevent
+// inbox bombing and email-quota abuse.
+router.post('/resend-verification', resendVerificationLimiter, async (req, res) => {
   const { email } = req.body;
   if (!email?.trim()) return res.status(400).json({ error: 'Email is required' });
 

@@ -126,4 +126,27 @@ const reportLimiter = rateLimit({
 	},
 });
 
-export { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, mfaLimiter, backupCodeLimiter, reportLimiter };
+// Verification-email resend limiter: 3 per 15 minutes, keyed by the TARGET
+// email (normalised) so an attacker can't email-bomb one victim by rotating
+// IPs, nor burn the project's email-sending quota. This endpoint is
+// unauthenticated and triggers an outbound email, so it needs a tighter,
+// email-scoped cap than the global IP limiter.
+const resendVerificationLimiter = rateLimit({
+	windowMs: 15 * 60 * 1000,
+	max: 3,
+	standardHeaders: true,
+	legacyHeaders: false,
+	keyGenerator: (req) =>
+		(typeof req.body?.email === 'string' && req.body.email.trim())
+			? `resend:${req.body.email.trim().toLowerCase()}`
+			: ipKeyGenerator(req),
+	handler: (req, res) => {
+		logger.warn('[RATE_LIMIT] Verification resend limit exceeded');
+		res.status(429).json({
+			error: 'Too many verification emails requested. Please wait a while before trying again.',
+			retryAfter: req.rateLimit.resetTime,
+		});
+	},
+});
+
+export { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, mfaLimiter, backupCodeLimiter, reportLimiter, resendVerificationLimiter };

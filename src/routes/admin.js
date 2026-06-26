@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
+import stripe from '../utils/stripeClient.js';
+import { payoutSeller } from '../services/payoutService.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
 
@@ -158,6 +160,91 @@ router.patch('/refunds/:id', async (req, res) => {
   } catch (err) {
     logger.error(`[ADMIN] Failed to process refund: ${err.message}`);
     res.status(500).json({ error: 'Failed to process refund' });
+  }
+});
+
+// ─── Chargeback disputes: list + resolve ──────────────────────────────────────
+const DISPUTE_TERMINAL = ['resolved_released', 'resolved_kept'];
+
+router.get('/disputes', async (req, res) => {
+  const { status } = req.query;
+  try {
+    let query = supabase
+      .from('payment_disputes')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (status === 'open') {
+      // "open" = anything we haven't resolved yet.
+      query = query.not('status', 'in', `(${DISPUTE_TERMINAL.join(',')})`);
+    } else if (status && status !== 'all') {
+      query = query.eq('status', status);
+    }
+    const { data, error } = await query;
+    if (error) throw error;
+    res.json({ disputes: data || [] });
+  } catch (err) {
+    logger.error(`[ADMIN] Failed to list disputes: ${err.message}`);
+    res.status(500).json({ error: 'Failed to load disputes' });
+  }
+});
+
+// Resolve a dispute. action:
+//   'release'     — chargeback won by us / resolved in seller's favour: pay the
+//                   seller their (previously frozen) proceeds.
+//   'keep_frozen' — chargeback lost / kept on hold: leave the payout frozen.
+router.patch('/disputes/:id', async (req, res) => {
+  const { id } = req.params;
+  const { action, resolution_notes } = req.body || {};
+
+  if (action !== 'release' && action !== 'keep_frozen') {
+    return res.status(400).json({ error: 'action must be "release" or "keep_frozen"' });
+  }
+
+  try {
+    const { data: dispute, error: fetchErr } = await supabase
+      .from('payment_disputes').select('*').eq('id', id).maybeSingle();
+    if (fetchErr) throw fetchErr;
+    if (!dispute) return res.status(404).json({ error: 'Dispute not found' });
+
+    let payout = null;
+    if (action === 'release') {
+      // Look up the order to recover the exact proceeds owed to the seller.
+      const { data: order } = await supabase
+        .from('orders')
+        .select('id, seller_id, listing_id, seller_proceeds_aud')
+        .eq('id', dispute.order_id)
+        .maybeSingle();
+      if (!order) return res.status(404).json({ error: 'Order for this dispute no longer exists' });
+
+      payout = await payoutSeller(stripe, {
+        sellerId: order.seller_id,
+        sellerProceeds: order.seller_proceeds_aud,
+        orderId: order.id,
+        listingId: order.listing_id,
+      });
+    }
+
+    const newStatus = action === 'release' ? 'resolved_released' : 'resolved_kept';
+    const { data: updated, error: updErr } = await supabase
+      .from('payment_disputes')
+      .update({
+        status: newStatus,
+        resolution_notes: resolution_notes?.trim() || null,
+        resolved_by: req.user.id,
+        resolved_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    if (updErr) throw updErr;
+
+    logger.info(`[ADMIN] ${req.user.id} resolved dispute ${id} → ${newStatus}${payout ? ` (payout: ${payout.status})` : ''}`);
+    res.json({ success: true, dispute: updated, payout });
+  } catch (err) {
+    logger.error(`[ADMIN] Failed to resolve dispute: ${err.message}`);
+    res.status(500).json({ error: 'Failed to resolve dispute' });
   }
 });
 

@@ -28,7 +28,10 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 - [ ] Audit remaining sensitive tables (orders, listings, offers, taxonomy) for admin/ownership RLS
 - [ ] Verify the service-role key is never reachable client-side; rotate if ever exposed
 - [ ] Enable Supabase leaked-password protection + MFA enforcement options
-- [ ] Confirm `POST /resend-verification` (unauthenticated) is rate-limited
+- [x] `POST /resend-verification` (unauthenticated, sends an email) is now rate-
+      limited per **target email** (3 / 15 min) — closes an inbox-bombing /
+      email-quota-abuse vector the global IP limiter (100/5min) didn't cover.
+      `resendVerificationLimiter` in `endpoint-rate-limit.js`; 2 tests.
 - [ ] Security headers / CSP review in production (helmet config vs. real responses)
 
 ### 3. End-to-end testing
@@ -197,11 +200,15 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
         (migration `20260626000002`), and notify admins + the seller. All
         best-effort/never-throws so the webhook always ack's. ⚠️ migration must be
         applied. 5 tests.
+      - **Disputes admin queue DONE:** `GET/PATCH /admin/disputes` +
+        `pages/admin/DisputesAdminPage.jsx` (`/admin/disputes`, linked from the
+        dashboard). Admins see open disputes + $ at risk and either **release**
+        the frozen payout (pays the seller via the shared `payoutSeller` helper —
+        extracted from the webhook so both paths share one implementation) or
+        **keep it frozen**. 10 tests (payout helper, admin endpoints, UI).
       - **Next:** listing-creation velocity is still open — listings are created
         client-side (`supabase.from('listings').insert`), so a new account can
         spam scam listings. Needs a backend listing endpoint or RLS rate rules.
-        Also: admin UI over `payment_disputes` + a flow to release a payout that
-        was frozen then won.
 - [ ] Clear, enforced policies (returns, authenticity guarantee, prohibited items)
 
 ---
