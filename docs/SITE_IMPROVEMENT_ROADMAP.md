@@ -181,7 +181,20 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
         backend notifies all admins (`report_escalation` notification). No
         auto-takedown (that would be a brigading vector) — moderators decide.
       - **Next:** wire report buttons onto cards/seller profiles/reviews.
-- [ ] Chargeback & fraud handling; velocity limits on new accounts
+- [~] Chargeback & fraud handling; velocity limits on new accounts.
+      - **Done:** new-account **purchase velocity** guard (`src/utils/purchaseVelocity.js`)
+        wired into both server-side checkout endpoints (`/create-checkout`,
+        `/create-cart-checkout`). Unverified accounts < 7 days old are capped at
+        $1,500/order, 5 orders/24h and $3,000 spend/24h (failed/refunded orders
+        don't count); verified or older accounts are unrestricted; the check
+        **fails open** so an outage never blocks all payments. 429 +
+        `velocity_limit` code with a "verify your identity to lift this" message.
+        8 backend tests.
+      - **Next:** listing-creation velocity is still open — listings are created
+        client-side (`supabase.from('listings').insert`), so a new account can
+        spam scam listings. Needs a backend listing endpoint or RLS rate rules.
+        Also: chargeback webhook handling (`charge.dispute.created`) + auto-freeze
+        of seller payout on dispute.
 - [ ] Clear, enforced policies (returns, authenticity guarantee, prohibited items)
 
 ---
