@@ -42,14 +42,13 @@ const MarketplaceListingPage = () => {
 
   // Fetch eBay pricing once listing title is known (replaces CardSight autocomplete → pricing)
   useEffect(() => {
-    const cardName = listing?.vault_item?.card_name;
-    if (!cardName) return;
+    if (!listing?.title) return;
     let cancelled = false;
     const fetchCsPrice = async () => {
       setCsPriceLoading(true);
       try {
         const prRes = await apiServerClient.fetch(
-          `/ebay/price-estimate?name=${encodeURIComponent(cardName)}`
+          `/ebay/price-estimate?name=${encodeURIComponent(listing.title)}`
         );
         if (!prRes.ok || cancelled) return;
         const prData = await prRes.json();
@@ -62,7 +61,7 @@ const MarketplaceListingPage = () => {
     };
     fetchCsPrice();
     return () => { cancelled = true; };
-  }, [listing?.vault_item?.card_name]);
+  }, [listing?.title]);
 
   if (loading) return <div className="container-default section-padding"><Skeleton className="h-[600px] rounded-2xl" /></div>;
   if (error) return (
@@ -76,55 +75,38 @@ const MarketplaceListingPage = () => {
   // Rich-result structured data so search engines can surface price /
   // availability / condition for this listing (Product + Offer + breadcrumb).
   const canonicalUrl = typeof window !== 'undefined' ? window.location.href.split('?')[0] : undefined;
-  const cardName = listing.vault_item?.card_name || 'Trading Card';
-
-  // Convert storage paths to public URLs
-  const images = (listing.vault_item?.vault_images?.map(vi => {
-    const path = vi.storage_path;
-    return path?.startsWith('http')
-      ? path
-      : supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
-  }) || []);
-  if (listing.vault_item?.card_image && images.length === 0) {
-    const path = listing.vault_item.card_image;
-    images.push(
-      path?.startsWith('http')
-        ? path
-        : supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl
-    );
-  }
   const structuredData = [
     generateStructuredData({
-      title: cardName,
+      title: listing.title,
       description: listing.description,
       id: listing.id,
-      price: listing.price_aud || listing.price,
+      price: listing.price,
       currency: 'AUD',
-      condition: listing.vault_item?.condition,
-      images: images.map((url) => ({ url })),
+      condition: listing.condition,
+      images: (listing.images || []).map((url) => ({ url })),
     }),
     generateBreadcrumbStructuredData([
       { name: 'Home', url: 'https://cardpop.com.au/' },
       { name: 'Marketplace', url: 'https://cardpop.com.au/marketplace' },
-      { name: cardName, url: canonicalUrl },
+      { name: listing.title, url: canonicalUrl },
     ]),
   ];
 
   return (
     <div className="container-default section-padding min-h-[80vh]">
       <SEOHead
-        title={`${cardName} | CardPop Marketplace`}
-        description={listing?.description || cardName || 'View this marketplace listing on CardPop'}
+        title={`${listing.title} | CardPop Marketplace`}
+        description={listing?.description || listing?.title || 'View this marketplace listing on CardPop'}
         canonicalUrl={canonicalUrl}
-        ogImage={images?.[0]}
+        ogImage={listing.images?.[0]}
         structuredData={structuredData}
       />
 
       <div className="flex flex-col lg:flex-row gap-12">
         <div className="w-full lg:w-3/5">
           <div className="bg-secondary/20 rounded-3xl p-4 border border-border aspect-square flex items-center justify-center overflow-hidden">
-             {images?.length > 0 ? (
-               <img src={images[0]} alt={cardName} className="w-full h-full object-contain mix-blend-multiply" />
+             {listing.images?.length > 0 ? (
+               <img src={listing.images[0]} alt={listing.title} className="w-full h-full object-contain mix-blend-multiply" />
              ) : (
                <div className="text-muted-foreground">No image available</div>
              )}
@@ -134,10 +116,10 @@ const MarketplaceListingPage = () => {
         <div className="w-full lg:w-2/5 flex flex-col">
           <div className="mb-4">
             <span className="inline-block px-3 py-1 bg-secondary text-secondary-foreground text-sm font-medium rounded-full mb-4">
-              {listing.vault_item?.category || 'Card'}
+              {listing.category}
             </span>
-            <h1 className="text-3xl md:text-4xl font-bold mb-4">{cardName}</h1>
-            <p className="text-4xl font-bold text-primary mb-6">{formatCurrency(listing.price_aud || listing.price)}</p>
+            <h1 className="text-3xl md:text-4xl font-bold mb-4">{listing.title}</h1>
+            <p className="text-4xl font-bold text-primary mb-6">{formatCurrency(listing.price)}</p>
           </div>
 
           <div className="bg-card border border-border rounded-2xl p-6 mb-8">
@@ -154,11 +136,11 @@ const MarketplaceListingPage = () => {
           <div className="space-y-4 mb-8">
              <div className="flex justify-between py-3 border-b border-border">
                <span className="text-muted-foreground">Condition</span>
-               <span className="font-medium">{listing.vault_item?.condition || 'Not specified'}</span>
+               <span className="font-medium">{listing.condition || 'Not specified'}</span>
              </div>
              <div className="flex justify-between py-3 border-b border-border">
                <span className="text-muted-foreground">Grade</span>
-               <span className="font-medium">{listing.vault_item?.grade || 'Raw / Ungraded'}</span>
+               <span className="font-medium">{listing.grade || 'Raw / Ungraded'}</span>
              </div>
              <div className="flex justify-between py-3 border-b border-border">
                <span className="text-muted-foreground">Protection</span>
@@ -191,7 +173,7 @@ const MarketplaceListingPage = () => {
                 const max = csPrice.maxPrice ?? csPrice.max_price ?? csPrice.maximum_price;
                 const count = csPrice.count ?? csPrice.total_count ?? csPrice.total;
                 if (!avg) return <p className="text-xs text-muted-foreground">No pricing data available.</p>;
-                const listingPrice = listing.price_aud ?? listing.price ?? 0;
+                const listingPrice = listing.price ?? 0;
                 const diff = avg > 0 ? (((listingPrice - avg) / avg) * 100).toFixed(0) : null;
                 return (
                   <div className="space-y-2">
