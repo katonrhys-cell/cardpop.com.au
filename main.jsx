@@ -1,4 +1,5 @@
 
+import * as Sentry from '@sentry/react';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { Analytics } from '@vercel/analytics/react';

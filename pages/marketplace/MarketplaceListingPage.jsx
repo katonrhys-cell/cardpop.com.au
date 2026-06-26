@@ -9,7 +9,6 @@ import { ShieldCheck, MessageCircle, User, TrendingUp, Loader2 } from 'lucide-re
 import { Skeleton } from '@/components/ui/skeleton';
 import GradingVerificationSection from '@/components/GradingVerificationSection.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
-import { generateProductSchema, generateBreadcrumbStructuredData } from '@/utils/seoUtils.js';
 
 const MarketplaceListingPage = () => {
   const { id } = useParams();
