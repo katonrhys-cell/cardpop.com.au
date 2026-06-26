@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
+import HeroCardImage from '@/components/HeroCardImage.jsx';
 import { Link } from 'react-router-dom';
 import { motion, useInView, AnimatePresence } from 'framer-motion';
 import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -81,7 +82,7 @@ const ACTIVITY_FEED = [
 // ─── Hero floating card shapes ────────────────────────────────────────────────
 const HERO_CARDS = [
   {
-    image: '/images/hero/black-lotus-1024.jpg',
+    image: '/images/hero/black-lotus',
     gradient: 'from-stone-800 via-stone-900 to-black',
     borderColor: 'border-yellow-600/60',
     rotate: -16, x: -200, y: 30, delay: 0, floatY: -12,
@@ -92,7 +93,7 @@ const HERO_CARDS = [
     value: '$500,000+',
   },
   {
-    image: '/images/hero/michael-jordan-1024.jpg',
+    image: '/images/hero/michael-jordan',
     gradient: 'from-red-800 via-red-900 to-black',
     borderColor: 'border-red-400/50',
     rotate: -8, x: -100, y: -15, delay: 0.12, floatY: -16,
@@ -103,7 +104,7 @@ const HERO_CARDS = [
     value: '$738,000',
   },
   {
-    image: '/images/hero/ohtani-rookie-1024.jpg',
+    image: '/images/hero/ohtani-rookie',
     gradient: 'from-blue-800 via-blue-900 to-red-900',
     borderColor: 'border-blue-300/50',
     rotate: 0, x: 0, y: 10, delay: 0.24, floatY: -10,
@@ -114,7 +115,7 @@ const HERO_CARDS = [
     value: '$200,000+',
   },
   {
-    image: '/images/hero/lebron-james-1024.jpg',
+    image: '/images/hero/lebron-james',
     gradient: 'from-purple-800 via-purple-900 to-black',
     borderColor: 'border-purple-400/50',
     rotate: 8, x: 100, y: 5, delay: 0.36, floatY: -14,
@@ -125,7 +126,7 @@ const HERO_CARDS = [
     value: '$5,200,000',
   },
   {
-    image: '/images/hero/pikachu-illustrator-1024.jpg',
+    image: '/images/hero/pikachu-illustrator',
     gradient: 'from-yellow-400 via-yellow-500 to-amber-500',
     borderColor: 'border-yellow-200/70',
     rotate: 16, x: 200, y: 35, delay: 0.48, floatY: -14,
@@ -282,6 +283,73 @@ const HomePage = () => {
         <div className="absolute top-1/3 right-[28%] w-[36rem] h-[36rem] bg-primary/8 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-[10%] w-[28rem] h-[28rem] bg-blue-600/8 rounded-full blur-3xl pointer-events-none" />
 
+        {/* ── Floating card stack — desktop only ── */}
+        <div className="absolute right-[1%] xl:right-[4%] top-1/2 -translate-y-1/2 hidden lg:block w-[540px] h-[460px] pointer-events-none select-none">
+          {HERO_CARDS.map((card, i) => (
+            <motion.div
+              key={i}
+              className={`absolute w-44 h-60 rounded-2xl bg-gradient-to-br ${card.gradient} border ${card.borderColor} overflow-hidden`}
+              style={{
+                left: '50%', top: '50%',
+                marginLeft: -88, marginTop: -120,
+                boxShadow: `0 32px 64px -12px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.06), 0 0 48px -8px rgba(200,160,60,0.${15 + i * 3})`,
+              }}
+              initial={{ opacity: 0, scale: 0.8, rotate: card.rotate, x: card.x, y: card.y + 60, rotateY: -25 }}
+              animate={{
+                opacity: 1,
+                scale: 1,
+                rotate: card.rotate,
+                rotateY: 0,
+                x: card.x,
+                y: [card.y, card.y + card.floatY, card.y],
+              }}
+              transition={{
+                opacity:  { duration: 0.6, delay: card.delay },
+                scale:    { duration: 0.6, delay: card.delay },
+                rotateY:  { duration: 0.8, delay: card.delay, ease: 'easeOut' },
+                y: {
+                  duration: 3.5 + i * 0.4,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                  delay: card.delay + 0.6,
+                },
+              }}
+            >
+              {/* Card image — responsive AVIF/WebP/JPG, lazy + low priority */}
+              {card.image && (
+                <HeroCardImage
+                  stem={card.image}
+                  alt={`${card.name} ${card.rarity}`}
+                />
+              )}
+
+              {/* Holographic shimmer overlay */}
+              <div
+                className="absolute inset-0 z-20 pointer-events-none mix-blend-screen"
+                style={{
+                  background: 'linear-gradient(125deg, transparent 15%, rgba(255,80,180,0.45) 30%, rgba(80,220,255,0.45) 50%, rgba(255,240,80,0.35) 70%, transparent 85%)',
+                  backgroundSize: '300% 300%',
+                  animation: `holo ${3.2 + i * 0.5}s ease-in-out infinite`,
+                }}
+              />
+
+              {/* Edge gloss */}
+              <div className="absolute inset-0 bg-gradient-to-br from-white/25 via-transparent to-black/40 pointer-events-none z-30" />
+
+              {/* Price badge — bottom of card */}
+              <div className="absolute bottom-0 left-0 right-0 z-40 px-2 pb-2 pt-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+                <div className="text-[7px] font-bold text-white/50 uppercase tracking-widest mb-0.5">{card.rarity}</div>
+                <div className="text-[8px] font-black text-yellow-300 drop-shadow">{card.value}</div>
+              </div>
+            </motion.div>
+          ))}
+
+          {/* Reflection / stage glow beneath the cards */}
+          <div
+            className="absolute bottom-0 left-1/2 -translate-x-1/2 w-80 h-24 pointer-events-none"
+            style={{ background: 'radial-gradient(ellipse at center, rgba(200,150,50,0.18) 0%, transparent 75%)' }}
+          />
+        </div>
         {/* ── Animated card showcase — shelf → stand (desktop only) ── */}
         <HeroCardShowcase cards={heroCards} />
 

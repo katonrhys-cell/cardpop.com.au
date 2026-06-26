@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { markTransformsUnavailable } from '@/utils/imageUrl.js';
 
 /**
  * Image for product/listing card grids.
@@ -7,9 +8,18 @@ import React, { useState } from 'react';
  * cards already reserve space, so there's no layout shift). It adds the polish
  * that was missing: a shimmer placeholder while loading, a smooth fade-in, and
  * a graceful "No Image" fallback for missing or broken photos.
+ *
+ * Responsive: pass `srcSet` + `sizes` (built via `getCardImage`) to let the
+ * browser fetch a right-sized, auto-WebP image from Supabase. If a transformed
+ * URL fails (e.g. image transformations aren't enabled on the plan), it falls
+ * back to `fallbackSrc` (the untransformed original) and flags transforms as
+ * unavailable for the rest of the session, so we don't keep retrying them.
  */
 const CardImage = ({
   src,
+  srcSet,
+  sizes,
+  fallbackSrc,
   alt = '',
   imgClassName = 'w-full h-full object-cover',
   width,
@@ -18,8 +28,19 @@ const CardImage = ({
   ...props
 }) => {
   const [status, setStatus] = useState('loading'); // 'loading' | 'loaded' | 'error'
+  const [useFallback, setUseFallback] = useState(false);
 
-  if (!src || status === 'error') {
+  // Reset when the source changes (e.g. card re-used in a virtualised list).
+  useEffect(() => {
+    setStatus('loading');
+    setUseFallback(false);
+  }, [src]);
+
+  const canFallback = !useFallback && fallbackSrc && fallbackSrc !== src;
+  const effectiveSrc = useFallback ? fallbackSrc : src;
+  const effectiveSrcSet = useFallback ? undefined : srcSet;
+
+  if (!effectiveSrc || status === 'error') {
     return (
       <div className="absolute inset-0 flex items-center justify-center bg-muted/30 text-muted-foreground text-sm font-medium">
         No Image
@@ -27,20 +48,33 @@ const CardImage = ({
     );
   }
 
+  const handleError = () => {
+    if (canFallback) {
+      // Transformed URL failed → drop to the original and stop using transforms.
+      markTransformsUnavailable();
+      setUseFallback(true);
+      setStatus('loading');
+    } else {
+      setStatus('error');
+    }
+  };
+
   return (
     <>
       {status === 'loading' && (
         <div className="absolute inset-0 animate-pulse bg-muted" aria-hidden="true" />
       )}
       <img
-        src={src}
+        src={effectiveSrc}
+        srcSet={effectiveSrcSet}
+        sizes={effectiveSrcSet ? sizes : undefined}
         alt={alt}
         width={width}
         height={height}
         loading={loading}
         decoding="async"
         onLoad={() => setStatus('loaded')}
-        onError={() => setStatus('error')}
+        onError={handleError}
         className={`${imgClassName} transition-opacity duration-500 ${
           status === 'loaded' ? 'opacity-100' : 'opacity-0'
         }`}

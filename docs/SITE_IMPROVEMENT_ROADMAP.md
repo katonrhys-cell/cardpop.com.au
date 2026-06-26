@@ -71,8 +71,57 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
       lazy-only (Header's Sheet/Dialog + Button's Slot are genuinely eager), and
       dropping the manual chunk merged radix into `vendor-react` (worse caching).
       Left as-is; revisit if Header's Radix surface shrinks.
-- [ ] Image pipeline: responsive sizes, AVIF/WebP, lazy-load, CDN; audit largest LCP images
-- [ ] Measure + set budgets for LCP / INP / CLS (Lighthouse CI)
+- [x] Image pipeline (homepage hero): the 5 hero cards display at 176 px but
+      shipped 1024 px JPGs (~926 KB) and were downloaded even on phones (where
+      they're `hidden`). Now AVIF/WebP/JPG at 360 w/720 w via `<picture>` +
+      `sizes="176px"`, `loading="lazy"` + `fetchpriority="low"`, with originals
+      moved out of `public/` to `tools/hero-sources/` (regen: `npm run optimize:images`).
+      **Home: perf 84→89, LCP 1.82s→1.22s (−33%), TBT 64→2 ms**; Lighthouse's
+      responsive-images (560 ms) + modern-formats (320 ms) opportunities now zero.
+- [x] Image pipeline (listing/product images): `utils/imageUrl.js` `getCardImage()`
+      builds responsive srcset URLs via Supabase Storage transforms (auto-WebP),
+      wired into `CardImage` + the grid cards (Marketplace/Product/Vault) and the
+      detail-page `ProductImageCarousel` (main image eager/high-priority + a
+      full-res original kept for the zoom microscope; thumbnails at 80/160 w).
+      Transforms are a paid feature, so it **degrades gracefully**: `CardImage`
+      swaps to the untransformed original on error and a session flag stops
+      retrying transforms (≤1 wasted request if the feature is off). Tested
+      (`imageUrl.test.js`, `cardImage.test.jsx`).
+      ⚠️ Not measured in-sandbox — Supabase egress is blocked here, so the
+      marketplace renders empty; the real LCP/bytes win needs a populated env.
+- [x] Lighthouse CI measuring LCP / TBT / CLS + a11y/SEO/best-practices on every
+      PR (`lighthouserc.cjs`, `npm run lhci` / `lhci:mobile`,
+      `.github/workflows/lighthouse.yml` — **desktop + mobile matrix**). Budgets
+      calibrated per form factor; CLS + a11y are hard `error` gates, perf/LCP/
+      TBT/SEO are `warn`. INP isn't measurable in a lab run — TBT is its proxy.
+      **Desktop baseline (median of 3):**
+      | Route | Perf | A11y | SEO | LCP | TBT | CLS |
+      |---|---|---|---|---|---|---|
+      | `/` | 84 | 98 | 92 | 1.82s | 64ms | 0.011 |
+      | `/marketplace` | 93 | 98 | 92 | 0.94s | 3ms | 0.007 |
+      | `/shop` | 90 | 98 | 92 | 0.91s | 6ms | 0.005 |
+      | `/login` | 99 | 98 | 66* | 0.90s | 0ms | 0.003 |
+
+      **Mobile baseline (Moto-G4 + slow-4G + 4× CPU, median of 3):**
+      | Route | Perf | LCP | FCP | TBT | CLS |
+      |---|---|---|---|---|---|
+      | `/` | 70 | 5.08s | 3.44s | 192ms | 0.070 |
+      | `/marketplace` | 77 | 4.02s | 3.47s | 141ms | 0.070 |
+      | `/shop` | 71 | 3.87s | 3.40s | 160ms | 0.070 |
+      | `/login` | 80 | 3.90s | 3.33s | 107ms | 0.002 |
+
+      *login is intentionally `noindex` — excluded from the SEO assertion.
+      a11y holds at 98 on mobile too. Note: marketplace/shop can't load real
+      data in the sandbox (Supabase egress blocked) so their content metrics are
+      shell-only; home is the representative number.
+- [ ] **Mobile backlog** (from the pass above — throttled mobile is the real
+      bottleneck; desktop is already strong):
+      - Render-blocking CSS ≈ **761 ms** on mobile (the 195 KB/30 KB-gz Tailwind
+        bundle blocks first paint) → biggest FCP lever. Needs critical-CSS
+        extraction or SSR/edge HTML; an architectural item, not a quick fix.
+      - unused-CSS ≈220 ms + unused-JS ≈310 ms on home; mobile FCP ~3.4s is the
+        shell cost (SPA renders client-side).
+      - Mobile CLS 0.070 (under the 0.1 gate but worth chasing once content loads).
 - [ ] Consider moving opencv card-detection into a Web Worker (off main thread)
 
 ### 6. Trust & safety (the actual marketplace product)
