@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { apiServerClient as apiClient } from '@/lib/apiServerClient.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -127,26 +128,23 @@ const AdminVerificationDashboard = () => {
     setSaving(true);
     try {
       const isInfoRequest = pendingAction === 'info_requested';
-      const updateData = {
-        admin_id: currentUser.id,
-        admin_notes: adminNotes.trim() || null,
-        reviewed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      if (isInfoRequest) {
-        updateData.additional_info_requested = additionalInfo.trim() || null;
-      } else {
-        updateData.status = pendingAction;
-        updateData.additional_info_requested = null;
-      }
-      const { error } = await supabase.from('user_verifications').update(updateData).eq('id', selected.id);
-      if (error) throw error;
-      await supabase.from('verification_audit_log').insert({
-        verification_id: selected.id,
-        admin_id: currentUser.id,
-        action: pendingAction,
-        notes: adminNotes.trim() || null,
+      // Privileged write: identity-verification decisions go through the
+      // admin-checked backend endpoint (a direct client update would let a user
+      // self-verify). The server records the audit-log entry too.
+      const res = await apiClient.fetch(`/admin/verifications/${selected.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          info_request: isInfoRequest,
+          status: isInfoRequest ? undefined : pendingAction,
+          admin_notes: adminNotes.trim() || null,
+          additional_info_requested: isInfoRequest ? (additionalInfo.trim() || null) : undefined,
+        }),
       });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error || 'Failed to update verification');
+      }
       const labels = { approved: 'Approved', rejected: 'Rejected', suspended: 'Suspended', revoked: 'Revoked', info_requested: 'Info requested' };
       toast.success(`${labels[pendingAction]} successfully`);
       setActionOpen(false);

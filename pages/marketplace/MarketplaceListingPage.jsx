@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
+import { generateStructuredData, generateBreadcrumbStructuredData } from '@/utils/seoUtils.js';
 import { supabase } from '@/lib/supabaseClient.js';
 import { formatCurrency } from '@/utils/formatCurrency.js';
 import { Button } from '@/components/ui/button';
@@ -71,38 +72,36 @@ const MarketplaceListingPage = () => {
   );
   if (!listing) return <div className="container-default section-padding text-center">Listing not found</div>;
 
-  const canonicalUrl = `https://cardpop.com.au/marketplace/${id}${listing.slug ? `/${listing.slug}` : ''}`;
-  const cardName = listing.title || listing.vault_item?.card_name || 'Trading Card';
-  const listingImage = listing.images?.[0];
-  const seoDescription = listing.description
-    || `${cardName} for sale on CardPop — Australia's trading card marketplace.`;
-  const productSchema = generateProductSchema({
-    name: cardName,
-    image: listingImage,
-    description: seoDescription,
-    url: canonicalUrl,
-    price: listing.price_aud ?? listing.price,
-    condition: listing.condition || listing.vault_item?.condition,
-    sellerName: listing.seller?.full_name || listing.seller?.username || 'CardPop Seller',
-    category: listing.category,
-  });
-  const breadcrumbSchema = generateBreadcrumbStructuredData([
-    { name: 'Home', url: 'https://cardpop.com.au/' },
-    { name: 'Marketplace', url: 'https://cardpop.com.au/marketplace' },
-    { name: cardName, url: canonicalUrl },
-  ]);
-  const structuredData = [productSchema, breadcrumbSchema].filter(Boolean);
+  // Rich-result structured data so search engines can surface price /
+  // availability / condition for this listing (Product + Offer + breadcrumb).
+  const canonicalUrl = typeof window !== 'undefined' ? window.location.href.split('?')[0] : undefined;
+  const structuredData = [
+    generateStructuredData({
+      title: listing.title,
+      description: listing.description,
+      id: listing.id,
+      price: listing.price,
+      currency: 'AUD',
+      condition: listing.condition,
+      images: (listing.images || []).map((url) => ({ url })),
+    }),
+    generateBreadcrumbStructuredData([
+      { name: 'Home', url: 'https://cardpop.com.au/' },
+      { name: 'Marketplace', url: 'https://cardpop.com.au/marketplace' },
+      { name: listing.title, url: canonicalUrl },
+    ]),
+  ];
 
   return (
     <div className="container-default section-padding min-h-[80vh]">
       <SEOHead
-        title={`${cardName} | CardPop Marketplace`}
-        description={seoDescription}
+        title={`${listing.title} | CardPop Marketplace`}
+        description={listing?.description || listing?.title || 'View this marketplace listing on CardPop'}
         canonicalUrl={canonicalUrl}
-        ogImage={listingImage || undefined}
+        ogImage={listing.images?.[0]}
         structuredData={structuredData}
       />
-      
+
       <div className="flex flex-col lg:flex-row gap-12">
         <div className="w-full lg:w-3/5">
           <div className="bg-secondary/20 rounded-3xl p-4 border border-border aspect-square flex items-center justify-center overflow-hidden">

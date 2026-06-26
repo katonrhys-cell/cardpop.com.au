@@ -52,27 +52,48 @@ const RefundDetailDialog = ({ order, refund, onClose, onUpdate }) => {
   const retainedFee  = Math.round(totalFee * (retentionPct / 100) * 100) / 100;
   const refundAmount = Math.round(((refund?.total_paid_aud || 0) - retainedFee) * 100) / 100;
 
+  // Refund decisions are privileged: a direct client update would let a user
+  // self-approve their own refund. Route through the admin-checked backend
+  // endpoint, which re-computes the amount and notifies the buyer server-side.
+  const decideRefund = async (body) => {
+    const res = await apiClient.fetch(`/admin/refunds/${refund.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(e.error || 'Refund update failed');
+    }
+  };
+
   const handleApprove = async () => {
     setSaving(true);
-    const { error } = await supabase.from('refunds').update({ status: 'approved', admin_notes: adminNotes }).eq('id', refund.id);
-    if (error) { toast.error('Failed to approve'); setSaving(false); return; }
-    await supabase.from('orders').update({ refund_status: 'approved' }).eq('id', order.id);
-    await supabase.from('notifications').insert({ user_id: refund.buyer_id, type: 'refund_approved', title: 'Refund Approved', body: `Your refund of $${refundAmount.toFixed(2)} AUD has been approved and will be processed shortly.` });
-    toast.success('Refund approved');
-    onUpdate();
-    onClose();
+    try {
+      await decideRefund({ action: 'approve', admin_notes: adminNotes });
+      toast.success('Refund approved');
+      onUpdate();
+      onClose();
+    } catch (err) {
+      toast.error(err.message || 'Failed to approve');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleReject = async () => {
     if (!rejectionReason.trim()) { toast.error('Please provide a rejection reason'); return; }
     setSaving(true);
-    const { error } = await supabase.from('refunds').update({ status: 'rejected', rejection_reason: rejectionReason, admin_notes: adminNotes }).eq('id', refund.id);
-    if (error) { toast.error('Failed to reject'); setSaving(false); return; }
-    await supabase.from('orders').update({ refund_status: 'rejected' }).eq('id', order.id);
-    await supabase.from('notifications').insert({ user_id: refund.buyer_id, type: 'refund_rejected', title: 'Refund Request Declined', body: `Your refund request was not approved. Reason: ${rejectionReason}` });
-    toast.success('Refund request rejected');
-    onUpdate();
-    onClose();
+    try {
+      await decideRefund({ action: 'reject', admin_notes: adminNotes, rejection_reason: rejectionReason });
+      toast.success('Refund request rejected');
+      onUpdate();
+      onClose();
+    } catch (err) {
+      toast.error(err.message || 'Failed to reject');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleProcess = async () => {
