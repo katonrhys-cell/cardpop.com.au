@@ -16,7 +16,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "check:bundle": "node tools/check-bundle-size.js"
+    "check:bundle": "node tools/check-bundle-size.js",
+    "lhci": "lhci autorun --config=lighthouserc.cjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -100,6 +101,7 @@
     "@babel/parser": "^7.26.3",
     "@babel/traverse": "^7.26.4",
     "@babel/types": "^7.26.3",
+    "@lhci/cli": "^0.15.1",
     "@playwright/test": "^1.56.1",
     "@supabase/supabase-js": "^2.106.2",
     "@testing-library/jest-dom": "^6.9.1",

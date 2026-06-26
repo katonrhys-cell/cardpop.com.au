@@ -72,7 +72,21 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
       dropping the manual chunk merged radix into `vendor-react` (worse caching).
       Left as-is; revisit if Header's Radix surface shrinks.
 - [ ] Image pipeline: responsive sizes, AVIF/WebP, lazy-load, CDN; audit largest LCP images
-- [ ] Measure + set budgets for LCP / INP / CLS (Lighthouse CI)
+- [x] Lighthouse CI measuring LCP / TBT / CLS + a11y/SEO/best-practices on every
+      PR (`lighthouserc.cjs`, `npm run lhci`, `.github/workflows/lighthouse.yml`).
+      Budgets derived from baseline; CLS + a11y are hard `error` gates, perf/LCP/
+      TBT/SEO are `warn`. Desktop preset (stable in CI); mobile is the harder
+      target to add next. **Baseline (desktop, median of 3):**
+      | Route | Perf | A11y | SEO | LCP | TBT | CLS |
+      |---|---|---|---|---|---|---|
+      | `/` | 84 | 98 | 92 | 1.82s | 64ms | 0.011 |
+      | `/marketplace` | 93 | 98 | 92 | 0.94s | 3ms | 0.007 |
+      | `/shop` | 90 | 98 | 92 | 0.91s | 6ms | 0.005 |
+      | `/login` | 99 | 98 | 66* | 0.90s | 0ms | 0.003 |
+
+      *login is intentionally `noindex` — excluded from the SEO assertion.
+      Home is the weakest (perf 84); it's the page to optimise next.
+      Note: INP isn't measurable in a lab run — TBT is budgeted as its proxy.
 - [ ] Consider moving opencv card-detection into a Web Worker (off main thread)
 
 ### 6. Trust & safety (the actual marketplace product)

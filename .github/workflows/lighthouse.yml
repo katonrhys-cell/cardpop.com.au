@@ -1,0 +1,52 @@
+name: Lighthouse
+
+# Lab Core Web Vitals + a11y/SEO/best-practices against the production build.
+# Runs on pull requests. Budgets live in lighthouserc.cjs. Kept as its own
+# workflow (like e2e) because Lighthouse runs are slower and a little noisy;
+# promote to a required check once it has proven stable.
+
+on:
+  pull_request:
+
+concurrency:
+  group: lighthouse-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Lighthouse drives a real browser; fetch Chromium and point chrome-launcher
+      # at it (the dev sandbox has one pre-installed, CI runners don't).
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Lighthouse CI
+        env:
+          CHROME_PATH: ''
+        run: |
+          # Resolve the Chromium binary Playwright just installed.
+          CHROME_PATH="$(node -e "console.log(require('playwright').chromium.executablePath())")"
+          export CHROME_PATH
+          echo "Using Chrome at: $CHROME_PATH"
+          npm run lhci
+
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-reports
+          path: .lighthouseci/
+          retention-days: 7
