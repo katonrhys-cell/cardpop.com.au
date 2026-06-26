@@ -27,7 +27,7 @@ jobs:
       - name: Lint
         run: npm run lint
 
-  test:
+  test-frontend:
     runs-on: self-hosted
     steps:
       - name: Checkout code
@@ -42,8 +42,26 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Test
-        run: npm test
+      - name: Test frontend
+        run: npx vitest run tests/frontend/
+
+  test-backend:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test backend
+        run: npx vitest run tests/backend/
 
   build:
     runs-on: self-hosted
@@ -67,7 +85,7 @@ jobs:
         run: npm run check:bundle
 
   deploy:
-    needs: [lint, test, build]
+    needs: [lint, test-frontend, test-backend, build]
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
