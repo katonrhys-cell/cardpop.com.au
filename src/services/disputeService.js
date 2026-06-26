@@ -1,5 +1,6 @@
 import supabase from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
+import { reverseSellerPayout } from './payoutService.js';
 
 // Handles Stripe chargeback (dispute) webhooks. When a buyer disputes a charge
 // with their bank, the platform can be left covering the loss if the seller was
@@ -61,23 +62,7 @@ export async function handleDisputeCreated(stripe, dispute) {
     }
 
     // Reverse / claw back the seller payout if it already went out.
-    let payoutAction = 'none';
-    try {
-      if (order.payout_status === 'transferred' && order.stripe_transfer_id) {
-        await stripe.transfers.createReversal(order.stripe_transfer_id);
-        payoutAction = 'transfer_reversed';
-        logger.warn(`[STRIPE DISPUTE] Reversed transfer ${order.stripe_transfer_id} for order ${order.id}`);
-      } else if (order.payout_status === 'wallet_credited' && order.seller_id) {
-        const { data: sp } = await supabase
-          .from('profiles').select('wallet_balance_aud').eq('id', order.seller_id).maybeSingle();
-        const newBalance = Math.max(0, (Number(sp?.wallet_balance_aud) || 0) - (Number(order.seller_proceeds_aud) || 0));
-        await supabase.from('profiles').update({ wallet_balance_aud: newBalance }).eq('id', order.seller_id);
-        payoutAction = 'wallet_clawback';
-        logger.warn(`[STRIPE DISPUTE] Clawed back $${order.seller_proceeds_aud} from seller ${order.seller_id}`);
-      }
-    } catch (e) {
-      logger.error(`[STRIPE DISPUTE] Payout reversal failed for order ${order.id}: ${e.message}`);
-    }
+    const { action: payoutAction } = await reverseSellerPayout(stripe, order);
 
     // Freeze the order payout (existing column — keep the schema footprint small).
     await supabase.from('orders').update({ payout_status: 'frozen' }).eq('id', order.id);

@@ -8,6 +8,7 @@ import { getRefractorLabel, getRefractorBadgeClass } from '@/lib/cardAttributeLa
 import CardMicroscope from '@/components/CardMicroscope.jsx';
 import CardImage from '@/components/CardImage.jsx';
 import { getCardImage, CARD_GRID_SIZES } from '@/utils/imageUrl.js';
+import { isVerified } from '@/utils/verification.js';
 
 const GRADE_BADGE = {
   psa:   'bg-red-600 text-white',
@@ -148,7 +149,7 @@ const ProductCard = ({ product }) => {
                   <span className="text-sm font-bold text-foreground truncate group-hover/seller:text-primary transition-colors">
                     {sellerObj?.display_name || sellerObj?.name || 'Community Seller'}
                   </span>
-                  {sellerObj?.is_verified === 'true' && (
+                  {isVerified(sellerObj?.is_verified) && (
                     <ShieldCheck className="w-3.5 h-3.5 text-[hsl(var(--verified-badge))] shrink-0" />
                   )}
                 </div>
