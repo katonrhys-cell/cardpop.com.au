@@ -95,7 +95,7 @@ const ShopPage = () => {
           </div>
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <Select value={sort} onValueChange={setSort}>
-              <SelectTrigger className="w-full sm:w-[200px] h-11 rounded-xl bg-card border-border">
+              <SelectTrigger aria-label="Sort products" className="w-full sm:w-[200px] h-11 rounded-xl bg-card border-border">
                 <SlidersHorizontal className="w-4 h-4 mr-2 text-muted-foreground" />
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>

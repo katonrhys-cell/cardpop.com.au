@@ -267,7 +267,7 @@ const MarketplacePage = () => {
           <div className="flex flex-wrap items-center gap-3">
             {/* Category */}
             <Select value={filterCat} onValueChange={setFilterCat}>
-              <SelectTrigger className="w-full sm:w-[160px] bg-background border-border rounded-xl font-medium">
+              <SelectTrigger aria-label="Filter by category" className="w-full sm:w-[160px] bg-background border-border rounded-xl font-medium">
                 <SelectValue placeholder="Category" />
               </SelectTrigger>
               <SelectContent>
@@ -277,7 +277,7 @@ const MarketplacePage = () => {
 
             {/* Franchise */}
             <Select value={filterFranchise} onValueChange={setFilterFranchise} disabled={!filterCat}>
-              <SelectTrigger className="w-full sm:w-[180px] bg-background border-border rounded-xl font-medium">
+              <SelectTrigger aria-label="Filter by franchise" className="w-full sm:w-[180px] bg-background border-border rounded-xl font-medium">
                 <SelectValue placeholder={filterCat ? 'Franchise' : '— select category —'} />
               </SelectTrigger>
               <SelectContent>
@@ -288,7 +288,7 @@ const MarketplacePage = () => {
             {/* Manufacturer — only show if franchise has manufacturers */}
             {filterFranchise && mfrOpts.length > 0 && (
               <Select value={filterMfr} onValueChange={setFilterMfr}>
-                <SelectTrigger className="w-full sm:w-[200px] bg-background border-border rounded-xl font-medium">
+                <SelectTrigger aria-label="Filter by manufacturer" className="w-full sm:w-[200px] bg-background border-border rounded-xl font-medium">
                   <SelectValue placeholder="Manufacturer" />
                 </SelectTrigger>
                 <SelectContent>
@@ -300,7 +300,7 @@ const MarketplacePage = () => {
             {/* Team — only show if franchise has teams (sports) */}
             {filterFranchise && teamOpts.length > 0 && (
               <Select value={filterTeam} onValueChange={setFilterTeam}>
-                <SelectTrigger className="w-full sm:w-[200px] bg-background border-border rounded-xl font-medium">
+                <SelectTrigger aria-label="Filter by team" className="w-full sm:w-[200px] bg-background border-border rounded-xl font-medium">
                   <SelectValue placeholder="Team" />
                 </SelectTrigger>
                 <SelectContent>
@@ -312,7 +312,7 @@ const MarketplacePage = () => {
             {/* Set — only show if franchise selected and sets exist */}
             {filterFranchise && setOpts.length > 0 && (
               <Select value={filterSet} onValueChange={setFilterSet}>
-                <SelectTrigger className="w-full sm:w-[240px] bg-background border-border rounded-xl font-medium">
+                <SelectTrigger aria-label="Filter by set or release" className="w-full sm:w-[240px] bg-background border-border rounded-xl font-medium">
                   <SelectValue placeholder="Set / Release" />
                 </SelectTrigger>
                 <SelectContent>
@@ -332,7 +332,7 @@ const MarketplacePage = () => {
             {/* Parallel — only show when franchise has parallels */}
             {filterFranchise && parallelOpts.length > 0 && (
               <Select value={filterParallel} onValueChange={setFilterParallel}>
-                <SelectTrigger className="w-full sm:w-[200px] bg-background border-border rounded-xl font-medium">
+                <SelectTrigger aria-label="Filter by parallel or variation" className="w-full sm:w-[200px] bg-background border-border rounded-xl font-medium">
                   <SelectValue placeholder="Parallel / Variation" />
                 </SelectTrigger>
                 <SelectContent>
@@ -348,7 +348,7 @@ const MarketplacePage = () => {
             {/* Subset — only show when a set is selected and it has subsets */}
             {filterSet && subsetOpts.length > 0 && (
               <Select value={filterSubset} onValueChange={setFilterSubset}>
-                <SelectTrigger className="w-full sm:w-[200px] bg-background border-border rounded-xl font-medium">
+                <SelectTrigger aria-label="Filter by subset or insert" className="w-full sm:w-[200px] bg-background border-border rounded-xl font-medium">
                   <SelectValue placeholder="Subset / Insert" />
                 </SelectTrigger>
                 <SelectContent>
@@ -415,11 +415,11 @@ const MarketplacePage = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => fetchRef.current?.(true)} disabled={loading} className="rounded-full h-10 w-10 shrink-0 bg-muted/50 hover:bg-muted">
+            <Button variant="ghost" size="icon" aria-label="Refresh listings" onClick={() => fetchRef.current?.(true)} disabled={loading} className="rounded-full h-10 w-10 shrink-0 bg-muted/50 hover:bg-muted">
               <RefreshCw className={`w-4 h-4 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
             </Button>
             <Select value={sort} onValueChange={setSort}>
-              <SelectTrigger className="w-[180px] h-10 rounded-xl bg-background border-border font-medium">
+              <SelectTrigger aria-label="Sort listings" className="w-[180px] h-10 rounded-xl bg-background border-border font-medium">
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent className="rounded-xl">
@@ -435,7 +435,7 @@ const MarketplacePage = () => {
           <div className="flex flex-col items-center justify-center py-20 bg-destructive/5 rounded-3xl border border-destructive/20 text-destructive">
             <AlertCircle className="w-12 h-12 mb-4" />
             <h3 className="text-xl font-bold mb-2">Connection Error</h3>
-            <p className="mb-6 opacity-80">{error}</p>
+            <p className="mb-6">{error}</p>
             <Button onClick={() => fetchRef.current?.(true)} className="rounded-xl font-bold">Try Again</Button>
           </div>
         ) : loading ? (

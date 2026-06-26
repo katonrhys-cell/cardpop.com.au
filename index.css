@@ -39,7 +39,7 @@
     --secondary-foreground: 215 28% 17%;
 
     --muted:              215 33% 97%;
-    --muted-foreground:   215 14% 50%;
+    --muted-foreground:   215 14% 43%;   /* WCAG AA: ≥4.5:1 on white & --secondary */
 
     --accent:             215 33% 97%;
     --accent-foreground:  215 28% 17%;
@@ -107,7 +107,7 @@
 
     /* ── SEO & Content ──────────────────────────────────────────────── */
     --seo-breadcrumb-bg:   215 33% 97%;
-    --seo-breadcrumb-text: 215 14% 50%;
+    --seo-breadcrumb-text: 215 14% 43%;   /* WCAG AA contrast */
   }
 
   .dark {
@@ -127,7 +127,7 @@
     --secondary-foreground: 0 0% 98%;
 
     --muted:              215 20% 20%;
-    --muted-foreground:   215 14% 60%;
+    --muted-foreground:   215 14% 64%;   /* WCAG AA: ≥4.5:1 on dark surfaces */
 
     --accent:             215 20% 20%;
     --accent-foreground:  0 0% 98%;
