@@ -189,7 +189,7 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 - [~] Counterfeit / scam **reporting flow** — was entirely missing (the
       `ModerationPanel` was just admin notes on catalog cards). Added an
       end-to-end vertical slice:
-      - `content_reports` table (`supabase/migrations/20260626000001_*.sql`) —
+      - `content_reports` table (`supabase/migrations/20260626000003_*.sql`) —
         RLS denies client reads (reports are accusations); writes go only via the
         backend; unique partial index enforces one open report per reporter/target.
         ⚠️ **Migration must be applied** (Supabase CLI/dashboard) before the
