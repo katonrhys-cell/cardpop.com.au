@@ -13,19 +13,7 @@ import { toast } from 'sonner';
 import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, ArrowRightLeft, Layers } from 'lucide-react';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import EbayMarketSection from '@/components/EbayMarketSection.jsx';
-import GradingVerificationSection from '@/components/GradingVerificationSection.jsx';
-import { getRefractorLabel, getRefractorBadgeClass } from '@/lib/cardAttributeLabels.js';
-import { slugify } from '@/lib/slugify.js';
-import { generateProductSchema, generateBreadcrumbStructuredData } from '@/utils/seoUtils.js';
-
-const GRADE_BADGE = {
-  psa:   'bg-red-600 text-white',
-  bgs:   'bg-blue-700 text-white',
-  cgc:   'bg-green-600 text-white',
-  ace:   'bg-orange-500 text-white',
-  sgc:   'bg-purple-600 text-white',
-  other: 'bg-slate-600 text-white',
-};
+import PSACertificationSection from '@/components/PSACertificationSection.jsx';
 
 const getStatusBadge = (listingType) => {
   switch (listingType) {
@@ -300,7 +288,7 @@ const ProductDetailPage = () => {
   // a direct vault item is the product itself. Shop products have none.
   const vi = isShop ? null : (product.vault_item || product);
   const variantChips = vi?.variant
-    ? vi.variant.split(',').map(s => s.trim()).filter(v => v && v !== 'Refractor')
+    ? vi.variant.split(',').map(s => s.trim()).filter(Boolean)
     : [];
   const autoLabel = vi?.is_auto
     ? [
@@ -315,61 +303,13 @@ const ProductDetailPage = () => {
     vi.subset?.name || vi.card_number || vi.condition || vi.grade
   );
 
-  const productSlug = slugify(product.name || 'card');
-  // Marketplace listings live canonically at /marketplace/:id; everything else
-  // at /product/:source/:id so we don't create duplicate indexable URLs.
-  const canonicalUrl = source === 'marketplace'
-    ? `https://cardpop.com.au/marketplace/${product.id}/${productSlug}`
-    : `https://cardpop.com.au/product/${source}/${product.id}/${productSlug}`;
-
-  // Convert first image to public URL for OG/SEO (handles both HTTP URLs and storage paths)
-  const firstImage = product.images?.[0];
-  const ogImage = firstImage
-    ? firstImage.startsWith('http')
-      ? firstImage
-      : supabase.storage.from('vault-images').getPublicUrl(firstImage).data.publicUrl
-    : undefined;
-  const seoDescription = product.description
-    || `${product.name} — available on CardPop, Australia's trading card marketplace.`;
-  const productSchema = generateProductSchema({
-    name: product.name,
-    image: ogImage,
-    description: seoDescription,
-    url: canonicalUrl,
-    price: product.price,
-    condition: vi?.condition || vi?.grade || product.condition,
-    availability: isShop && outOfStock ? 'OutOfStock' : 'InStock',
-    sellerName: seller?.business_name,
-    brand: isShop ? 'CardPop' : undefined,
-    category: product.category,
-    cardNumber: vi?.card_number,
-    setName: vi?.set_name || vi?.card_set,
-    sku: product.sku,
-  });
-  const breadcrumbSchema = generateBreadcrumbStructuredData(
-    isShop
-      ? [
-          { name: 'Home', url: 'https://cardpop.com.au/' },
-          { name: 'Shop', url: 'https://cardpop.com.au/shop' },
-          { name: product.name, url: canonicalUrl },
-        ]
-      : [
-          { name: 'Home', url: 'https://cardpop.com.au/' },
-          { name: 'Marketplace', url: 'https://cardpop.com.au/marketplace' },
-          { name: product.name, url: canonicalUrl },
-        ],
-  );
-  const structuredData = [productSchema, breadcrumbSchema].filter(Boolean);
-
   return (
     <div className="bg-background min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
         <SEOHead
           title={`${product.name} | CardPop`}
-          description={seoDescription}
-          canonicalUrl={canonicalUrl}
-          ogImage={ogImage}
-          structuredData={structuredData}
+          description={product.description || `${product.name} — available on CardPop Australia's trading card marketplace.`}
+          ogImage={product.images?.[0] || undefined}
         />
 
         <Button variant="link" className="px-0 mb-8 text-muted-foreground hover:text-primary font-medium" onClick={() => navigate(-1)}>
@@ -421,14 +361,9 @@ const ProductDetailPage = () => {
                       {vi.condition.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                     </Badge>
                   )}
-                  {vi.grade && vi.grading_company && vi.grading_company !== 'raw' && (
-                    <Badge className={`text-[11px] font-bold border-none ${GRADE_BADGE[vi.grading_company.toLowerCase()] || GRADE_BADGE.other}`}>
-                      {vi.grading_company.toUpperCase()} {vi.grade}
-                    </Badge>
-                  )}
-                  {vi.grade && (!vi.grading_company || vi.grading_company === 'raw') && (
-                    <Badge variant="outline" className="text-[11px] font-bold border-gray-400/50 text-gray-700 bg-gray-400/10 dark:text-gray-300">
-                      {vi.grade}
+                  {vi.grade && (
+                    <Badge variant="outline" className="text-[11px] font-bold border-purple-400/50 text-purple-700 bg-purple-400/10 dark:text-purple-300">
+                      {vi.grading_company ? `${vi.grading_company} ${vi.grade}` : vi.grade}
                     </Badge>
                   )}
                   {vi.parallel?.name && (
@@ -440,7 +375,7 @@ const ProductDetailPage = () => {
                   {vi.card_number && <Badge variant="secondary" className="text-[11px] font-medium">#{vi.card_number}</Badge>}
                   {vi.serial_number && <Badge variant="secondary" className="text-[11px] font-bold">#{vi.serial_number}</Badge>}
                   {vi.is_foil && <Badge variant="outline" className="text-[11px] font-bold border-yellow-400/50 text-yellow-700 bg-yellow-400/10 dark:text-yellow-300">Foil</Badge>}
-                  {getRefractorLabel(vi) && <Badge variant="outline" className={`text-[11px] font-bold ${getRefractorBadgeClass(vi)}`}>{getRefractorLabel(vi)}</Badge>}
+                  {vi.is_refractor && <Badge variant="outline" className="text-[11px] font-bold border-indigo-400/50 text-indigo-700 bg-indigo-400/10 dark:text-indigo-300">Refractor</Badge>}
                   {vi.is_auto && <Badge variant="outline" className="text-[11px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10 dark:text-blue-300">{autoLabel}</Badge>}
                   {vi.is_rookie && <Badge variant="outline" className="text-[11px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10 dark:text-amber-300">RC</Badge>}
                   {vi.is_sealed && <Badge variant="outline" className="text-[11px] font-bold border-green-400/50 text-green-700 bg-green-400/10 dark:text-green-300">Sealed</Badge>}
@@ -533,22 +468,19 @@ const ProductDetailPage = () => {
               )}
             </div>
 
-            {/* Grading Verification Section */}
-            {source === 'marketplace' && (vi?.cert_number || product.grading_company) && (
-              <GradingVerificationSection
-                gradingNumber={vi?.cert_number}
-                gradingCompany={vi?.grading_company || 'psa'}
-                grade={vi?.grade}
-              />
-            )}
-
             {!isShop && (
-              <EbayMarketSection
-                cardName={product.name}
-                cardSet={vi?.set_name || product.set}
-                gradingService={vi?.grading_company}
-                gradeScore={vi?.grade}
-              />
+              <>
+                <PSACertificationSection
+                  certNumber={vi?.cert_number || vi?.certification_number}
+                  gradingCompany={vi?.grading_company}
+                />
+                <EbayMarketSection
+                  cardName={product.name}
+                  cardSet={vi?.set_name || product.set}
+                  gradingService={vi?.grading_company}
+                  gradeScore={vi?.grade}
+                />
+              </>
             )}
           </div>
         </div>
