@@ -108,4 +108,22 @@ const backupCodeLimiter = rateLimit({
 	},
 });
 
-export { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, mfaLimiter, backupCodeLimiter };
+// Content-report submission limiter: 10 reports per hour per authenticated user.
+// Reporting requires auth, so key by user id — this throttles mass/abusive
+// reporting (a brigading vector) without blocking IPs shared by many users.
+const reportLimiter = rateLimit({
+	windowMs: 60 * 60 * 1000,
+	max: 10,
+	standardHeaders: true,
+	legacyHeaders: false,
+	keyGenerator: (req) => req.user?.id || ipKeyGenerator(req),
+	handler: (req, res) => {
+		logger.warn(`[RATE_LIMIT] Report submission limit exceeded for user: ${req.user?.id}`);
+		res.status(429).json({
+			error: 'You have submitted too many reports recently. Please try again later.',
+			retryAfter: req.rateLimit.resetTime,
+		});
+	},
+});
+
+export { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, mfaLimiter, backupCodeLimiter, reportLimiter };

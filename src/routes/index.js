@@ -29,6 +29,7 @@ import marketDataRouter from './market-data.js';
 import catalogRouter from './catalog.js';
 import gradingVerificationRouter from './grading-verification.js';
 import adminRouter from './admin.js';
+import reportsRouter from './reports.js';
 
 const router = Router();
 
@@ -122,6 +123,11 @@ export default () => {
     // Privileged admin operations (is_admin, verification review, refund decisions)
     router.use('/admin', apiLimiter);
     router.use('/admin', adminRouter);
+
+    // Content reporting (scam/counterfeit/abuse) — submission is auth-gated +
+    // per-user rate-limited inside the router; admin endpoints triage the queue.
+    router.use('/reports', apiLimiter);
+    router.use('/reports', reportsRouter);
 
     // Newsletter subscription
     router.use('/newsletter', newsletterRouter);
