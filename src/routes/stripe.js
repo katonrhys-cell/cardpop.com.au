@@ -641,6 +641,14 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         const configId        = meta.configId || null;
         const amountCents     = session.amount_total || 0;
 
+        // Guard against corrupt/missing metadata: a NaN amount would make the
+        // reconciliation comparison below always false (NaN > 2 === false),
+        // letting an order through with NaN money fields. Reject up front.
+        if (![itemPrice, commissionAud, gstAud].every(Number.isFinite)) {
+          logger.error(`[STRIPE] Non-finite amount in metadata for session ${session.id} — order rejected`);
+          break;
+        }
+
         // Reconcile: Stripe's authoritative amount_total must match what we expected.
         // Mismatch signals metadata corruption or a replay attack — reject the order.
         const expectedTotalCents = Math.round((itemPrice + commissionAud + gstAud) * 100);
@@ -861,13 +869,37 @@ router.post('/refund', authMiddleware, async (req, res) => {
 
     if (refundAmount <= 0) return res.status(400).json({ error: 'Calculated refund amount is zero or negative' });
 
-    // Issue partial refund via Stripe
-    const stripeRefund = await stripe.refunds.create({
-      payment_intent: paymentIntentId,
-      amount: Math.round(refundAmount * 100), // cents
-      reason: 'requested_by_customer',
-      metadata: { refundId, retainedFee: String(retainedFee), retentionPct: String(retentionPct) },
-    });
+    // Atomically claim the refund (approved → processing) BEFORE calling Stripe.
+    // Two concurrent admin clicks would otherwise both pass the status check above
+    // and both issue a Stripe refund (double refund). Only the request that flips
+    // the row proceeds.
+    const { data: claimed, error: claimErr } = await supabase
+      .from('refunds')
+      .update({ status: 'processing' })
+      .eq('id', refundId)
+      .eq('status', 'approved')
+      .select('id');
+
+    if (claimErr) return res.status(500).json({ error: 'Failed to claim refund' });
+    if (!claimed || claimed.length === 0) {
+      return res.status(409).json({ error: 'Refund is already being processed' });
+    }
+
+    // Issue partial refund via Stripe. The idempotency key is a backstop so a
+    // retried request can never create a second refund for this row.
+    let stripeRefund;
+    try {
+      stripeRefund = await stripe.refunds.create({
+        payment_intent: paymentIntentId,
+        amount: Math.round(refundAmount * 100), // cents
+        reason: 'requested_by_customer',
+        metadata: { refundId, retainedFee: String(retainedFee), retentionPct: String(retentionPct) },
+      }, { idempotencyKey: `refund_${refundId}` });
+    } catch (stripeErr) {
+      // Release the claim so the refund can be retried after a Stripe failure.
+      await supabase.from('refunds').update({ status: 'approved' }).eq('id', refundId);
+      throw stripeErr;
+    }
 
     const now = new Date().toISOString();
 
