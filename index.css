@@ -278,6 +278,75 @@
   to   { transform: translateX(-50%); }
 }
 /* ═══════════════════════════════════════════════════════
+   PROSE STYLES — Generic content container spacing
+   Used in InfoPageLayout and other content sections.
+   ═══════════════════════════════════════════════════════ */
+
+.prose h2 {
+  font-size: 1.5rem;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+  line-height: 1.3;
+}
+
+.prose h3 {
+  font-size: 1.25rem;
+  margin-top: 1.5rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.4;
+}
+
+.prose p {
+  margin-bottom: 1.25rem;
+  line-height: 1.75;
+}
+
+.prose p:last-child {
+  margin-bottom: 0;
+}
+
+.prose ol,
+.prose ul {
+  margin: 1.25rem 0;
+  padding-left: 1.75rem;
+}
+
+.prose ol {
+  list-style: decimal;
+}
+
+.prose ul {
+  list-style: disc;
+}
+
+.prose li {
+  margin-bottom: 0.625rem;
+  line-height: 1.7;
+}
+
+.prose li:last-child {
+  margin-bottom: 0;
+}
+
+.prose strong {
+  font-weight: 700;
+}
+
+.prose em {
+  font-style: italic;
+}
+
+.prose a:not([class]) {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.prose a:not([class]):hover {
+  opacity: 0.8;
+}
+
+/* ═══════════════════════════════════════════════════════
    THE PARALLEL REPORT — Article Section Styles
    Use these classes inside .article-content HTML content.
    ═══════════════════════════════════════════════════════ */
