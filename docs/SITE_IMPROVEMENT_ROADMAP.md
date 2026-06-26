@@ -127,7 +127,21 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 ### 6. Trust & safety (the actual marketplace product)
 - [ ] Card authentication / grading verification — is PSA/Beckett check enforced on high-value listings?
 - [ ] Seller vetting / tiers / verification badges — define and enforce
-- [ ] Dispute resolution + escrow: is buyer money actually held until delivery confirmed?
+- [~] Dispute resolution + escrow: **AUDIT FINDING — the "escrow" claim was
+      false.** `src/routes/stripe.js` transfers seller proceeds (Stripe Connect
+      transfer or wallet credit) on `checkout.session.completed` — i.e. the
+      instant payment succeeds, with **no hold until delivery**. The homepage /
+      About / Trust&Safety pages claimed "escrow… funds release only when both
+      parties are satisfied," which is misleading (Australian Consumer Law risk).
+      - **Done now:** corrected all user-facing copy to describe what actually
+        exists — secure Stripe payments + the 14-day **Buyer Protection**
+        refund flow (no "escrow"/"funds held" language).
+      - **Decision needed (real escrow is a build):** hold funds until delivery
+        confirmation. Options: Stripe manual-capture / separate charges &
+        transfers with a delayed transfer, or hold in the platform balance and
+        transfer on buyer confirmation / auto-release after N days. Pair with a
+        dispute state machine (open → evidence → resolve) — the refunds table +
+        admin approval is the seed.
 - [~] Counterfeit / scam **reporting flow** — was entirely missing (the
       `ModerationPanel` was just admin notes on catalog cards). Added an
       end-to-end vertical slice:

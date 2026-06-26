@@ -64,7 +64,7 @@ const HOW_IT_WORKS = [
   {
     step: '03', icon: ShieldCheck,
     title: 'Trade Safely',
-    desc: 'Our escrow system protects every deal. Funds release only when both parties are satisfied.',
+    desc: 'Pay securely through Stripe and shop with our 14-day Buyer Protection — a full refund if your item never arrives or isn\'t as described.',
   },
 ];
 
@@ -392,7 +392,7 @@ const HomePage = () => {
             </h1>
 
             <p className="text-base md:text-lg text-zinc-400 max-w-lg mb-10 leading-relaxed text-balance mx-auto lg:mx-0">
-              Pokémon&nbsp;·&nbsp;MTG&nbsp;·&nbsp;Sports&nbsp;·&nbsp;More — buy, sell and trade with verified Australian collectors. Real prices, AUD only, escrow on every deal.
+              Pokémon&nbsp;·&nbsp;MTG&nbsp;·&nbsp;Sports&nbsp;·&nbsp;More — buy, sell and trade with verified Australian collectors. Real prices, AUD only, buyer protection on every order.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-10">
@@ -436,7 +436,7 @@ const HomePage = () => {
               className="flex flex-wrap items-center justify-center lg:justify-start gap-3"
             >
               {[
-                { icon: <ShieldCheck className="w-3.5 h-3.5" />, label: 'Escrow Protected' },
+                { icon: <ShieldCheck className="w-3.5 h-3.5" />, label: 'Buyer Protected' },
                 { icon: <Zap className="w-3.5 h-3.5" />, label: 'AUD Pricing' },
                 { icon: <TrendingUp className="w-3.5 h-3.5" />, label: 'Live Market Data' },
               ].map(({ icon, label }) => (
@@ -585,7 +585,7 @@ const HomePage = () => {
                 </div>
                 <h3 className="text-2xl font-bold mb-3 text-secondary-foreground">Bank-Grade Security</h3>
                 <p className="text-secondary-foreground/80 leading-relaxed">
-                  Every transaction is protected by our advanced escrow system. Funds are only released when both parties are completely satisfied with the trade.
+                  Payments are processed securely through Stripe, and every order is covered by our 14-day Buyer Protection Guarantee — a full refund if an item doesn't arrive or isn't as described.
                 </p>
               </div>
               <div className="absolute right-0 bottom-0 w-2/3 h-2/3 bg-gradient-to-tl from-primary/10 to-transparent rounded-tl-full transition-transform duration-500 group-hover:scale-110" />
