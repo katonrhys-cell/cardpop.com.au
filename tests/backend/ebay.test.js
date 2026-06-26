@@ -4,28 +4,40 @@ import request from 'supertest';
 
 // ─── mocks ────────────────────────────────────────────────────────────────────
 
-const mockCallEbayApi = vi.hoisted(() => vi.fn());
+const {
+  mockCallEbayApi,
+  mockGetMarketData,
+  mockGetCardDetails,
+  mockGetSalesData,
+  mockGetStatistics,
+  mockEbayCache,
+  mockLogger,
+  mockPopularCards,
+} = vi.hoisted(() => ({
+  mockCallEbayApi: vi.fn(),
+  mockGetMarketData: vi.fn().mockResolvedValue({}),
+  mockGetCardDetails: vi.fn().mockResolvedValue({}),
+  mockGetSalesData: vi.fn().mockResolvedValue({ sales: [] }),
+  mockGetStatistics: vi.fn().mockResolvedValue({}),
+  mockEbayCache: { get: vi.fn().mockReturnValue(null), set: vi.fn(), clear: vi.fn() },
+  mockLogger: { default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } },
+  mockPopularCards: [{ name: 'Charizard', set: 'Base Set' }],
+}));
 
 vi.mock('../../src/utils/ebayClient.js', () => ({ callEbayApi: mockCallEbayApi }));
 vi.mock('../../src/utils/ebayMarketData.js', () => ({
-  getMarketData:  vi.fn().mockResolvedValue({}),
-  getCardDetails: vi.fn().mockResolvedValue({}),
+  getMarketData: mockGetMarketData,
+  getCardDetails: mockGetCardDetails,
 }));
 vi.mock('../../src/utils/ebaySalesStats.js', () => ({
-  getSalesData:   vi.fn().mockResolvedValue({ sales: [] }),
-  getStatistics:  vi.fn().mockResolvedValue({}),
+  getSalesData: mockGetSalesData,
+  getStatistics: mockGetStatistics,
 }));
 vi.mock('../../src/utils/ebayPopularCards.js', () => ({
-  POPULAR_CARDS: [{ name: 'Charizard', set: 'Base Set' }],
+  POPULAR_CARDS: mockPopularCards,
 }));
-vi.mock('../../src/utils/ebayCache.js', () => ({
-  get: vi.fn().mockReturnValue(null),
-  set: vi.fn(),
-  clear: vi.fn(),
-}));
-vi.mock('../../src/utils/logger.js', () => ({
-  default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-}));
+vi.mock('../../src/utils/ebayCache.js', () => mockEbayCache);
+vi.mock('../../src/utils/logger.js', () => mockLogger);
 
 import ebayRouter from '../../src/routes/ebay.js';
 
