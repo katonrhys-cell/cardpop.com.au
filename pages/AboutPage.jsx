@@ -116,7 +116,7 @@ const AboutPage = () => {
             <Card className="md:col-span-2 premium-card p-8 flex flex-col justify-center bg-card text-foreground">
               <ShieldCheck className="w-10 h-10 text-primary mb-6" />
               <h3 className="text-2xl font-bold mb-3">Uncompromising Security</h3>
-              <p className="text-muted-foreground text-lg max-w-md">Every seller is verified. Every transaction is protected. We hold funds securely until both parties are satisfied with the trade.</p>
+              <p className="text-muted-foreground text-lg max-w-md">Sellers are verified and payments run securely through Stripe. Every order is backed by our 14-day Buyer Protection Guarantee — a full refund if it doesn't arrive or isn't as described.</p>
             </Card>
             
             <Card className="premium-card p-8 flex flex-col justify-center bg-primary text-primary-foreground border-none shadow-md">

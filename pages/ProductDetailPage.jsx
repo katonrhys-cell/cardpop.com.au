@@ -321,8 +321,14 @@ const ProductDetailPage = () => {
   const canonicalUrl = source === 'marketplace'
     ? `https://cardpop.com.au/marketplace/${product.id}/${productSlug}`
     : `https://cardpop.com.au/product/${source}/${product.id}/${productSlug}`;
+
+  // Convert first image to public URL for OG/SEO (handles both HTTP URLs and storage paths)
   const firstImage = product.images?.[0];
-  const ogImage = firstImage && firstImage.startsWith('http') ? firstImage : undefined;
+  const ogImage = firstImage
+    ? firstImage.startsWith('http')
+      ? firstImage
+      : supabase.storage.from('vault-images').getPublicUrl(firstImage).data.publicUrl
+    : undefined;
   const seoDescription = product.description
     || `${product.name} — available on CardPop, Australia's trading card marketplace.`;
   const productSchema = generateProductSchema({
@@ -336,6 +342,9 @@ const ProductDetailPage = () => {
     sellerName: seller?.business_name,
     brand: isShop ? 'CardPop' : undefined,
     category: product.category,
+    cardNumber: vi?.card_number,
+    setName: vi?.set_name || vi?.card_set,
+    sku: product.sku,
   });
   const breadcrumbSchema = generateBreadcrumbStructuredData(
     isShop

@@ -93,55 +93,127 @@ router.get('/price-estimate', async (req, res) => {
   logger.info(`[EBAY_PRICE_ESTIMATE] Query: "${query}"`);
 
   try {
-    // Try Australian listings first
-    const auParams = new URLSearchParams({
-      q: query,
-      filter: 'buyingOptions:{AUCTION|FIXED_PRICE},itemLocationCountry:AU',
-      limit: 15,
-      sort: 'newlyListed',
-    });
+    // Fetch from both eBay AU and eBay US in parallel
+    const [auResult, usResult] = await Promise.allSettled([
+      // eBay.com.au (Australian listings)
+      callEbayApi(
+        `/buy/browse/v1/item_summary/search?${new URLSearchParams({
+          q: query,
+          filter: 'buyingOptions:{AUCTION|FIXED_PRICE},itemLocationCountry:AU',
+          limit: 15,
+          sort: 'newlyListed',
+        })}`,
+        { headers: { 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_AU' } }
+      ),
+      // eBay.com (US listings)
+      callEbayApi(
+        `/buy/browse/v1/item_summary/search?${new URLSearchParams({
+          q: query,
+          filter: 'buyingOptions:{AUCTION|FIXED_PRICE}',
+          limit: 15,
+          sort: 'newlyListed',
+        })}`,
+        { headers: { 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US' } }
+      ),
+    ]);
 
-    let data = await callEbayApi(`/buy/browse/v1/item_summary/search?${auParams}`);
-    let items = data.itemSummaries || [];
-
-    // If no AU results, fall back to global search
-    if (items.length === 0) {
-      logger.info(`[EBAY_PRICE_ESTIMATE] No AU listings found, trying global search`);
-      const globalParams = new URLSearchParams({
-        q: query,
-        filter: 'buyingOptions:{AUCTION|FIXED_PRICE}',
-        limit: 15,
-        sort: 'newlyListed',
+    // Extract results, marking with marketplace
+    let allItems = [];
+    if (auResult.status === 'fulfilled' && auResult.value.itemSummaries?.length > 0) {
+      auResult.value.itemSummaries.forEach(i => {
+        allItems.push({ ...i, marketplace: 'AU', currency: 'AUD' });
       });
-      data = await callEbayApi(`/buy/browse/v1/item_summary/search?${globalParams}`);
-      items = data.itemSummaries || [];
+      logger.info(`[EBAY_PRICE_ESTIMATE] Found ${auResult.value.itemSummaries.length} AU listings`);
+    }
+    if (usResult.status === 'fulfilled' && usResult.value.itemSummaries?.length > 0) {
+      usResult.value.itemSummaries.forEach(i => {
+        allItems.push({ ...i, marketplace: 'US', currency: 'USD' });
+      });
+      logger.info(`[EBAY_PRICE_ESTIMATE] Found ${usResult.value.itemSummaries.length} US listings`);
     }
 
-    const prices = items
-      .map(i => parseFloat(i.price?.value || 0))
-      .filter(p => p > 0);
+    // Filter to only include listings with valid prices
+    allItems = allItems.filter(i => {
+      const price = parseFloat(i.price?.value);
+      return !isNaN(price) && price > 0;
+    });
 
-    const avgPrice = prices.length > 0
-      ? Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) / 100
+    logger.info(`[EBAY_PRICE_ESTIMATE] After price filter: ${allItems.length} valid listings`);
+
+    // Separate base cards from graded versions
+    const gradingKeywords = ['psa', 'bgs', 'cgc', 'sgc', 'autograph', 'auto'];
+    const baseCards = [];
+    const gradedCards = [];
+
+    // Classify each listing
+    for (const item of allItems) {
+      const titleLower = item.title.toLowerCase();
+      const isGraded = gradingKeywords.some(kw => titleLower.includes(kw));
+      if (isGraded) {
+        gradedCards.push(item);
+      } else {
+        baseCards.push(item);
+      }
+    }
+
+    // Score and sort each group by relevance
+    const scoreListing = (item, cardNameLower) => {
+      const title = item.title.toLowerCase();
+      const exactMatch = title === cardNameLower ? 10 : 0;
+      const containsCardName = title.includes(cardNameLower) ? 3 : 0;
+      return exactMatch + containsCardName;
+    };
+
+    const cardNameLower = name.toLowerCase();
+    baseCards.sort((a, b) => scoreListing(b, cardNameLower) - scoreListing(a, cardNameLower));
+    gradedCards.sort((a, b) => scoreListing(b, cardNameLower) - scoreListing(a, cardNameLower));
+
+    // Convert all prices to AUD for comparison (1 USD ≈ 1.50 AUD as reference)
+    // In production, use a live exchange rate API
+    const USD_TO_AUD = 1.50;
+
+    const calculatePrices = (items) => {
+      return items.map(i => {
+        const basePrice = parseFloat(i.price?.value || 0);
+        return i.currency === 'USD' ? basePrice * USD_TO_AUD : basePrice;
+      }).filter(p => p > 0);
+    };
+
+    const baseCardPrices = calculatePrices(baseCards);
+    const gradedCardPrices = calculatePrices(gradedCards);
+    const allPrices = [...baseCardPrices, ...gradedCardPrices];
+
+    const avgPrice = allPrices.length > 0
+      ? Math.round((allPrices.reduce((a, b) => a + b, 0) / allPrices.length) * 100) / 100
       : 0;
 
-    const listings = items.slice(0, 8).map(i => ({
-      itemId:      i.itemId,
-      title:       i.title,
-      price:       parseFloat(i.price?.value || 0),
-      condition:   parseCondition(i.condition),
-      listingUrl:  i.itemWebUrl || '',
-      thumbnailUrl: i.image?.imageUrl || '',
-    }));
+    const formatListing = (item) => ({
+      itemId:      item.itemId,
+      title:       item.title,
+      price:       parseFloat(item.price?.value || 0),
+      currency:    item.currency,
+      priceInAUD:  item.currency === 'USD' ? parseFloat(item.price?.value || 0) * USD_TO_AUD : parseFloat(item.price?.value || 0),
+      condition:   parseCondition(item.condition),
+      marketplace: item.marketplace,
+      listingUrl:  item.itemWebUrl || '',
+      thumbnailUrl: item.image?.imageUrl || '',
+    });
 
-    logger.info(`[EBAY_PRICE_ESTIMATE] ${prices.length} prices found, avg: $${avgPrice}`);
+    const baseListings = baseCards.slice(0, 8).map(formatListing);
+    const gradedListings = gradedCards.slice(0, 8).map(formatListing);
+
+    logger.info(`[EBAY_PRICE_ESTIMATE] ${baseCards.length} base cards, ${gradedCards.length} graded, avg AUD: $${avgPrice}`);
 
     res.json({
-      count: prices.length,
+      count: allPrices.length,
       avgPrice,
-      minPrice: prices.length > 0 ? Math.min(...prices) : 0,
-      maxPrice: prices.length > 0 ? Math.max(...prices) : 0,
-      listings,
+      minPrice: allPrices.length > 0 ? Math.min(...allPrices) : 0,
+      maxPrice: allPrices.length > 0 ? Math.max(...allPrices) : 0,
+      baseListings,
+      gradedListings,
+      baseCount: baseCardPrices.length,
+      gradedCount: gradedCardPrices.length,
+      exchangeRate: USD_TO_AUD,
     });
   } catch (error) {
     logger.error(`[EBAY_PRICE_ESTIMATE] Error: ${error.message}`);

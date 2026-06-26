@@ -5,7 +5,38 @@ import logger from '../utils/logger.js';
 const CACHE_VALIDITY_DAYS = 90;
 const CACHE_EXPIRY_MS = CACHE_VALIDITY_DAYS * 24 * 60 * 60 * 1000;
 
-export async function verifyGradingNumber({ gradingNumber, company = 'psa' }) {
+// Pull the graded value out of a grading-company cert payload, tolerant of the
+// various shapes PSA returns it in.
+export function extractVerifiedGrade(details) {
+  if (!details || typeof details !== 'object') return null;
+  const cert = details.PSACert || details.psaCert || details;
+  return (
+    cert.CardGrade ?? cert.cardGrade ?? cert.grade ??
+    cert.GradeDescription ?? cert.gradeDescription ?? null
+  );
+}
+
+// Reduce a grade label to its numeric value: "PSA 10" → 10, "GEM-MT 10" → 10,
+// "9.5" → 9.5. Non-numeric grades (e.g. "Authentic") → null.
+export function parseGradeValue(grade) {
+  if (grade == null) return null;
+  const m = String(grade).match(/(\d+(?:\.\d+)?)/);
+  return m ? parseFloat(m[1]) : null;
+}
+
+// Does the seller's claimed grade match the verified cert's grade?
+//   true  — both numeric and equal
+//   false — both numeric and different (the scam case: real cert, inflated claim)
+//   null  — nothing to compare (no claim, or a non-numeric grade)
+export function computeGradeMatch(details, expectedGrade) {
+  if (expectedGrade == null || String(expectedGrade).trim() === '') return null;
+  const certNum = parseGradeValue(extractVerifiedGrade(details));
+  const claimNum = parseGradeValue(expectedGrade);
+  if (certNum == null || claimNum == null) return null;
+  return certNum === claimNum;
+}
+
+export async function verifyGradingNumber({ gradingNumber, company = 'psa', expectedGrade = null }) {
   if (!gradingNumber || typeof gradingNumber !== 'string') {
     throw new Error('gradingNumber is required');
   }
@@ -25,6 +56,8 @@ export async function verifyGradingNumber({ gradingNumber, company = 'psa' }) {
         verified: cached.verified,
         company,
         details: cached.details,
+        verifiedGrade: extractVerifiedGrade(cached.details),
+        gradeMatch: computeGradeMatch(cached.details, expectedGrade),
         cached: true,
         cachedAt: cached.verified_at
       };
@@ -50,6 +83,8 @@ export async function verifyGradingNumber({ gradingNumber, company = 'psa' }) {
       verified,
       company,
       details: details || null,
+      verifiedGrade: extractVerifiedGrade(details),
+      gradeMatch: computeGradeMatch(details, expectedGrade),
       cached: false
     };
   } catch (error) {

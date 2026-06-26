@@ -80,12 +80,54 @@ router.post('/', authMiddleware, reportLimiter, async (req, res) => {
     if (error) throw error;
 
     logger.info(`[REPORT] ${reporter_id} reported ${target_type}:${target_id} (${reason})`);
+
+    // Fraud signal: if enough DISTINCT users independently report the same
+    // target, escalate to admins. Reports are de-duped per reporter, so the open
+    // count == distinct reporters — a real signal, not one person brigading.
+    // We deliberately don't auto-hide the target (that itself would be a
+    // brigading takedown vector); we just alert moderators.
+    await maybeEscalate(target_type, target_id).catch((e) =>
+      logger.warn(`[REPORT] escalation check failed: ${e.message}`),
+    );
+
     res.status(201).json({ success: true, report: data });
   } catch (err) {
     logger.error(`[REPORT] Failed to file report: ${err.message}`);
     res.status(500).json({ error: 'Failed to submit report' });
   }
 });
+
+// Number of distinct open reports that escalates a target to admins.
+const ESCALATION_THRESHOLD = 3;
+
+async function maybeEscalate(target_type, target_id) {
+  const { data: open } = await supabase
+    .from('content_reports')
+    .select('id')
+    .eq('target_type', target_type)
+    .eq('target_id', target_id)
+    .eq('status', 'open');
+
+  const count = open?.length || 0;
+  // Fire exactly once, on the report that crosses the threshold.
+  if (count !== ESCALATION_THRESHOLD) return;
+
+  const { data: admins } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('is_admin', true);
+
+  if (!admins?.length) return;
+
+  const notifications = admins.map((a) => ({
+    user_id: a.id,
+    type: 'report_escalation',
+    title: 'Content flagged by multiple users',
+    body: `A ${target_type} has reached ${count} independent reports and needs review.`,
+  }));
+  await supabase.from('notifications').insert(notifications).catch(() => {});
+  logger.warn(`[REPORT] Escalated ${target_type}:${target_id} — ${count} distinct reports`);
+}
 
 // ─── Admin: list the moderation queue ─────────────────────────────────────────
 router.get('/', authMiddleware, async (req, res) => {

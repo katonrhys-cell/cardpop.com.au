@@ -11,6 +11,7 @@
 - [Analytics & Reports | Admin Portal](/analyticsreports): No description available
 - [Brand Management | Admin Portal](/brandsmanagement): No description available
 - [Category Mapping Tools | Admin](/categorymapping): No description available
+- [Chargebacks | Admin](/disputesadmin): No description available
 - [Check Your Email | Card Pop](/signup): No description available
 - [Commission Settings | CardPop Admin](/commissionsettings): No description available
 - [Complete Profile | Card Pop](/profilecompletion): No description available
@@ -34,6 +35,7 @@
 - [Public Profile | CardPop](/userprofile): No description available
 - [Public Profile | CardPop](/accountprofile): No description available
 - [Recover Account | Card Pop](/passwordreset): No description available
+- [Reports & Moderation | Admin](/reportsmoderation): No description available
 - [Reviews | CardPop](/accountreviews): No description available
 - [Secure Checkout | Card Pop](/checkout): No description available
 - [Security Settings | Card Pop](/securitysettings): No description available
