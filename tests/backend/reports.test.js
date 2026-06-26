@@ -36,9 +36,13 @@ function makeBuilder(result = { data: null, error: null }) {
     single: vi.fn(() => Promise.resolve(result)),
     maybeSingle: vi.fn(() => Promise.resolve(result)),
     then: (resolve, reject) => Promise.resolve(result).then(resolve, reject),
+    catch: (fn) => Promise.resolve(result).catch(fn),
   };
   return b;
 }
+// The POST handler, after inserting, runs an escalation count query. By default
+// queue a low count so escalation doesn't fire in the common-path tests.
+const lowEscalationCount = () => makeBuilder({ data: [{ id: 'x' }], error: null });
 const queueFrom = (...builders) => builders.forEach((b) => mockSupabase.from.mockReturnValueOnce(b));
 
 beforeEach(() => {
@@ -54,7 +58,7 @@ describe('POST /reports', () => {
   it('files a report, deriving reporter_id from the token', async () => {
     const dedupe = makeBuilder({ data: null, error: null }); // no existing open report
     const insert = makeBuilder({ data: { id: 'r1', status: 'open', created_at: 'now' }, error: null });
-    queueFrom(dedupe, insert);
+    queueFrom(dedupe, insert, lowEscalationCount());
 
     const res = await request(app).post('/reports').send(validReport);
     expect(res.status).toBe(201);
@@ -64,7 +68,7 @@ describe('POST /reports', () => {
   });
 
   it('ignores a client-supplied reporter_id', async () => {
-    queueFrom(makeBuilder({ data: null }), makeBuilder({ data: { id: 'r1' }, error: null }));
+    queueFrom(makeBuilder({ data: null }), makeBuilder({ data: { id: 'r1' }, error: null }), lowEscalationCount());
     const res = await request(app).post('/reports').send({ ...validReport, reporter_id: 'someone-else' });
     expect(res.status).toBe(201);
     const insertCall = mockSupabase.from.mock.results[1].value.insert.mock.calls[0][0];
@@ -108,6 +112,36 @@ describe('POST /reports', () => {
     queueFrom(makeBuilder({ data: null }), makeBuilder({ data: null, error: new Error('db down') }));
     const res = await request(app).post('/reports').send(validReport);
     expect(res.status).toBe(500);
+  });
+
+  it('escalates to admins when a target hits the distinct-report threshold', async () => {
+    const notifyBuilder = makeBuilder({ data: null, error: null });
+    queueFrom(
+      makeBuilder({ data: null }),                                   // dedupe
+      makeBuilder({ data: { id: 'r3' }, error: null }),             // insert
+      makeBuilder({ data: [{ id: 'a' }, { id: 'b' }, { id: 'c' }], error: null }), // open count = 3 (threshold)
+      makeBuilder({ data: [{ id: 'admin-1' }, { id: 'admin-2' }], error: null }),  // admins
+      notifyBuilder,                                                 // notification insert
+    );
+    const res = await request(app).post('/reports').send(validReport);
+    expect(res.status).toBe(201);
+    // one notification row per admin
+    expect(notifyBuilder.insert).toHaveBeenCalledWith([
+      expect.objectContaining({ user_id: 'admin-1', type: 'report_escalation' }),
+      expect.objectContaining({ user_id: 'admin-2', type: 'report_escalation' }),
+    ]);
+  });
+
+  it('does not escalate below the threshold', async () => {
+    queueFrom(
+      makeBuilder({ data: null }),                       // dedupe
+      makeBuilder({ data: { id: 'r1' }, error: null }), // insert
+      makeBuilder({ data: [{ id: 'a' }], error: null }), // open count = 1
+    );
+    const res = await request(app).post('/reports').send(validReport);
+    expect(res.status).toBe(201);
+    // only dedupe, insert, count — no admins/notifications queries
+    expect(mockSupabase.from).toHaveBeenCalledTimes(3);
   });
 });
 

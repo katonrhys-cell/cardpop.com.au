@@ -159,8 +159,10 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
         `/admin/reports`, linked from the dashboard) — reads/triages via the
         backend (RLS denies client reads), high-risk reasons flagged, deep-links
         to the reported target (4 frontend tests).
-      - **Next:** wire report buttons onto cards/seller profiles/reviews;
-        notify/auto-flag targets after N independent reports.
+      - Auto-escalation: when a target reaches 3 **distinct** open reports the
+        backend notifies all admins (`report_escalation` notification). No
+        auto-takedown (that would be a brigading vector) — moderators decide.
+      - **Next:** wire report buttons onto cards/seller profiles/reviews.
 - [ ] Chargeback & fraud handling; velocity limits on new accounts
 - [ ] Clear, enforced policies (returns, authenticity guarantee, prohibited items)
 
