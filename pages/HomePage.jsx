@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
+import HeroCardImage from '@/components/HeroCardImage.jsx';
 import { Link } from 'react-router-dom';
 import { motion, useInView, AnimatePresence } from 'framer-motion';
 import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -79,7 +80,7 @@ const ACTIVITY_FEED = [
 // ─── Hero floating card shapes ────────────────────────────────────────────────
 const HERO_CARDS = [
   {
-    image: '/images/hero/black-lotus-1024.jpg',
+    image: '/images/hero/black-lotus',
     gradient: 'from-stone-800 via-stone-900 to-black',
     borderColor: 'border-yellow-600/60',
     rotate: -16, x: -200, y: 30, delay: 0, floatY: -12,
@@ -90,7 +91,7 @@ const HERO_CARDS = [
     value: '$500,000+',
   },
   {
-    image: '/images/hero/michael-jordan-1024.jpg',
+    image: '/images/hero/michael-jordan',
     gradient: 'from-red-800 via-red-900 to-black',
     borderColor: 'border-red-400/50',
     rotate: -8, x: -100, y: -15, delay: 0.12, floatY: -16,
@@ -101,7 +102,7 @@ const HERO_CARDS = [
     value: '$738,000',
   },
   {
-    image: '/images/hero/ohtani-rookie-1024.jpg',
+    image: '/images/hero/ohtani-rookie',
     gradient: 'from-blue-800 via-blue-900 to-red-900',
     borderColor: 'border-blue-300/50',
     rotate: 0, x: 0, y: 10, delay: 0.24, floatY: -10,
@@ -112,7 +113,7 @@ const HERO_CARDS = [
     value: '$200,000+',
   },
   {
-    image: '/images/hero/lebron-james-1024.jpg',
+    image: '/images/hero/lebron-james',
     gradient: 'from-purple-800 via-purple-900 to-black',
     borderColor: 'border-purple-400/50',
     rotate: 8, x: 100, y: 5, delay: 0.36, floatY: -14,
@@ -123,7 +124,7 @@ const HERO_CARDS = [
     value: '$5,200,000',
   },
   {
-    image: '/images/hero/pikachu-illustrator-1024.jpg',
+    image: '/images/hero/pikachu-illustrator',
     gradient: 'from-yellow-400 via-yellow-500 to-amber-500',
     borderColor: 'border-yellow-200/70',
     rotate: 16, x: 200, y: 35, delay: 0.48, floatY: -14,
@@ -302,15 +303,11 @@ const HomePage = () => {
                 },
               }}
             >
-              {/* Card image */}
+              {/* Card image — responsive AVIF/WebP/JPG, lazy + low priority */}
               {card.image && (
-                <img
-                  src={card.image}
+                <HeroCardImage
+                  stem={card.image}
                   alt={`${card.name} ${card.rarity}`}
-                  className="absolute inset-0 w-full h-full object-contain p-1"
-                  draggable={false}
-                  width="176"
-                  height="240"
                 />
               )}
 

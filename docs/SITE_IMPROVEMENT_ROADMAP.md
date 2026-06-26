@@ -71,7 +71,15 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
       lazy-only (Header's Sheet/Dialog + Button's Slot are genuinely eager), and
       dropping the manual chunk merged radix into `vendor-react` (worse caching).
       Left as-is; revisit if Header's Radix surface shrinks.
-- [ ] Image pipeline: responsive sizes, AVIF/WebP, lazy-load, CDN; audit largest LCP images
+- [x] Image pipeline (homepage hero): the 5 hero cards display at 176 px but
+      shipped 1024 px JPGs (~926 KB) and were downloaded even on phones (where
+      they're `hidden`). Now AVIF/WebP/JPG at 360 w/720 w via `<picture>` +
+      `sizes="176px"`, `loading="lazy"` + `fetchpriority="low"`, with originals
+      moved out of `public/` to `tools/hero-sources/` (regen: `npm run optimize:images`).
+      **Home: perf 84→89, LCP 1.82s→1.22s (−33%), TBT 64→2 ms**; Lighthouse's
+      responsive-images (560 ms) + modern-formats (320 ms) opportunities now zero.
+- [ ] Image pipeline (rest): apply the same `<picture>`/srcset treatment to
+      Supabase-hosted listing/product images (LCP on marketplace/listing pages)
 - [x] Lighthouse CI measuring LCP / TBT / CLS + a11y/SEO/best-practices on every
       PR (`lighthouserc.cjs`, `npm run lhci`, `.github/workflows/lighthouse.yml`).
       Budgets derived from baseline; CLS + a11y are hard `error` gates, perf/LCP/
