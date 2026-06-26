@@ -26,7 +26,7 @@ const CategoryBadge = ({ slug }) => {
   const label = CATEGORY_MAP[slug] || slug;
   if (!label) return null;
   return (
-    <span className="absolute top-4 left-4 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm">
+    <span className="absolute top-1/2 -right-3 -translate-y-1/2 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm pointer-events-none">
       {label}
     </span>
   );
@@ -44,15 +44,15 @@ const FeaturedCard = ({ article }) => {
   return (
     <Link
       to={`/blog/${article.slug || article.id}`}
-      className="group flex flex-col bg-card border border-border rounded-2xl overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="group relative flex flex-col bg-card border border-border rounded-2xl overflow-visible hover:shadow-lg hover:-translate-y-1 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       <div className="aspect-video bg-muted relative overflow-hidden">
         {imageUrl
           ? <img src={imageUrl} alt={article.title} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
           : <ImagePlaceholder />
         }
-        <CategoryBadge slug={article.category} />
       </div>
+      <CategoryBadge slug={article.category} />
       <div className="p-6 flex flex-col flex-1">
         <h3 className="font-bold text-xl mb-2 line-clamp-2 group-hover:text-primary transition-colors leading-snug">
           {article.title}
@@ -81,15 +81,15 @@ const ArticleCard = ({ article }) => {
   return (
     <Link
       to={`/blog/${article.slug || article.id}`}
-      className="group flex flex-col bg-card border border-border rounded-2xl overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="group relative flex flex-col bg-card border border-border rounded-2xl overflow-visible hover:shadow-lg hover:-translate-y-1 transition-all duration-300 h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       <div className="aspect-[16/9] bg-muted relative overflow-hidden">
         {imageUrl
           ? <img src={imageUrl} alt={article.title} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
           : <ImagePlaceholder />
         }
-        <CategoryBadge slug={article.category} />
       </div>
+      <CategoryBadge slug={article.category} />
       <div className="p-5 flex flex-col flex-1">
         <div className="flex items-center justify-between mb-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
@@ -165,12 +165,15 @@ const BlogPage = () => {
 
   const activeCategory = categoryParam ? CATEGORY_MAP[categoryParam] : null;
   const pageTitle = activeCategory ? `${activeCategory} | Blog` : 'The Parallel Report | CardPop';
+  const pageDescription = activeCategory
+    ? `${activeCategory} from The Parallel Report by CardPop — trading card analysis, guides and insights for Australian Pokémon, MTG and sports card collectors.`
+    : 'The Parallel Report by CardPop — trading card news, market analysis, grading guides and investment insights for Australian Pokémon, MTG and sports card collectors.';
 
   return (
     <div className="min-h-[100dvh] bg-background">
       <SEOHead
         title={pageTitle}
-        description="The Parallel Report by CardPop — trading card news, market analysis, grading guides and investment insights for Australian Pokémon, MTG and sports card collectors."
+        description={pageDescription}
         canonicalUrl={categoryParam ? `https://cardpop.com.au/blog/category/${categoryParam}` : 'https://cardpop.com.au/blog'}
       />
 

@@ -15,6 +15,8 @@ import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import EbayMarketSection from '@/components/EbayMarketSection.jsx';
 import GradingVerificationSection from '@/components/GradingVerificationSection.jsx';
 import { getRefractorLabel, getRefractorBadgeClass } from '@/lib/cardAttributeLabels.js';
+import { slugify } from '@/lib/slugify.js';
+import { generateProductSchema, generateBreadcrumbStructuredData } from '@/utils/seoUtils.js';
 
 const GRADE_BADGE = {
   psa:   'bg-red-600 text-white',
@@ -313,13 +315,52 @@ const ProductDetailPage = () => {
     vi.subset?.name || vi.card_number || vi.condition || vi.grade
   );
 
+  const productSlug = slugify(product.name || 'card');
+  // Marketplace listings live canonically at /marketplace/:id; everything else
+  // at /product/:source/:id so we don't create duplicate indexable URLs.
+  const canonicalUrl = source === 'marketplace'
+    ? `https://cardpop.com.au/marketplace/${product.id}/${productSlug}`
+    : `https://cardpop.com.au/product/${source}/${product.id}/${productSlug}`;
+  const firstImage = product.images?.[0];
+  const ogImage = firstImage && firstImage.startsWith('http') ? firstImage : undefined;
+  const seoDescription = product.description
+    || `${product.name} — available on CardPop, Australia's trading card marketplace.`;
+  const productSchema = generateProductSchema({
+    name: product.name,
+    image: ogImage,
+    description: seoDescription,
+    url: canonicalUrl,
+    price: product.price,
+    condition: vi?.condition || vi?.grade || product.condition,
+    availability: isShop && outOfStock ? 'OutOfStock' : 'InStock',
+    sellerName: seller?.business_name,
+    brand: isShop ? 'CardPop' : undefined,
+    category: product.category,
+  });
+  const breadcrumbSchema = generateBreadcrumbStructuredData(
+    isShop
+      ? [
+          { name: 'Home', url: 'https://cardpop.com.au/' },
+          { name: 'Shop', url: 'https://cardpop.com.au/shop' },
+          { name: product.name, url: canonicalUrl },
+        ]
+      : [
+          { name: 'Home', url: 'https://cardpop.com.au/' },
+          { name: 'Marketplace', url: 'https://cardpop.com.au/marketplace' },
+          { name: product.name, url: canonicalUrl },
+        ],
+  );
+  const structuredData = [productSchema, breadcrumbSchema].filter(Boolean);
+
   return (
     <div className="bg-background min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
         <SEOHead
           title={`${product.name} | CardPop`}
-          description={product.description || `${product.name} — available on CardPop Australia's trading card marketplace.`}
-          ogImage={product.images?.[0] || undefined}
+          description={seoDescription}
+          canonicalUrl={canonicalUrl}
+          ogImage={ogImage}
+          structuredData={structuredData}
         />
 
         <Button variant="link" className="px-0 mb-8 text-muted-foreground hover:text-primary font-medium" onClick={() => navigate(-1)}>

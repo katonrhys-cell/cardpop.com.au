@@ -263,8 +263,12 @@ const BlogArticlePage = () => {
     excerpt: article.seo_description || article.excerpt
   });
 
-  const faqData = articleSlug ? FAQ_DATA[articleSlug] : null;
-  const faqStructuredData = faqData
+  // Prefer editor-managed FAQs stored on the article; fall back to the
+  // hard-coded map for the original articles that predate the `faqs` column.
+  const faqData = (Array.isArray(article.faqs) && article.faqs.length > 0)
+    ? article.faqs.filter(f => f && f.question && f.answer)
+    : (articleSlug ? FAQ_DATA[articleSlug] : null);
+  const faqStructuredData = (faqData && faqData.length > 0)
     ? generateFAQStructuredData(faqData.map(f => ({ question: f.question, answer: f.answer })))
     : null;
 
@@ -392,6 +396,22 @@ const BlogArticlePage = () => {
           </div>
         )}
       </div>
+
+      {faqData && faqData.length > 0 && (
+        <section className="border-t border-border py-14">
+          <div className="container-default max-w-4xl mx-auto">
+            <h2 className="font-heading font-extrabold text-2xl mb-6">Frequently Asked Questions</h2>
+            <div className="space-y-6">
+              {faqData.map((faq, i) => (
+                <div key={i}>
+                  <h3 className="font-bold text-lg mb-1.5 text-balance">{faq.question}</h3>
+                  <p className="text-muted-foreground leading-relaxed">{faq.answer}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {marketplaceCards.length > 0 && (
         <section className="border-t border-border py-14">

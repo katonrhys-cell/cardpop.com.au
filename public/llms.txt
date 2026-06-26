@@ -4,6 +4,8 @@
 - [| User Details](/userdetail): No description available
 - [Account Dashboard | CardPop](/accountdashboard): No description available
 - [Add Your First Card | Card Pop](/addyourfirstcard): No description available
+- [Admin - Collection Sections | CardPop](/collectionsectionsadmin): No description available
+- [Admin - Hero Showcase | CardPop](/heroshowcaseadmin): No description available
 - [Admin - Manage Events | CardPop](/eventsadmin): No description available
 - [Admin - Manage Featured Cards | CardPop](/featuredcardsadmin): No description available
 - [Analytics & Reports | Admin Portal](/analyticsreports): No description available

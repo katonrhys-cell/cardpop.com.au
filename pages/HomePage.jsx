@@ -11,6 +11,8 @@ import VaultListingCard from '@/components/VaultListingCard.jsx';
 import SellerCard from '@/components/SellerCard.jsx';
 import FeaturedSellerCard from '@/components/FeaturedSellerCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
+import HeroCardShowcase from '@/components/HeroCardShowcase.jsx';
+import { fetchActiveShowcaseCards } from '@/lib/heroShowcase.js';
 
 import { HOMEPAGE_CATEGORIES } from '@/components/CategoryIcons.jsx';
 
@@ -164,6 +166,7 @@ const HomePage = () => {
   const [featuredCards, setFeaturedCards]     = useState([]);
   const [featuredSellers, setFeaturedSellers] = useState([]);
   const [loading, setLoading]                 = useState(true);
+  const [heroCards, setHeroCards]             = useState(HERO_CARDS);
 
   const [deskStart, setDeskStart] = useState(0);
   const [deskDir,   setDeskDir]   = useState(1);
@@ -215,6 +218,15 @@ const HomePage = () => {
     };
 
     fetchHomeData();
+    return () => { isMounted = false; };
+  }, []);
+
+  // Hero showcase cards are admin-configurable; fall back to the built-in set.
+  useEffect(() => {
+    let isMounted = true;
+    fetchActiveShowcaseCards().then((cards) => {
+      if (isMounted && cards.length > 0) setHeroCards(cards);
+    });
     return () => { isMounted = false; };
   }, []);
 
@@ -338,6 +350,8 @@ const HomePage = () => {
             style={{ background: 'radial-gradient(ellipse at center, rgba(200,150,50,0.18) 0%, transparent 75%)' }}
           />
         </div>
+        {/* ── Animated card showcase — shelf → stand (desktop only) ── */}
+        <HeroCardShowcase cards={heroCards} />
 
         {/* ── Hero text ── */}
         <div className="max-w-5xl mx-auto w-full relative z-10 lg:pr-[460px] xl:pr-[480px]">

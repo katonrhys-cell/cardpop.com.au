@@ -9,6 +9,15 @@ const TODAY = new Date().toISOString().split('T')[0];
 const xmlUrl = (loc, lastmod, changefreq, priority) =>
   `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
 
+const slugify = (str = '') => String(str)
+  .toLowerCase()
+  .normalize('NFD')
+  .replace(/[̀-ͯ]/g, '')
+  .replace(/[^a-z0-9\s-]/g, ' ')
+  .trim()
+  .replace(/\s+/g, '-')
+  .replace(/-+/g, '-');
+
 const STATIC_PAGES = [
   { loc: '/',                      lastmod: TODAY,       freq: 'daily',   pri: '1.0' },
   { loc: '/marketplace',           lastmod: TODAY,       freq: 'daily',   pri: '0.9' },
@@ -74,7 +83,7 @@ export default async function handler(req, res) {
       auth: { persistSession: false },
     });
 
-    const [articlesRes, listingsRes, dealersRes] = await Promise.all([
+    const [articlesRes, listingsRes, dealersRes, productsRes] = await Promise.all([
       supabase
         .from('blog_articles')
         .select('slug, updated_at, published_at, created_at')
@@ -94,11 +103,18 @@ export default async function handler(req, res) {
         .eq('is_sole_trader', true)
         .eq('is_public', true)
         .limit(500),
+      supabase
+        .from('shop_products')
+        .select('id, title, updated_at, created_at')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(500),
     ]);
 
     const articles = articlesRes.data ?? [];
     const listings = listingsRes.data ?? [];
     const dealers = dealersRes.data ?? [];
+    const products = productsRes.data ?? [];
 
     const parts = [
       '<?xml version="1.0" encoding="UTF-8"?>',
@@ -121,6 +137,15 @@ export default async function handler(req, res) {
       for (const dealer of dealers) {
         const lastmod = (dealer.updated_at || TODAY).split('T')[0];
         parts.push(xmlUrl(`${BASE_URL}/dealer/${dealer.store_slug || dealer.id}`, lastmod, 'weekly', '0.6'));
+      }
+    }
+
+    if (products.length > 0) {
+      parts.push('', `  <!-- Shop products (${products.length}) -->`);
+      for (const product of products) {
+        const lastmod = (product.updated_at || product.created_at || TODAY).split('T')[0];
+        const urlSlug = slugify(product.title || 'product') || 'product';
+        parts.push(xmlUrl(`${BASE_URL}/product/shop/${product.id}/${urlSlug}`, lastmod, 'weekly', '0.7'));
       }
     }
 

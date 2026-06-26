@@ -17,6 +17,8 @@ import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import { COLLECTION_CONFIGS, resolveCollectionSlug } from '@/data/collectionConfigs.js';
 import { useCollectionEras } from '@/hooks/useCollectionEras.js';
 import { slugify } from '@/lib/slugify.js';
+import { CARD_VARIANTS } from '@/lib/cardVariants.js';
+import { fetchPinnedSectionItems, mergePinned } from '@/lib/collectionSections.js';
 import { getCardVariants } from '@/lib/cardVariants.js';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
 
@@ -343,80 +345,98 @@ const CollectionPage = () => {
     if (activeEra) setFilterSub('');
   }, [activeEra]);
 
-  // ─── New Releases ─────────────────────────────────────────────────────────
+  // ─── New Releases (admin-pinned first, then newest) ───────────────────────
   useEffect(() => {
     if (!categoryId) return;
     let cancelled = false;
     setNewReleasesLoading(true);
 
-    supabase.from('vault_items')
-      .select('*, vault_images(*)')
-      .eq('category_id', categoryId)
-      .eq('is_public', true)
-      .order('created_at', { ascending: false })
-      .limit(10)
-      .then(({ data }) => {
+    (async () => {
+      try {
+        const [pinned, autoRes] = await Promise.all([
+          fetchPinnedSectionItems(slug, 'new_releases'),
+          supabase.from('vault_items')
+            .select('*, vault_images(*)')
+            .eq('category_id', categoryId)
+            .eq('is_public', true)
+            .order('created_at', { ascending: false })
+            .limit(10),
+        ]);
         if (cancelled) return;
-        setNewReleases((data ?? []).map(i => ({ ...i, source: 'vault' })));
-      }).catch(() => {
+        const auto = (autoRes.data ?? []).map(i => ({ ...i, source: 'vault' }));
+        setNewReleases(mergePinned(pinned, auto, 10));
+      } catch {
         if (!cancelled) setNewReleases([]);
-      }).finally(() => {
+      } finally {
         if (!cancelled) setNewReleasesLoading(false);
-      });
+      }
+    })();
 
     return () => { cancelled = true; };
-  }, [categoryId]);
+  }, [categoryId, slug]);
 
-  // ─── Graded Slabs ─────────────────────────────────────────────────────────
+  // ─── Graded Slabs (admin-pinned first, then newest graded) ────────────────
   useEffect(() => {
     if (!categoryId || !config?.showGradedSection) return;
     let cancelled = false;
     setGradedLoading(true);
 
-    supabase.from('vault_items').select('*, vault_images(*)')
-      .eq('category_id', categoryId)
-      .eq('is_public', true)
-      .not('grade', 'is', null)
-      .neq('grading_company', 'raw')
-      .order('created_at', { ascending: false })
-      .limit(10)
-      .then(({ data }) => {
+    (async () => {
+      try {
+        const [pinned, autoRes] = await Promise.all([
+          fetchPinnedSectionItems(slug, 'graded'),
+          supabase.from('vault_items').select('*, vault_images(*)')
+            .eq('category_id', categoryId)
+            .eq('is_public', true)
+            .not('grade', 'is', null)
+            .neq('grading_company', 'raw')
+            .order('created_at', { ascending: false })
+            .limit(10),
+        ]);
         if (cancelled) return;
-        setGradedListings((data ?? []).map(i => ({ ...i, source: 'vault' })));
-      }).catch(() => {
+        const auto = (autoRes.data ?? []).map(i => ({ ...i, source: 'vault' }));
+        setGradedListings(mergePinned(pinned, auto, 10));
+      } catch {
         if (!cancelled) setGradedListings([]);
-      }).finally(() => {
+      } finally {
         if (!cancelled) setGradedLoading(false);
-      });
+      }
+    })();
 
     return () => { cancelled = true; };
-  }, [categoryId, config]);
+  }, [categoryId, config, slug]);
 
-  // ─── Trending (highest-priced listings = premium market signal) ───────────
+  // ─── Trending (admin-pinned first, then highest-priced) ───────────────────
   useEffect(() => {
     if (!categoryId || !config?.showTrendingSection) return;
     let cancelled = false;
     setTrendingLoading(true);
 
-    supabase.from('vault_items').select('*, vault_images(*)')
-      .eq('category_id', categoryId)
-      .eq('is_public', true)
-      .gt('estimated_value_aud', 0)
-      .order('estimated_value_aud', { ascending: false })
-      .limit(8)
-      .then(({ data }) => {
+    (async () => {
+      try {
+        const [pinned, autoRes] = await Promise.all([
+          fetchPinnedSectionItems(slug, 'trending'),
+          supabase.from('vault_items').select('*, vault_images(*)')
+            .eq('category_id', categoryId)
+            .eq('is_public', true)
+            .gt('estimated_value_aud', 0)
+            .order('estimated_value_aud', { ascending: false })
+            .limit(8),
+        ]);
         if (cancelled) return;
-        setTrendingListings((data ?? []).map(i => ({ ...i, source: 'vault' })));
-      }).catch(() => {
+        const auto = (autoRes.data ?? []).map(i => ({ ...i, source: 'vault' }));
+        setTrendingListings(mergePinned(pinned, auto, 8));
+      } catch {
         if (!cancelled) setTrendingListings([]);
-      }).finally(() => {
+      } finally {
         if (!cancelled) setTrendingLoading(false);
-      });
+      }
+    })();
 
     return () => { cancelled = true; };
-  }, [categoryId, config]);
+  }, [categoryId, config, slug]);
 
-  // ─── Holy Grail (featured picks) ─────────────────────────────────────────
+  // ─── Holy Grail (admin-pinned first, then highest-value picks) ────────────
   useEffect(() => {
     let cancelled = false;
     setHolyGrailLoading(true);
@@ -429,8 +449,13 @@ const CollectionPage = () => {
           .order('estimated_value_aud', { ascending: false })
           .limit(6);
         if (categoryId) query = query.eq('category_id', categoryId);
-        const { data: featured } = await query;
-        if (!cancelled) setHolyGrail((featured ?? []).map(i => ({ ...i, source: 'vault' })));
+        const [pinned, { data: featured }] = await Promise.all([
+          fetchPinnedSectionItems(slug, 'holy_grail', '*, vault_images(*), owner:profiles!owner_id(*)'),
+          query,
+        ]);
+        if (cancelled) return;
+        const auto = (featured ?? []).map(i => ({ ...i, source: 'vault' }));
+        setHolyGrail(mergePinned(pinned, auto, 6));
       } catch {
         if (!cancelled) setHolyGrail([]);
       } finally {
@@ -439,7 +464,7 @@ const CollectionPage = () => {
     };
     loadHolyGrail();
     return () => { cancelled = true; };
-  }, [categoryId]);
+  }, [categoryId, slug]);
 
   // ─── Main Browse Grid ─────────────────────────────────────────────────────
   // Each call gets a unique id; state updates are skipped once a newer call

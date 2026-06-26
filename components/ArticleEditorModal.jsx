@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
-import { Upload, FileCode, CheckCircle2 } from 'lucide-react';
+import { Upload, FileCode, CheckCircle2, Plus, Trash2 } from 'lucide-react';
 
 const CATEGORIES = [
   { value: 'australia-focus',  label: 'Australia Focus'   },
@@ -64,6 +64,7 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
   const [featuredImageUrl, setFeaturedImageUrl] = useState('');
   const [featured, setFeatured] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
+  const [faqs, setFaqs] = useState([]);
   const [saving, setSaving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [importedFileName, setImportedFileName] = useState('');
@@ -78,6 +79,7 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
     setFeaturedImageUrl(article?.featured_image_url ?? '');
     setFeatured(article?.featured ?? false);
     setIsPublished(article?.is_published ?? false);
+    setFaqs(Array.isArray(article?.faqs) ? article.faqs : []);
     setImportedFileName('');
   }, [article, isOpen]);
 
@@ -85,6 +87,11 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
     setTitle(value);
     if (!article?.id) setSlug(slugify(value));
   };
+
+  const addFaq = () => setFaqs(prev => [...prev, { question: '', answer: '' }]);
+  const updateFaq = (i, field, value) =>
+    setFaqs(prev => prev.map((f, idx) => (idx === i ? { ...f, [field]: value } : f)));
+  const removeFaq = (i) => setFaqs(prev => prev.filter((_, idx) => idx !== i));
 
   const processFile = useCallback((file) => {
     if (!file || !file.name.match(/\.html?$/i)) {
@@ -129,6 +136,12 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
         featured,
         is_published: isPublished,
         published_at: isPublished ? (article?.published_at ?? new Date().toISOString()) : null,
+        faqs: (() => {
+          const cleaned = faqs
+            .map(f => ({ question: f.question?.trim(), answer: f.answer?.trim() }))
+            .filter(f => f.question && f.answer);
+          return cleaned.length ? cleaned : null;
+        })(),
       };
 
       if (article?.id) {
@@ -288,6 +301,43 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
               rows={12}
               className="font-mono text-xs"
             />
+          </div>
+
+          {/* ── FAQs ── */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>FAQs <span className="text-xs font-normal text-muted-foreground">(shown on the article + emitted as FAQ rich results)</span></Label>
+              <Button type="button" variant="outline" size="sm" onClick={addFaq}>
+                <Plus className="w-3.5 h-3.5 mr-1" /> Add FAQ
+              </Button>
+            </div>
+            {faqs.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No FAQs yet. Add 4–6 to boost search visibility.</p>
+            ) : (
+              <div className="space-y-3">
+                {faqs.map((faq, i) => (
+                  <div key={i} className="rounded-lg border border-border p-3 bg-muted/20 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-muted-foreground">FAQ {i + 1}</span>
+                      <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-destructive hover:text-destructive" onClick={() => removeFaq(i)}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                    <Input
+                      value={faq.question ?? ''}
+                      onChange={e => updateFaq(i, 'question', e.target.value)}
+                      placeholder="Question…"
+                    />
+                    <Textarea
+                      value={faq.answer ?? ''}
+                      onChange={e => updateFaq(i, 'answer', e.target.value)}
+                      placeholder="Answer…"
+                      rows={2}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* ── Toggles ── */}
