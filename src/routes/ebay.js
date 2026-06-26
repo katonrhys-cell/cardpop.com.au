@@ -93,15 +93,29 @@ router.get('/price-estimate', async (req, res) => {
   logger.info(`[EBAY_PRICE_ESTIMATE] Query: "${query}"`);
 
   try {
-    const params = new URLSearchParams({
+    // Try Australian listings first
+    const auParams = new URLSearchParams({
       q: query,
       filter: 'buyingOptions:{AUCTION|FIXED_PRICE},itemLocationCountry:AU',
       limit: 15,
       sort: 'newlyListed',
     });
 
-    const data = await callEbayApi(`/buy/browse/v1/item_summary/search?${params}`);
-    const items = data.itemSummaries || [];
+    let data = await callEbayApi(`/buy/browse/v1/item_summary/search?${auParams}`);
+    let items = data.itemSummaries || [];
+
+    // If no AU results, fall back to global search
+    if (items.length === 0) {
+      logger.info(`[EBAY_PRICE_ESTIMATE] No AU listings found, trying global search`);
+      const globalParams = new URLSearchParams({
+        q: query,
+        filter: 'buyingOptions:{AUCTION|FIXED_PRICE}',
+        limit: 15,
+        sort: 'newlyListed',
+      });
+      data = await callEbayApi(`/buy/browse/v1/item_summary/search?${globalParams}`);
+      items = data.itemSummaries || [];
+    }
 
     const prices = items
       .map(i => parseFloat(i.price?.value || 0))
