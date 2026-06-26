@@ -152,6 +152,50 @@ export const generateLocalBusinessSchema = () => {
   };
 };
 
+// Map a trading-card condition / grade to a schema.org OfferItemCondition.
+// Kept consistent with api/prerender.js so client- and bot-rendered markup agree.
+export const mapItemCondition = (c) => {
+  const v = String(c || '').toLowerCase();
+  if (!v) return null;
+  if (/(gem|mint|sealed|brand new|\bnm\b|graded)/.test(v) || /\b(8|8\.5|9|9\.5|10)\b/.test(v)) return 'https://schema.org/NewCondition';
+  if (/(damaged|poor|heavily played|\bhp\b)/.test(v)) return 'https://schema.org/DamagedCondition';
+  return 'https://schema.org/UsedCondition';
+};
+
+// Build a schema.org Product (with a nested Offer when a price is known).
+export const generateProductSchema = ({
+  name, image, description, url, price, currency = 'AUD',
+  condition, availability = 'InStock', sellerName, brand, category,
+} = {}) => {
+  if (!name) return null;
+
+  const images = (Array.isArray(image) ? image : [image]).filter(Boolean);
+  const data = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name,
+    ...(images.length ? { image: images } : {}),
+    ...(description ? { description } : {}),
+    ...(category ? { category } : {}),
+    ...(brand ? { brand: { '@type': 'Brand', name: brand } } : {}),
+  };
+
+  if (price > 0) {
+    const itemCondition = condition ? mapItemCondition(condition) : null;
+    data.offers = {
+      '@type': 'Offer',
+      price: Number(price).toFixed(2),
+      priceCurrency: currency,
+      availability: `https://schema.org/${availability}`,
+      ...(itemCondition ? { itemCondition } : {}),
+      ...(url ? { url } : {}),
+      ...(sellerName ? { seller: { '@type': 'Organization', name: sellerName } } : {}),
+    };
+  }
+
+  return data;
+};
+
 export const generateBlogPostingSchema = (blogPost) => {
   if (!blogPost) return null;
 
