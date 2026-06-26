@@ -118,7 +118,7 @@ router.get('/price-estimate', async (req, res) => {
     ]);
 
     // Extract results, marking with marketplace
-    const allItems = [];
+    let allItems = [];
     if (auResult.status === 'fulfilled' && auResult.value.itemSummaries?.length > 0) {
       auResult.value.itemSummaries.forEach(i => {
         allItems.push({ ...i, marketplace: 'AU', currency: 'AUD' });
@@ -131,6 +131,39 @@ router.get('/price-estimate', async (req, res) => {
       });
       logger.info(`[EBAY_PRICE_ESTIMATE] Found ${usResult.value.itemSummaries.length} US listings`);
     }
+
+    // Filter to only include listings with valid prices
+    allItems = allItems.filter(i => {
+      const price = parseFloat(i.price?.value);
+      return !isNaN(price) && price > 0;
+    });
+
+    logger.info(`[EBAY_PRICE_ESTIMATE] After price filter: ${allItems.length} valid listings`);
+
+    // Score and sort by relevance: prioritize exact card name matches, deprioritize variants/graded
+    const cardNameLower = name.toLowerCase();
+    allItems = allItems.sort((a, b) => {
+      const aTitle = a.title.toLowerCase();
+      const bTitle = b.title.toLowerCase();
+
+      // Exact match score (higher = better)
+      const aExactMatch = aTitle === cardNameLower ? 10 : 0;
+      const bExactMatch = bTitle === cardNameLower ? 10 : 0;
+
+      // Penalize variant keywords (lower score = worse)
+      const variantKeywords = ['psa', 'bgs', 'cgc', 'autograph', 'auto', 'serial', 'rookie', 'variant', 'refractor', 'foil'];
+      const aVariantPenalty = variantKeywords.filter(kw => aTitle.includes(kw)).length;
+      const bVariantPenalty = variantKeywords.filter(kw => bTitle.includes(kw)).length;
+
+      // Prioritize raw/ungraded
+      const aIsRaw = aTitle.includes('raw') || aTitle.includes('ungraded') ? 5 : 0;
+      const bIsRaw = bTitle.includes('raw') || bTitle.includes('ungraded') ? 5 : 0;
+
+      const aScore = aExactMatch + aIsRaw - (aVariantPenalty * 2);
+      const bScore = bExactMatch + bIsRaw - (bVariantPenalty * 2);
+
+      return bScore - aScore;
+    });
 
     // Convert all prices to AUD for comparison (1 USD ≈ 1.50 AUD as reference)
     // In production, use a live exchange rate API
