@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { optionalAuthMiddleware, isAdminUser } from '../middleware/auth.js';
+import { escapeLike } from '../utils/escapeLike.js';
 
 const router = Router();
 
@@ -100,7 +101,7 @@ router.get('/market/:cardName', async (req, res) => {
     const { data: marketData, error: marketError } = await supabase
       .from('market_data')
       .select('*')
-      .ilike('card_name', `%${cardName}%`)
+      .ilike('card_name', `%${escapeLike(cardName)}%`)
       .order('recorded_at', { ascending: false })
       .limit(10);
 
