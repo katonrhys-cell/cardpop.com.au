@@ -20,16 +20,14 @@ export async function payoutSeller(stripe, { sellerId, sellerProceeds, orderId =
 
   const { data: sellerProfile } = await supabase
     .from('profiles')
-    .select('stripe_connect_account_id, stripe_connect_onboarded, wallet_balance_aud')
+    .select('stripe_connect_account_id, stripe_connect_onboarded')
     .eq('id', sellerId)
     .maybeSingle();
 
   const creditWallet = async () => {
-    const currentBalance = Number(sellerProfile?.wallet_balance_aud) || 0;
-    await supabase
-      .from('profiles')
-      .update({ wallet_balance_aud: currentBalance + Number(sellerProceeds) })
-      .eq('id', sellerId);
+    // Atomic increment via RPC — a read-modify-write here would lose updates when
+    // two payouts (or a payout and a clawback) run concurrently.
+    await supabase.rpc('increment_wallet_balance', { p_user: sellerId, p_delta: Number(sellerProceeds) });
     if (orderId) {
       await supabase.from('orders').update({ payout_status: 'wallet_credited' }).eq('id', orderId);
     }

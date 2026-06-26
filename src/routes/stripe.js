@@ -582,14 +582,46 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
           const lines = Array.isArray(existing.order_items) ? existing.order_items : [];
           const sellerIds = new Set();
+          const oversoldShopItems = [];
           for (const line of lines) {
             if (line.type === 'listing' && line.id) {
               await supabase.from('listings')
                 .update({ status: 'sold', sold_at: new Date().toISOString() })
                 .eq('id', line.id);
-              if (line.seller_id) sellerIds.add(line.seller_id);
+              if (line.seller_id) {
+                sellerIds.add(line.seller_id);
+                // Pay each cart seller their proceeds (line total minus commission).
+                // No orderId is passed: a multi-seller cart can't map onto the
+                // order's single payout_status/transfer_id, so we credit each
+                // seller without clobbering those fields. This runs exactly once —
+                // the atomic pending → payment_confirmed claim above guards retries.
+                const proceeds = Number(line.line_total_aud || 0) - Number(line.commission_aud || 0);
+                if (proceeds > 0) {
+                  await payoutSeller(stripe, { sellerId: line.seller_id, sellerProceeds: proceeds, listingId: line.id })
+                    .catch(e => logger.error(`[STRIPE] cart payout failed for seller ${line.seller_id}: ${e.message}`));
+                }
+              }
             } else if (line.type === 'shop' && line.id) {
-              await supabase.rpc('decrement_shop_stock', { p_id: line.id, p_qty: line.quantity || 1 });
+              // Guarded decrement returns false when there wasn't enough stock —
+              // i.e. an oversell. The buyer has already paid, so flag it for manual
+              // resolution instead of silently confirming an unfulfillable order.
+              const { data: ok } = await supabase.rpc('decrement_shop_stock', { p_id: line.id, p_qty: line.quantity || 1 });
+              if (ok === false) {
+                oversoldShopItems.push(line);
+                logger.error(`[STRIPE] Oversell on shop product ${line.id} (qty ${line.quantity || 1}) for order ${existing.id} — needs manual resolution`);
+              }
+            }
+          }
+
+          if (oversoldShopItems.length > 0) {
+            const { data: admins } = await supabase.from('profiles').select('id').eq('is_admin', true);
+            if (admins?.length) {
+              await supabase.from('notifications').insert(admins.map(a => ({
+                user_id: a.id,
+                type:    'order_oversold',
+                title:   'Oversold order needs attention',
+                body:    `Order ${existing.id} has ${oversoldShopItems.length} shop item(s) that exceeded available stock. Refund or restock.`,
+              }))).catch(() => {});
             }
           }
 

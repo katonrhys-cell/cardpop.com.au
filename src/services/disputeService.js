@@ -68,10 +68,12 @@ export async function handleDisputeCreated(stripe, dispute) {
         payoutAction = 'transfer_reversed';
         logger.warn(`[STRIPE DISPUTE] Reversed transfer ${order.stripe_transfer_id} for order ${order.id}`);
       } else if (order.payout_status === 'wallet_credited' && order.seller_id) {
-        const { data: sp } = await supabase
-          .from('profiles').select('wallet_balance_aud').eq('id', order.seller_id).maybeSingle();
-        const newBalance = Math.max(0, (Number(sp?.wallet_balance_aud) || 0) - (Number(order.seller_proceeds_aud) || 0));
-        await supabase.from('profiles').update({ wallet_balance_aud: newBalance }).eq('id', order.seller_id);
+        // Atomic clawback (negative delta, floored at 0 inside the RPC) — a
+        // read-modify-write would race with a concurrent payout credit.
+        await supabase.rpc('increment_wallet_balance', {
+          p_user: order.seller_id,
+          p_delta: -(Number(order.seller_proceeds_aud) || 0),
+        });
         payoutAction = 'wallet_clawback';
         logger.warn(`[STRIPE DISPUTE] Clawed back $${order.seller_proceeds_aud} from seller ${order.seller_id}`);
       }

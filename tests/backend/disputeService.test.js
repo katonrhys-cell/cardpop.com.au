@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
-const mockSupabase = vi.hoisted(() => ({ from: vi.fn() }));
+const mockSupabase = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(() => Promise.resolve({ data: null, error: null })) }));
 vi.mock('../../src/utils/supabaseClient.js', () => ({ default: mockSupabase, supabase: mockSupabase }));
 vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -57,8 +57,6 @@ describe('handleDisputeCreated', () => {
     const stripe = fakeStripe();
     queue(
       builder({ data: { id: 'o2', seller_id: 's2', buyer_id: 'b2', stripe_transfer_id: null, payout_status: 'wallet_credited', seller_proceeds_aud: 100 } }), // order
-      builder({ data: { wallet_balance_aud: 300 } }), // seller wallet read
-      builder({ error: null }), // wallet update
       builder({ error: null }), // orders freeze
       builder({ error: null }), // dispute insert
       builder({ data: [] }),    // admins
@@ -67,8 +65,8 @@ describe('handleDisputeCreated', () => {
     await handleDisputeCreated(stripe, dispute({ payment_intent: 'pi_2' }));
 
     expect(stripe.transfers.createReversal).not.toHaveBeenCalled();
-    const walletUpdate = mockSupabase.from.mock.results[2].value;
-    expect(walletUpdate.update).toHaveBeenCalledWith({ wallet_balance_aud: 200 }); // 300 - 100
+    // Clawback now goes through the atomic RPC (negative delta), not a read-modify-write.
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('increment_wallet_balance', { p_user: 's2', p_delta: -100 });
   });
 
   it('records the dispute even when no order matches', async () => {

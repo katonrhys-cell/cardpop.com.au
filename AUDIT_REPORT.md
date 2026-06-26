@@ -60,38 +60,31 @@ Legend: ✅ fixed in this branch · ⏸️ deferred (needs a decision or DB migr
 
 ---
 
-## ⏸️ Deferred — need a decision or a DB migration
+## ✅ Fixed — Money concurrency (`commit: atomic wallet, stock oversell, cart payouts`)
 
-### Money concurrency (require new SQL RPCs — apply the migration, then wire the code)
+> ⚠️ **Two new migrations must be applied to the database for this commit to work:**
+> `20260626000003_add_increment_wallet_balance_fn.sql` and
+> `20260626000004_guard_decrement_shop_stock_fn.sql`. The code now calls these
+> RPCs. Apply them via the Supabase dashboard/CLI before (or with) deploy.
 
-1. **Seller wallet payout is a read-modify-write (lost updates / double-pay).**
-   `services/payoutService.js` `creditWallet` and `services/disputeService.js`
-   clawback both read `wallet_balance_aud` into JS and write it back. Concurrent
-   payouts overwrite each other. Recommended migration:
-   ```sql
-   create or replace function public.increment_wallet_balance(p_user uuid, p_delta numeric)
-   returns void language sql security definer as $$
-     update public.profiles
-        set wallet_balance_aud = coalesce(wallet_balance_aud, 0) + p_delta
-      where id = p_user;
-   $$;
-   ```
-   then replace the read-modify-write with `supabase.rpc('increment_wallet_balance', { p_user, p_delta })`.
+1. **Seller wallet payout was a read-modify-write (lost updates / double-pay).**
+   `payoutService.creditWallet` and `disputeService` clawback read
+   `wallet_balance_aud` into JS and wrote it back; concurrent payouts overwrote
+   each other. Now both use an atomic `increment_wallet_balance(uuid, numeric)`
+   RPC (floors at 0, lockdown grants like `decrement_shop_stock`).
+2. **Stock oversell on cart checkout.** `decrement_shop_stock` floored at 0
+   (`greatest(0, …)`), so two buyers could both pay for the last unit and the
+   oversell was invisible. The function is now guarded
+   (`where stock_quantity >= qty`) and returns a boolean; the webhook flags an
+   oversell (admin notification) for manual refund/restock instead of confirming
+   it silently. Full reserve-at-checkout (with expiry) remains a possible future
+   hardening, but the silent-oversell hole is closed.
+3. **Cart-path sellers are now paid.** The cart confirmation branch credits each
+   listing line's seller via `payoutSeller` (proceeds = `line_total_aud −
+   commission_aud`), guarded by the existing atomic pending → payment_confirmed
+   claim so it runs exactly once.
 
-2. **Stock oversell on cart checkout.** `routes/stripe.js` validates stock at
-   session creation but only decrements in the webhook via `decrement_shop_stock`,
-   which floors at 0 (`greatest(0, …)`) — two buyers can both pay for the last
-   unit and the oversell is invisible. Needs an atomic reserve-at-checkout
-   (decrement with a `where stock_quantity >= qty` guard, releasing on
-   expiry/failure) rather than clamping.
-
-3. **Cart-path sellers are never paid.** The single-item checkout calls
-   `payoutSeller`, but the cart confirmation branch marks listings sold without
-   crediting each `line.seller_id`. Wire `payoutSeller` per cart line.
-
-> These were left unshipped because they depend on RPCs/migrations that must be
-> applied and verified against the live database; shipping code that calls an
-> un-applied RPC into payout logic would be worse than the race it fixes.
+## ⏸️ Deferred — need a decision
 
 ### Product decisions
 
