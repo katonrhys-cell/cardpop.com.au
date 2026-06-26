@@ -152,14 +152,43 @@ const PSACertificationSection = ({ certNumber, gradingCompany }) => {
             </div>
           )}
 
-          {/* PSA Estimate (USD) */}
+          {/* PSA Estimate (USD & AUD) */}
           {data.psaEstimate != null && (
-            <div className="mb-6 p-4 bg-green-500/10 rounded-lg border border-green-500/20">
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">PSA Estimate (USD)</p>
-              <p className="text-2xl font-bold text-green-700 dark:text-green-400">
-                ${data.psaEstimate.toFixed(2)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">Estimate based on recent comparable sales</p>
+            <div className="mb-6 space-y-3">
+              {/* USD Price */}
+              <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">PSA Estimate (USD)</p>
+                <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">
+                  USD ${data.psaEstimate.toFixed(2)}
+                </p>
+              </div>
+
+              {/* AUD Price */}
+              {data.psaEstimateAud != null && (
+                <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/20">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">PSA Estimate (AUD)</p>
+                  <p className="text-2xl font-bold text-green-700 dark:text-green-400">
+                    AUD ${data.psaEstimateAud.toFixed(2)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Exchange rate: 1 USD = {data.exchangeRate ? `${data.exchangeRate.toFixed(4)} AUD` : 'N/A'}
+                  </p>
+                </div>
+              )}
+
+              {/* Disclaimer */}
+              <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  <span className="font-bold">Exchange Rate Disclaimer:</span> AUD price is updated daily and reflects the most recent USD/AUD exchange rate available. Prices based on PSA's most recent comparable sales data. Actual value may vary based on market conditions.
+                  {data.lastExchangeRateUpdate && (
+                    <span className="block mt-1 text-[11px] text-muted-foreground">
+                      Last updated: {new Date(data.lastExchangeRateUpdate).toLocaleString()}
+                    </span>
+                  )}
+                </p>
+              </div>
+
+              <p className="text-xs text-muted-foreground">Estimate based on PSA's recent comparable sales data</p>
             </div>
           )}
 

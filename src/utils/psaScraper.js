@@ -1,5 +1,6 @@
 import cheerio from 'cheerio';
 import logger from './logger.js';
+import { convertUsdToAud, getExchangeRateInfo } from './exchangeRates.js';
 
 const PSA_BASE_URL = 'https://www.psacard.com/cert';
 
@@ -27,6 +28,10 @@ async function fetchPSACertification(certNumber) {
     const $ = cheerio.load(html);
 
     // Extract data from PSA page
+    const psaEstimateUsd = extractPSAEstimate($);
+    const psaEstimateAud = psaEstimateUsd ? await convertUsdToAud(psaEstimateUsd) : null;
+    const exchangeRateInfo = psaEstimateUsd ? await getExchangeRateInfo() : null;
+
     const certData = {
       certNumber,
       cardTitle: extractCardTitle($),
@@ -35,7 +40,10 @@ async function fetchPSACertification(certNumber) {
       cardNumber: extractCardNumber($),
       grade: extractGrade($),
       gradeCategory: extractGradeCategory($),
-      psaEstimate: extractPSAEstimate($),
+      psaEstimate: psaEstimateUsd,
+      psaEstimateAud,
+      exchangeRate: exchangeRateInfo?.rate,
+      lastExchangeRateUpdate: exchangeRateInfo?.lastUpdatedAt,
       population: extractPopulation($),
       popHigher: extractPopHigher($),
       frontImage: extractFrontImage($),
