@@ -4,8 +4,11 @@ import request from 'supertest';
 
 const mockSupabase = vi.hoisted(() => ({ from: vi.fn() }));
 const mockIsAdminUser = vi.hoisted(() => vi.fn());
+const mockPayoutSeller = vi.hoisted(() => vi.fn());
 
 vi.mock('../../src/utils/supabaseClient.js', () => ({ default: mockSupabase, supabase: mockSupabase }));
+vi.mock('../../src/utils/stripeClient.js', () => ({ default: { transfers: { create: vi.fn() } } }));
+vi.mock('../../src/services/payoutService.js', () => ({ payoutSeller: mockPayoutSeller }));
 vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -28,7 +31,9 @@ const app = makeApp();
 function makeBuilder(result = { data: null, error: null }) {
   const b = {
     select: vi.fn(() => b), update: vi.fn(() => b), insert: vi.fn(() => b), eq: vi.fn(() => b),
+    order: vi.fn(() => b), limit: vi.fn(() => b), not: vi.fn(() => b),
     single: vi.fn(() => Promise.resolve(result)),
+    maybeSingle: vi.fn(() => Promise.resolve(result)),
     then: (resolve, reject) => Promise.resolve(result).then(resolve, reject),
     catch: (fn) => Promise.resolve(result).catch(fn),
   };
@@ -39,6 +44,7 @@ const queueFrom = (...builders) => builders.forEach((b) => mockSupabase.from.moc
 beforeEach(() => {
   vi.clearAllMocks();
   mockIsAdminUser.mockResolvedValue(true);
+  mockPayoutSeller.mockResolvedValue({ status: 'transferred', transferId: 'tr_x' });
 });
 
 // ─── admin gate ────────────────────────────────────────────────────────────────
@@ -150,5 +156,57 @@ describe('PATCH /refunds/:id', () => {
   it('rejects an invalid action', async () => {
     const res = await request(app).patch('/admin/refunds/r1').send({ action: 'maybe' });
     expect(res.status).toBe(400);
+  });
+});
+
+// ─── disputes ───────────────────────────────────────────────────────────────────
+
+describe('GET /disputes', () => {
+  it('lists disputes for an admin', async () => {
+    queueFrom(makeBuilder({ data: [{ id: 'd1' }, { id: 'd2' }], error: null }));
+    const res = await request(app).get('/admin/disputes');
+    expect(res.status).toBe(200);
+    expect(res.body.disputes).toHaveLength(2);
+  });
+
+  it('rejects non-admins', async () => {
+    mockIsAdminUser.mockResolvedValue(false);
+    const res = await request(app).get('/admin/disputes');
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('PATCH /disputes/:id', () => {
+  it('releases a frozen payout by paying the seller their proceeds', async () => {
+    queueFrom(
+      makeBuilder({ data: { id: 'd1', order_id: 'o1' }, error: null }),                       // dispute fetch
+      makeBuilder({ data: { id: 'o1', seller_id: 's1', listing_id: 'l1', seller_proceeds_aud: 230 }, error: null }), // order fetch
+      makeBuilder({ data: { id: 'd1', status: 'resolved_released' }, error: null }),          // dispute update
+    );
+    const res = await request(app).patch('/admin/disputes/d1').send({ action: 'release', resolution_notes: 'won' });
+    expect(res.status).toBe(200);
+    expect(mockPayoutSeller).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ sellerId: 's1', sellerProceeds: 230, orderId: 'o1' }));
+    expect(res.body.dispute.status).toBe('resolved_released');
+  });
+
+  it('keeps the payout frozen without paying out', async () => {
+    queueFrom(
+      makeBuilder({ data: { id: 'd1', order_id: 'o1' }, error: null }),                 // dispute fetch
+      makeBuilder({ data: { id: 'd1', status: 'resolved_kept' }, error: null }),        // dispute update
+    );
+    const res = await request(app).patch('/admin/disputes/d1').send({ action: 'keep_frozen' });
+    expect(res.status).toBe(200);
+    expect(mockPayoutSeller).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid action', async () => {
+    const res = await request(app).patch('/admin/disputes/d1').send({ action: 'whatever' });
+    expect(res.status).toBe(400);
+  });
+
+  it('404s an unknown dispute', async () => {
+    queueFrom(makeBuilder({ data: null, error: null }));
+    const res = await request(app).patch('/admin/disputes/missing').send({ action: 'keep_frozen' });
+    expect(res.status).toBe(404);
   });
 });

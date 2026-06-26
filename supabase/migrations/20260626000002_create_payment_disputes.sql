@@ -19,6 +19,10 @@ CREATE TABLE IF NOT EXISTS payment_disputes (
   -- won, lost, etc. We keep whatever Stripe sends.
   status TEXT NOT NULL,
   payout_action TEXT,          -- 'transfer_reversed' | 'wallet_clawback' | 'none'
+  -- Admin resolution (set when a moderator releases or keeps the frozen payout).
+  resolution_notes TEXT,
+  resolved_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  resolved_at TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
