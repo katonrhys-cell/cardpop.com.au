@@ -8,9 +8,19 @@ const router = Router();
 router.get('/', async (req, res) => {
   try {
     const { q } = req.query;
-    const limit = parseInt(req.query.limit) || 10;
-    
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
+
     if (!q || q.length < 2) {
+      return res.json({ suggestions: [], didYouMean: null });
+    }
+
+    // Sanitize the term before interpolating into PostgREST filter strings.
+    // `.or()` takes a query-grammar string (not a bound parameter), so commas,
+    // parentheses and dots could inject extra filter clauses. Also strip LIKE
+    // wildcards (% _) which would otherwise let `q=%` match everything / force a
+    // full scan. Cap length defensively.
+    const safeQ = String(q).replace(/[,.()%_\\]/g, ' ').trim().slice(0, 100);
+    if (safeQ.length < 2) {
       return res.json({ suggestions: [], didYouMean: null });
     }
 
@@ -18,7 +28,7 @@ router.get('/', async (req, res) => {
     const { data: cards, error: cardsError } = await supabase
       .from('vault_items')
       .select('card_name')
-      .ilike('card_name', `%${q}%`)
+      .ilike('card_name', `%${safeQ}%`)
       .limit(limit)
       .order('card_name');
 
@@ -28,7 +38,7 @@ router.get('/', async (req, res) => {
     const { data: products, error: productsError } = await supabase
       .from('products')
       .select('title, name')
-      .or(`title.ilike.%${q}%,name.ilike.%${q}%`)
+      .or(`title.ilike.%${safeQ}%,name.ilike.%${safeQ}%`)
       .limit(limit)
       .order('title');
 

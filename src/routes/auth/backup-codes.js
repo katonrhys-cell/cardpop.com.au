@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import crypto from 'crypto';
 import express from 'express';
 import supabase from '../../utils/supabaseClient.js';
 import { generateBackupCodes } from '../../utils/otpGenerator.js';
@@ -9,6 +10,15 @@ import logger from '../../utils/logger.js';
 
 const router = express.Router();
 
+/** Constant-time comparison of two strings; false on any length mismatch. */
+function timingSafeEqualStr(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
 router.post('/generate', authMiddleware, async (req, res) => {
   const codes = generateBackupCodes(6);
   const encryptedCodes = encrypt({
@@ -16,10 +26,12 @@ router.post('/generate', authMiddleware, async (req, res) => {
     generatedAt: new Date().toISOString(),
   });
 
+  // Upsert (not update): if no user_security row exists yet, a plain update
+  // matches zero rows and silently succeeds, returning codes that were never
+  // persisted — the user would then be locked out when verifying.
   const { error } = await supabase
     .from('user_security')
-    .update({ backup_codes: encryptedCodes })
-    .eq('user_id', req.user.id);
+    .upsert({ user_id: req.user.id, backup_codes: encryptedCodes }, { onConflict: 'user_id' });
 
   if (error) throw error;
 
@@ -42,11 +54,11 @@ router.post('/verify', authMiddleware, backupCodeLimiter, async (req, res) => {
   if (!profile?.backup_codes) return res.status(404).json({ error: 'No backup codes found' });
 
   const decrypted = decrypt(profile.backup_codes);
-  const codeEntry = decrypted.codes.find(c => c.code === code && !c.used);
+  const codeEntry = decrypted.codes.find(c => timingSafeEqualStr(c.code, code) && !c.used);
   if (!codeEntry) return res.status(401).json({ error: 'Invalid or already used backup code' });
 
   const updatedEncrypted = encrypt({
-    codes: decrypted.codes.map(c => c.code === code ? { ...c, used: true } : c),
+    codes: decrypted.codes.map(c => c.code === codeEntry.code ? { ...c, used: true } : c),
     generatedAt: decrypted.generatedAt,
   });
 

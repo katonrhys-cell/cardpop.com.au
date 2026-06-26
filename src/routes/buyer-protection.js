@@ -19,7 +19,7 @@ router.get('/my-claims', async (req, res) => {
 
     const { data: claims, error } = await supabase
       .from('buyer_protection_claims')
-      .select('*, order:orders(id, created_at, total_amount)')
+      .select('*, order:orders(id, created_at, total_aud)')
       .eq('buyer_id', userId)
       .order('created_at', { ascending: false });
 

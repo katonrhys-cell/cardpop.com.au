@@ -13,11 +13,18 @@ export const psaApiClient = {
       throw new Error('gradingNumber is required and must be a string');
     }
 
+    // PSA cert numbers are alphanumeric; reject anything else so the value can't
+    // be used to alter the request path/query (path injection / request forgery).
+    const cert = gradingNumber.trim();
+    if (!/^[A-Za-z0-9-]+$/.test(cert)) {
+      throw new Error('Invalid grading number format');
+    }
+
     try {
-      logger.info(`[PSA_API] Looking up cert: ${gradingNumber}`);
+      logger.info(`[PSA_API] Looking up cert: ${cert}`);
 
       const response = await fetch(
-        `${PSA_API_BASE}/cert/GetByCertNumber/${gradingNumber.trim()}`,
+        `${PSA_API_BASE}/cert/GetByCertNumber/${encodeURIComponent(cert)}`,
         {
           method: 'GET',
           headers: {
@@ -36,9 +43,9 @@ export const psaApiClient = {
         throw new Error(`PSA API error: ${response.status} ${response.statusText}`);
       }
 
-      const cert = await response.json();
-      logger.info(`[PSA_API] Successfully retrieved cert ${gradingNumber}`);
-      return cert;
+      const result = await response.json();
+      logger.info(`[PSA_API] Successfully retrieved cert ${cert}`);
+      return result;
     } catch (error) {
       logger.error(`[PSA_API] Lookup failed for ${gradingNumber}: ${error.message}`);
       throw error;

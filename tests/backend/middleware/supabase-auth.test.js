@@ -39,13 +39,15 @@ describe('supabaseAuth (optional auth)', () => {
     expect(next).toHaveBeenCalledWith();
   });
 
-  it('forwards an error to next when token verification throws', async () => {
+  it('continues unauthenticated (does not surface a 500) when token verification throws', async () => {
+    // A thrown getUser is treated as "not authenticated", not a server error —
+    // next() is called with no argument so the request proceeds without a userId.
     mockGetUser.mockRejectedValue(new Error('network down'));
     const req = { headers: { authorization: 'Bearer x' } };
     const next = vi.fn();
     await supabaseAuth(req, {}, next);
     expect(next).toHaveBeenCalledTimes(1);
-    expect(next.mock.calls[0][0]).toBeInstanceOf(Error);
-    expect(next.mock.calls[0][0].message).toBe('network down');
+    expect(next.mock.calls[0][0]).toBeUndefined();
+    expect(req.userId).toBeUndefined();
   });
 });

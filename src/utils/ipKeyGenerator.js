@@ -6,15 +6,11 @@
  * @returns {string} Normalized IP address suitable for rate limiting keys
  */
 function ipKeyGenerator(req) {
-  // Try to get IP from x-forwarded-for header first (for proxied requests)
-  const forwardedFor = req.headers['x-forwarded-for'];
-  if (forwardedFor) {
-    // x-forwarded-for can contain multiple IPs, take the first one
-    const ip = forwardedFor.split(',')[0].trim();
-    return normalizeIp(ip);
-  }
-
-  // Fall back to req.ip (Express sets this from various sources)
+  // Use req.ip, which Express derives from X-Forwarded-For using the configured
+  // `trust proxy` hop count (see src/app.js). Reading the raw X-Forwarded-For
+  // header here would let a client spoof its IP (the header is fully
+  // client-controlled), bypassing every rate limiter and IP-based lockout — the
+  // exact attack the bounded trust-proxy setting exists to prevent.
   if (req.ip) {
     return normalizeIp(req.ip);
   }

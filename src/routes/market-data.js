@@ -150,7 +150,9 @@ router.get('/compare/:cardName', async (req, res) => {
 router.get('/trending/limit/:limit', async (req, res) => {
   try {
     const { limit } = req.params;
-    const limitNum = parseInt(limit) || 10;
+    // Clamp to a sane range — parseInt('-5') is truthy and would otherwise pass a
+    // negative value to .limit(); a huge value is a cheap amplification request.
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
 
     // Get cards with most recent market data updates
     const { data: trending, error } = await supabase
