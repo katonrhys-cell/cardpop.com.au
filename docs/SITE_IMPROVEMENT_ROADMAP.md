@@ -78,8 +78,17 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
       moved out of `public/` to `tools/hero-sources/` (regen: `npm run optimize:images`).
       **Home: perf 84→89, LCP 1.82s→1.22s (−33%), TBT 64→2 ms**; Lighthouse's
       responsive-images (560 ms) + modern-formats (320 ms) opportunities now zero.
-- [ ] Image pipeline (rest): apply the same `<picture>`/srcset treatment to
-      Supabase-hosted listing/product images (LCP on marketplace/listing pages)
+- [x] Image pipeline (listing/product images): `utils/imageUrl.js` `getCardImage()`
+      builds responsive srcset URLs via Supabase Storage transforms (auto-WebP),
+      wired into `CardImage` + the grid cards (Marketplace/Product/Vault) and the
+      detail-page `ProductImageCarousel` (main image eager/high-priority + a
+      full-res original kept for the zoom microscope; thumbnails at 80/160 w).
+      Transforms are a paid feature, so it **degrades gracefully**: `CardImage`
+      swaps to the untransformed original on error and a session flag stops
+      retrying transforms (≤1 wasted request if the feature is off). Tested
+      (`imageUrl.test.js`, `cardImage.test.jsx`).
+      ⚠️ Not measured in-sandbox — Supabase egress is blocked here, so the
+      marketplace renders empty; the real LCP/bytes win needs a populated env.
 - [x] Lighthouse CI measuring LCP / TBT / CLS + a11y/SEO/best-practices on every
       PR (`lighthouserc.cjs`, `npm run lhci`, `.github/workflows/lighthouse.yml`).
       Budgets derived from baseline; CLS + a11y are hard `error` gates, perf/LCP/

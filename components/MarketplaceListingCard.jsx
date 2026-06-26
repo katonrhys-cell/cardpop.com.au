@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Heart, ZoomIn } from 'lucide-react';
 import ImageZoomModal from '@/components/ImageZoomModal.jsx';
 import CardImage from '@/components/CardImage.jsx';
+import { getCardImage, CARD_GRID_SIZES } from '@/utils/imageUrl.js';
 import { toast } from 'sonner';
 import VerifiedBadge from '@/components/VerifiedBadge.jsx';
 import SellerTierBadge from '@/components/SellerTierBadge.jsx';
@@ -11,7 +12,6 @@ import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { VARIANT_BADGES } from '@/lib/cardVariants.js';
 import { getRefractorLabel, getRefractorBadgeClass } from '@/lib/cardAttributeLabels.js';
-import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { useWatchlist } from '@/hooks/useWatchlist.js';
 import SellerRatingDisplay from '@/components/SellerRatingDisplay.jsx';
@@ -45,9 +45,7 @@ const MarketplaceListingCard = ({ listing }) => {
   const vaultItem = listing.vault_item;
   // vault_images stores storage_path; card_image may be a full URL or storage path
   const imgPath = vaultItem?.card_image || vaultItem?.vault_images?.[0]?.storage_path || null;
-  const imgSrc = imgPath
-    ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
-    : null;
+  const { src: imgSrc, srcSet: imgSrcSet, fallbackSrc: imgFallback } = getCardImage(imgPath);
 
   const rawVariants = vaultItem?.variant
     ? vaultItem.variant.split(',').map(s => s.trim()).filter(Boolean)
@@ -68,6 +66,9 @@ const MarketplaceListingCard = ({ listing }) => {
       <Link to={detailPath} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
         <CardImage
           src={imgSrc}
+          srcSet={imgSrcSet}
+          sizes={CARD_GRID_SIZES}
+          fallbackSrc={imgFallback}
           alt={listing.title || 'Listing Image'}
           imgClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           width="400"

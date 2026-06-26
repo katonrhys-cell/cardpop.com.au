@@ -1,32 +1,31 @@
 
 import React, { useState } from 'react';
 import { ImageOff } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient.js';
 import { cn } from '@/lib/utils.js';
+import CardImage from '@/components/CardImage.jsx';
+import { getCardImage } from '@/utils/imageUrl.js';
 import CardMicroscope from '@/components/CardMicroscope.jsx';
+
+// The detail-page hero image is the LCP on listing/product pages, so it's loaded
+// eagerly at high priority and served responsively (480/800/1200 w, auto-WebP).
+const MAIN_SIZES = '(min-width: 1024px) 700px, 90vw';
 
 const ProductImageCarousel = ({ images = [], record = null, frameClassName = 'bg-white dark:bg-zinc-950' }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [microscopeOpen, setMicroscopeOpen] = useState(false);
 
-  const getImageUrl = (img) => {
-    if (!img) return null;
-    if (typeof img === 'string' && img.startsWith('http')) return img;
-    // If record has a storage_path, use Supabase Storage
-    if (record && record.storage_path) {
-      return supabase.storage.from('vault-images').getPublicUrl(record.storage_path).data.publicUrl;
-    }
-    // img might itself be a storage path
-    if (typeof img === 'string') {
-      return supabase.storage.from('vault-images').getPublicUrl(img).data.publicUrl;
-    }
-    return null;
+  // The underlying storage path / URL for a given slot. A record's storage_path
+  // wins (single-image vault records); otherwise the array entry is the source.
+  const sourceFor = (img) => {
+    if (record && record.storage_path) return record.storage_path;
+    return typeof img === 'string' ? img : null;
   };
 
   const validImages = Array.isArray(images) ? images : (images ? [images] : []);
-  const currentImage = validImages.length > 0 ? getImageUrl(validImages[activeIndex]) : null;
+  const mainSource = validImages.length > 0 ? sourceFor(validImages[activeIndex]) : null;
+  const main = getCardImage(mainSource, { widths: [480, 800, 1200], quality: 78 });
 
-  if (validImages.length === 0 || !currentImage) {
+  if (validImages.length === 0 || !main.src) {
     return (
       <div className="w-full aspect-[4/5] md:aspect-square bg-muted/40 rounded-3xl border border-border flex flex-col items-center justify-center text-muted-foreground">
         <ImageOff className="w-16 h-16 mb-4 opacity-20" />
@@ -42,10 +41,15 @@ const ProductImageCarousel = ({ images = [], record = null, frameClassName = 'bg
         onClick={() => setMicroscopeOpen(true)}
         className={cn("relative w-full aspect-[4/5] md:aspect-square rounded-3xl border border-border overflow-hidden cursor-zoom-in group shadow-sm", frameClassName)}
       >
-        <img
-          src={currentImage}
+        <CardImage
+          src={main.src}
+          srcSet={main.srcSet}
+          sizes={MAIN_SIZES}
+          fallbackSrc={main.fallbackSrc}
           alt={`Product view ${activeIndex + 1}`}
-          className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
+          imgClassName="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
+          loading="eager"
+          fetchPriority="high"
         />
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
         <div className="absolute top-4 right-4 bg-background/80 backdrop-blur-md p-2 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -56,35 +60,42 @@ const ProductImageCarousel = ({ images = [], record = null, frameClassName = 'bg
         </div>
       </div>
 
+      {/* The magnifier needs full resolution — give it the untransformed original. */}
       <CardMicroscope
         isOpen={microscopeOpen}
         onClose={() => setMicroscopeOpen(false)}
-        imageUrl={currentImage}
+        imageUrl={main.fallbackSrc}
         altText={`Product view ${activeIndex + 1}`}
       />
 
       {/* Thumbnails */}
       {validImages.length > 1 && (
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x">
-          {validImages.map((img, idx) => (
-            <button
-              key={idx}
-              onClick={() => setActiveIndex(idx)}
-              className={cn(
-                "relative w-20 h-20 shrink-0 rounded-xl overflow-hidden border-2 transition-all duration-200 snap-start",
-                frameClassName,
-                activeIndex === idx
-                  ? "border-primary ring-2 ring-primary/20 ring-offset-2 ring-offset-background"
-                  : "border-border hover:border-primary/50 opacity-70 hover:opacity-100"
-              )}
-            >
-              <img
-                src={getImageUrl(img)}
-                alt={`Thumbnail ${idx + 1}`}
-                className="w-full h-full object-cover"
-              />
-            </button>
-          ))}
+          {validImages.map((img, idx) => {
+            const thumb = getCardImage(sourceFor(img), { widths: [80, 160] });
+            return (
+              <button
+                key={idx}
+                onClick={() => setActiveIndex(idx)}
+                className={cn(
+                  "relative w-20 h-20 shrink-0 rounded-xl overflow-hidden border-2 transition-all duration-200 snap-start",
+                  frameClassName,
+                  activeIndex === idx
+                    ? "border-primary ring-2 ring-primary/20 ring-offset-2 ring-offset-background"
+                    : "border-border hover:border-primary/50 opacity-70 hover:opacity-100"
+                )}
+              >
+                <CardImage
+                  src={thumb.src}
+                  srcSet={thumb.srcSet}
+                  sizes="80px"
+                  fallbackSrc={thumb.fallbackSrc}
+                  alt={`Thumbnail ${idx + 1}`}
+                  imgClassName="w-full h-full object-cover"
+                />
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

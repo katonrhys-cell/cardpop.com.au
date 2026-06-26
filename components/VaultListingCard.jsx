@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { VARIANT_BADGES } from '@/lib/cardVariants.js';
 import { formatAutograph, getRefractorLabel, getRefractorBadgeClass } from '@/lib/cardAttributeLabels.js';
-import { supabase } from '@/lib/supabaseClient.js';
+import { getCardImage, CARD_GRID_SIZES } from '@/utils/imageUrl.js';
 
 const GRADE_BADGE = {
   psa:   'bg-red-600 text-white',
@@ -29,16 +29,10 @@ const getStatusBadge = (listingType) => {
   }
 };
 
-const resolveImageUrl = (path) => {
-  if (!path || typeof path !== 'string') return null;
-  if (path.startsWith('http')) return path;
-  return supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
-};
-
 const VaultListingCard = ({ vaultItem, listing }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
   const rawImg = vaultItem.vault_images?.[0]?.storage_path || vaultItem.card_image || vaultItem.vault_images?.[0]?.image_url || vaultItem.image_url || null;
-  const imgSrc = resolveImageUrl(rawImg);
+  const { src: imgSrc, srcSet: imgSrcSet, fallbackSrc: imgFallback } = getCardImage(rawImg);
   const sellerObj = vaultItem.profiles || vaultItem.owner || vaultItem.seller || vaultItem.expand?.user_id || null;
   const sellerId = vaultItem.user_id || vaultItem.owner_id || sellerObj?.id;
   const titleSlug = slugify(vaultItem.card_name || vaultItem.name || vaultItem.title || 'card');
@@ -65,6 +59,9 @@ const VaultListingCard = ({ vaultItem, listing }) => {
       <Link to={detailPath} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
         <CardImage
           src={imgSrc}
+          srcSet={imgSrcSet}
+          sizes={CARD_GRID_SIZES}
+          fallbackSrc={imgFallback}
           alt={vaultItem.card_name || vaultItem.name || 'Vault Image'}
           imgClassName="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500 p-2"
           width="400"

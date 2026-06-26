@@ -5,9 +5,9 @@ import { Star, ShieldCheck, ZoomIn } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { getRefractorLabel, getRefractorBadgeClass } from '@/lib/cardAttributeLabels.js';
-import { supabase } from '@/lib/supabaseClient.js';
 import CardMicroscope from '@/components/CardMicroscope.jsx';
 import CardImage from '@/components/CardImage.jsx';
+import { getCardImage, CARD_GRID_SIZES } from '@/utils/imageUrl.js';
 
 const GRADE_BADGE = {
   psa:   'bg-red-600 text-white',
@@ -18,16 +18,10 @@ const GRADE_BADGE = {
   other: 'bg-slate-600 text-white',
 };
 
-const resolveImageUrl = (path) => {
-  if (!path || typeof path !== 'string') return null;
-  if (path.startsWith('http')) return path;
-  return supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
-};
-
 const ProductCard = ({ product }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
   const rawImg = product.images?.[0] || product.cardImage?.[0] || product.card_image || product.image_url || null;
-  const imgSrc = resolveImageUrl(rawImg);
+  const { src: imgSrc, srcSet: imgSrcSet, fallbackSrc: imgFallback } = getCardImage(rawImg);
   const sellerId = product.seller_id || product.seller || product.owner_id || product.owner || product.user_id;
   const sellerObj = product.expand?.seller_id || product.expand?.seller || product.expand?.owner || product.expand?.user_id;
   const titleSlug = slugify(product.name || product.cardName || product.title || 'card');
@@ -40,6 +34,9 @@ const ProductCard = ({ product }) => {
       <Link to={detailPath} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
         <CardImage
           src={imgSrc}
+          srcSet={imgSrcSet}
+          sizes={CARD_GRID_SIZES}
+          fallbackSrc={imgFallback}
           alt={product.name || product.cardName || 'Product Image'}
           imgClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           width="400"
