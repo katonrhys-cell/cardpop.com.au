@@ -140,63 +140,79 @@ router.get('/price-estimate', async (req, res) => {
 
     logger.info(`[EBAY_PRICE_ESTIMATE] After price filter: ${allItems.length} valid listings`);
 
-    // Score and sort by relevance: prioritize exact card name matches, deprioritize variants/graded
+    // Separate base cards from graded versions
+    const gradingKeywords = ['psa', 'bgs', 'cgc', 'sgc', 'autograph', 'auto'];
+    const baseCards = [];
+    const gradedCards = [];
+
+    // Classify each listing
+    for (const item of allItems) {
+      const titleLower = item.title.toLowerCase();
+      const isGraded = gradingKeywords.some(kw => titleLower.includes(kw));
+      if (isGraded) {
+        gradedCards.push(item);
+      } else {
+        baseCards.push(item);
+      }
+    }
+
+    // Score and sort each group by relevance
+    const scoreListing = (item, cardNameLower) => {
+      const title = item.title.toLowerCase();
+      const exactMatch = title === cardNameLower ? 10 : 0;
+      const containsCardName = title.includes(cardNameLower) ? 3 : 0;
+      return exactMatch + containsCardName;
+    };
+
     const cardNameLower = name.toLowerCase();
-    allItems = allItems.sort((a, b) => {
-      const aTitle = a.title.toLowerCase();
-      const bTitle = b.title.toLowerCase();
-
-      // Exact match score (higher = better)
-      const aExactMatch = aTitle === cardNameLower ? 10 : 0;
-      const bExactMatch = bTitle === cardNameLower ? 10 : 0;
-
-      // Penalize variant keywords (lower score = worse)
-      const variantKeywords = ['psa', 'bgs', 'cgc', 'autograph', 'auto', 'serial', 'rookie', 'variant', 'refractor', 'foil'];
-      const aVariantPenalty = variantKeywords.filter(kw => aTitle.includes(kw)).length;
-      const bVariantPenalty = variantKeywords.filter(kw => bTitle.includes(kw)).length;
-
-      // Prioritize raw/ungraded
-      const aIsRaw = aTitle.includes('raw') || aTitle.includes('ungraded') ? 5 : 0;
-      const bIsRaw = bTitle.includes('raw') || bTitle.includes('ungraded') ? 5 : 0;
-
-      const aScore = aExactMatch + aIsRaw - (aVariantPenalty * 2);
-      const bScore = bExactMatch + bIsRaw - (bVariantPenalty * 2);
-
-      return bScore - aScore;
-    });
+    baseCards.sort((a, b) => scoreListing(b, cardNameLower) - scoreListing(a, cardNameLower));
+    gradedCards.sort((a, b) => scoreListing(b, cardNameLower) - scoreListing(a, cardNameLower));
 
     // Convert all prices to AUD for comparison (1 USD ≈ 1.50 AUD as reference)
     // In production, use a live exchange rate API
     const USD_TO_AUD = 1.50;
-    const pricesInAUD = allItems.map(i => {
-      const basePrice = parseFloat(i.price?.value || 0);
-      return i.currency === 'USD' ? basePrice * USD_TO_AUD : basePrice;
-    }).filter(p => p > 0);
 
-    const avgPrice = pricesInAUD.length > 0
-      ? Math.round((pricesInAUD.reduce((a, b) => a + b, 0) / pricesInAUD.length) * 100) / 100
+    const calculatePrices = (items) => {
+      return items.map(i => {
+        const basePrice = parseFloat(i.price?.value || 0);
+        return i.currency === 'USD' ? basePrice * USD_TO_AUD : basePrice;
+      }).filter(p => p > 0);
+    };
+
+    const baseCardPrices = calculatePrices(baseCards);
+    const gradedCardPrices = calculatePrices(gradedCards);
+    const allPrices = [...baseCardPrices, ...gradedCardPrices];
+
+    const avgPrice = allPrices.length > 0
+      ? Math.round((allPrices.reduce((a, b) => a + b, 0) / allPrices.length) * 100) / 100
       : 0;
 
-    const listings = allItems.slice(0, 12).map(i => ({
-      itemId:      i.itemId,
-      title:       i.title,
-      price:       parseFloat(i.price?.value || 0),
-      currency:    i.currency,
-      priceInAUD:  i.currency === 'USD' ? parseFloat(i.price?.value || 0) * USD_TO_AUD : parseFloat(i.price?.value || 0),
-      condition:   parseCondition(i.condition),
-      marketplace: i.marketplace,
-      listingUrl:  i.itemWebUrl || '',
-      thumbnailUrl: i.image?.imageUrl || '',
-    }));
+    const formatListing = (item) => ({
+      itemId:      item.itemId,
+      title:       item.title,
+      price:       parseFloat(item.price?.value || 0),
+      currency:    item.currency,
+      priceInAUD:  item.currency === 'USD' ? parseFloat(item.price?.value || 0) * USD_TO_AUD : parseFloat(item.price?.value || 0),
+      condition:   parseCondition(item.condition),
+      marketplace: item.marketplace,
+      listingUrl:  item.itemWebUrl || '',
+      thumbnailUrl: item.image?.imageUrl || '',
+    });
 
-    logger.info(`[EBAY_PRICE_ESTIMATE] Combined ${allItems.length} listings, avg AUD: $${avgPrice}`);
+    const baseListings = baseCards.slice(0, 8).map(formatListing);
+    const gradedListings = gradedCards.slice(0, 8).map(formatListing);
+
+    logger.info(`[EBAY_PRICE_ESTIMATE] ${baseCards.length} base cards, ${gradedCards.length} graded, avg AUD: $${avgPrice}`);
 
     res.json({
-      count: pricesInAUD.length,
+      count: allPrices.length,
       avgPrice,
-      minPrice: pricesInAUD.length > 0 ? Math.min(...pricesInAUD) : 0,
-      maxPrice: pricesInAUD.length > 0 ? Math.max(...pricesInAUD) : 0,
-      listings,
+      minPrice: allPrices.length > 0 ? Math.min(...allPrices) : 0,
+      maxPrice: allPrices.length > 0 ? Math.max(...allPrices) : 0,
+      baseListings,
+      gradedListings,
+      baseCount: baseCardPrices.length,
+      gradedCount: gradedCardPrices.length,
       exchangeRate: USD_TO_AUD,
     });
   } catch (error) {

@@ -137,12 +137,12 @@ const EbayMarketSection = ({ cardName, cardSet, gradingService, gradeScore }) =>
             </div>
           </div>
 
-          {/* Active Listings */}
-          {data.listings && data.listings.length > 0 && (
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Active Listings ({data.listings.length})</p>
+          {/* Base Card Listings */}
+          {data.baseListings && data.baseListings.length > 0 && (
+            <div className="mb-8">
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Base Cards ({data.baseCount})</p>
               <div className="space-y-2 max-h-80 overflow-y-auto">
-                {data.listings.map((listing, idx) => {
+                {data.baseListings.map((listing, idx) => {
                   const displayPrice = displayCurrency === 'USD' && listing.currency === 'AUD'
                     ? listing.price / data.exchangeRate
                     : displayCurrency === 'AUD' && listing.currency === 'USD'
@@ -195,7 +195,71 @@ const EbayMarketSection = ({ cardName, cardSet, gradingService, gradeScore }) =>
               </div>
               <Button asChild variant="outline" className="w-full mt-4 rounded-lg" size="sm">
                 <a href={`https://www.ebay.com.au/sch/i.html?_nkw=${encodeURIComponent(cardName)}`} target="_blank" rel="noopener noreferrer">
-                  View all listings on eBay Australia
+                  View all base cards on eBay
+                </a>
+              </Button>
+            </div>
+          )}
+
+          {/* Graded Card Listings */}
+          {data.gradedListings && data.gradedListings.length > 0 && (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">Graded Versions ({data.gradedCount})</p>
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {data.gradedListings.map((listing, idx) => {
+                  const displayPrice = displayCurrency === 'USD' && listing.currency === 'AUD'
+                    ? listing.price / data.exchangeRate
+                    : displayCurrency === 'AUD' && listing.currency === 'USD'
+                    ? listing.priceInAUD
+                    : listing.price;
+
+                  return (
+                    <a
+                      key={idx}
+                      href={listing.listingUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-start gap-3 p-3 bg-muted/20 hover:bg-muted/40 rounded-lg border border-border/50 hover:border-primary/50 transition-colors group"
+                    >
+                      {listing.thumbnailUrl && (
+                        <img
+                          src={listing.thumbnailUrl}
+                          alt="Listing"
+                          className="w-12 h-12 rounded object-cover flex-shrink-0"
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground group-hover:text-primary transition-colors line-clamp-2">
+                          {listing.title}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <Badge variant="secondary" className="text-xs font-bold">
+                            {listing.condition}
+                          </Badge>
+                          <Badge variant="outline" className="text-xs font-bold">
+                            {listing.marketplace === 'US' ? '🇺🇸 eBay.com' : '🇦🇺 eBay.au'}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {listing.shippingPrice > 0 ? `+${formatCurrency(listing.shippingPrice)} shipping` : 'Free shipping'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                        <p className="font-bold text-lg text-foreground tabular-nums">
+                          {displayCurrency === 'AUD' ? formatCurrency(displayPrice) : `$${displayPrice.toFixed(2)}`}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {listing.currency}
+                        </p>
+                        <ExternalLink className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
+              <Button asChild variant="outline" className="w-full mt-4 rounded-lg" size="sm">
+                <a href={`https://www.ebay.com.au/sch/i.html?_nkw=${encodeURIComponent(cardName)} graded`} target="_blank" rel="noopener noreferrer">
+                  View all graded listings on eBay
                 </a>
               </Button>
             </div>
