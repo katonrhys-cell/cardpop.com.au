@@ -686,8 +686,8 @@ const HomePage = () => {
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
                 <span className="font-bold text-background/90">{item.user}</span>
                 <span className="text-background/60">{item.action}</span>
-                <span className="font-bold text-primary bg-primary/15 px-2 py-0.5 rounded-lg">{item.price}</span>
-                <span className="text-background/40 text-xs">{item.time}</span>
+                <span className="font-bold text-primary-foreground bg-primary px-2 py-0.5 rounded-lg">{item.price}</span>
+                <span className="text-background/70 text-xs">{item.time}</span>
               </div>
             ))}
           </div>

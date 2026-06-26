@@ -76,10 +76,27 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 ## Tier 3 — Compounding quality
 
 ### 7. Accessibility
-- [ ] Add axe (jest-axe / @axe-core/playwright) to the test stack
-- [ ] Audit keyboard nav, focus management, ARIA on key flows (search, listing, checkout)
-- [ ] Colour-contrast pass against brand colours
-- [ ] AU DDA / WCAG 2.2 AA target
+- [x] Added axe to the test stack on **two** layers: `vitest-axe` unit checks
+      (`tests/frontend/a11y.test.jsx` — UI primitives, Footer, Breadcrumb, login
+      form, BuyerProtection) and `@axe-core/playwright` real-browser audits
+      (`e2e/a11y.spec.js` — home, marketplace, shop, login; fails the build on
+      serious/critical WCAG 2.0–2.2 A/AA violations, attaches full report)
+- [x] Colour-contrast pass against brand colours — fixed real AA failures the
+      audit surfaced:
+      - `--muted-foreground` was **4.1:1** on white (139 nodes site-wide) →
+        darkened light 50%→43% / lightened dark 60%→64% (now ≥4.8:1); same fix
+        for `--seo-breadcrumb-text`
+      - Home activity marquee: red price pill (2.1:1) → solid brand-red pill with
+        white text (5.5:1); faint timestamps `/40`→`/70` (6.2:1)
+      - Marketplace error state: `opacity-80` red text (4.05:1) → full destructive
+        red (5.1:1)
+- [x] ARIA names — gave every marketplace/shop filter `Select` combobox and the
+      icon-only refresh button an `aria-label` (axe `button-name` was critical:
+      comboboxes need an explicit label, not just placeholder text)
+- [ ] Manual audit of keyboard nav + focus management on key flows (search,
+      listing, checkout) — axe catches ~30–50%; the rest needs hands-on testing
+- [ ] Extend the axe E2E sweep to authenticated/checkout pages once seeded
+- [x] AU DDA / WCAG 2.2 AA target — encoded as the `withTags` set in the E2E spec
 
 ### 8. Test coverage gaps
 - [ ] `components/` (29%) — cover the high-traffic ones (cards, forms, modals)
