@@ -197,6 +197,28 @@ export const generateProductSchema = ({
       ...(itemCondition ? { itemCondition } : {}),
       ...(url ? { url } : {}),
       ...(sellerName ? { seller: { '@type': 'Organization', name: sellerName } } : {}),
+      shippingDetails: {
+        '@type': 'ShippingDeliveryTime',
+        handlingTime: {
+          '@type': 'QuantitativeValue',
+          minValue: 0,
+          maxValue: 2,
+          unitCode: 'DAY'
+        },
+        transitTime: {
+          '@type': 'QuantitativeValue',
+          minValue: 2,
+          maxValue: 7,
+          unitCode: 'DAY'
+        }
+      },
+      hasMerchantReturnPolicy: {
+        '@type': 'MerchantReturnPolicy',
+        returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
+        applicableCountry: 'AU',
+        merchantReturnDays: 30,
+        returnShippingFeeBusiness: 'https://schema.org/FreeReturn'
+      }
     };
   }
 
