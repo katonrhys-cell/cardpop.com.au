@@ -28,8 +28,8 @@ for (const path of PAGES) {
     await page.locator('#root').waitFor({ state: 'attached' });
     await expect(page.locator('#root')).not.toBeEmpty();
     await page.waitForLoadState('networkidle').catch(() => {});
-    // Final settle for any framer-motion entrance transitions (~0.3s each).
-    await page.waitForTimeout(800);
+    // Final settle for framer-motion entrance transitions (~0.3s each).
+    await page.waitForTimeout(400);
 
     const results = await new AxeBuilder({ page }).withTags(WCAG_AA_TAGS).analyze();
 
