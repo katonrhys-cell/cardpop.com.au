@@ -14,8 +14,9 @@ import { gzipSync } from 'node:zlib';
 import path from 'node:path';
 
 // Budget for the gzipped initial JS payload. Tighten over time; raise only with
-// a deliberate justification.
-const BUDGET_KB = 400;
+// a deliberate justification. Ratcheted 400→300 after evicting framer-motion
+// (~37 KB) from the critical path; current initial load ≈ 276 KB.
+const BUDGET_KB = 300;
 
 const distDir = 'dist';
 const indexHtml = readFileSync(path.join(distDir, 'index.html'), 'utf8');

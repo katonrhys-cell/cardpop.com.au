@@ -66,7 +66,20 @@ export default defineConfig({
 			output: {
 				manualChunks(id) {
 					if (!id.includes('node_modules')) return;
-					if (id.includes('framer-motion')) return 'vendor-motion';
+					// React core (incl. react/jsx-runtime + scheduler) MUST get its own
+					// chunk. Otherwise rolldown co-locates jsx-runtime into whichever
+					// vendor chunk it lands in (it was ending up in vendor-motion), and
+					// because every component imports jsx-runtime the entry then statically
+					// pulls that whole chunk — dragging framer-motion onto the critical
+					// path. Keeping React isolated lets framer-motion stay lazy-only.
+					if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/')) return 'vendor-react';
+					// NOTE: framer-motion is deliberately NOT forced into its own manual
+					// chunk. When it was, rolldown hoisted a shared react/jsx-runtime
+					// helper into that chunk, and because the eager entry needs jsx-runtime
+					// it then statically imported the whole framer-motion chunk — putting
+					// ~37 KB of animation code on the critical path even though only lazy
+					// pages use it. Letting rolldown auto-split framer-motion keeps it off
+					// the initial load (loaded on-demand with the pages that animate).
 					if (id.includes('lucide-react')) return 'vendor-icons';
 					if (id.includes('@radix-ui')) return 'vendor-radix';
 					if (id.includes('react-router')) return 'vendor-router';

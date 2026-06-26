@@ -18,7 +18,7 @@ import ProtectedRoute from '@/components/ProtectedRoute.jsx';
 import ProtectedAdminRoute from '@/components/ProtectedAdminRoute.jsx';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 import PageLoader from '@/components/PageLoader.jsx';
-import ShoppingCart from '@/components/ShoppingCart.jsx';
+import ShoppingCart from '@/components/ShoppingCartLazy.jsx';
 import AdminLayout from '@/components/AdminLayout.jsx';
 import MarketplaceListingRedirect from '@/components/MarketplaceListingRedirect.jsx';
 
