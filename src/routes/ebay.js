@@ -93,55 +93,78 @@ router.get('/price-estimate', async (req, res) => {
   logger.info(`[EBAY_PRICE_ESTIMATE] Query: "${query}"`);
 
   try {
-    // Try Australian listings first
-    const auParams = new URLSearchParams({
-      q: query,
-      filter: 'buyingOptions:{AUCTION|FIXED_PRICE},itemLocationCountry:AU',
-      limit: 15,
-      sort: 'newlyListed',
-    });
+    // Fetch from both eBay AU and eBay US in parallel
+    const [auResult, usResult] = await Promise.allSettled([
+      // eBay.com.au (Australian listings)
+      callEbayApi(
+        `/buy/browse/v1/item_summary/search?${new URLSearchParams({
+          q: query,
+          filter: 'buyingOptions:{AUCTION|FIXED_PRICE},itemLocationCountry:AU',
+          limit: 15,
+          sort: 'newlyListed',
+        })}`,
+        { headers: { 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_AU' } }
+      ),
+      // eBay.com (US listings)
+      callEbayApi(
+        `/buy/browse/v1/item_summary/search?${new URLSearchParams({
+          q: query,
+          filter: 'buyingOptions:{AUCTION|FIXED_PRICE}',
+          limit: 15,
+          sort: 'newlyListed',
+        })}`,
+        { headers: { 'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US' } }
+      ),
+    ]);
 
-    let data = await callEbayApi(`/buy/browse/v1/item_summary/search?${auParams}`);
-    let items = data.itemSummaries || [];
-
-    // If no AU results, fall back to global search
-    if (items.length === 0) {
-      logger.info(`[EBAY_PRICE_ESTIMATE] No AU listings found, trying global search`);
-      const globalParams = new URLSearchParams({
-        q: query,
-        filter: 'buyingOptions:{AUCTION|FIXED_PRICE}',
-        limit: 15,
-        sort: 'newlyListed',
+    // Extract results, marking with marketplace
+    const allItems = [];
+    if (auResult.status === 'fulfilled' && auResult.value.itemSummaries?.length > 0) {
+      auResult.value.itemSummaries.forEach(i => {
+        allItems.push({ ...i, marketplace: 'AU', currency: 'AUD' });
       });
-      data = await callEbayApi(`/buy/browse/v1/item_summary/search?${globalParams}`);
-      items = data.itemSummaries || [];
+      logger.info(`[EBAY_PRICE_ESTIMATE] Found ${auResult.value.itemSummaries.length} AU listings`);
+    }
+    if (usResult.status === 'fulfilled' && usResult.value.itemSummaries?.length > 0) {
+      usResult.value.itemSummaries.forEach(i => {
+        allItems.push({ ...i, marketplace: 'US', currency: 'USD' });
+      });
+      logger.info(`[EBAY_PRICE_ESTIMATE] Found ${usResult.value.itemSummaries.length} US listings`);
     }
 
-    const prices = items
-      .map(i => parseFloat(i.price?.value || 0))
-      .filter(p => p > 0);
+    // Convert all prices to AUD for comparison (1 USD ≈ 1.50 AUD as reference)
+    // In production, use a live exchange rate API
+    const USD_TO_AUD = 1.50;
+    const pricesInAUD = allItems.map(i => {
+      const basePrice = parseFloat(i.price?.value || 0);
+      return i.currency === 'USD' ? basePrice * USD_TO_AUD : basePrice;
+    }).filter(p => p > 0);
 
-    const avgPrice = prices.length > 0
-      ? Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) / 100
+    const avgPrice = pricesInAUD.length > 0
+      ? Math.round((pricesInAUD.reduce((a, b) => a + b, 0) / pricesInAUD.length) * 100) / 100
       : 0;
 
-    const listings = items.slice(0, 8).map(i => ({
+    const listings = allItems.slice(0, 12).map(i => ({
       itemId:      i.itemId,
       title:       i.title,
       price:       parseFloat(i.price?.value || 0),
+      currency:    i.currency,
+      priceInAUD:  i.currency === 'USD' ? parseFloat(i.price?.value || 0) * USD_TO_AUD : parseFloat(i.price?.value || 0),
       condition:   parseCondition(i.condition),
+      marketplace: i.marketplace,
       listingUrl:  i.itemWebUrl || '',
       thumbnailUrl: i.image?.imageUrl || '',
     }));
 
-    logger.info(`[EBAY_PRICE_ESTIMATE] ${prices.length} prices found, avg: $${avgPrice}`);
+    logger.info(`[EBAY_PRICE_ESTIMATE] Combined ${allItems.length} listings, avg AUD: $${avgPrice}`);
 
     res.json({
-      count: prices.length,
+      count: pricesInAUD.length,
       avgPrice,
-      minPrice: prices.length > 0 ? Math.min(...prices) : 0,
-      maxPrice: prices.length > 0 ? Math.max(...prices) : 0,
+      minPrice: pricesInAUD.length > 0 ? Math.min(...pricesInAUD) : 0,
+      maxPrice: pricesInAUD.length > 0 ? Math.max(...pricesInAUD) : 0,
       listings,
+      exchangeRate: USD_TO_AUD,
     });
   } catch (error) {
     logger.error(`[EBAY_PRICE_ESTIMATE] Error: ${error.message}`);
