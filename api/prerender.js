@@ -293,9 +293,9 @@ ${listingItems || '    <li>No active listings at the moment.</li>'}
 
 async function renderBlogArticle(supabase, param) {
   const byUuid = UUID_RE.test(param);
-  let query = supabase
-    .from('blog_articles')
-    .select('id, slug, title, seo_title, seo_description, excerpt, content_html, content, featured_image_url, author, category, published_at, created_at, updated_at, read_time_minutes, is_published');
+  // select('*') keeps this resilient to schema additions (e.g. the optional
+  // `faqs` column) without coupling deploys to migration timing.
+  let query = supabase.from('blog_articles').select('*');
   query = byUuid ? query.eq('id', param) : query.eq('slug', param);
   const { data: article } = await query.maybeSingle();
 
@@ -348,6 +348,27 @@ async function renderBlogArticle(supabase, param) {
     ],
   };
 
+  const faqs = Array.isArray(article.faqs)
+    ? article.faqs.filter((f) => f && f.question && f.answer)
+    : [];
+  const faqPage = faqs.length
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: faqs.map((f) => ({
+          '@type': 'Question',
+          name: f.question,
+          acceptedAnswer: { '@type': 'Answer', text: f.answer },
+        })),
+      }
+    : null;
+  const faqHtml = faqs.length
+    ? `<section>
+    <h2>Frequently Asked Questions</h2>
+    ${faqs.map((f) => `<h3>${esc(f.question)}</h3>\n    <p>${esc(f.answer)}</p>`).join('\n    ')}
+  </section>`
+    : '';
+
   const headExtra = [
     `<meta property="article:published_time" content="${esc(published || '')}" />`,
     `<meta property="article:modified_time" content="${esc(modified || '')}" />`,
@@ -364,9 +385,10 @@ async function renderBlogArticle(supabase, param) {
     ${image ? `<img src="${esc(image)}" alt="${esc(article.title)}" />` : ''}
     ${bodyContent || `<p>${esc(description)}</p>`}
   </article>
+  ${faqHtml}
 </main>`;
 
-  return htmlDoc({ title, description, canonical, ogImage: image, ogType: 'article', headExtra, jsonLdItems: [blogPosting, breadcrumb], bodyHtml });
+  return htmlDoc({ title, description, canonical, ogImage: image, ogType: 'article', headExtra, jsonLdItems: [blogPosting, breadcrumb, ...(faqPage ? [faqPage] : [])], bodyHtml });
 }
 
 async function renderListing(supabase, id, slugParam) {

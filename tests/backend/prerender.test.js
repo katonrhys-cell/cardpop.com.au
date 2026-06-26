@@ -80,6 +80,35 @@ describe('prerender blog articles', () => {
     expect(body).not.toContain('alert(1)');
   });
 
+  it('emits FAQPage JSON-LD and a visible FAQ section when the article has faqs', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'grading-guide', title: 'PSA Grading Guide',
+      content_html: '<p>Body.</p>', author: 'CardPop Research', is_published: true,
+      faqs: [
+        { question: 'How much does PSA grading cost?', answer: 'From about AUD $68 per card.' },
+        { question: 'Is grading worth it?', answer: 'When graded value exceeds raw + fees.' },
+        { question: '', answer: 'dropped — no question' },
+      ],
+    } };
+    const { body } = await run('/blog/grading-guide');
+    expect(body).toContain('"@type":"FAQPage"');
+    expect(body).toContain('How much does PSA grading cost?');
+    expect(body).toContain('From about AUD $68 per card.');
+    // visible on-page FAQ content (required for the rich result)
+    expect(body).toContain('Frequently Asked Questions');
+    // the incomplete entry is filtered out
+    expect(body).not.toContain('dropped — no question');
+  });
+
+  it('omits FAQPage when the article has no faqs', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'no-faq', title: 'No FAQ Article',
+      content_html: '<p>Body.</p>', is_published: true,
+    } };
+    const { body } = await run('/blog/no-faq');
+    expect(body).not.toContain('"@type":"FAQPage"');
+  });
+
   it('returns noindex when the article is missing', async () => {
     state.result = { data: null };
     const { body } = await run('/blog/does-not-exist');
