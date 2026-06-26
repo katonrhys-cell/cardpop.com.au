@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, ArrowRightLeft, Layers } from 'lucide-react';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import EbayMarketSection from '@/components/EbayMarketSection.jsx';
+import PSACertificationSection from '@/components/PSACertificationSection.jsx';
 
 const getStatusBadge = (listingType) => {
   switch (listingType) {
@@ -468,12 +469,18 @@ const ProductDetailPage = () => {
             </div>
 
             {!isShop && (
-              <EbayMarketSection
-                cardName={product.name}
-                cardSet={vi?.set_name || product.set}
-                gradingService={vi?.grading_company}
-                gradeScore={vi?.grade}
-              />
+              <>
+                <PSACertificationSection
+                  certNumber={vi?.cert_number || vi?.certification_number}
+                  gradingCompany={vi?.grading_company}
+                />
+                <EbayMarketSection
+                  cardName={product.name}
+                  cardSet={vi?.set_name || product.set}
+                  gradingService={vi?.grading_company}
+                  gradeScore={vi?.grade}
+                />
+              </>
             )}
           </div>
         </div>

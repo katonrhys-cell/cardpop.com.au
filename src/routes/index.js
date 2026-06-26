@@ -27,6 +27,7 @@ import priceHistoryRouter from './price-history.js';
 import newsletterRouter from './newsletter.js';
 import marketDataRouter from './market-data.js';
 import catalogRouter from './catalog.js';
+import psaRouter from './psa.js';
 
 const router = Router();
 
@@ -61,6 +62,10 @@ export default () => {
     // eBay routes with API rate limiting
     router.use('/ebay', apiLimiter);
     router.use('/ebay', ebayRouter);
+
+    // PSA certification routes with API rate limiting
+    router.use('/psa', apiLimiter);
+    router.use('/psa', psaRouter);
 
     // CardSight AI identification routes (image recognition only)
     router.use('/cardsight', apiLimiter);
