@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
-import { Star, ShieldCheck, MapPin, Calendar, ExternalLink, ShieldAlert, Package, MessageSquare } from 'lucide-react';
+import { Star, ShieldCheck, MapPin, Calendar, ExternalLink, ShieldAlert, Package, MessageSquare, Flag } from 'lucide-react';
+import ReportModal from '@/components/ReportModal.jsx';
 import SellerTierBadge from '@/components/SellerTierBadge.jsx';
 import VerifiedBadge from '@/components/VerifiedBadge.jsx';
 import { Badge } from '@/components/ui/badge';
@@ -211,7 +212,18 @@ const PublicSellerProfilePage = () => {
                 <Button className="rounded-xl font-bold shadow-md hover:-translate-y-0.5 transition-transform">
                   <MessageSquare className="w-4 h-4 mr-2" /> Message User
                 </Button>
-                
+
+                <ReportModal
+                  targetType="user"
+                  targetId={seller.id || userId}
+                  targetLabel="seller"
+                  trigger={
+                    <Button variant="ghost" className="rounded-xl font-medium text-muted-foreground hover:text-destructive">
+                      <Flag className="w-4 h-4 mr-2" /> Report
+                    </Button>
+                  }
+                />
+
                 {seller.social_links && Object.keys(seller.social_links).filter(k => seller.social_links[k]).length > 0 && (
                   <div className="flex items-center gap-2 pl-4 border-l border-[hsl(var(--section-divider))]">
                     {Object.entries(seller.social_links).filter(([, link]) => link).map(([platform, link]) => (

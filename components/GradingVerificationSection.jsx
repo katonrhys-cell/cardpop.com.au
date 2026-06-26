@@ -16,7 +16,9 @@ const GradingVerificationSection = ({ gradingNumber, gradingCompany = 'psa', gra
       setLoading(true);
       setError(null);
       try {
-        const data = await verifyGradingNumber(gradingNumber, gradingCompany);
+        // Pass the listing's claimed grade so the server can tell us whether it
+        // matches the real cert — not just that the cert exists.
+        const data = await verifyGradingNumber(gradingNumber, gradingCompany, grade);
         if (!cancelled) {
           setResult(data);
         }
@@ -33,14 +35,21 @@ const GradingVerificationSection = ({ gradingNumber, gradingCompany = 'psa', gra
 
     verify();
     return () => { cancelled = true; };
-  }, [gradingNumber, gradingCompany]);
+  }, [gradingNumber, gradingCompany, grade]);
 
   if (!gradingNumber) return null;
 
-  // Only assert verification once the lookup has actually confirmed the cert.
-  // Showing "Verified by CardPop" for an unverified/not-found/errored cert would
-  // mislead buyers on public listing pages.
-  const isVerified = !loading && !error && result?.verified === true;
+  // The cert exists AND the claimed grade contradicts the real one — the
+  // "real cert, inflated grade" scam. Treat this as a warning, never "verified".
+  const gradeMismatch = !loading && !error && result?.verified === true && result?.gradeMatch === false;
+
+  // Only assert verification once the lookup has confirmed the cert AND the grade
+  // doesn't contradict it. Showing "Verified by CardPop" for an unverified, not-
+  // found, errored, or grade-mismatched cert would mislead buyers.
+  const isVerified = !loading && !error && result?.verified === true && result?.gradeMatch !== false;
+  // We can only claim the GRADE is confirmed when it actually matched (not when
+  // the comparison was inconclusive).
+  const gradeConfirmed = isVerified && result?.gradeMatch === true;
 
   return (
     <div className="pt-4 border-t border-border space-y-4">
@@ -88,7 +97,14 @@ const GradingVerificationSection = ({ gradingNumber, gradingCompany = 'psa', gra
 
             {result && !loading && (
               <>
-                {result.verified ? (
+                {gradeMismatch ? (
+                  <>
+                    <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                    <span className="text-sm font-bold text-red-600 dark:text-red-400">
+                      Grade mismatch
+                    </span>
+                  </>
+                ) : result.verified ? (
                   <>
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                     <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
@@ -116,9 +132,20 @@ const GradingVerificationSection = ({ gradingNumber, gradingCompany = 'psa', gra
         </div>
       </div>
 
-      {isVerified ? (
+      {gradeMismatch ? (
+        <p className="text-xs font-medium text-red-600 dark:text-red-400 pt-2 border-t border-red-500/20 bg-red-500/5 -mx-1 px-3 py-2 rounded-lg">
+          ⚠ This listing is labelled <strong>{grade}</strong>, but {gradingCompany.toUpperCase()} cert{' '}
+          <span className="font-mono">{gradingNumber}</span>
+          {result?.verifiedGrade ? <> records a grade of <strong>{result.verifiedGrade}</strong></> : ' records a different grade'}.
+          Do not purchase based on the listed grade — confirm directly with {gradingCompany.toUpperCase()} first.
+        </p>
+      ) : gradeConfirmed ? (
         <p className="text-xs text-muted-foreground pt-2 border-t border-border/50">
-          This certificate number has been verified against the official {gradingCompany.toUpperCase()} database to confirm authenticity and accuracy of the grade and card details.
+          This certificate number has been verified against the official {gradingCompany.toUpperCase()} database, confirming the cert is genuine and the listed grade matches the official record.
+        </p>
+      ) : isVerified ? (
+        <p className="text-xs text-muted-foreground pt-2 border-t border-border/50">
+          This certificate number was found in the official {gradingCompany.toUpperCase()} database. We couldn't automatically match the listed grade — confirm the exact grade and card details with {gradingCompany.toUpperCase()} before purchasing.
         </p>
       ) : (
         <p className="text-xs text-muted-foreground pt-2 border-t border-border/50">

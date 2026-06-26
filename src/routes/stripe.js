@@ -5,6 +5,8 @@ import logger from '../utils/logger.js';
 import { supabase } from '../utils/supabaseClient.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import { sendOrderConfirmed, sendItemSold, sendRefundProcessed, sendRefundIssued } from '../utils/emailService.js';
+import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
+import { handleDisputeCreated, handleDisputeClosed } from '../services/disputeService.js';
 
 const router = express.Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -240,6 +242,14 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
     if (offerId) metadata.offerId = offerId;
     if (bidId)   metadata.bidId   = bidId;
 
+    // Fraud control: cap order size / frequency for brand-new, unverified buyers.
+    const buyerTotal = breakdown.itemPrice + (breakdown.commissionAud || 0) + (breakdown.gstAud || 0);
+    const velocity = await checkPurchaseVelocity({ userId, orderValueAud: buyerTotal });
+    if (!velocity.allowed) {
+      logger.warn(`[VELOCITY] Blocked checkout for ${userId} (${velocity.reason})`);
+      return res.status(429).json({ error: velocity.message, code: 'velocity_limit' });
+    }
+
     if (shippingAddress) {
       const s = shippingAddress;
       if (s.name)     metadata.shippingName     = String(s.name).slice(0, 100);
@@ -405,6 +415,13 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
     const email  = req.user.email;
 
     const { lineItems, orderLines, itemsCents, commissionCents, gstCents, grandCents } = await priceCart(items, userId);
+
+    // Fraud control: cap order size / frequency for brand-new, unverified buyers.
+    const velocity = await checkPurchaseVelocity({ userId, orderValueAud: grandCents / 100 });
+    if (!velocity.allowed) {
+      logger.warn(`[VELOCITY] Blocked cart checkout for ${userId} (${velocity.reason})`);
+      return res.status(429).json({ error: velocity.message, code: 'velocity_limit' });
+    }
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -834,6 +851,18 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           .from('orders')
           .update({ status: 'payment_failed' })
           .eq('stripe_payment_intent_id', pi.id);
+        break;
+      }
+
+      // Buyer chargebacks: freeze the order payout, reverse/claw back any seller
+      // payout, and alert admins so the platform isn't left covering the loss.
+      case 'charge.dispute.created': {
+        await handleDisputeCreated(stripe, event.data.object);
+        break;
+      }
+
+      case 'charge.dispute.closed': {
+        await handleDisputeClosed(stripe, event.data.object);
         break;
       }
 

@@ -22,7 +22,7 @@ const router = express.Router();
  *   }
  */
 router.post('/verify', async (req, res) => {
-  const { gradingNumber, company = 'psa' } = req.body;
+  const { gradingNumber, company = 'psa', expectedGrade = null } = req.body;
 
   if (!gradingNumber || typeof gradingNumber !== 'string' || !gradingNumber.trim()) {
     logger.warn('[GRADING_VERIFICATION] Missing or invalid gradingNumber');
@@ -38,9 +38,15 @@ router.post('/verify', async (req, res) => {
     });
   }
 
+  // expectedGrade lets us check the SELLER'S CLAIMED grade against the real cert,
+  // not just that the cert exists. Optional, but it's how we catch inflated grades.
+  if (expectedGrade != null && typeof expectedGrade !== 'string') {
+    return res.status(400).json({ error: 'expectedGrade must be a string' });
+  }
+
   try {
     logger.info(`[GRADING_VERIFICATION] Verifying ${gradingNumber} with ${company}`);
-    const result = await verifyGradingNumber({ gradingNumber, company });
+    const result = await verifyGradingNumber({ gradingNumber, company, expectedGrade });
     res.json(result);
   } catch (error) {
     logger.error(`[GRADING_VERIFICATION] Verification error: ${error.message}`);

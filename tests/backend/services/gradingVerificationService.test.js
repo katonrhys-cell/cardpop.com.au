@@ -72,6 +72,8 @@ describe('verifyGradingNumber — cache', () => {
       verified: true,
       company: 'psa',
       details: { grade: 10 },
+      verifiedGrade: 10,
+      gradeMatch: null,
       cached: true,
       cachedAt: '2026-01-01T00:00:00Z',
     });
@@ -110,6 +112,8 @@ describe('verifyGradingNumber — live lookup', () => {
       verified: true,
       company: 'psa',
       details: { grade: 10, cardName: 'Charizard' },
+      verifiedGrade: 10,
+      gradeMatch: null,
       cached: false,
     });
 

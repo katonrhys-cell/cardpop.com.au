@@ -63,14 +63,28 @@ describe('POST /verify', () => {
     const res = await request(app).post('/verify').send({ gradingNumber: ' 12345678 ' });
     expect(res.status).toBe(200);
     expect(res.body).toEqual(result);
-    expect(mockVerify).toHaveBeenCalledWith({ gradingNumber: ' 12345678 ', company: 'psa' });
+    expect(mockVerify).toHaveBeenCalledWith(expect.objectContaining({ gradingNumber: ' 12345678 ', company: 'psa' }));
   });
 
   it('passes the beckett company through to the service', async () => {
     mockVerify.mockResolvedValue({ verified: false, company: 'beckett', details: null, cached: true });
     const res = await request(app).post('/verify').send({ gradingNumber: 'B-1', company: 'beckett' });
     expect(res.status).toBe(200);
-    expect(mockVerify).toHaveBeenCalledWith({ gradingNumber: 'B-1', company: 'beckett' });
+    expect(mockVerify).toHaveBeenCalledWith(expect.objectContaining({ gradingNumber: 'B-1', company: 'beckett' }));
+  });
+
+  it('threads the claimed grade through as expectedGrade', async () => {
+    mockVerify.mockResolvedValue({ verified: true, company: 'psa', gradeMatch: false, cached: false });
+    const res = await request(app).post('/verify').send({ gradingNumber: '123', expectedGrade: 'PSA 10' });
+    expect(res.status).toBe(200);
+    expect(res.body.gradeMatch).toBe(false);
+    expect(mockVerify).toHaveBeenCalledWith(expect.objectContaining({ expectedGrade: 'PSA 10' }));
+  });
+
+  it('rejects a non-string expectedGrade', async () => {
+    const res = await request(app).post('/verify').send({ gradingNumber: '123', expectedGrade: 10 });
+    expect(res.status).toBe(400);
+    expect(mockVerify).not.toHaveBeenCalled();
   });
 
   it('returns 400 with the service error message when verification throws', async () => {

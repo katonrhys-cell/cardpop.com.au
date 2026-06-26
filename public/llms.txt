@@ -34,6 +34,7 @@
 - [Public Profile | CardPop](/userprofile): No description available
 - [Public Profile | CardPop](/accountprofile): No description available
 - [Recover Account | Card Pop](/passwordreset): No description available
+- [Reports & Moderation | Admin](/reportsmoderation): No description available
 - [Reviews | CardPop](/accountreviews): No description available
 - [Secure Checkout | Card Pop](/checkout): No description available
 - [Security Settings | Card Pop](/securitysettings): No description available

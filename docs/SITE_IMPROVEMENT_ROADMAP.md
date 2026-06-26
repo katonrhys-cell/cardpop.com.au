@@ -125,9 +125,41 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 - [ ] Consider moving opencv card-detection into a Web Worker (off main thread)
 
 ### 6. Trust & safety (the actual marketplace product)
-- [ ] Card authentication / grading verification — is PSA/Beckett check enforced on high-value listings?
+- [~] Card authentication / grading verification. **AUDIT:** the PSA client is
+      real (`api.psacard.com`), but verification was (a) view-time only, not bound
+      to the listing, and (b) `verified = !!details` — it only checked the cert
+      **exists**, never that the **claimed grade matched it**. So a genuine PSA 9
+      cert could be relabelled "PSA 10" and still render "Verified by CardPop…
+      accuracy of the grade confirmed" (a false claim + a real scam vector).
+      - **Done:** grade-match enforcement. `verifyGradingNumber` now extracts the
+        cert's real grade and compares it to the seller's claimed grade
+        (`gradeMatch`: true / false / null-inconclusive). `/verify` accepts
+        `expectedGrade`; `GradingVerificationSection` shows a red **"Grade
+        mismatch"** warning (and withholds the verified badge) when the claim
+        contradicts the cert, only confirms the grade when it actually matches,
+        and softens copy when inconclusive. Tests: service grade-match unit +
+        route passthrough + component states.
+      - **Next (needs schema + listing-flow change):** verify at listing-creation
+        time and persist a tamper-proof `grade_verified` on the vault_item (RLS:
+        clients can't self-set it), so grids/badges reflect stored truth and
+        high-value graded listings can require a passing check before going live.
+        Beckett verification is still a stub (`not yet implemented`).
 - [ ] Seller vetting / tiers / verification badges — define and enforce
-- [ ] Dispute resolution + escrow: is buyer money actually held until delivery confirmed?
+- [~] Dispute resolution + escrow: **AUDIT FINDING — the "escrow" claim was
+      false.** `src/routes/stripe.js` transfers seller proceeds (Stripe Connect
+      transfer or wallet credit) on `checkout.session.completed` — i.e. the
+      instant payment succeeds, with **no hold until delivery**. The homepage /
+      About / Trust&Safety pages claimed "escrow… funds release only when both
+      parties are satisfied," which is misleading (Australian Consumer Law risk).
+      - **Done now:** corrected all user-facing copy to describe what actually
+        exists — secure Stripe payments + the 14-day **Buyer Protection**
+        refund flow (no "escrow"/"funds held" language).
+      - **Decision needed (real escrow is a build):** hold funds until delivery
+        confirmation. Options: Stripe manual-capture / separate charges &
+        transfers with a delayed transfer, or hold in the platform balance and
+        transfer on buyer confirmation / auto-release after N days. Pair with a
+        dispute state machine (open → evidence → resolve) — the refunds table +
+        admin approval is the seed.
 - [~] Counterfeit / scam **reporting flow** — was entirely missing (the
       `ModerationPanel` was just admin notes on catalog cards). Added an
       end-to-end vertical slice:
@@ -141,9 +173,35 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
         (`src/routes/reports.js`, 16 backend tests).
       - `ReportModal.jsx` + a "Report this listing" control on the marketplace
         listing page (4 frontend tests). Reusable for users/reviews/events.
-      - **Next:** an admin moderation-queue UI over `GET/PATCH /reports`; wire
-        report buttons onto cards, seller profiles, reviews.
-- [ ] Chargeback & fraud handling; velocity limits on new accounts
+      - Admin moderation queue (`pages/admin/ReportsModerationPage.jsx`,
+        `/admin/reports`, linked from the dashboard) — reads/triages via the
+        backend (RLS denies client reads), high-risk reasons flagged, deep-links
+        to the reported target (4 frontend tests).
+      - Auto-escalation: when a target reaches 3 **distinct** open reports the
+        backend notifies all admins (`report_escalation` notification). No
+        auto-takedown (that would be a brigading vector) — moderators decide.
+      - **Next:** wire report buttons onto cards/seller profiles/reviews.
+- [~] Chargeback & fraud handling; velocity limits on new accounts.
+      - **Done:** new-account **purchase velocity** guard (`src/utils/purchaseVelocity.js`)
+        wired into both server-side checkout endpoints (`/create-checkout`,
+        `/create-cart-checkout`). Unverified accounts < 7 days old are capped at
+        $1,500/order, 5 orders/24h and $3,000 spend/24h (failed/refunded orders
+        don't count); verified or older accounts are unrestricted; the check
+        **fails open** so an outage never blocks all payments. 429 +
+        `velocity_limit` code with a "verify your identity to lift this" message.
+        8 backend tests.
+      - **Chargeback handling DONE:** `charge.dispute.created` / `closed` webhooks
+        (`src/services/disputeService.js`) now freeze the order payout
+        (`payout_status='frozen'`), reverse an already-sent Stripe transfer or
+        claw back a wallet credit, record the dispute in `payment_disputes`
+        (migration `20260626000002`), and notify admins + the seller. All
+        best-effort/never-throws so the webhook always ack's. ⚠️ migration must be
+        applied. 5 tests.
+      - **Next:** listing-creation velocity is still open — listings are created
+        client-side (`supabase.from('listings').insert`), so a new account can
+        spam scam listings. Needs a backend listing endpoint or RLS rate rules.
+        Also: admin UI over `payment_disputes` + a flow to release a payout that
+        was frozen then won.
 - [ ] Clear, enforced policies (returns, authenticity guarantee, prohibited items)
 
 ---
