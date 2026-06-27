@@ -4,19 +4,21 @@ import { Link } from 'react-router-dom';
 import {
   SearchCheck, BookOpen, BarChart2, Building2, ArrowRight,
   Store, ShieldCheck, DollarSign, Clock, MapPin, HelpCircle, TrendingUp, Calculator,
-  Sparkles, Flag,
+  Sparkles, Flag, Feather, Compass, Rocket, BookMarked,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-// The grading journey, told as a story: Learn → Understand → Decide → Preview → Choose → Submit.
-// Each chapter is a step on a connected path so collectors always know where they are and what's next.
+// The grading journey, told as a book: a cover, a clear place to begin,
+// then six chapters along a single connected path so collectors always
+// know where they are and what comes next.
 const CHAPTERS = [
   {
     href: '/grading/what-is-grading',
     icon: BookOpen,
-    chapter: 'Chapter 1',
+    chapter: 'Chapter One',
     label: 'Start your journey',
     title: 'What is Card Grading?',
+    opening: 'Every collection has a beginning.',
     description:
       'New to grading? Begin here. Learn what professional card grading is, how the process works, and why Australian collectors are grading more than ever.',
     cta: 'Read the guide',
@@ -24,9 +26,10 @@ const CHAPTERS = [
   {
     href: '/grading/scales',
     icon: BarChart2,
-    chapter: 'Chapter 2',
+    chapter: 'Chapter Two',
     label: 'Learn the language',
     title: 'Grading Scales Explained',
+    opening: 'Before you submit, learn to read a grade.',
     description:
       'Understand the 1–10 condition scales used by every major grading company. Know exactly what separates a Gem Mint 10 from a Mint 9 before you submit.',
     cta: 'View the scales',
@@ -34,19 +37,21 @@ const CHAPTERS = [
   {
     href: '/grading/roi-calculator',
     icon: TrendingUp,
-    chapter: 'Chapter 3',
+    chapter: 'Chapter Three',
     label: 'Decide if it’s worth it',
     title: 'Grading ROI Calculator',
+    opening: 'Now, the big question — is it worth it?',
     description:
-      'Is grading worth it for your card? Enter your card, raw cost, and grading service for a probability-weighted expected return powered by live eBay AU prices and full cost breakdowns.',
+      'Enter your card, raw cost, and grading service for a probability-weighted expected return powered by live eBay AU prices and full cost breakdowns.',
     cta: 'Calculate ROI',
   },
   {
     href: '/grading/estimator',
     icon: Calculator,
-    chapter: 'Chapter 4',
+    chapter: 'Chapter Four',
     label: 'Preview your grade',
     title: 'Grade Estimator',
+    opening: 'A glimpse of the grade to come.',
     description:
       'Upload photos of your card and receive AI-generated preliminary grade estimates across PSA, BGS, CGC, ACE, and SGC — a helpful guide before you commit to a professional submission.',
     cta: 'Try the estimator',
@@ -54,22 +59,50 @@ const CHAPTERS = [
   {
     href: '/grading/companies',
     icon: Building2,
-    chapter: 'Chapter 5',
+    chapter: 'Chapter Five',
     label: 'Choose your grader',
     title: 'Grading Companies',
+    opening: 'Choose the hands you trust your cards to.',
     description:
       'Compare PSA, BGS, CGC, ACE Grading and more. Find turnaround times, Australian pricing, and which service suits your cards and your budget.',
     cta: 'Compare services',
   },
   {
-    href: '/grading/local',
+    href: '/grading/submission-partners',
     icon: MapPin,
-    chapter: 'Chapter 6',
+    chapter: 'Chapter Six',
     label: 'Submit your cards',
     title: 'Submit Locally with Trusted Graders',
+    opening: 'The final step — send them off.',
     description:
       'Reach the destination. Skip international shipping and customs with ranked local Australian grading services, plus the best PSA and Beckett submission partners in Australia.',
     cta: 'View local options',
+  },
+];
+
+// "Where should I start?" — three quick on-ramps so readers can open the
+// book at the page that fits them, instead of feeling they must read it all.
+const START_PATHS = [
+  {
+    href: '/grading/what-is-grading',
+    icon: BookOpen,
+    badge: 'Begin at Chapter One',
+    title: 'I’m brand new to grading',
+    body: 'Start at the very beginning and learn how grading works, step by step.',
+  },
+  {
+    href: '/grading/roi-calculator',
+    icon: Compass,
+    badge: 'Skip to Chapter Three',
+    title: 'I want to know if it’s worth it',
+    body: 'Already know the basics? Jump straight to working out the return on a card.',
+  },
+  {
+    href: '/grading/submission-partners',
+    icon: Rocket,
+    badge: 'Jump to Chapter Six',
+    title: 'I’m ready to submit',
+    body: 'You’ve done your homework — find a trusted Australian grader and send it off.',
   },
 ];
 
@@ -127,51 +160,107 @@ const GradingPage = () => (
       keywords="card grading australia, PSA grading, ACE grading australia, pokemon grading, BGS grading, CGC cards, trading card grading guide, slab cards australia"
     />
 
-    {/* Hero — sets the scene for the journey */}
-    <section className="relative overflow-hidden bg-card border-b border-border py-20 text-center">
-      <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
+    {/* Hero — the book cover */}
+    <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-primary/[0.07] via-card to-background py-20 sm:py-24 text-center">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,theme(colors.primary/12%),transparent_60%)] pointer-events-none" />
       <div className="container-default relative">
-        <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-primary mb-6">
-          <Sparkles className="w-3.5 h-3.5" /> Your grading journey
+        <div className="mx-auto max-w-2xl rounded-[2rem] border border-border/70 bg-card/70 px-6 py-12 sm:px-12 shadow-sm backdrop-blur-sm">
+          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-primary mb-7">
+            <Feather className="w-3.5 h-3.5" /> A CardPop Field Guide
+          </div>
+
+          <SearchCheck className="w-12 h-12 text-primary mx-auto mb-6" />
+
+          <h1 className="text-4xl md:text-5xl font-bold leading-tight mb-4">
+            The Grading Journey
+          </h1>
+          <p className="text-sm uppercase tracking-[0.25em] text-muted-foreground mb-6">
+            From raw card to graded slab
+          </p>
+          <p className="text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
+            A story in six short chapters. We’ll take you from the very first
+            question — <em>“what even is grading?”</em> — all the way to posting
+            your cards off with confidence.
+          </p>
+
+          <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <a
+              href="#journey"
+              className="inline-flex items-center gap-2 rounded-full bg-primary px-7 py-3 text-sm font-bold text-primary-foreground hover:opacity-90 transition-opacity"
+            >
+              <BookOpen className="w-4 h-4" /> Open the book
+            </a>
+            <a
+              href="#start-here"
+              className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-7 py-3 text-sm font-bold text-foreground hover:border-primary/50 transition-colors"
+            >
+              Where should I start? <ArrowRight className="w-4 h-4" />
+            </a>
+          </div>
         </div>
-        <SearchCheck className="w-12 h-12 text-primary mx-auto mb-6" />
-        <h1 className="text-4xl md:text-5xl font-bold mb-4">The Grading Hub</h1>
-        <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-          From your very first raw card to a sealed, graded slab — follow the path below
-          chapter by chapter. We'll guide you from understanding the basics all the way
-          to submitting with confidence.
-        </p>
-        <a
-          href="#journey"
-          className="mt-8 inline-flex items-center gap-2 rounded-full bg-primary px-7 py-3 text-sm font-bold text-primary-foreground hover:opacity-90 transition-opacity"
-        >
-          Start at Chapter 1 <ArrowRight className="w-4 h-4" />
-        </a>
       </div>
     </section>
 
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-20">
+
+      {/* Where to start — pick your opening page */}
+      <section id="start-here" className="scroll-mt-8">
+        <div className="text-center mb-9">
+          <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-primary mb-3">
+            <Compass className="w-4 h-4" /> Find your starting point
+          </div>
+          <h2 className="text-2xl md:text-3xl font-bold mb-2">Where should you start?</h2>
+          <p className="text-muted-foreground max-w-xl mx-auto leading-relaxed">
+            You don’t have to read every page. Pick the line below that sounds
+            most like you, and we’ll open the book to the right chapter.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {START_PATHS.map(({ href, icon: Icon, badge, title, body }) => (
+            <Link
+              key={href}
+              to={href}
+              className="group flex flex-col rounded-3xl border border-border bg-card p-6 hover:border-primary/50 hover:shadow-md transition-all"
+            >
+              <div className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+                <Icon className="w-5 h-5 text-primary" />
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-primary mb-2">{badge}</span>
+              <h3 className="font-bold text-lg mb-1.5 group-hover:text-primary transition-colors">{title}</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed mb-4">{body}</p>
+              <span className="mt-auto inline-flex items-center gap-1.5 text-primary font-bold text-sm">
+                Take me there <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </span>
+            </Link>
+          ))}
+        </div>
+      </section>
 
       {/* The journey — a connected, numbered path of chapters */}
       <section id="journey" className="scroll-mt-8">
         <div className="text-center mb-10">
-          <h2 className="text-2xl md:text-3xl font-bold mb-2">Follow the path</h2>
-          <p className="text-muted-foreground max-w-xl mx-auto">
-            Six chapters take you from curious beginner to confident submitter. Read them in
-            order, or jump to wherever you are on your journey.
+          <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-primary mb-3">
+            <BookMarked className="w-4 h-4" /> Table of contents
+          </div>
+          <h2 className="text-2xl md:text-3xl font-bold mb-2">The six chapters</h2>
+          <p className="text-muted-foreground max-w-xl mx-auto leading-relaxed">
+            Follow the spine from top to bottom and you’ll go from curious
+            beginner to confident submitter — or jump to wherever your story is
+            right now.
           </p>
         </div>
 
         <ol className="relative">
-          {/* The connecting line that ties the chapters together */}
+          {/* The book spine that ties the chapters together */}
           <span
             aria-hidden="true"
             className="absolute left-5 sm:left-6 top-4 bottom-4 w-px bg-gradient-to-b from-primary/40 via-border to-primary/40"
           />
 
-          {CHAPTERS.map(({ href, icon: Icon, chapter, label, title, description, cta }, i) => (
+          {CHAPTERS.map(({ href, icon: Icon, chapter, label, title, opening, description, cta }, i) => (
             <li key={href} className="relative pl-16 sm:pl-20 pb-8 last:pb-0">
-              {/* Chapter node on the path */}
+              {/* Chapter node on the spine */}
               <span className="absolute left-0 top-1 flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary text-primary-foreground font-black text-lg shadow-sm ring-4 ring-background">
                 {i + 1}
               </span>
@@ -180,8 +269,8 @@ const GradingPage = () => (
                 to={href}
                 className="block bg-card border border-border rounded-3xl p-7 sm:p-8 hover:border-primary/50 hover:shadow-md transition-all group"
               >
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-xs font-bold uppercase tracking-widest text-primary">{chapter}</span>
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <span className="text-xs font-bold uppercase tracking-[0.18em] text-primary">{chapter}</span>
                   <span className="text-muted-foreground/40">•</span>
                   <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
                   {i === 0 && (
@@ -196,6 +285,7 @@ const GradingPage = () => (
                     <Icon className="w-7 h-7 text-primary" />
                   </div>
                   <div>
+                    <p className="text-sm italic text-muted-foreground/90 mb-1.5">{opening}</p>
                     <h3 className="text-xl sm:text-2xl font-bold mb-2 group-hover:text-primary transition-colors">{title}</h3>
                     <p className="text-muted-foreground mb-5 leading-relaxed">{description}</p>
                     <span className="inline-flex items-center gap-2 text-primary font-bold text-sm tracking-wide uppercase">
@@ -212,9 +302,10 @@ const GradingPage = () => (
             <span className="absolute left-0 top-1 flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary/15 ring-4 ring-background">
               <Flag className="w-5 h-5 text-primary" />
             </span>
-            <div className="pt-2">
-              <p className="font-bold text-lg">You're ready to submit. 🎉</p>
-              <p className="text-muted-foreground">
+            <div className="rounded-3xl border border-dashed border-primary/30 bg-primary/[0.04] p-7">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary mb-2">The happy ending</p>
+              <p className="font-bold text-lg mb-1">You’re ready to submit. 🎉</p>
+              <p className="text-muted-foreground leading-relaxed">
                 With your slabs in hand, <Link to="/marketplace" className="text-primary font-semibold hover:underline">list them on the CardPop Marketplace</Link> — graded cards sell faster and for more.
               </p>
             </div>
@@ -224,6 +315,9 @@ const GradingPage = () => (
 
       {/* Australian collector tips — the "field notes" appendix */}
       <section>
+        <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-primary mb-3">
+          <Sparkles className="w-4 h-4" /> Appendix
+        </div>
         <h2 className="text-2xl font-bold mb-2">Field Notes for Australian Collectors</h2>
         <p className="text-muted-foreground mb-6 leading-relaxed">
           Grading from Australia has unique considerations — costs, shipping, and service options differ from the US market.
