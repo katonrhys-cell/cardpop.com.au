@@ -17,8 +17,6 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "check:bundle": "node tools/check-bundle-size.js",
-    "lhci": "lhci autorun --config=lighthouserc.cjs",
-    "lhci:mobile": "LH_FORM_FACTOR=mobile lhci autorun --config=lighthouserc.cjs",
     "optimize:images": "node tools/optimize-hero-images.js"
   },
   "dependencies": {
