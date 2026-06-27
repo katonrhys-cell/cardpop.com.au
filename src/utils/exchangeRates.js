@@ -101,4 +101,12 @@ async function getExchangeRateInfo() {
   };
 }
 
-export { getUsdToAudRate, convertUsdToAud, getExchangeRateInfo };
+function _resetRateCache() {
+  exchangeRateCache = {
+    usdToAud: null,
+    lastUpdated: null,
+    cacheExpiry: 24 * 60 * 60 * 1000,
+  };
+}
+
+export { getUsdToAudRate, convertUsdToAud, getExchangeRateInfo, _resetRateCache };
