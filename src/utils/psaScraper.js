@@ -1,4 +1,4 @@
-import cheerio from 'cheerio';
+import { load } from 'cheerio';
 import logger from './logger.js';
 import { convertUsdToAud, getExchangeRateInfo } from './exchangeRates.js';
 
@@ -25,7 +25,7 @@ async function fetchPSACertification(certNumber) {
     }
 
     const html = await response.text();
-    const $ = cheerio.load(html);
+    const $ = load(html);
 
     // Extract data from PSA page
     const psaEstimateUsd = extractPSAEstimate($);
