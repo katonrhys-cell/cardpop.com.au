@@ -126,12 +126,14 @@ describe('GET /price-estimate', () => {
   });
 
   it('returns price statistics on success', async () => {
-    mockCallEbayApi.mockResolvedValue({
+    mockCallEbayApi.mockImplementationOnce(async () => ({
       itemSummaries: [
         { itemId: 'i1', title: 'Card A', price: { value: '100' }, condition: '3000', itemWebUrl: '', image: {} },
         { itemId: 'i2', title: 'Card B', price: { value: '200' }, condition: '3000', itemWebUrl: '', image: {} },
       ],
-    });
+    })).mockImplementationOnce(async () => ({
+      itemSummaries: [],
+    }));
     const res = await request(app).get('/price-estimate?name=Charizard');
     expect(res.status).toBe(200);
     expect(res.body.count).toBe(2);
@@ -161,7 +163,7 @@ describe('GET /price-estimate', () => {
   });
 
   it('returns 502 when the eBay API throws', async () => {
-    mockCallEbayApi.mockRejectedValue(new Error('timeout'));
+    mockCallEbayApi.mockRejectedValueOnce(new Error('timeout')).mockRejectedValueOnce(new Error('timeout'));
     const res = await request(app).get('/price-estimate?name=Charizard');
     expect(res.status).toBe(502);
   });
