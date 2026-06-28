@@ -76,16 +76,13 @@ describe('reverseSellerPayout', () => {
     expect(stripe.transfers.createReversal).toHaveBeenCalledWith('tr_1');
   });
 
-  it('claws back a wallet credit, never below zero', async () => {
+  it('claws back a wallet credit atomically via RPC (negative delta)', async () => {
     const stripe = stripeReversal();
-    queue(
-      builder({ data: { wallet_balance_aud: 50 } }), // seller wallet read
-      builder({ error: null }),                       // wallet update
-    );
     const res = await reverseSellerPayout(stripe, { id: 'o2', seller_id: 's2', payout_status: 'wallet_credited', seller_proceeds_aud: 80 });
     expect(res).toEqual({ action: 'wallet_clawback' });
-    const walletUpdate = mockSupabase.from.mock.results[1].value;
-    expect(walletUpdate.update).toHaveBeenCalledWith({ wallet_balance_aud: 0 }); // max(0, 50 - 80)
+    // Atomic clawback: negative delta through the same RPC as credits; the RPC
+    // floors the balance at 0, so a read-modify-write can't race it.
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('increment_wallet_balance', { p_user: 's2', p_delta: -80 });
   });
 
   it('does nothing when there was no payout to reverse', async () => {
