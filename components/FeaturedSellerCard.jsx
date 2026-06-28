@@ -29,8 +29,6 @@ const FeaturedSellerCard = ({ seller }) => {
   return (
     <div
       onClick={handleCardClick}
-      role="button"
-      tabIndex={0}
       className="group bg-card rounded-2xl border border-border/50 p-6 flex flex-col items-center text-center shadow-sm hover:shadow-lg hover:border-primary/40 transition-all duration-200 cursor-pointer h-full"
     >
       {/* Avatar/Logo */}
