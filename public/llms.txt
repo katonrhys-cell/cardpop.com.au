@@ -12,6 +12,7 @@
 - [Brand Management | Admin Portal](/brandsmanagement): No description available
 - [Category Mapping Tools | Admin](/categorymapping): No description available
 - [Chargebacks | Admin](/disputesadmin): No description available
+- [Chat Moderation | CardPop Admin](/chatmoderation): No description available
 - [Check Your Email | Card Pop](/signup): No description available
 - [Commission Settings | CardPop Admin](/commissionsettings): No description available
 - [Complete Profile | Card Pop](/profilecompletion): No description available
