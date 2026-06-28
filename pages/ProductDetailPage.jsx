@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -15,6 +15,7 @@ import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, Arro
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import EbayMarketSection from '@/components/EbayMarketSection.jsx';
 import PSACertificationSection from '@/components/PSACertificationSection.jsx';
+import GradeBadge from '@/components/GradeBadge.jsx';
 
 const getStatusBadge = (listingType) => {
   switch (listingType) {
@@ -36,6 +37,7 @@ const ProductDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [seller, setSeller] = useState(null);
+  const fetchRef = useRef(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -196,9 +198,23 @@ const ProductDetailPage = () => {
       }
     };
 
+    fetchRef.current = fetchProduct;
     fetchProduct();
     return () => { isMounted = false; };
   }, [id, source, currentUser?.id, isAdmin, authLoading]);
+
+  useEffect(() => {
+    if (source !== 'marketplace') return;
+
+    const channel = supabase
+      .channel(`product-detail-${id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vault_items' },
+        () => { if (fetchRef.current) fetchRef.current(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [id, source]);
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -363,9 +379,7 @@ const ProductDetailPage = () => {
                     </Badge>
                   )}
                   {vi.grade && (
-                    <Badge variant="outline" className="text-[11px] font-bold border-purple-400/50 text-purple-700 bg-purple-400/10 dark:text-purple-300">
-                      {vi.grading_company ? `${vi.grading_company} ${vi.grade}` : vi.grade}
-                    </Badge>
+                    <GradeBadge grade={vi.grade} gradingCompany={vi.grading_company} isPositioned={false} className="text-[11px]" />
                   )}
                   {vi.parallel?.name && (
                     <Badge variant="outline" className="text-[11px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10 dark:text-amber-300">{vi.parallel.name}</Badge>

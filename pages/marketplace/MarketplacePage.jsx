@@ -184,6 +184,18 @@ const MarketplacePage = () => {
     return () => { cancelled = true; };
   }, [sort, filterMode, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
 
+  // Realtime subscription to vault_items changes to refresh listings
+  useEffect(() => {
+    const channel = supabase
+      .channel('marketplace-vault-items')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vault_items' },
+        () => { if (fetchRef.current) fetchRef.current(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   const clearFilters = () => {
     setFilterCat(''); setFilterFranchise(''); setFilterMfr(''); setFilterTeam(''); setFilterSet('');
     setFilterParallel(''); setFilterSubset('');
