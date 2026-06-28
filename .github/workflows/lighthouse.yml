@@ -20,6 +20,9 @@ concurrency:
 jobs:
   lighthouse:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -48,10 +51,18 @@ jobs:
           echo "Using Chrome at: $CHROME_PATH (form factor: $LH_FORM_FACTOR)"
           lhci autorun --config=lighthouserc.cjs
 
-      - name: Upload Lighthouse reports
+      - name: Configure AWS credentials (OIDC)
         if: always()
-        uses: actions/upload-artifact@v4
+        id: aws
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          name: lighthouse-reports-${{ matrix.form_factor }}
-          path: .lighthouseci/
-          retention-days: 7
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ap-southeast-2
+
+      - name: Upload Lighthouse reports to S3
+        if: always() && steps.aws.outcome == 'success'
+        run: |
+          dest="s3://${{ vars.AWS_CI_ARTIFACTS_BUCKET }}/lighthouse/${{ github.run_id }}-${{ github.run_attempt }}/${{ matrix.form_factor }}/"
+          aws s3 cp .lighthouseci/ "$dest" --recursive
+          echo "Lighthouse report uploaded to $dest"
