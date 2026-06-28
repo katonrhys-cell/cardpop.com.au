@@ -15,6 +15,7 @@ import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, Arro
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import EbayMarketSection from '@/components/EbayMarketSection.jsx';
 import PSACertificationSection from '@/components/PSACertificationSection.jsx';
+import GradeBadge from '@/components/GradeBadge.jsx';
 
 const getStatusBadge = (listingType) => {
   switch (listingType) {
@@ -363,9 +364,7 @@ const ProductDetailPage = () => {
                     </Badge>
                   )}
                   {vi.grade && (
-                    <Badge variant="outline" className="text-[11px] font-bold border-purple-400/50 text-purple-700 bg-purple-400/10 dark:text-purple-300">
-                      {vi.grading_company ? `${vi.grading_company} ${vi.grade}` : vi.grade}
-                    </Badge>
+                    <GradeBadge grade={vi.grade} gradingCompany={vi.grading_company} isPositioned={false} className="text-[11px]" />
                   )}
                   {vi.parallel?.name && (
                     <Badge variant="outline" className="text-[11px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10 dark:text-amber-300">{vi.parallel.name}</Badge>
