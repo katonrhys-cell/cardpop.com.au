@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
+import GradeBadge from '@/components/GradeBadge.jsx';
 import { COLLECTION_CONFIGS, resolveCollectionSlug } from '@/data/collectionConfigs.js';
 import { useCollectionEras } from '@/hooks/useCollectionEras.js';
 import { slugify } from '@/lib/slugify.js';
@@ -76,9 +77,7 @@ const MiniListingCard = ({ listing, accentHex, badge }) => {
         )}
         {/* Grade badge overlay */}
         {grade && (
-          <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-yellow-400 text-yellow-900 shadow">
-            {gradingCompany ? `${gradingCompany} ${grade}` : grade}
-          </div>
+          <GradeBadge grade={grade} gradingCompany={gradingCompany} isPositioned={false} className="absolute top-2 right-2 z-10 text-[10px]" />
         )}
         {/* Custom badge (e.g. "Trending") */}
         {badge && !grade && (

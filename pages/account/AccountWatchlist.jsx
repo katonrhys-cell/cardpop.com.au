@@ -11,6 +11,7 @@ import { useWatchlist } from '@/hooks/useWatchlist.js';
 import { supabase } from '@/lib/supabaseClient.js';
 import { slugify } from '@/lib/slugify.js';
 import { toast } from 'sonner';
+import GradeBadge from '@/components/GradeBadge.jsx';
 
 // ── Auction countdown ─────────────────────────────────────────────────────────
 const useCountdown = (endAt) => {
@@ -33,12 +34,6 @@ const useCountdown = (endAt) => {
     return () => clearInterval(id);
   }, [endAt]);
   return timeLeft;
-};
-
-const GRADE_BADGE = {
-  psa: 'bg-red-600 text-white', bgs: 'bg-blue-700 text-white',
-  cgc: 'bg-green-600 text-white', ace: 'bg-orange-500 text-white',
-  sgc: 'bg-purple-600 text-white', other: 'bg-slate-600 text-white',
 };
 
 const STATUS = {
@@ -118,9 +113,7 @@ const WatchlistRow = ({ entry, onRemove }) => {
         )}
 
         {hasGrade && (
-          <span className={`inline-block text-[10px] font-extrabold px-2 py-0.5 rounded-md mr-2 mb-1.5 ${GRADE_BADGE[vi.grading_company] || GRADE_BADGE.other}`}>
-            {vi.grading_company.toUpperCase()} {vi.grade}
-          </span>
+          <GradeBadge grade={vi.grade} gradingCompany={vi.grading_company} isPositioned={false} className="inline-block mr-2 mb-1.5 text-[10px]" />
         )}
 
         <div className="flex items-center gap-3 mt-1.5 flex-wrap">

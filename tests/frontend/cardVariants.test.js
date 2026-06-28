@@ -44,7 +44,7 @@ describe('resolveGameKey', () => {
 describe('getVariantGroups / getCardVariants', () => {
   it('returns the game-specific groups for a known collection', () => {
     expect(getVariantGroups('Pokemon')).toBe(GAME_VARIANT_GROUPS[GAME_KEYS.POKEMON]);
-    expect(getCardVariants('NBA')).toContain('Black Prizm');
+    expect(getCardVariants('NBA')).toContain('Prizm');
     expect(getCardVariants('Magic: The Gathering')).toContain('Surge Foil');
     expect(getCardVariants('Yu-Gi-Oh')).toContain('Starlight Rare');
   });

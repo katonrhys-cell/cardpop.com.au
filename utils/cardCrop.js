@@ -13,6 +13,7 @@ export const CARD_RATIO = 5 / 7; // width / height, portrait
 export const OUTPUT = { width: 1200, height: 1680 };
 
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 
 /**
  * Orders four points as [top-left, top-right, bottom-right, bottom-left].

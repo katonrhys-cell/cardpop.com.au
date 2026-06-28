@@ -13,6 +13,7 @@ import { ShoppingCart, ShieldCheck, BarChart3 } from 'lucide-react';
 import PSAPopPanel from '@/components/PSAPopPanel.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import GradingVerificationSection from '@/components/GradingVerificationSection.jsx';
+import PSACertificationSection from '@/components/PSACertificationSection.jsx';
 import { getCardAttributeRows } from '@/lib/cardAttributeLabels.js';
 
 const VaultListingDetailPage = () => {
@@ -212,6 +213,12 @@ const VaultListingDetailPage = () => {
               />
             )}
           </div>
+
+          {/* PSA Certification Details Section */}
+          <PSACertificationSection
+            certNumber={vi?.cert_number || listing?.grading_number}
+            gradingCompany={vi?.grading_company || listing?.grading_company}
+          />
 
           <BuyerProtection className="mb-8" />
 

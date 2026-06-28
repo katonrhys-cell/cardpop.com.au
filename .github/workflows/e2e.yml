@@ -15,6 +15,9 @@ concurrency:
 jobs:
   e2e:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -36,10 +39,20 @@ jobs:
       - name: Run E2E tests
         run: npm run test:e2e
 
-      - name: Upload report on failure
+      # Reports go to S3 instead of GitHub artifacts. Fork PRs can't mint an
+      # id-token, so the upload is skipped gracefully on those.
+      - name: Configure AWS credentials (OIDC)
         if: failure()
-        uses: actions/upload-artifact@v4
+        id: aws
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 7
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ap-southeast-2
+
+      - name: Upload report to S3 on failure
+        if: failure() && steps.aws.outcome == 'success'
+        run: |
+          dest="s3://${{ vars.AWS_CI_ARTIFACTS_BUCKET }}/e2e/${{ github.run_id }}-${{ github.run_attempt }}/"
+          aws s3 cp playwright-report/ "$dest" --recursive
+          echo "Playwright report uploaded to $dest"

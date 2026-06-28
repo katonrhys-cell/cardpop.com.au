@@ -9,15 +9,7 @@ import CardMicroscope from '@/components/CardMicroscope.jsx';
 import CardImage from '@/components/CardImage.jsx';
 import { getCardImage, CARD_GRID_SIZES } from '@/utils/imageUrl.js';
 import { isVerified } from '@/utils/verification.js';
-
-const GRADE_BADGE = {
-  psa:   'bg-red-600 text-white',
-  bgs:   'bg-blue-700 text-white',
-  cgc:   'bg-green-600 text-white',
-  ace:   'bg-orange-500 text-white',
-  sgc:   'bg-purple-600 text-white',
-  other: 'bg-slate-600 text-white',
-};
+import GradeBadge from '@/components/GradeBadge.jsx';
 
 const ProductCard = ({ product }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
@@ -61,9 +53,7 @@ const ProductCard = ({ product }) => {
 
         {/* Grade badge — bottom left (only for graded slabs) */}
         {isGraded && (
-          <div className={`absolute bottom-3 left-3 z-10 px-2.5 py-1 rounded-md text-[11px] font-extrabold tracking-wide shadow-lg ${GRADE_BADGE[gradingCompany] || GRADE_BADGE.other}`}>
-            {gradingCompany.toUpperCase()} {product.grade}
-          </div>
+          <GradeBadge grade={product.grade} gradingCompany={gradingCompany} />
         )}
 
         {/* Serial number badge — bottom right */}

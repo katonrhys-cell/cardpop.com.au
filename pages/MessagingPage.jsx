@@ -88,7 +88,7 @@ const MessagingPage = () => {
             });
             scrollToBottom();
             if (record.recipient_id === uid) {
-              supabase.from('messages').update({ is_read: true }).eq('id', record.id).eq('recipient_id', uid).catch(console.error);
+              supabase.from('messages').update({ status: 'read', read_at: new Date().toISOString() }).eq('id', record.id).eq('recipient_id', uid).catch(console.error);
             }
           }
         }
@@ -124,11 +124,11 @@ const MessagingPage = () => {
           convMap.set(otherId, {
             otherUserId: otherId,
             otherUserName: 'Loading...',
-            lastMessage: msg.content,
+            lastMessage: msg.body,
             timestamp: msg.created_at,
-            unreadCount: (msg.recipient_id === currentUser.id && !msg.is_read) ? 1 : 0
+            unreadCount: (msg.recipient_id === currentUser.id && !msg.read_at) ? 1 : 0
           });
-        } else if (msg.recipient_id === currentUser.id && !msg.is_read) {
+        } else if (msg.recipient_id === currentUser.id && !msg.read_at) {
           const c = convMap.get(otherId);
           c.unreadCount += 1;
         }
@@ -177,9 +177,9 @@ const MessagingPage = () => {
       }
 
       // Mark unread as read
-      const unreadIds = (msgs || []).filter(m => m.recipient_id === currentUser.id && !m.is_read).map(m => m.id);
+      const unreadIds = (msgs || []).filter(m => m.recipient_id === currentUser.id && !m.read_at).map(m => m.id);
       if (unreadIds.length > 0) {
-        await supabase.from('messages').update({ is_read: true }).in('id', unreadIds).eq('recipient_id', currentUser.id);
+        await supabase.from('messages').update({ status: 'read', read_at: new Date().toISOString() }).in('id', unreadIds).eq('recipient_id', currentUser.id);
         fetchConversations();
       }
 
@@ -205,8 +205,7 @@ const MessagingPage = () => {
       const msgData = {
         sender_id: currentUser.id,
         recipient_id: selectedUserId,
-        content: content,
-        is_read: false,
+        body: content,
         trade_id: null,
       };
 
@@ -339,7 +338,7 @@ const MessagingPage = () => {
                 <div className="space-y-4 max-w-3xl mx-auto flex flex-col">
                   {messages.map((msg, idx) => {
                     const isSent = msg.sender_id === currentUser.id;
-                    const isFlagged = containsFlaggedContent(msg.content);
+                    const isFlagged = containsFlaggedContent(msg.body);
                     return (
                       <div key={msg.id || idx} className={`flex flex-col ${isSent ? 'items-end' : 'items-start'}`}>
                         <div className={`max-w-[85%] md:max-w-[70%] rounded-2xl px-5 py-3 shadow-sm ${
@@ -347,7 +346,7 @@ const MessagingPage = () => {
                             ? 'bg-primary text-primary-foreground rounded-br-sm'
                             : 'bg-card border border-border text-card-foreground rounded-bl-sm'
                         } ${isFlagged ? 'border-2 border-amber-400' : ''}`}>
-                          <p className="leading-relaxed text-sm md:text-base whitespace-pre-wrap break-words">{msg.content}</p>
+                          <p className="leading-relaxed text-sm md:text-base whitespace-pre-wrap break-words">{msg.body}</p>
                           <p className={`text-[10px] mt-2 font-medium tracking-wide text-right opacity-70`}>
                             {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </p>

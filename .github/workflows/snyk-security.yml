@@ -11,8 +11,10 @@ on:
 jobs:
   snyk:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     env:
-      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
@@ -28,10 +30,32 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Skip scan — SNYK_TOKEN not configured
+      # Fork PRs can't mint an id-token, so this step (and the scan) is skipped
+      # gracefully rather than failing the job.
+      - name: Configure AWS credentials (OIDC)
+        id: aws
+        continue-on-error: true
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ap-southeast-2
+
+      - name: Load Snyk token from SSM Parameter Store
+        if: steps.aws.outcome == 'success'
+        run: |
+          # The token is optional. If the parameter isn't set in SSM, leave
+          # SNYK_TOKEN empty and let the next step skip the scan — don't fail.
+          if token=$(aws ssm get-parameter --name /cardpop/snyk/token --with-decryption --query 'Parameter.Value' --output text 2>/dev/null); then
+            echo "::add-mask::$token"
+            echo "SNYK_TOKEN=$token" >> "$GITHUB_ENV"
+          else
+            echo "::notice::/cardpop/snyk/token not set in SSM — skipping Snyk scan."
+          fi
+
+      - name: Skip scan — SNYK_TOKEN not available
         if: env.SNYK_TOKEN == ''
         run: |
-          echo "::warning::SNYK_TOKEN secret is not configured. Add it in GitHub Settings → Secrets to enable vulnerability scanning."
+          echo "::warning::SNYK_TOKEN unavailable (SSM unreachable or fork PR without OIDC) — skipping vulnerability scan."
 
       - name: Run Snyk vulnerability test
         if: env.SNYK_TOKEN != ''

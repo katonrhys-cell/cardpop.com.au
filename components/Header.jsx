@@ -924,12 +924,12 @@ const Header = () => {
             .from('messages')
             .select('*', { count: 'exact', head: true })
             .eq('recipient_id', currentUser.id)
-            .eq('is_read', false),
+            .is('read_at', null),
           supabase
             .from('trades')
             .select('*', { count: 'exact', head: true })
             .eq('responder_id', currentUser.id)
-            .eq('status', 'pending')
+            .eq('status', 'proposed')
         ]);
         if (isMounted) {
           setUnreadCount(msgCount || 0);

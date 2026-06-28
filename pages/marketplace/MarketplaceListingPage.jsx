@@ -9,6 +9,7 @@ import { ShieldCheck, MessageCircle, User, TrendingUp, Loader2, Flag } from 'luc
 import ReportModal from '@/components/ReportModal.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import GradingVerificationSection from '@/components/GradingVerificationSection.jsx';
+import PSACertificationSection from '@/components/PSACertificationSection.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
 
 const MarketplaceListingPage = () => {
@@ -156,6 +157,12 @@ const MarketplaceListingPage = () => {
               grade={listing.vault_item?.grade}
             />
           )}
+
+          {/* PSA Certification Details Section */}
+          <PSACertificationSection
+            certNumber={listing?.vault_item?.cert_number || listing?.grading_number}
+            gradingCompany={listing?.vault_item?.grading_company || listing?.grading_company}
+          />
 
           {/* CardSight market price reference */}
           {(csPriceLoading || csPrice) && (

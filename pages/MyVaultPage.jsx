@@ -18,19 +18,11 @@ import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 import VaultListingModal from '@/components/VaultListingModal.jsx';
 import { VARIANT_BADGES } from '@/lib/cardVariants.js';
 import { slugify } from '@/lib/slugify.js';
+import GradeBadge from '@/components/GradeBadge.jsx';
 
 const CONDITION_LABELS = {
   mint: 'Mint', near_mint: 'Near Mint', excellent: 'Excellent',
   good: 'Good', light_played: 'Light Played', played: 'Played', poor: 'Poor',
-};
-
-const GRADE_BADGE = {
-  psa:   'bg-red-600 text-white',
-  bgs:   'bg-blue-700 text-white',
-  cgc:   'bg-green-600 text-white',
-  ace:   'bg-orange-500 text-white',
-  sgc:   'bg-purple-600 text-white',
-  other: 'bg-slate-600 text-white',
 };
 
 const MyVaultPage = () => {
@@ -214,9 +206,7 @@ const MyVaultPage = () => {
 
           {/* Grade badge — bottom left (only for graded slabs) */}
           {card?.grading_company && card.grading_company !== 'raw' && card?.grade && (
-            <div className={`absolute bottom-3 left-3 z-10 px-2.5 py-1 rounded-md text-[11px] font-extrabold tracking-wide shadow-lg ${GRADE_BADGE[card.grading_company] || GRADE_BADGE.other}`}>
-              {card.grading_company.toUpperCase()} {card.grade}
-            </div>
+            <GradeBadge grade={card.grade} gradingCompany={card.grading_company} />
           )}
 
           {card.serial_number && (

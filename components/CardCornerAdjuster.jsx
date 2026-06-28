@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
@@ -18,7 +18,10 @@ const OK_COLOR = '#10b981';
 /**
  * Manual crop editor: shows the original image with four draggable corner
  * handles (seeded from the auto-detected quad when available, otherwise an
- * inset rectangle). On apply it hands the adjusted corners — in natural image
+ * inset rectangle). It overlays a perspective-aware rule-of-thirds grid, edge
+ * handles, and a live "perfect rectangle" indicator so the user can tell at a
+ * glance whether their crop is square — plus a one-tap snap to a clean 5:7 card
+ * rectangle. On apply it hands the adjusted corners — in natural image
  * coordinates — back to the parent, which warps the image.
  *
  * Mount this only while editing (conditionally render in the parent) so it
@@ -29,8 +32,9 @@ const CardCornerAdjuster = ({ imageUrl, initialCorners, onApply, onCancel }) => 
   const [natural, setNatural] = useState(null); // { w, h } natural image size
   const [displayW, setDisplayW] = useState(0);   // rendered image width (px)
   const [corners, setCorners] = useState(null);  // [[x,y]×4] in natural coords
-  const [dragging, setDragging] = useState(null);
+  const [dragging, setDragging] = useState(null); // corner index | { edge: i } | null
   const [applying, setApplying] = useState(false);
+  const lastPt = useRef(null); // last pointer position (natural coords) for edge drags
 
   const seed = useCallback(() => {
     const img = imgRef.current;
@@ -62,16 +66,58 @@ const CardCornerAdjuster = ({ imageUrl, initialCorners, onApply, onCancel }) => 
   const displayH = natural ? natural.h * scale : 0;
   const ready = !!(natural && corners && displayW > 0);
 
+  const pointerToImage = (e) => {
+    const rect = imgRef.current.getBoundingClientRect();
+    return [
+      clamp((e.clientX - rect.left) / scale, 0, natural.w),
+      clamp((e.clientY - rect.top) / scale, 0, natural.h),
+    ];
+  };
+
   const onPointerMove = (e) => {
     if (dragging == null || !natural) return;
     e.preventDefault();
-    const rect = imgRef.current.getBoundingClientRect();
-    const x = clamp((e.clientX - rect.left) / scale, 0, natural.w);
-    const y = clamp((e.clientY - rect.top) / scale, 0, natural.h);
-    setCorners(prev => prev.map((c, i) => (i === dragging ? [x, y] : c)));
+    const [x, y] = pointerToImage(e);
+
+    if (typeof dragging === 'number') {
+      setCorners(prev => prev.map((c, i) => (i === dragging ? [x, y] : c)));
+      return;
+    }
+    // Edge drag: translate both endpoints of the edge by the pointer delta so
+    // the whole side moves together — handy for straightening one edge.
+    if (dragging.edge != null && lastPt.current) {
+      const dx = x - lastPt.current[0];
+      const dy = y - lastPt.current[1];
+      const i = dragging.edge;
+      const j = (i + 1) % 4;
+      setCorners(prev => prev.map((c, k) => (
+        k === i || k === j
+          ? [clamp(c[0] + dx, 0, natural.w), clamp(c[1] + dy, 0, natural.h)]
+          : c
+      )));
+      lastPt.current = [x, y];
+    }
   };
 
-  const endDrag = () => setDragging(null);
+  // Pointer capture keeps move/up events flowing to the handle even when the
+  // finger/cursor strays outside the SVG, so a drag toward the image edge no
+  // longer silently drops.
+  const capture = (e) => e.currentTarget.setPointerCapture?.(e.pointerId);
+  const startCornerDrag = (i) => (e) => { e.preventDefault(); capture(e); setDragging(i); };
+  const startEdgeDrag = (i) => (e) => {
+    e.preventDefault();
+    capture(e);
+    lastPt.current = pointerToImage(e);
+    setDragging({ edge: i });
+  };
+  const endDrag = () => { setDragging(null); lastPt.current = null; };
+
+  // Snap to a clean, upright 5:7 card rectangle centred on the current framing —
+  // guarantees four right angles at the standard card ratio.
+  const snapToRectangle = () => {
+    if (!corners || !natural) return;
+    setCorners(rectifyToCard(corners, natural.w, natural.h));
+  };
 
   const apply = async () => {
     if (!corners) return;
@@ -148,14 +194,13 @@ const CardCornerAdjuster = ({ imageUrl, initialCorners, onApply, onCancel }) => 
               draggable={false}
               className="block max-w-full max-h-[55vh] select-none rounded-lg"
             />
-            {ready && (
+            {ready && overlay && (
               <svg
                 className="absolute left-0 top-0 overflow-visible"
                 width={displayW}
                 height={displayH}
                 onPointerMove={onPointerMove}
                 onPointerUp={endDrag}
-                onPointerLeave={endDrag}
               >
                 <polygon
                   points={polygon}
@@ -183,7 +228,7 @@ const CardCornerAdjuster = ({ imageUrl, initialCorners, onApply, onCancel }) => 
                     stroke="#fff"
                     strokeWidth="2"
                     style={{ cursor: 'grab' }}
-                    onPointerDown={(e) => { e.preventDefault(); setDragging(i); }}
+                    onPointerDown={startCornerDrag(i)}
                   />
                 ))}
               </svg>

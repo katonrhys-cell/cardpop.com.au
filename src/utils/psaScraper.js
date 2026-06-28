@@ -15,7 +15,7 @@ async function fetchPSACertification(certNumber) {
     const url = `${PSA_BASE_URL}/${certNumber}`;
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; CardPopBot/1.0)',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
     });
 
@@ -61,36 +61,54 @@ async function fetchPSACertification(certNumber) {
 }
 
 function extractCardTitle($) {
-  // PSA page structure: <h1> or heading with card title
-  // Common selectors: h1, .cert-title, .card-title
+  // Try multiple selectors for card title
   let title = $('h1').first().text().trim();
   if (!title) {
-    title = $('.cert-title, .card-title').first().text().trim();
+    title = $('[data-testid="cert-title"]').first().text().trim();
+  }
+  if (!title) {
+    title = $('h2').first().text().trim();
+  }
+  if (!title) {
+    title = $('*[class*="title"]').first().text().trim();
   }
   return title || null;
 }
 
 function extractYear($) {
   const title = extractCardTitle($);
+  if (!title) {
+    // Alternative: look for year in dedicated field
+    const year = $('[data-testid="year"]').first().text().trim();
+    if (year) return year;
+  }
   if (!title) return null;
-  const match = title.match(/(\d{4})\s/);
+  const match = title.match(/(\d{4})/);
   return match ? match[1] : null;
 }
 
 function extractSet($) {
-  // Usually in format: YEAR BRAND SET #NUM
-  // e.g., "2023 TOPPS CHROME #1"
+  // Try dedicated set field first
+  let set = $('[data-testid="set"]').first().text().trim();
+  if (set) return set;
+
+  // Try parsing from title
   const title = extractCardTitle($);
   if (!title) return null;
   const parts = title.split('#');
   if (parts[0]) {
-    const setPart = parts[0].trim().split(/\s+/).slice(1, -1).join(' ');
+    const setPart = parts[0].trim().split(/\s+/).slice(1).join(' ');
     return setPart || null;
   }
   return null;
 }
 
 function extractCardNumber($) {
+  // Try dedicated field
+  let cardNum = $('[data-testid="card-number"]').first().text().trim();
+  if (cardNum) return cardNum;
+
+  // Parse from title
   const title = extractCardTitle($);
   if (!title) return null;
   const match = title.match(/#(\d+)/);
@@ -98,11 +116,13 @@ function extractCardNumber($) {
 }
 
 function extractGrade($) {
-  // Look for grade in format "MINT 9" or similar
-  // Try multiple selectors
-  let gradeText = $('[data-grade], .grade, .item-grade').first().text().trim();
+  // Try dedicated grade field first
+  let gradeText = $('[data-testid="grade"]').first().text().trim();
   if (!gradeText) {
-    gradeText = $('*:contains("MINT")').first().text().trim();
+    gradeText = $('[class*="grade"][class*="value"]').first().text().trim();
+  }
+  if (!gradeText) {
+    gradeText = $('*:contains("Grade:")').next().text().trim();
   }
   const match = gradeText.match(/(\d+(?:\.\d+)?)/);
   return match ? parseFloat(match[1]) : null;
@@ -110,23 +130,29 @@ function extractGrade($) {
 
 function extractGradeCategory($) {
   // e.g., "MINT", "GEM MINT", "EXCELLENT", etc.
-  let gradeText = $('[data-grade], .grade, .item-grade').first().text().trim();
+  let gradeText = $('[data-testid="grade-category"]').first().text().trim();
   if (!gradeText) {
-    gradeText = $('*:contains("MINT")').first().text().trim();
+    gradeText = $('[class*="grade"][class*="label"]').first().text().trim();
   }
-  const match = gradeText.match(/^([A-Z\s]+)\s+\d/);
+  if (!gradeText) {
+    gradeText = $('*:contains("Grade:")').next().text().trim();
+  }
+  const match = gradeText.match(/^([A-Z\s]+?)(?:\s+\d|$)/);
   return match ? match[1].trim() : null;
 }
 
 function extractPSAEstimate($) {
-  // Look for price estimate
-  let estimateText = $('[data-estimate], .psa-estimate, .estimate-price').first().text();
+  // Look for price estimate in various formats
+  let estimateText = $('[data-testid="psa-estimate"]').first().text();
+  if (!estimateText) {
+    estimateText = $('[class*="estimate"][class*="price"]').first().text();
+  }
   if (!estimateText) {
     estimateText = $('*:contains("PSA Estimate")').next().text();
   }
-  const match = estimateText.match(/\$[\d,]+(?:\.\d{2})?/);
+  const match = estimateText.match(/\$\s*([\d,]+(?:\.\d{2})?)/);
   if (match) {
-    const priceStr = match[0].replace(/[$,]/g, '');
+    const priceStr = match[1].replace(/,/g, '');
     return parseFloat(priceStr);
   }
   return null;
@@ -134,9 +160,12 @@ function extractPSAEstimate($) {
 
 function extractPopulation($) {
   // PSA Population at this grade
-  let popText = $('[data-population], .population').first().text();
+  let popText = $('[data-testid="population"]').first().text();
   if (!popText) {
-    popText = $('*:contains("PSA Population")').next().text();
+    popText = $('[class*="population"]').first().text();
+  }
+  if (!popText) {
+    popText = $('*:contains("Population")').next().text();
   }
   const match = popText.match(/[\d,]+/);
   if (match) {
@@ -147,7 +176,10 @@ function extractPopulation($) {
 
 function extractPopHigher($) {
   // PSA Pop Higher (graded higher)
-  let popHigherText = $('[data-pop-higher], .pop-higher').first().text();
+  let popHigherText = $('[data-testid="pop-higher"]').first().text();
+  if (!popHigherText) {
+    popHigherText = $('[class*="pop-higher"]').first().text();
+  }
   if (!popHigherText) {
     popHigherText = $('*:contains("Pop Higher")').next().text();
   }
@@ -160,25 +192,49 @@ function extractPopHigher($) {
 
 function extractFrontImage($) {
   // Front image of the card
-  const frontImg = $('[data-front-image], .card-front-image, img[alt*="front"]').first();
-  return frontImg.attr('src') || frontImg.attr('data-src') || null;
+  let img = $('[data-testid="card-front-image"]').first();
+  if (!img.length) {
+    img = $('img[alt*="front" i]').first();
+  }
+  if (!img.length) {
+    img = $('[class*="card-image"][class*="front"]').first();
+  }
+  if (!img.length) {
+    img = $('img').first(); // fallback to first image
+  }
+  return img.attr('src') || img.attr('data-src') || null;
 }
 
 function extractBackImage($) {
   // Back image of the card
-  const backImg = $('[data-back-image], .card-back-image, img[alt*="back"]').first();
-  return backImg.attr('src') || backImg.attr('data-src') || null;
+  let img = $('[data-testid="card-back-image"]').first();
+  if (!img.length) {
+    img = $('img[alt*="back" i]').first();
+  }
+  if (!img.length) {
+    img = $('[class*="card-image"][class*="back"]').first();
+  }
+  if (!img.length) {
+    img = $('img').eq(1); // fallback to second image
+  }
+  return img.attr('src') || img.attr('data-src') || null;
 }
 
 function extractVariant($) {
   // Card variant info (parallel, autograph, etc.)
-  let variantText = $('.variant, [data-variant]').first().text().trim();
+  let variantText = $('[data-testid="variant"]').first().text().trim();
+  if (!variantText) {
+    variantText = $('[class*="variant"]').first().text().trim();
+  }
   return variantText || null;
 }
 
 function extractCondition($) {
   // Detailed condition notes
-  let conditionText = $('.condition, [data-condition]').first().text().trim();
+  let conditionText = $('[data-testid="condition"]').first().text().trim();
+  if (!conditionText) {
+    conditionText = $('[class*="condition"]').first().text().trim();
+  }
   return conditionText || null;
 }
 

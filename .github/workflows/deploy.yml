@@ -94,6 +94,11 @@ jobs:
   deploy:
     needs: [lint, test-frontend, test-backend, build]
     runs-on: ubuntu-latest
+    # OIDC: the job mints a short-lived token GitHub signs, AWS trusts it, and we
+    # assume an IAM role for temporary credentials — no long-lived AWS keys here.
+    permissions:
+      id-token: write
+      contents: read
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -110,9 +115,21 @@ jobs:
       - name: Install Vercel CLI
         run: npm install -g vercel@latest
 
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ap-southeast-2
+
+      - name: Load Vercel secrets from SSM Parameter Store
+        run: |
+          token=$(aws ssm get-parameter --name /cardpop/vercel/token --with-decryption --query 'Parameter.Value' --output text)
+          echo "::add-mask::$token"
+          {
+            echo "VERCEL_TOKEN=$token"
+            echo "VERCEL_ORG_ID=$(aws ssm get-parameter --name /cardpop/vercel/org_id --query 'Parameter.Value' --output text)"
+            echo "VERCEL_PROJECT_ID=$(aws ssm get-parameter --name /cardpop/vercel/project_id --query 'Parameter.Value' --output text)"
+          } >> "$GITHUB_ENV"
+
       - name: Deploy to Vercel
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-        run: vercel --prod --token=$VERCEL_TOKEN
+        run: vercel --prod --token="$VERCEL_TOKEN"

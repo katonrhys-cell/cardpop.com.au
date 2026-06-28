@@ -134,6 +134,23 @@ const GradingScalePage = () => {
           <p className="text-sm text-muted-foreground leading-relaxed">{company.auNote}</p>
         </div>
 
+        {/* YouTube Video - Only show for PSA */}
+        {scale?.toLowerCase() === 'psa' && (
+          <div className="rounded-2xl overflow-hidden">
+            <div className="aspect-video bg-black">
+              <iframe
+                width="100%"
+                height="100%"
+                src="https://www.youtube.com/embed/E9do7O74zM0"
+                title="PSA Grading Scale Guide"
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          </div>
+        )}
+
         {/* Scale table */}
         <div>
           <div className="bg-card border border-border rounded-3xl overflow-hidden">

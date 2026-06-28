@@ -1,9 +1,10 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Star, ShieldCheck, ImageOff } from 'lucide-react';
+import { Star, ImageOff } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/utils/formatCurrency.js';
+import GradeBadge from '@/components/GradeBadge.jsx';
 
 const FeaturedProductCard = ({ product, seller }) => {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ const FeaturedProductCard = ({ product, seller }) => {
   const category = product.collectionType || product.category || 'Trading Card';
   const condition = product.condition || 'Ungraded';
   const grade = product.grade || product.gradeText || product.gradeScore;
+  const gradingCompany = product.grading_company || product.gradingCompany || '';
   const priceVal = product.price || product.estimatedValue || product.askingPrice || product.salePrice || 0;
 
   // Formatting price via shared ECommerce logic
@@ -90,10 +92,7 @@ const FeaturedProductCard = ({ product, seller }) => {
             {condition}
           </Badge>
           {grade && (
-            <Badge className="bg-primary/90 text-primary-foreground backdrop-blur-sm flex items-center gap-1 font-bold shadow-sm border-none">
-              <ShieldCheck className="w-3 h-3" />
-              {grade}
-            </Badge>
+            <GradeBadge grade={grade} gradingCompany={gradingCompany} isPositioned={false} className="shadow-md backdrop-blur-sm" />
           )}
         </div>
       </div>

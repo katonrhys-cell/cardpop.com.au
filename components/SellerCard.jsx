@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, User } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
+import { isVerified } from '@/utils/verification.js';
 import { Button } from '@/components/ui/button';
 
 const SellerCard = ({ seller }) => {
@@ -57,7 +58,7 @@ const SellerCard = ({ seller }) => {
       </h3>
 
       {/* Verified Badge */}
-      {seller.is_verified && (
+      {isVerified(seller.is_verified) && (
         <span className="inline-flex items-center gap-1 text-emerald-600 text-xs font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full mb-2">
           <CheckCircle2 className="w-3 h-3" />
           Verified
