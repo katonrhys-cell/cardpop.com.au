@@ -63,7 +63,16 @@ const ShopPage = () => {
     return () => { cancelled = true; };
   }, [sort, searchTerm]);
 
-  useShopProductRealtimeSync(fetchRef, 'shop-products');
+  useEffect(() => {
+    const channel = supabase
+      .channel('shop-products')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products' },
+        () => { if (fetchRef.current) fetchRef.current(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const handleAddToCart = (product, variant) => {
     addToCart(product, variant, 1, product.stockQuantity ?? 999)

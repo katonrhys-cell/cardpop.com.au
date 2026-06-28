@@ -205,8 +205,19 @@ const ProductDetailPage = () => {
     return () => { isMounted = false; };
   }, [id, source, currentUser?.id, isAdmin, authLoading]);
 
-  useShopProductRealtimeSync(fetchRef, 'product-detail-shop');
-  useVaultItemRealtimeSync(fetchRef, 'product-detail-vault');
+  useEffect(() => {
+    const channel = supabase
+      .channel(`product-detail-${id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vault_items' },
+        () => { if (source === 'marketplace' && fetchRef.current) fetchRef.current(); }
+      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products' },
+        () => { if (source === 'shop' && fetchRef.current) fetchRef.current(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [id, source]);
 
   const handleAddToCart = () => {
     if (!product) return;

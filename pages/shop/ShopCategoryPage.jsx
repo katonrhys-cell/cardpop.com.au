@@ -21,6 +21,7 @@ const ShopCategoryPage = () => {
   const [sort, setSort] = useState('newest');
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
+  const fetchRef = useRef(null);
 
   const pathInfo = getCategoryBySlug(hierarchy, categorySlug, subcategorySlug, productTypeSlug);
   const { category, subcategory, productType } = pathInfo || {};
@@ -69,13 +70,23 @@ const ShopCategoryPage = () => {
     };
 
     if (!contextLoading) {
+      fetchRef.current = fetchProducts;
       fetchProducts();
     }
     // Depend on stable slug strings (not the derived path objects, which get new
     // identities every render and would re-run this effect needlessly).
   }, [categoryName, page, sort, contextLoading]);
 
-  useShopProductRealtimeSync(fetchRef, 'shop-category-products');
+  useEffect(() => {
+    const channel = supabase
+      .channel('shop-category-products')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products' },
+        () => { if (fetchRef.current) fetchRef.current(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const breadcrumbs = getBreadcrumbs(category, subcategory, productType, '/shop');
   const metaTitle = generateMetaTitle(category, subcategory, productType) + " - Official Store";

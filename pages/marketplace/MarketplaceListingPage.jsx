@@ -9,7 +9,7 @@ import { ShieldCheck, MessageCircle, User, TrendingUp, Loader2, Flag } from 'luc
 import ReportModal from '@/components/ReportModal.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import GradingVerificationSection from '@/components/GradingVerificationSection.jsx';
-import useVaultItemRealtimeSync from '@/hooks/useVaultItemRealtimeSync.js';
+import PSACertificationSection from '@/components/PSACertificationSection.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
 
 const MarketplaceListingPage = () => {
@@ -43,7 +43,16 @@ const MarketplaceListingPage = () => {
     return () => { cancelled = true; };
   }, [id]);
 
-  useVaultItemRealtimeSync(fetchRef, 'marketplace-listing-detail');
+  useEffect(() => {
+    const channel = supabase
+      .channel(`marketplace-listing-${id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vault_items' },
+        () => { if (fetchRef.current) fetchRef.current(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [id]);
 
   // Fetch eBay pricing once listing title is known (replaces CardSight autocomplete → pricing)
   useEffect(() => {
@@ -161,6 +170,12 @@ const MarketplaceListingPage = () => {
               grade={listing.vault_item?.grade}
             />
           )}
+
+          {/* PSA Certification Details Section */}
+          <PSACertificationSection
+            certNumber={listing?.vault_item?.cert_number || listing?.grading_number}
+            gradingCompany={listing?.vault_item?.grading_company || listing?.grading_company}
+          />
 
           {/* CardSight market price reference */}
           {(csPriceLoading || csPrice) && (
