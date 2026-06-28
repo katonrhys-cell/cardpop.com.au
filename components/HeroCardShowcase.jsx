@@ -1,5 +1,28 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import HeroCardImage from '@/components/HeroCardImage.jsx';
+
+// The built-in HERO_CARDS reference extension-less stems
+// ("/images/hero/black-lotus") that resolve to responsive AVIF/WebP/JPG
+// variants, whereas DB-driven showcase rows store a full image URL with its
+// extension. Render each kind appropriately so the photos actually load.
+const hasFileExtension = (src) => /\.(avif|webp|jpe?g|png|gif)$/i.test(src || '');
+
+const CardArt = ({ image, padding = 'p-1' }) => {
+  if (!image) return null;
+  if (hasFileExtension(image)) {
+    return (
+      <img
+        src={image}
+        alt=""
+        className={`absolute inset-0 w-full h-full object-contain ${padding}`}
+        draggable={false}
+        loading="lazy"
+      />
+    );
+  }
+  return <HeroCardImage stem={image} alt="" />;
+};
 
 /**
  * HeroCardShowcase
@@ -88,15 +111,7 @@ const HeroCardShowcase = ({ cards = [] }) => {
                     boxShadow: '0 8px 16px -6px rgba(0,0,0,0.7), inset 0 0 0 1px rgba(255,255,255,0.05)',
                   }}
                 >
-                  {card.image && (
-                    <img
-                      src={card.image}
-                      alt=""
-                      className="absolute inset-0 w-full h-full object-contain p-0.5"
-                      draggable={false}
-                      loading="lazy"
-                    />
-                  )}
+                  <CardArt image={card.image} padding="p-0.5" />
                 </div>
               </div>
             );
@@ -164,16 +179,7 @@ const HeroCardShowcase = ({ cards = [] }) => {
           }
         >
           {/* Card art */}
-          {activeCard.image && (
-            <img
-              src={activeCard.image}
-              alt=""
-              className="absolute inset-0 w-full h-full object-contain p-1"
-              draggable={false}
-              width="160"
-              height="224"
-            />
-          )}
+          <CardArt image={activeCard.image} padding="p-1" />
 
           {/* Holographic shimmer */}
           <div

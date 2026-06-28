@@ -629,6 +629,14 @@ const AddEditCardPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!isEdit && !imageFile) { toast.error('Card image is required'); return; }
+    // Require both Category (e.g. Sports) and Franchise (e.g. NBA). The specific
+    // franchise is what places a card in its collection page (e.g. /collections/nba);
+    // saving with only a broad category leaves the card out of every collection.
+    if (!selCategoryId || !franchiseId) {
+      toast.error('Please choose both a Category and a Franchise (e.g. Sports → NBA) so your card appears in the right collection.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     if (!validateForm()) {
       toast.error('Please fix the errors in the form');
       // Jump to the first problem — on a long form (especially mobile) the

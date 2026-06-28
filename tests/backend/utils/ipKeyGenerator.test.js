@@ -13,28 +13,26 @@ function makeReq({ forwardedFor, ip, connectionAddr, socketAddr } = {}) {
   };
 }
 
-// ─── x-forwarded-for header ───────────────────────────────────────────────────
+// ─── x-forwarded-for header is NOT trusted ────────────────────────────────────
+// The raw X-Forwarded-For header is client-controlled and must be ignored — only
+// req.ip (which Express derives from the header using the bounded `trust proxy`
+// hop count) is authoritative. Reading the raw header would let a client spoof
+// its IP and bypass every rate limiter / IP lockout.
 
-describe('x-forwarded-for header', () => {
-  it('returns the IP from a single-entry x-forwarded-for header', () => {
-    expect(ipKeyGenerator(makeReq({ forwardedFor: '203.0.113.5' }))).toBe('203.0.113.5');
-  });
-
-  it('returns only the first IP from a multi-entry x-forwarded-for header', () => {
-    expect(ipKeyGenerator(makeReq({ forwardedFor: '203.0.113.5, 10.0.0.1, 172.16.0.1' }))).toBe('203.0.113.5');
-  });
-
-  it('trims whitespace from the extracted IP', () => {
-    expect(ipKeyGenerator(makeReq({ forwardedFor: '  203.0.113.5  , 10.0.0.1' }))).toBe('203.0.113.5');
-  });
-
-  it('strips the ::ffff: prefix from an IPv4-mapped IPv6 address in x-forwarded-for', () => {
-    expect(ipKeyGenerator(makeReq({ forwardedFor: '::ffff:192.168.1.1' }))).toBe('192.168.1.1');
-  });
-
-  it('x-forwarded-for takes precedence over req.ip', () => {
+describe('x-forwarded-for header is not trusted', () => {
+  it('ignores a client-supplied x-forwarded-for header and uses req.ip', () => {
     const req = { ...makeReq({ forwardedFor: '203.0.113.5' }), ip: '10.0.0.1' };
-    expect(ipKeyGenerator(req)).toBe('203.0.113.5');
+    expect(ipKeyGenerator(req)).toBe('10.0.0.1');
+  });
+
+  it('does not let a spoofed header override the real req.ip', () => {
+    const req = { ...makeReq({ forwardedFor: '1.2.3.4, 5.6.7.8' }), ip: '198.51.100.7' };
+    expect(ipKeyGenerator(req)).toBe('198.51.100.7');
+  });
+
+  it('falls back to connection/socket (never the header) when req.ip is absent', () => {
+    const req = { ...makeReq({ forwardedFor: '203.0.113.5', connectionAddr: '192.0.2.50' }), ip: null };
+    expect(ipKeyGenerator(req)).toBe('192.0.2.50');
   });
 });
 

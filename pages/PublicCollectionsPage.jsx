@@ -50,12 +50,12 @@ const PublicCollectionsPage = () => {
       const processVaultItem = (item) => {
         const isSportsItem = SPORTS_COLLECTIONS.includes(item.collectionType);
         const brand = isSportsItem
-          ? (SPORTS_BRANDS.find(b => item.card_name?.includes(b)) || SPORTS_BRANDS[item.id.charCodeAt(0) % SPORTS_BRANDS.length])
-          : (TCG_BRANDS.find(b => item.grading_company?.includes(b)) || TCG_BRANDS[item.id.charCodeAt(0) % TCG_BRANDS.length]);
+          ? (SPORTS_BRANDS.find(b => item.card_name?.includes(b)) || SPORTS_BRANDS[String(item.id).charCodeAt(0) % SPORTS_BRANDS.length])
+          : (TCG_BRANDS.find(b => item.grading_company?.includes(b)) || TCG_BRANDS[String(item.id).charCodeAt(0) % TCG_BRANDS.length]);
 
         const series = isSportsItem
-          ? SPORTS_SERIES[item.id.charCodeAt(1) % SPORTS_SERIES.length]
-          : TCG_SERIES[item.id.charCodeAt(1) % TCG_SERIES.length];
+          ? SPORTS_SERIES[String(item.id).charCodeAt(1) % SPORTS_SERIES.length]
+          : TCG_SERIES[String(item.id).charCodeAt(1) % TCG_SERIES.length];
 
         return {
           id: item.id,
@@ -84,8 +84,8 @@ const PublicCollectionsPage = () => {
           : (TCG_BRANDS.find(b => item.name?.includes(b) || item.grading_company?.includes(b)) || 'Official');
 
         const series = isSportsItem
-          ? SPORTS_SERIES[item.id.charCodeAt(1) % SPORTS_SERIES.length]
-          : TCG_SERIES[item.id.charCodeAt(1) % TCG_SERIES.length];
+          ? SPORTS_SERIES[String(item.id).charCodeAt(1) % SPORTS_SERIES.length]
+          : TCG_SERIES[String(item.id).charCodeAt(1) % TCG_SERIES.length];
 
         return {
           id: item.id,

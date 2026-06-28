@@ -17,6 +17,15 @@ const EbayMarketSection = ({ cardName, cardSet, gradingService, gradeScore }) =>
       return;
     }
 
+    // Reset state for the new card and guard against stale responses — this
+    // component is reused across card navigations, so without this a late
+    // response for a previous card could overwrite the current one, and the
+    // prior card's data/error would flash before the new fetch resolves.
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    setData(null);
+
     const fetchEbayData = async () => {
       try {
         const params = new URLSearchParams();
@@ -32,12 +41,13 @@ const EbayMarketSection = ({ cardName, cardSet, gradingService, gradeScore }) =>
         const response = await apiServerClient.fetch(`/ebay/price-estimate?${params}`);
         if (!response.ok) throw new Error('Failed to fetch eBay data');
         const json = await response.json();
-        setData(json);
+        if (!cancelled) setData(json);
       } catch (err) {
+        if (cancelled) return;
         console.error('Error fetching eBay data:', err);
         setError(err.message);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
@@ -45,7 +55,7 @@ const EbayMarketSection = ({ cardName, cardSet, gradingService, gradeScore }) =>
       fetchEbayData();
     }, 300);
 
-    return () => clearTimeout(timer);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [cardName, cardSet, gradingService, gradeScore]);
 
   const formatCurrency = (val) => `$${Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

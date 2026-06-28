@@ -357,7 +357,7 @@ const CollectionPage = () => {
           fetchPinnedSectionItems(slug, 'new_releases'),
           supabase.from('vault_items')
             .select('*, vault_images(*)')
-            .eq('category_id', categoryId)
+            .or(`category_id.eq.${categoryId},franchise_id.eq.${categoryId}`)
             .eq('is_public', true)
             .order('created_at', { ascending: false })
             .limit(10),
@@ -386,7 +386,7 @@ const CollectionPage = () => {
         const [pinned, autoRes] = await Promise.all([
           fetchPinnedSectionItems(slug, 'graded'),
           supabase.from('vault_items').select('*, vault_images(*)')
-            .eq('category_id', categoryId)
+            .or(`category_id.eq.${categoryId},franchise_id.eq.${categoryId}`)
             .eq('is_public', true)
             .not('grade', 'is', null)
             .neq('grading_company', 'raw')
@@ -417,7 +417,7 @@ const CollectionPage = () => {
         const [pinned, autoRes] = await Promise.all([
           fetchPinnedSectionItems(slug, 'trending'),
           supabase.from('vault_items').select('*, vault_images(*)')
-            .eq('category_id', categoryId)
+            .or(`category_id.eq.${categoryId},franchise_id.eq.${categoryId}`)
             .eq('is_public', true)
             .gt('estimated_value_aud', 0)
             .order('estimated_value_aud', { ascending: false })
@@ -448,7 +448,7 @@ const CollectionPage = () => {
           .gt('estimated_value_aud', 0)
           .order('estimated_value_aud', { ascending: false })
           .limit(6);
-        if (categoryId) query = query.eq('category_id', categoryId);
+        if (categoryId) query = query.or(`category_id.eq.${categoryId},franchise_id.eq.${categoryId}`);
         const [pinned, { data: featured }] = await Promise.all([
           fetchPinnedSectionItems(slug, 'holy_grail', '*, vault_images(*), owner:profiles!owner_id(*)'),
           query,
@@ -482,13 +482,17 @@ const CollectionPage = () => {
     try {
       // Query active listings, joining vault_items (inner so only listings with
       // matching vault items are returned) to apply the category filter.
+      // The add-card flow stores the specific game/sport (e.g. NBA) in
+      // franchise_id and the broad group (e.g. Sports) in category_id, while
+      // older rows stored the specific id directly in category_id — so match
+      // the resolved collection id against EITHER column.
       let q = supabase.from('listings')
         .select(
           `*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(display_name, username, avatar_url, is_verified)`,
           { count: 'exact' }
         )
         .eq('status', 'active')
-        .eq('vault_items.category_id', categoryId)
+        .or(`category_id.eq.${categoryId},franchise_id.eq.${categoryId}`, { referencedTable: 'vault_items' })
         .range(from, from + perPage - 1);
 
       // Era pills carry a short label (e.g. "Topps Chrome") while real set

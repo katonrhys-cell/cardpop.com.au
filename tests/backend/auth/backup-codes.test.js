@@ -46,6 +46,7 @@ function makeBuilder(result = { data: null, error: null }) {
   const b = {
     select: vi.fn().mockReturnThis(),
     update: vi.fn().mockReturnThis(),
+    upsert: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     single: vi.fn().mockResolvedValue(result),
     then: (resolve, reject) => Promise.resolve(result).then(resolve, reject),
@@ -67,11 +68,14 @@ describe('POST /generate', () => {
     expect(res.body.message).toBeDefined();
   });
 
-  it('stores encrypted codes in the profile', async () => {
+  it('upserts encrypted codes keyed by user_id (creates the row if missing)', async () => {
     const b = makeBuilder({ data: null, error: null });
     mockSupabase.from.mockReturnValue(b);
     await request(app).post('/generate');
-    expect(b.update).toHaveBeenCalledWith({ backup_codes: ENCRYPTED_CODES });
+    expect(b.upsert).toHaveBeenCalledWith(
+      { user_id: 'user-1', backup_codes: ENCRYPTED_CODES },
+      { onConflict: 'user_id' },
+    );
   });
 });
 

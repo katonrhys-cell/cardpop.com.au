@@ -255,7 +255,7 @@ const AccountWatchlist = () => {
 
   const handleRemove = async (listingId) => {
     setEntries(prev => prev.filter(e => e.listing_id !== listingId));
-    const success = await toggle(listingId);
+    const { success } = await toggle(listingId);
     if (success) {
       toast.success('Removed from watchlist');
     } else {

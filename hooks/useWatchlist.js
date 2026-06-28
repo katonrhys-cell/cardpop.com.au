@@ -57,8 +57,16 @@ export const useWatchlist = () => {
     };
   }, [currentUser?.id, isAuthenticated]);
 
+  /**
+   * Toggle a listing's watchlist membership.
+   * Returns { success, watchlisted }:
+   *   success    — whether the DB write succeeded
+   *   watchlisted — the resulting membership state
+   * (A bare boolean was ambiguous: a successful *removal* and a *failure* both
+   * looked the same to callers.)
+   */
   const toggle = useCallback(async (listingId) => {
-    if (!currentUser?.id) return false;
+    if (!currentUser?.id) return { success: false, watchlisted: ids.has(listingId) };
     const uid = currentUser.id;
     const already = ids.has(listingId);
 
@@ -71,27 +79,36 @@ export const useWatchlist = () => {
       return next;
     });
 
+    let error;
     try {
+      // Supabase resolves with { error } rather than throwing, so inspect it
+      // explicitly — otherwise a failed write would be treated as success.
       if (already) {
-        await supabase.from('watchlist').delete().eq('user_id', uid).eq('listing_id', listingId);
+        ({ error } = await supabase.from('watchlist').delete().eq('user_id', uid).eq('listing_id', listingId));
       } else {
-        await supabase.from('watchlist').insert({ user_id: uid, listing_id: listingId });
+        ({ error } = await supabase.from('watchlist').insert({ user_id: uid, listing_id: listingId }));
       }
-      return !already;
-    } catch {
-      // Roll back on error
+    } catch (e) {
+      error = e;
+    }
+
+    if (error) {
+      // Roll back the optimistic change.
       setIds(prev => {
         const next = new Set(prev);
         if (already) next.add(listingId);
         else next.delete(listingId);
         return next;
       });
-      return already;
-    } finally {
-      pendingRef.current = Math.max(0, pendingRef.current - 1);
-      // Once the last concurrent toggle settles, reconcile with server truth.
-      if (pendingRef.current === 0) fetchRef.current?.();
     }
+
+    pendingRef.current = Math.max(0, pendingRef.current - 1);
+    // Once the last concurrent toggle settles, reconcile with server truth.
+    if (pendingRef.current === 0) fetchRef.current?.();
+
+    return error
+      ? { success: false, watchlisted: already }
+      : { success: true, watchlisted: !already };
   }, [currentUser?.id, ids]);
 
   return {

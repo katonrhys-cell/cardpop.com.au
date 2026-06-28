@@ -582,14 +582,46 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
           const lines = Array.isArray(existing.order_items) ? existing.order_items : [];
           const sellerIds = new Set();
+          const oversoldShopItems = [];
           for (const line of lines) {
             if (line.type === 'listing' && line.id) {
               await supabase.from('listings')
                 .update({ status: 'sold', sold_at: new Date().toISOString() })
                 .eq('id', line.id);
-              if (line.seller_id) sellerIds.add(line.seller_id);
+              if (line.seller_id) {
+                sellerIds.add(line.seller_id);
+                // Pay each cart seller their proceeds (line total minus commission).
+                // No orderId is passed: a multi-seller cart can't map onto the
+                // order's single payout_status/transfer_id, so we credit each
+                // seller without clobbering those fields. This runs exactly once —
+                // the atomic pending → payment_confirmed claim above guards retries.
+                const proceeds = Number(line.line_total_aud || 0) - Number(line.commission_aud || 0);
+                if (proceeds > 0) {
+                  await payoutSeller(stripe, { sellerId: line.seller_id, sellerProceeds: proceeds, listingId: line.id })
+                    .catch(e => logger.error(`[STRIPE] cart payout failed for seller ${line.seller_id}: ${e.message}`));
+                }
+              }
             } else if (line.type === 'shop' && line.id) {
-              await supabase.rpc('decrement_shop_stock', { p_id: line.id, p_qty: line.quantity || 1 });
+              // Guarded decrement returns false when there wasn't enough stock —
+              // i.e. an oversell. The buyer has already paid, so flag it for manual
+              // resolution instead of silently confirming an unfulfillable order.
+              const { data: ok } = await supabase.rpc('decrement_shop_stock', { p_id: line.id, p_qty: line.quantity || 1 });
+              if (ok === false) {
+                oversoldShopItems.push(line);
+                logger.error(`[STRIPE] Oversell on shop product ${line.id} (qty ${line.quantity || 1}) for order ${existing.id} — needs manual resolution`);
+              }
+            }
+          }
+
+          if (oversoldShopItems.length > 0) {
+            const { data: admins } = await supabase.from('profiles').select('id').eq('is_admin', true);
+            if (admins?.length) {
+              await supabase.from('notifications').insert(admins.map(a => ({
+                user_id: a.id,
+                type:    'order_oversold',
+                title:   'Oversold order needs attention',
+                body:    `Order ${existing.id} has ${oversoldShopItems.length} shop item(s) that exceeded available stock. Refund or restock.`,
+              }))).catch(() => {});
             }
           }
 
@@ -640,6 +672,14 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         const sellerProceeds  = parseFloat(meta.sellerProceedsAud || String(itemPrice - commissionAud));
         const configId        = meta.configId || null;
         const amountCents     = session.amount_total || 0;
+
+        // Guard against corrupt/missing metadata: a NaN amount would make the
+        // reconciliation comparison below always false (NaN > 2 === false),
+        // letting an order through with NaN money fields. Reject up front.
+        if (![itemPrice, commissionAud, gstAud].every(Number.isFinite)) {
+          logger.error(`[STRIPE] Non-finite amount in metadata for session ${session.id} — order rejected`);
+          break;
+        }
 
         // Reconcile: Stripe's authoritative amount_total must match what we expected.
         // Mismatch signals metadata corruption or a replay attack — reject the order.
@@ -861,13 +901,37 @@ router.post('/refund', authMiddleware, async (req, res) => {
 
     if (refundAmount <= 0) return res.status(400).json({ error: 'Calculated refund amount is zero or negative' });
 
-    // Issue partial refund via Stripe
-    const stripeRefund = await stripe.refunds.create({
-      payment_intent: paymentIntentId,
-      amount: Math.round(refundAmount * 100), // cents
-      reason: 'requested_by_customer',
-      metadata: { refundId, retainedFee: String(retainedFee), retentionPct: String(retentionPct) },
-    });
+    // Atomically claim the refund (approved → processing) BEFORE calling Stripe.
+    // Two concurrent admin clicks would otherwise both pass the status check above
+    // and both issue a Stripe refund (double refund). Only the request that flips
+    // the row proceeds.
+    const { data: claimed, error: claimErr } = await supabase
+      .from('refunds')
+      .update({ status: 'processing' })
+      .eq('id', refundId)
+      .eq('status', 'approved')
+      .select('id');
+
+    if (claimErr) return res.status(500).json({ error: 'Failed to claim refund' });
+    if (!claimed || claimed.length === 0) {
+      return res.status(409).json({ error: 'Refund is already being processed' });
+    }
+
+    // Issue partial refund via Stripe. The idempotency key is a backstop so a
+    // retried request can never create a second refund for this row.
+    let stripeRefund;
+    try {
+      stripeRefund = await stripe.refunds.create({
+        payment_intent: paymentIntentId,
+        amount: Math.round(refundAmount * 100), // cents
+        reason: 'requested_by_customer',
+        metadata: { refundId, retainedFee: String(retainedFee), retentionPct: String(retentionPct) },
+      }, { idempotencyKey: `refund_${refundId}` });
+    } catch (stripeErr) {
+      // Release the claim so the refund can be retried after a Stripe failure.
+      await supabase.from('refunds').update({ status: 'approved' }).eq('id', refundId);
+      throw stripeErr;
+    }
 
     const now = new Date().toISOString();
 

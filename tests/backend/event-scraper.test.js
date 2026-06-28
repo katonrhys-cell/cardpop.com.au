@@ -7,6 +7,14 @@ vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
+// The SSRF guard resolves the host before fetching; stub DNS to a public IP so
+// the happy-path tests don't depend on real network resolution.
+const mockDnsLookup = vi.hoisted(() => vi.fn().mockResolvedValue([{ address: '93.184.216.34', family: 4 }]));
+vi.mock('dns/promises', () => ({
+  default: { lookup: mockDnsLookup },
+  lookup: mockDnsLookup,
+}));
+
 vi.mock('../../src/middleware/auth.js', () => ({
   authMiddleware: (req, _res, next) => { req.user = { id: 'user-1', app_metadata: { is_admin: true } }; next(); },
   isAdminUser: async (req) => req.user?.app_metadata?.is_admin === true,
@@ -123,17 +131,17 @@ describe('POST /scrape-event-url', () => {
     expect(res.body.content).toContain('Clean');
   });
 
-  it('returns 500 when the fetch call throws', async () => {
+  it('returns 400 when the fetch call throws', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
 
     const res = await request(app)
       .post('/scrape-event-url')
       .send({ url: 'https://example.com/event' });
 
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(400);
   });
 
-  it('returns 500 when the fetched page returns a non-ok status', async () => {
+  it('returns 400 when the fetched page returns a non-ok status', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: false,
       status: 404,
@@ -144,7 +152,19 @@ describe('POST /scrape-event-url', () => {
       .post('/scrape-event-url')
       .send({ url: 'https://example.com/event' });
 
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(400);
+  });
+
+  it('blocks SSRF to a private/link-local address (e.g. cloud metadata)', async () => {
+    mockDnsLookup.mockResolvedValueOnce([{ address: '169.254.169.254', family: 4 }]);
+    vi.stubGlobal('fetch', vi.fn());
+
+    const res = await request(app)
+      .post('/scrape-event-url')
+      .send({ url: 'https://metadata.evil.example/latest' });
+
+    expect(res.status).toBe(400);
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });
 

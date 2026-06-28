@@ -255,24 +255,21 @@ export function usePhotoTemplate() {
       // Load rembg ONNX model for browser-based background removal
       const { removeBackground } = await import('@imgly/background-removal');
 
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        try {
-          const result = await removeBackground(e.target.result);
-
-          // Convert blob to data URL
-          const url = URL.createObjectURL(result);
-          setPreviewUrl(url);
-        } catch (error) {
-          console.error('Background removal error:', error);
-          toast.error('Failed to remove background. Make sure your image is clear and well-lit.');
-        }
-      };
-
-      reader.readAsArrayBuffer(imageFile);
+      // Await the whole pipeline before clearing the processing flag. The old
+      // code scheduled a FileReader and fell straight through to the finally
+      // block, so isProcessing flipped to false while removeBackground was still
+      // running (a multi-second job), showing "done" prematurely.
+      const arrayBuffer = await imageFile.arrayBuffer();
+      const result = await removeBackground(arrayBuffer);
+      const url = URL.createObjectURL(result);
+      setPreviewUrl(prev => {
+        // Revoke the previous blob URL so it isn't leaked.
+        if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+        return url;
+      });
     } catch (error) {
-      console.error('Error loading background removal:', error);
-      toast.error('Background removal is not available. Please try again.');
+      console.error('Background removal error:', error);
+      toast.error('Failed to remove background. Make sure your image is clear and well-lit.');
     } finally {
       setIsProcessing(false);
     }

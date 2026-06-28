@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Calculator, Upload, X, AlertTriangle, CheckCircle2, XCircle,
@@ -133,7 +133,16 @@ function ImageUploadSlot({ label, required, file, onFile, onRemove }) {
     if (dropped && dropped.type.startsWith('image/')) onFile(dropped);
   }, [onFile]);
 
-  const previewUrl = file ? URL.createObjectURL(file) : null;
+  // Create the object URL in an effect (not in render) so it's created once per
+  // file and revoked on change/unmount — building it inline leaked a new blob
+  // URL (holding the full image) on every re-render.
+  const [previewUrl, setPreviewUrl] = useState(null);
+  useEffect(() => {
+    if (!file) { setPreviewUrl(null); return; }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   return (
     <div className="flex flex-col gap-2">
@@ -426,20 +435,14 @@ const GradeEstimatorPage = () => {
       />
 
       {/* Hero */}
-      <section className="bg-gradient-to-br from-brand-charcoal via-gray-900 to-brand-charcoal py-20 text-center text-white">
+      <section className="bg-card border-b border-border py-20 text-center">
         <div className="container-default">
-          <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center mx-auto mb-6">
-            <Calculator className="w-7 h-7 text-white" />
-          </div>
+          <Calculator className="w-12 h-12 text-primary mx-auto mb-6" />
           <h1 className="text-4xl md:text-5xl font-bold mb-4">Grade Estimator</h1>
-          <p className="text-lg text-white/80 max-w-2xl mx-auto">
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Upload photos of your trading card and receive AI-generated preliminary grade estimates
             across five major grading services. A guide to help you self-assess before professional submission.
           </p>
-          <div className="mt-6 inline-flex items-center gap-2 bg-white/15 border border-white/25 rounded-full px-4 py-2 text-sm">
-            <AlertTriangle className="w-4 h-4 text-amber-300" />
-            <span>Estimate only — not professional grading advice</span>
-          </div>
         </div>
       </section>
 

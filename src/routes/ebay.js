@@ -117,6 +117,15 @@ router.get('/price-estimate', async (req, res) => {
       ),
     ]);
 
+    // Promise.allSettled never rejects, so a total outage (both marketplaces
+    // failed) would otherwise fall through as an empty result with a 200 — making
+    // "eBay is down" indistinguishable from "no listings found". Signal it.
+    // A single-marketplace failure still degrades gracefully to the other's data.
+    if (auResult.status === 'rejected' && usResult.status === 'rejected') {
+      logger.error(`[EBAY_PRICE_ESTIMATE] Both marketplaces failed: ${auResult.reason?.message || usResult.reason?.message}`);
+      return res.status(502).json({ error: 'eBay API unavailable. Please try again later.' });
+    }
+
     // Extract results, marking with marketplace
     let allItems = [];
     if (auResult.status === 'fulfilled' && auResult.value.itemSummaries?.length > 0) {

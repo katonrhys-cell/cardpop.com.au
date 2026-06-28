@@ -25,12 +25,12 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete }) => {
 
   return (
     <Card className="flex flex-col overflow-hidden h-full shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl group border-border">
-      <div className="relative h-48 w-full overflow-hidden bg-muted">
+      <div className="relative h-48 w-full overflow-hidden bg-muted flex items-center justify-center">
         {rawImageUrl && !imgError ? (
           <img
             src={rawImageUrl}
             alt={eventTitle}
-            className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
+            className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500"
             loading="lazy"
             onError={() => setImgError(true)}
           />

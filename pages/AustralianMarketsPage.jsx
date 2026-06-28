@@ -158,10 +158,10 @@ const AustralianMarketsPage = () => {
               Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-36 rounded-2xl bg-secondary" />)
             ) : statsData ? (
               <>
-                <MarketStatsCard 
-                  title="Total Sales Volume" 
-                  value={statsData.totalSalesVolume.toLocaleString()} 
-                  icon={Database} 
+                <MarketStatsCard
+                  title="Total Sales Volume"
+                  value={(statsData.totalSalesVolume ?? 0).toLocaleString()}
+                  icon={Database}
                 />
                 <MarketStatsCard 
                   title="Total Sales Value" 

@@ -11,7 +11,7 @@ vi.mock('../../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 vi.mock('../../../src/middleware/auth.js', () => ({
-  authMiddleware: (req, _res, next) => { req.user = { id: 'user-1' }; next(); },
+  authMiddleware: (req, _res, next) => { req.user = { id: 'user-1', email: 'test@example.com' }; next(); },
 }));
 vi.mock('../../../src/utils/otpGenerator.js', () => ({
   generateOTP: vi.fn().mockReturnValue('87654321'),
@@ -60,25 +60,25 @@ beforeEach(() => vi.clearAllMocks());
 // ─── POST /request ────────────────────────────────────────────────────────────
 
 describe('POST /request', () => {
-  it('returns 400 when email is missing', async () => {
-    const res = await request(app).post('/request').send({ userId: 'user-1' });
-    expect(res.status).toBe(400);
-  });
-
   it('creates an MFA session and returns mfaId', async () => {
     mockSupabase.from.mockReturnValue(makeBuilder({ data: null, error: null }));
-    const res = await request(app).post('/request').send({ userId: 'user-1', email: 'test@example.com' });
+    const res = await request(app).post('/request').send({ userId: 'user-1' });
     expect(res.status).toBe(200);
     expect(res.body.mfaId).toBeDefined();
     expect(res.body.expiresAt).toBeDefined();
     expect(res.body.message).toBeDefined();
   });
 
-  it('stores encrypted OTP in mfa_sessions', async () => {
+  it('stores the OTP against the authenticated user email, ignoring any body email', async () => {
     const b = makeBuilder({ data: null, error: null });
     mockSupabase.from.mockReturnValue(b);
-    await request(app).post('/request').send({ userId: 'user-1', email: 'test@example.com' });
-    expect(b.insert).toHaveBeenCalledWith(expect.objectContaining({ encrypted_otp: ENCRYPTED_OTP, verified: false }));
+    // A body-supplied email must NOT be trusted — the session binds to req.user.email.
+    await request(app).post('/request').send({ userId: 'user-1', email: 'attacker@evil.com' });
+    expect(b.insert).toHaveBeenCalledWith(expect.objectContaining({
+      encrypted_otp: ENCRYPTED_OTP,
+      verified: false,
+      email: 'test@example.com',
+    }));
   });
 });
 
