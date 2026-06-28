@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -7,8 +8,29 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const alias = { '@': path.resolve(__dirname, '.') };
 const extensions = ['.jsx', '.js', '.tsx', '.ts', '.json'];
 
+// The self-hosted CI runner is a low-core MacBook Air. Vitest's default fork
+// pool spawns one worker per CPU, which overwhelms the machine and produces
+// "Failed to start forks worker" / "Timeout waiting for worker to respond"
+// errors that fail the suite even though the tests themselves pass. Cap the
+// worker count (override with VITEST_MAX_FORKS) so the pool stays within what
+// the host can actually schedule. Defaults to half the cores, max 4.
+const cpuCount =
+  typeof os.availableParallelism === 'function'
+    ? os.availableParallelism()
+    : os.cpus().length;
+const maxWorkers = Number(process.env.VITEST_MAX_FORKS) ||
+  Math.max(1, Math.min(4, Math.floor(cpuCount / 2)));
+
 export default defineConfig({
   test: {
+    // Raised from the 5s default: under-resourced runners need headroom so
+    // a slow-to-start worker doesn't trip a spurious timeout.
+    testTimeout: 15000,
+    hookTimeout: 15000,
+    // Vitest 4: pool sizing is top-level (poolOptions was removed).
+    pool: 'forks',
+    minWorkers: 1,
+    maxWorkers,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
