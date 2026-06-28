@@ -116,6 +116,7 @@ const AddEditCardPage = () => {
   const [showSpGuide, setShowSpGuide]         = useState(false);
   const [showRookieGuide, setShowRookieGuide] = useState(false);
   const [showRefractorGuide, setShowRefractorGuide] = useState(false);
+  const [showPrizmGuide, setShowPrizmGuide]   = useState(false);
 
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
@@ -155,6 +156,8 @@ const AddEditCardPage = () => {
     rookieLogo:     '',
     refractorType:  '',
     refractorColor: '',
+    prizmType:      '',
+    prizmColor:     '',
     // Grading
     gradingCompany: 'raw',
     grade:          '',
@@ -285,6 +288,8 @@ const AddEditCardPage = () => {
           rookieLogo:     card.rookie_logo     || '',
           refractorType:  card.refractor_type  || '',
           refractorColor: card.refractor_color || '',
+          prizmType:      card.prizm_type      || '',
+          prizmColor:     card.prizm_color     || '',
           gradingCompany: card.grading_company || 'raw',
           grade:          card.grade          || '',
           certNumber:     card.cert_number    || '',
@@ -717,6 +722,8 @@ const AddEditCardPage = () => {
         rookie_logo:         formData.variant.includes('Rookie Card (RC)') ? (formData.rookieLogo || null) : null,
         refractor_type:      formData.variant.includes('Refractor') ? (formData.refractorType || null) : null,
         refractor_color:     formData.variant.includes('Refractor') ? (formData.refractorColor || null) : null,
+        prizm_type:          formData.variant.includes('Prizm') ? (formData.prizmType || null) : null,
+        prizm_color:         formData.variant.includes('Prizm') ? (formData.prizmColor || null) : null,
         grading_company:     formData.gradingCompany,
         grade:               isGraded ? (formData.grade?.trim() || null) : null,
         cert_number:         isGraded ? (formData.certNumber?.trim() || null) : null,
@@ -1557,6 +1564,138 @@ const AddEditCardPage = () => {
                                 <span className="flex flex-col leading-tight">
                                   <span className={`font-bold text-xs ${formData.refractorColor === value ? 'text-fuchsia-700 dark:text-fuchsia-400' : 'text-foreground'}`}>{label}</span>
                                   <span className={`text-[10px] ${formData.refractorColor === value ? 'text-fuchsia-600/70 dark:text-fuchsia-400/70' : 'text-muted-foreground'}`}>{sub}</span>
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground leading-relaxed">Print runs vary by set and year — the values shown are typical guides. Use the Serial # field above to record the exact numbering.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Prizm sub-details — shown when the "Prizm" finish is
+                        selected in the Card Variant / Finish section (Finish group).
+                        The individual Prizm colours/patterns live here rather than
+                        as separate chips above. */}
+                    {formData.variant.includes('Prizm') && (
+                      <div className="mt-3 p-4 rounded-xl border-2 border-indigo-400/30 bg-indigo-400/5 space-y-4 animate-in fade-in slide-in-from-top-1">
+                        <p className="text-xs font-extrabold uppercase tracking-widest text-indigo-700 dark:text-indigo-400">Prizm Details</p>
+
+                        {/* Prizm type / pattern */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Prizm Type / Pattern</Label>
+                          <div className="grid grid-cols-2 gap-2">
+                            {[
+                              { value: 'base',        label: 'Base (Silver) Prizm', desc: 'Standard silver chrome Prizm parallel' },
+                              { value: 'hyper',       label: 'Hyper Prizm',         desc: 'Retail hyper pattern' },
+                              { value: 'disco',       label: 'Disco Prizm',         desc: 'Diamond-sparkle disco pattern' },
+                              { value: 'mojo',        label: 'Mojo Prizm',          desc: "Rippling 'mojo' wave finish" },
+                              { value: 'shimmer',     label: 'Shimmer Prizm',       desc: 'High-gloss shimmer finish' },
+                              { value: 'wave',        label: 'Wave Prizm',          desc: 'Flowing wave-line pattern' },
+                              { value: 'pulsar',      label: 'Pulsar Prizm',        desc: 'Starburst / pulsar burst pattern' },
+                              { value: 'cracked_ice', label: 'Cracked Ice Prizm',   desc: 'Cracked-ice texture' },
+                              { value: 'snakeskin',   label: 'Snakeskin Prizm',     desc: 'Scaled snakeskin texture' },
+                              { value: 'fast_break',  label: 'Fast Break / Flash',  desc: 'Set-specific burst pattern' },
+                              { value: 'other',       label: 'Other Prizm',         desc: 'Another Prizm-style parallel' },
+                            ].map(({ value, label, desc }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('prizmType', formData.prizmType === value ? '' : value)}
+                                className={`flex flex-col items-start px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
+                                  formData.prizmType === value
+                                    ? 'border-indigo-500 bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                }`}
+                              >
+                                <span className="font-bold text-xs">{label}</span>
+                                <span className={`text-[10px] mt-0.5 leading-tight ${formData.prizmType === value ? 'text-indigo-600/70 dark:text-indigo-400/70' : 'text-muted-foreground'}`}>{desc}</span>
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Collapsible prizm guide */}
+                          <div className="rounded-xl border border-indigo-400/25 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setShowPrizmGuide(v => !v)}
+                              className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-indigo-400/5 transition-colors"
+                            >
+                              <span className="text-[11px] font-bold text-indigo-700 dark:text-indigo-400">How do Prizm parallels work? View guide</span>
+                              <ChevronDown className={`h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400 transition-transform duration-200 ${showPrizmGuide ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showPrizmGuide && (
+                              <div className="px-3 pb-3 divide-y divide-border/40">
+                                {[
+                                  {
+                                    title: 'What is a Prizm?',
+                                    badge: 'Basics',
+                                    badgeClass: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 border border-indigo-500/20',
+                                    body: "Prizm is Panini's chrome parallel line — the equivalent of Topps' Refractor. The base chrome card is the Silver Prizm; the same design is then printed across many colour and pattern parallels that differ in scarcity.",
+                                  },
+                                  {
+                                    title: 'Colour = rarity',
+                                    badge: 'Hierarchy',
+                                    badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20',
+                                    body: 'Silver is the unnumbered base. Coloured parallels are usually serial-numbered — e.g. Blue /199, Orange /249, Red /299, Gold /10, with Black and Nebula typically 1-of-1. Print runs vary by set and year, so check the back for the serial number.',
+                                  },
+                                  {
+                                    title: 'Pattern parallels',
+                                    badge: 'Patterns',
+                                    badgeClass: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-500/20',
+                                    body: 'Beyond plain colours, Prizm adds textured patterns such as Hyper, Disco, Mojo, Shimmer, Wave, Pulsar, Cracked Ice and Snakeskin — each a distinct finish layered over the chrome.',
+                                  },
+                                  {
+                                    title: 'Black & Nebula 1/1s',
+                                    badge: '1-of-1',
+                                    badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20',
+                                    body: 'Black Prizm and Nebula Prizm are typically one-of-one cards — the rarest pulls in a Prizm set and among the most coveted modern parallels.',
+                                  },
+                                ].map(({ title, badge, badgeClass, body }) => (
+                                  <div key={title} className="py-2.5 first:pt-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-[11px] font-bold text-foreground">{title}</span>
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${badgeClass}`}>{badge}</span>
+                                    </div>
+                                    <p className="text-[10px] leading-relaxed text-muted-foreground">{body}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Prizm colour / parallel */}
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Prizm Colour / Parallel</Label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[
+                              { value: 'silver', label: 'Silver', sub: 'base, unnumbered', dot: 'bg-gradient-to-br from-slate-200 via-slate-400 to-slate-200' },
+                              { value: 'rwb',    label: 'Red/White/Blue', sub: 'retail',     dot: 'bg-gradient-to-br from-red-500 via-white to-blue-500 border border-white/40' },
+                              { value: 'green',  label: 'Green',  sub: 'often /199',  dot: 'bg-green-500' },
+                              { value: 'purple', label: 'Purple', sub: 'scarce',      dot: 'bg-purple-500' },
+                              { value: 'blue',   label: 'Blue',   sub: 'often /199',  dot: 'bg-blue-500' },
+                              { value: 'pink',   label: 'Pink',   sub: 'retail',      dot: 'bg-pink-400' },
+                              { value: 'orange', label: 'Orange', sub: 'often /249',  dot: 'bg-orange-500' },
+                              { value: 'red',    label: 'Red',    sub: 'often /299',  dot: 'bg-red-500' },
+                              { value: 'gold',   label: 'Gold',   sub: 'often /10',   dot: 'bg-amber-400' },
+                              { value: 'black',  label: 'Black',  sub: '1/1',         dot: 'bg-neutral-900 border border-white/40' },
+                              { value: 'nebula', label: 'Nebula', sub: '1/1',         dot: 'bg-gradient-to-br from-fuchsia-500 via-indigo-500 to-cyan-400' },
+                            ].map(({ value, label, sub, dot }) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => set('prizmColor', formData.prizmColor === value ? '' : value)}
+                                className={`flex items-center gap-2 px-2.5 py-2 rounded-xl border-2 text-left transition-all ${
+                                  formData.prizmColor === value
+                                    ? 'border-indigo-500 bg-indigo-500/10 shadow-sm'
+                                    : 'border-border bg-background hover:border-muted-foreground/40'
+                                }`}
+                              >
+                                <span className={`h-4 w-4 rounded-full shrink-0 ${dot}`} aria-hidden="true" />
+                                <span className="flex flex-col leading-tight">
+                                  <span className={`font-bold text-xs ${formData.prizmColor === value ? 'text-indigo-700 dark:text-indigo-400' : 'text-foreground'}`}>{label}</span>
+                                  <span className={`text-[10px] ${formData.prizmColor === value ? 'text-indigo-600/70 dark:text-indigo-400/70' : 'text-muted-foreground'}`}>{sub}</span>
                                 </span>
                               </button>
                             ))}
