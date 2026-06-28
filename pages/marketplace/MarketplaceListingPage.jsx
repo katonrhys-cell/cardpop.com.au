@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { generateStructuredData, generateBreadcrumbStructuredData } from '@/utils/seoUtils.js';
@@ -9,6 +9,7 @@ import { ShieldCheck, MessageCircle, User, TrendingUp, Loader2, Flag } from 'luc
 import ReportModal from '@/components/ReportModal.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import GradingVerificationSection from '@/components/GradingVerificationSection.jsx';
+import useVaultItemRealtimeSync from '@/hooks/useVaultItemRealtimeSync.js';
 import apiServerClient from '@/lib/apiServerClient.js';
 
 const MarketplaceListingPage = () => {
@@ -18,6 +19,7 @@ const MarketplaceListingPage = () => {
   const [error, setError] = useState(null);
   const [csPrice, setCsPrice] = useState(null);
   const [csPriceLoading, setCsPriceLoading] = useState(false);
+  const fetchRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,9 +38,12 @@ const MarketplaceListingPage = () => {
         if (!cancelled) setLoading(false);
       }
     };
+    fetchRef.current = fetchListing;
     fetchListing();
     return () => { cancelled = true; };
   }, [id]);
+
+  useVaultItemRealtimeSync(fetchRef, 'marketplace-listing-detail');
 
   // Fetch eBay pricing once listing title is known (replaces CardSight autocomplete → pricing)
   useEffect(() => {

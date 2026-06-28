@@ -16,6 +16,8 @@ import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import EbayMarketSection from '@/components/EbayMarketSection.jsx';
 import PSACertificationSection from '@/components/PSACertificationSection.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
+import useShopProductRealtimeSync from '@/hooks/useShopProductRealtimeSync.js';
+import useVaultItemRealtimeSync from '@/hooks/useVaultItemRealtimeSync.js';
 
 const getStatusBadge = (listingType) => {
   switch (listingType) {
@@ -203,19 +205,8 @@ const ProductDetailPage = () => {
     return () => { isMounted = false; };
   }, [id, source, currentUser?.id, isAdmin, authLoading]);
 
-  useEffect(() => {
-    const channel = supabase
-      .channel('product-detail')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products' },
-        () => { if (fetchRef.current) fetchRef.current(); }
-      )
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vault_items' },
-        () => { if (fetchRef.current) fetchRef.current(); }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, []);
+  useShopProductRealtimeSync(fetchRef, 'product-detail-shop');
+  useVaultItemRealtimeSync(fetchRef, 'product-detail-vault');
 
   const handleAddToCart = () => {
     if (!product) return;
