@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient.js';
+import { isVerified } from '@/utils/verification.js';
 import { apiServerClient as apiClient } from '@/lib/apiServerClient.js';
 import { toast } from 'sonner';
 import { useAdmin } from '@/contexts/AdminContext.jsx';
@@ -224,7 +225,7 @@ const UserManagementPage = () => {
                         ) : (
                           <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-200 text-[10px] px-1.5 py-0">User</Badge>
                         )}
-                        {user.is_verified && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-blue-500/10 text-blue-600">Verified</Badge>}
+                        {isVerified(user.is_verified) && <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-blue-500/10 text-blue-600">Verified</Badge>}
                       </div>
                     </TableCell>
                     <TableCell className="text-center font-medium">

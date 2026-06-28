@@ -5,6 +5,7 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { canViewVaultProduct } from '@/utils/vaultSecurityUtils.js';
+import { isVerified } from '@/utils/verification.js';
 import { useCart } from '@/hooks/useCart.jsx';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -406,7 +407,7 @@ const ProductDetailPage = () => {
                     <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-0.5">Owner / Seller</p>
                     <p className="font-bold text-base text-foreground flex items-center gap-1.5">
                       {seller.business_name}
-                      {seller.is_verified && <ShieldCheck className="w-4 h-4" style={{ color: `hsl(var(--verified-badge))` }} />}
+                      {isVerified(seller.is_verified) && <ShieldCheck className="w-4 h-4" style={{ color: `hsl(var(--verified-badge))` }} />}
                     </p>
                   </div>
                 </div>

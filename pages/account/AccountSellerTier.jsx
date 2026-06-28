@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet';
 import { ShieldCheck, BadgeCheck, Award, Zap, User, TrendingUp, Star, Package, Lock } from 'lucide-react';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
+import { isVerified } from '@/utils/verification.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
@@ -100,7 +101,7 @@ const AccountSellerTier = () => {
   const sales      = profile?.total_sales    ?? 0;
   const rating     = parseFloat(profile?.rating ?? 0);
   const reviews    = profile?.reviews_count  ?? 0;
-  const verified   = profile?.is_verified    ?? false;
+  const verified   = isVerified(profile?.is_verified);
   const currentTier = profile?.seller_tier   ?? 'none';
 
   const currentTierIdx = TIERS.findIndex(t => t.key === currentTier);

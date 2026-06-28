@@ -5,6 +5,7 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Star, ShieldCheck, MapPin, Calendar, ExternalLink, ShieldAlert, Package, MessageSquare, Flag } from 'lucide-react';
 import ReportModal from '@/components/ReportModal.jsx';
+import { isVerified } from '@/utils/verification.js';
 import SellerTierBadge from '@/components/SellerTierBadge.jsx';
 import VerifiedBadge from '@/components/VerifiedBadge.jsx';
 import { Badge } from '@/components/ui/badge';
@@ -137,7 +138,7 @@ const PublicSellerProfilePage = () => {
         ? seller.profile_photo_or_character
         : supabase.storage.from('vault-images').getPublicUrl(seller.profile_photo_or_character).data.publicUrl)
     : null;
-  const isVerified = seller.is_admin === true || seller.is_verified === true || seller.is_verified === 'true';
+  const sellerVerified = seller.is_admin === true || isVerified(seller.is_verified);
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -159,7 +160,7 @@ const PublicSellerProfilePage = () => {
                   </span>
                 )}
               </div>
-              {isVerified && (
+              {sellerVerified && (
                 <div className="absolute -bottom-2 -right-2 bg-[hsl(var(--verified-badge))] text-white p-2 rounded-xl shadow-lg border-2 border-card" title="Verified Collector">
                   <ShieldCheck className="w-6 h-6" />
                 </div>
@@ -172,7 +173,7 @@ const PublicSellerProfilePage = () => {
                 <h1 className="text-3xl md:text-4xl font-serif font-bold text-foreground">
                   {seller.display_name || seller.name || 'Community Member'}
                 </h1>
-                {isVerified && <VerifiedBadge size="md" showLabel />}
+                {sellerVerified && <VerifiedBadge size="md" showLabel />}
                 {seller.seller_tier && seller.seller_tier !== 'none' && (
                   <SellerTierBadge tier={seller.seller_tier} size="md" />
                 )}
@@ -287,7 +288,7 @@ const PublicSellerProfilePage = () => {
               </div>
             )}
 
-            {isVerified && (
+            {sellerVerified && (
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Identity</span>
                 <VerifiedBadge size="sm" showLabel />

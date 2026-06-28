@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
+import { isVerified } from '@/utils/verification.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -150,7 +151,7 @@ const ProfilesPage = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map(profile => {
               const avatarUrl = resolveAvatar(profile);
-              const isVerified = profile.is_verified === 'true' || profile.is_verified === true;
+              const profileVerified = isVerified(profile.is_verified);
               const name = profile.display_name || profile.username || 'Collector';
 
               return (
@@ -168,10 +169,10 @@ const ProfilesPage = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
                         <span className="font-bold truncate text-sm">{name}</span>
-                        {isVerified && <ShieldCheck className="w-4 h-4 text-primary flex-shrink-0" />}
+                        {profileVerified && <ShieldCheck className="w-4 h-4 text-primary flex-shrink-0" />}
                       </div>
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        {isVerified && (
+                        {profileVerified && (
                           <Badge className="text-[10px] font-bold bg-primary/10 text-primary border-primary/20 px-1.5 py-0">
                             Verified
                           </Badge>

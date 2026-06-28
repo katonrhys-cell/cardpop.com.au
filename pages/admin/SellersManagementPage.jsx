@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient.js';
+import { isVerified } from '@/utils/verification.js';
 import { toast } from 'sonner';
 import { useAdmin } from '@/contexts/AdminContext.jsx';
 import { useDebounce } from '@/hooks/useDebounce.js';
@@ -249,7 +250,7 @@ const SellersManagementPage = () => {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1 items-start">
-                        {seller.is_verified && (
+                        {isVerified(seller.is_verified) && (
                           <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-blue-500/10 text-blue-600">
                             Verified
                           </Badge>

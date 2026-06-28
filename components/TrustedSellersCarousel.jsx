@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Star, MapPin, User, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
+import { isVerified } from '@/utils/verification.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 
@@ -187,7 +188,7 @@ const TrustedSellersCarousel = () => {
                       <User className="w-10 h-10 text-muted-foreground/50" />
                     </div>
                   )}
-                  {seller.is_verified && (
+                  {isVerified(seller.is_verified) && (
                     <div className="absolute -bottom-2 -right-2 bg-background rounded-full p-0.5 shadow-sm">
                       <CheckCircle2 className="w-6 h-6 text-primary fill-background" />
                     </div>
