@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { generateStructuredData, generateBreadcrumbStructuredData } from '@/utils/seoUtils.js';
@@ -19,6 +19,7 @@ const MarketplaceListingPage = () => {
   const [error, setError] = useState(null);
   const [csPrice, setCsPrice] = useState(null);
   const [csPriceLoading, setCsPriceLoading] = useState(false);
+  const fetchRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,8 +38,20 @@ const MarketplaceListingPage = () => {
         if (!cancelled) setLoading(false);
       }
     };
+    fetchRef.current = fetchListing;
     fetchListing();
     return () => { cancelled = true; };
+  }, [id]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`marketplace-listing-${id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vault_items' },
+        () => { if (fetchRef.current) fetchRef.current(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [id]);
 
   // Fetch eBay pricing once listing title is known (replaces CardSight autocomplete → pricing)
