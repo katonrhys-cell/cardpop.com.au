@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import dns from 'dns/promises';
+import net from 'net';
 import express from 'express';
 import logger from '../utils/logger.js';
 import { stream } from '../api/integrated-ai.js';
@@ -21,8 +23,49 @@ function isValidUrl(url) {
   }
 }
 
+/** True if an IP literal is in a private / loopback / link-local / reserved range. */
+function isPrivateIp(ip) {
+  if (net.isIPv4(ip)) {
+    const [a, b] = ip.split('.').map(Number);
+    if (a === 10 || a === 127 || a === 0) return true;            // private / loopback / this-host
+    if (a === 169 && b === 254) return true;                       // link-local (incl. cloud metadata 169.254.169.254)
+    if (a === 172 && b >= 16 && b <= 31) return true;              // private
+    if (a === 192 && b === 168) return true;                       // private
+    if (a === 100 && b >= 64 && b <= 127) return true;             // CGNAT
+    return false;
+  }
+  const lower = ip.toLowerCase();
+  if (lower === '::1' || lower === '::') return true;              // loopback / unspecified
+  if (lower.startsWith('fc') || lower.startsWith('fd')) return true; // unique-local
+  if (lower.startsWith('fe80')) return true;                       // link-local
+  if (lower.startsWith('::ffff:')) return isPrivateIp(lower.slice(7)); // IPv4-mapped
+  return false;
+}
+
+/**
+ * Resolve the URL's host and reject any request that would hit a private,
+ * loopback or link-local address. Prevents SSRF (e.g. cloud metadata at
+ * 169.254.169.254, internal services) via an attacker-supplied URL.
+ */
+async function assertPublicUrl(url) {
+  const { hostname } = new URL(url);
+  // Direct IP literal in the host.
+  if (net.isIP(hostname)) {
+    if (isPrivateIp(hostname)) throw new Error('Blocked: private address');
+    return;
+  }
+  if (hostname.toLowerCase() === 'localhost') throw new Error('Blocked: localhost');
+  const records = await dns.lookup(hostname, { all: true });
+  if (!records.length || records.some(r => isPrivateIp(r.address))) {
+    throw new Error('Blocked: host resolves to a private address');
+  }
+}
+
 async function fetchWebpageContent(url) {
   logger.info(`[EVENT_SCRAPER] Fetching content from URL: ${url}`);
+
+  // SSRF guard: validate the resolved address before issuing the request.
+  await assertPublicUrl(url);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -190,6 +233,12 @@ function formatSSEEvent(data) {
 router.post('/scrape-event-url', authMiddleware, async (req, res) => {
   logger.info('[EVENT_SCRAPER] Received scrape-event-url request');
 
+  // Admin-only: this endpoint fetches arbitrary server-side URLs, so restrict it
+  // to admins (the scraper UI is an admin tool) on top of the SSRF guard below.
+  if (!(await isAdminUser(req))) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
   const url = req.body?.url;
   if (!url || typeof url !== 'string' || !url.trim()) {
     return res.status(400).json({ error: 'URL is required and must be a non-empty string' });
@@ -200,14 +249,24 @@ router.post('/scrape-event-url', authMiddleware, async (req, res) => {
     return res.status(400).json({ error: 'Invalid URL format. Please provide a valid HTTP/HTTPS URL.' });
   }
 
-  const htmlContent = await fetchWebpageContent(trimmedUrl);
-  const textContent = extractTextFromHtml(htmlContent);
-
-  res.json({ success: true, content: textContent });
+  try {
+    const htmlContent = await fetchWebpageContent(trimmedUrl);
+    const textContent = extractTextFromHtml(htmlContent);
+    res.json({ success: true, content: textContent });
+  } catch (err) {
+    logger.warn(`[EVENT_SCRAPER] Fetch rejected for ${trimmedUrl}: ${err.message}`);
+    return res.status(400).json({ error: 'Unable to fetch the provided URL.' });
+  }
 });
 
 router.post('/extract-event-from-content', authMiddleware, async (req, res) => {
   logger.info('[EVENT_SCRAPER] Received extract-event-from-content request');
+
+  // Admin-only: this triggers paid AI processing and is only used by the admin
+  // scraper panel; gate it to prevent unauthenticated cost abuse.
+  if (!(await isAdminUser(req))) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
 
   const content = req.body?.content;
   if (!content || typeof content !== 'string' || !content.trim()) {

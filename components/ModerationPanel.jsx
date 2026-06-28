@@ -13,13 +13,14 @@ const ModerationPanel = ({ listing, onUpdate }) => {
     if (!listing?.id) return;
     setIsSubmitting(true);
     try {
-      const { data: updated } = await supabase
+      const { data: updated, error } = await supabase
         .from('set_cards')
         .update({ moderationNotes: notes })
         .eq('id', listing.id)
         .select()
         .single();
-      
+      if (error || !updated) throw (error || new Error('No row updated'));
+
       toast.success('Moderation notes updated successfully');
       if (onUpdate) onUpdate(updated);
     } catch (error) {
@@ -47,12 +48,13 @@ const ModerationPanel = ({ listing, onUpdate }) => {
         msg = 'Moderation notes cleared';
       }
 
-      const { data: updated } = await supabase
+      const { data: updated, error } = await supabase
         .from('set_cards')
         .update(updatedData)
         .eq('id', listing.id)
         .select()
         .single();
+      if (error || !updated) throw (error || new Error('No row updated'));
       toast.success(msg);
       if (onUpdate) onUpdate(updated);
     } catch (error) {

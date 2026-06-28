@@ -1,6 +1,6 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
-const mockSupabase = vi.hoisted(() => ({ from: vi.fn() }));
+const mockSupabase = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(() => Promise.resolve({ data: null, error: null })) }));
 vi.mock('../../src/utils/supabaseClient.js', () => ({ default: mockSupabase, supabase: mockSupabase }));
 vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -44,28 +44,25 @@ describe('payoutSeller', () => {
   it('falls back to a wallet credit when the transfer fails', async () => {
     const stripe = stripeWith(async () => { throw new Error('transfer boom'); });
     queue(
-      builder({ data: { stripe_connect_account_id: 'acct_1', stripe_connect_onboarded: true, wallet_balance_aud: 50 } }), // profile
-      builder({ error: null }), // wallet update
-      builder({ error: null }), // orders update
+      builder({ data: { stripe_connect_account_id: 'acct_1', stripe_connect_onboarded: true } }), // profile
+      builder({ error: null }), // orders payout_status update
     );
     const res = await payoutSeller(stripe, { sellerId: 's1', sellerProceeds: 100, orderId: 'o1' });
     expect(res).toEqual({ status: 'wallet_credited', fallback: true });
-    const walletUpdate = mockSupabase.from.mock.results[1].value;
-    expect(walletUpdate.update).toHaveBeenCalledWith({ wallet_balance_aud: 150 });
+    // Wallet credit now goes through the atomic RPC, not a read-modify-write update.
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('increment_wallet_balance', { p_user: 's1', p_delta: 100 });
   });
 
   it('credits the wallet when the seller is not Connect-onboarded', async () => {
     const stripe = stripeWith();
     queue(
-      builder({ data: { stripe_connect_account_id: null, stripe_connect_onboarded: false, wallet_balance_aud: 20 } }),
-      builder({ error: null }), // wallet update
-      builder({ error: null }), // orders update
+      builder({ data: { stripe_connect_account_id: null, stripe_connect_onboarded: false } }),
+      builder({ error: null }), // orders payout_status update
     );
     const res = await payoutSeller(stripe, { sellerId: 's1', sellerProceeds: 80, orderId: 'o1' });
     expect(res).toEqual({ status: 'wallet_credited' });
     expect(stripe.transfers.create).not.toHaveBeenCalled();
-    const walletUpdate = mockSupabase.from.mock.results[1].value;
-    expect(walletUpdate.update).toHaveBeenCalledWith({ wallet_balance_aud: 100 });
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('increment_wallet_balance', { p_user: 's1', p_delta: 80 });
   });
 });
 
@@ -79,16 +76,13 @@ describe('reverseSellerPayout', () => {
     expect(stripe.transfers.createReversal).toHaveBeenCalledWith('tr_1');
   });
 
-  it('claws back a wallet credit, never below zero', async () => {
+  it('claws back a wallet credit atomically via RPC (negative delta)', async () => {
     const stripe = stripeReversal();
-    queue(
-      builder({ data: { wallet_balance_aud: 50 } }), // seller wallet read
-      builder({ error: null }),                       // wallet update
-    );
     const res = await reverseSellerPayout(stripe, { id: 'o2', seller_id: 's2', payout_status: 'wallet_credited', seller_proceeds_aud: 80 });
     expect(res).toEqual({ action: 'wallet_clawback' });
-    const walletUpdate = mockSupabase.from.mock.results[1].value;
-    expect(walletUpdate.update).toHaveBeenCalledWith({ wallet_balance_aud: 0 }); // max(0, 50 - 80)
+    // Atomic clawback: negative delta through the same RPC as credits; the RPC
+    // floors the balance at 0, so a read-modify-write can't race it.
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('increment_wallet_balance', { p_user: 's2', p_delta: -80 });
   });
 
   it('does nothing when there was no payout to reverse', async () => {

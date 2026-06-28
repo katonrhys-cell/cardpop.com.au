@@ -17,11 +17,19 @@ const ShopCategoryPage = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [sort, setSort] = useState('newest');
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
   const pathInfo = getCategoryBySlug(hierarchy, categorySlug, subcategorySlug, productTypeSlug);
   const { category, subcategory, productType } = pathInfo || {};
+  const categoryName = subcategory?.name || category?.name;
+
+  // Reset to the first page whenever the category path or sort changes, so we
+  // never land on an out-of-range page showing zero products.
+  useEffect(() => {
+    setPage(1);
+  }, [categorySlug, subcategorySlug, productTypeSlug, sort]);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -33,14 +41,18 @@ const ShopCategoryPage = () => {
         let query = supabase
           .from('shop_products')
           .select('*', { count: 'exact' })
-          .eq('status', 'active')
-          .order('created_at', { ascending: false })
-          .range(from, from + perPage - 1);
+          .eq('status', 'active');
 
         // shop_products stores a free-text category; match the resolved
         // subcategory/category name against it.
-        const categoryName = subcategory?.name || category?.name;
         if (categoryName) query = query.ilike('category', `%${categoryName}%`);
+
+        if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
+        else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
+        else if (sort === 'oldest') query = query.order('created_at', { ascending: true });
+        else query = query.order('created_at', { ascending: false });
+
+        query = query.range(from, from + perPage - 1);
 
         const { data, count, error } = await query;
         if (error) throw error;
@@ -58,7 +70,9 @@ const ShopCategoryPage = () => {
     if (!contextLoading) {
       fetchProducts();
     }
-  }, [category, subcategory, productType, page, contextLoading]);
+    // Depend on stable slug strings (not the derived path objects, which get new
+    // identities every render and would re-run this effect needlessly).
+  }, [categoryName, page, sort, contextLoading]);
 
   const breadcrumbs = getBreadcrumbs(category, subcategory, productType, '/shop');
   const metaTitle = generateMetaTitle(category, subcategory, productType) + " - Official Store";
@@ -75,12 +89,12 @@ const ShopCategoryPage = () => {
       <Breadcrumb items={breadcrumbs} />
       
       <div className="flex flex-col md:flex-row gap-8">
-        <CategoryFilter 
-          hierarchy={hierarchy} 
-          currentCategory={category} 
-          currentSubcategory={subcategory} 
-          basePath="/shop" 
-        />
+        <div className="md:w-56 shrink-0">
+          <CategoryFilter
+            filters={{ sort }}
+            onChange={({ sort: nextSort }) => setSort(nextSort ?? 'newest')}
+          />
+        </div>
         
         <div className="flex-1 min-w-0">
           <div className="mb-8">

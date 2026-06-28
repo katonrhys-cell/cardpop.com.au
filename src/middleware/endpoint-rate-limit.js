@@ -74,16 +74,19 @@ const stripeLimiter = rateLimit({
 	},
 });
 
-// MFA verify rate limiter: 5 attempts per 15 minutes, keyed by mfaId so that
-// rotating IPs cannot bypass the limit for the same MFA session.
+// MFA verify rate limiter: 5 attempts per 15 minutes, keyed by the authenticated
+// user id. The /verify route runs authMiddleware before this limiter, so req.user
+// is always populated. Keying on the body-supplied mfaId was bypassable: an
+// attacker could rotate mfaId (or omit it to fall back to a spoofable IP key) to
+// evade the cap while brute-forcing a single session.
 const mfaLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000,
 	max: 5,
 	standardHeaders: true,
 	legacyHeaders: false,
-	keyGenerator: (req) => req.body?.mfaId || ipKeyGenerator(req),
+	keyGenerator: (req) => req.user?.id || ipKeyGenerator(req),
 	handler: (req, res) => {
-		logger.warn(`[RATE_LIMIT] MFA verify rate limit exceeded for mfaId: ${req.body?.mfaId}`);
+		logger.warn(`[RATE_LIMIT] MFA verify rate limit exceeded for user: ${req.user?.id}`);
 		res.status(429).json({
 			error: 'Too many verification attempts, please try again later',
 			retryAfter: req.rateLimit.resetTime,

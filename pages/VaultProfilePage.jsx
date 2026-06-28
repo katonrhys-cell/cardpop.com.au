@@ -452,16 +452,16 @@ const VaultProfilePage = () => {
           {selectedCard && (
             <div className="grid grid-cols-1 md:grid-cols-2 h-full max-h-[80vh]">
               <div className="bg-muted/30 p-6 flex items-center justify-center border-r border-border/50">
-                <ProductImageCarousel 
-                  images={selectedCard.cardImage} 
-                  record={selectedCard} 
+                <ProductImageCarousel
+                  images={selectedCard.card_image}
+                  record={selectedCard}
                   className="w-full max-w-sm"
                 />
               </div>
               <div className="p-6 flex flex-col overflow-y-auto">
                 <DialogHeader className="mb-6">
                   <DialogTitle className="text-2xl font-serif font-bold">{selectedCard.card_name}</DialogTitle>
-                  <p className="text-muted-foreground font-medium">{selectedCard.collectionType}</p>
+                  <p className="text-muted-foreground font-medium">{selectedCard.collection}</p>
                 </DialogHeader>
 
                 <div className="space-y-4 flex-1">
@@ -472,17 +472,17 @@ const VaultProfilePage = () => {
                     </div>
                     <div className="bg-muted/50 p-3 rounded-xl">
                       <p className="text-xs text-muted-foreground font-bold uppercase mb-1">
-                        {['For Sale', 'For Both'].includes(selectedCard.listingStatus) ? 'Asking Price' : 'Est. Value'}
+                        {['For Sale', 'For Sale & Trade'].includes(selectedCard.listing_type) ? 'Asking Price' : 'Est. Value'}
                       </p>
                       <p className="font-medium tabular-nums">
-                        ${(['For Sale', 'For Both'].includes(selectedCard.listingStatus) && selectedCard.price_aud)
-                          ? selectedCard.price_aud.toFixed(2)
-                          : (selectedCard.estimated_value_aud?.toFixed(2) || '0.00')}
+                        ${(['For Sale', 'For Sale & Trade'].includes(selectedCard.listing_type) && selectedCard.price_aud)
+                          ? Number(selectedCard.price_aud).toFixed(2)
+                          : (Number(selectedCard.estimated_value_aud ?? 0).toFixed(2))}
                       </p>
                     </div>
                     <div className="bg-muted/50 p-3 rounded-xl">
                       <p className="text-xs text-muted-foreground font-bold uppercase mb-1">Status</p>
-                      <p className="font-medium">{selectedCard.listingStatus}</p>
+                      <p className="font-medium">{selectedCard.listing_type}</p>
                     </div>
                   </div>
                   

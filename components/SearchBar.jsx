@@ -22,12 +22,16 @@ const SearchBar = ({ initialQuery = '', className = '', onSearchChange, placehol
 
   // Fetch search suggestions
   useEffect(() => {
+    // Guard against out-of-order responses: a slow fetch for an earlier query
+    // must not overwrite suggestions for the current one.
+    let cancelled = false;
+
     const fetchSuggestions = async () => {
       if (query.length < 2) {
-        setSuggestions([]);
-        // Show search history when query is empty
-        if (query.length === 0) {
-          setShowSuggestions(searchHistory.length > 0);
+        if (!cancelled) {
+          setSuggestions([]);
+          // Show search history when query is empty
+          if (query.length === 0) setShowSuggestions(searchHistory.length > 0);
         }
         return;
       }
@@ -36,21 +40,26 @@ const SearchBar = ({ initialQuery = '', className = '', onSearchChange, placehol
       try {
         const response = await fetch(`/api/search-suggestions?q=${encodeURIComponent(query)}&limit=8`);
         const data = await response.json();
+        if (cancelled) return;
         setSuggestions(data.suggestions || []);
         setDidYouMean(data.didYouMean || null);
         setShowSuggestions(true);
       } catch (error) {
+        if (cancelled) return;
         console.error('Error fetching suggestions:', error);
         setSuggestions([]);
         setDidYouMean(null);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     const debounceTimer = setTimeout(fetchSuggestions, 300);
-    return () => clearTimeout(debounceTimer);
-  }, [query, searchHistory.length]);
+    return () => { cancelled = true; clearTimeout(debounceTimer); };
+    // Intentionally not depending on searchHistory.length — it would re-fire the
+    // network fetch when history changes. The empty-query branch reads it lazily.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
 
   // Close suggestions when clicking outside
   useEffect(() => {

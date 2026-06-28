@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Calculator, Upload, X, AlertTriangle, CheckCircle2, XCircle,
@@ -133,7 +133,16 @@ function ImageUploadSlot({ label, required, file, onFile, onRemove }) {
     if (dropped && dropped.type.startsWith('image/')) onFile(dropped);
   }, [onFile]);
 
-  const previewUrl = file ? URL.createObjectURL(file) : null;
+  // Create the object URL in an effect (not in render) so it's created once per
+  // file and revoked on change/unmount — building it inline leaked a new blob
+  // URL (holding the full image) on every re-render.
+  const [previewUrl, setPreviewUrl] = useState(null);
+  useEffect(() => {
+    if (!file) { setPreviewUrl(null); return; }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   return (
     <div className="flex flex-col gap-2">

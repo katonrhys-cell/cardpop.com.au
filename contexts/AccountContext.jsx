@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 
 const AccountContext = createContext();
@@ -50,10 +50,16 @@ export const AccountProvider = ({ children }) => {
     return () => {
       isMounted = false;
     };
-  }, [isAuthenticated, currentUser]);
+    // Depend on the stable user id, not the currentUser object — a new object
+    // identity on every AuthContext re-render would otherwise re-run this fetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, currentUser?.id]);
+
+  // Memoise so consumers don't re-render on every provider render.
+  const value = useMemo(() => ({ stats, loading }), [stats, loading]);
 
   return (
-    <AccountContext.Provider value={{ stats, loading }}>
+    <AccountContext.Provider value={value}>
       {children}
     </AccountContext.Provider>
   );

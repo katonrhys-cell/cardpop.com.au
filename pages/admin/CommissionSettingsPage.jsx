@@ -332,8 +332,8 @@ const CommissionSettingsPage = () => {
             <SettingToggle
               label="Commission on Buy Now / Fixed"
               description="Charge commission on fixed-price listings."
-              settingKey="commissions_enabled"
-              value={settings['commissions_enabled']}
+              settingKey="commission_on_offers"
+              value={settings['commission_on_offers']}
               onChange={handleSettingToggle}
             />
             <SettingToggle

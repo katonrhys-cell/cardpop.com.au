@@ -57,12 +57,16 @@ const FeaturedCardsAdminPage = () => {
 
     setProcessingId(card.id);
     try {
-      const { data: updatedCard } = await supabase
+      const { data: updatedCard, error } = await supabase
         .from('vault_items')
         .update({ featured: !card.featured })
         .eq('id', card.id)
         .select()
         .single();
+
+      // Supabase resolves with { error } rather than throwing; without this the
+      // row below would be mapped to null and updatedCard.card_name would crash.
+      if (error || !updatedCard) throw (error || new Error('Update returned no row'));
 
       setCards(prev => prev.map(c => c.id === card.id ? updatedCard : c));
       toast.success(`${updatedCard.card_name || updatedCard.cardName} is now ${updatedCard.featured ? 'featured' : 'unfeatured'}.`);

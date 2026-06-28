@@ -80,7 +80,7 @@ const UserDetailPage = () => {
   }
 
   const avatarUrl = user.avatar_url || null;
-  const displayName = user.display_name || user.username || user.email;
+  const displayName = user.display_name || user.username || user.email || 'User';
   const initials = displayName.substring(0, 2).toUpperCase();
 
   return (

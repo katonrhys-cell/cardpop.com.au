@@ -38,8 +38,12 @@ const MarketplaceListingCard = ({ listing }) => {
       toast.error('Sign in to save listings to your watchlist');
       return;
     }
-    const added = await toggle(listing.id);
-    toast.success(added ? 'Added to watchlist' : 'Removed from watchlist');
+    const { success, watchlisted } = await toggle(listing.id);
+    if (!success) {
+      toast.error('Could not update your watchlist. Please try again.');
+      return;
+    }
+    toast.success(watchlisted ? 'Added to watchlist' : 'Removed from watchlist');
   };
 
   const vaultItem = listing.vault_item;

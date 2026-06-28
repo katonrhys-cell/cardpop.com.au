@@ -249,7 +249,7 @@ const CategoryManagementPage = () => {
 
               {/* ── Category row ── */}
               <div
-                className="flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-muted/40 select-none"
+                className="group flex items-center gap-2 px-4 py-3 cursor-pointer hover:bg-muted/40 select-none"
                 onClick={() => toggle(cat.id)}
               >
                 <button className="text-muted-foreground" onClick={e => { e.stopPropagation(); toggle(cat.id); }}>
