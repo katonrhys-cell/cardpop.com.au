@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { COLLECTION_CONFIGS } from '@/data/collectionConfigs.js';
 import { Button } from '@/components/ui/button';
@@ -182,7 +182,7 @@ const CollectionsManagementPage = () => {
     return () => { isMounted.current = false; };
   }, []);
 
-  const fetchEras = async () => {
+  const fetchEras = useCallback(async () => {
     if (!isMounted.current) return;
     setLoading(true);
     const { data, error } = await supabase
@@ -194,9 +194,9 @@ const CollectionsManagementPage = () => {
     if (error) toast.error('Failed to load eras');
     setEras(data || []);
     setLoading(false);
-  };
+  }, [selectedSlug]);
 
-  useEffect(() => { fetchEras(); }, [selectedSlug]);
+  useEffect(() => { fetchEras(); }, [fetchEras]);
 
   const handleDelete = async () => {
     if (!deleteTarget) return;

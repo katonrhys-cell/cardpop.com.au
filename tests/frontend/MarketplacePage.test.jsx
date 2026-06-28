@@ -22,7 +22,17 @@ vi.mock('@/lib/supabaseClient.js', () => {
     });
     return b;
   }
-  const supabase = { from: vi.fn(() => makeBuilder()) };
+  function makeChannel() {
+    return {
+      on: () => makeChannel(),
+      subscribe: () => ({ unsubscribe: vi.fn() }),
+    };
+  }
+  const supabase = {
+    from: vi.fn(() => makeBuilder()),
+    channel: vi.fn(() => makeChannel()),
+    removeChannel: vi.fn(),
+  };
   return { supabase, default: supabase };
 });
 

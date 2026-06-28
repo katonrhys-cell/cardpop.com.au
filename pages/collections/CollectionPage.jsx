@@ -18,9 +18,8 @@ import GradeBadge from '@/components/GradeBadge.jsx';
 import { COLLECTION_CONFIGS, resolveCollectionSlug } from '@/data/collectionConfigs.js';
 import { useCollectionEras } from '@/hooks/useCollectionEras.js';
 import { slugify } from '@/lib/slugify.js';
-import { CARD_VARIANTS } from '@/lib/cardVariants.js';
+import { CARD_VARIANTS, getCardVariants } from '@/lib/cardVariants.js';
 import { fetchPinnedSectionItems, mergePinned } from '@/lib/collectionSections.js';
-import { getCardVariants } from '@/lib/cardVariants.js';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
 
 // ─── Hero floating icon animation ───────────────────────────────────────────
@@ -525,7 +524,7 @@ const CollectionPage = () => {
     } finally {
       if (isCurrent()) setListingsLoading(false);
     }
-  }, [categoryId, activeEra, filterType, filterCondition, filterVariant, filterSort, filterSub, filterBrand, filterSeries]);
+  }, [categoryId, activeEra, filterType, filterCondition, filterVariant, filterSort]);
 
   useEffect(() => {
     if (categoryId) fetchListings(1);

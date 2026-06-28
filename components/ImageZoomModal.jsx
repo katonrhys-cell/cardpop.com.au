@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useMotionValue, useSpring } from 'framer-motion';
 import { X, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -18,6 +18,17 @@ const ImageZoomModal = ({ isOpen, onClose, imageUrl, altText }) => {
   const MIN_SCALE = 1;
   const MAX_SCALE = 4;
 
+  const handleZoom = useCallback((delta) => {
+    setScale((prev) => {
+      const newScale = Math.min(Math.max(prev + delta, MIN_SCALE), MAX_SCALE);
+      if (newScale === MIN_SCALE) {
+        x.set(0);
+        y.set(0);
+      }
+      return newScale;
+    });
+  }, [x, y]);
+
   useEffect(() => {
     if (!isOpen) {
       setScale(1);
@@ -30,7 +41,7 @@ const ImageZoomModal = ({ isOpen, onClose, imageUrl, altText }) => {
       if (e.key === 'Escape') onClose();
       if (e.key === '=' || e.key === '+') handleZoom(0.5);
       if (e.key === '-') handleZoom(-0.5);
-      
+
       const panStep = 50;
       if (e.key === 'ArrowUp') y.set(y.get() + panStep);
       if (e.key === 'ArrowDown') y.set(y.get() - panStep);
@@ -45,18 +56,7 @@ const ImageZoomModal = ({ isOpen, onClose, imageUrl, altText }) => {
       window.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, onClose, x, y]);
-
-  const handleZoom = (delta) => {
-    setScale((prev) => {
-      const newScale = Math.min(Math.max(prev + delta, MIN_SCALE), MAX_SCALE);
-      if (newScale === MIN_SCALE) {
-        x.set(0);
-        y.set(0);
-      }
-      return newScale;
-    });
-  };
+  }, [isOpen, onClose, x, y, handleZoom]);
 
   const handleWheel = (e) => {
     e.preventDefault();

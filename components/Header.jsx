@@ -956,7 +956,7 @@ const Header = () => {
       supabase.removeChannel(msgChannel);
       supabase.removeChannel(tradeChannel);
     };
-  }, [isAuthenticated, currentUser?.id]);
+  }, [isAuthenticated, currentUser]);
 
   const cartItemCount = cartItems?.reduce((sum, item) => sum + item.quantity, 0) || 0;
 

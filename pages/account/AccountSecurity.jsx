@@ -35,7 +35,7 @@ const TOTPSetup = ({ onComplete, onCancel }) => {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [enrollTOTP, onCancel]);
 
   const copySecret = async () => {
     await navigator.clipboard.writeText(enrollment.totp.secret);
