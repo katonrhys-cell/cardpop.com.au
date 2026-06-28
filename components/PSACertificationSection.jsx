@@ -10,8 +10,12 @@ const PSACertificationSection = ({ certNumber, gradingCompany }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // grading_company is stored as a lowercase enum ('psa') in the database,
+  // so normalise before comparing to avoid hiding the certification.
+  const isPSA = certNumber && gradingCompany?.toLowerCase() === 'psa';
+
   useEffect(() => {
-    if (!certNumber || gradingCompany !== 'PSA') {
+    if (!isPSA) {
       setLoading(false);
       return;
     }
@@ -35,9 +39,9 @@ const PSACertificationSection = ({ certNumber, gradingCompany }) => {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [certNumber, gradingCompany]);
+  }, [isPSA, certNumber]);
 
-  if (!certNumber || gradingCompany !== 'PSA') return null;
+  if (!isPSA) return null;
 
   if (loading) {
     return (
