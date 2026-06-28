@@ -56,10 +56,10 @@ const AccountDashboard = () => {
         const [salesRes, revenueRes, listingsRes, vaultRes, tradesRes] = await Promise.all([
           supabase.from('orders').select('id', { count: 'exact', head: true })
             .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
-            .in('status', ['delivered', 'completed']),
+            .eq('status', 'delivered'),
           supabase.from('orders').select('total_aud')
             .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
-            .in('status', ['delivered', 'completed']),
+            .eq('status', 'delivered'),
           supabase.from('listings').select('id', { count: 'exact', head: true })
             .eq('seller_id', currentUser.id).eq('status', 'active').neq('listing_type', 'vault'),
           supabase.from('vault_items').select('id', { count: 'exact', head: true })
