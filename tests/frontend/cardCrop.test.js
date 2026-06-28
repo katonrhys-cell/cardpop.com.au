@@ -6,6 +6,12 @@ import {
   isPlausibleCard,
   outputDimsFor,
   defaultCorners,
+  cornerAngles,
+  maxAngleError,
+  aspectStatus,
+  cropGuideStatus,
+  rectifyToCard,
+  CARD_RATIO,
   OUTPUT,
 } from '@/utils/cardCrop.js';
 
@@ -110,5 +116,70 @@ describe('defaultCorners', () => {
   it('produces a plausible card quad for a portrait frame', () => {
     // A 1000×1400 frame inset 8% is ~840×1288 → ratio ~0.65, within card range.
     expect(isPlausibleCard(defaultCorners(1000, 1400), 1000, 1400)).toBe(true);
+  });
+});
+
+describe('cornerAngles / maxAngleError', () => {
+  it('reports four right angles for a rectangle', () => {
+    cornerAngles(CARD_SEQ).forEach(a => expect(a).toBeCloseTo(90));
+    expect(maxAngleError(CARD_SEQ)).toBeCloseTo(0);
+  });
+
+  it('reports a non-zero error for a skewed quad', () => {
+    const skewed = [[250, 100], [600, 100], [600, 800], [100, 800]];
+    expect(maxAngleError(skewed)).toBeGreaterThan(5);
+  });
+});
+
+describe('aspectStatus', () => {
+  it('matches the card ratio for a 5:7 rectangle', () => {
+    const s = aspectStatus(CARD_SEQ);
+    expect(s.ratio).toBeCloseTo(CARD_RATIO);
+    expect(s.matchesCard).toBe(true);
+  });
+
+  it('rejects a square shape', () => {
+    const square = [[0, 0], [500, 0], [500, 500], [0, 500]];
+    expect(aspectStatus(square).matchesCard).toBe(false);
+  });
+
+  it('handles degenerate input', () => {
+    const zero = [[0, 0], [0, 0], [0, 0], [0, 0]];
+    expect(aspectStatus(zero)).toEqual({ ratio: 0, matchesCard: false });
+  });
+});
+
+describe('cropGuideStatus', () => {
+  it('is perfect for a clean 5:7 rectangle', () => {
+    const s = cropGuideStatus(CARD_SEQ);
+    expect(s.isRectangle).toBe(true);
+    expect(s.matchesCard).toBe(true);
+    expect(s.isPerfect).toBe(true);
+  });
+
+  it('is not perfect when edges are skewed', () => {
+    const skewed = [[250, 100], [600, 100], [600, 800], [100, 800]];
+    expect(cropGuideStatus(skewed).isPerfect).toBe(false);
+  });
+});
+
+describe('rectifyToCard', () => {
+  it('turns a skewed quad into a right-angled card rectangle', () => {
+    const skewed = [[150, 100], [600, 120], [580, 800], [100, 780]];
+    const rect = rectifyToCard(skewed, 1000, 1000);
+    expect(maxAngleError(rect)).toBeCloseTo(0);
+    expect(aspectStatus(rect).matchesCard).toBe(true);
+    expect(cropGuideStatus(rect).isPerfect).toBe(true);
+  });
+
+  it('keeps the rectangle inside the frame', () => {
+    const big = [[-50, -50], [1100, -50], [1100, 1100], [-50, 1100]];
+    const rect = rectifyToCard(big, 1000, 1000);
+    rect.forEach(([x, y]) => {
+      expect(x).toBeGreaterThanOrEqual(0);
+      expect(x).toBeLessThanOrEqual(1000);
+      expect(y).toBeGreaterThanOrEqual(0);
+      expect(y).toBeLessThanOrEqual(1000);
+    });
   });
 });
