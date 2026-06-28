@@ -8,10 +8,8 @@ import {
   defaultCorners,
   cornerAngles,
   maxAngleError,
-  aspectStatus,
-  cropGuideStatus,
-  rectifyToCard,
-  CARD_RATIO,
+  isRectangularQuad,
+  rectifyQuad,
   OUTPUT,
 } from '@/utils/cardCrop.js';
 
@@ -119,67 +117,52 @@ describe('defaultCorners', () => {
   });
 });
 
-describe('cornerAngles / maxAngleError', () => {
+describe('cornerAngles', () => {
   it('reports four right angles for a rectangle', () => {
-    cornerAngles(CARD_SEQ).forEach(a => expect(a).toBeCloseTo(90));
-    expect(maxAngleError(CARD_SEQ)).toBeCloseTo(0);
+    cornerAngles(CARD_SEQ).forEach(a => expect(a).toBeCloseTo(90, 5));
   });
 
-  it('reports a non-zero error for a skewed quad', () => {
-    const skewed = [[250, 100], [600, 100], [600, 800], [100, 800]];
-    expect(maxAngleError(skewed)).toBeGreaterThan(5);
-  });
-});
-
-describe('aspectStatus', () => {
-  it('matches the card ratio for a 5:7 rectangle', () => {
-    const s = aspectStatus(CARD_SEQ);
-    expect(s.ratio).toBeCloseTo(CARD_RATIO);
-    expect(s.matchesCard).toBe(true);
-  });
-
-  it('rejects a square shape', () => {
-    const square = [[0, 0], [500, 0], [500, 500], [0, 500]];
-    expect(aspectStatus(square).matchesCard).toBe(false);
-  });
-
-  it('handles degenerate input', () => {
-    const zero = [[0, 0], [0, 0], [0, 0], [0, 0]];
-    expect(aspectStatus(zero)).toEqual({ ratio: 0, matchesCard: false });
+  it('reports skewed angles for a sheared quad', () => {
+    // A parallelogram (top edge shifted right) has no 90° corners.
+    const sheared = [[200, 100], [700, 100], [600, 800], [100, 800]];
+    const angles = cornerAngles(sheared);
+    expect(Math.max(...angles.map(a => Math.abs(a - 90)))).toBeGreaterThan(5);
   });
 });
 
-describe('cropGuideStatus', () => {
-  it('is perfect for a clean 5:7 rectangle', () => {
-    const s = cropGuideStatus(CARD_SEQ);
-    expect(s.isRectangle).toBe(true);
-    expect(s.matchesCard).toBe(true);
-    expect(s.isPerfect).toBe(true);
+describe('maxAngleError / isRectangularQuad', () => {
+  it('treats a clean rectangle as rectangular', () => {
+    expect(maxAngleError(CARD_SEQ)).toBeCloseTo(0, 5);
+    expect(isRectangularQuad(CARD_SEQ)).toBe(true);
   });
 
-  it('is not perfect when edges are skewed', () => {
-    const skewed = [[250, 100], [600, 100], [600, 800], [100, 800]];
-    expect(cropGuideStatus(skewed).isPerfect).toBe(false);
+  it('tolerates a tiny skew within the default tolerance', () => {
+    const nearly = [[100, 100], [600, 102], [600, 800], [100, 798]]; // ~0.2° off
+    expect(isRectangularQuad(nearly)).toBe(true);
+  });
+
+  it('rejects a clearly skewed quad', () => {
+    const sheared = [[250, 100], [700, 100], [550, 800], [100, 800]];
+    expect(isRectangularQuad(sheared)).toBe(false);
   });
 });
 
-describe('rectifyToCard', () => {
-  it('turns a skewed quad into a right-angled card rectangle', () => {
-    const skewed = [[150, 100], [600, 120], [580, 800], [100, 780]];
-    const rect = rectifyToCard(skewed, 1000, 1000);
-    expect(maxAngleError(rect)).toBeCloseTo(0);
-    expect(aspectStatus(rect).matchesCard).toBe(true);
-    expect(cropGuideStatus(rect).isPerfect).toBe(true);
+describe('rectifyQuad', () => {
+  it('returns an upright rectangle ordered [tl, tr, br, bl]', () => {
+    const rect = rectifyQuad(CARD_SEQ);
+    expect(rect).toEqual(orderCorners(rect));
+    expect(isRectangularQuad(rect)).toBe(true);
   });
 
-  it('keeps the rectangle inside the frame', () => {
-    const big = [[-50, -50], [1100, -50], [1100, 1100], [-50, 1100]];
-    const rect = rectifyToCard(big, 1000, 1000);
-    rect.forEach(([x, y]) => {
-      expect(x).toBeGreaterThanOrEqual(0);
-      expect(x).toBeLessThanOrEqual(1000);
-      expect(y).toBeGreaterThanOrEqual(0);
-      expect(y).toBeLessThanOrEqual(1000);
-    });
+  it('preserves the centre and average size of a skewed quad', () => {
+    const sheared = [[250, 100], [700, 100], [550, 800], [100, 800]];
+    const rect = rectifyQuad(sheared);
+    // Centre is unchanged…
+    const cx = sheared.reduce((s, p) => s + p[0], 0) / 4;
+    const cy = sheared.reduce((s, p) => s + p[1], 0) / 4;
+    expect((rect[0][0] + rect[1][0]) / 2).toBeCloseTo(cx, 5);
+    expect((rect[0][1] + rect[3][1]) / 2).toBeCloseTo(cy, 5);
+    // …and the result is a true rectangle.
+    expect(isRectangularQuad(rect)).toBe(true);
   });
 });

@@ -3,11 +3,17 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, Check, Square, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { defaultCorners, orderCorners, cropGuideStatus, rectifyToCard } from '@/utils/cardCrop.js';
+import { Loader2, Check, CheckCircle2, Frame, Square } from 'lucide-react';
+import {
+  defaultCorners, orderCorners, isRectangularQuad, rectifyQuad,
+} from '@/utils/cardCrop.js';
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+
+// Colours for the crop overlay: emerald once the selection is a true
+// rectangle, the brand primary while it still needs straightening.
+const OK_COLOR = '#10b981';
 
 /**
  * Manual crop editor: shows the original image with four draggable corner
@@ -123,37 +129,32 @@ const CardCornerAdjuster = ({ imageUrl, initialCorners, onApply, onCancel }) => 
     }
   };
 
-  // Live squareness / ratio assessment, backed by the tested geometry helpers.
-  const status = useMemo(() => (ready ? cropGuideStatus(corners) : null), [ready, corners]);
-  const ordered = useMemo(() => (ready ? orderCorners(corners) : null), [ready, corners]);
+  // Snap the current selection to an upright rectangle (clamped to the image)
+  // so the user gets a perfect rectangle crop in one tap.
+  const snapToRectangle = () => {
+    if (!corners || !natural) return;
+    setCorners(
+      rectifyQuad(corners).map(([x, y]) => [clamp(x, 0, natural.w), clamp(y, 0, natural.h)]),
+    );
+  };
 
-  // Perspective-aware overlay geometry, all in display pixels.
-  const overlay = useMemo(() => {
-    if (!ready || !ordered) return null;
-    const [tl, tr, br, bl] = ordered;
-    const px = ([x, y]) => `${x * scale},${y * scale}`;
-    const polygon = [tl, tr, br, bl].map(px).join(' ');
-    // Rule-of-thirds lines that follow the (possibly skewed) quad via bilinear
-    // interpolation, so the grid stays glued to the crop as corners move.
-    const at = (u, v) => {
-      const top = lerp(tl, tr, u);
-      const bottom = lerp(bl, br, u);
-      return lerp(top, bottom, v);
-    };
-    const lines = [];
-    for (const u of [1 / 3, 2 / 3]) lines.push([at(u, 0), at(u, 1)]);
-    for (const v of [1 / 3, 2 / 3]) lines.push([at(0, v), at(1, v)]);
-    // Edge handles at the midpoint of each side (array-order ring).
-    const edges = corners.map((c, i) => {
-      const n = corners[(i + 1) % 4];
-      return [(c[0] + n[0]) / 2, (c[1] + n[1]) / 2];
-    });
-    return { polygon, lines, edges };
-  }, [ready, ordered, corners, scale]);
+  const polygon = ready ? corners.map(([x, y]) => `${x * scale},${y * scale}`).join(' ') : '';
 
-  const ok = status?.isRectangle;
-  const strokeColor = ok ? 'hsl(142 71% 45%)' : 'hsl(var(--primary))';
-  const fillColor = ok ? 'hsl(142 71% 45% / 0.12)' : 'hsl(var(--primary) / 0.12)';
+  // Is the selection square enough to crop without perspective distortion?
+  const isRect = ready ? isRectangularQuad(corners) : false;
+  const lineColor = isRect ? OK_COLOR : 'hsl(var(--primary))';
+
+  // Perspective-correct rule-of-thirds guide lines, drawn between the
+  // interpolated thirds of opposite edges of the (ordered) selection. They give
+  // the user a reference for keeping the card square as they drag the corners.
+  const gridLines = [];
+  if (ready) {
+    const [tl, tr, br, bl] = orderCorners(corners).map(([x, y]) => [x * scale, y * scale]);
+    for (const t of [1 / 3, 2 / 3]) {
+      gridLines.push([lerp(tl, tr, t), lerp(bl, br, t)]); // vertical thirds
+      gridLines.push([lerp(tl, bl, t), lerp(tr, br, t)]); // horizontal thirds
+    }
+  }
 
   return (
     <Dialog open onOpenChange={(next) => { if (!next && !applying) onCancel(); }}>
@@ -162,9 +163,26 @@ const CardCornerAdjuster = ({ imageUrl, initialCorners, onApply, onCancel }) => 
           <DialogTitle>Adjust crop corners</DialogTitle>
         </DialogHeader>
         <p className="text-xs text-muted-foreground -mt-2">
-          Drag each corner to a corner of the card, or drag a side to nudge a whole
-          edge. Keep the outline square for a clean rectangle.
+          Drag each handle to a corner of the card. Keep the edges square — the
+          guides below turn green when your crop is a perfect rectangle.
         </p>
+
+        {/* Live rectangle indicator: green confirmation when square, amber
+            nudge while the selection is still skewed. */}
+        <div
+          role="status"
+          className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium ${
+            isRect
+              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600'
+              : 'border-amber-500/30 bg-amber-500/10 text-amber-600'
+          }`}
+        >
+          {isRect ? (
+            <><CheckCircle2 className="w-3.5 h-3.5" /> Perfect rectangle — ready to crop</>
+          ) : (
+            <><Frame className="w-3.5 h-3.5" /> Line the handles up with the card edges to square the crop</>
+          )}
+        </div>
 
         <div className="flex justify-center">
           <div className="relative inline-block" style={{ touchAction: 'none' }}>
@@ -185,43 +203,28 @@ const CardCornerAdjuster = ({ imageUrl, initialCorners, onApply, onCancel }) => 
                 onPointerUp={endDrag}
               >
                 <polygon
-                  points={overlay.polygon}
-                  fill={fillColor}
-                  stroke={strokeColor}
+                  points={polygon}
+                  fill={isRect ? `${OK_COLOR}1f` : 'hsl(var(--primary) / 0.12)'}
+                  stroke={lineColor}
                   strokeWidth="2"
                 />
-                {/* Rule-of-thirds guide grid */}
-                {overlay.lines.map(([p1, p2], i) => (
+                {gridLines.map(([[x1, y1], [x2, y2]], i) => (
                   <line
                     key={`g${i}`}
-                    x1={p1[0] * scale} y1={p1[1] * scale}
-                    x2={p2[0] * scale} y2={p2[1] * scale}
-                    stroke={strokeColor}
+                    x1={x1} y1={y1} x2={x2} y2={y2}
+                    stroke={lineColor}
                     strokeWidth="1"
-                    strokeOpacity="0.4"
+                    strokeDasharray="4 4"
+                    strokeOpacity="0.55"
                   />
                 ))}
-                {/* Edge (side) handles */}
-                {overlay.edges.map(([x, y], i) => (
-                  <rect
-                    key={`e${i}`}
-                    x={x * scale - 7} y={y * scale - 7}
-                    width="14" height="14" rx="3"
-                    fill="#fff"
-                    stroke={strokeColor}
-                    strokeWidth="2"
-                    style={{ cursor: 'move' }}
-                    onPointerDown={startEdgeDrag(i)}
-                  />
-                ))}
-                {/* Corner handles */}
                 {corners.map(([x, y], i) => (
                   <circle
                     key={i}
                     cx={x * scale}
                     cy={y * scale}
                     r={11}
-                    fill={strokeColor}
+                    fill={lineColor}
                     stroke="#fff"
                     strokeWidth="2"
                     style={{ cursor: 'grab' }}
@@ -233,36 +236,16 @@ const CardCornerAdjuster = ({ imageUrl, initialCorners, onApply, onCancel }) => 
           </div>
         </div>
 
-        {/* Live "perfect rectangle" indicator */}
-        {ready && status && (
-          <div
-            className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium ${
-              ok
-                ? 'border-green-500/30 bg-green-500/10 text-green-700 dark:text-green-400'
-                : 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400'
-            }`}
-            role="status"
-            aria-live="polite"
-          >
-            {ok ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
-            <span className="flex-1">
-              {ok
-                ? 'Perfect rectangle — corners are square.'
-                : `Edges are skewed by ${Math.round(status.angleError)}°. Square the corners or snap to a rectangle.`}
-            </span>
-            {!ok && (
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={snapToRectangle}
-                className="h-7 gap-1.5 px-2"
-              >
-                <Square className="w-3.5 h-3.5" /> Snap
-              </Button>
-            )}
-          </div>
-        )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={snapToRectangle}
+          disabled={!ready || applying}
+          className="gap-1.5 self-center text-xs text-muted-foreground"
+        >
+          <Square className="w-3.5 h-3.5" /> Snap to perfect rectangle
+        </Button>
 
         <DialogFooter className="gap-2 sm:gap-2">
           <Button type="button" variant="outline" onClick={onCancel} disabled={applying} className="flex-1">
