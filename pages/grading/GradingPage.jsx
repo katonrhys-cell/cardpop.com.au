@@ -19,6 +19,7 @@ const CHAPTERS = [
     icon: BookOpen,
     label: 'Start your journey',
     title: 'What is Card Grading?',
+    opening: 'Every collection has a beginning.',
     description:
       'New to grading? Begin here. Learn what professional card grading is, how the process works, and why Australian collectors are grading more than ever.',
     cta: 'Read the guide',
@@ -28,6 +29,7 @@ const CHAPTERS = [
     icon: BarChart2,
     label: 'Learn the language',
     title: 'Grading Scales Explained',
+    opening: 'Before you submit, learn to read a grade.',
     description:
       'Understand the 1–10 condition scales used by every major grading company. Know exactly what separates a Gem Mint 10 from a Mint 9 before you submit.',
     cta: 'View the scales',
@@ -37,8 +39,9 @@ const CHAPTERS = [
     icon: TrendingUp,
     label: 'Decide if it’s worth it',
     title: 'Grading ROI Calculator',
+    opening: 'Now, the big question — is it worth it?',
     description:
-      'Is grading worth it for your card? Enter your card, raw cost, and grading service for a probability-weighted expected return powered by live eBay AU prices and full cost breakdowns.',
+      'Enter your card, raw cost, and grading service for a probability-weighted expected return powered by live eBay AU prices and full cost breakdowns.',
     cta: 'Calculate ROI',
   },
   {
@@ -46,6 +49,7 @@ const CHAPTERS = [
     icon: Calculator,
     label: 'Preview your grade',
     title: 'Grade Estimator',
+    opening: 'A glimpse of the grade to come.',
     description:
       'Upload photos of your card and receive AI-generated preliminary grade estimates across PSA, BGS, CGC, ACE, and SGC — a helpful guide before you commit to a professional submission.',
     cta: 'Try the estimator',
@@ -55,18 +59,46 @@ const CHAPTERS = [
     icon: Building2,
     label: 'Choose your grader',
     title: 'Grading Companies',
+    opening: 'Choose the hands you trust your cards to.',
     description:
       'Compare PSA, BGS, CGC, ACE Grading and more. Find turnaround times, Australian pricing, and which service suits your cards and your budget.',
     cta: 'Compare services',
   },
   {
-    href: '/grading/local',
+    href: '/grading/submission-partners',
     icon: MapPin,
     label: 'Submit your cards',
     title: 'Submit Locally with Trusted Graders',
+    opening: 'The final step — send them off.',
     description:
       'Reach the destination. Skip international shipping and customs with ranked local Australian grading services, plus the best PSA and Beckett submission partners in Australia.',
     cta: 'View local options',
+  },
+];
+
+// "Where should I start?" — three quick on-ramps so readers can open the
+// book at the page that fits them, instead of feeling they must read it all.
+const START_PATHS = [
+  {
+    href: '/grading/what-is-grading',
+    icon: BookOpen,
+    badge: 'Begin at Chapter One',
+    title: 'I’m brand new to grading',
+    body: 'Start at the very beginning and learn how grading works, step by step.',
+  },
+  {
+    href: '/grading/roi-calculator',
+    icon: Compass,
+    badge: 'Skip to Chapter Three',
+    title: 'I want to know if it’s worth it',
+    body: 'Already know the basics? Jump straight to working out the return on a card.',
+  },
+  {
+    href: '/grading/submission-partners',
+    icon: Rocket,
+    badge: 'Jump to Chapter Six',
+    title: 'I’m ready to submit',
+    body: 'You’ve done your homework — find a trusted Australian grader and send it off.',
   },
 ];
 
@@ -220,7 +252,7 @@ const GradingPage = () => (
         </div>
 
         <ol className="relative">
-          {/* The connecting line that ties the chapters together */}
+          {/* The book spine that ties the chapters together */}
           <span
             aria-hidden="true"
             className="absolute left-5 top-4 bottom-4 w-px bg-gradient-to-b from-primary/40 via-border to-primary/40 sm:left-6"
