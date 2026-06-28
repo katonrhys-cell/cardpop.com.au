@@ -326,7 +326,7 @@ const AddEditCardPage = () => {
     };
     fetchCard();
     return () => { cancelled = true; };
-  }, [id, currentUser?.id, navigate, isEdit]);
+  }, [id, currentUser, navigate, isEdit]);
 
   // ─── Image handling ───────────────────────────────────────────────────────
   // Score a photo against the CardPop Photography Standard (advisory only).

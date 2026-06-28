@@ -22,7 +22,7 @@ export function useLazyLoad(options = { threshold: 0.1, rootMargin: '50px' }) {
         observer.unobserve(currentRef);
       }
     };
-  }, [options.threshold, options.rootMargin]);
+  }, [options]);
 
   return [ref, isVisible];
 }

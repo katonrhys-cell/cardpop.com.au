@@ -203,7 +203,7 @@ const ProductDetailPage = () => {
     fetchRef.current = fetchProduct;
     fetchProduct();
     return () => { isMounted = false; };
-  }, [id, source, currentUser?.id, isAdmin, authLoading]);
+  }, [id, source, currentUser, isAdmin, authLoading, navigate]);
 
   useEffect(() => {
     const channel = supabase

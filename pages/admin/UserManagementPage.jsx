@@ -36,6 +36,28 @@ const UserManagementPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
+  const fetchRelatedCounts = async (userList) => {
+    const newCounts = { ...userCounts };
+
+    await Promise.all(userList.map(async (u) => {
+      if (newCounts[u.id]) return; // Skip if already cached
+
+      try {
+        // Using getList with limit 1 just to get totalItems efficiently
+        const [vaultRes, ordersRes] = await Promise.all([
+          supabase.from('vault_items').select('id', { count: 'exact', head: true }).eq('owner_id', u.id),
+          supabase.from('orders').select('id', { count: 'exact', head: true }).or(`buyer_id.eq.${u.id},seller_id.eq.${u.id}`),
+        ]);
+
+        newCounts[u.id] = { vault: vaultRes.count ?? 0, orders: ordersRes.count ?? 0 };
+      } catch (e) {
+        newCounts[u.id] = { vault: 0, orders: 0 };
+      }
+    }));
+
+    setUserCounts(newCounts);
+  };
+
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
@@ -57,7 +79,7 @@ const UserManagementPage = () => {
       setTotalItems(count ?? 0);
 
       fetchRelatedCounts(records ?? []);
-      
+
     } catch (error) {
       console.error("Error fetching users:", error);
       toast.error("Failed to load users.");
@@ -74,28 +96,6 @@ const UserManagementPage = () => {
   // clear) rather than in an effect, so the filter change and the page reset land
   // in the same batched render — fetchUsers is recreated once and fires a single
   // query instead of first re-fetching the old page number under the new filter.
-
-  const fetchRelatedCounts = async (userList) => {
-    const newCounts = { ...userCounts };
-    
-    await Promise.all(userList.map(async (u) => {
-      if (newCounts[u.id]) return; // Skip if already cached
-      
-      try {
-        // Using getList with limit 1 just to get totalItems efficiently
-        const [vaultRes, ordersRes] = await Promise.all([
-          supabase.from('vault_items').select('id', { count: 'exact', head: true }).eq('owner_id', u.id),
-          supabase.from('orders').select('id', { count: 'exact', head: true }).or(`buyer_id.eq.${u.id},seller_id.eq.${u.id}`),
-        ]);
-
-        newCounts[u.id] = { vault: vaultRes.count ?? 0, orders: ordersRes.count ?? 0 };
-      } catch (e) {
-        newCounts[u.id] = { vault: 0, orders: 0 };
-      }
-    }));
-    
-    setUserCounts(newCounts);
-  };
 
   const handleRoleChange = async (userId, makeAdmin) => {
     try {

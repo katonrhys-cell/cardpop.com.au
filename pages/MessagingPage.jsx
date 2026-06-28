@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet';
 import { Send, MessageSquare, AlertCircle, Shield, AlertTriangle } from 'lucide-react';
@@ -46,7 +46,59 @@ const MessagingPage = () => {
   useEffect(() => {
     isMounted.current = true;
     if (currentUser) {
-      fetchConversations();
+      (async () => {
+        try {
+          const { data: allMessages, error: msgError } = await supabase
+            .from('messages')
+            .select('*')
+            .or(`sender_id.eq.${currentUser.id},recipient_id.eq.${currentUser.id}`)
+            .order('created_at', { ascending: false })
+            .limit(200);
+          if (msgError) throw msgError;
+
+          const convMap = new Map();
+
+          for (const msg of allMessages || []) {
+            const otherId = msg.sender_id === currentUser.id ? msg.recipient_id : msg.sender_id;
+            if (!convMap.has(otherId)) {
+              convMap.set(otherId, {
+                otherUserId: otherId,
+                otherUserName: 'Loading...',
+                lastMessage: msg.body,
+                timestamp: msg.created_at,
+                unreadCount: (msg.recipient_id === currentUser.id && !msg.read_at) ? 1 : 0
+              });
+            } else if (msg.recipient_id === currentUser.id && !msg.read_at) {
+              const c = convMap.get(otherId);
+              c.unreadCount += 1;
+            }
+          }
+
+          // Fetch profiles for display names
+          const uniqueIds = Array.from(convMap.keys());
+          if (uniqueIds.length > 0) {
+            const { data: profiles } = await supabase
+              .from('profiles')
+              .select('id, display_name, avatar_url')
+              .in('id', uniqueIds);
+
+            (profiles || []).forEach(u => {
+              if (convMap.has(u.id)) {
+                convMap.get(u.id).otherUserName = u.display_name || 'Anonymous';
+                convMap.get(u.id).avatar = u.avatar_url || null;
+              }
+            });
+          }
+
+          if (isMounted.current) {
+            setConversations(Array.from(convMap.values()));
+            setLoading(false);
+          }
+        } catch (error) {
+          console.error('Error fetching conversations:', error);
+          if (isMounted.current) setLoading(false);
+        }
+      })();
     } else {
       setLoading(false);
     }
@@ -106,7 +158,7 @@ const MessagingPage = () => {
     }, 100);
   };
 
-  const fetchConversations = async () => {
+  const fetchConversations = useCallback(async () => {
     try {
       const { data: allMessages, error: msgError } = await supabase
         .from('messages')
@@ -158,7 +210,7 @@ const MessagingPage = () => {
       console.error('Error fetching conversations:', error);
       if (isMounted.current) setLoading(false);
     }
-  };
+  }, [currentUser]);
 
   const loadThread = async (otherId) => {
     setSelectedUserId(otherId);

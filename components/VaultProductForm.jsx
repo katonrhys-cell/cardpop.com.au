@@ -153,7 +153,7 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
     if (formData.is_public !== shouldBePublic) {
       setFormData(prev => ({ ...prev, is_public: shouldBePublic }));
     }
-  }, [formData.listing_type]);
+  }, [formData.listing_type, formData.is_public]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
