@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/ProductCard.jsx';
 import { useCart } from '@/hooks/useCart.jsx';
+import useShopProductRealtimeSync from '@/hooks/useShopProductRealtimeSync.js';
 import { toast } from 'sonner';
 
 const ShopPage = () => {
@@ -62,16 +63,7 @@ const ShopPage = () => {
     return () => { cancelled = true; };
   }, [sort, searchTerm]);
 
-  useEffect(() => {
-    const channel = supabase
-      .channel('shop-products')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products' },
-        () => { if (fetchRef.current) fetchRef.current(); }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, []);
+  useShopProductRealtimeSync(fetchRef, 'shop-products');
 
   const handleAddToCart = (product, variant) => {
     addToCart(product, variant, 1, product.stockQuantity ?? 999)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCategory } from '@/contexts/CategoryContext.jsx';
@@ -9,6 +9,7 @@ import Breadcrumb from '@/components/Breadcrumb.jsx';
 import CategoryFilter from '@/components/CategoryFilter.jsx';
 import ProductGrid from '@/components/ProductGrid.jsx';
 import PaginationControls from '@/components/PaginationControls.jsx';
+import useShopProductRealtimeSync from '@/hooks/useShopProductRealtimeSync.js';
 
 const ShopCategoryPage = () => {
   const { categorySlug, subcategorySlug, productTypeSlug } = useParams();
@@ -73,6 +74,8 @@ const ShopCategoryPage = () => {
     // Depend on stable slug strings (not the derived path objects, which get new
     // identities every render and would re-run this effect needlessly).
   }, [categoryName, page, sort, contextLoading]);
+
+  useShopProductRealtimeSync(fetchRef, 'shop-category-products');
 
   const breadcrumbs = getBreadcrumbs(category, subcategory, productType, '/shop');
   const metaTitle = generateMetaTitle(category, subcategory, productType) + " - Official Store";

@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, SlidersHorizontal, PackageX, Package } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCart } from '@/hooks/useCart.jsx';
+import useShopProductRealtimeSync from '@/hooks/useShopProductRealtimeSync.js';
 import { toast } from 'sonner';
 import ProductCard from '@/components/ProductCard.jsx';
 import { Button } from '@/components/ui/button';
@@ -73,6 +74,8 @@ const ShopSealedBoxesPage = () => {
       clearTimeout(timer);
     };
   }, [sort, condition, minPrice, maxPrice]);
+
+  useShopProductRealtimeSync(fetchRef, 'shop-sealed-boxes');
 
   const handleAddToCart = (product, variant) => {
     addToCart(product, variant, 1, product.stockQuantity || 1);
