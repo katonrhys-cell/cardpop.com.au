@@ -24,8 +24,9 @@ const maxWorkers = Number(process.env.VITEST_MAX_FORKS) ||
 export default defineConfig({
   test: {
     // Raised from the 5s default: under-resourced runners need headroom so
-    // a slow-to-start worker doesn't trip a spurious timeout.
-    testTimeout: 15000,
+    // a slow-to-start worker doesn't trip a spurious timeout. Some page modules
+    // (AddEditCardPage, LocalMapPage) have large imports that can take 15+ seconds.
+    testTimeout: 30000,
     hookTimeout: 15000,
     // Vitest 4: pool sizing is top-level (poolOptions was removed).
     pool: 'forks',
