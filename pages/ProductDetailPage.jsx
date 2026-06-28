@@ -204,12 +204,13 @@ const ProductDetailPage = () => {
   }, [id, source, currentUser?.id, isAdmin, authLoading]);
 
   useEffect(() => {
-    if (source !== 'marketplace') return;
-
     const channel = supabase
       .channel(`product-detail-${id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vault_items' },
-        () => { if (fetchRef.current) fetchRef.current(); }
+        () => { if (source === 'marketplace' && fetchRef.current) fetchRef.current(); }
+      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products' },
+        () => { if (source === 'shop' && fetchRef.current) fetchRef.current(); }
       )
       .subscribe();
 

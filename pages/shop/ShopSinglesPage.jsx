@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, SlidersHorizontal, PackageX, Layers } from 'lucide-react';
@@ -14,10 +14,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 const ShopSinglesPage = () => {
   const { addToCart } = useCart();
-  
+
   const [products, setProducts] = useState([]);
   const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
+  const fetchRef = useRef(null);
   
   // Filters and Sort State
   const [sort, setSort] = useState('created_at_desc');
@@ -64,6 +65,7 @@ const ShopSinglesPage = () => {
       }
     };
 
+    fetchRef.current = fetchProducts;
     const timer = setTimeout(() => {
       fetchProducts();
     }, 400);
@@ -73,6 +75,17 @@ const ShopSinglesPage = () => {
       clearTimeout(timer);
     };
   }, [sort, condition, minPrice, maxPrice]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('shop-singles')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products' },
+        () => { if (fetchRef.current) fetchRef.current(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   const handleAddToCart = (product, variant) => {
     addToCart(product, variant, 1, product.stockQuantity || 1);
