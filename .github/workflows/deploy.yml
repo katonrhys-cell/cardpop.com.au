@@ -8,6 +8,13 @@ on:
       - '**.md'
       - '.gitignore'
 
+# Only one deploy per branch at a time. A newer push cancels older in-progress
+# or queued runs, so several merges in quick succession collapse to a single
+# deploy of the latest commit instead of piling up behind the self-hosted runner.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     runs-on: self-hosted
