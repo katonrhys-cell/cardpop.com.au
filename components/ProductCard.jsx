@@ -116,10 +116,21 @@ const ProductCard = ({ product }) => {
         </Link>
         
         <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-border">
-          <div className="flex items-center justify-between">
-            <span className="font-extrabold text-xl tabular-nums text-foreground">
-              ${Number(product.price ?? product.price_aud ?? product.askingPrice ?? product.estimatedValue ?? 0).toFixed(2)}
-            </span>
+          <div className="flex items-center justify-between gap-2">
+            {product.retail_price_aud && Number(product.price ?? product.price_aud) < Number(product.retail_price_aud) ? (
+              <div className="flex items-baseline gap-2">
+                <span className="font-extrabold text-xl tabular-nums text-foreground">
+                  ${Number(product.price ?? product.price_aud ?? 0).toFixed(2)}
+                </span>
+                <span className="text-sm text-muted-foreground line-through">
+                  ${Number(product.retail_price_aud).toFixed(2)}
+                </span>
+              </div>
+            ) : (
+              <span className="font-extrabold text-xl tabular-nums text-foreground">
+                ${Number(product.price ?? product.price_aud ?? product.askingPrice ?? product.estimatedValue ?? 0).toFixed(2)}
+              </span>
+            )}
           </div>
           
           {sellerId && (

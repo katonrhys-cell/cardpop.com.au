@@ -392,6 +392,11 @@ const ProductDetailPage = () => {
                 <span className="text-4xl font-extrabold tabular-nums tracking-tight text-foreground">
                   ${(product.price || 0).toFixed(2)}
                 </span>
+                {product.retail_price_aud && Number(product.price || 0) < Number(product.retail_price_aud) && (
+                  <span className="text-lg text-muted-foreground line-through pb-1">
+                    ${Number(product.retail_price_aud).toFixed(2)}
+                  </span>
+                )}
                 {isShop && <span className="text-sm font-medium text-muted-foreground pb-1">+ Shipping</span>}
               </div>
             </div>
