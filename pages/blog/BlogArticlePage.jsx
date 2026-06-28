@@ -220,7 +220,7 @@ const BlogArticlePage = () => {
     fetchArticleData();
     window.scrollTo({ top: 0, behavior: 'smooth' });
     return () => { cancelled = true; };
-  }, [identifier, bySlug]);
+  }, [identifier, bySlug, navigate]);
 
   if (loading) {
     return (

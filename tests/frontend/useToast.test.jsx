@@ -1,7 +1,6 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
-import { reducer } from '@/hooks/use-toast.js';
-import { useToast } from '@/hooks/use-toast.js';
+import { reducer, useToast } from '@/hooks/use-toast.js';
 
 const base = () => ({ toasts: [] });
 

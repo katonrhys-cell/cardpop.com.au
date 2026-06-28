@@ -7,7 +7,7 @@ export function useTradeRequests() {
   const { currentUser } = useAuth();
   const [loading, setLoading] = useState(false);
 
-  const fetchTrades = async (filter) => {
+  const fetchTrades = useCallback(async (filter) => {
     if (!currentUser) return [];
     try {
       const { data, error } = await supabase
@@ -32,14 +32,14 @@ export function useTradeRequests() {
       console.error('Error fetching trades:', err);
       return [];
     }
-  };
+  }, [currentUser]);
 
   const getMyTradesSent = useCallback(async () => {
     setLoading(true);
     const res = await fetchTrades({ initiator_id: currentUser?.id, status: 'proposed' });
     setLoading(false);
     return res;
-  }, [currentUser]);
+  }, [currentUser, fetchTrades]);
 
   const getMyTradesReceived = useCallback(async () => {
     if (!currentUser) return [];
