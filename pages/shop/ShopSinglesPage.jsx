@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, SlidersHorizontal, PackageX, Layers } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCart } from '@/hooks/useCart.jsx';
+import useShopProductRealtimeSync from '@/hooks/useShopProductRealtimeSync.js';
 import { toast } from 'sonner';
 import ProductCard from '@/components/ProductCard.jsx';
 import { Button } from '@/components/ui/button';

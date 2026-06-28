@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/ProductCard.jsx';
 import { useCart } from '@/hooks/useCart.jsx';
+import useShopProductRealtimeSync from '@/hooks/useShopProductRealtimeSync.js';
 import { toast } from 'sonner';
 
 const ShopPage = () => {

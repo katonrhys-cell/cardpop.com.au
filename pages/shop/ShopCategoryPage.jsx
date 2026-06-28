@@ -9,6 +9,7 @@ import Breadcrumb from '@/components/Breadcrumb.jsx';
 import CategoryFilter from '@/components/CategoryFilter.jsx';
 import ProductGrid from '@/components/ProductGrid.jsx';
 import PaginationControls from '@/components/PaginationControls.jsx';
+import useShopProductRealtimeSync from '@/hooks/useShopProductRealtimeSync.js';
 
 const ShopCategoryPage = () => {
   const { categorySlug, subcategorySlug, productTypeSlug } = useParams();
