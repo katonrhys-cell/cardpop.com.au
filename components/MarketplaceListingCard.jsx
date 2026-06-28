@@ -16,15 +16,7 @@ import { getRefractorLabel, getRefractorBadgeClass } from '@/lib/cardAttributeLa
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { useWatchlist } from '@/hooks/useWatchlist.js';
 import SellerRatingDisplay from '@/components/SellerRatingDisplay.jsx';
-
-const GRADE_BADGE = {
-  psa:   'bg-red-600 text-white',
-  bgs:   'bg-blue-700 text-white',
-  cgc:   'bg-green-600 text-white',
-  ace:   'bg-orange-500 text-white',
-  sgc:   'bg-purple-600 text-white',
-  other: 'bg-slate-600 text-white',
-};
+import GradeBadge from '@/components/GradeBadge.jsx';
 
 const MarketplaceListingCard = ({ listing }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
@@ -88,9 +80,7 @@ const MarketplaceListingCard = ({ listing }) => {
 
         {/* Grade badge — bottom left (only for graded slabs) */}
         {vaultItem?.grading_company && vaultItem.grading_company !== 'raw' && vaultItem?.grade && (
-          <div className={`absolute bottom-3 left-3 z-10 px-2.5 py-1 rounded-md text-[11px] font-extrabold tracking-wide shadow-lg ${GRADE_BADGE[vaultItem.grading_company] || GRADE_BADGE.other}`}>
-            {vaultItem.grading_company.toUpperCase()} {vaultItem.grade}
-          </div>
+          <GradeBadge grade={vaultItem.grade} gradingCompany={vaultItem.grading_company} />
         )}
 
         {/* Serial number badge — bottom right, always visible */}

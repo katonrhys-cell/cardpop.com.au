@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import apiServerClient from '@/lib/apiServerClient.js';
+import GradeBadge from '@/components/GradeBadge.jsx';
 
 const PSACertificationSection = ({ certNumber, gradingCompany }) => {
   const [data, setData] = useState(null);
@@ -122,9 +123,9 @@ const PSACertificationSection = ({ certNumber, gradingCompany }) => {
               </div>
             )}
             {data.grade != null && (
-              <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/30">
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Grade</p>
-                <p className="font-bold text-lg text-purple-700 dark:text-purple-400">{data.grade}</p>
+              <div className="p-3 bg-muted/30 rounded-lg border border-border/50 flex flex-col justify-center">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Grade</p>
+                <GradeBadge grade={data.grade} gradingCompany="psa" isPositioned={false} className="w-fit" />
               </div>
             )}
           </div>
