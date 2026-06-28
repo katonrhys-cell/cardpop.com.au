@@ -97,3 +97,56 @@ export function defaultCorners(width, height, inset = 0.08) {
   const y1 = height * (1 - inset);
   return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
 }
+
+/**
+ * Interior angle (degrees) at each corner of the (ordered) quad, returned in
+ * [tl, tr, br, bl] order. A perfect rectangle has four 90° corners — the manual
+ * crop editor uses these to tell the user whether their selection is square.
+ */
+export function cornerAngles(quad) {
+  const ordered = orderCorners(quad);
+  return ordered.map((cur, i) => {
+    const prev = ordered[(i + 3) % 4];
+    const next = ordered[(i + 1) % 4];
+    const v1 = [prev[0] - cur[0], prev[1] - cur[1]];
+    const v2 = [next[0] - cur[0], next[1] - cur[1]];
+    const m1 = Math.hypot(v1[0], v1[1]);
+    const m2 = Math.hypot(v2[0], v2[1]);
+    if (!m1 || !m2) return 0;
+    const cos = Math.max(-1, Math.min(1, (v1[0] * v2[0] + v1[1] * v2[1]) / (m1 * m2)));
+    return (Math.acos(cos) * 180) / Math.PI;
+  });
+}
+
+/** Largest deviation (degrees) of any corner from a perfect 90° right angle. */
+export function maxAngleError(quad) {
+  return Math.max(...cornerAngles(quad).map(a => Math.abs(a - 90)));
+}
+
+/**
+ * Whether the quad is close enough to a true rectangle (all corners within
+ * `toleranceDeg` of 90°) to crop cleanly without perspective distortion.
+ */
+export function isRectangularQuad(quad, toleranceDeg = 4) {
+  return maxAngleError(quad) <= toleranceDeg;
+}
+
+/**
+ * Snaps an arbitrary quad to an upright rectangle of the same centre and
+ * average side lengths, ordered [tl, tr, br, bl]. Lets the user fix a skewed
+ * selection in one tap so the crop comes out as a perfect rectangle.
+ */
+export function rectifyQuad(quad) {
+  const ordered = orderCorners(quad);
+  const cx = ordered.reduce((s, p) => s + p[0], 0) / 4;
+  const cy = ordered.reduce((s, p) => s + p[1], 0) / 4;
+  const { width, height } = quadSides(ordered);
+  const hw = width / 2;
+  const hh = height / 2;
+  return [
+    [cx - hw, cy - hh],
+    [cx + hw, cy - hh],
+    [cx + hw, cy + hh],
+    [cx - hw, cy + hh],
+  ];
+}

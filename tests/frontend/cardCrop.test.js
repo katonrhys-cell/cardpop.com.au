@@ -6,6 +6,10 @@ import {
   isPlausibleCard,
   outputDimsFor,
   defaultCorners,
+  cornerAngles,
+  maxAngleError,
+  isRectangularQuad,
+  rectifyQuad,
   OUTPUT,
 } from '@/utils/cardCrop.js';
 
@@ -110,5 +114,55 @@ describe('defaultCorners', () => {
   it('produces a plausible card quad for a portrait frame', () => {
     // A 1000×1400 frame inset 8% is ~840×1288 → ratio ~0.65, within card range.
     expect(isPlausibleCard(defaultCorners(1000, 1400), 1000, 1400)).toBe(true);
+  });
+});
+
+describe('cornerAngles', () => {
+  it('reports four right angles for a rectangle', () => {
+    cornerAngles(CARD_SEQ).forEach(a => expect(a).toBeCloseTo(90, 5));
+  });
+
+  it('reports skewed angles for a sheared quad', () => {
+    // A parallelogram (top edge shifted right) has no 90° corners.
+    const sheared = [[200, 100], [700, 100], [600, 800], [100, 800]];
+    const angles = cornerAngles(sheared);
+    expect(Math.max(...angles.map(a => Math.abs(a - 90)))).toBeGreaterThan(5);
+  });
+});
+
+describe('maxAngleError / isRectangularQuad', () => {
+  it('treats a clean rectangle as rectangular', () => {
+    expect(maxAngleError(CARD_SEQ)).toBeCloseTo(0, 5);
+    expect(isRectangularQuad(CARD_SEQ)).toBe(true);
+  });
+
+  it('tolerates a tiny skew within the default tolerance', () => {
+    const nearly = [[100, 100], [600, 102], [600, 800], [100, 798]]; // ~0.2° off
+    expect(isRectangularQuad(nearly)).toBe(true);
+  });
+
+  it('rejects a clearly skewed quad', () => {
+    const sheared = [[250, 100], [700, 100], [550, 800], [100, 800]];
+    expect(isRectangularQuad(sheared)).toBe(false);
+  });
+});
+
+describe('rectifyQuad', () => {
+  it('returns an upright rectangle ordered [tl, tr, br, bl]', () => {
+    const rect = rectifyQuad(CARD_SEQ);
+    expect(rect).toEqual(orderCorners(rect));
+    expect(isRectangularQuad(rect)).toBe(true);
+  });
+
+  it('preserves the centre and average size of a skewed quad', () => {
+    const sheared = [[250, 100], [700, 100], [550, 800], [100, 800]];
+    const rect = rectifyQuad(sheared);
+    // Centre is unchanged…
+    const cx = sheared.reduce((s, p) => s + p[0], 0) / 4;
+    const cy = sheared.reduce((s, p) => s + p[1], 0) / 4;
+    expect((rect[0][0] + rect[1][0]) / 2).toBeCloseTo(cx, 5);
+    expect((rect[0][1] + rect[3][1]) / 2).toBeCloseTo(cy, 5);
+    // …and the result is a true rectangle.
+    expect(isRectangularQuad(rect)).toBe(true);
   });
 });
