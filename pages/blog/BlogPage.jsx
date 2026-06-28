@@ -46,9 +46,9 @@ const FeaturedCard = ({ article }) => {
       to={`/blog/${article.slug || article.id}`}
       className="group relative flex flex-col bg-card border border-border rounded-2xl overflow-visible hover:shadow-lg hover:-translate-y-1 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
-      <div className="aspect-video bg-muted relative overflow-hidden">
+      <div className="aspect-video bg-muted relative overflow-hidden flex items-center justify-center">
         {imageUrl
-          ? <img src={imageUrl} alt={article.title} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
+          ? <img src={imageUrl} alt={article.title} className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" />
           : <ImagePlaceholder />
         }
       </div>
@@ -83,9 +83,9 @@ const ArticleCard = ({ article }) => {
       to={`/blog/${article.slug || article.id}`}
       className="group relative flex flex-col bg-card border border-border rounded-2xl overflow-visible hover:shadow-lg hover:-translate-y-1 transition-all duration-300 h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
-      <div className="aspect-[16/9] bg-muted relative overflow-hidden">
+      <div className="aspect-[16/9] bg-muted relative overflow-hidden flex items-center justify-center">
         {imageUrl
-          ? <img src={imageUrl} alt={article.title} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
+          ? <img src={imageUrl} alt={article.title} className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" />
           : <ImagePlaceholder />
         }
       </div>
