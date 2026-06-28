@@ -1,8 +1,8 @@
 import React from 'react';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 // ─── mocks ────────────────────────────────────────────────────────────────────
 
@@ -22,7 +22,17 @@ vi.mock('@/lib/supabaseClient.js', () => {
     });
     return b;
   }
-  const supabase = { from: vi.fn(() => makeBuilder()) };
+  const supabase = {
+    from: vi.fn(() => makeBuilder()),
+    channel: vi.fn(() => {
+      const channel = {
+        on: vi.fn(function() { return this; }),
+        subscribe: vi.fn(() => ({})),
+      };
+      return channel;
+    }),
+    removeChannel: vi.fn(),
+  };
   return { supabase, default: supabase };
 });
 
@@ -61,6 +71,10 @@ function renderPage() {
 beforeEach(() => {
   vi.clearAllMocks();
   h.result = { data: [], error: null };
+});
+
+afterEach(() => {
+  cleanup();
 });
 
 // ─── data states ─────────────────────────────────────────────────────────────
