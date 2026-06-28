@@ -112,12 +112,6 @@ const CardCornerAdjuster = ({ imageUrl, initialCorners, onApply, onCancel }) => 
   };
   const endDrag = () => { setDragging(null); lastPt.current = null; };
 
-  // Snap to a clean, upright 5:7 card rectangle centred on the current framing —
-  // guarantees four right angles at the standard card ratio.
-  const snapToRectangle = () => {
-    if (!corners || !natural) return;
-    setCorners(rectifyToCard(corners, natural.w, natural.h));
-  };
 
   const apply = async () => {
     if (!corners) return;
@@ -194,7 +188,7 @@ const CardCornerAdjuster = ({ imageUrl, initialCorners, onApply, onCancel }) => 
               draggable={false}
               className="block max-w-full max-h-[55vh] select-none rounded-lg"
             />
-            {ready && overlay && (
+            {ready && (
               <svg
                 className="absolute left-0 top-0 overflow-visible"
                 width={displayW}
