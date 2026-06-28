@@ -1,0 +1,186 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  CardPop GitHub <-> AWS integration. Creates an OIDC trust so GitHub Actions can
+  assume a short-lived IAM role (no long-lived secrets in GitHub), an SSM-read +
+  S3-artifacts permission policy, an S3 bucket for CI artifacts, and an optional
+  EC2 instance-profile role for the self-hosted runner. Deploy once with:
+    aws cloudformation deploy \
+      --template-file infra/aws/cloudformation/github-aws-integration.yml \
+      --stack-name cardpop-github-aws \
+      --capabilities CAPABILITY_NAMED_IAM \
+      --region ap-southeast-2 \
+      --parameter-overrides GitHubOrg=katonrhys-cell GitHubRepo=cardpop.com.au
+
+Parameters:
+  GitHubOrg:
+    Type: String
+    Default: katonrhys-cell
+    Description: GitHub org/user that owns the repo.
+  GitHubRepo:
+    Type: String
+    Default: cardpop.com.au
+    Description: Repository name (without the org prefix).
+  SsmPrefix:
+    Type: String
+    Default: /cardpop
+    Description: SSM Parameter Store path prefix the role may read (SecureString secrets live here).
+  CreateOIDCProvider:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: >-
+      Set to 'false' if this AWS account ALREADY has a GitHub OIDC provider
+      (token.actions.githubusercontent.com) — an account can only have one.
+  CreateEc2RunnerRole:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: >-
+      Create an instance-profile role for the self-hosted EC2 runner so jobs on
+      it can read SSM / write artifacts via the instance's own identity (no OIDC
+      needed for self-hosted jobs). Attach the output InstanceProfile to the runner.
+
+Conditions:
+  ShouldCreateOIDCProvider: !Equals [!Ref CreateOIDCProvider, 'true']
+  ShouldCreateEc2RunnerRole: !Equals [!Ref CreateEc2RunnerRole, 'true']
+
+Resources:
+  # --- OIDC trust between GitHub Actions and this AWS account ---------------
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: ShouldCreateOIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      # AWS now validates GitHub's OIDC cert via its trusted CA store, but the
+      # CloudFormation resource still requires a thumbprint list.
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+        - 1c58a3a8518e8759bf075b76b750d4f2df264fca
+
+  # --- S3 bucket for CI artifacts (Playwright / Lighthouse reports) ---------
+  CiArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub cardpop-ci-artifacts-${AWS::AccountId}-${AWS::Region}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-reports
+            Status: Enabled
+            ExpirationInDays: 30
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+
+  # --- Shared permissions: read SSM secrets + write CI artifacts ------------
+  CardPopCiPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: cardpop-ci-ssm-and-artifacts
+      Description: Read CardPop SSM secrets and read/write CI artifacts in S3.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ReadSsmSecrets
+            Effect: Allow
+            Action:
+              - ssm:GetParameter
+              - ssm:GetParameters
+              - ssm:GetParametersByPath
+            Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SsmPrefix}/*
+          - Sid: DecryptSecureStringViaSsm
+            Effect: Allow
+            Action:
+              - kms:Decrypt
+            Resource: '*'
+            Condition:
+              StringEquals:
+                kms:ViaService: !Sub ssm.${AWS::Region}.amazonaws.com
+          - Sid: WriteCiArtifacts
+            Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+            Resource: !Sub ${CiArtifactsBucket.Arn}/*
+          - Sid: ListCiArtifactsBucket
+            Effect: Allow
+            Action:
+              - s3:ListBucket
+            Resource: !GetAtt CiArtifactsBucket.Arn
+
+  # --- Role assumed by GitHub-hosted runners via OIDC -----------------------
+  GitHubActionsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: cardpop-github-actions
+      Description: Assumed by GitHub Actions (GitHub-hosted runners) via OIDC.
+      MaxSessionDuration: 3600
+      ManagedPolicyArns:
+        - !Ref CardPopCiPolicy
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !If
+                - ShouldCreateOIDCProvider
+                - !Ref GitHubOIDCProvider
+                - !Sub arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              # Scope to THIS repo only. ':*' allows any branch/PR/tag ref of the
+              # repo; tighten to e.g. 'repo:ORG/REPO:ref:refs/heads/main' if you
+              # only ever assume the role from main.
+              StringLike:
+                token.actions.githubusercontent.com:sub: !Sub repo:${GitHubOrg}/${GitHubRepo}:*
+
+  # --- Optional role + instance profile for the self-hosted EC2 runner ------
+  Ec2RunnerRole:
+    Type: AWS::IAM::Role
+    Condition: ShouldCreateEc2RunnerRole
+    Properties:
+      RoleName: cardpop-ec2-runner
+      Description: Instance-profile role for the self-hosted GitHub runner on EC2.
+      ManagedPolicyArns:
+        - !Ref CardPopCiPolicy
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+
+  Ec2RunnerInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Condition: ShouldCreateEc2RunnerRole
+    Properties:
+      InstanceProfileName: cardpop-ec2-runner
+      Roles:
+        - !Ref Ec2RunnerRole
+
+Outputs:
+  GitHubActionsRoleArn:
+    Description: Set this as the GitHub repo variable AWS_ROLE_ARN.
+    Value: !GetAtt GitHubActionsRole.Arn
+  CiArtifactsBucketName:
+    Description: Set this as the GitHub repo variable AWS_CI_ARTIFACTS_BUCKET.
+    Value: !Ref CiArtifactsBucket
+  Ec2RunnerInstanceProfileName:
+    Condition: ShouldCreateEc2RunnerRole
+    Description: Attach this instance profile to the self-hosted EC2 runner.
+    Value: !Ref Ec2RunnerInstanceProfile
+  Region:
+    Description: Region this stack deployed to (use as aws-region in workflows).
+    Value: !Ref AWS::Region
