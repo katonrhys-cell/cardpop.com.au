@@ -56,10 +56,10 @@ const AccountDashboard = () => {
         const [salesRes, revenueRes, listingsRes, vaultRes, tradesRes] = await Promise.all([
           supabase.from('orders').select('id', { count: 'exact', head: true })
             .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
-            .in('status', ['delivered', 'completed']),
+            .eq('status', 'delivered'),
           supabase.from('orders').select('total_aud')
             .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
-            .in('status', ['delivered', 'completed']),
+            .eq('status', 'delivered'),
           supabase.from('listings').select('id', { count: 'exact', head: true })
             .eq('seller_id', currentUser.id).eq('status', 'active').neq('listing_type', 'vault'),
           supabase.from('vault_items').select('id', { count: 'exact', head: true })
@@ -334,7 +334,7 @@ const AccountDashboard = () => {
                       <TableHead>Set</TableHead>
                       <TableHead>Condition / Grade</TableHead>
                       <TableHead className="text-right">Est. Value (AUD)</TableHead>
-                      <TableHead className="text-right">Added</TableHead>
+                      <TableHead className="text-right min-w-fit">Added</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -356,7 +356,7 @@ const AccountDashboard = () => {
                         <TableCell className="text-right font-medium">
                           {item.estimated_value_aud != null ? `$${Number(item.estimated_value_aud).toFixed(2)}` : '—'}
                         </TableCell>
-                        <TableCell className="text-right text-muted-foreground text-sm tabular-nums">
+                        <TableCell className="text-right text-muted-foreground text-sm tabular-nums whitespace-nowrap">
                           {new Date(item.created_at).toLocaleDateString()}
                         </TableCell>
                       </TableRow>

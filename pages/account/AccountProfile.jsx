@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet';
 import { Save, Upload, Trash2, Eye, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { compressImage } from '@/utils/compressImage.js';
+import { isVerified } from '@/utils/verification.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -126,7 +127,7 @@ const AccountProfile = () => {
   };
 
   const currentPhotoUrl = currentUser?.avatar_url ?? null;
-  const isVerified = currentUser?.is_verified === 'true' || currentUser?.verified;
+  const isUserVerified = isVerified(currentUser?.is_verified) || currentUser?.verified;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 space-y-8 animate-in fade-in duration-300">
@@ -169,7 +170,7 @@ const AccountProfile = () => {
                   <h2 className="text-2xl font-bold font-serif tracking-tight text-foreground">
                     {formData.display_name || 'Anonymous Collector'}
                   </h2>
-                  {isVerified && <ShieldCheck className="w-5 h-5 text-primary" />}
+                  {isUserVerified && <ShieldCheck className="w-5 h-5 text-primary" />}
                 </div>
                 <p className="text-sm text-muted-foreground font-medium">
                   {[formData.location_suburb, formData.location_state].filter(Boolean).join(', ') || 'Location hidden'}

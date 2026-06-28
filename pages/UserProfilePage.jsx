@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet';
 import { Calendar, Save, Edit3, X, ShieldAlert, Upload, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { compressImage } from '@/utils/compressImage.js';
+import { isVerified } from '@/utils/verification.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -316,7 +317,7 @@ const UserProfilePage = () => {
                           Verification
                         </div>
                         <span className="font-bold text-foreground text-sm capitalize">
-                          {profile?.is_verified === 'true' ? 'Verified' : profile?.is_verified === 'pending' ? 'Pending' : 'Unverified'}
+                          {isVerified(profile?.is_verified) ? 'Verified' : profile?.is_verified === 'pending' ? 'Pending' : 'Unverified'}
                         </span>
                       </div>
                     </div>

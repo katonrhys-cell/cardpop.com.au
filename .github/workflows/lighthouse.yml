@@ -6,9 +6,12 @@ name: Lighthouse
 # e2e) because Lighthouse runs are slower and a little noisy; promote to a
 # required check once it has proven stable.
 
+# Disabled for now: this workflow runs `lhci`, but @lhci/cli has been removed
+# from the project, so every automatic run fails the PR checks. Switched to
+# manual-only (workflow_dispatch) until Lighthouse CI is reinstated; re-add the
+# `pull_request` trigger here once @lhci/cli is back in devDependencies.
 on:
-  pull_request_target:
-    branches: []
+  workflow_dispatch:
 
 concurrency:
   group: lighthouse-${{ github.ref }}
