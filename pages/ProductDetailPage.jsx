@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -37,6 +37,7 @@ const ProductDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [seller, setSeller] = useState(null);
+  const fetchRef = useRef(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -197,9 +198,24 @@ const ProductDetailPage = () => {
       }
     };
 
+    fetchRef.current = fetchProduct;
     fetchProduct();
     return () => { isMounted = false; };
   }, [id, source, currentUser?.id, isAdmin, authLoading]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel(`product-detail-${id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vault_items' },
+        () => { if (source === 'marketplace' && fetchRef.current) fetchRef.current(); }
+      )
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products' },
+        () => { if (source === 'shop' && fetchRef.current) fetchRef.current(); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [id, source]);
 
   const handleAddToCart = () => {
     if (!product) return;
