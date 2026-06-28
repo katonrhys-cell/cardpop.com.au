@@ -27,9 +27,7 @@ import priceHistoryRouter from './price-history.js';
 import newsletterRouter from './newsletter.js';
 import marketDataRouter from './market-data.js';
 import catalogRouter from './catalog.js';
-import gradingVerificationRouter from './grading-verification.js';
-import adminRouter from './admin.js';
-import reportsRouter from './reports.js';
+import psaRouter from './psa.js';
 
 const router = Router();
 
@@ -65,6 +63,10 @@ export default () => {
     router.use('/ebay', apiLimiter);
     router.use('/ebay', ebayRouter);
 
+    // PSA certification routes with API rate limiting
+    router.use('/psa', apiLimiter);
+    router.use('/psa', psaRouter);
+
     // CardSight AI identification routes (image recognition only)
     router.use('/cardsight', apiLimiter);
     router.use('/cardsight', cardsightRouter);
@@ -94,10 +96,6 @@ export default () => {
     router.use('/photo-template', apiLimiter);
     router.use('/photo-template', photoTemplateRouter);
 
-    // Grading verification routes with API rate limiting
-    router.use('/grading-verification', apiLimiter);
-    router.use('/grading-verification', gradingVerificationRouter);
-
     // Marketplace feature routes with API rate limiting
     router.use('/seller-ratings', apiLimiter);
     router.use('/seller-ratings', sellerRatingsRouter);
@@ -119,15 +117,6 @@ export default () => {
 
     router.use('/search-suggestions', apiLimiter);
     router.use('/search-suggestions', searchSuggestionsRouter);
-
-    // Privileged admin operations (is_admin, verification review, refund decisions)
-    router.use('/admin', apiLimiter);
-    router.use('/admin', adminRouter);
-
-    // Content reporting (scam/counterfeit/abuse) — submission is auth-gated +
-    // per-user rate-limited inside the router; admin endpoints triage the queue.
-    router.use('/reports', apiLimiter);
-    router.use('/reports', reportsRouter);
 
     // Newsletter subscription
     router.use('/newsletter', newsletterRouter);

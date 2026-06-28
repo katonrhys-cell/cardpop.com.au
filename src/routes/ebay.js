@@ -133,12 +133,21 @@ router.get('/price-estimate', async (req, res) => {
         allItems.push({ ...i, marketplace: 'AU', currency: 'AUD' });
       });
       logger.info(`[EBAY_PRICE_ESTIMATE] Found ${auResult.value.itemSummaries.length} AU listings`);
+    } else if (auResult.status === 'rejected') {
+      logger.warn(`[EBAY_PRICE_ESTIMATE] AU API failed: ${auResult.reason?.message}`);
     }
     if (usResult.status === 'fulfilled' && usResult.value.itemSummaries?.length > 0) {
       usResult.value.itemSummaries.forEach(i => {
         allItems.push({ ...i, marketplace: 'US', currency: 'USD' });
       });
       logger.info(`[EBAY_PRICE_ESTIMATE] Found ${usResult.value.itemSummaries.length} US listings`);
+    } else if (usResult.status === 'rejected') {
+      logger.warn(`[EBAY_PRICE_ESTIMATE] US API failed: ${usResult.reason?.message}`);
+    }
+
+    // If both marketplaces failed, throw error
+    if (auResult.status === 'rejected' && usResult.status === 'rejected') {
+      throw new Error('Both eBay API calls failed');
     }
 
     // Filter to only include listings with valid prices

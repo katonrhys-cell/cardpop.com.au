@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
+import { isVerified } from '@/utils/verification.js';
 import { MessageSquare, Users, Store, ExternalLink, ShieldCheck, ChevronLeft, ChevronRight, Instagram } from 'lucide-react';
 
 const WhatnotIcon = ({ className = 'w-4 h-4' }) => (
@@ -329,11 +330,11 @@ const CommunityPage = () => {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-semibold truncate">{profile.display_name || 'Collector'}</span>
-                            {profile.is_verified === 'true' && (
+                            {isVerified(profile.is_verified) && (
                               <ShieldCheck className="w-4 h-4 text-primary flex-shrink-0" />
                             )}
                           </div>
-                          {profile.is_verified === 'true' && (
+                          {isVerified(profile.is_verified) && (
                             <Badge variant="secondary" className="text-xs">Verified</Badge>
                           )}
                         </div>

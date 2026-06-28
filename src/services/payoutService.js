@@ -60,3 +60,37 @@ export async function payoutSeller(stripe, { sellerId, sellerProceeds, orderId =
   logger.info(`[PAYOUT] Seller ${sellerId} not connected — credited wallet $${sellerProceeds} AUD`);
   return { status: 'wallet_credited' };
 }
+
+// Reverse a seller payout that already went out — used when a buyer is refunded
+// or wins a chargeback, so the platform isn't left covering the loss. Reverses
+// the Stripe Connect transfer, or claws the proceeds back from the seller's
+// wallet, depending on how they were paid. Best-effort; does NOT change the
+// order's payout_status (the caller owns that, since 'refunded' vs 'frozen'
+// differs by context).
+//
+// @param order { id, seller_id, stripe_transfer_id, payout_status, seller_proceeds_aud }
+// @returns {Promise<{ action: 'transfer_reversed'|'wallet_clawback'|'none'|'failed' }>}
+export async function reverseSellerPayout(stripe, order) {
+  if (!order) return { action: 'none' };
+  try {
+    if (order.payout_status === 'transferred' && order.stripe_transfer_id) {
+      await stripe.transfers.createReversal(order.stripe_transfer_id);
+      logger.warn(`[PAYOUT] Reversed transfer ${order.stripe_transfer_id} for order ${order.id}`);
+      return { action: 'transfer_reversed' };
+    }
+    if (order.payout_status === 'wallet_credited' && order.seller_id) {
+      // Atomic clawback (negative delta, floored at 0 inside the RPC) — a
+      // read-modify-write would race with a concurrent payout credit.
+      await supabase.rpc('increment_wallet_balance', {
+        p_user: order.seller_id,
+        p_delta: -(Number(order.seller_proceeds_aud) || 0),
+      });
+      logger.warn(`[PAYOUT] Clawed back $${order.seller_proceeds_aud} from seller ${order.seller_id}`);
+      return { action: 'wallet_clawback' };
+    }
+    return { action: 'none' };
+  } catch (e) {
+    logger.error(`[PAYOUT] reverseSellerPayout failed for order ${order?.id}: ${e.message}`);
+    return { action: 'failed' };
+  }
+}

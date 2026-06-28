@@ -147,7 +147,21 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
         clients can't self-set it), so grids/badges reflect stored truth and
         high-value graded listings can require a passing check before going live.
         Beckett verification is still a stub (`not yet implemented`).
-- [ ] Seller vetting / tiers / verification badges — define and enforce
+- [~] Seller vetting / tiers / verification badges — define and enforce.
+      **AUDIT FINDINGS + fixes:**
+      - The admin verification-review endpoint (`PATCH /admin/verifications/:id`)
+        updated `user_verifications.status` but **never touched the profile**, and
+        there's no DB trigger — so approving an identity verification through the
+        dashboard didn't actually grant verified status (the badge reads
+        `profiles.is_verified`). **Fixed:** the endpoint now syncs
+        `is_verified` + `verification_status` (+ `verified_at`) to the profile on
+        approve/reject/suspend/revoke. 2 tests.
+      - `is_verified` is a boolean, but several views compared it to the string
+        `'true'`, so verified sellers showed **no badge** on product cards and the
+        community page. **Fixed:** shared `utils/verification.js` `isVerified()`
+        (accepts both) wired into those spots. 1 test.
+      - **Next:** sweep remaining `=== 'true'` checks to the helper; define what
+        each seller tier unlocks and gate accordingly.
 - [~] Dispute resolution + escrow: **AUDIT FINDING — the "escrow" claim was
       false.** `src/routes/stripe.js` transfers seller proceeds (Stripe Connect
       transfer or wallet credit) on `checkout.session.completed` — i.e. the
@@ -157,12 +171,16 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
       - **Done now:** corrected all user-facing copy to describe what actually
         exists — secure Stripe payments + the 14-day **Buyer Protection**
         refund flow (no "escrow"/"funds held" language).
-      - **Decision needed (real escrow is a build):** hold funds until delivery
-        confirmation. Options: Stripe manual-capture / separate charges &
-        transfers with a delayed transfer, or hold in the platform balance and
-        transfer on buyer confirmation / auto-release after N days. Pair with a
-        dispute state machine (open → evidence → resolve) — the refunds table +
-        admin approval is the seed.
+      - **DECISION (owner):** real escrow is **deferred to a future third-party
+        escrow provider**. The current model stays: pay the seller at checkout +
+        a **Buyer Protection refund** flow for recourse. Don't build custom
+        fund-holding.
+      - **Done (makes the current model financially sound):** the Buyer
+        Protection refund now **claws the seller's payout back** when a refund is
+        processed (`reverseSellerPayout` in `payoutService.js`) — reverses the
+        Connect transfer or debits the wallet, so the platform isn't left
+        covering a refund it issued to the buyer. Shared with the chargeback
+        path (same helper). 4 tests.
 - [~] Counterfeit / scam **reporting flow** — was entirely missing (the
       `ModerationPanel` was just admin notes on catalog cards). Added an
       end-to-end vertical slice:

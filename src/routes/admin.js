@@ -94,6 +94,24 @@ router.patch('/verifications/:id', async (req, res) => {
       .single();
     if (error) throw error;
 
+    // Propagate the decision to the user's PROFILE — the verified badge and all
+    // gating read profiles.is_verified / verification_status, so without this the
+    // review is cosmetic (approving never actually grants verified status).
+    if (!info_request && data?.user_id) {
+      const profileUpdate = { verification_status: status, updated_at: now };
+      if (status === 'approved') {
+        profileUpdate.is_verified = true;
+        profileUpdate.verified_at = now;
+      } else if (['rejected', 'suspended', 'revoked'].includes(status)) {
+        profileUpdate.is_verified = false;
+      }
+      const { error: profErr } = await supabase
+        .from('profiles')
+        .update(profileUpdate)
+        .eq('id', data.user_id);
+      if (profErr) logger.error(`[ADMIN] verification ${id}: failed to sync profile ${data.user_id}: ${profErr.message}`);
+    }
+
     await supabase.from('verification_audit_log').insert({
       verification_id: id,
       admin_id: req.user.id,

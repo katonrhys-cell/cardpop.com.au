@@ -7,7 +7,7 @@ import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import { sendOrderConfirmed, sendItemSold, sendRefundProcessed, sendRefundIssued } from '../utils/emailService.js';
 import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
 import { handleDisputeCreated, handleDisputeClosed } from '../services/disputeService.js';
-import { payoutSeller } from '../services/payoutService.js';
+import { payoutSeller, reverseSellerPayout } from '../services/payoutService.js';
 
 const router = express.Router();
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
@@ -882,7 +882,7 @@ router.post('/refund', authMiddleware, async (req, res) => {
     // Load refund + its order
     const { data: refund, error: rErr } = await supabase
       .from('refunds')
-      .select('*, order:orders!order_id(stripe_payment_intent_id, total_aud, status, refund_status)')
+      .select('*, order:orders!order_id(id, stripe_payment_intent_id, total_aud, status, refund_status, seller_id, stripe_transfer_id, payout_status, seller_proceeds_aud)')
       .eq('id', refundId)
       .maybeSingle();
 
@@ -949,6 +949,15 @@ router.post('/refund', authMiddleware, async (req, res) => {
       status:        'refunded',
       refund_status: 'processed',
     }).eq('id', refund.order_id);
+
+    // The seller was paid out at checkout, so refunding only the buyer would
+    // leave the platform covering the loss. Claw the seller's proceeds back
+    // (reverse the Connect transfer, or debit their wallet) and mark the payout
+    // reversed. Best-effort — the buyer refund has already succeeded.
+    const reversal = await reverseSellerPayout(stripe, refund.order);
+    if (reversal.action === 'transfer_reversed' || reversal.action === 'wallet_clawback') {
+      await supabase.from('orders').update({ payout_status: 'reversed' }).eq('id', refund.order_id);
+    }
 
     // Notify buyer
     if (refund.buyer_id) {
