@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import {
   BookOpen, BarChart2, Building2, ArrowRight,
   Store, ShieldCheck, DollarSign, Clock, MapPin, TrendingUp, Calculator,
-  BookMarked, Flag, BookText,
+  BookMarked, Flag, BookText, Compass, Rocket,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
