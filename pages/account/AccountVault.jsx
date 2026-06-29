@@ -54,7 +54,7 @@ const AccountVault = () => {
     try {
       let query = supabase
         .from('vault_items')
-        .select('*, parallel:parallels(id,name), subset:subsets(id,name)')
+        .select('*')
         .eq('owner_id', currentUser.id)
         .order('created_at', { ascending: false })
         .limit(200);
