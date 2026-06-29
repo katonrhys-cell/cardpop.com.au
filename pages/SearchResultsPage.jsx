@@ -36,7 +36,7 @@ const SearchResultsPage = () => {
         let dbQuery = supabase
           .from('listings')
           .select(
-            '*, vault_item:vault_items!inner(*, vault_images(storage_path), parallel:parallels(id,name,color), subset:subsets(id,name)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)',
+            '*, vault_item:vault_items!inner(*, vault_images(storage_path)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)',
             { count: 'exact' }
           )
           .eq('status', 'active')
