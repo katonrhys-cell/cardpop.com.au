@@ -10,16 +10,17 @@ import { handleDisputeCreated, handleDisputeClosed } from '../services/disputeSe
 import { payoutSeller, reverseSellerPayout } from '../services/payoutService.js';
 import { calculateBreakdown } from '../services/commissionService.js';
 import { handleCheckoutSessionCompleted, handlePaymentFailed, getPlatformSetting } from '../services/stripeWebhookService.js';
+import { validateRequestBody, validateRequestQuery } from '../middleware/validateRequest.js';
+import { createCheckoutSchema, calculateBreakdownSchema, processRefundSchema } from '../schemas/stripeSchemas.js';
 
 const router = express.Router();
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
 // ─── GET /calculate ──────────────────────────────────────────────────────────
 
-router.get('/calculate', authMiddleware, async (req, res) => {
+router.get('/calculate', authMiddleware, validateRequestQuery(calculateBreakdownSchema), async (req, res) => {
   try {
     const { listingId, transactionType = 'fixed' } = req.query;
-    if (!listingId) return res.status(400).json({ error: 'listingId is required' });
 
     const { data: listing, error } = await supabase
       .from('listings')
@@ -49,7 +50,7 @@ router.get('/calculate', authMiddleware, async (req, res) => {
 
 // ─── POST /create-checkout ───────────────────────────────────────────────────
 
-router.post('/create-checkout', authMiddleware, async (req, res) => {
+router.post('/create-checkout', authMiddleware, validateRequestBody(createCheckoutSchema), async (req, res) => {
   try {
     const {
       listingId,
@@ -60,9 +61,6 @@ router.post('/create-checkout', authMiddleware, async (req, res) => {
       cancelUrl,
       shippingAddress,
     } = req.body;
-
-    if (!listingId)              return res.status(400).json({ error: 'listingId is required' });
-    if (!successUrl || !cancelUrl) return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
 
     const userId = req.user.id;
     const email  = req.user.email;
@@ -485,16 +483,13 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 // Admin-only: processes an approved refund request against Stripe.
 // Calculates retained fee server-side; never trusts client-supplied amounts.
 
-router.post('/refund', authMiddleware, async (req, res) => {
+router.post('/refund', authMiddleware, validateRequestBody(processRefundSchema), async (req, res) => {
   try {
-    // Admin check via shared helper: accepts the JWT app_metadata claim and
-    // falls back to a server-side profiles.is_admin lookup.
     if (!(await isAdminUser(req))) {
       return res.status(403).json({ error: 'Admin only' });
     }
 
     const { refundId } = req.body;
-    if (!refundId) return res.status(400).json({ error: 'refundId is required' });
 
     // Load refund + its order
     const { data: refund, error: rErr } = await supabase

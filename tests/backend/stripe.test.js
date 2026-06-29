@@ -85,12 +85,13 @@ describe('POST /create-checkout', () => {
   it('returns 400 when listingId is missing', async () => {
     const res = await request(app).post('/create-checkout').send({ successUrl: 'https://example.com/success', cancelUrl: 'https://example.com/cancel' });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/listingId/i);
+    expect(res.body.error).toBe('Invalid request body');
   });
 
   it('returns 400 when successUrl or cancelUrl is missing', async () => {
     const res = await request(app).post('/create-checkout').send({ listingId: 'listing-1' });
     expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid request body');
   });
 
   it('returns 404 when listing is not found', async () => {

@@ -2,6 +2,8 @@ import logger from '../utils/logger.js';
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { authMiddleware, optionalAuthMiddleware, isAdminUser } from '../middleware/auth.js';
+import { validateRequestBody, validateRequestParams } from '../middleware/validateRequest.js';
+import { getSellerRatingsSchema, createRatingSchema, updatePerformanceSchema, updatePerformanceBodySchema } from '../schemas/sellerRatingSchemas.js';
 
 const router = Router();
 
@@ -12,7 +14,7 @@ const router = Router();
 router.use(optionalAuthMiddleware);
 
 // Get seller ratings and stats
-router.get('/:sellerId', async (req, res) => {
+router.get('/:sellerId', validateRequestParams(getSellerRatingsSchema), async (req, res) => {
   try {
     const { sellerId } = req.params;
 
@@ -62,19 +64,11 @@ router.get('/:sellerId', async (req, res) => {
 });
 
 // Create a new rating
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authMiddleware, validateRequestBody(createRatingSchema), async (req, res) => {
   try {
     const { seller_id, rating, comment, order_id } = req.body;
     // Never trust a client-supplied reviewer_id — derive it from the token.
     const reviewer_id = req.user.id;
-
-    if (!seller_id || !rating || !order_id) {
-      return res.status(400).json({ error: 'seller_id, order_id and rating are required' });
-    }
-
-    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
-      return res.status(400).json({ error: 'Rating must be an integer between 1 and 5' });
-    }
 
     if (seller_id === reviewer_id) {
       return res.status(400).json({ error: 'You cannot rate yourself' });
@@ -155,7 +149,7 @@ async function updateSellerStats(sellerId) {
 }
 
 // Update seller performance metrics — admin only (overwrites profile stats).
-router.put('/:sellerId/performance', authMiddleware, async (req, res) => {
+router.put('/:sellerId/performance', authMiddleware, validateRequestParams(updatePerformanceSchema), validateRequestBody(updatePerformanceBodySchema), async (req, res) => {
   try {
     if (!(await isAdminUser(req))) {
       return res.status(403).json({ error: 'Admin access required' });

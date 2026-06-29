@@ -2,6 +2,8 @@ import logger from '../utils/logger.js';
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { optionalAuthMiddleware } from '../middleware/auth.js';
+import { validateRequestBody, validateRequestParams } from '../middleware/validateRequest.js';
+import { addWishlistSchema, removeWishlistSchema, checkWishlistSchema } from '../schemas/wishlistSchemas.js';
 
 const router = Router();
 
@@ -35,22 +37,13 @@ router.get('/', async (req, res) => {
 });
 
 // Add item to wishlist
-router.post('/', async (req, res) => {
+router.post('/', validateRequestBody(addWishlistSchema), async (req, res) => {
   try {
     const { item_id, item_type } = req.body;
     const userId = req.user?.id;
 
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    if (!item_id || !item_type) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    const validTypes = ['vault_item', 'product', 'listing'];
-    if (!validTypes.includes(item_type)) {
-      return res.status(400).json({ error: 'Invalid item type' });
     }
 
     // Check if already in wishlist
@@ -86,7 +79,7 @@ router.post('/', async (req, res) => {
 });
 
 // Remove item from wishlist
-router.delete('/:itemId', async (req, res) => {
+router.delete('/:itemId', validateRequestParams(removeWishlistSchema), async (req, res) => {
   try {
     const { itemId } = req.params;
     const userId = req.user?.id;
@@ -111,7 +104,7 @@ router.delete('/:itemId', async (req, res) => {
 });
 
 // Check if item is in wishlist
-router.get('/check/:itemId/:itemType', async (req, res) => {
+router.get('/check/:itemId/:itemType', validateRequestParams(checkWishlistSchema), async (req, res) => {
   try {
     const { itemId, itemType } = req.params;
     const userId = req.user?.id;

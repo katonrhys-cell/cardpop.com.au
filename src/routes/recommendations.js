@@ -2,6 +2,8 @@ import logger from '../utils/logger.js';
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { optionalAuthMiddleware } from '../middleware/auth.js';
+import { validateRequestQuery, validateRequestParams } from '../middleware/validateRequest.js';
+import { getRecommendationsSchema, getSimilarItemsSchema, getSimilarItemsQuerySchema } from '../schemas/recommendationSchemas.js';
 
 const router = Router();
 
@@ -10,7 +12,7 @@ const router = Router();
 router.use(optionalAuthMiddleware);
 
 // Get personalized recommendations for user
-router.get('/', async (req, res) => {
+router.get('/', validateRequestQuery(getRecommendationsSchema), async (req, res) => {
   try {
     const userId = req.user?.id;
     const limit = parseInt(req.query.limit) || 12;
@@ -100,7 +102,7 @@ router.get('/', async (req, res) => {
 });
 
 // Get "You might also like" recommendations for a specific item
-router.get('/similar/:itemId', async (req, res) => {
+router.get('/similar/:itemId', validateRequestParams(getSimilarItemsSchema), validateRequestQuery(getSimilarItemsQuerySchema), async (req, res) => {
   try {
     const { itemId } = req.params;
     const limit = parseInt(req.query.limit) || 8;
