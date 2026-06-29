@@ -109,15 +109,38 @@ export function mapCardSightToFormFields(result) {
   if (card?.rarity)       fields.variant         = card.rarity;  // closest match
   if (card?.manufacturer) fields.manufacturerName = card.manufacturer;
 
-  // Grading slab detection
+  // Grading slab detection + condition mapping
   if (grading) {
     const company = (grading.company || '').toLowerCase();
     if (company.includes('psa'))     fields.gradingCompany = 'psa';
     else if (company.includes('bgs') || company.includes('beckett')) fields.gradingCompany = 'bgs';
     else if (company.includes('cgc')) fields.gradingCompany = 'cgc';
     else if (company.includes('sgc')) fields.gradingCompany = 'sgc';
-    if (grading.grade)  fields.grade      = String(grading.grade);
+    if (grading.grade)  fields.grade = String(grading.grade);
+
+    // Map grading condition to card condition enum
+    if (grading.condition) {
+      const cond = grading.condition.toLowerCase();
+      if (cond.includes('gem') || cond.includes('10')) fields.condition = 'mint';
+      else if (cond.includes('mint')) fields.condition = 'near_mint';
+      else if (cond.includes('near')) fields.condition = 'near_mint';
+      else if (cond.includes('excellent') || cond.includes('9')) fields.condition = 'excellent';
+      else if (cond.includes('good') || cond.includes('8') || cond.includes('7')) fields.condition = 'good';
+      else if (cond.includes('fair') || cond.includes('poor') || cond.includes('6') || cond.includes('5')) fields.condition = 'light_played';
+    }
   }
+
+  // Store parallel info for later resolution to parallel_id
+  if (parallel) {
+    fields.parallelName = parallel.name || null;
+    fields.parallelPrintRun = parallel.print_run || null;
+  }
+
+  // Append artist and HP info to notes
+  const notes = [];
+  if (card?.artist) notes.push(`Artist: ${card.artist}`);
+  if (card?.hp) notes.push(`HP: ${card.hp}`);
+  if (notes.length > 0) fields.notesFromCardSight = notes.join('\n');
 
   // Collection/sport mapping
   if (card?.segment || card?.sport) {
