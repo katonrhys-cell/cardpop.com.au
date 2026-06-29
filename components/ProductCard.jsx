@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, ShieldCheck, ZoomIn, Shirt } from 'lucide-react';
+import { Star, ShieldCheck, ZoomIn } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { getRefractorLabel, getRefractorBadgeClass } from '@/lib/cardAttributeLabels.js';
@@ -10,6 +10,12 @@ import CardImage from '@/components/CardImage.jsx';
 import { getCardImage, CARD_GRID_SIZES } from '@/utils/imageUrl.js';
 import { isVerified } from '@/utils/verification.js';
 import GradeBadge from '@/components/GradeBadge.jsx';
+
+const BasketballSinglet = ({ className = 'w-3 h-3' }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M6 3h12M8 3l-1 6v12h10V9l-1-6M8 3h2M14 3h2M9 9h6M8 9v12h8V9" />
+  </svg>
+);
 
 const ProductCard = ({ product }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
@@ -103,7 +109,7 @@ const ProductCard = ({ product }) => {
             {(product.is_auto || product.isAuto) && <Badge variant="outline" className="text-[10px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10">Auto</Badge>}
             {(product.is_rookie || product.isRookie) && (
               <Badge variant="outline" className="text-[10px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10 gap-1">
-                <Shirt className="w-3 h-3" /> RC
+                <BasketballSinglet /> RC
               </Badge>
             )}
             {(product.is_sealed || product.isSealed) && <Badge variant="outline" className="text-[10px] font-bold border-green-400/50 text-green-700 bg-green-400/10">Sealed</Badge>}
