@@ -1,0 +1,130 @@
+import stripe from '../utils/stripeClient.js';
+import { supabase } from '../utils/supabaseClient.js';
+import logger from '../utils/logger.js';
+import { sendRefundProcessed, sendRefundIssued } from '../utils/emailService.js';
+import { reverseSellerPayout } from './payoutService.js';
+import { getPlatformSetting } from './stripeWebhookService.js';
+import { isAdminUser } from '../middleware/auth.js';
+
+export async function processRefund(req, res) {
+  try {
+    if (!(await isAdminUser(req))) {
+      return res.status(403).json({ error: 'Admin only' });
+    }
+
+    const { refundId } = req.body;
+
+    const { data: refund, error: rErr } = await supabase
+      .from('refunds')
+      .select('*, order:orders!order_id(id, stripe_payment_intent_id, total_aud, status, refund_status, seller_id, stripe_transfer_id, payout_status, seller_proceeds_aud)')
+      .eq('id', refundId)
+      .maybeSingle();
+
+    if (rErr || !refund) return res.status(404).json({ error: 'Refund not found' });
+    if (refund.status !== 'approved') return res.status(400).json({ error: 'Refund must be in approved state before processing' });
+    if (refund.order?.status === 'refunded') return res.status(400).json({ error: 'Order already refunded' });
+
+    const paymentIntentId = refund.order?.stripe_payment_intent_id;
+    if (!paymentIntentId) return res.status(400).json({ error: 'No Stripe payment intent on this order' });
+
+    const retentionPct = Number(await getPlatformSetting('refund_fee_retention_pct', 50));
+    const totalCommission = Number(refund.commission_aud) + Number(refund.gst_aud);
+    const retainedFee = Math.round(totalCommission * (retentionPct / 100) * 100) / 100;
+    const refundAmount = Math.round((Number(refund.total_paid_aud) - retainedFee) * 100) / 100;
+
+    if (refundAmount <= 0) return res.status(400).json({ error: 'Calculated refund amount is zero or negative' });
+
+    const { data: claimed, error: claimErr } = await supabase
+      .from('refunds')
+      .update({ status: 'processing' })
+      .eq('id', refundId)
+      .eq('status', 'approved')
+      .select('id');
+
+    if (claimErr) return res.status(500).json({ error: 'Failed to claim refund' });
+    if (!claimed || claimed.length === 0) {
+      return res.status(409).json({ error: 'Refund is already being processed' });
+    }
+
+    let stripeRefund;
+    try {
+      stripeRefund = await stripe.refunds.create({
+        payment_intent: paymentIntentId,
+        amount: Math.round(refundAmount * 100),
+        reason: 'requested_by_customer',
+        metadata: { refundId, retainedFee: String(retainedFee), retentionPct: String(retentionPct) },
+      }, { idempotencyKey: `refund_${refundId}` });
+    } catch (stripeErr) {
+      await supabase.from('refunds').update({ status: 'approved' }).eq('id', refundId);
+      throw stripeErr;
+    }
+
+    const now = new Date().toISOString();
+
+    await supabase.from('refunds').update({
+      status: 'processed',
+      stripe_refund_id: stripeRefund.id,
+      retained_fee_aud: retainedFee,
+      refund_amount_aud: refundAmount,
+      processed_at: now,
+    }).eq('id', refundId);
+
+    await supabase.from('orders').update({
+      status: 'refunded',
+      refund_status: 'processed',
+    }).eq('id', refund.order_id);
+
+    const reversal = await reverseSellerPayout(stripe, refund.order);
+    if (reversal.action === 'transfer_reversed' || reversal.action === 'wallet_clawback') {
+      await supabase.from('orders').update({ payout_status: 'reversed' }).eq('id', refund.order_id);
+    }
+
+    if (refund.buyer_id) {
+      await supabase.from('notifications').insert({
+        user_id: refund.buyer_id,
+        type: 'refund_processed',
+        title: 'Refund Processed',
+        body: `Your refund of $${refundAmount.toFixed(2)} AUD has been issued. Please allow 5-10 business days for it to appear on your statement.`,
+      });
+    }
+
+    if (refund.seller_id) {
+      await supabase.from('notifications').insert({
+        user_id: refund.seller_id,
+        type: 'refund_issued',
+        title: 'Refund Issued on Your Sale',
+        body: `A refund of $${refundAmount.toFixed(2)} AUD was issued to the buyer. The platform retained $${retainedFee.toFixed(2)} AUD in processing fees.`,
+      });
+    }
+
+    const [{ data: buyerProfile }, { data: sellerProfile }] = await Promise.all([
+      refund.buyer_id ? supabase.from('profiles').select('email, display_name').eq('id', refund.buyer_id).maybeSingle() : { data: null },
+      refund.seller_id ? supabase.from('profiles').select('email, display_name').eq('id', refund.seller_id).maybeSingle() : { data: null },
+    ]);
+
+    if (buyerProfile?.email) {
+      await sendRefundProcessed({
+        buyerEmail: buyerProfile.email,
+        buyerName: buyerProfile.display_name || 'Collector',
+        refundAmount,
+        orderId: refund.order_id,
+      });
+    }
+
+    if (sellerProfile?.email) {
+      await sendRefundIssued({
+        sellerEmail: sellerProfile.email,
+        sellerName: sellerProfile.display_name || 'Collector',
+        refundAmount,
+        retainedFee,
+        orderId: refund.order_id,
+      });
+    }
+
+    logger.info(`[STRIPE] Refund processed: ${stripeRefund.id} — $${refundAmount} (retained $${retainedFee})`);
+    res.json({ success: true, stripeRefundId: stripeRefund.id, refundAmount, retainedFee });
+  } catch (err) {
+    logger.error(`[STRIPE] /refund error: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+}
