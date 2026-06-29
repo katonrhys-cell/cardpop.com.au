@@ -2,16 +2,6 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-NCZ6K9VFF8"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'G-NCZ6K9VFF8');
-    </script>
-
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
     <meta name="theme-color" content="#CE1126" media="(prefers-color-scheme: light)" />
@@ -39,13 +29,12 @@
     <meta name="author" content="CardPop" />
     <link rel="canonical" href="https://cardpop.com.au/" />
 
-    <!-- Google Fonts — preconnect first, then load Syne -->
-    <!-- font-display:optional prevents layout shift on swap (FOUT); Syne shows on warm cache -->
+    <!-- Google Fonts — loaded async to avoid blocking FCP -->
+    <!-- System font stack loads immediately as fallback; Google font enhances after download -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=optional" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=optional" media="print" onload="this.media='all'" />
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=optional" /></noscript>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" media="print" onload="this.media='all'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" /></noscript>
 
     <!-- Open Graph (Facebook, Discord, Slack previews) -->
     <meta property="og:type" content="website" />
@@ -159,11 +148,21 @@
       }
     }
     </script>
-    <!-- Impact affiliate tracking -->
-    <script type="text/javascript">(function(i,m,p,a,c,t){c.ire_o=p;c[p]=c[p]||function(){(c[p].a=c[p].a||[]).push(arguments)};t=a.createElement(m);var z=a.getElementsByTagName(m)[0];t.async=1;t.src=i;z.parentNode.insertBefore(t,z)})('https://utt.impactcdn.com/P-A7361090-8367-4d02-a53d-c4f13bef08391.js','script','impactStat',document,window);impactStat('transformLinks');impactStat('trackImpression');</script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/main.jsx"></script>
+
+    <!-- Google tag (gtag.js) — deferred until after app loads -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-NCZ6K9VFF8"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-NCZ6K9VFF8');
+    </script>
+
+    <!-- Impact affiliate tracking — deferred until after first paint -->
+    <script defer type="text/javascript">(function(i,m,p,a,c,t){c.ire_o=p;c[p]=c[p]||function(){(c[p].a=c[p].a||[]).push(arguments)};t=a.createElement(m);var z=a.getElementsByTagName(m)[0];t.async=1;t.src=i;z.parentNode.insertBefore(t,z)})('https://utt.impactcdn.com/P-A7361090-8367-4d02-a53d-c4f13bef08391.js','script','impactStat',document,window);impactStat('transformLinks');impactStat('trackImpression');</script>
   </body>
 </html>

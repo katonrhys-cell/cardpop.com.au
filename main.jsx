@@ -1,17 +1,23 @@
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
-import { Analytics } from '@vercel/analytics/react';
-import { SpeedInsights } from '@vercel/speed-insights/react';
 import App from '@/App.jsx';
 import '@/index.css';
 import '@/global.css';
 
+// Lazy-load Analytics and SpeedInsights to defer their JS loading
+const Analytics = React.lazy(() => import('@vercel/analytics/react').then(m => ({ default: m.Analytics })));
+const SpeedInsights = React.lazy(() => import('@vercel/speed-insights/react').then(m => ({ default: m.SpeedInsights })));
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <>
     <App />
-    <Analytics />
-    <SpeedInsights />
+    <Suspense fallback={null}>
+      <Analytics />
+    </Suspense>
+    <Suspense fallback={null}>
+      <SpeedInsights />
+    </Suspense>
   </>
 );
 
