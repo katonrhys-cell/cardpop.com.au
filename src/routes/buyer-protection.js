@@ -2,6 +2,8 @@ import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
+import { validateRequestBody } from '../middleware/validateRequest.js';
+import { createClaimSchema, updateClaimStatusSchema } from '../schemas/buyerProtectionSchemas.js';
 
 const router = Router();
 
@@ -34,23 +36,13 @@ router.get('/my-claims', async (req, res) => {
 });
 
 // Create a new claim
-router.post('/', async (req, res) => {
+router.post('/', validateRequestBody(createClaimSchema), async (req, res) => {
   try {
     const { order_id, claim_type, description } = req.body;
     const userId = req.user?.id;
 
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    if (!order_id || !claim_type || !description) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    // Validate claim type
-    const validTypes = ['item_not_received', 'item_not_as_described', 'damaged', 'other'];
-    if (!validTypes.includes(claim_type)) {
-      return res.status(400).json({ error: 'Invalid claim type' });
     }
 
     // Get order details
@@ -104,7 +96,7 @@ router.post('/', async (req, res) => {
 });
 
 // Update claim status (admin only)
-router.put('/:claimId/status', async (req, res) => {
+router.put('/:claimId/status', validateRequestBody(updateClaimStatusSchema), async (req, res) => {
   try {
     const { claimId } = req.params;
     const { status, resolution, refund_amount } = req.body;
@@ -112,12 +104,6 @@ router.put('/:claimId/status', async (req, res) => {
 
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    // Validate status
-    const validStatuses = ['pending', 'investigating', 'resolved', 'rejected'];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({ error: 'Invalid status' });
     }
 
     // Resolving/rejecting claims and setting refund amounts is an admin-only
