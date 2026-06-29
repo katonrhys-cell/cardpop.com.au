@@ -21,6 +21,21 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   </>
 );
 
+// Register Service Worker for offline support and caching (deferred until idle)
+const registerServiceWorker = () => {
+  if ('serviceWorker' in navigator && import.meta.env.PROD) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').then((reg) => {
+        console.log('[SW] Service Worker registered');
+        // Check for updates every hour
+        setInterval(() => reg.update(), 60 * 60 * 1000);
+      }).catch((err) => {
+        console.warn('[SW] Service Worker registration failed:', err);
+      });
+    });
+  }
+};
+
 // Error monitoring is deferred until the browser is idle so the ~87 kB (gzip)
 // Sentry SDK — replay + tracing included — never blocks first paint. The React
 // ErrorBoundary still catches render crashes during the brief pre-init window.
@@ -43,6 +58,10 @@ const initSentry = () => {
 };
 
 if (typeof window !== 'undefined') {
+  // Register service worker after page load for offline support
+  registerServiceWorker();
+
+  // Initialize error monitoring after idle
   if ('requestIdleCallback' in window) {
     window.requestIdleCallback(initSentry, { timeout: 5000 });
   } else {
