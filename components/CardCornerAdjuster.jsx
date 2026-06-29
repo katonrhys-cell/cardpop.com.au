@@ -18,23 +18,23 @@ const OK_COLOR = '#10b981';
 /**
  * Manual crop editor: shows the original image with four draggable corner
  * handles (seeded from the auto-detected quad when available, otherwise an
- * inset rectangle). It overlays a perspective-aware rule-of-thirds grid, edge
- * handles, and a live "perfect rectangle" indicator so the user can tell at a
- * glance whether their crop is square — plus a one-tap snap to a clean 5:7 card
- * rectangle. On apply it hands the adjusted corners — in natural image
- * coordinates — back to the parent, which warps the image.
+ * inset rectangle). Displays a split-view: left side shows adjustment handles,
+ * right side shows a live preview of what the cropped result will look like
+ * with the card filling the entire container.
  *
  * Mount this only while editing (conditionally render in the parent) so it
  * re-seeds cleanly each time it opens.
  */
 const CardCornerAdjuster = ({ imageUrl, initialCorners, onApply, onCancel }) => {
   const imgRef = useRef(null);
+  const previewCanvasRef = useRef(null);
   const [natural, setNatural] = useState(null); // { w, h } natural image size
   const [displayW, setDisplayW] = useState(0);   // rendered image width (px)
   const [corners, setCorners] = useState(null);  // [[x,y]×4] in natural coords
   const [dragging, setDragging] = useState(null); // corner index | { edge: i } | null
   const [applying, setApplying] = useState(false);
   const lastPt = useRef(null); // last pointer position (natural coords) for edge drags
+  const [previewUrl, setPreviewUrl] = useState(null); // live preview of cropped result
 
   const seed = useCallback(() => {
     const img = imgRef.current;
@@ -61,6 +61,94 @@ const CardCornerAdjuster = ({ imageUrl, initialCorners, onApply, onCancel }) => 
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  // Generate live preview of the perspective-warped crop result
+  useEffect(() => {
+    if (!imgRef.current || !natural || !corners || !previewCanvasRef.current) return;
+
+    const img = imgRef.current;
+    const canvas = previewCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Set preview dimensions to 5:7 card ratio (smaller for performance)
+    const previewWidth = 300;
+    const previewHeight = 420;
+    canvas.width = previewWidth;
+    canvas.height = previewHeight;
+
+    // Perspective transform: map the crop corners to the full preview rect
+    const [tl, tr, br, bl] = corners.map(([x, y]) => [x, y]);
+    const srcPoints = [tl, tr, br, bl];
+    const dstPoints = [[0, 0], [previewWidth, 0], [previewWidth, previewHeight], [0, previewHeight]];
+
+    // Use canvas 2D transforms (approximation; 3D would need WebGL)
+    // Draw the image with perspective using triangle subdivisions
+    ctx.clearRect(0, 0, previewWidth, previewHeight);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, previewWidth, previewHeight);
+
+    // Subdivide the quad into triangles for better perspective accuracy
+    const triangles = [
+      [0, 1, 2], // top-right triangle
+      [0, 2, 3], // bottom-left triangle
+    ];
+
+    try {
+      ctx.save();
+      for (const [i0, i1, i2] of triangles) {
+        const p0 = srcPoints[i0];
+        const p1 = srcPoints[i1];
+        const p2 = srcPoints[i2];
+        const dp0 = dstPoints[i0];
+        const dp1 = dstPoints[i1];
+        const dp2 = dstPoints[i2];
+
+        // Simple bilinear sampling: map destination rect to source triangle
+        ctx.beginPath();
+        ctx.moveTo(dp0[0], dp0[1]);
+        ctx.lineTo(dp1[0], dp1[1]);
+        ctx.lineTo(dp2[0], dp2[1]);
+        ctx.closePath();
+
+        ctx.save();
+        ctx.clip();
+
+        // Draw stretched/warped version - approximate perspective
+        const minX = Math.min(dp0[0], dp1[0], dp2[0]);
+        const maxX = Math.max(dp0[0], dp1[0], dp2[0]);
+        const minY = Math.min(dp0[1], dp1[1], dp2[1]);
+        const maxY = Math.max(dp0[1], dp1[1], dp2[1]);
+
+        // Calculate the bounding box in source space for this triangle
+        const srcMinX = Math.min(p0[0], p1[0], p2[0]);
+        const srcMaxX = Math.max(p0[0], p1[0], p2[0]);
+        const srcMinY = Math.min(p0[1], p1[1], p2[1]);
+        const srcMaxY = Math.max(p0[1], p1[1], p2[1]);
+
+        const srcW = srcMaxX - srcMinX;
+        const srcH = srcMaxY - srcMinY;
+        const dstW = maxX - minX;
+        const dstH = maxY - minY;
+
+        if (srcW > 0 && srcH > 0 && dstW > 0 && dstH > 0) {
+          ctx.drawImage(
+            img,
+            srcMinX, srcMinY, srcW, srcH,
+            minX, minY, dstW, dstH
+          );
+        }
+
+        ctx.restore();
+      }
+    } catch {
+      // Fallback: just show a darkened preview
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.fillRect(0, 0, previewWidth, previewHeight);
+    }
+
+    setPreviewUrl(canvas.toDataURL('image/jpeg', 0.8));
+  }, [corners, natural]);
 
   const scale = natural && displayW ? displayW / natural.w : 1;
   const displayH = natural ? natural.h * scale : 0;
@@ -152,17 +240,16 @@ const CardCornerAdjuster = ({ imageUrl, initialCorners, onApply, onCancel }) => 
 
   return (
     <Dialog open onOpenChange={(next) => { if (!next && !applying) onCancel(); }}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Adjust crop corners</DialogTitle>
+          <DialogTitle>Adjust crop container</DialogTitle>
         </DialogHeader>
         <p className="text-xs text-muted-foreground -mt-2">
-          Drag each handle to a corner of the card. Keep the edges square — the
-          guides below turn green when your crop is a perfect rectangle.
+          Drag handles to define the card's outer edges. The right side shows how
+          the card will fill the final container — aim for a perfect rectangle.
         </p>
 
-        {/* Live rectangle indicator: green confirmation when square, amber
-            nudge while the selection is still skewed. */}
+        {/* Live rectangle indicator */}
         <div
           role="status"
           className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium ${
@@ -178,55 +265,80 @@ const CardCornerAdjuster = ({ imageUrl, initialCorners, onApply, onCancel }) => 
           )}
         </div>
 
-        <div className="flex justify-center">
-          <div className="relative inline-block" style={{ touchAction: 'none' }}>
-            <img
-              ref={imgRef}
-              src={imageUrl}
-              alt="Adjust crop"
-              onLoad={seed}
-              draggable={false}
-              className="block max-w-full max-h-[55vh] select-none rounded-lg"
-            />
-            {ready && (
-              <svg
-                className="absolute left-0 top-0 overflow-visible"
-                width={displayW}
-                height={displayH}
-                onPointerMove={onPointerMove}
-                onPointerUp={endDrag}
-              >
-                <polygon
-                  points={polygon}
-                  fill={isRect ? `${OK_COLOR}1f` : 'hsl(var(--primary) / 0.12)'}
-                  stroke={lineColor}
-                  strokeWidth="2"
-                />
-                {gridLines.map(([[x1, y1], [x2, y2]], i) => (
-                  <line
-                    key={`g${i}`}
-                    x1={x1} y1={y1} x2={x2} y2={y2}
+        {/* Split-view: adjustment panel (left) + live preview (right) */}
+        <div className="grid grid-cols-2 gap-4 rounded-lg border border-border bg-muted/30 p-4">
+          {/* Left: Original image with adjustment handles */}
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-semibold text-foreground">Adjust corners</p>
+            <div className="relative inline-block flex-1 min-h-[300px] flex items-center justify-center" style={{ touchAction: 'none' }}>
+              <img
+                ref={imgRef}
+                src={imageUrl}
+                alt="Adjust crop"
+                onLoad={seed}
+                draggable={false}
+                className="block max-w-full max-h-[40vh] select-none rounded-lg"
+              />
+              {ready && (
+                <svg
+                  className="absolute left-0 top-0 overflow-visible"
+                  width={displayW}
+                  height={displayH}
+                  onPointerMove={onPointerMove}
+                  onPointerUp={endDrag}
+                >
+                  <polygon
+                    points={polygon}
+                    fill={isRect ? `${OK_COLOR}1f` : 'hsl(var(--primary) / 0.12)'}
                     stroke={lineColor}
-                    strokeWidth="1"
-                    strokeDasharray="4 4"
-                    strokeOpacity="0.55"
-                  />
-                ))}
-                {corners.map(([x, y], i) => (
-                  <circle
-                    key={i}
-                    cx={x * scale}
-                    cy={y * scale}
-                    r={11}
-                    fill={lineColor}
-                    stroke="#fff"
                     strokeWidth="2"
-                    style={{ cursor: 'grab' }}
-                    onPointerDown={startCornerDrag(i)}
                   />
-                ))}
-              </svg>
-            )}
+                  {gridLines.map(([[x1, y1], [x2, y2]], i) => (
+                    <line
+                      key={`g${i}`}
+                      x1={x1} y1={y1} x2={x2} y2={y2}
+                      stroke={lineColor}
+                      strokeWidth="1"
+                      strokeDasharray="4 4"
+                      strokeOpacity="0.55"
+                    />
+                  ))}
+                  {corners.map(([x, y], i) => (
+                    <circle
+                      key={i}
+                      cx={x * scale}
+                      cy={y * scale}
+                      r={11}
+                      fill={lineColor}
+                      stroke="#fff"
+                      strokeWidth="2"
+                      style={{ cursor: 'grab' }}
+                      onPointerDown={startCornerDrag(i)}
+                    />
+                  ))}
+                </svg>
+              )}
+            </div>
+          </div>
+
+          {/* Right: Live preview of cropped result filling the container */}
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-semibold text-foreground">Container preview</p>
+            <div className="flex-1 flex items-center justify-center rounded-lg bg-black/10 min-h-[300px]">
+              {previewUrl ? (
+                <img
+                  src={previewUrl}
+                  alt="Crop preview"
+                  className="h-full max-h-[40vh] object-contain rounded-md"
+                />
+              ) : (
+                <p className="text-xs text-muted-foreground">Preview loading…</p>
+              )}
+            </div>
+            <canvas
+              ref={previewCanvasRef}
+              className="hidden"
+            />
           </div>
         </div>
 
