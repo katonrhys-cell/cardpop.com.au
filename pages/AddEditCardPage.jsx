@@ -136,6 +136,7 @@ const AddEditCardPage = () => {
     cardNumber:     '',
     year:           '',
     variant:        [],
+    manufacturerName: '',
     // Attributes
     isFoil:         false,
     isSealed:       false,
@@ -212,6 +213,16 @@ const AddEditCardPage = () => {
     setParallelOpts([]);
     if (franchiseId) getParallelsByFranchise(franchiseId).then(setParallelOpts);
   }, [franchiseId, getParallelsByFranchise]);
+
+  // When AI autofills formData.manufacturerName (e.g., "Topps"), look up the matching manufacturer ID
+  useEffect(() => {
+    if (!franchiseId || !formData.manufacturerName || manufacturerId) return;
+    getCategories().then(cats => {
+      const manufacturers = cats.filter(c => c.parent_id === franchiseId);
+      const match = manufacturers.find(m => m.name.toLowerCase() === formData.manufacturerName.toLowerCase());
+      if (match) setManufacturerId(match.id);
+    });
+  }, [franchiseId, formData.manufacturerName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load subsets whenever set changes
   useEffect(() => {

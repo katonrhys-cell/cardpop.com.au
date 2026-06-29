@@ -102,11 +102,12 @@ export function mapCardSightToFormFields(result) {
   const { card, grading, parallel } = result;
   const fields = {};
 
-  if (card?.name)         fields.cardName       = card.name;
-  if (card?.setName)      fields.setName        = card.setName;
-  if (card?.cardNumber)   fields.cardNumber     = card.cardNumber;
-  if (card?.year)         fields.year           = String(card.year);
-  if (card?.rarity)       fields.variant        = card.rarity;  // closest match
+  if (card?.name)         fields.cardName        = card.name;
+  if (card?.setName)      fields.setName         = card.setName;
+  if (card?.cardNumber)   fields.cardNumber      = card.cardNumber;
+  if (card?.year)         fields.year            = String(card.year);
+  if (card?.rarity)       fields.variant         = card.rarity;  // closest match
+  if (card?.manufacturer) fields.manufacturerName = card.manufacturer;
 
   // Grading slab detection
   if (grading) {
