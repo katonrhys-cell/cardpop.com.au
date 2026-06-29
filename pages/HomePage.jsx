@@ -6,6 +6,7 @@ import { motion, useInView, AnimatePresence } from 'framer-motion';
 import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient.js';
+import { cachedQuery } from '@/lib/queryCache.js';
 import VaultListingCard from '@/components/VaultListingCard.jsx';
 import SellerCard from '@/components/SellerCard.jsx';
 import FeaturedSellerCard from '@/components/FeaturedSellerCard.jsx';
@@ -193,9 +194,16 @@ const HomePage = () => {
     // This prevents Supabase queries from blocking LCP
     const fetchHomeData = async () => {
       try {
+        // Use 5-minute cache for homepage data (user sees fresh content on repeat visits)
         const [listingsRes, sellersRes] = await Promise.all([
-          supabase.from('vault_items').select('*, owner:profiles!owner_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count), vault_images(*)').eq('is_public', true).neq('listing_type', 'Private').order('created_at', { ascending: false }).limit(4),
-          supabase.from('profiles').select('*').eq('is_featured_seller', true).eq('is_active', true).limit(4),
+          cachedQuery('homepage_featured_cards', () =>
+            supabase.from('vault_items').select('*, owner:profiles!owner_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count), vault_images(*)').eq('is_public', true).neq('listing_type', 'Private').order('created_at', { ascending: false }).limit(4),
+            5 * 60 * 1000
+          ),
+          cachedQuery('homepage_featured_sellers', () =>
+            supabase.from('profiles').select('*').eq('is_featured_seller', true).eq('is_active', true).limit(4),
+            5 * 60 * 1000
+          ),
         ]);
 
         if (isMounted) {
