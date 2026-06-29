@@ -35,15 +35,8 @@ const ProductCard = ({ product }) => {
           width="400"
           height="500"
         />
-        {/* Rookie badge — top left */}
-        {(product.is_rookie || product.isRookie) && (
-          <div className="absolute top-3 left-3 z-10 px-2 py-1 rounded-md text-[11px] font-extrabold tracking-wide bg-amber-400 text-amber-900 shadow-md">
-            RC
-          </div>
-        )}
-
-        {/* Condition badge — top left (when no rookie) */}
-        {product.condition && !(product.is_rookie || product.isRookie) && (
+        {/* Condition badge — top left */}
+        {product.condition && (
           <div className="absolute top-3 left-3 z-10">
             <Badge variant="secondary" className="shadow-sm font-bold backdrop-blur-md bg-background/80">
               {product.condition}
@@ -108,6 +101,7 @@ const ProductCard = ({ product }) => {
             {(product.is_foil || product.isFoil) && <Badge variant="outline" className="text-[10px] font-bold border-yellow-400/50 text-yellow-700 bg-yellow-400/10">Foil</Badge>}
             {getRefractorLabel(product) && <Badge variant="outline" className={`text-[10px] font-bold ${getRefractorBadgeClass(product)}`}>{getRefractorLabel(product)}</Badge>}
             {(product.is_auto || product.isAuto) && <Badge variant="outline" className="text-[10px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10">Auto</Badge>}
+            {(product.is_rookie || product.isRookie) && <Badge variant="outline" className="text-[10px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10">RC</Badge>}
             {(product.is_sealed || product.isSealed) && <Badge variant="outline" className="text-[10px] font-bold border-green-400/50 text-green-700 bg-green-400/10">Sealed</Badge>}
             {(product.variant || product.cardVariant) && (product.variant || product.cardVariant).split(',').map(v => v.trim()).filter(v => v && v !== 'Refractor').map(v => (
               <Badge key={v} variant="outline" className="text-[10px] font-bold border-primary/30 text-primary bg-primary/5">{v}</Badge>
