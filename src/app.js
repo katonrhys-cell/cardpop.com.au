@@ -78,6 +78,8 @@ app.use((req, res, next) => {
 logger.debug(`[MAIN] Configuring body parser with limit: ${BodyLimit} bytes`);
 // Stripe webhooks need the raw body buffer for signature verification — skip JSON
 // parsing for that path so express.raw() inside the route handler sees the buffer.
+// The /stripe/webhook route handler (in src/routes/stripe.js) validates the signature
+// with stripe.webhooks.constructEvent() before processing the event.
 // endsWith handles both /stripe/webhook (dev) and /hcgi/api/stripe/webhook (Hostinger proxy).
 app.use((req, res, next) => {
 	if (req.path.endsWith('/stripe/webhook')) return next();
