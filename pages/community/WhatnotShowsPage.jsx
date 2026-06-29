@@ -78,7 +78,6 @@ const WhatnotShowsPage = () => {
           setForm(f => ({ ...f, seller_name: data.display_name || data.username || '' }));
         }
       })
-      .catch((err) => { console.warn('[WhatnotShowsPage] profile fetch failed:', err); });
     return () => { cancelled = true; };
   }, [currentUser?.id]);
 
@@ -94,7 +93,6 @@ const WhatnotShowsPage = () => {
       if (error) throw error;
       setShows(data || []);
     } catch (err) {
-      console.error('Failed to fetch Whatnot shows:', err);
     } finally {
       setLoading(false);
     }

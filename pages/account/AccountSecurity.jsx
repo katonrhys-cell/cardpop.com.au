@@ -148,7 +148,6 @@ const AccountSecurity = () => {
       const data = await listMFAFactors();
       setFactors(data);
     } catch (e) {
-      console.error('[AccountSecurity] loadFactors:', e);
     }
   }, [listMFAFactors]);
 

@@ -26,7 +26,6 @@ const TransactionHistoryPage = () => {
           .limit(100);
         setTxs(data ?? []);
       } catch (error) {
-        console.error(error);
       } finally {
         setLoading(false);
       }

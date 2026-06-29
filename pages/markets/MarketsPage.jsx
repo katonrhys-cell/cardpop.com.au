@@ -243,7 +243,6 @@ const MarketsPage = () => {
       });
     } catch (err) {
       // Fallback to demo simulation
-      console.warn('[MarketsPage] Real search failed, falling back to demo:', err.message);
       const base = 50 + Math.random() * 200;
       const change7d = +(Math.random() * 30 - 10).toFixed(1);
       setSearchResult({

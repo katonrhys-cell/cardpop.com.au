@@ -95,7 +95,6 @@ const PublicSellerProfilePage = () => {
 
       } catch (err) {
         if (isMounted) {
-          console.error(err);
           setError(err.message || 'Profile not found.');
         }
       } finally {

@@ -33,7 +33,6 @@ const CategoryMappingPage = () => {
         total: unmappedCount + mappedCount
       });
     } catch (error) {
-      console.error(error);
     } finally {
       setLoading(false);
     }

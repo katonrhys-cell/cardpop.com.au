@@ -108,7 +108,6 @@ const SoleTraderStorePage = () => {
         setListings(combined);
         setStats({ totalListings: combined.length, averageRating: avgRating, totalReviews: totalReviews || (profile.reviews_count || 0) });
       } catch (err) {
-        if (mounted) { console.error(err); setError(err.message || 'Store not found.'); }
       } finally {
         if (mounted) setLoading(false);
       }

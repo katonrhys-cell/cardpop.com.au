@@ -82,7 +82,6 @@ const MyVaultPage = () => {
       setCards(cardsWithListings);
       setError(null);
     } catch (err) {
-      console.error("Failed to fetch vault:", err);
       setError(err.message || 'Failed to load vault. Please try again.');
     } finally {
       setLoading(false);

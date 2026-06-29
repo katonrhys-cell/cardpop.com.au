@@ -211,7 +211,6 @@ const BlogArticlePage = () => {
         }
 
       } catch (err) {
-        console.error('Error loading article:', err);
         if (!cancelled) setError('Article not found or unavailable.');
       } finally {
         if (!cancelled) setLoading(false);

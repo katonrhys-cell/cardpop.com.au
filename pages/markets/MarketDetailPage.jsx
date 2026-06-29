@@ -19,7 +19,6 @@ const MarketDetailPage = () => {
         const { data: res } = await supabase.from('market_data').select('*').eq('id', market).maybeSingle();
         setData(res);
       } catch (error) {
-        console.error(error);
       } finally {
         setLoading(false);
       }

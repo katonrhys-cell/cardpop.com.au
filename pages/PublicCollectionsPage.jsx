@@ -117,7 +117,6 @@ const PublicCollectionsPage = () => {
       
       if (!cancelled) setItems(combined.sort((a, b) => b.price - a.price));
     } catch (err) {
-      console.error('[PublicCollectionsPage] Error processing unified collections items:', err);
       if (!cancelled) {
         setError('Failed to load collections. Please check your connection and try again.');
         toast.error('Failed to load collections');

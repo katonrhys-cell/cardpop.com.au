@@ -141,7 +141,6 @@ const VaultCategoryPage = () => {
           setTotalPages(Math.ceil((count || 0) / perPage));
         }
       } catch (error) {
-        console.error("Error fetching vault listings:", error);
       } finally {
         setLoading(false);
       }

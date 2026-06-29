@@ -71,7 +71,6 @@ const SellersManagementPage = () => {
       setTotalPages(Math.ceil((count ?? 0) / 20));
       setTotalItems(count ?? 0);
     } catch (error) {
-      console.error('Error fetching sellers:', error);
       toast.error('Failed to load sellers.');
     } finally {
       setLoading(false);
@@ -98,7 +97,6 @@ const SellersManagementPage = () => {
 
       setSellers(sellers.map(s => s.id === sellerId ? { ...s, is_featured_seller: newStatus } : s));
     } catch (error) {
-      console.error('Error updating seller:', error);
       toast.error('Failed to update seller status.');
     } finally {
       setUpdating(null);

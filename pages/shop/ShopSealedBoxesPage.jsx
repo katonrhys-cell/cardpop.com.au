@@ -59,7 +59,6 @@ const ShopSealedBoxesPage = () => {
           setTotalItems(count || 0);
         }
       } catch (err) {
-        console.error('Failed to fetch sealed boxes:', err);
         if (isMounted) toast.error('Failed to load products.');
       } finally {
         if (isMounted) setLoading(false);

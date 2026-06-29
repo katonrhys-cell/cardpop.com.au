@@ -145,7 +145,6 @@ const AnalyticsReportsPage = () => {
         setChartData(last6Months);
 
       } catch (err) {
-        console.error("Failed to fetch analytics data:", err);
         setError("Failed to load analytics data. Please try again.");
         toast.error("Failed to load analytics data");
       } finally {

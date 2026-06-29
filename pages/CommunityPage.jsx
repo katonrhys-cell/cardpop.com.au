@@ -24,7 +24,6 @@ const CommunityPage = () => {
         if (fetchError) throw fetchError;
         setSellers(data || []);
       } catch (err) {
-        console.error('Failed to fetch sellers:', err);
         setError('Unable to load the seller directory at this time. Please try again later.');
       } finally {
         setIsLoading(false);

@@ -38,7 +38,6 @@ const AccountEvents = () => {
       if (error) throw error;
       setEvents(data || []);
     } catch (err) {
-      console.error('Error fetching my events:', err);
     } finally {
       setIsLoading(false);
     }

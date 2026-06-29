@@ -65,7 +65,6 @@ const SellerProfilePage = () => {
           .limit(10);
         if (!cancelled) setReviews(reviewsData ?? []);
       } catch (error) {
-        console.error('Error fetching seller data:', error);
       } finally {
         if (!cancelled) setLoading(false);
       }

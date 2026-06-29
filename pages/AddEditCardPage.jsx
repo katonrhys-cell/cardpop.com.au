@@ -498,7 +498,6 @@ const AddEditCardPage = () => {
         resetPhotoTemplate();
         toast.success('Photo formatted — it will be saved with your card.');
       } catch (error) {
-        console.error('Local format error:', error);
         toast.error('Failed to apply formatted photo');
       } finally {
         setIsUploadingTemplate(false);
@@ -532,7 +531,6 @@ const AddEditCardPage = () => {
       setImagePreview(supabase.storage.from('vault-images').getPublicUrl(filePath).data.publicUrl);
       toast.success('Photo formatted successfully!');
     } catch (error) {
-      console.error('Template upload error:', error);
       toast.error('Failed to upload processed image');
     } finally {
       setIsUploadingTemplate(false);
@@ -625,7 +623,6 @@ const AddEditCardPage = () => {
         await supabase.from('listings').insert(listingPayload);
       }
     } catch (err) {
-      console.error('Listing sync error:', err);
       toast.error('Card saved, but updating its marketplace listing failed. You can re-list it from your vault.');
     }
   };

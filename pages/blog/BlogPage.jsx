@@ -126,7 +126,6 @@ const BlogPage = () => {
       const { data } = await supabase.from('blog_articles').select('*').eq('is_published', true).order('created_at', { ascending: false }).limit(100);
       setArticles(data ?? []);
     } catch (err) {
-      console.error('Error fetching articles:', err);
       setError('Failed to load articles. Please try again later.');
     } finally {
       setLoading(false);

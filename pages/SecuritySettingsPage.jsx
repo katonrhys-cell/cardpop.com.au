@@ -45,7 +45,6 @@ const SecuritySettingsPage = () => {
         setSessions(data.sessions);
       }
     } catch (err) {
-      console.error('Failed to load sessions:', err);
     } finally {
       setLoadingSessions(false);
     }

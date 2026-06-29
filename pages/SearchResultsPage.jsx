@@ -61,7 +61,6 @@ const SearchResultsPage = () => {
           setTotalPages(Math.max(1, Math.ceil((count || 0) / PER_PAGE)));
         }
       } catch (error) {
-        console.error('Search error:', error);
         if (!cancelled) {
           setResults([]);
           setTotalItems(0);

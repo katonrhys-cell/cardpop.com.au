@@ -210,7 +210,6 @@ const HomePage = () => {
           setFeaturedSellers(uniqueSellers);
         }
       } catch (error) {
-        console.error('Failed to fetch homepage data:', error);
       } finally {
         if (isMounted) setLoading(false);
       }

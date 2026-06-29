@@ -64,7 +64,6 @@ const EventsManagementPage = () => {
       if (error) throw error;
       setEvents(data ?? []);
     } catch (err) {
-      console.error('Failed to fetch events:', err);
       toast.error('Failed to load events.');
     } finally {
       setIsLoading(false);

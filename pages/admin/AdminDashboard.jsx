@@ -139,7 +139,6 @@ const AdminDashboard = () => {
         setVaultProducts(vaultRes.data || []);
         setFilteredCount(vaultRes.count || 0);
       } catch (err) {
-        console.error("Admin Dashboard fetch error:", err);
         if (!cancelled) setError("Failed to load dashboard data.");
       } finally {
         if (!cancelled) setLoading(false);

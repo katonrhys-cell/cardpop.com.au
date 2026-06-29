@@ -202,7 +202,6 @@ const LocalMapPage = () => {
             url: r.website_url,
           });
         });
-      } catch (e) { console.warn('retailers fetch:', e); }
 
       // Upcoming events — only those with at least a suburb/state so they can be placed
       try {
@@ -236,7 +235,6 @@ const LocalMapPage = () => {
             eventUrl: ev.slug ? `/events/${ev.slug}` : `/events/${ev.id}`,
           });
         });
-      } catch (e) { console.warn('events fetch:', e); }
 
       if (!cancelled) {
         setRawItems(results);

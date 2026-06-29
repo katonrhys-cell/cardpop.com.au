@@ -26,7 +26,6 @@ const SitemapPage = () => {
         
         setLinks(combined);
       } catch (err) {
-        console.error("Failed to load sitemap links", err);
       }
     };
     fetchSitemapData();

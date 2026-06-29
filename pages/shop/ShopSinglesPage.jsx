@@ -59,7 +59,6 @@ const ShopSinglesPage = () => {
           setTotalItems(count || 0);
         }
       } catch (err) {
-        console.error('Failed to fetch singles:', err);
         if (isMounted) toast.error('Failed to load products.');
       } finally {
         if (isMounted) setLoading(false);

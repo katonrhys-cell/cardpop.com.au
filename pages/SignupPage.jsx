@@ -59,7 +59,6 @@ const SignupPage = () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: formData.email, firstName: formData.name.split(' ')[0] }),
-        }).catch((err) => { console.warn('[SignupPage] Newsletter subscribe failed:', err); });
       }
 
       try {
@@ -71,12 +70,10 @@ const SignupPage = () => {
         setSuccess(true);
         toast.success('Account created successfully!');
       } catch (emailErr) {
-        console.error('Failed to send verification email:', emailErr);
         toast.error('Account created, but failed to send verification email. Please contact support.');
         navigate('/login');
       }
     } catch (error) {
-      console.error('Registration error:', error);
       toast.error(error.message || 'Registration failed. Email may already be in use.');
     } finally {
       setLoading(false);

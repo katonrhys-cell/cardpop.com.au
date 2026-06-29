@@ -123,7 +123,6 @@ const BrandsManagementPage = () => {
       setIsModalOpen(false);
       resetForm();
     } catch (err) {
-      console.error("Error saving brand:", err);
       toast.error(err.message || 'Failed to save brand');
     } finally {
       setIsSubmitting(false);
@@ -140,7 +139,6 @@ const BrandsManagementPage = () => {
       setIsDeleteDialogOpen(false);
       setSelectedBrand(null);
     } catch (err) {
-      console.error("Error deleting brand:", err);
       toast.error('Failed to delete brand. It may be in use.');
     } finally {
       setIsSubmitting(false);
