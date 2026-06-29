@@ -1,3 +1,7 @@
+# CardPop Robots Configuration
+# See /llms.txt for AI agent accessibility guidelines
+
+# Allow all user agents by default
 User-agent: *
 Allow: /
 
@@ -25,4 +29,53 @@ Disallow: /success
 # Internal tooling
 Disallow: /diagnostics
 
+# Rate limiting for all bots
+# Please crawl at a reasonable rate (1-2 second delay between requests)
+# Contact developers@cardpop.com.au for higher rate limit requests
+Crawl-delay: 1
+
+# Specific rules for AI agents and LLMs
+# For guidelines on how to properly interact with CardPop, see /llms.txt
+User-agent: GPTBot
+Allow: /collections/
+Allow: /markets/
+Allow: /community/
+Allow: /blog/
+Allow: /info/
+Allow: /shop/
+Disallow: /account
+Disallow: /vault
+Disallow: /admin
+Disallow: /checkout
+
+User-agent: CCBot
+Allow: /collections/
+Allow: /markets/
+Allow: /community/
+Allow: /blog/
+Allow: /info/
+Allow: /shop/
+Disallow: /account
+Disallow: /vault
+Disallow: /admin
+Disallow: /checkout
+
+User-agent: anthropic-ai
+Allow: /
+Disallow: /account
+Disallow: /vault
+Disallow: /admin
+Disallow: /checkout
+
+User-agent: Claude-Web
+Allow: /
+Disallow: /account
+Disallow: /vault
+Disallow: /admin
+Disallow: /checkout
+
+# Sitemaps
 Sitemap: https://cardpop.com.au/sitemap.xml
+Sitemap: https://cardpop.com.au/api/sitemap/products
+Sitemap: https://cardpop.com.au/api/sitemap/listings
+Sitemap: https://cardpop.com.au/api/sitemap/blog
