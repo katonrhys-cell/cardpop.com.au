@@ -1,19 +1,40 @@
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
-import { Analytics } from '@vercel/analytics/react';
-import { SpeedInsights } from '@vercel/speed-insights/react';
 import App from '@/App.jsx';
 import '@/index.css';
 import '@/global.css';
 
+// Lazy-load Analytics and SpeedInsights to defer their JS loading
+const Analytics = React.lazy(() => import('@vercel/analytics/react').then(m => ({ default: m.Analytics })));
+const SpeedInsights = React.lazy(() => import('@vercel/speed-insights/react').then(m => ({ default: m.SpeedInsights })));
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <>
     <App />
-    <Analytics />
-    <SpeedInsights />
+    <Suspense fallback={null}>
+      <Analytics />
+    </Suspense>
+    <Suspense fallback={null}>
+      <SpeedInsights />
+    </Suspense>
   </>
 );
+
+// Register Service Worker for offline support and caching (deferred until idle)
+const registerServiceWorker = () => {
+  if ('serviceWorker' in navigator && import.meta.env.PROD) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').then((reg) => {
+        console.log('[SW] Service Worker registered');
+        // Check for updates every hour
+        setInterval(() => reg.update(), 60 * 60 * 1000);
+      }).catch((err) => {
+        console.warn('[SW] Service Worker registration failed:', err);
+      });
+    });
+  }
+};
 
 // Error monitoring is deferred until the browser is idle so the ~87 kB (gzip)
 // Sentry SDK — replay + tracing included — never blocks first paint. The React
@@ -37,6 +58,10 @@ const initSentry = () => {
 };
 
 if (typeof window !== 'undefined') {
+  // Register service worker after page load for offline support
+  registerServiceWorker();
+
+  // Initialize error monitoring after idle
   if ('requestIdleCallback' in window) {
     window.requestIdleCallback(initSentry, { timeout: 5000 });
   } else {

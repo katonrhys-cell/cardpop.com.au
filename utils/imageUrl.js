@@ -43,11 +43,11 @@ const isHttp = (s) => typeof s === 'string' && /^https?:\/\//.test(s);
  * @param {object} [opts]
  * @param {number[]} [opts.widths]  Candidate widths for the srcset.
  * @param {string}   [opts.bucket]  Storage bucket (default `vault-images`).
- * @param {number}   [opts.quality] Transform quality (default 70).
+ * @param {number}   [opts.quality] Transform quality (default 75).
  * @returns {{ src: string|null, srcSet: string|null, fallbackSrc: string|null }}
  */
 export function getCardImage(pathOrUrl, opts = {}) {
-  const { widths = DEFAULT_WIDTHS, bucket = DEFAULT_BUCKET, quality = 70 } = opts;
+  const { widths = DEFAULT_WIDTHS, bucket = DEFAULT_BUCKET, quality = 75 } = opts;
 
   if (!pathOrUrl || typeof pathOrUrl !== 'string') {
     return { src: null, srcSet: null, fallbackSrc: null };

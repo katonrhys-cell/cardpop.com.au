@@ -2,16 +2,6 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-NCZ6K9VFF8"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'G-NCZ6K9VFF8');
-    </script>
-
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
     <meta name="theme-color" content="#CE1126" media="(prefers-color-scheme: light)" />
@@ -29,8 +19,87 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     
     <!-- Prevent CLS: width+height attrs + height:auto lets browser compute aspect-ratio before load -->
+    <!-- Critical CSS: minimal above-the-fold styles to enable rendering without full CSS file -->
     <style>
+      /* Base styles — enable fast first paint */
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+        font-size: 16px; line-height: 1.65; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+      }
+
+      /* Images — prevent layout shift */
       img { max-width: 100%; height: auto; aspect-ratio: auto; }
+
+      /* Typography — ensure text renders immediately */
+      h1, h2, h3, h4, h5, h6 { font-family: 'Syne', 'Syne Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+      /* Hero section — above fold on desktop/tablet, stats on mobile */
+      .min-h-\[92dvh\] { min-height: 92dvh; display: flex; align-items: flex-start; justify-content: center; }
+
+      /* Flexbox for layout stability */
+      .flex { display: flex; }
+      .flex-col { flex-direction: column; }
+      .items-center { align-items: center; }
+      .justify-center { justify-content: center; }
+
+      /* Text classes for hero copy */
+      .text-foreground { color: rgb(31, 41, 55); }
+      .text-white { color: rgb(255, 255, 255); }
+      .text-zinc-400 { color: rgb(161, 161, 170); }
+      .bg-zinc-950 { background-color: rgb(9, 9, 11); }
+      .bg-background { background-color: rgb(255, 255, 255); }
+      .bg-card { background-color: rgb(255, 255, 255); }
+
+      /* Spacing — critical for layout shift prevention */
+      .pt-10 { padding-top: 2.5rem; }
+      .pb-16 { padding-bottom: 4rem; }
+      .px-4 { padding-left: 1rem; padding-right: 1rem; }
+      .mb-6 { margin-bottom: 1.5rem; }
+      .mb-8 { margin-bottom: 2rem; }
+      .mb-10 { margin-bottom: 2.5rem; }
+      .gap-4 { gap: 1rem; }
+
+      /* Typography scale */
+      .text-base { font-size: 1rem; }
+      .text-lg { font-size: 1.125rem; }
+      .text-5xl { font-size: 3rem; }
+      .text-6xl { font-size: 3.75rem; }
+
+      .font-bold { font-weight: 700; }
+      .font-extrabold { font-weight: 800; }
+
+      .text-balance { text-wrap: balance; }
+      .text-center { text-align: center; }
+
+      /* Container — max-width for content */
+      .max-w-5xl { max-width: 64rem; }
+      .mx-auto { margin-left: auto; margin-right: auto; }
+      .w-full { width: 100%; }
+
+      /* Buttons — visible immediately */
+      .rounded-2xl { border-radius: 1rem; }
+      .px-8 { padding-left: 2rem; padding-right: 2rem; }
+      .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+
+      /* Loading state — skeleton animations */
+      .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+      @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+      /* Responsive */
+      @media (min-width: 640px) {
+        .sm\:block { display: block; }
+        .sm\:flex { display: flex; }
+        .sm\:pt-14 { padding-top: 3.5rem; }
+        .sm\:px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+        .sm\:text-6xl { font-size: 3.75rem; }
+      }
+
+      @media (min-width: 1024px) {
+        .lg\:block { display: block; }
+        .lg\:text-\[4\.25rem\] { font-size: 4.25rem; }
+        .lg\:px-8 { padding-left: 2rem; padding-right: 2rem; }
+      }
     </style>
 
     <title>CardPop | Australia's Trading Card Marketplace</title>
@@ -39,13 +108,13 @@
     <meta name="author" content="CardPop" />
     <link rel="canonical" href="https://cardpop.com.au/" />
 
-    <!-- Google Fonts — preconnect first, then load Syne -->
-    <!-- font-display:optional prevents layout shift on swap (FOUT); Syne shows on warm cache -->
+    <!-- Google Fonts — preload CSS to start download earlier, async load to avoid blocking -->
+    <!-- System font stack loads immediately as fallback; Google font enhances after download -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=optional" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=optional" media="print" onload="this.media='all'" />
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=optional" /></noscript>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" media="print" onload="this.media='all'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" /></noscript>
 
     <!-- Open Graph (Facebook, Discord, Slack previews) -->
     <meta property="og:type" content="website" />
@@ -159,11 +228,21 @@
       }
     }
     </script>
-    <!-- Impact affiliate tracking -->
-    <script type="text/javascript">(function(i,m,p,a,c,t){c.ire_o=p;c[p]=c[p]||function(){(c[p].a=c[p].a||[]).push(arguments)};t=a.createElement(m);var z=a.getElementsByTagName(m)[0];t.async=1;t.src=i;z.parentNode.insertBefore(t,z)})('https://utt.impactcdn.com/P-A7361090-8367-4d02-a53d-c4f13bef08391.js','script','impactStat',document,window);impactStat('transformLinks');impactStat('trackImpression');</script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/main.jsx"></script>
+
+    <!-- Google tag (gtag.js) — deferred until after app loads -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-NCZ6K9VFF8"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-NCZ6K9VFF8');
+    </script>
+
+    <!-- Impact affiliate tracking — deferred until after first paint -->
+    <script defer type="text/javascript">(function(i,m,p,a,c,t){c.ire_o=p;c[p]=c[p]||function(){(c[p].a=c[p].a||[]).push(arguments)};t=a.createElement(m);var z=a.getElementsByTagName(m)[0];t.async=1;t.src=i;z.parentNode.insertBefore(t,z)})('https://utt.impactcdn.com/P-A7361090-8367-4d02-a53d-c4f13bef08391.js','script','impactStat',document,window);impactStat('transformLinks');impactStat('trackImpression');</script>
   </body>
 </html>
