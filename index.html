@@ -109,10 +109,17 @@
     <link rel="canonical" href="https://cardpop.com.au/" />
 
     <!-- Google Fonts — Syne for headings (brand typeface) -->
-    <!-- System font stack loads immediately as fallback; Google font enhances after download -->
+    <!-- Async load: preload resource, load with media query, JS ensures fallback -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" />
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" media="(max-width: 0px)" id="font-syne" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" /></noscript>
+    <script>
+      var f = document.getElementById('font-syne');
+      f.media = '(max-width: 9999px)';
+      f.onload = function() { this.media = 'all'; };
+    </script>
 
     <!-- Open Graph (Facebook, Discord, Slack previews) -->
     <meta property="og:type" content="website" />
