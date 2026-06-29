@@ -2,8 +2,8 @@ import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
-import { validateRequestBody } from '../middleware/validateRequest.js';
-import { createClaimSchema, updateClaimStatusSchema } from '../schemas/buyerProtectionSchemas.js';
+import { validateRequestBody, validateRequestParams } from '../middleware/validateRequest.js';
+import { createClaimSchema, getClaimSchema, updateClaimStatusParamsSchema, updateClaimStatusBodySchema } from '../schemas/buyerProtectionSchemas.js';
 
 const router = Router();
 
@@ -96,7 +96,7 @@ router.post('/', validateRequestBody(createClaimSchema), async (req, res) => {
 });
 
 // Update claim status (admin only)
-router.put('/:claimId/status', validateRequestBody(updateClaimStatusSchema), async (req, res) => {
+router.put('/:claimId/status', validateRequestParams(updateClaimStatusParamsSchema), validateRequestBody(updateClaimStatusBodySchema), async (req, res) => {
   try {
     const { claimId } = req.params;
     const { status, resolution, refund_amount } = req.body;
@@ -140,7 +140,7 @@ router.put('/:claimId/status', validateRequestBody(updateClaimStatusSchema), asy
 });
 
 // Get claim details
-router.get('/:claimId', async (req, res) => {
+router.get('/:claimId', validateRequestParams(getClaimSchema), async (req, res) => {
   try {
     const { claimId } = req.params;
     const userId = req.user?.id;
