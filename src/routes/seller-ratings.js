@@ -1,3 +1,4 @@
+import logger from '../utils/logger.js';
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { authMiddleware, optionalAuthMiddleware, isAdminUser } from '../middleware/auth.js';
@@ -55,7 +56,7 @@ router.get('/:sellerId', async (req, res) => {
       performance: seller || null
     });
   } catch (error) {
-    console.error('Error fetching seller ratings:', error);
+    logger.error('Error fetching seller ratings:', error);
     res.status(500).json({ error: 'Failed to fetch ratings' });
   }
 });
@@ -124,7 +125,7 @@ router.post('/', authMiddleware, async (req, res) => {
 
     res.status(201).json(newRating);
   } catch (error) {
-    console.error('Error creating rating:', error);
+    logger.error('Error creating rating:', error);
     res.status(500).json({ error: 'Failed to create rating' });
   }
 });
@@ -149,7 +150,7 @@ async function updateSellerStats(sellerId) {
         .eq('id', sellerId);
     }
   } catch (error) {
-    console.error('Error updating seller stats:', error);
+    logger.error('Error updating seller stats:', error);
   }
 }
 
@@ -178,7 +179,7 @@ router.put('/:sellerId/performance', authMiddleware, async (req, res) => {
 
     res.json(data);
   } catch (error) {
-    console.error('Error updating seller performance:', error);
+    logger.error('Error updating seller performance:', error);
     res.status(500).json({ error: 'Failed to update performance' });
   }
 });

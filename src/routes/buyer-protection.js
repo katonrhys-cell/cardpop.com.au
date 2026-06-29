@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -27,7 +28,7 @@ router.get('/my-claims', async (req, res) => {
 
     res.json(claims || []);
   } catch (error) {
-    console.error('Error fetching claims:', error);
+    logger.error('Error fetching claims:', error);
     res.status(500).json({ error: 'Failed to fetch claims' });
   }
 });
@@ -97,7 +98,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(claim);
   } catch (error) {
-    console.error('Error creating claim:', error);
+    logger.error('Error creating claim:', error);
     res.status(500).json({ error: 'Failed to create claim' });
   }
 });
@@ -147,7 +148,7 @@ router.put('/:claimId/status', async (req, res) => {
 
     res.json(claim);
   } catch (error) {
-    console.error('Error updating claim:', error);
+    logger.error('Error updating claim:', error);
     res.status(500).json({ error: 'Failed to update claim' });
   }
 });
@@ -178,7 +179,7 @@ router.get('/:claimId', async (req, res) => {
 
     res.json(claim);
   } catch (error) {
-    console.error('Error fetching claim:', error);
+    logger.error('Error fetching claim:', error);
     res.status(500).json({ error: 'Failed to fetch claim' });
   }
 });

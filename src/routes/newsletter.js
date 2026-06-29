@@ -1,3 +1,4 @@
+import logger from '../utils/logger.js';
 import express from 'express';
 
 const router = express.Router();
@@ -39,7 +40,7 @@ router.post('/subscribe', async (req, res) => {
 
     return res.status(200).json({ success: true });
   } catch (err) {
-    console.error('[newsletter] subscribe error:', err);
+    logger.error('[newsletter] subscribe error:', err);
     return res.status(500).json({ error: 'Failed to connect to newsletter service.' });
   }
 });

@@ -1,3 +1,4 @@
+import logger from '../utils/logger.js';
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 
@@ -28,7 +29,7 @@ ${products?.map(product => `  <url>
         res.set('Content-Type', 'application/xml');
         res.send(xml);
     } catch (error) {
-        console.error('Error generating products sitemap:', error);
+        logger.error('Error generating products sitemap:', error);
         res.status(500).send('Error generating sitemap');
     }
 });
@@ -58,7 +59,7 @@ ${listings?.map(listing => `  <url>
         res.set('Content-Type', 'application/xml');
         res.send(xml);
     } catch (error) {
-        console.error('Error generating listings sitemap:', error);
+        logger.error('Error generating listings sitemap:', error);
         res.status(500).send('Error generating sitemap');
     }
 });
@@ -88,7 +89,7 @@ ${posts?.map(post => `  <url>
         res.set('Content-Type', 'application/xml');
         res.send(xml);
     } catch (error) {
-        console.error('Error generating blog sitemap:', error);
+        logger.error('Error generating blog sitemap:', error);
         res.status(500).send('Error generating sitemap');
     }
 });

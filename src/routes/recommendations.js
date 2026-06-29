@@ -1,3 +1,4 @@
+import logger from '../utils/logger.js';
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { optionalAuthMiddleware } from '../middleware/auth.js';
@@ -93,7 +94,7 @@ router.get('/', async (req, res) => {
       type: userInterests.size > 0 ? 'personalized' : 'popular'
     });
   } catch (error) {
-    console.error('Error generating recommendations:', error);
+    logger.error('Error generating recommendations:', error);
     res.status(500).json({ error: 'Failed to generate recommendations' });
   }
 });
@@ -145,7 +146,7 @@ router.get('/similar/:itemId', async (req, res) => {
 
     res.json(similarItems || []);
   } catch (error) {
-    console.error('Error generating similar items:', error);
+    logger.error('Error generating similar items:', error);
     res.status(500).json({ error: 'Failed to generate similar items' });
   }
 });

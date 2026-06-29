@@ -3,6 +3,7 @@ import supabase from '../utils/supabaseClient.js';
 import { optionalAuthMiddleware, isAdminUser } from '../middleware/auth.js';
 import { getUsdToAudRate } from '../utils/exchangeRates.js';
 import { escapeLike } from '../utils/escapeLike.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -59,7 +60,7 @@ router.get('/:cardName', async (req, res) => {
       sources: Object.keys(aggregated)
     });
   } catch (error) {
-    console.error('Error fetching market data:', error);
+    logger.error('Error fetching market data:', error);
     res.status(500).json({ error: 'Failed to fetch market data' });
   }
 });
@@ -97,7 +98,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(marketData);
   } catch (error) {
-    console.error('Error recording market data:', error);
+    logger.error('Error recording market data:', error);
     res.status(500).json({ error: 'Failed to record market data' });
   }
 });
@@ -142,7 +143,7 @@ router.get('/compare/:cardName', async (req, res) => {
       sources: Object.keys(latestBySource)
     });
   } catch (error) {
-    console.error('Error comparing market prices:', error);
+    logger.error('Error comparing market prices:', error);
     res.status(500).json({ error: 'Failed to compare market prices' });
   }
 });
@@ -195,7 +196,7 @@ router.get('/trending/limit/:limit', async (req, res) => {
 
     res.json(sortedCards);
   } catch (error) {
-    console.error('Error fetching trending cards:', error);
+    logger.error('Error fetching trending cards:', error);
     res.status(500).json({ error: 'Failed to fetch trending cards' });
   }
 });

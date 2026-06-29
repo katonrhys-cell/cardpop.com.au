@@ -1,3 +1,4 @@
+import logger from '../utils/logger.js';
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { optionalAuthMiddleware } from '../middleware/auth.js';
@@ -28,7 +29,7 @@ router.get('/', async (req, res) => {
 
     res.json(wishlist || []);
   } catch (error) {
-    console.error('Error fetching wishlist:', error);
+    logger.error('Error fetching wishlist:', error);
     res.status(500).json({ error: 'Failed to fetch wishlist' });
   }
 });
@@ -79,7 +80,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(wishlistItem);
   } catch (error) {
-    console.error('Error adding to wishlist:', error);
+    logger.error('Error adding to wishlist:', error);
     res.status(500).json({ error: 'Failed to add to wishlist' });
   }
 });
@@ -104,7 +105,7 @@ router.delete('/:itemId', async (req, res) => {
 
     res.status(204).send();
   } catch (error) {
-    console.error('Error removing from wishlist:', error);
+    logger.error('Error removing from wishlist:', error);
     res.status(500).json({ error: 'Failed to remove from wishlist' });
   }
 });
@@ -129,7 +130,7 @@ router.get('/check/:itemId/:itemType', async (req, res) => {
 
     res.json({ inWishlist: !!existing });
   } catch (error) {
-    console.error('Error checking wishlist:', error);
+    logger.error('Error checking wishlist:', error);
     res.json({ inWishlist: false });
   }
 });
