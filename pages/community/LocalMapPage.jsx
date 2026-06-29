@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { geocodeLocation, STATE_CENTROIDS } from '@/lib/geocode.js';
+import logger from '@/src/utils/logger.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -202,6 +203,9 @@ const LocalMapPage = () => {
             url: r.website_url,
           });
         });
+      } catch (err) {
+        logger.error(`Failed to fetch retailers: ${err.message}`);
+      }
 
       // Upcoming events — only those with at least a suburb/state so they can be placed
       try {
@@ -235,6 +239,9 @@ const LocalMapPage = () => {
             eventUrl: ev.slug ? `/events/${ev.slug}` : `/events/${ev.id}`,
           });
         });
+      } catch (err) {
+        logger.error(`Failed to fetch events: ${err.message}`);
+      }
 
       if (!cancelled) {
         setRawItems(results);

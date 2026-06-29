@@ -213,7 +213,7 @@ const CardAnalyticsPage = () => {
         setListings(shop.map(i => ({ ...i, _source: 'shop' })));
         setVaultItems(vault.map(i => ({ ...i, _source: 'vault' })));
       }
-
+    });
     return () => { cancelled = true; };
   }, [cardName]);
 
@@ -234,7 +234,7 @@ const CardAnalyticsPage = () => {
       // Also fetch price range from DB
       apiServerClient.fetch(`/market-data/price-range/${cardsightId}`)
         .then(r => r.ok ? r.json() : null)
-        .then(r => { if (r) setPriceRange(r); })
+        .then(r => { if (r) setPriceRange(r); });
     }).finally(() => setCsLoading(false));
   }, [cardsightId]);
 

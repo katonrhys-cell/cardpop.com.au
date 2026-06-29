@@ -59,19 +59,20 @@ const SignupPage = () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: formData.email, firstName: formData.name.split(' ')[0] }),
-      }
-
-      try {
-        await apiServerClient.fetch('/send-verification-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: user.id })
         });
-        setSuccess(true);
-        toast.success('Account created successfully!');
-      } catch (emailErr) {
-        toast.error('Account created, but failed to send verification email. Please contact support.');
-        navigate('/login');
+
+        try {
+          await apiServerClient.fetch('/send-verification-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id })
+          });
+          setSuccess(true);
+          toast.success('Account created successfully!');
+        } catch (emailErr) {
+          toast.error('Account created, but failed to send verification email. Please contact support.');
+          navigate('/login');
+        }
       }
     } catch (error) {
       toast.error(error.message || 'Registration failed. Email may already be in use.');

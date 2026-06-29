@@ -309,7 +309,7 @@ const CollectionPage = () => {
       const aliases = [config.name, ...(config.categoryAliases ?? [])].map(a => a.toLowerCase());
       const match = cats.find(c => aliases.includes(c.name.toLowerCase()));
       if (match) setCategoryId(match.id);
-
+    });
     return () => { cancelled = true; };
   }, [config, getCategories]);
 
@@ -319,18 +319,21 @@ const CollectionPage = () => {
     let cancelled = false;
     getSubcategoriesByCategory(categoryId).then(subs => {
       if (!cancelled) setSubOpts(subs);
+    });
     return () => { cancelled = true; };
   }, [categoryId, getSubcategoriesByCategory]);
 
   useEffect(() => {
     if (!filterSub) { setBrandOpts([]); setFilterBrand(''); return; }
     let cancelled = false;
+    getBrandsBySubcategory(filterSub).then(b => { if (!cancelled) setBrandOpts(b); });
     return () => { cancelled = true; };
   }, [filterSub, getBrandsBySubcategory]);
 
   useEffect(() => {
     if (!filterBrand) { setSeriesOpts([]); setFilterSeries(''); return; }
     let cancelled = false;
+    getSeriesByBrand(filterBrand).then(s => { if (!cancelled) setSeriesOpts(s); });
     return () => { cancelled = true; };
   }, [filterBrand, getSeriesByBrand]);
 
