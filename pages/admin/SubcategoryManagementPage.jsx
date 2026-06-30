@@ -45,7 +45,8 @@ const SubcategoryManagementPage = () => {
   const fetchData = async (showToast = false) => {
     setLoading(true);
     try {
-      const { data: allCats } = await supabase.from('categories').select('*').order('sort_order');
+      const { data: allCats, error: catsErr } = await supabase.from('categories').select('*').order('sort_order');
+      if (catsErr) throw catsErr;
       const topLevel = (allCats ?? []).filter(c => !c.parent_id);
       const children = (allCats ?? []).filter(c => c.parent_id);
       setSubcategories(children.map(c => ({ ...c, parentCategory: c.parent_id })));

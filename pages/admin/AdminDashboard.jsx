@@ -126,6 +126,13 @@ const AdminDashboard = () => {
 
         if (cancelled) return;
 
+        // Supabase queries resolve with { error } rather than rejecting, so the
+        // per-query .catch() above never fires. Log any partial-load errors so a
+        // false "0" stat isn't completely silent (a full failure still hits the
+        // catch below and shows the error screen).
+        const loadErrors = [usersRes.error, ordersRes.error, tradesRes.error, vaultRes.error].filter(Boolean);
+        if (loadErrors.length) console.error('[AdminDashboard] partial load errors:', loadErrors);
+
         const calculatedRevenue = (ordersRes.data || []).reduce((acc, o) => acc + (Number(o.total_aud) || 0), 0);
 
         setStats(prev => ({

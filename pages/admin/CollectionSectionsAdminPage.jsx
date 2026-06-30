@@ -129,21 +129,20 @@ const CollectionSectionsAdminPage = () => {
   const move = async (index, dir) => {
     const target = index + dir;
     if (target < 0 || target >= pins.length) return;
-    const a = pins[index];
-    const b = pins[target];
-    const aOrder = a.sort_order ?? index;
-    const bOrder = b.sort_order ?? target;
+
+    // Swap array positions, then renumber sequentially. Swapping the two rows'
+    // sort_order values broke when they were equal (e.g. both default 0) — the
+    // swap wrote identical values and nothing moved. Renumbering is deterministic.
     const reordered = [...pins];
-    reordered[index] = { ...b, sort_order: aOrder };
-    reordered[target] = { ...a, sort_order: bOrder };
-    reordered.sort((x, y) => (x.sort_order ?? 0) - (y.sort_order ?? 0));
-    setPins(reordered);
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    setPins(reordered.map((p, i) => ({ ...p, sort_order: i }))); // optimistic
     try {
-      const [r1, r2] = await Promise.all([
-        supabase.from('collection_section_cards').update({ sort_order: bOrder }).eq('id', a.id),
-        supabase.from('collection_section_cards').update({ sort_order: aOrder }).eq('id', b.id),
-      ]);
-      if (r1.error || r2.error) throw (r1.error || r2.error);
+      for (let i = 0; i < reordered.length; i++) {
+        if (reordered[i].sort_order !== i) {
+          const { error } = await supabase.from('collection_section_cards').update({ sort_order: i }).eq('id', reordered[i].id);
+          if (error) throw error;
+        }
+      }
     } catch (err) {
       toast.error('Failed to save new order.');
       loadPins();

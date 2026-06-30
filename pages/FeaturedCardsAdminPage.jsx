@@ -24,10 +24,14 @@ const FeaturedCardsAdminPage = () => {
   const fetchCards = async () => {
     setIsLoading(true);
     try {
-      const { data: response } = await supabase
+      // profiles has no `name`/`email` columns (display_name/username are the
+      // canonical ones) — selecting them errored the query, silently emptying
+      // the page. Use real columns and surface any read error.
+      const { data: response, error } = await supabase
         .from('vault_items')
-        .select('*, profiles(name, email)')
+        .select('*, profiles(display_name, username)')
         .order('created_at', { ascending: false });
+      if (error) throw error;
       setCards(response || []);
     } catch (error) {
       toast.error('Failed to load cards. Please refresh the page.');
@@ -168,7 +172,7 @@ const FeaturedCardsAdminPage = () => {
                       </td>
                       <td className="px-6 py-4 hidden md:table-cell">
                         <p className="text-foreground font-medium truncate max-w-[150px]">
-                          {card.profiles?.name || card.profiles?.email || 'Unknown Owner'}
+                          {card.profiles?.display_name || card.profiles?.username || 'Unknown Owner'}
                         </p>
                       </td>
                       <td className="px-6 py-4 text-right">

@@ -44,7 +44,8 @@ const ProductLinesManagementPage = () => {
   const fetchData = async (showToast = false) => {
     setLoading(true);
     try {
-      const { data: allCats } = await supabase.from('categories').select('*').order('sort_order');
+      const { data: allCats, error: catsErr } = await supabase.from('categories').select('*').order('sort_order');
+      if (catsErr) throw catsErr;
       const topLevel = (allCats ?? []).filter(c => !c.parent_id);
       const secondLevel = (allCats ?? []).filter(c => c.parent_id);
       setProductLines(secondLevel.map(c => ({ ...c, brand: c.parent_id })));
