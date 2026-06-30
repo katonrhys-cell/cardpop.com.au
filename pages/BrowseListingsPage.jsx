@@ -29,7 +29,10 @@ const BrowseListingsPage = () => {
       try {
         let query = supabase
           .from('listings')
-          .select('*, vault_item:vault_items(*, vault_images(*), categories(*)), seller:profiles!seller_id(*)')
+          // Only fetch what the page/card actually reads: the seller(*) and
+          // categories(*) joins were never consumed (ProductCard reads a
+          // PocketBase-style `expand` path), and vault_images only needs image_url.
+          .select('*, vault_item:vault_items(*, vault_images(image_url))')
           .or('status.eq.active,status.eq.For Sale')
           .limit(24);
 
