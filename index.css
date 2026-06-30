@@ -1,5 +1,16 @@
 /* CardPop Australia — Syne ExtraBold 800 for headings (loaded via <link> in index.html) */
 
+/* Brand heading font — self-hosted (same-origin) Syne variable font, latin
+   subset, weight axis 400–800. Self-hosting replaces the flaky runtime Google
+   Fonts loader so headings render Syne reliably across the site. */
+@font-face {
+  font-family: 'Syne';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('/fonts/syne-latin-var.woff2') format('woff2');
+}
+
 /* Metric-adjusted fallback for Syne — reduces layout shift if Syne isn't cached yet */
 @font-face {
   font-family: 'Syne Fallback';

@@ -13,11 +13,12 @@
     <link rel="alternate" hreflang="x-default" href="https://cardpop.com.au/" />
 
     <!-- Core Web Vitals: preconnect only to origins used on first paint.
-         Keep this list <=4 (Lighthouse warns past that). No self-preconnect —
-         the document already came from this origin. -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+         Fonts are now self-hosted (same-origin) so no font-CDN preconnect is
+         needed. Supabase is the first data origin the app hits. -->
     <link rel="preconnect" href="https://odoglvswwymyjuwlonkf.supabase.co" crossorigin />
+    <!-- Preload the self-hosted Syne heading font (crossorigin required even
+         same-origin — fonts fetch in CORS/anonymous mode). @font-face is in index.css. -->
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/syne-latin-var.woff2" crossorigin />
     
     <!-- Prevent CLS: width+height attrs + height:auto lets browser compute aspect-ratio before load -->
     <!-- Critical CSS: minimal above-the-fold styles to enable rendering without full CSS file -->
@@ -109,18 +110,6 @@
     <meta name="author" content="CardPop™" />
     <!-- Canonical is emitted per-route by SEOHead (apex-normalised) so it never
          conflicts with a static tag. The www host 301-redirects to apex (vercel.json). -->
-
-    <!-- Google Fonts — Syne for headings (brand typeface) -->
-    <!-- Async load: preload resource, load with media query, JS ensures fallback.
-         (Font preconnects are declared once, above, in the Core Web Vitals block.) -->
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" media="(max-width: 0px)" id="font-syne" />
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" /></noscript>
-    <script>
-      var f = document.getElementById('font-syne');
-      f.media = '(max-width: 9999px)';
-      f.onload = function() { this.media = 'all'; };
-    </script>
 
     <!-- Open Graph (Facebook, Discord, Slack previews) -->
     <meta property="og:type" content="website" />
