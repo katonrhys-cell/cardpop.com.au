@@ -190,8 +190,11 @@ const HomePage = () => {
   useEffect(() => {
     let isMounted = true;
 
+    // Defer data fetching until after first paint using requestIdleCallback / setTimeout
+    // This prevents Supabase queries from blocking LCP
     const fetchHomeData = async () => {
       try {
+        // Use 5-minute cache for homepage data (user sees fresh content on repeat visits)
         const [listingsRes, sellersRes] = await Promise.all([
           cachedQuery('homepage_featured_cards', () =>
             supabase.from('vault_items').select('*, owner:profiles!owner_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count), vault_images(*)').eq('is_public', true).neq('listing_type', 'Private').order('created_at', { ascending: false }).limit(4),
@@ -222,7 +225,14 @@ const HomePage = () => {
       }
     };
 
-    fetchHomeData();
+    // Schedule fetch to run after first paint / initial render
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(fetchHomeData, { timeout: 2000 });
+    } else {
+      const timer = setTimeout(fetchHomeData, 100);
+      return () => clearTimeout(timer);
+    }
+
     return () => { isMounted = false; };
   }, []);
 
