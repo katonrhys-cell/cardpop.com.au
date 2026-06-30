@@ -20,7 +20,7 @@ const FEATURES = [
 
 const TESTIMONIALS = [
   {
-    quote: <>I've traded cards online for years and always had that nagging doubt. CardPop<sup className="text-[0.6em]">™</sup> completely changed that — sold a PSA 10 without a second thought.</>,
+    quote: "I've traded cards online for years and always had that nagging doubt. CardPop™ completely changed that — sold a PSA 10 without a second thought.",
     name: 'Jake M.',
     location: 'Sydney, NSW',
   },
@@ -30,7 +30,7 @@ const TESTIMONIALS = [
     location: 'Brisbane, QLD',
   },
   {
-    quote: <>For high-value trades, peace of mind is everything. Knowing sellers are verified before I commit makes CardPop<sup className="text-[0.6em]">™</sup> the only place I buy from now.</>,
+    quote: "For high-value trades, peace of mind is everything. Knowing sellers are verified before I commit makes CardPop™ the only place I buy from now.",
     name: 'Chris W.',
     location: 'Perth, WA',
   },
@@ -48,7 +48,7 @@ const AboutPage = () => {
             Built for the hobby.<br />Powered by collectors.
           </h1>
           <p className="text-lg leading-relaxed max-w-xl opacity-70 mb-10">
-            CardPop<sup className="text-[0.6em]">™</sup> Australia was created to bring the energy of card shows,
+            CardPop™ Australia was created to bring the energy of card shows,
             trade nights, and collector culture into one trusted digital marketplace.
           </p>
           <div className="flex flex-wrap gap-3">
@@ -88,7 +88,7 @@ const AboutPage = () => {
               that uncertainty isn't just frustrating. It's a real barrier.
             </p>
             <p>
-              CardPop<sup className="text-[0.6em]">™</sup> was built to solve that. A place where cards can be shared, traded, and
+              CardPop™ was built to solve that. A place where cards can be shared, traded, and
               genuinely enjoyed — where your duplicates and seconds find new homes with people
               who'll love them just as much as you did. Where verified sellers give buyers real
               peace of mind. And where every transaction carries the same trust you'd feel shaking
