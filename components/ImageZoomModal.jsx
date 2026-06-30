@@ -7,6 +7,9 @@ import { Button } from '@/components/ui/button';
 const ImageZoomModal = ({ isOpen, onClose, imageUrl, altText }) => {
   const [scale, setScale] = useState(1);
   const containerRef = useRef(null);
+  const dialogRef = useRef(null);
+  const closeButtonRef = useRef(null);
+  const previouslyFocusedRef = useRef(null);
   
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -47,14 +50,36 @@ const ImageZoomModal = ({ isOpen, onClose, imageUrl, altText }) => {
       if (e.key === 'ArrowDown') y.set(y.get() - panStep);
       if (e.key === 'ArrowLeft') x.set(x.get() + panStep);
       if (e.key === 'ArrowRight') x.set(x.get() - panStep);
+
+      // Trap focus within the dialog so Tab can't reach the page behind it.
+      if (e.key === 'Tab' && dialogRef.current) {
+        const focusable = dialogRef.current.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     document.body.style.overflow = 'hidden';
 
+    // Move focus into the dialog on open; restore it to the trigger on close.
+    previouslyFocusedRef.current = document.activeElement;
+    closeButtonRef.current?.focus();
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'unset';
+      previouslyFocusedRef.current?.focus?.();
     };
   }, [isOpen, onClose, x, y, handleZoom]);
 
@@ -76,6 +101,10 @@ const ImageZoomModal = ({ isOpen, onClose, imageUrl, altText }) => {
     <AnimatePresence>
       {isOpen && (
         <motion.div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={altText ? `Zoomed image: ${altText}` : 'Image zoom viewer'}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -89,6 +118,7 @@ const ImageZoomModal = ({ isOpen, onClose, imageUrl, altText }) => {
               {Math.round(scale * 100)}%
             </div>
             <button
+              ref={closeButtonRef}
               onClick={onClose}
               className="p-2 text-white/70 hover:text-white bg-black/40 hover:bg-white/20 rounded-full transition-all backdrop-blur-sm"
               aria-label="Close image zoom"
@@ -125,17 +155,18 @@ const ImageZoomModal = ({ isOpen, onClose, imageUrl, altText }) => {
               size="icon" 
               onClick={() => handleZoom(-0.5)}
               disabled={scale <= MIN_SCALE}
+              aria-label="Zoom out"
               className="text-white hover:bg-white/20 rounded-xl h-10 w-10"
             >
               <ZoomOut className="w-5 h-5" />
             </Button>
-            
-            <input 
-              type="range" 
-              min={MIN_SCALE} 
-              max={MAX_SCALE} 
-              step="0.1" 
-              value={scale} 
+
+            <input
+              type="range"
+              min={MIN_SCALE}
+              max={MAX_SCALE}
+              step="0.1"
+              value={scale}
               onChange={(e) => {
                 const val = parseFloat(e.target.value);
                 setScale(val);
@@ -144,6 +175,7 @@ const ImageZoomModal = ({ isOpen, onClose, imageUrl, altText }) => {
                   y.set(0);
                 }
               }}
+              aria-label="Zoom level"
               className="w-32 sm:w-48 accent-primary"
             />
             
@@ -152,6 +184,7 @@ const ImageZoomModal = ({ isOpen, onClose, imageUrl, altText }) => {
               size="icon" 
               onClick={() => handleZoom(0.5)}
               disabled={scale >= MAX_SCALE}
+              aria-label="Zoom in"
               className="text-white hover:bg-white/20 rounded-xl h-10 w-10"
             >
               <ZoomIn className="w-5 h-5" />
@@ -164,6 +197,7 @@ const ImageZoomModal = ({ isOpen, onClose, imageUrl, altText }) => {
               size="icon" 
               onClick={resetZoom}
               disabled={scale === MIN_SCALE && x.get() === 0 && y.get() === 0}
+              aria-label="Reset zoom"
               className="text-white hover:bg-white/20 rounded-xl h-10 w-10"
               title="Reset Zoom"
             >
