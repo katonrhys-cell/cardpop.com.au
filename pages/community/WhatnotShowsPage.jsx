@@ -100,6 +100,12 @@ const WhatnotShowsPage = () => {
 
   useEffect(() => { fetchShows(); }, [fetchShows]);
 
+  // Revoke the previous image-preview object URL when it changes or on unmount
+  // (otherwise selecting/replacing an image leaks its Blob for the page lifetime).
+  useEffect(() => {
+    return () => { if (imagePreview) URL.revokeObjectURL(imagePreview); };
+  }, [imagePreview]);
+
   const handleImageChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;

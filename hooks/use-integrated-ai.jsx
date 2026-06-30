@@ -170,6 +170,9 @@ function useIntegratedAi() {
 	const [isStreaming, setIsStreaming] = useState(false);
 	const [isLoadingHistory, setIsLoadingHistory] = useState(true);
 	const abortControllerRef = useRef(null);
+	// Track object URLs created for attached images so we can revoke them
+	// (otherwise each image chat permanently leaks its Blob for the page lifetime).
+	const objectUrlsRef = useRef([]);
 
 	useEffect(() => {
 		async function loadHistory() {
@@ -271,7 +274,11 @@ function useIntegratedAi() {
 				role: 'user',
 				content: userMessage,
 				...(images.length > 0 && {
-					images: images.map(img => URL.createObjectURL(img)),
+					images: images.map(img => {
+						const url = URL.createObjectURL(img);
+						objectUrlsRef.current.push(url);
+						return url;
+					}),
 				}),
 			},
 			{ role: 'assistant', content: '' },
@@ -353,7 +360,15 @@ function useIntegratedAi() {
 	}, [handleSSEEvent]);
 
 	const clearMessages = useCallback(() => {
+		objectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+		objectUrlsRef.current = [];
 		setMessages([]);
+	}, []);
+
+	// Revoke any outstanding image object URLs on unmount.
+	useEffect(() => () => {
+		objectUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+		objectUrlsRef.current = [];
 	}, []);
 
 	return {

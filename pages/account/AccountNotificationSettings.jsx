@@ -66,16 +66,24 @@ const AccountNotificationSettings = () => {
     if (!currentUser?.id) { setLoading(false); return; }
     let cancelled = false;
     const run = async () => {
-      const { data, error } = await supabase
-        .from('notification_preferences')
-        .select('type, in_app, email')
-        .eq('user_id', currentUser.id);
-      if (error) throw error;
-      if (!cancelled) {
-        const map = {};
-        (data || []).forEach(r => { map[r.type] = { in_app: r.in_app, email: r.email }; });
-        setPrefs(map);
-        setLoading(false);
+      try {
+        const { data, error } = await supabase
+          .from('notification_preferences')
+          .select('type, in_app, email')
+          .eq('user_id', currentUser.id);
+        if (error) throw error;
+        if (!cancelled) {
+          const map = {};
+          (data || []).forEach(r => { map[r.type] = { in_app: r.in_app, email: r.email }; });
+          setPrefs(map);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Failed to load notification preferences:', err);
+          toast.error('Could not load your notification preferences.');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     };
     run();
@@ -98,7 +106,8 @@ const AccountNotificationSettings = () => {
       const rows = Object.entries(prefs).map(([type, v]) => ({
         user_id: currentUser.id, type, in_app: v.in_app ?? true, email: v.email ?? false,
       }));
-      await supabase.from('notification_preferences').upsert(rows, { onConflict: 'user_id,type' });
+      const { error } = await supabase.from('notification_preferences').upsert(rows, { onConflict: 'user_id,type' });
+      if (error) throw error;
       toast.success('Notification preferences saved');
     } catch {
       toast.error('Failed to save preferences');
