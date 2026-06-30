@@ -1,12 +1,16 @@
 name: Snyk Security Scan
 
+# Scoped to main pushes + a weekly sweep instead of every PR: per-PR dependency
+# scanning is already provided by the Snyk GitHub App (the `security/snyk`
+# status check), so the per-PR workflow run (checkout + npm ci + scan) was
+# redundant and burned Actions minutes / Snyk test quota.
 on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
+  schedule:
+    - cron: '0 3 * * 1' # Mondays 03:00 UTC
+  workflow_dispatch:
 
 jobs:
   snyk:
