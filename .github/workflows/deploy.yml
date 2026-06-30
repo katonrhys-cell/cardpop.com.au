@@ -16,7 +16,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint:
+  # Single quality gate: one checkout + one `npm ci`, then lint, the full test
+  # suite, build and the bundle budget run sequentially. Previously these were
+  # four separate jobs (lint / test-frontend / test-backend / build), each doing
+  # its own `npm ci` — ~4× the install cost per push for no extra coverage.
+  verify:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -34,56 +38,8 @@ jobs:
       - name: Lint
         run: npm run lint
 
-  test-frontend:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Test frontend
-        run: npx vitest run tests/frontend/
-
-  test-backend:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Test backend
-        run: npx vitest run tests/backend/
-
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
+      - name: Test
+        run: npm test
 
       - name: Build
         run: npm run build
@@ -93,7 +49,6 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    needs: [build]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -114,7 +69,7 @@ jobs:
         run: npm run test:e2e
 
   deploy:
-    needs: [lint, test-frontend, test-backend, build, e2e]
+    needs: [verify, e2e]
     runs-on: ubuntu-latest
     # OIDC: the job mints a short-lived token GitHub signs, AWS trusts it, and we
     # assume an IAM role for temporary credentials — no long-lived AWS keys here.
