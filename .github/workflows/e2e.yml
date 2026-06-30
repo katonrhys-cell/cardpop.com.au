@@ -7,6 +7,9 @@ name: E2E
 
 on:
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
 
 concurrency:
   group: e2e-${{ github.ref }}
@@ -30,6 +33,15 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # Cache the downloaded browser binary across runs (keyed on the lockfile,
+      # which pins the Playwright version) so we don't re-fetch ~50 MB of
+      # Chromium every run. --with-deps still runs so the apt libs are present.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
 
       # GitHub runners don't have the browser pre-installed (this repo's dev
       # sandbox does), so fetch it here.

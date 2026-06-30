@@ -1,15 +1,15 @@
 name: CI
 
-# Runs lint + the full test suite + a production build on every pull request
-# and on pushes to main. This is the gate that makes the test suite actually
-# protect production — enable it as a required status check in branch
+# Runs lint + the full test suite + a production build on every pull request.
+# This is the PR gate — enable it as a required status check in branch
 # protection so a red build can't be merged.
+#
+# NOTE: intentionally PR-only. Pushes to main are covered by the equivalent
+# `verify` job in deploy.yml (which then deploys), so running this on main too
+# would just duplicate the whole suite and burn Actions minutes twice.
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
 
 concurrency:
   group: ci-${{ github.ref }}

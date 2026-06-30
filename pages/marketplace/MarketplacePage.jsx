@@ -161,7 +161,7 @@ const MarketplacePage = () => {
 
         if (filterMode === 'Auction')   query = query.eq('listing_type', 'auction');
         else if (filterMode === 'BuyNow') query = query.eq('listing_type', 'fixed');
-        else if (filterMode === 'ForTrade') query = query.eq('listing_type', 'trade');
+        else if (filterMode === 'ForTrade') query = query.eq('accepts_trade', true);
         else if (filterMode === 'MakeOffer') query = query.eq('accepts_offers', true);
 
         if (filterRookie) query = query.contains('vault_items.cardVariants', ['Rookie Card (RC)']);

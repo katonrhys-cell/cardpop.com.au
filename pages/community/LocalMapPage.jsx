@@ -178,34 +178,11 @@ const LocalMapPage = () => {
       setLoading(true);
       const results = [];
 
-      // Retailers with a physical storefront
-      try {
-        const { data: retailers } = await supabase
-          .from('business_profiles')
-          .select('id, business_name, store_address, store_suburb, store_state, store_postcode, specialises_in, website_url, logo_url')
-          .eq('has_physical_store', true)
-          .not('store_state', 'is', null);
-
-        (retailers || []).forEach(r => {
-          const parts = [r.store_address, r.store_suburb, r.store_state, r.store_postcode].filter(Boolean);
-          results.push({
-            id: 'retailer-' + r.id,
-            type: 'retailer',
-            name: r.business_name || 'Card Store',
-            geocodeParams: {
-              address: r.store_address,
-              suburb: r.store_suburb,
-              state: r.store_state,
-              postcode: r.store_postcode,
-            },
-            location: parts.join(', '),
-            description: r.specialises_in?.length ? `Specialises in: ${r.specialises_in.join(', ')}` : null,
-            url: r.website_url,
-          });
-        });
-      } catch (err) {
-        logger.error(`Failed to fetch retailers: ${err.message}`);
-      }
+      // NOTE: retailer/storefront markers are intentionally not fetched yet.
+      // business_profiles has no location/geo columns (the previous query hit
+      // non-existent columns like store_address/has_physical_store and silently
+      // errored). Re-add this layer once a store-location data source exists; the
+      // 'retailer' marker type and the "List Your Store" CTA are kept for then.
 
       // Upcoming events — only those with at least a suburb/state so they can be placed
       try {

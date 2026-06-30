@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, ShieldCheck, ZoomIn } from 'lucide-react';
+import { Star, ShieldCheck, ZoomIn, ShoppingCart } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { slugify } from '@/lib/slugify.js';
 import { getRefractorLabel, getRefractorBadgeClass } from '@/lib/cardAttributeLabels.js';
 import CardMicroscope from '@/components/CardMicroscope.jsx';
@@ -17,7 +18,7 @@ const BasketballSinglet = ({ className = 'w-3 h-3' }) => (
   </svg>
 );
 
-const ProductCard = ({ product }) => {
+const ProductCard = ({ product, onAddToCart }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
   const rawImg = product.images?.[0] || product.cardImage?.[0] || product.card_image || product.image_url || null;
   const { src: imgSrc, srcSet: imgSrcSet, fallbackSrc: imgFallback } = getCardImage(rawImg);
@@ -136,7 +137,17 @@ const ProductCard = ({ product }) => {
               </span>
             )}
           </div>
-          
+
+          {onAddToCart && (
+            <Button
+              size="sm"
+              className="w-full rounded-xl font-bold"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAddToCart(product); }}
+            >
+              <ShoppingCart className="w-4 h-4 mr-2" /> Add to Cart
+            </Button>
+          )}
+
           {sellerId && (
             <Link 
               to={`/seller/${sellerId}`} 
