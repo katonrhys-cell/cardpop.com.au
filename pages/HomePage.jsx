@@ -238,8 +238,8 @@ const HomePage = () => {
   return (
     <div className="min-h-screen bg-background font-sans overflow-hidden">
       <SEOHead
-        title="CardPop | Australia's Trading Card Marketplace"
-        description="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop — Australia's most trusted trading card platform."
+        title="CardPop™ | Australia's Trading Card Marketplace"
+        description="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop™ Australia — Australia's most trusted trading card platform."
       />
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
@@ -313,7 +313,7 @@ const HomePage = () => {
               }}
             >
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
-              CardPop Live
+              CardPop™ Live
               <span className="text-white/30 font-normal">·</span>
               <span className="text-white/60 font-semibold normal-case tracking-normal">Australia's Card Show</span>
             </motion.div>
