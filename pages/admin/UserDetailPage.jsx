@@ -55,6 +55,34 @@ const UserDetailPage = () => {
     }
   };
 
+  // Performs the action chosen in the confirmation modal. Previously the modal's
+  // Confirm button was wired to a non-existent `onComplete` prop and there was no
+  // mutation, so Suspend/Reactivate/Reset-password did nothing.
+  const handleConfirmAction = async () => {
+    const type = actionModal.type;
+    if (!type || !userId) return;
+    try {
+      if (type === 'suspend' || type === 'unsuspend') {
+        const { error: updErr } = await supabase
+          .from('profiles')
+          .update({ is_active: type === 'unsuspend' })
+          .eq('id', userId);
+        if (updErr) throw updErr;
+        toast.success(type === 'suspend' ? 'Account suspended.' : 'Account reactivated.');
+        refetch?.();
+      } else if (type === 'reset_password') {
+        if (!user?.email) { toast.error('No email on file for this user.'); return; }
+        const { error: resetErr } = await supabase.auth.resetPasswordForEmail(user.email, {
+          redirectTo: `${window.location.origin}/reset-password`,
+        });
+        if (resetErr) throw resetErr;
+        toast.success('Password reset email sent to the user.');
+      }
+    } catch (err) {
+      toast.error(err.message || 'Action failed.');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -172,8 +200,13 @@ const UserDetailPage = () => {
               <Button variant="outline" className="w-full justify-start" onClick={() => openAction('reset_password')}>
                 <KeyRound className="w-4 h-4 mr-2" /> Send Password Reset
               </Button>
-              <Button variant="outline" className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20" onClick={() => openAction('delete')}>
-                <Trash2 className="w-4 h-4 mr-2" /> Delete Account
+              <Button
+                variant="outline"
+                className="w-full justify-start text-muted-foreground border-border"
+                disabled
+                title="Account deletion requires a service-role backend endpoint (auth user removal). Not yet available."
+              >
+                <Trash2 className="w-4 h-4 mr-2" /> Delete Account (unavailable)
               </Button>
             </div>
           </CardContent>
@@ -279,12 +312,12 @@ const UserDetailPage = () => {
         </div>
       </div>
 
-      <UserActionsModal 
-        isOpen={actionModal.isOpen} 
-        onClose={closeAction} 
-        actionType={actionModal.type} 
+      <UserActionsModal
+        isOpen={actionModal.isOpen}
+        onClose={closeAction}
+        actionType={actionModal.type}
         user={user}
-        onComplete={refetch}
+        onConfirm={handleConfirmAction}
       />
     </div>
   );

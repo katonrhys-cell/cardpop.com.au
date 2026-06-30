@@ -152,6 +152,10 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
           seller_id: currentUser.id,
           listing_type: selected.listingType,
           status: 'active',
+          // 'For Sale & Trade' (listing_type 'fixed') and 'For Trade' both accept
+          // trades — this flag is what the marketplace trade filter matches on,
+          // so a fixed-price-but-trade-open listing is no longer invisible to it.
+          accepts_trade: !!selected.needsTrade,
           price_aud: selected.needsPrice ? Number(price) : null,
           trade_wants: selected.needsTrade ? (tradeWants.trim() || null) : null,
           listed_at: new Date().toISOString(),

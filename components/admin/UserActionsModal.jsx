@@ -4,10 +4,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 
 const ACTION_LABELS = {
-  ban: { title: 'Ban User', description: 'This will prevent the user from logging in.', variant: 'destructive' },
-  unban: { title: 'Unban User', description: 'This will restore the user\'s access.', variant: 'default' },
+  suspend: { title: 'Suspend Account', description: 'This deactivates the account (hides their public store and listings) until reactivated.', variant: 'destructive' },
+  unsuspend: { title: 'Reactivate Account', description: 'This restores the account to active.', variant: 'default' },
   reset_password: { title: 'Reset Password', description: 'Send a password reset email to the user.', variant: 'default' },
-  delete: { title: 'Delete User', description: 'Permanently delete this user and all their data. This cannot be undone.', variant: 'destructive' },
 };
 
 const UserActionsModal = ({ isOpen, onClose, actionType, user, onConfirm }) => {
@@ -24,7 +23,7 @@ const UserActionsModal = ({ isOpen, onClose, actionType, user, onConfirm }) => {
         </DialogHeader>
         <p className="text-sm text-muted-foreground">
           {action.description}
-          {user?.name && <> User: <strong>{user.name}</strong></>}
+          {(user?.display_name || user?.username) && <> User: <strong>{user.display_name || user.username}</strong></>}
         </p>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>

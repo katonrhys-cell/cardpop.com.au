@@ -87,8 +87,27 @@ const ShopSinglesPage = () => {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  const handleAddToCart = (product, variant) => {
-    addToCart(product, variant, 1, product.stockQuantity || 1);
+  const handleAddToCart = (product) => {
+    // Build a proper cart product/variant from the real shop_products columns
+    // (price_aud / stock_quantity), mirroring the product detail page.
+    const priceInCents = Math.round((Number(product.price_aud) || 0) * 100);
+    const cartProduct = {
+      id: product.id,
+      source: 'shop',
+      type: 'shop',
+      title: product.name,
+      price: priceInCents / 100,
+      image: product.images?.[0] || product.image_url || product.card_image || null,
+      grading_company: product.grading_company || null,
+      grade: product.grade || null,
+    };
+    const cartVariant = {
+      id: product.id,
+      price_in_cents: priceInCents,
+      manage_inventory: product.stock_quantity != null,
+      inventory_quantity: product.stock_quantity,
+    };
+    addToCart(cartProduct, cartVariant, 1, product.stock_quantity ?? 999);
     toast.success(`${product.name || 'Item'} added to cart`);
   };
 

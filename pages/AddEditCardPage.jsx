@@ -615,6 +615,7 @@ const AddEditCardPage = () => {
   const syncMarketplaceListing = async (cardId) => {
     const isPublic = formData.listingType !== 'private';
     const isSale   = formData.listingType === 'For Sale' || formData.listingType === 'For Sale & Trade';
+    const acceptsTrade = formData.listingType === 'For Trade' || formData.listingType === 'For Sale & Trade';
     try {
       if (!isPublic) {
         // Going private — archive any active listing.
@@ -632,6 +633,7 @@ const AddEditCardPage = () => {
         seller_id:     currentUser.id,
         listing_type:  isSale ? 'fixed' : 'trade',
         status:        'active',
+        accepts_trade: acceptsTrade,
         price_aud:     isSale ? (parseFloat(formData.estimatedValue) || null) : null,
         listed_at:     new Date().toISOString(),
       };

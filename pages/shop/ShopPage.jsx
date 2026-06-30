@@ -73,8 +73,29 @@ const ShopPage = () => {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
-  const handleAddToCart = (product, variant) => {
-    addToCart(product, variant, 1, product.stockQuantity ?? 999)
+  const handleAddToCart = (product) => {
+    // Build the cart product/variant the same way the product detail page does,
+    // using the real shop_products columns (price_aud / stock_quantity). The grid
+    // previously passed no variant, so the cart fell back to the raw row (no
+    // price_in_cents → $0) and read stockQuantity (camelCase, always undefined).
+    const priceInCents = Math.round((Number(product.price_aud) || 0) * 100);
+    const cartProduct = {
+      id: product.id,
+      source: 'shop',
+      type: 'shop',
+      title: product.name,
+      price: priceInCents / 100,
+      image: product.images?.[0] || product.image_url || product.card_image || null,
+      grading_company: product.grading_company || null,
+      grade: product.grade || null,
+    };
+    const cartVariant = {
+      id: product.id,
+      price_in_cents: priceInCents,
+      manage_inventory: product.stock_quantity != null,
+      inventory_quantity: product.stock_quantity,
+    };
+    addToCart(cartProduct, cartVariant, 1, product.stock_quantity ?? 999)
       .then(() => toast.success('Added to cart'))
       .catch(e => toast.error(e.message));
   };
