@@ -152,7 +152,7 @@ router.patch('/:id/base-value', authMiddleware, async (req, res) => {
     return res.status(403).json({ error: 'Only administrators can adjust locked base values.' });
   }
 
-  if (!newValue || isNaN(Number(newValue)) || Number(newValue) < 0) {
+  if (newValue === undefined || newValue === null || isNaN(Number(newValue)) || Number(newValue) < 0) {
     return res.status(400).json({ error: 'A valid newValue (number >= 0) is required.' });
   }
 

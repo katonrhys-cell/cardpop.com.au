@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { Plus, Search, Edit, Trash2, Layers, AlertCircle, RefreshCw, ImageOff, ChevronLeft } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -44,7 +44,8 @@ const ProductLinesManagementPage = () => {
   const fetchData = async (showToast = false) => {
     setLoading(true);
     try {
-      const { data: allCats } = await supabase.from('categories').select('*').order('sort_order');
+      const { data: allCats, error: catsErr } = await supabase.from('categories').select('*').order('sort_order');
+      if (catsErr) throw catsErr;
       const topLevel = (allCats ?? []).filter(c => !c.parent_id);
       const secondLevel = (allCats ?? []).filter(c => c.parent_id);
       setProductLines(secondLevel.map(c => ({ ...c, brand: c.parent_id })));
@@ -132,7 +133,8 @@ const ProductLinesManagementPage = () => {
       if (formData.image instanceof File) {
         const path = `categories/${Date.now()}-${formData.image.name}`;
         const { error: upErr } = await supabase.storage.from('categories').upload(path, formData.image, { upsert: true });
-        if (!upErr) image_url = supabase.storage.from('categories').getPublicUrl(path).data.publicUrl;
+        if (upErr) throw upErr; // don't silently save without the uploaded image
+        image_url = supabase.storage.from('categories').getPublicUrl(path).data.publicUrl;
       }
       const payload = { name: formData.name.trim(), description: formData.description.trim(), parent_id: formData.brand || null, image_url };
 

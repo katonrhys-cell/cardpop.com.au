@@ -89,12 +89,25 @@ router.post('/record-failure', async (req, res) => {
   res.json({ success: true });
 });
 
-// Clear failed attempts after successful login
+// Clear failed attempts after successful login. This MUST require proof of a
+// successful authentication: a valid Supabase session token whose user matches
+// the email. Without it, anyone could reset a victim's (or their own) lockout
+// with just an email and no credentials — nullifying the brute-force lockout.
 router.post('/record-success', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email is required' });
-  const ipAddress = req.ip || 'unknown';
 
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'Authentication required' });
+
+  const { data, error } = await supabase.auth.getUser(token);
+  const tokenEmail = (data?.user?.email || '').toLowerCase();
+  if (error || !data?.user || tokenEmail !== email.trim().toLowerCase()) {
+    return res.status(403).json({ error: 'Token does not match the account' });
+  }
+
+  const ipAddress = req.ip || 'unknown';
   await clearLoginAttempts(email.trim().toLowerCase(), ipAddress);
   res.json({ success: true });
 });

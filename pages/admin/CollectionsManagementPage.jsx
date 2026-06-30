@@ -208,9 +208,24 @@ const CollectionsManagementPage = () => {
   };
 
   const moveOrder = async (era, direction) => {
-    const newOrder = era.sort_order + direction;
-    await supabase.from('collection_eras').update({ sort_order: newOrder }).eq('id', era.id);
-    fetchEras();
+    const idx = eras.findIndex(e => e.id === era.id);
+    const targetIdx = idx + direction;
+    if (idx < 0 || targetIdx < 0 || targetIdx >= eras.length) return;
+
+    // Swap array positions, then renumber sequentially. The previous code just
+    // did sort_order + direction on a single row — it never swapped the
+    // neighbour, so gaps left the control looking dead and duplicate sort_order
+    // values created more duplicates. Renumbering guarantees a clean order.
+    const reordered = [...eras];
+    [reordered[idx], reordered[targetIdx]] = [reordered[targetIdx], reordered[idx]];
+    setEras(reordered); // optimistic
+
+    for (let i = 0; i < reordered.length; i++) {
+      if (reordered[i].sort_order !== i) {
+        const { error } = await supabase.from('collection_eras').update({ sort_order: i }).eq('id', reordered[i].id);
+        if (error) { toast.error('Failed to reorder. Reverting.'); fetchEras(); return; }
+      }
+    }
   };
 
   const selectedConfig = COLLECTION_CONFIGS[selectedSlug];

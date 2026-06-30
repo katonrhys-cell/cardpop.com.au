@@ -16,7 +16,7 @@ export async function processRefund(req, res) {
 
     const { data: refund, error: rErr } = await supabase
       .from('refunds')
-      .select('*, order:orders!order_id(id, stripe_payment_intent_id, total_aud, status, refund_status, seller_id, stripe_transfer_id, payout_status, seller_proceeds_aud)')
+      .select('*, order:orders!order_id(id, stripe_payment_intent_id, total_aud, platform_fee_aud, gst_aud, status, refund_status, seller_id, stripe_transfer_id, payout_status, seller_proceeds_aud)')
       .eq('id', refundId)
       .maybeSingle();
 
@@ -24,15 +24,30 @@ export async function processRefund(req, res) {
     if (refund.status !== 'approved') return res.status(400).json({ error: 'Refund must be in approved state before processing' });
     if (refund.order?.status === 'refunded') return res.status(400).json({ error: 'Order already refunded' });
 
+    // Don't double-act on an order whose payout was already frozen/reversed by a
+    // chargeback (handleDisputeCreated) — that path already reversed the seller
+    // payout and may have compensated the buyer.
+    if (['frozen', 'reversed'].includes(refund.order?.payout_status)) {
+      return res.status(409).json({ error: 'Order payout is frozen or reversed (open dispute) — resolve the dispute instead of issuing a manual refund' });
+    }
+
     const paymentIntentId = refund.order?.stripe_payment_intent_id;
     if (!paymentIntentId) return res.status(400).json({ error: 'No Stripe payment intent on this order' });
 
+    // Compute from the server-authoritative ORDER row (written by the Stripe
+    // webhook), NOT the buyer-created refunds row, so the fee retention can't be
+    // bypassed by zeroing commission_aud/gst_aud or inflating total_paid_aud.
     const retentionPct = Number(await getPlatformSetting('refund_fee_retention_pct', 50));
-    const totalCommission = Number(refund.commission_aud) + Number(refund.gst_aud);
+    const orderTotal = Number(refund.order?.total_aud);
+    const totalCommission = Number(refund.order?.platform_fee_aud) || 0; // commission + GST
+    if (!Number.isFinite(orderTotal) || orderTotal <= 0) {
+      return res.status(400).json({ error: 'Order total is missing or invalid' });
+    }
     const retainedFee = Math.round(totalCommission * (retentionPct / 100) * 100) / 100;
-    const refundAmount = Math.round((Number(refund.total_paid_aud) - retainedFee) * 100) / 100;
+    const refundAmount = Math.round((orderTotal - retainedFee) * 100) / 100;
 
     if (refundAmount <= 0) return res.status(400).json({ error: 'Calculated refund amount is zero or negative' });
+    if (refundAmount > orderTotal) return res.status(400).json({ error: 'Refund exceeds order total' });
 
     const { data: claimed, error: claimErr } = await supabase
       .from('refunds')

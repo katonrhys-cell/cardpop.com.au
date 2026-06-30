@@ -19,6 +19,9 @@ const MarketplacePage = () => {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [page, setPage] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 24;
 
   const [sort, setSort] = useState('created_at_desc');
   const [filterMode, setFilterMode] = useState('All');
@@ -136,10 +139,10 @@ const MarketplacePage = () => {
       try {
         let query = supabase
           .from('listings')
-          .select('*, vault_item:vault_items!inner(*, vault_images(storage_path)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
+          .select('*, vault_item:vault_items!inner(*, vault_images(storage_path)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)', { count: 'exact' })
           .eq('status', 'active')
           .neq('listing_type', 'vault')
-          .limit(100);
+          .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
 
         // Apply hierarchy filters — most specific wins for the hierarchy levels,
         // but parallel and subset stack on top independently
@@ -167,11 +170,12 @@ const MarketplacePage = () => {
         else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
         else query = query.order('created_at', { ascending: false });
 
-        const { data, error: fetchError } = await query;
+        const { data, count, error: fetchError } = await query;
         if (cancelled) return;
         if (fetchError) throw fetchError;
 
         setListings(data || []);
+        setTotalCount(count || 0);
         if (showToast) toast.success('Marketplace data refreshed');
       } catch (err) {
         if (!cancelled) setError(err.message || 'Failed to load marketplace listings.');
@@ -183,6 +187,12 @@ const MarketplacePage = () => {
     fetchRef.current = run;
     run();
     return () => { cancelled = true; };
+  }, [page, sort, filterMode, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
+
+  // Reset to the first page whenever the filters/sort change so the user never
+  // lands on an out-of-range page (the stale-fetch is cancelled by the guard).
+  useEffect(() => {
+    setPage(0);
   }, [sort, filterMode, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
 
   // Realtime subscription to vault_items changes to refresh listings
@@ -463,11 +473,36 @@ const MarketplacePage = () => {
             ))}
           </div>
         ) : listings.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {listings.map(listing => (
-              <MarketplaceListingCard key={`${listing.source}-${listing.id}`} listing={listing} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {listings.map(listing => (
+                <MarketplaceListingCard key={`${listing.source}-${listing.id}`} listing={listing} />
+              ))}
+            </div>
+            {totalCount > PAGE_SIZE && (
+              <div className="flex items-center justify-center gap-4 mt-12">
+                <Button
+                  variant="outline"
+                  className="rounded-xl font-bold"
+                  disabled={page === 0}
+                  onClick={() => { setPage(p => Math.max(0, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm font-medium text-muted-foreground tabular-nums">
+                  Page {page + 1} of {Math.ceil(totalCount / PAGE_SIZE)}
+                </span>
+                <Button
+                  variant="outline"
+                  className="rounded-xl font-bold"
+                  disabled={(page + 1) * PAGE_SIZE >= totalCount}
+                  onClick={() => { setPage(p => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
+          </>
         ) : (
           <div className="flex flex-col items-center justify-center py-24 bg-card rounded-[2rem] border border-border shadow-sm">
             <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-6">

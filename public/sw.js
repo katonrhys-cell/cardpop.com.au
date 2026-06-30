@@ -4,17 +4,19 @@
 // - Stale While Revalidate for HTML pages (serve cached, update in background)
 
 const CACHE_NAMES = {
-  STATIC: 'cardpop-static-v2',
-  DYNAMIC: 'cardpop-dynamic-v2',
-  PAGES: 'cardpop-pages-v2',
+  STATIC: 'cardpop-static-v3',
+  DYNAMIC: 'cardpop-dynamic-v3',
+  PAGES: 'cardpop-pages-v3',
 };
 
+// Only precache the app shell. Vite emits content-hashed asset filenames
+// (assets/*.js|css) that aren't known at SW-author time, and the previous list
+// included dev-only paths (/index.css, /global.css, /main.jsx) that 404 in
+// production — because cache.addAll is atomic, one 404 made the ENTIRE precache
+// (including '/') silently fail. Hashed assets are cached on demand (cacheFirst).
 const STATIC_ASSETS = [
   '/',
   '/index.html',
-  '/index.css',
-  '/global.css',
-  '/main.jsx',
 ];
 
 // Install: cache static assets

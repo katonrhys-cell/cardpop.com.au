@@ -86,7 +86,7 @@ const VaultCategoryPage = () => {
 
           let query = supabase
             .from('vault_items')
-            .select('*, profiles:owner_id(name)', { count: 'exact' })
+            .select('*', { count: 'exact' })
             .in('id', vaultItemIds)
             .order('created_at', { ascending: false })
             .range(from, from + perPage - 1);
@@ -120,7 +120,7 @@ const VaultCategoryPage = () => {
 
           let query = supabase
             .from('vault_items')
-            .select('*, profiles:owner_id(name)', { count: 'exact' })
+            .select('*', { count: 'exact' })
             .order('created_at', { ascending: false })
             .range(from, from + perPage - 1);
 
@@ -141,6 +141,7 @@ const VaultCategoryPage = () => {
           setTotalPages(Math.ceil((count || 0) / perPage));
         }
       } catch (error) {
+        console.error('Failed to load vault listings:', error);
       } finally {
         setLoading(false);
       }

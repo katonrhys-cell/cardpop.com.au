@@ -942,13 +942,17 @@ const Header = () => {
 
     fetchData();
 
+    // Scope realtime to THIS user's rows (and use per-user channel names).
+    // Previously these subscribed to every row of messages/trades, so any
+    // write anywhere on the platform woke every connected client into a double
+    // count refetch — load that scaled with users × global write rate.
     const msgChannel = supabase
-      .channel('header-messages')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => fetchData())
+      .channel(`header-messages-${currentUser.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `recipient_id=eq.${currentUser.id}` }, () => fetchData())
       .subscribe();
     const tradeChannel = supabase
-      .channel('header-trades')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades' }, () => fetchData())
+      .channel(`header-trades-${currentUser.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades', filter: `responder_id=eq.${currentUser.id}` }, () => fetchData())
       .subscribe();
 
     return () => {
@@ -956,7 +960,7 @@ const Header = () => {
       supabase.removeChannel(msgChannel);
       supabase.removeChannel(tradeChannel);
     };
-  }, [isAuthenticated, currentUser]);
+  }, [isAuthenticated, currentUser?.id]);
 
   const cartItemCount = cartItems?.reduce((sum, item) => sum + item.quantity, 0) || 0;
 

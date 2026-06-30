@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { toast } from 'sonner';
 import {
   Sparkles, Plus, Loader2, Trash2, Pencil, ArrowUp, ArrowDown,
@@ -252,22 +252,20 @@ const HeroShowcaseAdminPage = () => {
   const move = async (index, dir) => {
     const target = index + dir;
     if (target < 0 || target >= cards.length) return;
-    const a = cards[index];
-    const b = cards[target];
-    // Swap sort_order values and reorder locally.
-    const aOrder = a.sort_order ?? index;
-    const bOrder = b.sort_order ?? target;
+
+    // Swap array positions, then renumber sequentially. Swapping the two rows'
+    // sort_order values broke when they were equal (e.g. both default 0) — the
+    // swap wrote identical values and nothing moved. Renumbering is deterministic.
     const reordered = [...cards];
-    reordered[index] = { ...b, sort_order: aOrder };
-    reordered[target] = { ...a, sort_order: bOrder };
-    reordered.sort((x, y) => (x.sort_order ?? 0) - (y.sort_order ?? 0));
-    setCards(reordered);
+    [reordered[index], reordered[target]] = [reordered[target], reordered[index]];
+    setCards(reordered.map((c, i) => ({ ...c, sort_order: i }))); // optimistic
     try {
-      const [r1, r2] = await Promise.all([
-        supabase.from('hero_showcase_cards').update({ sort_order: bOrder }).eq('id', a.id),
-        supabase.from('hero_showcase_cards').update({ sort_order: aOrder }).eq('id', b.id),
-      ]);
-      if (r1.error || r2.error) throw (r1.error || r2.error);
+      for (let i = 0; i < reordered.length; i++) {
+        if (reordered[i].sort_order !== i) {
+          const { error } = await supabase.from('hero_showcase_cards').update({ sort_order: i }).eq('id', reordered[i].id);
+          if (error) throw error;
+        }
+      }
     } catch (err) {
       toast.error('Failed to save new order.');
       fetchCards();

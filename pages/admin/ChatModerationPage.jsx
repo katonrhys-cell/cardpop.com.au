@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import {
   MessagesSquare, Search, Loader2, RefreshCw, ArrowRight, ShieldAlert, X,
 } from 'lucide-react';

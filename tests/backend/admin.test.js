@@ -132,16 +132,19 @@ describe('PATCH /verifications/:id', () => {
 // ─── PATCH /refunds/:id ────────────────────────────────────────────────────────
 
 describe('PATCH /refunds/:id', () => {
-  it('approves a refund, computing the amount server-side', async () => {
+  it('approves a refund, computing the amount from the server-authoritative order', async () => {
     queueFrom(
-      makeBuilder({ data: { id: 'r1', order_id: 'o1', buyer_id: 'b1', total_paid_aud: 100, commission_aud: 8, gst_aud: 2 }, error: null }), // fetch
+      // The amount is computed from the joined ORDER (total_aud / platform_fee_aud),
+      // NOT the buyer-supplied refund fields — those client values (here zeroed)
+      // must be ignored so the fee retention can't be bypassed.
+      makeBuilder({ data: { id: 'r1', order_id: 'o1', buyer_id: 'b1', total_paid_aud: 0, commission_aud: 0, gst_aud: 0, order: { total_aud: 100, platform_fee_aud: 10 } }, error: null }), // fetch
       makeBuilder({ error: null }), // refunds update
       makeBuilder({ error: null }), // orders update
       makeBuilder({ error: null }), // notification insert
     );
     const res = await request(app).patch('/admin/refunds/r1').send({ action: 'approve' });
     expect(res.status).toBe(200);
-    // retained = (8+2)*0.5 = 5; refund = 100 - 5 = 95
+    // retained = platform_fee_aud(10) * 0.5 = 5; refund = total_aud(100) - 5 = 95
     expect(res.body).toMatchObject({ status: 'approved', refundAmount: 95 });
   });
 

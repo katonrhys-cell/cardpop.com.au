@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Plus, Package, ImageOff, Lock, ShoppingCart, ArrowRightLeft,
@@ -36,6 +36,8 @@ const getListingBadge = (card) => {
   }
 };
 
+const VAULT_PAGE_SIZE = 24;
+
 const AccountVault = () => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
@@ -46,6 +48,11 @@ const AccountVault = () => {
   const [error, setError] = useState(null);
   const [filterCollection, setFilterCollection] = useState('');
   const [listingModal, setListingModal] = useState({ open: false, card: null });
+  const [page, setPage] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+
+  // Change the collection filter and reset to page 1 in one update.
+  const changeFilter = (val) => { setFilterCollection(val); setPage(0); };
 
   const fetchVault = useCallback(async () => {
     if (!currentUser?.id) { setLoading(false); return; }
@@ -54,14 +61,15 @@ const AccountVault = () => {
     try {
       let query = supabase
         .from('vault_items')
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('owner_id', currentUser.id)
         .order('created_at', { ascending: false })
-        .limit(200);
+        .range(page * VAULT_PAGE_SIZE, page * VAULT_PAGE_SIZE + VAULT_PAGE_SIZE - 1);
       if (filterCollection) query = query.eq('collection', filterCollection);
-      const { data, error: fetchError } = await query;
+      const { data, count, error: fetchError } = await query;
       if (fetchError) throw fetchError;
       setCards(data || []);
+      setTotalCount(count || 0);
 
       // Batch-fetch PSA population for all identified cards
       const csIds = [...new Set((data || []).map(c => c.cardsight_card_id).filter(Boolean))];
@@ -82,7 +90,7 @@ const AccountVault = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentUser?.id, filterCollection]);
+  }, [currentUser?.id, filterCollection, page]);
 
   useEffect(() => { fetchVault(); }, [fetchVault]);
 
@@ -220,7 +228,7 @@ const AccountVault = () => {
         <div>
           <h1 className="text-3xl font-bold font-heading mb-2">My Vault</h1>
           <p className="text-muted-foreground">
-            {loading ? 'Loading your collection…' : `${cards.length} card${cards.length !== 1 ? 's' : ''} in your vault`}
+            {loading ? 'Loading your collection…' : `${totalCount} card${totalCount !== 1 ? 's' : ''} in your vault`}
           </p>
         </div>
         <Button asChild>
@@ -232,7 +240,7 @@ const AccountVault = () => {
 
       {/* Collection filter */}
       <div className="flex flex-wrap items-center gap-3">
-        <Select value={filterCollection} onValueChange={setFilterCollection}>
+        <Select value={filterCollection} onValueChange={changeFilter}>
           <SelectTrigger className="w-[200px] bg-background border-border rounded-xl font-medium">
             <SelectValue placeholder="All Collections" />
           </SelectTrigger>
@@ -241,7 +249,7 @@ const AccountVault = () => {
           </SelectContent>
         </Select>
         {filterCollection && (
-          <Button variant="ghost" onClick={() => setFilterCollection('')} className="rounded-xl text-muted-foreground hover:text-foreground">
+          <Button variant="ghost" onClick={() => changeFilter('')} className="rounded-xl text-muted-foreground hover:text-foreground">
             <X className="w-4 h-4 mr-2" /> Clear
           </Button>
         )}
@@ -264,9 +272,34 @@ const AccountVault = () => {
           ))}
         </div>
       ) : cards.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {cards.map(renderCard)}
-        </div>
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {cards.map(renderCard)}
+          </div>
+          {totalCount > VAULT_PAGE_SIZE && (
+            <div className="flex items-center justify-center gap-4 mt-12">
+              <Button
+                variant="outline"
+                className="rounded-xl font-bold"
+                disabled={page === 0}
+                onClick={() => { setPage(p => Math.max(0, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              >
+                Previous
+              </Button>
+              <span className="text-sm font-medium text-muted-foreground tabular-nums">
+                Page {page + 1} of {Math.ceil(totalCount / VAULT_PAGE_SIZE)}
+              </span>
+              <Button
+                variant="outline"
+                className="rounded-xl font-bold"
+                disabled={(page + 1) * VAULT_PAGE_SIZE >= totalCount}
+                onClick={() => { setPage(p => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              >
+                Next
+              </Button>
+            </div>
+          )}
+        </>
       ) : (
         <div className="bg-card border border-border rounded-2xl p-12 text-center shadow-sm">
           <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />

@@ -5,6 +5,7 @@ import { getMarketData, getCardDetails } from '../utils/ebayMarketData.js';
 import { getSalesData, getStatistics } from '../utils/ebaySalesStats.js';
 import { POPULAR_CARDS } from '../utils/ebayPopularCards.js';
 import * as ebayCache from '../utils/ebayCache.js';
+import { getUsdToAudRate } from '../utils/exchangeRates.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -186,9 +187,10 @@ router.get('/price-estimate', async (req, res) => {
     baseCards.sort((a, b) => scoreListing(b, cardNameLower) - scoreListing(a, cardNameLower));
     gradedCards.sort((a, b) => scoreListing(b, cardNameLower) - scoreListing(a, cardNameLower));
 
-    // Convert all prices to AUD for comparison (1 USD ≈ 1.50 AUD as reference)
-    // In production, use a live exchange rate API
-    const USD_TO_AUD = 1.50;
+    // Convert all prices to AUD using the live (24h-cached) rate, with a safe
+    // fallback inside getUsdToAudRate. A hardcoded 1.50 skewed every
+    // cross-marketplace average that feeds the card valuations users see.
+    const USD_TO_AUD = await getUsdToAudRate();
 
     const calculatePrices = (items) => {
       return items.map(i => {

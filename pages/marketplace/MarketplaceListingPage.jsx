@@ -3,7 +3,6 @@ import { useParams, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { generateStructuredData, generateBreadcrumbStructuredData } from '@/utils/seoUtils.js';
 import { supabase } from '@/lib/supabaseClient.js';
-import { formatCurrency } from '@/utils/formatCurrency.js';
 import { Button } from '@/components/ui/button';
 import { ShieldCheck, MessageCircle, User, TrendingUp, Loader2, Flag } from 'lucide-react';
 import ReportModal from '@/components/ReportModal.jsx';
@@ -94,7 +93,7 @@ const MarketplaceListingPage = () => {
       title: listing.title,
       description: listing.description,
       id: listing.id,
-      price: listing.price,
+      price: listing.price_aud,
       currency: 'AUD',
       condition: listing.condition,
       images: (listing.images || []).map((url) => ({ url })),
@@ -133,7 +132,7 @@ const MarketplaceListingPage = () => {
               {listing.category}
             </span>
             <h1 className="text-3xl md:text-4xl font-bold mb-4">{listing.title}</h1>
-            <p className="text-4xl font-bold text-primary mb-6">{formatCurrency(listing.price)}</p>
+            <p className="text-4xl font-bold text-primary mb-6">${(listing.price_aud || 0).toFixed(2)}</p>
           </div>
 
           <div className="bg-card border border-border rounded-2xl p-6 mb-8">

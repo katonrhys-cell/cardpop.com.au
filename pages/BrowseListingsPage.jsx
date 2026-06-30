@@ -29,13 +29,18 @@ const BrowseListingsPage = () => {
       try {
         let query = supabase
           .from('listings')
-          .select('*, vault_item:vault_items(*, vault_images(*), categories(*)), seller:profiles!seller_id(*)')
+          // Only fetch what the page/card actually reads: the seller(*) and
+          // categories(*) joins were never consumed (ProductCard reads a
+          // PocketBase-style `expand` path), and vault_images only needs image_url.
+          .select('*, vault_item:vault_items(*, vault_images(image_url))')
           .or('status.eq.active,status.eq.For Sale')
           .limit(24);
 
         if (searchParams.get('q')) {
           const q = searchParams.get('q').replace(/'/g, '');
-          query = query.ilike('name', `%${q}%`);
+          // listings has a `title` column (not `name`) — searching the
+          // non-existent column errored out the whole grid.
+          query = query.ilike('title', `%${q}%`);
         }
 
         if (category && category !== 'all') {
@@ -71,11 +76,13 @@ const BrowseListingsPage = () => {
   };
 
   const handleAddToCart = (product, variant) => {
-    const priceInCents = product.price ? Math.round(product.price * 100) : 0;
+    // listings store the price in `price_aud` (dollars); `product.price` was
+    // always undefined, so every cart line landed at $0.00.
+    const priceInCents = Math.round((Number(product.price_aud) || 0) * 100);
     const cartProduct = {
       id: product.id,
       type: 'listing',
-      title: product.name,
+      title: product.title || product.vault_item?.card_name || 'Trading Card',
       price: priceInCents / 100,
       image: product.images?.[0] || product.vault_item?.vault_images?.[0]?.image_url || null,
       year: product.year || product.card_year || null,
@@ -84,14 +91,15 @@ const BrowseListingsPage = () => {
       grade: product.grade || null,
     };
 
+    // A marketplace listing is a single 1-of-1 vault item — cap the quantity at 1.
     const cartVariant = {
       id: product.id,
       price_in_cents: priceInCents,
-      manage_inventory: product.stockQuantity !== null,
-      inventory_quantity: product.stockQuantity
+      manage_inventory: true,
+      inventory_quantity: 1,
     };
 
-    addToCart(cartProduct, cartVariant, 1, product.stockQuantity ?? 999);
+    addToCart(cartProduct, cartVariant, 1, 1);
     toast.success('Added to cart');
   };
 

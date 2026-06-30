@@ -1,5 +1,5 @@
 import React from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { ArrowRightLeft } from 'lucide-react';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 

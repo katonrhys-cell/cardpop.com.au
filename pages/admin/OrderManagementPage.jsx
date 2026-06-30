@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { Search, MoreHorizontal, Eye, RefreshCcw, ShoppingCart, ChevronLeft, AlertCircle, Download, RotateCcw, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card } from '@/components/ui/card';
@@ -244,10 +244,14 @@ const OrderManagementPage = () => {
   }, [fetchOrders]);
 
   const openRefundDialog = async (order) => {
-    const { data } = await supabase.from('refunds').select('*').eq('order_id', order.id).maybeSingle();
+    const { data, error } = await supabase.from('refunds').select('*').eq('order_id', order.id).maybeSingle();
+    if (error) {
+      // A real read failure (RLS/transient) — don't mislabel it as "no details".
+      toast.error('Could not load the refund details. Please try again.');
+      return;
+    }
     if (!data) {
-      // Order is flagged for refund but the refunds row is missing — surface it
-      // instead of silently doing nothing when "Review Refund Request" is clicked.
+      // Order is flagged for refund but the refunds row is genuinely missing.
       toast.error('No refund details found for this order.');
       return;
     }

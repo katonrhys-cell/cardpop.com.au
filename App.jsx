@@ -1,7 +1,7 @@
 
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
-import { Helmet } from 'react-helmet';
+import { Helmet, HelmetProvider } from 'react-helmet-async';
 import { Toaster } from '@/components/ui/sonner';
 
 // Contexts
@@ -205,6 +205,7 @@ const PhotographyStandardPage = lazy(() => import('@/pages/info/PhotographyStand
 const App = () => {
   return (
     <ErrorBoundary>
+      <HelmetProvider>
       <AuthProvider>
         <AdminProvider>
           <CartProvider>
@@ -421,6 +422,7 @@ const App = () => {
           </CartProvider>
         </AdminProvider>
       </AuthProvider>
+      </HelmetProvider>
     </ErrorBoundary>
   );
 };

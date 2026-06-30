@@ -64,9 +64,18 @@ const pct = (v) => `${v.toFixed(1)}%`;
 
 function calcROI({ rawCost, gradingFee, shipping, gemRate, nineRate, tenPrice, ninePrice }) {
   const totalCost = rawCost + gradingFee + shipping;
+  // Gem + Grade-9 probabilities can't exceed 100% combined. If the sliders sum
+  // past 100, scale them down proportionally — otherwise weightedRevenue (and
+  // the ROI verdict) is inflated by impossible odds.
+  let gem = gemRate, nine = nineRate;
+  if (gem + nine > 100) {
+    const scale = 100 / (gem + nine);
+    gem *= scale;
+    nine *= scale;
+  }
   const weightedRevenue =
-    (tenPrice * gemRate / 100) +
-    (ninePrice * nineRate / 100);
+    (tenPrice * gem / 100) +
+    (ninePrice * nine / 100);
   const netProfit = weightedRevenue - totalCost;
   const roi = totalCost > 0 ? (netProfit / totalCost) * 100 : 0;
   const breakEvenRawCost = weightedRevenue - gradingFee - shipping;

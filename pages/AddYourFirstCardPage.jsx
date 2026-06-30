@@ -1,5 +1,5 @@
 import React from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { Plus, ShieldCheck, TrendingUp, Layers, Award } from 'lucide-react';
 import Header from '@/components/Header.jsx';

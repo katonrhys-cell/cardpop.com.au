@@ -12,11 +12,13 @@
     <link rel="alternate" hreflang="en" href="https://cardpop.com.au/" />
     <link rel="alternate" hreflang="x-default" href="https://cardpop.com.au/" />
 
-    <!-- Core Web Vitals optimization -->
-    <link rel="preconnect" href="https://cardpop.com.au" />
-    <link rel="dns-prefetch" href="https://cardpop.com.au" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Core Web Vitals: preconnect only to origins used on first paint.
+         Fonts are now self-hosted (same-origin) so no font-CDN preconnect is
+         needed. Supabase is the first data origin the app hits. -->
+    <link rel="preconnect" href="https://odoglvswwymyjuwlonkf.supabase.co" crossorigin />
+    <!-- Preload the self-hosted Syne heading font (crossorigin required even
+         same-origin — fonts fetch in CORS/anonymous mode). @font-face is in index.css. -->
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/syne-latin-var.woff2" crossorigin />
     
     <!-- Prevent CLS: width+height attrs + height:auto lets browser compute aspect-ratio before load -->
     <!-- Critical CSS: minimal above-the-fold styles to enable rendering without full CSS file -->
@@ -106,20 +108,8 @@
     <meta name="description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, Yu-Gi-Oh, and sports cards on CardPop™ Australia — Australia's trusted online trading card marketplace. Browse thousands of listings, check live prices, and shop sealed boxes." />
     <meta name="keywords" content="trading cards Australia, Pokemon cards Australia, buy sell trade cards, MTG Australia, sports cards Australia, card marketplace" />
     <meta name="author" content="CardPop™" />
-    <link rel="canonical" href="https://cardpop.com.au/" />
-
-    <!-- Google Fonts — Syne for headings (brand typeface) -->
-    <!-- Async load: preload resource, load with media query, JS ensures fallback -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" media="(max-width: 0px)" id="font-syne" />
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" /></noscript>
-    <script>
-      var f = document.getElementById('font-syne');
-      f.media = '(max-width: 9999px)';
-      f.onload = function() { this.media = 'all'; };
-    </script>
+    <!-- Canonical is emitted per-route by SEOHead (apex-normalised) so it never
+         conflicts with a static tag. The www host 301-redirects to apex (vercel.json). -->
 
     <!-- Open Graph (Facebook, Discord, Slack previews) -->
     <meta property="og:type" content="website" />

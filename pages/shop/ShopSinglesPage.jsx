@@ -96,7 +96,9 @@ const ShopSinglesPage = () => {
     setCondition('all');
     setMinPrice('');
     setMaxPrice('');
-    setSort('-created');
+    // Must match a SelectItem value (and the initial state) or the Sort control
+    // blanks out — '-created' matched nothing.
+    setSort('created_at_desc');
   };
 
   return (

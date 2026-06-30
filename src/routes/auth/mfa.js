@@ -5,7 +5,7 @@ import supabase from '../../utils/supabaseClient.js';
 import { generateOTP } from '../../utils/otpGenerator.js';
 import { encrypt, decrypt } from '../../utils/encryption.js';
 import { authMiddleware } from '../../middleware/auth.js';
-import { mfaLimiter } from '../../middleware/endpoint-rate-limit.js';
+import { mfaLimiter, mfaRequestLimiter } from '../../middleware/endpoint-rate-limit.js';
 import logger from '../../utils/logger.js';
 
 const router = express.Router();
@@ -23,7 +23,7 @@ function timingSafeEqualStr(a, b) {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
-router.post('/request', authMiddleware, async (req, res) => {
+router.post('/request', authMiddleware, mfaRequestLimiter, async (req, res) => {
   const userId = req.user.id;
   // The email is bound to the authenticated user, not taken from the request
   // body — trusting a body-supplied email would let a caller store an MFA
