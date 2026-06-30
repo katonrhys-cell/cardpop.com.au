@@ -1,0 +1,290 @@
+/* =============================================================================
+   Card Showcase Engine — visual treatments for vault display styles.
+
+   One component (CardShowcase.jsx) renders the markup; this file holds the
+   look. Every style is keyed off `.cardshowcase--<key>` so new styles slot in
+   without touching the cards that use them.
+
+   Design rules:
+   - The card image stays the hero. Transforms are subtle (≤ ~8°) so the photo
+     a buyer cares about is never distorted or obscured.
+   - Effects are pure CSS where possible (GPU transforms / keyframes). Only the
+     holographic style needs JS, and only for pointer tracking.
+   - Animations run only while the card is on screen (`.is-visible`, toggled by
+     an IntersectionObserver) and are disabled under reduced-motion.
+   - Colours reference existing theme tokens so styles track light/dark mode.
+   ========================================================================== */
+
+.cardshowcase {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.cardshowcase__stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  perspective: 1100px;
+}
+
+/* The transformed element. The image fills it via object-contain. */
+.cardshowcase__card {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-style: preserve-3d;
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+/* Soft contact/ambient shadow used by several styles. */
+.cardshowcase__shadow {
+  position: absolute;
+  bottom: 7%;
+  left: 50%;
+  width: 58%;
+  height: 7%;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0.32) 0%,
+    rgba(0, 0, 0, 0.16) 45%,
+    transparent 72%
+  );
+  filter: blur(3px);
+  opacity: 0;
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  pointer-events: none;
+}
+
+/* -----------------------------------------------------------------------------
+   1. Classic Flat — the baseline. No frame, no motion. Just a clean photo.
+   -------------------------------------------------------------------------- */
+/* (no extra rules needed; the bare image is the style) */
+
+/* -----------------------------------------------------------------------------
+   2. Premium Stand — card leans back on a subtle acrylic stand with a shadow.
+   -------------------------------------------------------------------------- */
+.cardshowcase--stand .cardshowcase__card {
+  transform: translateY(-3%) rotateX(7deg);
+  transform-origin: center bottom;
+}
+.cardshowcase--stand .cardshowcase__shadow {
+  opacity: 0.85;
+  bottom: 8%;
+}
+/* The acrylic base — a translucent rounded slab the card appears to rest in. */
+.cardshowcase--stand .cardshowcase__prop {
+  position: absolute;
+  bottom: 8%;
+  left: 50%;
+  width: 46%;
+  height: 4.5%;
+  transform: translateX(-50%) rotateX(62deg);
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.45),
+    rgba(255, 255, 255, 0.08)
+  );
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 999px;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
+/* -----------------------------------------------------------------------------
+   3. Floating Showcase — gentle vertical float with a breathing ambient shadow.
+   -------------------------------------------------------------------------- */
+.cardshowcase--floating .cardshowcase__shadow {
+  opacity: 0.7;
+}
+.cardshowcase--floating.is-visible .cardshowcase__card {
+  animation: csFloat 4.5s ease-in-out infinite;
+}
+.cardshowcase--floating.is-visible .cardshowcase__shadow {
+  animation: csFloatShadow 4.5s ease-in-out infinite;
+}
+@keyframes csFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-5%); }
+}
+@keyframes csFloatShadow {
+  0%, 100% { opacity: 0.7; transform: translateX(-50%) scale(1); }
+  50%      { opacity: 0.4; transform: translateX(-50%) scale(0.86); }
+}
+
+/* -----------------------------------------------------------------------------
+   4. Glass Museum — dark cabinet, overhead spotlight, glass sheen.
+   -------------------------------------------------------------------------- */
+.cardshowcase--glass {
+  background:
+    radial-gradient(
+      ellipse 70% 50% at 50% 0%,
+      rgba(255, 255, 255, 0.16) 0%,
+      transparent 60%
+    ),
+    linear-gradient(
+      to bottom,
+      hsl(var(--brand-charcoal)) 0%,
+      hsl(215 28% 12%) 100%
+    );
+}
+/* Diagonal glass reflection sheen across the cabinet glass. */
+.cardshowcase--glass .cardshowcase__glass {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.10) 44%,
+    rgba(255, 255, 255, 0.02) 50%,
+    transparent 64%
+  );
+  pointer-events: none;
+}
+.cardshowcase--glass .cardshowcase__shadow {
+  opacity: 0.55;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0.5) 0%,
+    transparent 70%
+  );
+}
+
+/* -----------------------------------------------------------------------------
+   5. Slab Display — clear graded-slab shell around the card.
+   -------------------------------------------------------------------------- */
+.cardshowcase--slab .cardshowcase__card {
+  width: 84%;
+  height: 92%;
+  padding: 9% 6% 5%;
+  border-radius: 10px;
+  background: linear-gradient(
+    150deg,
+    rgba(255, 255, 255, 0.22) 0%,
+    rgba(255, 255, 255, 0.06) 40%,
+    rgba(255, 255, 255, 0.14) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.6),
+    inset 0 0 0 6px rgba(255, 255, 255, 0.06),
+    0 10px 24px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+/* The frosted label strip at the top of the slab. */
+.cardshowcase--slab .cardshowcase__prop {
+  position: absolute;
+  top: 4%;
+  left: 50%;
+  width: 64%;
+  height: 5%;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.85),
+    rgba(255, 255, 255, 0.45)
+  );
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+}
+
+/* -----------------------------------------------------------------------------
+   6. Rotating Premium — slow, refined back-and-forth Y rotation. Never spins.
+   -------------------------------------------------------------------------- */
+.cardshowcase--rotating .cardshowcase__shadow {
+  opacity: 0.55;
+}
+.cardshowcase--rotating.is-visible .cardshowcase__card {
+  animation: csRotate 7s ease-in-out infinite;
+}
+@keyframes csRotate {
+  0%, 100% { transform: rotateY(-4deg); }
+  50%      { transform: rotateY(4deg); }
+}
+
+/* -----------------------------------------------------------------------------
+   7. Holographic — shine + rainbow that track the pointer (JS sets --cs-* vars).
+   -------------------------------------------------------------------------- */
+.cardshowcase--holographic .cardshowcase__card {
+  transform: rotateX(var(--cs-rx, 0deg)) rotateY(var(--cs-ry, 0deg));
+  transition: transform 0.2s ease-out;
+}
+.cardshowcase--holographic .cardshowcase__holo {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  opacity: 0.5;
+  mix-blend-mode: color-dodge;
+  pointer-events: none;
+  /* A fine prismatic rainbow (the holo foil) plus a bright glare band that
+     rides the pointer via --cs-px. The two blend together for the foil look. */
+  background-image:
+    linear-gradient(
+      115deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.6) calc(var(--cs-px, 50%) - 8%),
+      rgba(255, 255, 255, 0.1) var(--cs-px, 50%),
+      transparent calc(var(--cs-px, 50%) + 14%)
+    ),
+    repeating-linear-gradient(
+      115deg,
+      rgba(255, 90, 150, 0.55) 0%,
+      rgba(255, 205, 120, 0.55) 7%,
+      rgba(120, 255, 180, 0.55) 14%,
+      rgba(120, 205, 255, 0.55) 21%,
+      rgba(200, 140, 255, 0.55) 28%,
+      rgba(255, 90, 150, 0.55) 35%
+    );
+  background-size: 100% 100%, 240% 240%;
+  background-position: 0 0, var(--cs-px, 50%) 50%;
+  background-blend-mode: screen;
+  transition: opacity 0.3s ease;
+}
+/* Pointer-driven: a touch brighter and crisper while the cursor is on it. */
+.cardshowcase--holographic.is-pointing .cardshowcase__holo {
+  opacity: 0.7;
+}
+/* Idle shimmer when the pointer isn't driving it. */
+.cardshowcase--holographic.is-visible:not(.is-pointing) .cardshowcase__holo {
+  animation: csHolo 6s ease-in-out infinite;
+}
+@keyframes csHolo {
+  0%, 100% { --cs-px: 30%; opacity: 0.4; }
+  50%      { --cs-px: 70%; opacity: 0.6; }
+}
+/* The custom property must be registered for the keyframe above to animate it
+   smoothly; without @property browsers still fall back to discrete steps,
+   which is acceptable. */
+@property --cs-px {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 50%;
+}
+
+/* -----------------------------------------------------------------------------
+   Reduced motion — kill all animation/tilt, keep the static framing.
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .cardshowcase__card,
+  .cardshowcase__holo {
+    animation: none !important;
+    transition: none !important;
+  }
+  .cardshowcase--holographic .cardshowcase__card {
+    transform: none;
+  }
+}
