@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import {
   ChevronRight, ChevronDown, Plus, Pencil, Trash2, Loader2,
   FolderTree, Tag, Factory, Check, X,

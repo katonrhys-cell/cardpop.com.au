@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { toast } from 'sonner';
 import {
   LayoutList, Loader2, Trash2, ArrowUp, ArrowDown, ImageOff, Search, Plus, Info,

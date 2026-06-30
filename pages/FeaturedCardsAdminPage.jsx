@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { toast } from 'sonner';
 import { Search, Loader2, ImageOff, Star } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';

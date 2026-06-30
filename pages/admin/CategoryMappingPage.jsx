@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { autoMapCategories } from '@/utils/categoryMappingEngine.js';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';

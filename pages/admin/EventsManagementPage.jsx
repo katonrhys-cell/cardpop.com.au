@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Wand2, Star } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';

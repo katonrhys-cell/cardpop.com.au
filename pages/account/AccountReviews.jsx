@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { Star, ShieldCheck, RefreshCw } from 'lucide-react';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import { isVerified } from '@/utils/verification.js';

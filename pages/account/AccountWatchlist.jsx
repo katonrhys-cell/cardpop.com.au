@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { Heart, ExternalLink, RefreshCw, Clock, Tag, Trash2 } from 'lucide-react';
 import Breadcrumb from '@/components/Breadcrumb.jsx';

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet';
+import { Helmet } from 'react-helmet-async';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Loader2, Wand2 } from 'lucide-react';
 import { format } from 'date-fns';
