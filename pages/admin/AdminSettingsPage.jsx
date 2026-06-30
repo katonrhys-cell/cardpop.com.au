@@ -72,7 +72,6 @@ const AdminSettingsPage = () => {
       if (error) throw error;
       toast.success('Settings saved successfully.');
     } catch (err) {
-      console.error('Settings save error:', err);
       toast.error(err.message || 'Failed to save settings.');
     } finally {
       setSaving(false);

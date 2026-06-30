@@ -66,7 +66,6 @@ const EventsAdminPage = () => {
       if (error) throw error;
       setEvents(data ?? []);
     } catch (err) {
-      console.error("Failed to fetch events:", err);
       setError("Failed to load events. Please try again.");
       toast.error("Failed to load events");
     } finally {
@@ -123,7 +122,6 @@ const EventsAdminPage = () => {
       setIsDeleteDialogOpen(false);
       fetchEvents();
     } catch (err) {
-      console.error("Failed to delete event:", err);
       toast.error(err.message || "Failed to delete event");
     }
   };
@@ -168,7 +166,6 @@ const EventsAdminPage = () => {
       setIsFormOpen(false);
       fetchEvents();
     } catch (err) {
-      console.error("Form submission error:", err);
       toast.error(err.message || "Failed to save event");
     } finally {
       setIsSubmitting(false);

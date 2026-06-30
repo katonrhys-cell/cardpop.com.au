@@ -33,7 +33,6 @@ const TradeRequestsPage = () => {
       setSent(s);
       setHistory(h);
     } catch (err) {
-      console.error(err);
       toast.error('Failed to refresh trade requests.');
     } finally {
       setFetching(false);

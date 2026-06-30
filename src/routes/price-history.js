@@ -2,6 +2,7 @@ import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { optionalAuthMiddleware, isAdminUser } from '../middleware/auth.js';
 import { escapeLike } from '../utils/escapeLike.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -52,7 +53,7 @@ router.get('/:itemId', async (req, res) => {
       period: `${daysNum} days`
     });
   } catch (error) {
-    console.error('Error fetching price history:', error);
+    logger.error('Error fetching price history:', error);
     res.status(500).json({ error: 'Failed to fetch price history' });
   }
 });
@@ -87,7 +88,7 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(pricePoint);
   } catch (error) {
-    console.error('Error recording price:', error);
+    logger.error('Error recording price:', error);
     res.status(500).json({ error: 'Failed to record price' });
   }
 });
@@ -128,7 +129,7 @@ router.get('/market/:cardName', async (req, res) => {
 
     res.json(marketStats);
   } catch (error) {
-    console.error('Error fetching market comparison:', error);
+    logger.error('Error fetching market comparison:', error);
     res.status(500).json({ error: 'Failed to fetch market comparison' });
   }
 });

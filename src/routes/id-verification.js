@@ -3,6 +3,7 @@ import { ContentBlockType, streamOneShot, uploadImagesToSupabase } from '../api/
 import { uploadFiles } from '../middleware/file-upload.js';
 import { integratedAiRateLimit } from '../middleware/integrated-ai-rate-limit.js';
 import { supabaseAuth } from '../middleware/supabase-auth.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -83,7 +84,7 @@ router.post(
         document_type: result.document_type ?? 'unknown',
       });
     } catch (err) {
-      console.error('ID name extraction error:', err);
+      logger.error('ID name extraction error:', err);
       return res.status(500).json({ error: 'Name extraction failed', extracted_name: null, confidence: 'low' });
     }
   }

@@ -22,7 +22,6 @@ const CommunityDiscussionPage = () => {
         if (fetchError) throw fetchError;
         if (!cancelled) setDiscussion(data);
       } catch (error) {
-        console.error(error);
       } finally {
         if (!cancelled) setLoading(false);
       }

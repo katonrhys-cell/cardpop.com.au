@@ -1,4 +1,5 @@
 import process from 'node:process';
+import crypto from 'node:crypto';
 import { PassThrough, Readable } from 'node:stream';
 import dotenv from 'dotenv';
 import { NodeEnv } from '../constants/common.js';
@@ -158,7 +159,7 @@ const SquashableSSEEventTypes = new Set([
 export async function uploadImagesToSupabase({ images }) {
 	const uploadPromises = images.map(async (file) => {
 		const ext = file.originalname.split('.').pop() || 'jpg';
-		const path = `ocr/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+		const path = `ocr/${crypto.randomBytes(8).toString('hex')}.${ext}`;
 
 		const { buffer, contentType } = await compressImageBuffer(file.buffer, file.mimetype);
 

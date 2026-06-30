@@ -1,3 +1,4 @@
+import logger from "../utils/logger.js";
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { findBestMatches, getDidYouMean } from '../../utils/fuzzyMatch.js';
@@ -95,7 +96,7 @@ router.get('/', async (req, res) => {
       didYouMean
     });
   } catch (error) {
-    console.error('Error generating search suggestions:', error);
+    logger.error('Error generating search suggestions:', error);
     res.status(500).json({ error: 'Failed to generate suggestions' });
   }
 });

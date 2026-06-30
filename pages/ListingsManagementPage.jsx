@@ -76,7 +76,6 @@ const ListingsManagementPage = () => {
         setAllListingsForAnalytics(allData ?? []);
       }
     } catch (error) {
-      console.error('Failed to fetch listings:', error);
       toast.error('Failed to load listings');
     } finally {
       setLoading(false);

@@ -52,7 +52,6 @@ const ProductLinesManagementPage = () => {
       setError(null);
       if (showToast) toast.success('Product lines refreshed');
     } catch (err) {
-      console.error('[ProductLinesManagementPage] Failed to fetch data:', err);
       setError("Failed to load product lines from database. Please check your connection.");
       if (showToast) toast.error('Failed to refresh data');
     } finally {
@@ -151,7 +150,6 @@ const ProductLinesManagementPage = () => {
       resetForm();
       fetchData();
     } catch (err) {
-      console.error('Error saving product line:', err);
       toast.error(err.message || 'Failed to save product line');
     } finally {
       setIsSubmitting(false);
@@ -170,7 +168,6 @@ const ProductLinesManagementPage = () => {
       setSelectedLine(null);
       fetchData();
     } catch (err) {
-      console.error('Failed to delete product line:', err);
       toast.error('Failed to delete product line.');
     } finally {
       setIsSubmitting(false);

@@ -4,7 +4,19 @@ import importPlugin from 'eslint-plugin-import';
 import globals from 'globals';
 
 export default [
-	{ ignores: ['node_modules/**', 'dist/**', 'build/**', 'vite.config.js', 'vitest.config.js', 'pb_hooks/**', 'pb_migrations/**', 'components/CollectionsDropdown.jsx'] },
+	{
+		ignores: [
+			'node_modules/**',
+			'dist/**',
+			'build/**',
+			'vite.config.js',
+			'vitest.config.js',
+			'pb_hooks/**',
+			'pb_migrations/**',
+			// CollectionsDropdown has dynamic imports that trigger ESLint false positives
+			'components/CollectionsDropdown.jsx',
+		],
+	},
 	{
 		files: ['**/*.js', '**/*.jsx'],
 		plugins: { react, 'react-hooks': reactHooks, import: importPlugin },

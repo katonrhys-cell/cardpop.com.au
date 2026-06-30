@@ -1,6 +1,9 @@
+import logger from '../utils/logger.js';
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { optionalAuthMiddleware } from '../middleware/auth.js';
+import { validateRequestBody, validateRequestParams } from '../middleware/validateRequest.js';
+import { addWishlistSchema, removeWishlistSchema, checkWishlistSchema } from '../schemas/wishlistSchemas.js';
 
 const router = Router();
 
@@ -28,28 +31,19 @@ router.get('/', async (req, res) => {
 
     res.json(wishlist || []);
   } catch (error) {
-    console.error('Error fetching wishlist:', error);
+    logger.error('Error fetching wishlist:', error);
     res.status(500).json({ error: 'Failed to fetch wishlist' });
   }
 });
 
 // Add item to wishlist
-router.post('/', async (req, res) => {
+router.post('/', validateRequestBody(addWishlistSchema), async (req, res) => {
   try {
     const { item_id, item_type } = req.body;
     const userId = req.user?.id;
 
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    if (!item_id || !item_type) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    const validTypes = ['vault_item', 'product', 'listing'];
-    if (!validTypes.includes(item_type)) {
-      return res.status(400).json({ error: 'Invalid item type' });
     }
 
     // Check if already in wishlist
@@ -79,13 +73,13 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(wishlistItem);
   } catch (error) {
-    console.error('Error adding to wishlist:', error);
+    logger.error('Error adding to wishlist:', error);
     res.status(500).json({ error: 'Failed to add to wishlist' });
   }
 });
 
 // Remove item from wishlist
-router.delete('/:itemId', async (req, res) => {
+router.delete('/:itemId', validateRequestParams(removeWishlistSchema), async (req, res) => {
   try {
     const { itemId } = req.params;
     const userId = req.user?.id;
@@ -104,13 +98,13 @@ router.delete('/:itemId', async (req, res) => {
 
     res.status(204).send();
   } catch (error) {
-    console.error('Error removing from wishlist:', error);
+    logger.error('Error removing from wishlist:', error);
     res.status(500).json({ error: 'Failed to remove from wishlist' });
   }
 });
 
 // Check if item is in wishlist
-router.get('/check/:itemId/:itemType', async (req, res) => {
+router.get('/check/:itemId/:itemType', validateRequestParams(checkWishlistSchema), async (req, res) => {
   try {
     const { itemId, itemType } = req.params;
     const userId = req.user?.id;
@@ -129,7 +123,7 @@ router.get('/check/:itemId/:itemType', async (req, res) => {
 
     res.json({ inWishlist: !!existing });
   } catch (error) {
-    console.error('Error checking wishlist:', error);
+    logger.error('Error checking wishlist:', error);
     res.json({ inWishlist: false });
   }
 });

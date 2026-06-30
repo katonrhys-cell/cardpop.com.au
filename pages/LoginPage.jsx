@@ -91,7 +91,6 @@ const LoginPage = () => {
         navigate(from, { replace: true });
       }
     } catch (error) {
-      console.error('[LoginPage] Login error:', error);
       // Shake the lock on failure
       setLockState('error');
       setTimeout(() => setLockState('locked'), 500);

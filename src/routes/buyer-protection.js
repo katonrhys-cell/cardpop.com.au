@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
+import logger from '../utils/logger.js';
+import { validateRequestBody, validateRequestParams } from '../middleware/validateRequest.js';
+import { createClaimSchema, getClaimSchema, updateClaimStatusParamsSchema, updateClaimStatusBodySchema } from '../schemas/buyerProtectionSchemas.js';
 
 const router = Router();
 
@@ -27,29 +30,19 @@ router.get('/my-claims', async (req, res) => {
 
     res.json(claims || []);
   } catch (error) {
-    console.error('Error fetching claims:', error);
+    logger.error('Error fetching claims:', error);
     res.status(500).json({ error: 'Failed to fetch claims' });
   }
 });
 
 // Create a new claim
-router.post('/', async (req, res) => {
+router.post('/', validateRequestBody(createClaimSchema), async (req, res) => {
   try {
     const { order_id, claim_type, description } = req.body;
     const userId = req.user?.id;
 
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    if (!order_id || !claim_type || !description) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    // Validate claim type
-    const validTypes = ['item_not_received', 'item_not_as_described', 'damaged', 'other'];
-    if (!validTypes.includes(claim_type)) {
-      return res.status(400).json({ error: 'Invalid claim type' });
     }
 
     // Get order details
@@ -97,13 +90,13 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(claim);
   } catch (error) {
-    console.error('Error creating claim:', error);
+    logger.error('Error creating claim:', error);
     res.status(500).json({ error: 'Failed to create claim' });
   }
 });
 
 // Update claim status (admin only)
-router.put('/:claimId/status', async (req, res) => {
+router.put('/:claimId/status', validateRequestParams(updateClaimStatusParamsSchema), validateRequestBody(updateClaimStatusBodySchema), async (req, res) => {
   try {
     const { claimId } = req.params;
     const { status, resolution, refund_amount } = req.body;
@@ -111,12 +104,6 @@ router.put('/:claimId/status', async (req, res) => {
 
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized' });
-    }
-
-    // Validate status
-    const validStatuses = ['pending', 'investigating', 'resolved', 'rejected'];
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({ error: 'Invalid status' });
     }
 
     // Resolving/rejecting claims and setting refund amounts is an admin-only
@@ -147,13 +134,13 @@ router.put('/:claimId/status', async (req, res) => {
 
     res.json(claim);
   } catch (error) {
-    console.error('Error updating claim:', error);
+    logger.error('Error updating claim:', error);
     res.status(500).json({ error: 'Failed to update claim' });
   }
 });
 
 // Get claim details
-router.get('/:claimId', async (req, res) => {
+router.get('/:claimId', validateRequestParams(getClaimSchema), async (req, res) => {
   try {
     const { claimId } = req.params;
     const userId = req.user?.id;
@@ -178,7 +165,7 @@ router.get('/:claimId', async (req, res) => {
 
     res.json(claim);
   } catch (error) {
-    console.error('Error fetching claim:', error);
+    logger.error('Error fetching claim:', error);
     res.status(500).json({ error: 'Failed to fetch claim' });
   }
 });

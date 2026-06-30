@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { optionalAuthMiddleware, isAdminUser } from '../middleware/auth.js';
+import { validateRequestBody, validateRequestParams, validateRequestQuery } from '../middleware/validateRequest.js';
+import { getMarketDataSchema, recordMarketDataSchema, compareMarketPricesSchema, getTrendingSchema } from '../schemas/marketDataSchemas.js';
 import { getUsdToAudRate } from '../utils/exchangeRates.js';
 import { escapeLike } from '../utils/escapeLike.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -10,7 +13,7 @@ const router = Router();
 router.use(optionalAuthMiddleware);
 
 // Get market data for a card
-router.get('/:cardName', async (req, res) => {
+router.get('/:cardName', validateRequestParams(getMarketDataSchema), async (req, res) => {
   try {
     const { cardName } = req.params;
     const { source } = req.query;
@@ -59,24 +62,20 @@ router.get('/:cardName', async (req, res) => {
       sources: Object.keys(aggregated)
     });
   } catch (error) {
-    console.error('Error fetching market data:', error);
+    logger.error('Error fetching market data:', error);
     res.status(500).json({ error: 'Failed to fetch market data' });
   }
 });
 
 // Record market data (for automated imports) — admin only to prevent
 // anyone from injecting arbitrary prices that feed valuations.
-router.post('/', async (req, res) => {
+router.post('/', validateRequestBody(recordMarketDataSchema), async (req, res) => {
   try {
     if (!(await isAdminUser(req))) {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
-    const { card_name, set_name, source, market_price, low_price, mid_price, high_price, currency = 'USD' } = req.body;
-
-    if (!card_name || !source || !market_price) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
+    const { card_name, set_name, source, market_price, low_price, mid_price, high_price, currency } = req.body;
 
     const { data: marketData, error } = await supabase
       .from('market_data')
@@ -97,13 +96,13 @@ router.post('/', async (req, res) => {
 
     res.status(201).json(marketData);
   } catch (error) {
-    console.error('Error recording market data:', error);
+    logger.error('Error recording market data:', error);
     res.status(500).json({ error: 'Failed to record market data' });
   }
 });
 
 // Get market price comparison across sources
-router.get('/compare/:cardName', async (req, res) => {
+router.get('/compare/:cardName', validateRequestParams(compareMarketPricesSchema), async (req, res) => {
   try {
     const { cardName } = req.params;
 
@@ -142,25 +141,24 @@ router.get('/compare/:cardName', async (req, res) => {
       sources: Object.keys(latestBySource)
     });
   } catch (error) {
-    console.error('Error comparing market prices:', error);
+    logger.error('Error comparing market prices:', error);
     res.status(500).json({ error: 'Failed to compare market prices' });
   }
 });
 
 // Get trending cards (by market data volume)
-router.get('/trending/limit/:limit', async (req, res) => {
+router.get('/trending/limit/:limit', validateRequestParams(getTrendingSchema), async (req, res) => {
   try {
-    const { limit } = req.params;
-    // Clamp to a sane range — parseInt('-5') is truthy and would otherwise pass a
-    // negative value to .limit(); a huge value is a cheap amplification request.
-    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
+    const { limit: limitNum } = req.params;
+    // Clamp to a sane range — validation ensures positive integer, limit to 50 max
+    const clampedLimit = Math.min(50, limitNum);
 
     // Get cards with most recent market data updates
     const { data: trending, error } = await supabase
       .from('market_data')
       .select('card_name, set_name, market_price, source, recorded_at')
       .order('recorded_at', { ascending: false })
-      .limit(limitNum * 5); // Get more to account for duplicates
+      .limit(clampedLimit * 5); // Get more to account for duplicates
 
     if (error) throw error;
 
@@ -191,11 +189,11 @@ router.get('/trending/limit/:limit', async (req, res) => {
         sources: Array.from(card.sources)
       }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, limitNum);
+      .slice(0, clampedLimit);
 
     res.json(sortedCards);
   } catch (error) {
-    console.error('Error fetching trending cards:', error);
+    logger.error('Error fetching trending cards:', error);
     res.status(500).json({ error: 'Failed to fetch trending cards' });
   }
 });

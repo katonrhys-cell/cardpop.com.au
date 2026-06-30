@@ -119,7 +119,6 @@ const AccountProfile = () => {
       setRemoveAvatar(false);
       toast.success('Profile updated successfully!');
     } catch (err) {
-      console.error(err);
       toast.error(err.message || 'Failed to update profile.');
     } finally {
       setLoading(false);

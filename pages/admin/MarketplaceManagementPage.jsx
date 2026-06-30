@@ -18,7 +18,6 @@ const MarketplaceManagementPage = () => {
         if (error) throw error;
         setListings(data ?? []);
       } catch (error) {
-        console.error(error);
         toast.error("Failed to load marketplace data.");
       } finally {
         setLoading(false);

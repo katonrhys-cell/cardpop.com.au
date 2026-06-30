@@ -95,7 +95,6 @@ const MessagingPage = () => {
             setLoading(false);
           }
         } catch (error) {
-          console.error('Error fetching conversations:', error);
           if (isMounted.current) setLoading(false);
         }
       })();
@@ -140,7 +139,7 @@ const MessagingPage = () => {
             });
             scrollToBottom();
             if (record.recipient_id === uid) {
-              supabase.from('messages').update({ status: 'read', read_at: new Date().toISOString() }).eq('id', record.id).eq('recipient_id', uid).catch(console.error);
+              supabase.from('messages').update({ status: 'read', read_at: new Date().toISOString() }).eq('id', record.id).eq('recipient_id', uid).catch(() => {});
             }
           }
         }
@@ -207,7 +206,6 @@ const MessagingPage = () => {
         setLoading(false);
       }
     } catch (error) {
-      console.error('Error fetching conversations:', error);
       if (isMounted.current) setLoading(false);
     }
   }, [currentUser]);
@@ -236,7 +234,6 @@ const MessagingPage = () => {
       }
 
     } catch (error) {
-      console.error('Error loading thread:', error);
     }
   };
 

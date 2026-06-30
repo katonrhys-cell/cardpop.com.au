@@ -46,7 +46,7 @@ const CardPopLogo = ({
         {/* Wordmark */}
           <span className="font-serif font-bold tracking-wide leading-none text-[1.55rem]">
           <span className={cardText}>Card</span>
-          <span className="text-primary">Pop</span>
+          <span className="text-primary">Pop<sup className="text-[0.5em] leading-none">™</sup></span>
         </span>
 
         {/* Australia subtitle */}

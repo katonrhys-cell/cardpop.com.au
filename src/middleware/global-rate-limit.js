@@ -4,7 +4,7 @@ import logger from '../utils/logger.js';
 
 export const globalRateLimit = rateLimit({
 	windowMs: 5 * 60 * 1000,
-	max: 100,
+	max: 50,
 	standardHeaders: true,
 	legacyHeaders: false,
 	message: { error: 'Too many requests, please try again later' },
@@ -17,4 +17,6 @@ export const globalRateLimit = rateLimit({
 			retryAfter: req.rateLimit.resetTime,
 		});
 	},
+	// Skip rate limiting for certain safe endpoints (e.g., health checks)
+	skip: (req) => req.path === '/health',
 });

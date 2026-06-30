@@ -51,7 +51,6 @@ const CategoryPage = () => {
         setTotalItems(count || 0);
         setTotalPages(Math.ceil((count || 0) / perPage));
       } catch (error) {
-        console.error('Error fetching category products:', error);
       } finally {
         setLoading(false);
       }

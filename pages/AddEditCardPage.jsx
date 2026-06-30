@@ -136,6 +136,10 @@ const AddEditCardPage = () => {
     cardNumber:     '',
     year:           '',
     variant:        [],
+    manufacturerName: '',
+    parallelName:   '',
+    parallelPrintRun: '',
+    notesFromCardSight: '',
     // Attributes
     isFoil:         false,
     isSealed:       false,
@@ -212,6 +216,33 @@ const AddEditCardPage = () => {
     setParallelOpts([]);
     if (franchiseId) getParallelsByFranchise(franchiseId).then(setParallelOpts);
   }, [franchiseId, getParallelsByFranchise]);
+
+  // When AI autofills formData.manufacturerName (e.g., "Topps"), look up the matching manufacturer ID
+  useEffect(() => {
+    if (!franchiseId || !formData.manufacturerName || manufacturerId) return;
+    getCategories().then(cats => {
+      const manufacturers = cats.filter(c => c.parent_id === franchiseId);
+      const match = manufacturers.find(m => m.name.toLowerCase() === formData.manufacturerName.toLowerCase());
+      if (match) setManufacturerId(match.id);
+    });
+  }, [franchiseId, formData.manufacturerName]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When AI detects a parallel, try to auto-select it from available parallels
+  useEffect(() => {
+    if (!formData.parallelName || !parallelOpts.length || parallelId) return;
+    const match = parallelOpts.find(p => p.name?.toLowerCase() === formData.parallelName.toLowerCase());
+    if (match) setParallelId(match.id);
+  }, [formData.parallelName, parallelOpts]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Append CardSight-detected artist/HP info to notes
+  useEffect(() => {
+    if (!formData.notesFromCardSight) return;
+    setFormData(prev => {
+      if (prev.notes.includes(formData.notesFromCardSight)) return prev;
+      const combined = [prev.notes, formData.notesFromCardSight].filter(Boolean).join('\n');
+      return { ...prev, notes: combined, notesFromCardSight: '' };
+    });
+  }, [formData.notesFromCardSight]);
 
   // Load subsets whenever set changes
   useEffect(() => {
@@ -498,7 +529,6 @@ const AddEditCardPage = () => {
         resetPhotoTemplate();
         toast.success('Photo formatted — it will be saved with your card.');
       } catch (error) {
-        console.error('Local format error:', error);
         toast.error('Failed to apply formatted photo');
       } finally {
         setIsUploadingTemplate(false);
@@ -532,7 +562,6 @@ const AddEditCardPage = () => {
       setImagePreview(supabase.storage.from('vault-images').getPublicUrl(filePath).data.publicUrl);
       toast.success('Photo formatted successfully!');
     } catch (error) {
-      console.error('Template upload error:', error);
       toast.error('Failed to upload processed image');
     } finally {
       setIsUploadingTemplate(false);
@@ -625,7 +654,6 @@ const AddEditCardPage = () => {
         await supabase.from('listings').insert(listingPayload);
       }
     } catch (err) {
-      console.error('Listing sync error:', err);
       toast.error('Card saved, but updating its marketplace listing failed. You can re-list it from your vault.');
     }
   };
@@ -1087,7 +1115,14 @@ const AddEditCardPage = () => {
                             {cardSightResult.card?.year && <div><strong className="text-foreground">Year:</strong> {cardSightResult.card.year}</div>}
                             {cardSightResult.card?.cardNumber && <div><strong className="text-foreground">No:</strong> {cardSightResult.card.cardNumber}</div>}
                             {cardSightResult.card?.manufacturer && <div><strong className="text-foreground">Brand:</strong> {cardSightResult.card.manufacturer}</div>}
-                            {cardSightResult.grading && <div className="col-span-2"><strong className="text-foreground">Graded:</strong> {cardSightResult.grading.company} {cardSightResult.grading.grade}</div>}
+                            {cardSightResult.card?.artist && <div className="col-span-2"><strong className="text-foreground">Artist:</strong> {cardSightResult.card.artist}</div>}
+                            {cardSightResult.card?.hp && <div><strong className="text-foreground">HP:</strong> {cardSightResult.card.hp}</div>}
+                            {cardSightResult.grading && (
+                              <>
+                                <div className="col-span-2"><strong className="text-foreground">Graded:</strong> {cardSightResult.grading.company} {cardSightResult.grading.grade}</div>
+                                {cardSightResult.grading.condition && <div className="col-span-2"><strong className="text-foreground">Condition:</strong> {cardSightResult.grading.condition}</div>}
+                              </>
+                            )}
                             {cardSightResult.parallel && <div className="col-span-2"><strong className="text-foreground">Parallel:</strong> {cardSightResult.parallel.name ?? 'Yes'}</div>}
                           </div>
                           {cardSightResult.pricing && (

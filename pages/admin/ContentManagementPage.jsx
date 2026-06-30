@@ -57,7 +57,6 @@ const ContentManagementPage = () => {
       if (fetchErr) throw fetchErr;
       if (!cancelled.value) setArticles(data ?? []);
     } catch (err) {
-      console.error('[ContentManagementPage] fetch failed:', err);
       if (!cancelled.value) setError(err.message || 'Failed to load articles.');
     } finally {
       if (!cancelled.value) setLoading(false);
@@ -89,7 +88,6 @@ const ContentManagementPage = () => {
       toast.success('Article deleted.');
       setArticles(prev => prev.filter(a => a.id !== deleteTarget.id));
     } catch (err) {
-      console.error('[ContentManagementPage] delete error:', err);
       toast.error(err.message || 'Failed to delete article.');
     } finally {
       setDeleteTarget(null);
@@ -107,7 +105,6 @@ const ContentManagementPage = () => {
       setArticles(prev => prev.map(a => a.id === article.id ? { ...a, is_published: next } : a));
       toast.success(next ? 'Article published.' : 'Article set to draft.');
     } catch (err) {
-      console.error('[ContentManagementPage] publish toggle error:', err);
       toast.error('Failed to update status.');
     }
   };

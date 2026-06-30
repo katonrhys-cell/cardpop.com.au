@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import crypto from 'crypto';
 import express from 'express';
 import supabase from '../../utils/supabaseClient.js';
 import { authMiddleware } from '../../middleware/auth.js';
@@ -14,7 +15,7 @@ router.post('/create', authMiddleware, async (req, res) => {
     .from('user_security').select('active_sessions').eq('user_id', userId).single();
   if (error) throw error;
 
-  const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  const sessionId = `session_${crypto.randomBytes(16).toString('hex')}`;
   const deviceName = getDeviceName(req.headers['user-agent'] || '');
   const ipAddress = req.ip || req.connection?.remoteAddress;
   const now = new Date().toISOString();

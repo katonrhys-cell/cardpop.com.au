@@ -51,7 +51,6 @@ const ShopPage = () => {
       } catch (err) {
         if (!cancelled) {
           setError('Failed to load shop products.');
-          console.error(err);
         }
       } finally {
         if (!cancelled) setLoading(false);

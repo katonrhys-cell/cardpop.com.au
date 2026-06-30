@@ -53,7 +53,6 @@ const BrowseListingsPage = () => {
 
         setProducts(data || []);
       } catch (error) {
-        console.error('Error fetching products:', error);
         toast.error('Failed to load listings');
       } finally {
         setLoading(false);

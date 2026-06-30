@@ -42,7 +42,6 @@ const EventDetailPage = () => {
         if (error) throw error;
         if (isMounted) setEvent(data);
       } catch (err) {
-        console.error('Error fetching event:', err);
         if (isMounted) setEvent(null);
       } finally {
         if (isMounted) setIsLoading(false);

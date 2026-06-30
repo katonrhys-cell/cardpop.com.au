@@ -10,7 +10,7 @@ const PrivacyPage = () => {
       title="Privacy Policy"
       description="How we collect, use, and protect your personal information."
     >
-      <SEOHead title="Privacy Policy | CardPop" description="CardPop's privacy policy — how we collect, use and protect your personal information." />
+      <SEOHead title="Privacy Policy | CardPop™" description="CardPop™'s privacy policy — how we collect, use and protect your personal information." />
 
       <p className="text-sm text-muted-foreground mb-8">Last Updated: May 10, 2026</p>
 

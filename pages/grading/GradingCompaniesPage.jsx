@@ -117,7 +117,7 @@ const GradingCompaniesPage = () => {
     let cancelled = false;
     supabase.from('grading_companies').select('*').order('name').limit(20)
       .then(({ data }) => { if (!cancelled) setGuides(data ?? []); })
-      .catch(console.error)
+      .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);

@@ -60,7 +60,6 @@ const AccountListings = () => {
         if (fetchError) throw fetchError;
         if (!cancelled) setListings(data ?? []);
       } catch (err) {
-        console.error('Failed to fetch listings:', err);
         if (!cancelled) setError(err.message || 'Failed to load listings.');
       } finally {
         if (!cancelled) setLoading(false);

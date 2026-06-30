@@ -78,7 +78,6 @@ const VaultProfilePage = () => {
         if (!cancelled) setVaultCards(cardsData || []);
 
       } catch (error) {
-        console.error('Error fetching profile data:', error);
         if (!cancelled) toast.error('Failed to load profile data.');
       } finally {
         if (!cancelled) setLoading(false);
@@ -145,7 +144,6 @@ const VaultProfilePage = () => {
       setIsEditing(false);
       toast.success('Profile updated successfully.');
     } catch (error) {
-      console.error('Error updating profile:', error);
       toast.error('Failed to update profile. Please try again.');
     } finally {
       setSaving(false);

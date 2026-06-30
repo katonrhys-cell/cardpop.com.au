@@ -28,22 +28,22 @@
         font-size: 16px; line-height: 1.65; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
       }
 
-      /* Images — prevent layout shift -->
+      /* Images — prevent layout shift */
       img { max-width: 100%; height: auto; aspect-ratio: auto; }
 
-      /* Typography — ensure text renders immediately -->
+      /* Typography — ensure text renders immediately */
       h1, h2, h3, h4, h5, h6 { font-family: 'Syne', 'Syne Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 
-      /* Hero section — above fold on desktop/tablet, stats on mobile -->
+      /* Hero section — above fold on desktop/tablet, stats on mobile */
       .min-h-\[92dvh\] { min-height: 92dvh; display: flex; align-items: flex-start; justify-content: center; }
 
-      /* Flexbox for layout stability -->
+      /* Flexbox for layout stability */
       .flex { display: flex; }
       .flex-col { flex-direction: column; }
       .items-center { align-items: center; }
       .justify-center { justify-content: center; }
 
-      /* Text classes for hero copy -->
+      /* Text classes for hero copy */
       .text-foreground { color: rgb(31, 41, 55); }
       .text-white { color: rgb(255, 255, 255); }
       .text-zinc-400 { color: rgb(161, 161, 170); }
@@ -51,7 +51,7 @@
       .bg-background { background-color: rgb(255, 255, 255); }
       .bg-card { background-color: rgb(255, 255, 255); }
 
-      /* Spacing — critical for layout shift prevention -->
+      /* Spacing — critical for layout shift prevention */
       .pt-10 { padding-top: 2.5rem; }
       .pb-16 { padding-bottom: 4rem; }
       .px-4 { padding-left: 1rem; padding-right: 1rem; }
@@ -60,7 +60,7 @@
       .mb-10 { margin-bottom: 2.5rem; }
       .gap-4 { gap: 1rem; }
 
-      /* Typography scale -->
+      /* Typography scale */
       .text-base { font-size: 1rem; }
       .text-lg { font-size: 1.125rem; }
       .text-5xl { font-size: 3rem; }
@@ -102,26 +102,31 @@
       }
     </style>
 
-    <title>CardPop | Australia's Trading Card Marketplace</title>
-    <meta name="description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, Yu-Gi-Oh, and sports cards on CardPop — Australia's trusted online trading card marketplace. Browse thousands of listings, check live prices, and shop sealed boxes." />
+    <title>CardPop™ | Australia's Trading Card Marketplace</title>
+    <meta name="description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, Yu-Gi-Oh, and sports cards on CardPop™ Australia — Australia's trusted online trading card marketplace. Browse thousands of listings, check live prices, and shop sealed boxes." />
     <meta name="keywords" content="trading cards Australia, Pokemon cards Australia, buy sell trade cards, MTG Australia, sports cards Australia, card marketplace" />
-    <meta name="author" content="CardPop" />
+    <meta name="author" content="CardPop™" />
     <link rel="canonical" href="https://cardpop.com.au/" />
 
-    <!-- Google Fonts — preload CSS to start download earlier, async load to avoid blocking -->
-    <!-- System font stack loads immediately as fallback; Google font enhances after download -->
+    <!-- Google Fonts — Syne for headings (brand typeface) -->
+    <!-- Async load: preload resource, load with media query, JS ensures fallback -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" media="print" onload="this.media='all'" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" media="(max-width: 0px)" id="font-syne" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" /></noscript>
+    <script>
+      var f = document.getElementById('font-syne');
+      f.media = '(max-width: 9999px)';
+      f.onload = function() { this.media = 'all'; };
+    </script>
 
     <!-- Open Graph (Facebook, Discord, Slack previews) -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://cardpop.com.au/" />
-    <meta property="og:site_name" content="CardPop" />
-    <meta property="og:title" content="CardPop | Australia's Trusted Digital Card Show - Trading Card Marketplace" />
-    <meta property="og:description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop — Australia's most trusted trading card platform." />
+    <meta property="og:site_name" content="CardPop™" />
+    <meta property="og:title" content="CardPop™ | Australia's Trusted Digital Card Show - Trading Card Marketplace" />
+    <meta property="og:description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop™ Australia — Australia's most trusted trading card platform." />
     <meta property="og:image" content="https://cardpop.com.au/og-image.jpg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -130,8 +135,8 @@
     <!-- Twitter / X card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@cardpopau" />
-    <meta name="twitter:title" content="CardPop | Australia's Trusted Digital Card Show - Trading Card Marketplace" />
-    <meta name="twitter:description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop — Australia's most trusted trading card platform." />
+    <meta name="twitter:title" content="CardPop™ | Australia's Trusted Digital Card Show - Trading Card Marketplace" />
+    <meta name="twitter:description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop™ Australia — Australia's most trusted trading card platform." />
     <meta name="twitter:image" content="https://cardpop.com.au/og-image.jpg" />
 
     <!-- Favicon — CardPop card-holder icon in brand red -->
@@ -142,7 +147,7 @@
     {
       "@context": "https://schema.org",
       "@type": "WebSite",
-      "name": "CardPop",
+      "name": "CardPop™",
       "url": "https://cardpop.com.au",
       "description": "Australia's trading card marketplace for Pokémon, Magic: The Gathering, sports cards and more.",
       "potentialAction": {
@@ -161,7 +166,7 @@
     {
       "@context": "https://schema.org",
       "@type": "Organization",
-      "name": "CardPop",
+      "name": "CardPop™",
       "url": "https://cardpop.com.au",
       "logo": "https://cardpop.com.au/og-image.jpg",
       "description": "Australia's most trusted trading card marketplace.",
@@ -184,7 +189,7 @@
     {
       "@context": "https://schema.org",
       "@type": "OnlineStore",
-      "name": "CardPop",
+      "name": "CardPop™",
       "description": "Australia's most trusted trading card marketplace for Pokémon, Magic: The Gathering, Yu-Gi-Oh and sports cards.",
       "url": "https://cardpop.com.au",
       "currenciesAccepted": "AUD",

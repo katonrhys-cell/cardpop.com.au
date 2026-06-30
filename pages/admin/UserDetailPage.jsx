@@ -49,7 +49,6 @@ const UserDetailPage = () => {
       toast.success(successMsg);
       refetch?.();
     } catch (err) {
-      console.error(err);
       toast.error(err.message || 'Failed to update store.');
     } finally {
       setFlagSaving(false);

@@ -44,7 +44,6 @@ const InsiderTradingPage = () => {
       if (fetchError) throw fetchError;
       setRetailers(records || []);
     } catch (error) {
-      console.error('Error fetching retailers:', error);
       toast.error('Failed to load retailers.');
     } finally {
       setLoading(false);
@@ -107,7 +106,6 @@ const InsiderTradingPage = () => {
       toast.success('Retailer deleted successfully.');
       fetchRetailers();
     } catch (error) {
-      console.error('Error deleting retailer:', error);
       toast.error('Failed to delete retailer.');
     }
   };
@@ -138,7 +136,6 @@ const InsiderTradingPage = () => {
       resetForm();
       fetchRetailers();
     } catch (error) {
-      console.error('Error saving retailer:', error);
       toast.error('Failed to save retailer.');
     } finally {
       setIsSubmitting(false);

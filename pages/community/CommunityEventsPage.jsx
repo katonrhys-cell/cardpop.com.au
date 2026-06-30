@@ -91,7 +91,6 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
       if (fetchError) throw fetchError;
       if (isMounted.current) setEvents(data || []);
     } catch (err) {
-      console.error('Error fetching events:', err);
       if (isMounted.current) setError('Failed to load events. Please try again.');
     } finally {
       if (isMounted.current) setIsLoading(false);

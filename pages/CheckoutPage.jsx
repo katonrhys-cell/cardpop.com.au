@@ -87,7 +87,6 @@ const CheckoutPage = () => {
             variant: null,
           });
         } catch (err) {
-          console.error('[CheckoutPage] Failed to load vault item:', err);
           if (!cancelled) {
             toast.error('Item not found or unavailable');
             navigate('/browse');

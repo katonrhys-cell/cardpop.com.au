@@ -80,7 +80,6 @@ const LocalTradersPage = () => {
 
       setTraders(uniqueTraders);
     } catch (err) {
-      console.error(err);
     }
   }, [selectedState]);
 

@@ -91,7 +91,7 @@ const Footer = () => {
 
         <div className="border-t border-border pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
           <p className="text-muted-foreground text-sm font-medium">
-            © {new Date().getFullYear()} CardPop. All rights reserved.
+            © {new Date().getFullYear()} CardPop<sup className="text-[0.6em]">™</sup> Australia. All rights reserved.
           </p>
           <p className="text-muted-foreground text-sm">
             Made with ❤️ for the Australian trading card community

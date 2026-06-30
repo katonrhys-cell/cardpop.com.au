@@ -109,7 +109,6 @@ const ChatModerationPage = () => {
       setProfiles(profMap);
       setResults(deduped);
     } catch (err) {
-      console.error('[ChatModeration] search failed:', err);
       toast.error('Failed to search messages.');
       if (myReq === reqRef.current) setResults([]);
     } finally {
@@ -139,7 +138,6 @@ const ChatModerationPage = () => {
       }
       setThreadMsgs(data ?? []);
     } catch (err) {
-      console.error('[ChatModeration] thread load failed:', err);
       toast.error('Failed to load conversation.');
       setThreadMsgs([]);
     } finally {

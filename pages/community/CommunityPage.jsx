@@ -62,7 +62,7 @@ const CommunityPage = () => {
       .order('created_at', { ascending: false })
       .limit(20)
       .then(({ data }) => { if (!cancelled) setDiscussions(data || []); })
-      .catch(console.error)
+      .catch(() => {})
       .finally(() => { if (!cancelled) setLoadingDiscussions(false); });
 
     supabase
@@ -82,7 +82,7 @@ const CommunityPage = () => {
           setProfiles(uniqueProfiles);
         }
       })
-      .catch(console.error)
+      .catch(() => {})
       .finally(() => { if (!cancelled) setLoadingProfiles(false); });
 
     supabase
@@ -91,7 +91,7 @@ const CommunityPage = () => {
       .eq('is_active', true)
       .order('brand_name', { ascending: true })
       .then(({ data }) => { if (!cancelled) setRetailers(data || []); })
-      .catch(console.error)
+      .catch(() => {})
       .finally(() => { if (!cancelled) setLoadingRetailers(false); });
 
     return () => { cancelled = true; };

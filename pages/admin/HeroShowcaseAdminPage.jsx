@@ -64,7 +64,6 @@ const HeroShowcaseAdminPage = () => {
       if (error) throw error;
       setCards(data || []);
     } catch (err) {
-      console.error('Error loading showcase cards:', err);
       toast.error('Failed to load showcase cards.');
     } finally {
       setIsLoading(false);
@@ -83,7 +82,6 @@ const HeroShowcaseAdminPage = () => {
       if (error) throw error;
       setVaultItems(data || []);
     } catch (err) {
-      console.error('Error loading marketplace cards:', err);
       toast.error('Failed to load marketplace cards.');
     } finally {
       setVaultLoading(false);
@@ -211,7 +209,6 @@ const HeroShowcaseAdminPage = () => {
       setDialogOpen(false);
       resetImageInputs();
     } catch (err) {
-      console.error('Error saving showcase card:', err);
       toast.error(err.message || 'Failed to save showcase card.');
     } finally {
       setSaving(false);
@@ -231,7 +228,6 @@ const HeroShowcaseAdminPage = () => {
       if (error) throw error;
       setCards((prev) => prev.map((c) => (c.id === card.id ? data : c)));
     } catch (err) {
-      console.error('Error toggling card:', err);
       toast.error('Failed to update card.');
     } finally {
       setBusyId(null);
@@ -247,7 +243,6 @@ const HeroShowcaseAdminPage = () => {
       setCards((prev) => prev.filter((c) => c.id !== card.id));
       toast.success('Card removed.');
     } catch (err) {
-      console.error('Error deleting card:', err);
       toast.error('Failed to remove card.');
     } finally {
       setBusyId(null);
@@ -274,7 +269,6 @@ const HeroShowcaseAdminPage = () => {
       ]);
       if (r1.error || r2.error) throw (r1.error || r2.error);
     } catch (err) {
-      console.error('Error reordering:', err);
       toast.error('Failed to save new order.');
       fetchCards();
     }

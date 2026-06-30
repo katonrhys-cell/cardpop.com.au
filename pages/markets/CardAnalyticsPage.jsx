@@ -213,8 +213,7 @@ const CardAnalyticsPage = () => {
         setListings(shop.map(i => ({ ...i, _source: 'shop' })));
         setVaultItems(vault.map(i => ({ ...i, _source: 'vault' })));
       }
-    }).catch((err) => { console.warn('[CardAnalyticsPage] listings fetch failed:', err); }).finally(() => { if (!cancelled) setLoadingL(false); });
-
+    });
     return () => { cancelled = true; };
   }, [cardName]);
 
@@ -235,8 +234,7 @@ const CardAnalyticsPage = () => {
       // Also fetch price range from DB
       apiServerClient.fetch(`/market-data/price-range/${cardsightId}`)
         .then(r => r.ok ? r.json() : null)
-        .then(r => { if (r) setPriceRange(r); })
-        .catch((err) => { console.warn('[CardAnalyticsPage] price range fetch failed:', err); });
+        .then(r => { if (r) setPriceRange(r); });
     }).finally(() => setCsLoading(false));
   }, [cardsightId]);
 
@@ -261,7 +259,6 @@ const CardAnalyticsPage = () => {
           volume:   items.length,
         });
       })
-      .catch((err) => { console.warn('[CardAnalyticsPage] live sales fetch failed:', err); })
       .finally(() => { if (!cancelled) setLiveLoading(false); });
     return () => { cancelled = true; };
   }, [cardName, cardSet]);

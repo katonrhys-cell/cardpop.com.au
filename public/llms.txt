@@ -1,58 +1,319 @@
-## Pages
-- [- Seller Profile - Card Pop Australia`}](/sellerprofile): No description available
-- [| Card Pop](/addeditcard): No description available
-- [| User Details](/userdetail): No description available
-- [Account Dashboard | CardPop](/accountdashboard): No description available
-- [Add Your First Card | Card Pop](/addyourfirstcard): No description available
-- [Admin - Collection Sections | CardPop](/collectionsectionsadmin): No description available
-- [Admin - Hero Showcase | CardPop](/heroshowcaseadmin): No description available
-- [Admin - Manage Events | CardPop](/eventsadmin): No description available
-- [Admin - Manage Featured Cards | CardPop](/featuredcardsadmin): No description available
-- [Analytics & Reports | Admin Portal](/analyticsreports): No description available
-- [Brand Management | Admin Portal](/brandsmanagement): No description available
-- [Category Mapping Tools | Admin](/categorymapping): No description available
-- [Chargebacks | Admin](/disputesadmin): No description available
-- [Chat Moderation | CardPop Admin](/chatmoderation): No description available
-- [Check Your Email | Card Pop](/signup): No description available
-- [Commission Settings | CardPop Admin](/commissionsettings): No description available
-- [Complete Profile | Card Pop](/profilecompletion): No description available
-- [Confirming Order | Card Pop](/checkoutsuccess): No description available
-- [Hierarchy Management | CardPop Admin](/categorymanagement): No description available
-- [Log In | CardPop](/login): No description available
-- [Manage Events | Admin Portal](/eventsadmin): No description available
-- [Manage Events | Admin Portal](/eventsmanagement): No description available
-- [Messaging | Card Pop](/messaging): No description available
-- [My Balance | Card Pop](/userbalance): No description available
-- [My Digital Vault | CardPop](/myvault): No description available
-- [My Events | CardPop](/accountevents): No description available
-- [My Listings | CardPop](/accountlistings): No description available
-- [My Vault | CardPop](/accountvault): No description available
-- [Notification Settings | CardPop](/accountnotificationsettings): No description available
-- [Notifications | CardPop](/accountnotifications): No description available
-- [Offers | CardPop](/accountoffers): No description available
-- [Official Shop Management | Admin](/productmanagement): No description available
-- [Platform Settings | Admin](/adminsettings): No description available
-- [Product Lines Management | Admin Portal](/productlinesmanagement): No description available
-- [Public Profile | CardPop](/userprofile): No description available
-- [Public Profile | CardPop](/accountprofile): No description available
-- [Recover Account | Card Pop](/passwordreset): No description available
-- [Reports & Moderation | Admin](/reportsmoderation): No description available
-- [Reviews | CardPop](/accountreviews): No description available
-- [Secure Checkout | Card Pop](/checkout): No description available
-- [Security Settings | Card Pop](/securitysettings): No description available
-- [Security Settings | CardPop](/accountsecurity): No description available
-- [Seller Tier | CardPop](/accountsellertier): No description available
-- [Sellers Management | Admin Portal](/sellersmanagement): No description available
-- [Sole Trader Account | CardPop](/accountsoletrader): No description available
-- [Subcategory Management | Admin Portal](/subcategorymanagement): No description available
-- [System Diagnostics | Admin](/systemdiagnostics): No description available
-- [System Diagnostics | Emergency Console](/diagnostics): No description available
-- [Transactions | Card Pop](/transactionhistory): No description available
-- [Transactions | CardPop](/accounttransactions): No description available
-- [User Management | Admin Portal](/usermanagement): No description available
-- [Vault Profile | CardPop](/vaultprofile): No description available
-- [Verification Management | Admin](/adminverificationdashboard): No description available
-- [Verification Pending | Card Pop](/verificationpending): No description available
-- [Verification Status | CardPop](/verificationsubmission): No description available
-- [Wallet & Payouts | CardPop](/accountwallet): No description available
-- [Watchlist | CardPop](/accountwatchlist): No description available
+# CardPop - Australian Trading Card Marketplace
+## AI Agent Accessibility Guidelines
+
+Welcome! This file provides guidance for AI agents and Large Language Models interacting with CardPop.
+
+---
+
+## About CardPop
+
+CardPop is a secure, member-based trading card marketplace for Australian collectors. We facilitate buying, selling, trading, and grading of collectible trading cards with a focus on:
+- Verified seller network
+- Secure escrow payments via Stripe
+- Card grading partnerships (PSA, BGS, CGC, ACE)
+- Community-driven price discovery
+- Trust & Safety protections
+
+**Primary URL:** https://cardpop.com.au
+**Region:** Australia (AUD pricing, local payment methods)
+**Type:** E-commerce, Social Community, Data-driven Analytics
+
+---
+
+## Navigation & Key Sections
+
+### Public Content (Accessible without authentication)
+- **Home:** `/` - Site overview, featured cards, trending listings
+- **Collections:** `/collections/*` - Category-specific card browsing
+  - Examples: `/collections/pokemon`, `/collections/sports`, `/collections/yu-gi-oh`
+- **Grading Guide:** `/info/grading` - Educational content on card grading
+- **Market Insights:** `/markets/card-analytics` - Price trends and market data
+- **Community:** `/community/local-map` - Geographic seller directory, events
+- **Blog:** `/blog/*` - Collector guides, market analysis
+- **Shop:** `/shop` - Official CardPop curated product listings
+- **Terms & Policies:**
+  - Terms of Service: `/terms`
+  - Privacy Policy: `/privacy`
+  - Trust & Safety: `/trust-safety`
+
+### Authenticated Content (Login required)
+- **Account Dashboard:** `/account` - User profile, settings, balance
+- **Digital Vault:** `/vault` - Personal card collection management
+- **My Listings:** `/account/listings` - Posted cards for sale/trade
+- **Messaging:** `/messaging` - Private conversations with other users
+- **Wallet & Payouts:** `/account/wallet` - Financial management
+- **Orders & Transactions:** `/account/transactions` - Purchase history
+- **Watchlist:** `/account/watchlist` - Saved cards of interest
+
+### Admin Content (Admin access only)
+- **Admin Panel:** `/admin/*` - Platform management tools
+- **Analytics:** `/admin/analytics` - Marketplace metrics and insights
+- **Moderation:** `/admin/moderation` - Reports and compliance tools
+
+---
+
+## Guidelines for AI Agents
+
+### What You Can Do
+1. **Browse Public Data:** Read product listings, prices, descriptions, and market analytics
+2. **Analyze Collections:** Study card categories, grading information, and pricing trends
+3. **Research Market Trends:** Access `/markets/card-analytics` for historical price data
+4. **Explore Community:** View public seller profiles, events, and community content
+5. **Read Educational Content:** Access guides, blog posts, and grading information
+6. **Query Product Data:** Build applications using CardPop's public data with attribution
+
+### What You Cannot Do
+1. **Scrape Private Data:** Do not attempt to scrape user profiles, messages, or personal collections
+2. **Bypass Authentication:** Do not attempt to access login-required pages without proper credentials
+3. **Modify Data:** Do not attempt to create, edit, or delete listings without user authorization
+4. **Access Admin Tools:** Do not attempt to access `/admin` pages or administrative functions
+5. **Perform High-Volume Requests:** Respect rate limits and avoid overwhelming the server
+6. **Impersonate Users:** Do not create fake accounts or pretend to be a human user
+
+---
+
+## Authentication & Access Control
+
+CardPop uses Supabase Auth with the following security measures:
+- **Email verification required** for new accounts
+- **MFA available** for account security (TOTP, backup codes)
+- **Session-based authentication** using Bearer tokens
+- **Row-Level Security (RLS)** policies enforce data privacy
+- **Rate limiting** on authentication endpoints
+
+**For AI Agents:** If you need programmatic access, contact developers@cardpop.com.au to discuss API authentication options.
+
+---
+
+## Rate Limiting & Responsible Usage
+
+Please follow these guidelines to ensure platform stability:
+- **Maximum requests:** 100 requests per minute per IP address
+- **Crawl delays:** Implement 1-2 second delays between requests
+- **Respect robots.txt:** See `/robots.txt` for crawl directives
+- **User-Agent header:** Always identify as an AI agent: `User-Agent: MyAgent/1.0 (+http://example.com)`
+- **Cache responses:** Implement client-side caching to reduce redundant requests
+
+Violating rate limits may result in IP-based rate limiting or temporary blocking.
+
+---
+
+## Data Privacy & Handling
+
+CardPop prioritizes user privacy. When interacting with the platform:
+
+1. **Don't Store Personal Data:** Do not cache or store user emails, phone numbers, or personal information
+2. **Respect User Consent:** Only process data that users have explicitly shared publicly
+3. **Handle Sensitively:** Treat financial information (prices, payouts, balances) as confidential
+4. **No Account Creation:** Do not create accounts on behalf of users or without explicit consent
+5. **GDPR & Privacy:** Respect Australian Privacy Principles and data handling regulations
+
+**Data Processing:** CardPop uses:
+- Supabase for database and authentication
+- Stripe for payment processing
+- Sentry for error monitoring
+- Vercel for hosting and CDN
+
+---
+
+## Specific Guidelines by Section
+
+### Market Analytics
+- **Price data:** Freely available at `/markets/card-analytics`
+- **Historical trends:** Accessible and suitable for analysis
+- **Commercial use:** Allowed with attribution to CardPop
+- **Resale restrictions:** Do not resell CardPop data as a service without permission
+
+### Card Listings
+- **Public listings:** Available for research and comparison
+- **Seller information:** Publicly visible profiles only; do not aggregate
+- **Contact information:** Listed seller contact is public; private messages require authentication
+- **Images:** Licensed under Creative Commons or seller's specified terms
+
+### User Profiles
+- **Public profiles:** Seller ratings, reviews, and verification status are public
+- **Private data:** Email, phone, address, and transaction details are private
+- **No scraping:** Do not extract or aggregate user profile data
+
+### Community & Events
+- **Event listings:** Publicly available for discovery and promotion
+- **Location data:** Aggregated city/region data is public; individual locations are private
+- **RSVP data:** Only accessible to event organizers
+
+---
+
+## Common Use Cases & Recommendations
+
+### Use Case 1: Building a Price Comparison Tool
+✅ **Recommended approach:**
+- Fetch public listing data from `/collections/*`
+- Access analytics at `/markets/card-analytics`
+- Cache results to minimize requests
+- Display CardPop as a data source
+- Implement 2-3 second crawl delays
+- Respect robots.txt directives
+
+### Use Case 2: Creating a Seller Insights Dashboard
+✅ **Recommended approach:**
+- Use public seller profiles and ratings
+- Analyze public review data
+- Display seller verification status
+- Include CardPop attribution
+- Do not attempt to access private seller data
+
+### Use Case 3: Developing a Market Analysis Bot
+✅ **Recommended approach:**
+- Query historical price data from `/markets/card-analytics`
+- Identify trends in public listings
+- Generate insights without storing personal data
+- Use API with proper User-Agent headers
+- Request API access if you need higher rate limits
+
+### Use Case 4: Building an Integration or Extension
+⚠️ **Contact:** developers@cardpop.com.au
+- Describe your use case and data needs
+- Request appropriate API credentials
+- Discuss rate limits and authentication
+- Sign an integration agreement if required
+
+---
+
+## Technical Details
+
+### Frontend Architecture
+- **Framework:** React 18 with React Router v7
+- **Styling:** Tailwind CSS with dark mode support
+- **State Management:** React Context API
+- **API Client:** Fetch API with Bearer token authentication
+- **Data Validation:** Zod schema validation
+
+### Backend Architecture
+- **Server:** Express.js running on Vercel serverless
+- **Database:** PostgreSQL via Supabase with RLS policies
+- **Authentication:** Supabase Auth with JWT tokens
+- **Payment Processing:** Stripe (including Connect for seller payouts)
+- **External APIs:** eBay pricing, CardSight valuations, Kit.com newsletter
+
+### API Conventions
+- **Base URL:** https://cardpop.com.au/api/*
+- **Authentication:** Bearer token in `Authorization` header
+- **Response Format:** JSON
+- **Error Handling:** Standard HTTP status codes with error messages
+- **CORS:** Enabled for same-origin and authorized integrations
+
+### Important Endpoints for AI Agents
+- `GET /api/categories` - Browse card categories
+- `GET /api/listings` - Search public listings
+- `GET /api/collections` - Browse collection pages
+- `GET /markets/card-analytics` - Price trends and analytics
+- `GET /community/local-map` - Community events and locations
+
+---
+
+## Error Handling & Support
+
+### Common Errors You May Encounter
+
+| Status | Meaning | Solution |
+|--------|---------|----------|
+| 429 | Rate limit exceeded | Wait before making more requests |
+| 401 | Authentication required | Page requires login; respect `/robots.txt` Disallow rules |
+| 403 | Access forbidden | Do not attempt to access private user data |
+| 404 | Page not found | Check URL structure and collection names |
+| 503 | Service unavailable | Temporary outage; retry after waiting |
+
+### Getting Help
+- **General inquiries:** hello@cardpop.com.au
+- **Technical issues:** developers@cardpop.com.au
+- **Data access requests:** data@cardpop.com.au
+- **Report abuse:** support@cardpop.com.au
+- **GitHub:** katonrhys-cell/cardpop.com.au
+
+---
+
+## Content Guidelines
+
+When referencing CardPop data in AI-generated content:
+
+1. **Attribution:** Always credit CardPop as the data source
+2. **Accuracy:** Ensure data is current; prices change frequently
+3. **Context:** Provide proper context for market data
+4. **Disclaimers:** Note that past performance doesn't guarantee future results
+5. **Responsible Disclosure:** Report bugs or security issues to developers@cardpop.com.au
+
+### Example Attribution
+```
+Data source: CardPop Australian Trading Card Marketplace
+Retrieved: [Date]
+URL: https://cardpop.com.au
+```
+
+---
+
+## Changes & Updates
+
+This guidelines document is maintained to reflect platform best practices. AI agents should:
+- Check this file periodically for updates
+- Respect new guidelines or restrictions as they're added
+- Implement changes within 30 days of publication
+
+**Last Updated:** June 29, 2026
+**Version:** 1.0
+
+---
+
+## Platform Compliance
+
+CardPop operates in compliance with:
+- **Australian Consumer Law** - Fair trading and consumer protection
+- **Privacy Act 1988 (Cth)** - Personal data protection
+- **ASIC regulations** - Financial services compliance
+- **Stripe compliance** - Payment processing requirements
+- **Vercel terms of service** - Hosting and infrastructure
+
+AI agents must also comply with these regulations when accessing platform data.
+
+---
+
+## Code of Conduct for AI Agents
+
+We expect all AI agents to:
+
+1. **Be Honest:** Identify as an AI agent; don't impersonate humans
+2. **Be Respectful:** Don't overload servers or abuse rate limits
+3. **Be Transparent:** Disclose data sources and AI involvement
+4. **Be Safe:** Don't attempt unauthorized access or data extraction
+5. **Be Helpful:** Use your capabilities to enhance the CardPop ecosystem
+
+Violations may result in:
+- IP-based rate limiting
+- Account suspension (if using an account)
+- Legal action (for serious violations like unauthorized data access)
+- Public disclosure (for bad-faith actors)
+
+---
+
+## Feedback & Suggestions
+
+We welcome feedback from AI agents and developers! Please share:
+- Feature requests for better AI accessibility
+- Documentation improvements
+- Bug reports
+- Integration ideas
+
+**Send to:** developers@cardpop.com.au
+
+---
+
+## Quick Links
+
+- **Sitemap:** https://cardpop.com.au/sitemap.xml
+- **Robots.txt:** https://cardpop.com.au/robots.txt
+- **Privacy Policy:** https://cardpop.com.au/privacy
+- **Terms of Service:** https://cardpop.com.au/terms
+- **Status Page:** https://status.cardpop.com.au
+- **Blog:** https://cardpop.com.au/blog
+
+---
+
+**Happy browsing! CardPop team**

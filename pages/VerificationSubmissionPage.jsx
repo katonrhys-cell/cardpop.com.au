@@ -163,7 +163,6 @@ const VerificationSubmissionPage = () => {
       toast.success('Verification request submitted successfully!');
       setExistingStatus('pending');
     } catch (err) {
-      console.error('Submission error:', err);
       toast.error(err.message || 'Failed to submit verification request.');
     } finally {
       setSubmitting(false);

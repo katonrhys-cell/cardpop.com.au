@@ -60,7 +60,6 @@ const CollectionSectionsAdminPage = () => {
       }
       setPins((rows ?? []).map((r) => ({ ...r, item: itemsById[r.vault_item_id] || null })));
     } catch (err) {
-      console.error('Error loading pinned cards:', err);
       toast.error('Failed to load pinned cards.');
     } finally {
       setLoading(false);
@@ -82,7 +81,6 @@ const CollectionSectionsAdminPage = () => {
         if (error) throw error;
         if (!cancelled) setResults(data ?? []);
       } catch (err) {
-        console.error('Search failed:', err);
         if (!cancelled) setResults([]);
       } finally {
         if (!cancelled) setSearching(false);
@@ -108,7 +106,6 @@ const CollectionSectionsAdminPage = () => {
       setPins((prev) => [...prev, { ...data, item }]);
       toast.success('Card pinned.');
     } catch (err) {
-      console.error('Error pinning card:', err);
       toast.error(err.message || 'Failed to pin card.');
     } finally {
       setBusyId(null);
@@ -123,7 +120,6 @@ const CollectionSectionsAdminPage = () => {
       setPins((prev) => prev.filter((p) => p.id !== pin.id));
       toast.success('Card removed.');
     } catch (err) {
-      console.error('Error removing pin:', err);
       toast.error('Failed to remove card.');
     } finally {
       setBusyId(null);
@@ -149,7 +145,6 @@ const CollectionSectionsAdminPage = () => {
       ]);
       if (r1.error || r2.error) throw (r1.error || r2.error);
     } catch (err) {
-      console.error('Error reordering:', err);
       toast.error('Failed to save new order.');
       loadPins();
     }

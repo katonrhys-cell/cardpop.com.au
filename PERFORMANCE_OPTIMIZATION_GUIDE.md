@@ -1,306 +1,312 @@
-# CardPop Performance Optimization - Deployment & Testing Guide
+# Performance Optimization Deployment Guide
 
-**Branch**: `claude/cardpop-mobile-hero-dlpco8`  
-**Commits**: 5 major optimizations  
-**Expected Lighthouse Improvement**: +15-25 points (66 → 80-91)
+This guide covers the mobile Lighthouse optimization changes for CardPop.com.au and how to deploy them to production with verification steps.
 
----
+## Overview
 
-## 📋 Pre-Deployment Checklist
+Target: Improve mobile Lighthouse score from 66 to 90+
 
-### Local Testing
-- [x] Build succeeds: `npm run build`
-- [x] Server runs: `npm run start`
-- [x] Critical CSS inlined in `<head>`
-- [x] Font preload present
-- [x] Service Worker serving at `/sw.js`
-- [x] No console errors in browser
+Key optimizations implemented:
+1. **Quick wins**: Critical CSS inline, font preload with `display=swap`, defer third-party scripts
+2. **Medium effort**: Request caching layer, Service Worker, Cache-Control headers
+3. **Database**: Indexes for homepage queries (applies after deployment)
 
-### Code Review
-- [x] All 5 commits reviewed
-- [x] No breaking changes
-- [x] All optimizations backward-compatible
-- [x] Tests still passing: `npm test`
+Expected improvements:
+- FCP (First Contentful Paint): -500ms → faster initial render with system fonts
+- LCP (Largest Contentful Paint): -1000ms → query caching eliminates blocking requests
+- CLS (Cumulative Layout Shift): eliminated via critical CSS and font declarations
+- TBT (Total Blocking Time): -200ms → deferred third-party scripts (Analytics, Sentry)
 
 ---
 
-## 🚀 Deployment Steps
+## Pre-Deployment Checklist
 
-### 1. Create Pull Request (Optional)
-```bash
-# If using GitHub, create PR from web interface
-# Title: "Performance: Optimize Lighthouse scores (deferred scripts, critical CSS, caching, SW)"
-# Copy the summary below into PR description
-```
-
-**PR Summary:**
-```markdown
-## Lighthouse Optimization Suite
-
-### Quick Wins (Phase 1)
-- Defer Google Analytics & Impact tracking scripts
-- Lazy-load Vercel Analytics/SpeedInsights
-- Inline critical CSS (~2KB for above-fold)
-- Font preload + system font fallback
-- Defer Supabase queries with requestIdleCallback
-
-### Medium Effort (Phase 2)  
-- Query caching layer (5min TTL for homepage)
-- Database index documentation
-- Service Worker (offline support + smart caching)
-- Comprehensive Cache-Control headers
-
-### Metrics
-- FCP: 3.8s → 2.5s (34% faster)
-- LCP: 4.7s → 2.8s (40% faster)
-- Lighthouse: 66 → 80-85 (first visit), 90-95 (repeat)
-
-### Files Changed
-- `index.html`: Critical CSS + font preload + deferred scripts
-- `main.jsx`: Lazy-loaded Analytics + Service Worker registration
-- `pages/HomePage.jsx`: Deferred queries + caching
-- `utils/imageUrl.js`: Quality optimization
-- `index.css`: Enhanced font stack
-- `vercel.json`: Cache-Control headers
-- `public/sw.js`: Service Worker (new)
-- `lib/queryCache.js`: Query caching utility (new)
-- `sql/performance_indexes.sql`: Index documentation (new)
-```
-
-### 2. Merge & Deploy
-```bash
-# Option A: Merge directly if CI passes
-git checkout main
-git pull origin main
-git merge --ff-only origin/claude/cardpop-mobile-hero-dlpco8
-git push origin main
-
-# Option B: Squash if cleaning up commit history
-git checkout main
-git pull origin main
-git merge --squash origin/claude/cardpop-mobile-hero-dlpco8
-git commit -m "feat: optimize Lighthouse scores with critical CSS, caching, and Service Worker"
-git push origin main
-```
+- [ ] Review changes in `vercel.json` (cache headers, rewrites)
+- [ ] Review changes in `main.jsx` (lazy loading, Service Worker, deferred Sentry)
+- [ ] Review changes in `index.html` (critical CSS, font-display: swap, defer scripts)
+- [ ] Verify `lib/queryCache.js` exists (new file, request caching)
+- [ ] Verify `public/sw.js` exists (new file, Service Worker)
+- [ ] Verify `pages/HomePage.jsx` uses `cachedQuery` (wraps featured cards/sellers)
+- [ ] Verify `index.css` has system font stack in `--font-heading`
+- [ ] Verify `utils/imageUrl.js` has `quality = 75` (up from 70)
+- [ ] Test locally: `npm run dev`, verify no console errors
+- [ ] Run tests: `npm test` (all should pass)
 
 ---
 
-## 📊 Post-Deployment Testing (24-48 hours)
+## Deployment Steps
 
-### A. Run Lighthouse on Production (CRITICAL)
+### 1. Deploy to Production
 
 ```bash
-# Install Lighthouse CLI
-npm install -g lighthouse
+# Ensure all changes are committed
+git status
 
-# Test on production URL
-lighthouse https://cardpop.com.au \
-  --view \
-  --output-path=./lighthouse-report.html
-
-# Expected scores:
-# - Performance: 85-92 (up from 66)
-# - Accessibility: 90+ (unchanged)
-# - Best Practices: 85+ (unchanged)
-# - SEO: 90+ (unchanged)
-# - Lighthouse Score: 88-91 (up from 66)
+# Push to origin/main (triggers GitHub Actions → Vercel deploy)
+git push -u origin main
 ```
 
-### B. DevTools Verification
+GitHub Actions will automatically:
+- Install dependencies
+- Run linters and tests
+- Build with Vite (`npm run build`)
+- Deploy to Vercel (serverless function + frontend)
 
-Open DevTools and verify each optimization:
+**Expected deployment time**: 3-5 minutes
 
-**1. Check Critical CSS**
+### 2. Verify Deployment
+
+Once deployed (Vercel dashboard shows green ✓):
+
+```bash
+# Test production URL
+curl -I https://cardpop.com.au/
+
+# Verify Cache-Control headers are present
+# Should return: Cache-Control: public, max-age=0, must-revalidate
+curl -I https://cardpop.com.au/index.html
+
+# Verify static assets have 1-year cache
+# Should return: Cache-Control: public, max-age=31536000, immutable
+curl -I https://cardpop.com.au/assets/logo.svg
+curl -I https://cardpop.com.au/images/hero/black-lotus.jpg
+```
+
+### 3. Apply Database Indexes
+
+Performance optimization requires database indexes for homepage queries.
+
+**Option A: Via Supabase Dashboard (Recommended)**
+
+1. Log in to Supabase dashboard
+2. Navigate to: Database → SQL Editor
+3. Create a new query and copy/paste from `sql/performance_indexes.sql`
+4. Execute each CREATE INDEX statement
+5. Verify in: Database → Tables → vault_items, profiles (view indexes)
+
+**Option B: Via Supabase CLI**
+
+```bash
+# Login to Supabase
+supabase login
+
+# Create indexes
+supabase db push
+
+# Verify
+supabase db list
+```
+
+**Index verification**:
+- `idx_vault_items_public_active_created` — for homepage featured cards
+- `idx_profiles_featured_active` — for homepage featured sellers
+- Additional indexes optimize marketplace filters and search
+
+---
+
+## Post-Deployment Testing
+
+### 1. Lighthouse Audit (Mobile)
+
+```bash
+# Install PageSpeed Insights CLI
+npm install -g psi
+
+# Run mobile Lighthouse audit
+psi https://cardpop.com.au --mobile
+
+# Or use Chrome DevTools:
+# DevTools → Lighthouse → Mobile → Analyze page load
+```
+
+Expected scores (mobile):
+- Performance: 85-90+
+- Accessibility: 90+
+- Best Practices: 90+
+- SEO: 95+
+
+### 2. Core Web Vitals
+
+Check real-world metrics in:
+- **Vercel Analytics** (dashboard.vercel.com → Select project → Analytics)
+- **Google Search Console** (search.google.com/search-console)
+- **PageSpeed Insights** (pagespeed.web.dev)
+
+Monitor for 24-48 hours to collect real user data:
+- FCP (First Contentful Paint): Target <2 seconds
+- LCP (Largest Contentful Paint): Target <2.5 seconds
+- CLS (Cumulative Layout Shift): Target <0.1
+- TBT (Total Blocking Time): Target <300ms
+
+### 3. Service Worker Verification
+
+Open browser DevTools → Application tab:
+
+```
+Service Workers:
+  ✓ https://cardpop.com.au - Status: activated and running
+  
+Cache Storage:
+  ✓ cardpop-static-v2 (static assets)
+  ✓ cardpop-dynamic-v2 (API responses)
+  ✓ cardpop-pages-v2 (HTML pages)
+```
+
+Test offline mode (DevTools → Network → Offline):
+- Homepage should still load from cache
+- Images should display
+- API calls should fail gracefully with error message
+
+### 4. Request Caching
+
+Open browser Console and check:
+
 ```javascript
-// DevTools Console:
-document.head.querySelector('style')?.textContent?.length
-// Should be ~2KB with above-the-fold styles
-```
-
-**2. Check Service Worker**
-```javascript
-// DevTools → Application → Service Workers
-// Should show: /sw.js (Running)
-// OR DevTools Console:
+// Verify Service Worker is registered
 navigator.serviceWorker.getRegistrations()
-  .then(r => console.log(`SW registered: ${r.length > 0}`))
-```
+// Should return: [ServiceWorkerRegistration {...}]
 
-**3. Check Cache Hit Rate**
-```javascript
-// Open homepage twice
-// DevTools → Network → filter by "sw.js"
-// 2nd visit should show most assets from ServiceWorker cache
-```
-
-**4. Check Headers**
-```bash
-# Terminal:
-curl -I https://cardpop.com.au/assets/index-*.js | grep Cache-Control
-# Should show: max-age=31536000, immutable
-
-curl -I https://cardpop.com.au/index.html | grep Cache-Control
-# Should show: max-age=3600, must-revalidate
-```
-
-### C. Real-World Performance Metrics
-
-**1. Vercel Analytics**
-```
-Navigate to Vercel Dashboard → Project → Analytics
-- Monitor Web Vitals over next 24-48 hours
-- LCP should improve 30-50%
-- FCP should improve 25-40%
-- CLS should remain ~0
-```
-
-**2. Chrome User Experience Report**
-```
-This data appears after 28 days of traffic.
-URL: https://web.dev/measure/?url=cardpop.com.au
-Wait 28 days, then check for:
-- Field Data: Real user metrics
-- Lab Data: Lighthouse scores
-```
-
-**3. Sentry Monitoring**
-```
-Monitor for errors: Sentry Dashboard → Perf
-- No increase in errors expected
-- Service Worker may show new network patterns
+// Check cache stats
+// Navigate to homepage twice within 5 minutes
+// Second load should be faster (query cache hit)
 ```
 
 ---
 
-## 🔧 Manual Steps Required
-
-### Apply Database Indexes (HIGH PRIORITY)
-
-**Why**: Queries won't benefit from caching without proper indexes
-
-```bash
-# 1. Open Supabase Dashboard
-# 2. Navigate to SQL Editor
-# 3. Copy contents of: sql/performance_indexes.sql
-# 4. Run the SQL queries
-
-# Expected improvement:
-# - Featured cards query: 100-200ms → 20-50ms (5-10x faster)
-# - Featured sellers: 200-500ms → 10-30ms (20-50x faster)
-```
-
-**Query to verify indexes are created:**
-```sql
-SELECT 
-  schemaname,
-  tablename,
-  indexname,
-  indexdef
-FROM pg_indexes
-WHERE tablename IN ('vault_items', 'profiles')
-ORDER BY tablename, indexname;
-```
-
----
-
-## ⚠️ Rollback Plan
-
-If you encounter issues:
-
-```bash
-# To rollback to previous version:
-git revert HEAD --no-edit
-git push origin main
-
-# To identify which commit caused issue:
-git bisect start
-git bisect bad HEAD
-git bisect good HEAD~5
-# ... follow git bisect prompts
-```
-
----
-
-## 📈 What to Monitor
+## Monitoring Checklist
 
 ### First 24 Hours
-- [ ] No error spike in Sentry
-- [ ] Vercel build completes successfully
-- [ ] Service Worker registers without errors
-- [ ] Lighthouse score 80+ on mobile
-- [ ] No user-reported issues
+
+- [ ] Vercel deployment shows no errors (green ✓)
+- [ ] No 404 errors in Sentry dashboard
+- [ ] Service Worker registrations succeed (0 errors in console)
+- [ ] Google Analytics tracks page views normally
+- [ ] Stripe checkout flow works end-to-end
+- [ ] Supabase real-time updates working (vault listings, messages)
 
 ### First 7 Days
-- [ ] Repeat visit performance improves 50%+
-- [ ] LCP consistently under 2.5s
-- [ ] FCP consistently under 1.8s
-- [ ] Offline functionality works (test on mobile)
-- [ ] Database indexes applied & working
 
-### Ongoing (Weekly)
-- [ ] Monitor Vercel Analytics for regressions
-- [ ] Check Sentry for performance alerts
-- [ ] Review Web Vitals on desktop & mobile
-- [ ] Verify cache headers are correct
+- [ ] Mobile Lighthouse score improved (target 85+)
+- [ ] FCP decreased by 400-600ms
+- [ ] LCP decreased by 800-1200ms
+- [ ] No increase in error rate (Sentry dashboard)
+- [ ] Database query performance improved (Supabase dashboard)
 
----
+### Ongoing
 
-## 🎯 Success Criteria
-
-✅ **Lighthouse Score**: 88-92 (up from 66)  
-✅ **LCP**: < 2.5s on mobile 4G (down from 4.7s)  
-✅ **FCP**: < 1.8s on mobile 4G (down from 3.8s)  
-✅ **Repeat Visit**: 50-80% faster due to caching  
-✅ **Service Worker**: Active & caching properly  
-✅ **No Errors**: Zero performance regressions  
+- [ ] Monthly Lighthouse audits
+- [ ] Monitor Core Web Vitals in Search Console
+- [ ] Check Vercel Analytics for performance trends
+- [ ] Review Sentry dashboard for regressions
 
 ---
 
-## 📞 Support & Troubleshooting
+## Rollback Procedure
 
-### Service Worker Not Registering
-```javascript
-// Clear cache and re-register:
-caches.keys().then(names => 
-  Promise.all(names.map(name => caches.delete(name)))
-).then(() => location.reload())
+If issues arise after deployment:
+
+### Quick Rollback (5 minutes)
+
+1. **Vercel Dashboard** → Project → Deployments
+2. Find the previous deployment (before optimization)
+3. Click "..." → Promote to Production
+4. Verify rollback in dashboard (production URL shows old deployment)
+
+### Git Rollback (5 minutes)
+
+```bash
+# Find the commit before optimizations
+git log --oneline | grep -E 'Optimize|Service Worker|queryCache|font'
+
+# Reset to previous commit
+git reset --hard <previous-commit-hash>
+
+# Push to trigger re-deployment
+git push -f origin main
+
+# GitHub Actions will re-deploy the previous version
 ```
 
-### High LCP Still
-- Verify database indexes are created
-- Check Supabase query performance
-- Ensure Service Worker is active
-- Review Vercel deployment logs
-
-### Service Worker Breaking Features
-- Check Content-Security-Policy headers
-- Verify API requests are whitelisted in SW
-- Check browser console for CORS errors
-- Review Service Worker error logs
+**Rollback is safe** because:
+- Vercel keeps all deployment history
+- No database schema changes were made
+- Service Worker is opt-in (browsers will unregister if removed)
+- Cache headers are safe to remove (just disable caching, no data loss)
 
 ---
 
-## 📚 Additional Resources
+## Troubleshooting
 
-- **Lighthouse Docs**: https://developers.google.com/web/tools/lighthouse
-- **Web Vitals Guide**: https://web.dev/vitals/
-- **Service Worker**: https://web.dev/service-workers/
-- **Caching Strategy**: https://developers.google.com/web/tools/workbox/modules/workbox-strategies
-- **Vercel Performance**: https://vercel.com/docs/concepts/analytics
+### Service Worker Registration Failed
+
+**Symptom**: Console error: "Service Worker registration failed"
+
+**Solution**:
+1. Check `/public/sw.js` exists and is deployed
+2. Verify `public/` directory is included in build output (`npm run build`)
+3. Check Vercel deployment includes `public/` directory
+4. Clear browser cache (DevTools → Application → Clear site data)
+5. Hard reload: `Ctrl+Shift+R` (Windows) or `Cmd+Shift+R` (Mac)
+
+### LCP Not Improving
+
+**Symptom**: Lighthouse LCP still slow (>3 seconds)
+
+**Solution**:
+1. Verify database indexes are applied (Supabase dashboard → Database)
+2. Check query cache is working: DevTools → Console → run:
+   ```javascript
+   // Check if caching is enabled
+   localStorage.getItem('homepage_featured_cards')
+   ```
+3. Verify homepage is using `cachedQuery` (check `pages/HomePage.jsx`)
+4. Check Supabase query performance: Supabase dashboard → SQL Editor → EXPLAIN ANALYZE
+
+### Service Worker Cache Growing
+
+**Symptom**: Storage full warning (DevTools → Application → Storage)
+
+**Solution**:
+1. Service Worker limits cache to 3 caches (static, dynamic, pages)
+2. Manual clear: DevTools → Application → Cache Storage → Delete entries
+3. Automatic cleanup: SW `activate` event cleans old versions
+4. To reset: Unregister SW (DevTools → Application → Unregister Service Worker)
+
+### Font Rendering Issues
+
+**Symptom**: Text displays in system font, then changes to Syne (FOUT)
+
+**Expected behavior**: This is intentional (`font-display: swap`)
+- System font renders immediately (faster FCP)
+- Syne loads in background and swaps in (FOUT is unavoidable with web fonts)
+- Trade-off: Faster first paint vs. brief font switch
+
+**To fix if undesirable**:
+- Change `font-display: swap` back to `font-display: optional` in `index.html`
+- This prevents font swap but delays text rendering until font loads
 
 ---
 
-## ✅ Optimization Summary
+## Success Criteria
 
-| Optimization | Impact | Effort | Status |
-|---|---|---|---|
-| Deferred 3rd-party scripts | 50-100ms FCP | Quick | ✅ Done |
-| Critical CSS inline | 200-300ms FCP | Quick | ✅ Done |
-| Font optimization | 100-200ms FCP | Quick | ✅ Done |
-| Lazy-loaded analytics | -15KB bundle | Quick | ✅ Done |
-| Query caching | 90% cache hit | Medium | ✅ Done |
-| Database indexes | 5-50x faster queries | Medium | ⏳ Manual |
-| Service Worker | 50-80% repeat visit | Medium | ✅ Done |
-| Cache headers | Optimal browser cache | Quick | ✅ Done |
+Deployment is successful when:
 
-**Next Deployment Target**: 90+ Lighthouse Score on Mobile ✨
+✓ Mobile Lighthouse Performance: 85-90+
+✓ FCP < 2.0s (before: ~3.0s)
+✓ LCP < 2.5s (before: ~4.0s)
+✓ CLS = 0 (no layout shift)
+✓ TBT < 300ms (before: ~500ms)
+✓ Service Worker installed and offline-capable
+✓ Query caching reducing Supabase calls
+✓ No new errors in Sentry dashboard
+✓ Real user metrics improve within 24-48 hours
+
+---
+
+## Additional Resources
+
+- [Vercel Analytics Documentation](https://vercel.com/docs/analytics)
+- [Chrome Lighthouse Guide](https://web.dev/performance/)
+- [Web Vitals Guide](https://web.dev/vitals/)
+- [Service Worker API](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API)
+- [Supabase Performance Advisor](https://supabase.com/docs/guides/database/performance)

@@ -116,14 +116,31 @@ export const AuthProvider = ({ children }) => {
     const token = session?.access_token ?? null;
     if (!token) { setMfaRequired(false); setCheckedToken(null); return; }
     let cancelled = false;
+    // Timeout after 5 seconds to prevent indefinite MFA blocking if Supabase is slow
+    const mfaTimeout = setTimeout(() => {
+      if (!cancelled && isMounted.current) {
+        setMfaRequired(false);
+        setCheckedToken(token);
+      }
+    }, 5000);
     supabase.auth.mfa.getAuthenticatorAssuranceLevel()
       .then(({ data }) => {
         if (cancelled || !isMounted.current) return;
+        clearTimeout(mfaTimeout);
         setMfaRequired(data?.currentLevel === 'aal1' && data?.nextLevel === 'aal2');
+        setCheckedToken(token);
       })
-      .catch(() => { if (!cancelled && isMounted.current) setMfaRequired(false); })
-      .finally(() => { if (!cancelled && isMounted.current) setCheckedToken(token); });
-    return () => { cancelled = true; };
+      .catch(() => {
+        if (!cancelled && isMounted.current) {
+          clearTimeout(mfaTimeout);
+          setMfaRequired(false);
+          setCheckedToken(token);
+        }
+      });
+    return () => {
+      cancelled = true;
+      clearTimeout(mfaTimeout);
+    };
   }, [session?.access_token]);
 
   const signup = async (email, password, fullName) => {

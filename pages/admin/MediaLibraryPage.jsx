@@ -43,7 +43,6 @@ const MediaLibraryPage = () => {
         if (error) throw error;
         if (!cancelled) setMedia(data ?? []);
       } catch (err) {
-        console.error("Error fetching media:", err);
         if (!cancelled) setError(err.message || "Failed to load media library.");
       } finally {
         if (!cancelled) setLoading(false);
@@ -106,7 +105,6 @@ const MediaLibraryPage = () => {
       setUploadData({ filename: '', description: '' });
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
-      console.error("Upload error:", err);
       toast.error(err.message || "Failed to upload media.");
     } finally {
       setIsUploading(false);
@@ -122,7 +120,6 @@ const MediaLibraryPage = () => {
       toast.success("Media deleted successfully.");
       setMedia(media.filter(m => m.id !== id));
     } catch (err) {
-      console.error("Delete error:", err);
       toast.error(err.message || "Failed to delete media.");
     }
   };

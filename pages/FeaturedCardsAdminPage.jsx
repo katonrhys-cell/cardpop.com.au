@@ -30,7 +30,6 @@ const FeaturedCardsAdminPage = () => {
         .order('created_at', { ascending: false });
       setCards(response || []);
     } catch (error) {
-      console.error('Error fetching cards:', error);
       toast.error('Failed to load cards. Please refresh the page.');
     } finally {
       setIsLoading(false);
@@ -71,7 +70,6 @@ const FeaturedCardsAdminPage = () => {
       setCards(prev => prev.map(c => c.id === card.id ? updatedCard : c));
       toast.success(`${updatedCard.card_name || updatedCard.cardName} is now ${updatedCard.featured ? 'featured' : 'unfeatured'}.`);
     } catch (error) {
-      console.error('Error toggling featured status:', error);
       toast.error('Failed to update card featured status.');
     } finally {
       setProcessingId(null);

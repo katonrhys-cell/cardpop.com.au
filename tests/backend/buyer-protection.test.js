@@ -86,13 +86,13 @@ describe('POST /', () => {
   it('returns 400 when required fields are missing', async () => {
     const res = await request(app).post('/').send({ order_id: 'o1' });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/required/i);
+    expect(res.body.error).toBe('Invalid request body');
   });
 
   it('returns 400 for an invalid claim_type', async () => {
     const res = await request(app).post('/').send({ ...valid, claim_type: 'nope' });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/invalid claim type/i);
+    expect(res.body.error).toBe('Invalid request body');
   });
 
   it('returns 404 when the order does not exist', async () => {
@@ -157,7 +157,7 @@ describe('PUT /:claimId/status', () => {
   it('returns 400 for an invalid status', async () => {
     const res = await request(app).put('/c1/status').send({ status: 'maybe' });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/invalid status/i);
+    expect(res.body.error).toBe('Invalid request body');
   });
 
   it('returns 403 for non-admin users', async () => {

@@ -3,6 +3,8 @@ import supabase from '../utils/supabaseClient.js';
 import stripe from '../utils/stripeClient.js';
 import { payoutSeller } from '../services/payoutService.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
+import { validateRequestBody, validateRequestParams, validateRequestQuery } from '../middleware/validateRequest.js';
+import { setUserRoleSchema, setUserRoleBodySchema, reviewVerificationSchema, reviewVerificationBodySchema, processRefundSchema, processRefundBodySchema, getDisputesSchema, resolveDisputeSchema, resolveDisputeBodySchema } from '../schemas/adminSchemas.js';
 import logger from '../utils/logger.js';
 
 const router = Router();
@@ -25,13 +27,10 @@ router.use(async (req, res, next) => {
 const round2 = (n) => Math.round(n * 100) / 100;
 
 // ─── Set a user's admin flag ──────────────────────────────────────────────────
-router.patch('/users/:userId/role', async (req, res) => {
+router.patch('/users/:userId/role', validateRequestParams(setUserRoleSchema), validateRequestBody(setUserRoleBodySchema), async (req, res) => {
   const { userId } = req.params;
   const { is_admin } = req.body;
 
-  if (typeof is_admin !== 'boolean') {
-    return res.status(400).json({ error: 'is_admin (boolean) is required' });
-  }
   // Prevent an admin from removing their own admin rights (lock-out guard).
   if (userId === req.user.id && is_admin === false) {
     return res.status(400).json({ error: 'You cannot revoke your own admin access' });
@@ -62,11 +61,10 @@ router.patch('/users/:userId/role', async (req, res) => {
 });
 
 // ─── Review an identity verification ──────────────────────────────────────────
-router.patch('/verifications/:id', async (req, res) => {
+router.patch('/verifications/:id', validateRequestParams(reviewVerificationSchema), validateRequestBody(reviewVerificationBodySchema), async (req, res) => {
   const { id } = req.params;
   const { status, admin_notes, additional_info_requested, info_request } = req.body;
 
-  const validStatuses = ['approved', 'rejected', 'suspended', 'revoked', 'info_requested'];
   const now = new Date().toISOString();
   const updateData = {
     admin_id: req.user.id,
@@ -78,9 +76,6 @@ router.patch('/verifications/:id', async (req, res) => {
   if (info_request) {
     updateData.additional_info_requested = additional_info_requested?.trim() || null;
   } else {
-    if (!validStatuses.includes(status)) {
-      return res.status(400).json({ error: 'A valid status is required' });
-    }
     updateData.status = status;
     updateData.additional_info_requested = null;
   }
@@ -128,16 +123,9 @@ router.patch('/verifications/:id', async (req, res) => {
 });
 
 // ─── Approve / reject a refund ────────────────────────────────────────────────
-router.patch('/refunds/:id', async (req, res) => {
+router.patch('/refunds/:id', validateRequestParams(processRefundSchema), validateRequestBody(processRefundBodySchema), async (req, res) => {
   const { id } = req.params;
   const { action, admin_notes, rejection_reason } = req.body;
-
-  if (action !== 'approve' && action !== 'reject') {
-    return res.status(400).json({ error: 'action must be "approve" or "reject"' });
-  }
-  if (action === 'reject' && !rejection_reason?.trim()) {
-    return res.status(400).json({ error: 'A rejection reason is required' });
-  }
 
   try {
     const { data: refund, error: fetchErr } = await supabase
@@ -184,7 +172,7 @@ router.patch('/refunds/:id', async (req, res) => {
 // ─── Chargeback disputes: list + resolve ──────────────────────────────────────
 const DISPUTE_TERMINAL = ['resolved_released', 'resolved_kept'];
 
-router.get('/disputes', async (req, res) => {
+router.get('/disputes', validateRequestQuery(getDisputesSchema), async (req, res) => {
   const { status } = req.query;
   try {
     let query = supabase
@@ -211,13 +199,9 @@ router.get('/disputes', async (req, res) => {
 //   'release'     — chargeback won by us / resolved in seller's favour: pay the
 //                   seller their (previously frozen) proceeds.
 //   'keep_frozen' — chargeback lost / kept on hold: leave the payout frozen.
-router.patch('/disputes/:id', async (req, res) => {
+router.patch('/disputes/:id', validateRequestParams(resolveDisputeSchema), validateRequestBody(resolveDisputeBodySchema), async (req, res) => {
   const { id } = req.params;
-  const { action, resolution_notes } = req.body || {};
-
-  if (action !== 'release' && action !== 'keep_frozen') {
-    return res.status(400).json({ error: 'action must be "release" or "keep_frozen"' });
-  }
+  const { action, resolution_notes } = req.body;
 
   try {
     const { data: dispute, error: fetchErr } = await supabase

@@ -18,7 +18,6 @@ const DiagnosticsPage = () => {
       const results = await runDiagnostics();
       setReport(results);
     } catch (error) {
-      console.error("Critical failure running diagnostics:", error);
       // Fallback report if the diagnostic script itself crashes
       setReport({
         timestamp: new Date().toISOString(),

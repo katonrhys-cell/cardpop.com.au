@@ -34,7 +34,6 @@ const CheckoutSuccessPage = () => {
         if (paid) clearCart();
       })
       .catch(err => {
-        console.error('Failed to load session details', err);
         if (!cancelled) setStatus('error');
       });
 

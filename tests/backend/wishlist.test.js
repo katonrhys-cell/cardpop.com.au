@@ -94,13 +94,15 @@ describe('POST /', () => {
   it('returns 400 when required fields are missing', async () => {
     const res = await auth(request(app).post('/').send({ item_id: 'i1' }));
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/required/i);
+    expect(res.body.error).toBe('Invalid request body');
+    expect(res.body.issues.some(i => i.path === 'item_type')).toBe(true);
   });
 
   it('returns 400 for an invalid item_type', async () => {
     const res = await auth(request(app).post('/').send({ item_id: 'i1', item_type: 'banana' }));
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/invalid item type/i);
+    expect(res.body.error).toBe('Invalid request body');
+    expect(res.body.issues.some(i => i.path === 'item_type')).toBe(true);
   });
 
   it('returns 400 when the item is already in the wishlist', async () => {

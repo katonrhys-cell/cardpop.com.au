@@ -53,7 +53,6 @@ const SubcategoryManagementPage = () => {
       setError(null);
       if (showToast) toast.success('Data refreshed');
     } catch (err) {
-      console.error('[SubcategoryManagementPage] Failed to fetch data:', err);
       setError("Failed to load subcategories from database. Please check your connection.");
       if (showToast) toast.error('Failed to refresh data');
     } finally {
@@ -160,7 +159,6 @@ const SubcategoryManagementPage = () => {
       resetForm();
       fetchData();
     } catch (err) {
-      console.error('Error saving subcategory:', err);
       toast.error(err.message || 'Failed to save subcategory');
     } finally {
       setIsSubmitting(false);
@@ -179,7 +177,6 @@ const SubcategoryManagementPage = () => {
       setSelectedSubcategory(null);
       fetchData();
     } catch (err) {
-      console.error('Error deleting subcategory:', err);
       toast.error('Failed to delete subcategory. It may be in use.');
     } finally {
       setIsSubmitting(false);

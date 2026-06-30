@@ -117,18 +117,19 @@ describe('POST /', () => {
   it('returns 400 when required fields are missing', async () => {
     const res = await request(app).post('/').send({ rating: 5 });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/required/i);
+    expect(res.body.error).toBe('Invalid request body');
   });
 
   it('returns 400 when the rating is out of range', async () => {
     const res = await request(app).post('/').send({ ...valid, rating: 6 });
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/between 1 and 5/i);
+    expect(res.body.error).toBe('Invalid request body');
   });
 
   it('returns 400 when the rating is not an integer', async () => {
     const res = await request(app).post('/').send({ ...valid, rating: 4.5 });
     expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid request body');
   });
 
   it('returns 400 when a user tries to rate themselves', async () => {

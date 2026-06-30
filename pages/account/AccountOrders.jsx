@@ -282,7 +282,6 @@ const AccountOrders = () => {
     setLoading(false);
   }, [currentUser?.id]);
 
-  useEffect(() => { fetchOrders().catch((err) => { console.error('[AccountOrders] fetchOrders failed:', err); }); }, [fetchOrders]);
 
   const filtered = statusFilter === 'all'
     ? orders

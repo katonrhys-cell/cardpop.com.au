@@ -74,7 +74,6 @@ const EventsAdminPage = () => {
       if (fetchError) throw fetchError;
       setEvents(data || []);
     } catch (err) {
-      console.error('Failed to fetch events:', err);
       toast.error('Failed to load events.');
     } finally {
       setIsLoading(false);
@@ -171,7 +170,6 @@ const EventsAdminPage = () => {
       }
       handleCloseModal();
     } catch (err) {
-      console.error('Error saving event:', err);
       toast.error('Failed to save event. Check console for details.');
     } finally {
       setIsSubmitting(false);
@@ -185,7 +183,6 @@ const EventsAdminPage = () => {
       if (error) throw error;
       toast.success(`Event marked as ${newStatus}.`);
     } catch (err) {
-      console.error('Failed to toggle status:', err);
       toast.error('Failed to update event status.');
     }
   };
@@ -197,7 +194,6 @@ const EventsAdminPage = () => {
         if (error) throw error;
         toast.success('Event deleted successfully.');
       } catch (err) {
-        console.error('Failed to delete event:', err);
         toast.error('Failed to delete event.');
       }
     }

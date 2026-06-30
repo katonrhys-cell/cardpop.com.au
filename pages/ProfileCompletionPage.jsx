@@ -55,7 +55,6 @@ const ProfileCompletionPage = () => {
 
         if (!cancelled) setVerifying(false);
       } catch (err) {
-        console.error('Verification error:', err);
         if (!cancelled) {
           setVerificationError(err.message);
           setVerifying(false);
@@ -133,7 +132,6 @@ const ProfileCompletionPage = () => {
 
       setStep(3);
     } catch (error) {
-      console.error('Profile update error:', error);
       toast.error(error.message || 'Failed to update profile.');
     } finally {
       setSaving(false);
