@@ -68,9 +68,16 @@
 }
 
 /* -----------------------------------------------------------------------------
-   1. Classic Flat — the baseline. No frame, no motion. Just a clean photo.
+   1. Classic Flat — the baseline. No frame, no motion. Just a clean photo,
+   with the same subtle hover-zoom the grids have always had (when the card
+   sits inside a `.group` hover container).
    -------------------------------------------------------------------------- */
-/* (no extra rules needed; the bare image is the style) */
+.cardshowcase--classic .cardshowcase__card {
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.group:hover .cardshowcase--classic .cardshowcase__card {
+  transform: scale(1.04);
+}
 
 /* -----------------------------------------------------------------------------
    2. Premium Stand — card leans back on a subtle acrylic stand with a shadow.

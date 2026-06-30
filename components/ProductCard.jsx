@@ -8,6 +8,7 @@ import { slugify } from '@/lib/slugify.js';
 import { getRefractorLabel, getRefractorBadgeClass } from '@/lib/cardAttributeLabels.js';
 import CardMicroscope from '@/components/CardMicroscope.jsx';
 import CardImage from '@/components/CardImage.jsx';
+import CardShowcase from '@/components/vault/CardShowcase.jsx';
 import { getCardImage, CARD_GRID_SIZES } from '@/utils/imageUrl.js';
 import { isVerified } from '@/utils/verification.js';
 import GradeBadge from '@/components/GradeBadge.jsx';
@@ -28,20 +29,37 @@ const ProductCard = ({ product, onAddToCart }) => {
   const detailPath = `/product/${product.source || 'vault'}/${product.id}/${titleSlug}`;
   const gradingCompany = product.grading_company || product.gradingCompany || '';
   const isGraded = gradingCompany && gradingCompany !== 'raw' && product.grade;
+  // Vault listings render through the Card Showcase Engine (their chosen display
+  // style); shop products keep the plain cover-cropped image. display_style is a
+  // vault-only field, so its presence reliably marks a vault item.
+  const useShowcase = product.source === 'vault' || !!product.display_style;
 
   return (
     <div className="group flex flex-col h-full bg-card rounded-2xl border border-border overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
       <Link to={detailPath} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
-        <CardImage
-          src={imgSrc}
-          srcSet={imgSrcSet}
-          sizes={CARD_GRID_SIZES}
-          fallbackSrc={imgFallback}
-          alt={product.name || product.cardName || 'Product Image'}
-          imgClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          width="400"
-          height="500"
-        />
+        {useShowcase ? (
+          <CardShowcase
+            src={imgSrc}
+            srcSet={imgSrcSet}
+            sizes={CARD_GRID_SIZES}
+            fallbackSrc={imgFallback}
+            alt={product.name || product.cardName || 'Product Image'}
+            displayStyle={product.display_style}
+            width="400"
+            height="500"
+          />
+        ) : (
+          <CardImage
+            src={imgSrc}
+            srcSet={imgSrcSet}
+            sizes={CARD_GRID_SIZES}
+            fallbackSrc={imgFallback}
+            alt={product.name || product.cardName || 'Product Image'}
+            imgClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            width="400"
+            height="500"
+          />
+        )}
         {/* Condition badge — top left */}
         {product.condition && (
           <div className="absolute top-3 left-3 z-10">
