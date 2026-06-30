@@ -3,9 +3,23 @@ import { Helmet } from 'react-helmet';
 
 const SEOHead = ({ title, description, canonicalUrl, ogImage, structuredData }) => {
   const siteName = "CardPop";
+  const SITE_ORIGIN = "https://cardpop.com.au";
   const defaultTitle = `${siteName} | Australia's Trading Card Marketplace`;
   const defaultDescription = "Buy, sell, and trade authenticated trading cards in Australia. Browse Pokemon, Magic, Yu-Gi-Oh and more on CardPop.";
-  const resolvedCanonical = canonicalUrl || (typeof window !== 'undefined' ? window.location.href.split('?')[0] : '');
+  // Always emit an apex-host, query-stripped canonical so the tag never conflicts
+  // with the static one in index.html (Lighthouse flagged www vs apex duplicates).
+  const normalizeCanonical = (url) => {
+    if (!url) return '';
+    try {
+      const u = new URL(url, SITE_ORIGIN);
+      return `${SITE_ORIGIN}${u.pathname}`.replace(/\/+$/, '') || SITE_ORIGIN;
+    } catch {
+      return SITE_ORIGIN;
+    }
+  };
+  const resolvedCanonical = normalizeCanonical(
+    canonicalUrl || (typeof window !== 'undefined' ? window.location.pathname : '/')
+  );
   const resolvedTitle = title || defaultTitle;
   const resolvedDesc = description || defaultDescription;
 

@@ -12,11 +12,12 @@
     <link rel="alternate" hreflang="en" href="https://cardpop.com.au/" />
     <link rel="alternate" hreflang="x-default" href="https://cardpop.com.au/" />
 
-    <!-- Core Web Vitals optimization -->
-    <link rel="preconnect" href="https://cardpop.com.au" />
-    <link rel="dns-prefetch" href="https://cardpop.com.au" />
+    <!-- Core Web Vitals: preconnect only to origins used on first paint.
+         Keep this list <=4 (Lighthouse warns past that). No self-preconnect —
+         the document already came from this origin. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://odoglvswwymyjuwlonkf.supabase.co" crossorigin />
     
     <!-- Prevent CLS: width+height attrs + height:auto lets browser compute aspect-ratio before load -->
     <!-- Critical CSS: minimal above-the-fold styles to enable rendering without full CSS file -->
@@ -106,12 +107,12 @@
     <meta name="description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, Yu-Gi-Oh, and sports cards on CardPop™ Australia — Australia's trusted online trading card marketplace. Browse thousands of listings, check live prices, and shop sealed boxes." />
     <meta name="keywords" content="trading cards Australia, Pokemon cards Australia, buy sell trade cards, MTG Australia, sports cards Australia, card marketplace" />
     <meta name="author" content="CardPop™" />
-    <link rel="canonical" href="https://cardpop.com.au/" />
+    <!-- Canonical is emitted per-route by SEOHead (apex-normalised) so it never
+         conflicts with a static tag. The www host 301-redirects to apex (vercel.json). -->
 
     <!-- Google Fonts — Syne for headings (brand typeface) -->
-    <!-- Async load: preload resource, load with media query, JS ensures fallback -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Async load: preload resource, load with media query, JS ensures fallback.
+         (Font preconnects are declared once, above, in the Core Web Vitals block.) -->
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" media="(max-width: 0px)" id="font-syne" />
     <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap" /></noscript>

@@ -271,16 +271,28 @@ const AccountOrders = () => {
   const fetchOrders = useCallback(async () => {
     if (!currentUser?.id) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from('orders')
-      .select('*, seller:profiles!seller_id(id, display_name, username), listing:listings!listing_id(vault_item:vault_items!inner(card_name))')
-      .eq('buyer_id', currentUser.id)
-      .order('created_at', { ascending: false })
-      .limit(100);
-    if (error) throw error;
-    setOrders(data || []);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*, seller:profiles!seller_id(id, display_name, username), listing:listings!listing_id(vault_item:vault_items!inner(card_name))')
+        .eq('buyer_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      setOrders(data || []);
+    } catch (err) {
+      console.error('Failed to load orders:', err);
+      toast.error('Could not load your orders. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   }, [currentUser?.id]);
+
+  // Load orders on mount / when the signed-in user changes. Without this the
+  // page sat on loading skeletons forever (loading is only cleared here).
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
 
 
   const filtered = statusFilter === 'all'

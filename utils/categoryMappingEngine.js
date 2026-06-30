@@ -31,7 +31,9 @@ export const autoMapCategories = async (onProgress) => {
       const collectionTypeLower = (listing.collection_type || listing.collectionType || listing.brand || '').toLowerCase();
 
       for (const cat of categories) {
-        if (cat.name.toLowerCase() === collectionTypeLower || collectionTypeLower.includes(cat.name.toLowerCase())) {
+        const catName = (cat.name || '').toLowerCase();
+        if (!catName) continue; // a null category name must not crash the batch
+        if (catName === collectionTypeLower || (collectionTypeLower && collectionTypeLower.includes(catName))) {
           matchedCategory = cat;
           break;
         }
@@ -39,8 +41,17 @@ export const autoMapCategories = async (onProgress) => {
 
       if (matchedCategory) {
         const updateData = { category_id: matchedCategory.id };
-        await supabase.from('listings').update(updateData).eq('id', listing.id);
-        mappedCount++;
+        const { error: updateError } = await supabase
+          .from('listings')
+          .update(updateData)
+          .eq('id', listing.id);
+        // Only count rows that actually changed — an ignored {error} (e.g. RLS
+        // denial) previously reported false "Successfully mapped N" with 0 writes.
+        if (updateError) {
+          failedCount++;
+        } else {
+          mappedCount++;
+        }
       } else {
         failedCount++;
       }

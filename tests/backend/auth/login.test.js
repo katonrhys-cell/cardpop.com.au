@@ -136,10 +136,28 @@ describe('POST /record-success', () => {
     expect(res.status).toBe(400);
   });
 
-  it('clears login attempts on success', async () => {
+  it('returns 401 without a bearer token (cannot clear lockout unauthenticated)', async () => {
+    const res = await request(app).post('/record-success').send({ email: 'test@example.com' });
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 403 when the token does not match the email', async () => {
+    mockSupabase.auth.getUser = vi.fn().mockResolvedValue({ data: { user: { email: 'someone@else.com' } }, error: null });
+    const res = await request(app)
+      .post('/record-success')
+      .set('Authorization', 'Bearer tok')
+      .send({ email: 'test@example.com' });
+    expect(res.status).toBe(403);
+  });
+
+  it('clears login attempts when the token matches the email', async () => {
+    mockSupabase.auth.getUser = vi.fn().mockResolvedValue({ data: { user: { email: 'test@example.com' } }, error: null });
     const deleteBuilder = makeBuilder({ data: null, error: null });
     mockSupabase.from.mockReturnValue(deleteBuilder);
-    const res = await request(app).post('/record-success').send({ email: 'test@example.com' });
+    const res = await request(app)
+      .post('/record-success')
+      .set('Authorization', 'Bearer tok')
+      .send({ email: 'test@example.com' });
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
   });

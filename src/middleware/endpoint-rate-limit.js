@@ -94,6 +94,24 @@ const mfaLimiter = rateLimit({
 	},
 });
 
+// MFA request (OTP issue) limiter: bounds how often a user can trigger an OTP
+// email + mfa_sessions row. Kept separate from mfaLimiter so verify attempts and
+// OTP requests don't share one budget (and can't starve each other).
+const mfaRequestLimiter = rateLimit({
+	windowMs: 15 * 60 * 1000,
+	max: 5,
+	standardHeaders: true,
+	legacyHeaders: false,
+	keyGenerator: (req) => req.user?.id || ipKeyGenerator(req),
+	handler: (req, res) => {
+		logger.warn(`[RATE_LIMIT] MFA request rate limit exceeded for user: ${req.user?.id}`);
+		res.status(429).json({
+			error: 'Too many verification code requests, please try again later',
+			retryAfter: req.rateLimit.resetTime,
+		});
+	},
+});
+
 // Backup code verify rate limiter: 5 attempts per 15 minutes per authenticated user.
 // The route already requires authMiddleware so req.user is always populated here.
 const backupCodeLimiter = rateLimit({
@@ -152,4 +170,4 @@ const resendVerificationLimiter = rateLimit({
 	},
 });
 
-export { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, mfaLimiter, backupCodeLimiter, reportLimiter, resendVerificationLimiter };
+export { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, mfaLimiter, mfaRequestLimiter, backupCodeLimiter, reportLimiter, resendVerificationLimiter };

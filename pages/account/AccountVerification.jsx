@@ -199,7 +199,9 @@ const AccountVerification = () => {
   }
 
   const status = profile?.verification_status || 'none';
-  const statusCfg = STATUS_CONFIG[status];
+  // Fall back to the default config so an unmapped/legacy status value (e.g.
+  // 'in_review') can't crash the whole page on statusCfg.icon.
+  const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG.none;
   const StatusIcon = statusCfg.icon;
   const canApply = status === 'none' || status === 'rejected' || status === 'revoked';
 

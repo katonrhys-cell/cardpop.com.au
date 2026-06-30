@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { getCategoryHierarchy } from '@/utils/categoryUtils.js';
 
 const CategoryContext = createContext(null);
@@ -43,8 +43,10 @@ export const CategoryHierarchyProvider = ({ children }) => {
     fetchHierarchy();
   }, []);
 
+  const value = useMemo(() => ({ hierarchy, loading, error }), [hierarchy, loading, error]);
+
   return (
-    <CategoryContext.Provider value={{ hierarchy, loading, error }}>
+    <CategoryContext.Provider value={value}>
       {children}
     </CategoryContext.Provider>
   );

@@ -44,6 +44,11 @@ function cleanText(text) {
 		.replace(CLEAN_CONTENT_REGEX.htmlEntities.lt, '<')
 		.replace(CLEAN_CONTENT_REGEX.htmlEntities.gt, '>')
 		.replace(CLEAN_CONTENT_REGEX.htmlEntities.apos, "'")
+		// Strip leftover JSX/template-literal punctuation (e.g. `{` `}` backticks)
+		// and any leading separator so titles read cleanly.
+		.replace(/[`{}]/g, '')
+		.replace(/^[\s\-|–—]+/, '')
+		.replace(/\s{2,}/g, ' ')
 		.trim();
 }
 
@@ -112,7 +117,9 @@ function extractHelmetData(content, filePath, routes) {
 	const description = cleanText(descMatch?.[1]);
 
 	const fileName = path.basename(filePath, path.extname(filePath));
-	const url = routes.length && routes.has(fileName)
+	// routes is a Map — use .size (the previous `.length` was always undefined,
+	// so every page fell back to a guessed slug instead of its real route).
+	const url = routes.size && routes.has(fileName)
 		? routes.get(fileName)
 		: generateFallbackUrl(fileName);
 
@@ -128,13 +135,33 @@ function generateFallbackUrl(fileName) {
 	return cleanName === 'app' ? '/' : `/${cleanName}`;
 }
 
+const SITE_ORIGIN = 'https://cardpop.com.au';
+const SITE_NAME = 'CardPop';
+const SITE_SUMMARY = "Australia's trading card marketplace for Pokémon, Magic: The Gathering, Yu-Gi-Oh and sports cards. Buy, sell, and trade authenticated cards with live AUD pricing and buyer protection.";
+
+function toAbsolute(url) {
+	if (!url) return SITE_ORIGIN;
+	if (/^https?:\/\//.test(url)) return url;
+	return `${SITE_ORIGIN}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
+// Follows the llms.txt spec (https://llmstxt.org): an H1 site title, a
+// blockquote summary, then H2 sections of markdown links with absolute URLs.
 function generateLlmsTxt(pages) {
 	const sortedPages = pages.sort((a, b) => a.title.localeCompare(b.title));
 	const pageEntries = sortedPages.map(page =>
-		`- [${page.title}](${page.url}): ${page.description}`
+		`- [${page.title}](${toAbsolute(page.url)}): ${page.description}`
 	).join('\n');
 
-	return `## Pages\n${pageEntries}`;
+	return [
+		`# ${SITE_NAME}`,
+		'',
+		`> ${SITE_SUMMARY}`,
+		'',
+		'## Pages',
+		pageEntries,
+		'',
+	].join('\n');
 }
 
 function ensureDirectoryExists(dirPath) {

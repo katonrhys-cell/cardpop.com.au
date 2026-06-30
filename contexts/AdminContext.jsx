@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 
@@ -24,14 +24,14 @@ export const AdminProvider = ({ children }) => {
     // on unrelated AuthProvider re-renders.
   }, [currentUser?.is_admin, isAuthenticated, authLoading]);
 
-  const logAdminAction = async (action, details = {}) => {
+  const logAdminAction = useCallback(async (action, details = {}) => {
     if (!isAdmin) {
       console.warn('Attempted admin action without admin privileges:', action);
       return;
     }
     // Supabase has no auditLogs table — log to console in development
     console.info('[AdminAudit]', action, details);
-  };
+  }, [isAdmin]);
 
   const getSystemHealth = useCallback(async () => {
     try {
@@ -47,8 +47,13 @@ export const AdminProvider = ({ children }) => {
     }
   }, []);
 
+  const value = useMemo(
+    () => ({ isAdmin, loading, logAdminAction, getSystemHealth }),
+    [isAdmin, loading, logAdminAction, getSystemHealth]
+  );
+
   return (
-    <AdminContext.Provider value={{ isAdmin, loading, logAdminAction, getSystemHealth }}>
+    <AdminContext.Provider value={value}>
       {children}
     </AdminContext.Provider>
   );

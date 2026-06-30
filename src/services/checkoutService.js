@@ -10,7 +10,6 @@ export async function createSingleItemCheckout(req, res) {
       listingId,
       offerId,
       bidId,
-      transactionType = 'fixed',
       successUrl,
       cancelUrl,
       shippingAddress,
@@ -50,6 +49,11 @@ export async function createSingleItemCheckout(req, res) {
       }
       itemPrice = Number(offer.amount_aud);
     }
+
+    // Derive the commission tier from server-side context, NEVER the request
+    // body. Trusting a client transactionType let a buyer pass 'trade' (often a
+    // 0% tier) on a normal fixed-price purchase to avoid the platform fee.
+    const transactionType = offerId ? 'offer' : (bidId ? 'auction' : 'fixed');
 
     const cardName = listing.vault_item?.card_name || listing.title || 'Trading Card';
     const breakdown = await calculateBreakdown({ ...listing, price_aud: itemPrice }, transactionType);

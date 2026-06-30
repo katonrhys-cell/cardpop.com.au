@@ -129,7 +129,7 @@ router.patch('/refunds/:id', validateRequestParams(processRefundSchema), validat
 
   try {
     const { data: refund, error: fetchErr } = await supabase
-      .from('refunds').select('*').eq('id', id).single();
+      .from('refunds').select('*, order:orders!order_id(total_aud, platform_fee_aud)').eq('id', id).single();
     if (fetchErr || !refund) return res.status(404).json({ error: 'Refund not found' });
 
     if (action === 'reject') {
@@ -146,10 +146,15 @@ router.patch('/refunds/:id', validateRequestParams(processRefundSchema), validat
       return res.json({ success: true, status: 'rejected' });
     }
 
-    // Approve — compute the refundable amount server-side (never trust the client).
-    const totalFee = (refund.commission_aud || 0) + (refund.gst_aud || 0);
+    // Approve — compute the refundable amount from the server-authoritative
+    // ORDER row (total_aud / platform_fee_aud written by the Stripe webhook),
+    // NOT from the buyer-created refunds row. A buyer who set commission_aud/
+    // gst_aud to 0 (or inflated total_paid_aud) could otherwise escape the fee
+    // retention entirely.
+    const totalFee = Number(refund.order?.platform_fee_aud) || 0; // commission + GST
+    const orderTotal = Number(refund.order?.total_aud) || 0;
     const retainedFee = round2(totalFee * 0.5);
-    const refundAmount = round2((refund.total_paid_aud || 0) - retainedFee);
+    const refundAmount = round2(orderTotal - retainedFee);
 
     const { error } = await supabase.from('refunds')
       .update({ status: 'approved', admin_notes: admin_notes || null })
