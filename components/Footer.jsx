@@ -20,9 +20,9 @@ const SOCIAL_LINKS = [
 
 const Footer = () => {
   return (
-    <footer className="bg-secondary/30 text-foreground pt-20 pb-10 mt-auto border-t border-border">
+    <footer className="bg-secondary/30 text-foreground pt-12 pb-8 sm:pt-20 sm:pb-10 mt-auto border-t border-border">
       <div className="container-default">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-12 mb-16">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10 sm:gap-12 mb-10 sm:mb-16">
           <div className="lg:col-span-2">
             <Link to="/" className="inline-block mb-6 text-2xl">
               <CardPopLogo variant="full" iconClassName="w-8 h-[39px]" />
