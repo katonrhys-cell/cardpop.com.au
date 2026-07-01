@@ -1,0 +1,52 @@
+<!--
+  Static homepage shell. A Vite build step (see vite.config.js) injects this
+  markup inside <div id="root"> of the "/"-only index.html so the LCP hero paints
+  from static HTML — before any JS parses — then React's <HeroSection/> (the "/"
+  route Suspense fallback) renders the identical hero on its first commit and
+  takes over seamlessly. Every OTHER route is served the shell-less app.html.
+
+  Keep this visually in sync with components/HeroSection.jsx (same <h1>, copy and
+  layout). It uses the same Tailwind classes, which are present in the built CSS
+  because HeroSection uses them. Decorative spotlights and CTA/chip icons are
+  omitted here for brevity — they fade in imperceptibly when React mounts and are
+  not the LCP element.
+-->
+<div class="flex flex-col min-h-screen bg-background text-foreground">
+  <header class="sticky top-0 z-50 w-full bg-background border-b border-border/50">
+    <div class="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="relative flex items-center py-3 border-b border-border/40">
+        <span class="flex items-center h-10 text-xl font-extrabold font-serif text-foreground">CardPop</span>
+      </div>
+    </div>
+  </header>
+  <main class="flex-grow flex flex-col">
+    <section class="relative min-h-[92dvh] flex items-start justify-center pt-10 sm:pt-14 pb-16 px-4 sm:px-6 lg:px-8 overflow-hidden bg-zinc-950">
+      <div class="absolute inset-0 bg-gradient-to-b from-zinc-950 via-[#0f0f14] to-zinc-950 pointer-events-none"></div>
+      <div class="max-w-5xl mx-auto w-full relative z-10 lg:pr-[460px] xl:pr-[480px]">
+        <div class="text-center lg:text-left">
+          <div class="inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-8 border text-sm font-black tracking-wider uppercase" style="background:rgba(220,38,38,0.12);border-color:rgba(220,38,38,0.35);color:#f87171;box-shadow:0 0 24px rgba(220,38,38,0.2)">
+            <span class="w-2 h-2 rounded-full bg-red-500 flex-shrink-0"></span>
+            CardPop<sup class="text-[0.5em]" style="text-decoration:none">™</sup> Live
+            <span class="text-white/30 font-normal">·</span>
+            <span class="text-white/60 font-semibold normal-case tracking-normal">Australia's Card Show</span>
+          </div>
+          <h1 class="text-5xl md:text-6xl lg:text-[4.25rem] font-bold font-serif tracking-normal text-balance mb-6 leading-[1.2] text-white">
+            The Card Show
+            <br class="hidden sm:block" />
+            <span class="text-transparent bg-clip-text" style="background-image:linear-gradient(90deg, #fbbf24 0%, #f87171 45%, #a78bfa 100%)">That Never Closes</span>
+          </h1>
+          <p class="text-base md:text-lg text-zinc-400 max-w-lg mb-10 leading-relaxed text-balance mx-auto lg:mx-0">Pokémon&nbsp;·&nbsp;MTG&nbsp;·&nbsp;Sports&nbsp;·&nbsp;More — buy, sell and trade with verified Australian collectors. Real prices, AUD only, buyer protection on every order.</p>
+          <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-10">
+            <a href="/marketplace" class="inline-flex items-center justify-center w-full sm:w-auto h-14 px-8 rounded-2xl font-black text-lg" style="background:linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);box-shadow:0 8px 32px rgba(220,38,38,0.4);color:#fff;border:none">Browse the Show</a>
+            <a href="/signup" class="inline-flex items-center justify-center w-full sm:w-auto h-14 px-8 rounded-2xl font-bold text-lg" style="background:rgba(255,255,255,0.05);border:1.5px solid rgba(255,255,255,0.15);color:#e4e4e7">Open Your Vault</a>
+          </div>
+          <div class="flex flex-wrap items-center justify-center lg:justify-start gap-3">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.10);color:#a1a1aa">Buyer Protected</span>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.10);color:#a1a1aa">AUD Pricing</span>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.10);color:#a1a1aa">Live Market Data</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>

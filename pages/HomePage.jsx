@@ -303,12 +303,12 @@ const HomePage = () => {
 
         {/* ── Hero text ── */}
         <div className="max-w-5xl mx-auto w-full relative z-10 lg:pr-[460px] xl:pr-[480px]">
-          <motion.div
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, ease: 'easeOut' }}
-            className="text-center lg:text-left"
-          >
+          {/* NOTE: the hero text block is intentionally NOT wrapped in a
+              motion fade. It contains the LCP <h1>, which must paint the moment
+              HomePage renders — gating it behind a framer-motion opacity:0→1
+              animation delayed LCP until the JS loaded and the tween ran. Only
+              the small, non-LCP badge and trust chips animate below. */}
+          <div className="text-center lg:text-left">
             {/* LIVE show badge */}
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
@@ -397,7 +397,7 @@ const HomePage = () => {
                 </span>
               ))}
             </motion.div>
-          </motion.div>
+          </div>
         </div>
 
         {/* ── Live price ticker strip at hero bottom ── */}

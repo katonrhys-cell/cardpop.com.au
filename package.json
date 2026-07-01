@@ -114,6 +114,7 @@
     "@vitest/coverage-v8": "^4.1.7",
     "autoprefixer": "^10.4.20",
     "axe-core": "^4.12.1",
+    "beasties": "^0.4.2",
     "eslint": "^9.39.4",
     "eslint-import-resolver-alias": "^1.1.2",
     "eslint-plugin-import": "^2.32.0",

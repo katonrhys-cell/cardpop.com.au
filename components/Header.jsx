@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, startTransition } from 'react';
+import React, { useState, useEffect, useRef, startTransition, Suspense, lazy } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ShoppingCart, Menu, Shield, MessageSquare, ArrowRightLeft,
@@ -20,7 +20,9 @@ import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle 
 import { Badge } from '@/components/ui/badge';
 import VaultDropdown from '@/components/VaultDropdown.jsx';
 import SearchBar from '@/components/SearchBar.jsx';
-import NotificationBell from '@/components/NotificationBell.jsx';
+// Lazy-loaded: only rendered for authenticated users, and it pulls in date-fns.
+// Keeping it out of the static graph keeps date-fns off the anonymous critical path.
+const NotificationBell = lazy(() => import('@/components/NotificationBell.jsx'));
 
 const WhatnotIcon = ({ className = 'w-4 h-4' }) => (
   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
@@ -1041,8 +1043,8 @@ const Header = () => {
 
             {!authLoading && isAuthenticated && (
               <Button asChild variant="ghost" size="icon" className="hidden sm:flex relative rounded-xl hover:bg-muted">
-                <Link to="/trade-requests">
-                  <ArrowRightLeft className="h-5 w-5" />
+                <Link to="/trade-requests" aria-label={tradeCount > 0 ? `Trade requests, ${tradeCount > 99 ? '99+' : tradeCount} pending` : 'Trade requests'}>
+                  <ArrowRightLeft className="h-5 w-5" aria-hidden="true" />
                   {tradeCount > 0 && (
                     <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px] bg-accent text-accent-foreground border-none font-bold tabular-nums shadow-sm">
                       {tradeCount > 99 ? '99+' : tradeCount}
@@ -1054,8 +1056,8 @@ const Header = () => {
 
             {!authLoading && isAuthenticated && (
               <Button asChild variant="ghost" size="icon" className="hidden sm:flex relative rounded-xl hover:bg-muted">
-                <Link to="/messaging">
-                  <MessageSquare className="h-5 w-5" />
+                <Link to="/messaging" aria-label={unreadCount > 0 ? `Messages, ${unreadCount > 99 ? '99+' : unreadCount} unread` : 'Messages'}>
+                  <MessageSquare className="h-5 w-5" aria-hidden="true" />
                   {unreadCount > 0 && (
                     <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px] bg-primary text-primary-foreground border-none font-bold tabular-nums shadow-sm">
                       {unreadCount > 99 ? '99+' : unreadCount}
@@ -1067,7 +1069,9 @@ const Header = () => {
 
             {!authLoading && isAuthenticated && (
               <div className="hidden sm:block">
-                <NotificationBell />
+                <Suspense fallback={null}>
+                  <NotificationBell />
+                </Suspense>
               </div>
             )}
 

@@ -2,10 +2,69 @@ import path from 'node:path';
 import react from '@vitejs/plugin-react';
 import { createLogger, defineConfig } from 'vite';
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import Beasties from 'beasties';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
 const allDeps = Object.keys(pkg.dependencies || {});
+
+// After the build, emit two HTML entries from one Vite-built index.html:
+//   • index.html — the "/"-only document, with the static hero shell injected
+//     into #root so the LCP paints from HTML before any JS runs (Vercel serves
+//     this for "/" via the filesystem index).
+//   • app.html   — a shell-less copy served for every OTHER route via the
+//     catch-all rewrite in vercel.json, so those pages never flash the homepage
+//     hero. Both reference the identical hashed JS/CSS, so the SPA boots the same.
+function homeShellPlugin() {
+	const shellPath = path.resolve(__dirname, 'tools/home-shell.html');
+	return {
+		name: 'cardpop-home-shell',
+		apply: 'build',
+		async writeBundle(outputOptions) {
+			const outDir = outputOptions.dir || path.resolve(__dirname, 'dist');
+			const indexPath = path.join(outDir, 'index.html');
+			if (!existsSync(indexPath)) return;
+
+			const builtIndex = readFileSync(indexPath, 'utf-8');
+			// Shell-less document for all non-root routes (CSS stays render-blocking
+			// there — those pages are React-gated, so it costs them nothing).
+			writeFileSync(path.join(outDir, 'app.html'), builtIndex, 'utf-8');
+
+			// Inject the hero shell into the "/"-only index.html.
+			const marker = '<div id="root"></div>';
+			if (!builtIndex.includes(marker)) {
+				this.warn('home-shell: `<div id="root"></div>` not found — shell not injected');
+				return;
+			}
+			const shell = readFileSync(shellPath, 'utf-8');
+			let indexHtml = builtIndex.replace(marker, `<div id="root">${shell}</div>`);
+
+			// Inline the above-the-fold critical CSS and load the full stylesheet
+			// asynchronously so it no longer blocks the shell's first paint. The
+			// classic media="print"/onload swap uses an inline handler that our
+			// hardened CSP (no 'unsafe-inline' in script-src) blocks, so we strip
+			// beasties' onload and let main.jsx flip [data-async-style] to media
+			// "all" instead. Fail-safe: any error keeps the render-blocking link.
+			try {
+				const beasties = new Beasties({
+					path: outDir,
+					publicPath: '/',
+					preload: 'media',
+					pruneSource: false,
+					inlineFonts: false,
+					preloadFonts: false,
+					logLevel: 'silent',
+				});
+				const processed = await beasties.process(indexHtml);
+				indexHtml = processed.replace(/ onload="this\.media='all'"/g, ' data-async-style');
+			} catch (e) {
+				this.warn(`home-shell: critical-CSS inlining skipped (${e.message}); CSS stays render-blocking`);
+			}
+
+			writeFileSync(indexPath, indexHtml, 'utf-8');
+		},
+	};
+}
 
 console.warn = () => { };
 
@@ -27,6 +86,7 @@ export default defineConfig({
 	customLogger: logger,
 	plugins: [
 		react(),
+		homeShellPlugin(),
 	],
 	server: {
 		port: 3000,
@@ -84,7 +144,13 @@ export default defineConfig({
 					// pages use it. Letting rolldown auto-split framer-motion keeps it off
 					// the initial load (loaded on-demand with the pages that animate).
 					if (id.includes('lucide-react')) return 'vendor-icons';
-					if (id.includes('@radix-ui')) return 'vendor-radix';
+					// NOTE: @radix-ui is deliberately NOT forced into one manual chunk.
+					// The eager Header only needs a couple of primitives (dialog/slot),
+					// but a single vendor-radix chunk dragged EVERY radix primitive used
+					// anywhere (select, popover, accordion, tabs…) onto the critical path
+					// — ~89 KB gzip of mostly-unused JS at first paint. Letting rolldown
+					// auto-split radix keeps the shared core eager while each primitive
+					// rides along with the lazy page that actually uses it.
 					if (id.includes('react-router')) return 'vendor-router';
 					if (id.includes('react-hook-form') || id.includes('@hookform') || id.includes('zod')) return 'vendor-forms';
 					if (id.includes('@sentry')) return 'vendor-sentry';

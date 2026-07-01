@@ -18,6 +18,11 @@ import ProtectedRoute from '@/components/ProtectedRoute.jsx';
 import ProtectedAdminRoute from '@/components/ProtectedAdminRoute.jsx';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 import PageLoader from '@/components/PageLoader.jsx';
+// Eager, framer-motion-free homepage hero. Used as the "/" route's Suspense
+// fallback so the LCP <h1> paints on React's first commit — matching the static
+// shell baked into index.html — instead of flashing a spinner while HomePage
+// (and framer-motion) lazy-load.
+import HeroSection from '@/components/HeroSection.jsx';
 import ShoppingCart from '@/components/ShoppingCartLazy.jsx';
 import AdminLayout from '@/components/AdminLayout.jsx';
 import MarketplaceListingRedirect from '@/components/MarketplaceListingRedirect.jsx';
@@ -224,7 +229,7 @@ const App = () => {
                     <Suspense fallback={<PageLoader />}>
                       <Routes>
                         {/* --- PUBLIC ROUTES --- */}
-                        <Route path="/" element={<HomePage />} />
+                        <Route path="/" element={<Suspense fallback={<HeroSection />}><HomePage /></Suspense>} />
                         
                         {/* Auth */}
                         <Route path="/logout" element={<LogoutPage />} />

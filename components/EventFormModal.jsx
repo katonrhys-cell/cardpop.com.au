@@ -500,8 +500,15 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                         </div>
                       </div>
                     ) : (
-                      <div className="flex flex-col items-center justify-center py-8 cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                        <UploadCloud className="w-8 h-8 text-muted-foreground mb-2" />
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Upload image — click or press Enter to choose a file"
+                        className="flex flex-col items-center justify-center py-8 cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        onClick={() => fileInputRef.current?.click()}
+                        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click(); } }}
+                      >
+                        <UploadCloud className="w-8 h-8 text-muted-foreground mb-2" aria-hidden="true" />
                         <p className="text-sm font-semibold text-foreground">Click or drag to upload</p>
                         <p className="text-xs text-muted-foreground">Max 20MB — JPG, PNG, WEBP</p>
                       </div>
