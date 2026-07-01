@@ -85,7 +85,13 @@ export default defineConfig({
 					// pages use it. Letting rolldown auto-split framer-motion keeps it off
 					// the initial load (loaded on-demand with the pages that animate).
 					if (id.includes('lucide-react')) return 'vendor-icons';
-					if (id.includes('@radix-ui')) return 'vendor-radix';
+					// NOTE: @radix-ui is deliberately NOT forced into one manual chunk.
+					// The eager Header only needs a couple of primitives (dialog/slot),
+					// but a single vendor-radix chunk dragged EVERY radix primitive used
+					// anywhere (select, popover, accordion, tabs…) onto the critical path
+					// — ~89 KB gzip of mostly-unused JS at first paint. Letting rolldown
+					// auto-split radix keeps the shared core eager while each primitive
+					// rides along with the lazy page that actually uses it.
 					if (id.includes('react-router')) return 'vendor-router';
 					if (id.includes('react-hook-form') || id.includes('@hookform') || id.includes('zod')) return 'vendor-forms';
 					if (id.includes('@sentry')) return 'vendor-sentry';

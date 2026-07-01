@@ -227,17 +227,8 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/main.jsx"></script>
-
-    <!-- Google tag (gtag.js) — deferred until after app loads -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-NCZ6K9VFF8"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-NCZ6K9VFF8');
-    </script>
-
-    <!-- Impact affiliate tracking — deferred until after first paint -->
-    <script defer type="text/javascript">(function(i,m,p,a,c,t){c.ire_o=p;c[p]=c[p]||function(){(c[p].a=c[p].a||[]).push(arguments)};t=a.createElement(m);var z=a.getElementsByTagName(m)[0];t.async=1;t.src=i;z.parentNode.insertBefore(t,z)})('https://utt.impactcdn.com/P-A7361090-8367-4d02-a53d-c4f13bef08391.js','script','impactStat',document,window);impactStat('transformLinks');impactStat('trackImpression');</script>
+    <!-- Third-party analytics (Google gtag) and affiliate (Impact) scripts are
+         loaded from main.jsx after the app is interactive (requestIdleCallback),
+         so they never compete with React hydration for the main thread. -->
   </body>
 </html>

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, startTransition } from 'react';
+import React, { useState, useEffect, useRef, startTransition, Suspense, lazy } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ShoppingCart, Menu, Shield, MessageSquare, ArrowRightLeft,
@@ -20,7 +20,9 @@ import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle 
 import { Badge } from '@/components/ui/badge';
 import VaultDropdown from '@/components/VaultDropdown.jsx';
 import SearchBar from '@/components/SearchBar.jsx';
-import NotificationBell from '@/components/NotificationBell.jsx';
+// Lazy-loaded: only rendered for authenticated users, and it pulls in date-fns.
+// Keeping it out of the static graph keeps date-fns off the anonymous critical path.
+const NotificationBell = lazy(() => import('@/components/NotificationBell.jsx'));
 
 const WhatnotIcon = ({ className = 'w-4 h-4' }) => (
   <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
@@ -1067,7 +1069,9 @@ const Header = () => {
 
             {!authLoading && isAuthenticated && (
               <div className="hidden sm:block">
-                <NotificationBell />
+                <Suspense fallback={null}>
+                  <NotificationBell />
+                </Suspense>
               </div>
             )}
 

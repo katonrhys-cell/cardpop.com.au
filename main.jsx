@@ -57,14 +57,48 @@ const initSentry = () => {
     .catch(() => { /* monitoring is non-critical — never block the app on it */ });
 };
 
+// Third-party analytics + affiliate tags. These add no first-paint value, so we
+// load them only after the app is interactive — keeping their ~90 kB of parse/
+// execute off the critical path cuts main-thread work and long tasks during load.
+const GA_MEASUREMENT_ID = 'G-NCZ6K9VFF8';
+const loadThirdPartyScripts = () => {
+  if (!import.meta.env.PROD) return;
+
+  // Google Analytics (gtag.js)
+  try {
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { window.dataLayer.push(arguments); }
+    window.gtag = gtag;
+    gtag('js', new Date());
+    gtag('config', GA_MEASUREMENT_ID);
+    const gtagScript = document.createElement('script');
+    gtagScript.async = true;
+    gtagScript.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
+    document.head.appendChild(gtagScript);
+  } catch { /* analytics is non-critical */ }
+
+  // Impact affiliate tracking
+  try {
+    (function (i, m, p, a, c, t) {
+      c.ire_o = p; c[p] = c[p] || function () { (c[p].a = c[p].a || []).push(arguments); };
+      t = a.createElement(m); const z = a.getElementsByTagName(m)[0];
+      t.async = 1; t.src = i; z.parentNode.insertBefore(t, z);
+    })('https://utt.impactcdn.com/P-A7361090-8367-4d02-a53d-c4f13bef08391.js', 'script', 'impactStat', document, window);
+    window.impactStat('transformLinks');
+    window.impactStat('trackImpression');
+  } catch { /* affiliate tracking is non-critical */ }
+};
+
 if (typeof window !== 'undefined') {
   // Register service worker after page load for offline support
   registerServiceWorker();
 
-  // Initialize error monitoring after idle
+  // Defer error monitoring and third-party tags until the browser is idle so
+  // none of them block first paint or hydration.
+  const initDeferred = () => { initSentry(); loadThirdPartyScripts(); };
   if ('requestIdleCallback' in window) {
-    window.requestIdleCallback(initSentry, { timeout: 5000 });
+    window.requestIdleCallback(initDeferred, { timeout: 5000 });
   } else {
-    window.setTimeout(initSentry, 3000);
+    window.setTimeout(initDeferred, 3000);
   }
 }
