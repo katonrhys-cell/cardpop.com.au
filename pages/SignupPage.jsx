@@ -49,30 +49,46 @@ const SignupPage = () => {
       toast.error('Please meet all password requirements to continue.');
       return;
     }
-    
+
     setLoading(true);
     try {
-      const user = await signup(formData.email, formData.password, formData.name);
+      const result = await signup(formData.email, formData.password, formData.name);
+      const user = result?.user;
+      const session = result?.session;
 
+      // Newsletter opt-in (fire-and-forget — never blocks registration).
       if (newsletterOptIn) {
         apiServerClient.fetch('/newsletter/subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: formData.email, firstName: formData.name.split(' ')[0] }),
         });
+      }
 
+      // Send the verification email regardless of the newsletter choice.
+      if (user?.id) {
         try {
           await apiServerClient.fetch('/send-verification-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId: user.id })
           });
-          setSuccess(true);
-          toast.success('Account created successfully!');
         } catch (emailErr) {
-          toast.error('Account created, but failed to send verification email. Please contact support.');
-          navigate('/login');
+          // Non-fatal: the account exists; surface it but continue.
+          toast.error('Account created, but the verification email failed to send. You can resend it from Login.');
         }
+      }
+
+      toast.success('Account created successfully!');
+
+      // If email confirmation is disabled the user already has a live session, so
+      // we can collect a payment method now (card at registration). Otherwise
+      // they must verify their email first; the card is collected on their first
+      // sign-in via the membership page (which the selling gate also points to).
+      if (session?.access_token) {
+        navigate('/account/membership?welcome=1');
+      } else {
+        setSuccess(true);
       }
     } catch (error) {
       toast.error(error.message || 'Registration failed. Email may already be in use.');
@@ -104,9 +120,13 @@ const SignupPage = () => {
               <MailCheck className="w-8 h-8 text-primary" />
             </div>
             <h2 className="font-serif text-2xl font-bold mb-4">Check Your Email</h2>
-            <p className="text-muted-foreground mb-8 leading-relaxed">
-              We've sent a verification link to <span className="text-foreground font-bold">{formData.email}</span>. 
+            <p className="text-muted-foreground mb-4 leading-relaxed">
+              We've sent a verification link to <span className="text-foreground font-bold">{formData.email}</span>.
               Check your email to verify your account and complete your profile.
+            </p>
+            <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
+              Once you sign in, start your <span className="text-foreground font-bold">30-day free trial</span> to
+              list and sell cards — add a card or PayPal to begin, and cancel anytime before the trial ends.
             </p>
             <Button asChild className="w-full h-12 font-bold">
               <Link to="/login">Go to Login</Link>

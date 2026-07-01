@@ -1,0 +1,181 @@
+import 'dotenv/config';
+import express from 'express';
+import stripe from '../utils/stripeClient.js';
+import logger from '../utils/logger.js';
+import { authMiddleware } from '../middleware/auth.js';
+import {
+  getOrCreateStripeCustomer,
+  applyPaypalSubscription,
+  mapPaypalStatus,
+  getSubscriptionStatus,
+} from '../services/subscriptionService.js';
+import {
+  isPaypalConfigured,
+  createPaypalSubscription,
+  getPaypalSubscription,
+  verifyPaypalWebhook,
+} from '../utils/paypalClient.js';
+import { TRIAL_DAYS } from '../../config/subscription.js';
+
+const router = express.Router();
+
+// ─── GET /status ─────────────────────────────────────────────────────────────
+// Current entitlement snapshot for the authenticated user.
+router.get('/status', authMiddleware, async (req, res) => {
+  try {
+    const status = await getSubscriptionStatus(req.user.id);
+    res.json(status || { subscription_status: 'none', trial_ends_at: null });
+  } catch (err) {
+    logger.error(`[SUB] /status error: ${err.message}`);
+    res.status(500).json({ error: 'Failed to load subscription status' });
+  }
+});
+
+// ─── POST /stripe/checkout ───────────────────────────────────────────────────
+// Start the trial via Stripe Checkout in subscription mode. The card is captured
+// but NOT charged until the trial ends (trial_period_days). Returns a hosted URL.
+router.post('/stripe/checkout', authMiddleware, async (req, res) => {
+  try {
+    const priceId = process.env.STRIPE_SUBSCRIPTION_PRICE_ID;
+    if (!priceId) {
+      logger.error('[SUB] STRIPE_SUBSCRIPTION_PRICE_ID not configured');
+      return res.status(503).json({ error: 'Subscriptions are not configured yet.' });
+    }
+
+    const { successUrl, cancelUrl } = req.body;
+    if (!successUrl || !cancelUrl) {
+      return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
+    }
+
+    const userId = req.user.id;
+    const customerId = await getOrCreateStripeCustomer(userId, req.user.email);
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'subscription',
+      customer: customerId,
+      line_items: [{ price: priceId, quantity: 1 }],
+      subscription_data: {
+        trial_period_days: TRIAL_DAYS,
+        metadata: { userId },
+      },
+      payment_method_collection: 'always', // require a card even during the trial
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      metadata: { userId, kind: 'subscription' },
+    });
+
+    if (!session?.url) throw new Error('Stripe returned a session without a URL');
+    logger.info(`[SUB] Stripe subscription checkout created for ${userId}: ${session.id}`);
+    res.json({ url: session.url });
+  } catch (err) {
+    logger.error(`[SUB] /stripe/checkout error: ${err.message}`);
+    res.status(500).json({ error: 'Could not start Stripe checkout' });
+  }
+});
+
+// ─── POST /paypal/create ─────────────────────────────────────────────────────
+// Create a PayPal subscription against the trial plan; returns the approval URL.
+router.post('/paypal/create', authMiddleware, async (req, res) => {
+  try {
+    if (!isPaypalConfigured()) {
+      return res.status(503).json({ error: 'PayPal is not configured yet.' });
+    }
+    const { returnUrl, cancelUrl } = req.body;
+    if (!returnUrl || !cancelUrl) {
+      return res.status(400).json({ error: 'returnUrl and cancelUrl are required' });
+    }
+
+    const { id, approveUrl } = await createPaypalSubscription({
+      userId: req.user.id,
+      email: req.user.email,
+      returnUrl,
+      cancelUrl,
+    });
+    if (!approveUrl) throw new Error('PayPal did not return an approval link');
+
+    // Persist the pending subscription id so the return handler / webhook can
+    // resolve the user even before the webhook arrives.
+    await applyPaypalSubscription({
+      userId: req.user.id,
+      paypalSubscriptionId: id,
+      status: 'none', // not entitled until approved/active
+    });
+
+    logger.info(`[SUB] PayPal subscription created for ${req.user.id}: ${id}`);
+    res.json({ id, approveUrl });
+  } catch (err) {
+    logger.error(`[SUB] /paypal/create error: ${err.message}`);
+    res.status(500).json({ error: 'Could not start PayPal checkout' });
+  }
+});
+
+// ─── POST /paypal/activate ───────────────────────────────────────────────────
+// Called when the buyer returns from PayPal approval. Confirms the live state
+// with PayPal and mirrors it onto the profile (webhook remains source of truth).
+router.post('/paypal/activate', authMiddleware, async (req, res) => {
+  try {
+    const { subscriptionId } = req.body;
+    if (!subscriptionId) return res.status(400).json({ error: 'subscriptionId is required' });
+
+    const sub = await getPaypalSubscription(subscriptionId);
+    // Guard: the subscription must belong to this user (custom_id set at creation).
+    if (sub.custom_id && sub.custom_id !== req.user.id) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const status = mapPaypalStatus(sub.status);
+    const trialEndsAt = sub.billing_info?.next_billing_time || null;
+    await applyPaypalSubscription({
+      userId: req.user.id,
+      paypalSubscriptionId: subscriptionId,
+      status,
+      trialEndsAt,
+    });
+
+    res.json({ subscription_status: status });
+  } catch (err) {
+    logger.error(`[SUB] /paypal/activate error: ${err.message}`);
+    res.status(500).json({ error: 'Could not confirm PayPal subscription' });
+  }
+});
+
+// ─── POST /paypal/webhook ────────────────────────────────────────────────────
+// PayPal billing events. Verified via the verify-webhook-signature API.
+router.post('/paypal/webhook', async (req, res) => {
+  try {
+    const verified = await verifyPaypalWebhook({ headers: req.headers, body: req.body });
+    if (!verified) {
+      logger.warn('[SUB] PayPal webhook failed verification');
+      return res.status(400).json({ error: 'Invalid webhook signature' });
+    }
+
+    const event = req.body;
+    const resource = event.resource || {};
+    const subscriptionId = resource.id;
+    const userId = resource.custom_id || null;
+
+    switch (event.event_type) {
+      case 'BILLING.SUBSCRIPTION.ACTIVATED':
+      case 'BILLING.SUBSCRIPTION.UPDATED':
+      case 'BILLING.SUBSCRIPTION.SUSPENDED':
+      case 'BILLING.SUBSCRIPTION.CANCELLED':
+      case 'BILLING.SUBSCRIPTION.EXPIRED':
+        await applyPaypalSubscription({
+          userId,
+          paypalSubscriptionId: subscriptionId,
+          status: mapPaypalStatus(resource.status),
+          trialEndsAt: resource.billing_info?.next_billing_time || null,
+        });
+        break;
+      default:
+        logger.debug(`[SUB] Unhandled PayPal event: ${event.event_type}`);
+    }
+
+    res.json({ received: true });
+  } catch (err) {
+    logger.error(`[SUB] PayPal webhook error: ${err.message}`);
+    res.status(500).json({ error: 'Webhook processing failed' });
+  }
+});
+
+export default router;

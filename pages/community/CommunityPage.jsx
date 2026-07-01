@@ -113,35 +113,35 @@ const CommunityPage = () => {
 
       {/* ── Promo Carousel ── */}
       <section
-        className="relative overflow-hidden min-h-[300px] sm:min-h-[360px]"
+        className="relative overflow-hidden min-h-[380px] sm:min-h-[400px]"
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
         {/* Slide 1 — Free Trial */}
         <div className={`absolute inset-0 transition-opacity duration-700 ${currentSlide === 0 ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
-          <div className="relative h-full overflow-hidden text-white flex flex-col items-center justify-center px-4 pb-10 pt-12 text-center"
-            style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 55%, #2563eb 100%)' }}>
-            {/* Diagonal accent slab */}
+          <div className="relative h-full overflow-hidden text-white flex flex-col items-center justify-center px-5 pb-16 pt-12 text-center"
+            style={{ background: 'linear-gradient(135deg, #1F2937 0%, #7F131F 58%, #CE1126 100%)' }}>
+            {/* Diagonal accent slabs */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
               <div className="absolute -right-24 top-0 w-72 h-full bg-white/5" style={{ transform: 'skewX(-12deg)' }} />
-              <div className="absolute -right-4 top-0 w-40 h-full bg-white/4" style={{ transform: 'skewX(-12deg)' }} />
+              <div className="absolute -right-4 top-0 w-40 h-full bg-white/[0.04]" style={{ transform: 'skewX(-12deg)' }} />
             </div>
-            <div className="relative z-10 flex flex-col items-center gap-3 max-w-2xl">
-              <span className="bg-white text-blue-900 font-black text-xs px-4 py-1.5 uppercase tracking-widest rounded-sm shadow">
+            <div className="relative z-10 flex flex-col items-center gap-4 max-w-2xl">
+              <span className="bg-white text-brand-red font-heading font-extrabold text-xs px-4 py-1.5 uppercase tracking-[0.2em] rounded-pill shadow-sm">
                 Limited Time
               </span>
-              <h2 className="text-2xl sm:text-3xl font-black leading-tight uppercase tracking-tight">
-                30 Days Free.<br />No Card Required.
+              <h2 className="font-heading text-3xl sm:text-4xl font-extrabold leading-[1.05] uppercase tracking-tight">
+                30 Days Free.<br />Cancel Anytime.
               </h2>
               <div className="w-12 h-1 bg-white/40 rounded-full" />
-              <p className="text-white/75 text-sm sm:text-base max-w-lg">
-                List and sell cards completely free for 30 days. Join Australia's fastest-growing trading card community.
+              <p className="text-white/80 text-sm sm:text-base max-w-md leading-relaxed">
+                List and sell your cards free for 30 days. Add a card to start — cancel anytime before your trial ends and you won't be charged.
               </p>
               <Link
                 to="/signup"
-                className="mt-2 bg-white text-blue-900 font-black text-sm px-8 py-3 uppercase tracking-widest rounded-sm hover:bg-blue-50 transition-colors shadow-xl"
+                className="mt-1 inline-flex items-center gap-2 bg-white text-brand-red font-heading font-extrabold text-sm px-8 py-3.5 uppercase tracking-[0.15em] rounded-button hover:bg-white/90 transition-colors shadow-lg"
               >
-                Register Free →
+                Start Free Trial <span aria-hidden="true">→</span>
               </Link>
             </div>
           </div>
@@ -149,32 +149,32 @@ const CommunityPage = () => {
 
         {/* Slide 2 — Whatnot Shows */}
         <div className={`absolute inset-0 transition-opacity duration-700 ${currentSlide === 1 ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
-          <div className="relative h-full overflow-hidden bg-black text-white flex flex-col items-center justify-center px-4 pb-10 pt-12 text-center">
+          <div className="relative h-full overflow-hidden bg-black text-white flex flex-col items-center justify-center px-5 pb-16 pt-12 text-center">
             {/* Yellow diagonal accent */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
-              <div className="absolute -left-16 top-0 w-56 h-full bg-yellow-400/8" style={{ transform: 'skewX(-12deg)' }} />
+              <div className="absolute -left-16 top-0 w-56 h-full bg-yellow-400/[0.08]" style={{ transform: 'skewX(-12deg)' }} />
               <div className="absolute left-32 top-0 w-24 h-full bg-yellow-400/5" style={{ transform: 'skewX(-12deg)' }} />
             </div>
-            <div className="relative z-10 flex flex-col items-center gap-3 max-w-2xl">
+            <div className="relative z-10 flex flex-col items-center gap-4 max-w-2xl">
               <div className="flex items-center gap-3">
                 <WhatnotIcon className="w-10 h-10" />
-                <span className="bg-yellow-400 text-black font-black text-xs px-4 py-1.5 uppercase tracking-widest rounded-sm shadow">
+                <span className="bg-yellow-400 text-black font-heading font-extrabold text-xs px-4 py-1.5 uppercase tracking-[0.2em] rounded-pill shadow-sm">
                   Go Live
                 </span>
               </div>
-              <h2 className="text-2xl sm:text-3xl font-black leading-tight uppercase tracking-tight"
+              <h2 className="font-heading text-3xl sm:text-4xl font-extrabold leading-[1.05] uppercase tracking-tight"
                 style={{ textShadow: '0 0 60px rgba(250,204,21,0.25)' }}>
                 Promote Your<br />Whatnot Shows
               </h2>
               <div className="w-12 h-1 bg-yellow-400/60 rounded-full" />
-              <p className="text-white/70 text-sm sm:text-base max-w-lg">
+              <p className="text-white/70 text-sm sm:text-base max-w-md leading-relaxed">
                 Got live pack breaks and auctions? Sign up and list your shows on CardPop — reach thousands of Australian collectors.
               </p>
               <Link
                 to="/signup"
-                className="mt-2 bg-yellow-400 text-black font-black text-sm px-8 py-3 uppercase tracking-widest rounded-sm hover:bg-yellow-300 transition-colors shadow-xl"
+                className="mt-1 inline-flex items-center gap-2 bg-yellow-400 text-black font-heading font-extrabold text-sm px-8 py-3.5 uppercase tracking-[0.15em] rounded-button hover:bg-yellow-300 transition-colors shadow-lg"
               >
-                Add Your Show →
+                Add Your Show <span aria-hidden="true">→</span>
               </Link>
             </div>
           </div>
@@ -182,30 +182,30 @@ const CommunityPage = () => {
 
         {/* Slide 3 — Instagram / Socials */}
         <div className={`absolute inset-0 transition-opacity duration-700 ${currentSlide === 2 ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}`}>
-          <div className="relative h-full overflow-hidden text-white flex flex-col items-center justify-center px-4 pb-10 pt-12 text-center"
+          <div className="relative h-full overflow-hidden text-white flex flex-col items-center justify-center px-5 pb-16 pt-12 text-center"
             style={{ background: 'linear-gradient(135deg, #4c1d95 0%, #be185d 50%, #ea580c 100%)' }}>
             {/* Diagonal accents */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
               <div className="absolute -right-20 top-0 w-64 h-full bg-white/5" style={{ transform: 'skewX(-12deg)' }} />
-              <div className="absolute right-36 top-0 w-20 h-full bg-white/4" style={{ transform: 'skewX(-12deg)' }} />
+              <div className="absolute right-36 top-0 w-20 h-full bg-white/[0.04]" style={{ transform: 'skewX(-12deg)' }} />
             </div>
-            <div className="relative z-10 flex flex-col items-center gap-3 max-w-2xl">
-              <span className="border-2 border-white/50 text-white font-black text-xs px-4 py-1.5 uppercase tracking-widest rounded-sm">
+            <div className="relative z-10 flex flex-col items-center gap-4 max-w-2xl">
+              <span className="border-2 border-white/50 text-white font-heading font-extrabold text-xs px-4 py-1.5 uppercase tracking-[0.2em] rounded-pill">
                 Connect
               </span>
-              <h2 className="text-2xl sm:text-3xl font-black leading-tight uppercase tracking-tight"
+              <h2 className="font-heading text-3xl sm:text-4xl font-extrabold leading-[1.05] uppercase tracking-tight"
                 style={{ textShadow: '0 2px 30px rgba(0,0,0,0.35)' }}>
                 Share Your Pulls.<br />Build Your Name.
               </h2>
               <div className="w-12 h-1 bg-white/40 rounded-full" />
-              <p className="text-white/85 text-sm sm:text-base max-w-lg">
+              <p className="text-white/85 text-sm sm:text-base max-w-md leading-relaxed">
                 Link your Instagram to your CardPop profile. Get discovered, share your collection, and connect with breakers across Australia.
               </p>
               <Link
                 to="/signup"
-                className="mt-2 bg-white text-pink-700 font-black text-sm px-8 py-3 uppercase tracking-widest rounded-sm hover:bg-white/90 transition-colors shadow-xl"
+                className="mt-1 inline-flex items-center gap-2 bg-white text-pink-700 font-heading font-extrabold text-sm px-8 py-3.5 uppercase tracking-[0.15em] rounded-button hover:bg-white/90 transition-colors shadow-lg"
               >
-                Build Your Profile →
+                Build Your Profile <span aria-hidden="true">→</span>
               </Link>
             </div>
           </div>
@@ -230,7 +230,7 @@ const CommunityPage = () => {
         </button>
 
         {/* Dots — kept above the angled divider overlap */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
+        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
           {Array.from({ length: TOTAL_SLIDES }).map((_, i) => (
             <button
               key={i}
@@ -245,7 +245,7 @@ const CommunityPage = () => {
       {/* Angled edge below carousel */}
       <div
         aria-hidden="true"
-        className="relative -mt-6 h-6 z-10 bg-background pointer-events-none"
+        className="relative -mt-4 h-4 z-10 bg-background pointer-events-none"
         style={{ clipPath: 'polygon(0 100%, 100% 0, 100% 100%)' }}
       />
 

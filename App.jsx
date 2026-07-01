@@ -102,6 +102,7 @@ const AccountSellerTier = lazy(() => import('@/pages/account/AccountSellerTier.j
 const AccountOrders = lazy(() => import('@/pages/account/AccountOrders.jsx'));
 const AccountEvents = lazy(() => import('@/pages/account/AccountEvents.jsx'));
 const AccountSoleTrader = lazy(() => import('@/pages/account/AccountSoleTrader.jsx'));
+const AccountMembership = lazy(() => import('@/pages/account/AccountMembership.jsx'));
 const SoleTraderStorePage = lazy(() => import('@/pages/SoleTraderStorePage.jsx'));
 
 // Vault & Trading
@@ -294,6 +295,7 @@ const App = () => {
                         <Route path="/account/orders" element={<ProtectedRoute><AccountOrders /></ProtectedRoute>} />
                         <Route path="/account/events" element={<ProtectedRoute><AccountEvents /></ProtectedRoute>} />
                         <Route path="/account/sole-trader" element={<ProtectedRoute><AccountSoleTrader /></ProtectedRoute>} />
+                        <Route path="/account/membership" element={<ProtectedRoute><AccountMembership /></ProtectedRoute>} />
                         
                         {/* Vault & Trading */}
                         <Route path="/vault" element={<ProtectedRoute><MyVaultPage /></ProtectedRoute>} />
