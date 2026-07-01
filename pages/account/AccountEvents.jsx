@@ -23,12 +23,14 @@ const AccountEvents = () => {
   const { currentUser } = useAuth();
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
 
   const fetchMyEvents = useCallback(async () => {
     if (!currentUser?.id) return;
     setIsLoading(true);
+    setLoadError(null);
     try {
       const { data, error } = await supabase
         .from('events')
@@ -38,6 +40,9 @@ const AccountEvents = () => {
       if (error) throw error;
       setEvents(data || []);
     } catch (err) {
+      console.error('Failed to load your events:', err);
+      setLoadError('We couldn’t load your events right now. Please try again shortly.');
+      setEvents([]);
     } finally {
       setIsLoading(false);
     }
@@ -75,6 +80,15 @@ const AccountEvents = () => {
       {isLoading ? (
         <div className="space-y-4">
           {[1, 2, 3].map(i => <Skeleton key={i} className="h-28 w-full rounded-2xl" />)}
+        </div>
+      ) : loadError ? (
+        <div className="text-center py-20 bg-card rounded-3xl border border-dashed border-destructive/30">
+          <CalendarDays className="w-14 h-14 text-destructive mx-auto mb-4 opacity-40" />
+          <h2 className="text-xl font-bold mb-2">Couldn’t load your events</h2>
+          <p className="text-muted-foreground mb-6 max-w-sm mx-auto">{loadError}</p>
+          <Button onClick={fetchMyEvents} variant="outline" className="rounded-xl font-bold">
+            Try again
+          </Button>
         </div>
       ) : events.length === 0 ? (
         <div className="text-center py-20 bg-card rounded-3xl border border-dashed border-border">
