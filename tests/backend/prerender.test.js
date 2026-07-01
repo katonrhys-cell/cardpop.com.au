@@ -12,6 +12,8 @@ vi.mock('@supabase/supabase-js', () => {
       select: vi.fn(() => b),
       eq: vi.fn(() => b),
       neq: vi.fn(() => b),
+      gt: vi.fn(() => b),
+      gte: vi.fn(() => b),
       order: vi.fn(() => b),
       limit: vi.fn(() => b),
       maybeSingle: vi.fn(() => Promise.resolve(state.result)),
@@ -219,6 +221,104 @@ describe('prerender landing pages', () => {
     const { body } = await run('/browse');
     expect(body).toContain('<title>Browse Listings | CardPop</title>');
     expect(body).toContain('No items available right now.');
+    expect(body).not.toContain('noindex');
+  });
+});
+
+describe('prerender events', () => {
+  it('renders the events landing with an Event ItemList', async () => {
+    state.listResult = { data: [
+      { id: UUID, slug: 'melbourne-card-expo', title: 'Melbourne Card Expo', start_date: '2026-08-01', venue_name: 'Royal Exhibition Building', suburb: 'Carlton', state: 'VIC' },
+    ] };
+    const { status, body } = await run('/events');
+    expect(status).toBe(200);
+    expect(body).toContain('<title>Trading Card Events, Shows &amp; Expos in Australia | CardPop</title>');
+    expect(body).toContain('"@type":"ItemList"');
+    expect(body).toContain('Melbourne Card Expo');
+    expect(body).toContain('/events/melbourne-card-expo');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('renders a category landing for a known slug', async () => {
+    state.listResult = { data: [] };
+    const { status, body } = await run('/events/card-shows');
+    expect(status).toBe(200);
+    expect(body).toContain('Trading Card Shows in Australia');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/events/card-shows" />');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('renders an individual event with Event JSON-LD and a self-canonical', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'melbourne-card-expo', title: 'Melbourne Card Expo', status: 'approved',
+      description: 'The biggest trading card expo in Victoria.', image_url: 'https://cdn.test/expo.jpg',
+      venue_name: 'Royal Exhibition Building', address: '9 Nicholson St', suburb: 'Carlton', state: 'VIC', postcode: '3053',
+      start_date: '2026-08-01', end_date: '2026-08-02', entry_fee_aud: 15, is_free: false, organizer_name: 'CardPop',
+    } };
+    const { status, body } = await run('/events/melbourne-card-expo');
+    expect(status).toBe(200);
+    expect(body).toContain('"@type":"Event"');
+    expect(body).toContain('Melbourne Card Expo');
+    expect(body).toContain('"addressRegion":"VIC"');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/events/melbourne-card-expo" />');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('returns a noindex document for an unknown event', async () => {
+    state.result = { data: null };
+    const { body } = await run('/events/does-not-exist');
+    expect(body).toContain('Event Not Found');
+    expect(body).toContain('noindex');
+  });
+});
+
+describe('prerender static content pages', () => {
+  it('renders the grading hub with FAQ JSON-LD and chapter links', async () => {
+    const { status, body } = await run('/grading');
+    expect(status).toBe(200);
+    expect(body).toContain('<title>Grading Hub | CardPop');
+    expect(body).toContain('<h1>The Grading Handbook</h1>');
+    expect(body).toContain('"@type":"FAQPage"');
+    expect(body).toContain('"@type":"BreadcrumbList"');
+    expect(body).toContain('href="https://cardpop.com.au/grading/what-is-grading"');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/grading" />');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('renders a legal page (returns) with its sections', async () => {
+    const { status, body } = await run('/returns');
+    expect(status).toBe(200);
+    expect(body).toContain('<h1>Returns &amp; Refunds</h1>');
+    expect(body).toContain('Platform fee retention on refunds');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/returns" />');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('reuses shared grader lists on submission-partners', async () => {
+    const { body } = await run('/grading/submission-partners');
+    expect(body).toContain('Card Grading Australia (CGA)');
+    expect(body).toContain('How to submit');
+  });
+
+  it('escapes and renders the FAQ page questions', async () => {
+    const { body } = await run('/faq');
+    expect(body).toContain('How does the CardPop™ Vault work?');
+    expect(body).toContain('"@type":"Question"');
+  });
+});
+
+describe('prerender blog index', () => {
+  it('lists recent articles and static topic categories', async () => {
+    state.listResult = { data: [
+      { slug: 'card-parallels', title: 'Understanding Parallels', excerpt: 'A guide.', author: 'CardPop', published_at: '2026-03-01T00:00:00.000Z' },
+    ] };
+    const { status, body } = await run('/blog');
+    expect(status).toBe(200);
+    expect(body).toContain('<title>The Parallel Report | CardPop</title>');
+    expect(body).toContain('Explore by topic');
+    expect(body).toContain('/blog/card-parallels');
+    expect(body).toContain('/blog/category/grading-guides');
+    expect(body).toContain('"@type":"ItemList"');
     expect(body).not.toContain('noindex');
   });
 });

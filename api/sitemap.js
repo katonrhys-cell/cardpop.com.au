@@ -5,6 +5,11 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const BASE_URL = 'https://cardpop.com.au';
 const TODAY = new Date().toISOString().split('T')[0];
+// Stable <lastmod> for structural/static pages. Stamping TODAY on every request
+// (even when nothing changed) trains crawlers to distrust the sitemap's dates,
+// which hurts recrawl scheduling. Bump this only when the static pages actually
+// change; DB-driven URLs below keep their real updated_at timestamps.
+const SITE_UPDATED = '2026-06-30';
 
 const xmlUrl = (loc, lastmod, changefreq, priority) =>
   `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
@@ -19,32 +24,32 @@ const slugify = (str = '') => String(str)
   .replace(/-+/g, '-');
 
 const STATIC_PAGES = [
-  { loc: '/',                      lastmod: TODAY,       freq: 'daily',   pri: '1.0' },
-  { loc: '/marketplace',           lastmod: TODAY,       freq: 'daily',   pri: '0.9' },
-  { loc: '/browse',                lastmod: TODAY,       freq: 'daily',   pri: '0.9' },
-  { loc: '/search',                lastmod: TODAY,       freq: 'daily',   pri: '0.8' },
-  { loc: '/shop',                  lastmod: TODAY,       freq: 'daily',   pri: '0.9' },
-  { loc: '/shop/sealed-boxes',     lastmod: TODAY,       freq: 'daily',   pri: '0.8' },
-  { loc: '/shop/singles',          lastmod: TODAY,       freq: 'daily',   pri: '0.8' },
-  { loc: '/analytics',             lastmod: TODAY,       freq: 'daily',   pri: '0.8' },
-  { loc: '/australian-markets',    lastmod: TODAY,       freq: 'daily',   pri: '0.8' },
-  { loc: '/insider-trading',       lastmod: TODAY,       freq: 'weekly',  pri: '0.7' },
-  { loc: '/grading',               lastmod: TODAY,       freq: 'weekly',  pri: '0.8' },
-  { loc: '/grading/what-is-grading', lastmod: TODAY,    freq: 'monthly',  pri: '0.7' },
-  { loc: '/grading/scales',        lastmod: TODAY,       freq: 'monthly',  pri: '0.7' },
-  { loc: '/grading/companies',     lastmod: TODAY,       freq: 'monthly',  pri: '0.7' },
-  { loc: '/grading/local-graders', lastmod: TODAY,       freq: 'monthly',  pri: '0.7' },
-  { loc: '/grading/submission-partners', lastmod: TODAY, freq: 'monthly',  pri: '0.7' },
-  { loc: '/grading/estimator',     lastmod: TODAY,       freq: 'weekly',   pri: '0.8' },
-  { loc: '/grading/roi-calculator', lastmod: TODAY,      freq: 'weekly',   pri: '0.8' },
-  { loc: '/community',             lastmod: TODAY,       freq: 'daily',   pri: '0.7' },
-  { loc: '/events',                lastmod: TODAY,       freq: 'daily',   pri: '0.8' },
-  { loc: '/events/card-shows',     lastmod: TODAY,       freq: 'daily',   pri: '0.8' },
-  { loc: '/events/trade-events',   lastmod: TODAY,       freq: 'daily',   pri: '0.8' },
-  { loc: '/events/community-events', lastmod: TODAY,     freq: 'daily',   pri: '0.8' },
-  { loc: '/events/store-events',   lastmod: TODAY,       freq: 'daily',   pri: '0.8' },
-  { loc: '/community/local-traders', lastmod: TODAY,     freq: 'daily',   pri: '0.7' },
-  { loc: '/blog',                  lastmod: TODAY,       freq: 'weekly',  pri: '0.8' },
+  { loc: '/',                      lastmod: SITE_UPDATED,       freq: 'daily',   pri: '1.0' },
+  { loc: '/marketplace',           lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.9' },
+  { loc: '/browse',                lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.9' },
+  { loc: '/search',                lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
+  { loc: '/shop',                  lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.9' },
+  { loc: '/shop/sealed-boxes',     lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
+  { loc: '/shop/singles',          lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
+  { loc: '/analytics',             lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
+  { loc: '/australian-markets',    lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
+  { loc: '/insider-trading',       lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.7' },
+  { loc: '/grading',               lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' },
+  { loc: '/grading/what-is-grading', lastmod: SITE_UPDATED,    freq: 'monthly',  pri: '0.7' },
+  { loc: '/grading/scales',        lastmod: SITE_UPDATED,       freq: 'monthly',  pri: '0.7' },
+  { loc: '/grading/companies',     lastmod: SITE_UPDATED,       freq: 'monthly',  pri: '0.7' },
+  { loc: '/grading/local-graders', lastmod: SITE_UPDATED,       freq: 'monthly',  pri: '0.7' },
+  { loc: '/grading/submission-partners', lastmod: SITE_UPDATED, freq: 'monthly',  pri: '0.7' },
+  { loc: '/grading/estimator',     lastmod: SITE_UPDATED,       freq: 'weekly',   pri: '0.8' },
+  { loc: '/grading/roi-calculator', lastmod: SITE_UPDATED,      freq: 'weekly',   pri: '0.8' },
+  { loc: '/community',             lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.7' },
+  { loc: '/events',                lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
+  { loc: '/events/card-shows',     lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
+  { loc: '/events/trade-events',   lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
+  { loc: '/events/community-events', lastmod: SITE_UPDATED,     freq: 'daily',   pri: '0.8' },
+  { loc: '/events/store-events',   lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
+  { loc: '/community/local-traders', lastmod: SITE_UPDATED,     freq: 'daily',   pri: '0.7' },
+  { loc: '/blog',                  lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' },
   { loc: '/about',                 lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
   { loc: '/contact',               lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
   { loc: '/faq',                   lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
@@ -95,8 +100,8 @@ export default async function handler(req, res) {
       supabase
         .from('events')
         .select('id, slug, updated_at, created_at')
-        .eq('is_published', true)
-        .gt('start_date', TODAY)
+        .eq('status', 'approved')
+        .gte('start_date', TODAY)
         .order('start_date', { ascending: true })
         .limit(500),
     ]);
@@ -122,7 +127,7 @@ export default async function handler(req, res) {
       parts.push('', `  <!-- Event pages (${events.length}) -->`);
       for (const event of events) {
         const lastmod = (event.updated_at || event.created_at || TODAY).split('T')[0];
-        parts.push(xmlUrl(`${BASE_URL}/events/${event.id}`, lastmod, 'weekly', '0.6'));
+        parts.push(xmlUrl(`${BASE_URL}/events/${event.slug || event.id}`, lastmod, 'weekly', '0.6'));
       }
     }
 
