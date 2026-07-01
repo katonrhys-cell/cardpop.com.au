@@ -61,7 +61,6 @@ export default defineConfig({
 				'@babel/types',
 				'onnxruntime-web',
 				'onnxruntime-web/webgpu',
-				'react-is'
 			],
 			output: {
 				manualChunks(id) {
