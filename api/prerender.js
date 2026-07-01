@@ -672,6 +672,192 @@ ${itemsHtml || '    <li>No items available right now.</li>'}
   return htmlDoc({ title: cfg.title, description: cfg.description, canonical, jsonLdItems: [collectionPage, itemList, breadcrumb], bodyHtml });
 }
 
+// Event category landing pages. `type` filters by the event_type enum where a
+// matching value exists; null means "show all upcoming events" (used for
+// categories that don't yet map to a distinct enum value).
+const EVENT_CATEGORIES = {
+  'card-shows':       { type: 'card_show',       h1: 'Trading Card Shows in Australia',       label: 'card shows' },
+  'trade-events':     { type: null,              h1: 'Trading Card Trade Events',             label: 'trade events' },
+  'community-events': { type: 'community_event', h1: 'Trading Card Community Events',          label: 'community events' },
+  'store-events':     { type: null,              h1: 'Trading Card Store Events',             label: 'store events' },
+};
+
+const eventDateLine = (ev) => {
+  const start = ev.start_date;
+  const end = ev.end_date && ev.end_date !== ev.start_date ? ev.end_date : null;
+  if (!start) return '';
+  return end ? `${start} – ${end}` : start;
+};
+
+const eventLocationLine = (ev) =>
+  [ev.venue_name, ev.suburb, ev.state].filter(Boolean).join(', ');
+
+// schema.org startDate/endDate — combine the date with a time when we have one.
+const eventIsoDate = (date, time) => {
+  if (!date) return undefined;
+  return time ? `${date}T${time}` : date;
+};
+
+const EVENT_FIELDS =
+  'id, slug, title, description, short_description, image_url, event_type, status, ' +
+  'venue_name, address, suburb, state, postcode, start_date, end_date, start_time, end_time, ' +
+  'entry_fee_aud, is_free, website_url, ticket_url, organizer_name, seo_title, seo_description, ' +
+  'created_at, updated_at';
+
+async function renderEventsLanding(supabase, categorySlug) {
+  const cfg = categorySlug ? EVENT_CATEGORIES[categorySlug] : null;
+  const canonical = categorySlug ? `${BASE_URL}/events/${categorySlug}` : `${BASE_URL}/events`;
+  const today = new Date().toISOString().split('T')[0];
+
+  let q = supabase
+    .from('events')
+    .select('id, slug, title, short_description, description, image_url, venue_name, suburb, state, start_date, end_date, entry_fee_aud, is_free')
+    .eq('status', 'approved')
+    .gte('start_date', today);
+  if (cfg?.type) q = q.eq('event_type', cfg.type);
+  const { data } = await q.order('start_date', { ascending: true }).limit(100);
+  const events = data || [];
+
+  const h1 = cfg ? cfg.h1 : 'Trading Card Events in Australia';
+  const title = cfg ? `${cfg.h1} | CardPop` : 'Trading Card Events, Shows & Expos in Australia | CardPop';
+  const description = cfg
+    ? `Upcoming ${cfg.label} for trading card collectors across Australia. Find dates, venues and details on CardPop.`
+    : 'Find upcoming trading card shows, expos, tournaments and community events across Australia. Dates, venues and details for Pokémon, Magic, Yu-Gi-Oh and sports card collectors on CardPop.';
+
+  const breadcrumbItems = [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+    { '@type': 'ListItem', position: 2, name: 'Events', item: `${BASE_URL}/events` },
+  ];
+  if (cfg) breadcrumbItems.push({ '@type': 'ListItem', position: 3, name: cfg.h1, item: canonical });
+  const breadcrumb = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: breadcrumbItems };
+
+  const itemList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: h1,
+    numberOfItems: events.length,
+    itemListElement: events.map((ev, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      item: {
+        '@type': 'Event',
+        name: ev.title,
+        url: `${BASE_URL}/events/${ev.slug || ev.id}`,
+        ...(ev.start_date ? { startDate: ev.start_date } : {}),
+        ...(ev.end_date ? { endDate: ev.end_date } : {}),
+        ...(eventLocationLine(ev) ? { location: { '@type': 'Place', name: ev.venue_name || eventLocationLine(ev) } } : {}),
+      },
+    })),
+  };
+
+  const itemsHtml = events.map((ev) => {
+    const when = eventDateLine(ev);
+    const where = eventLocationLine(ev);
+    return `    <li><a href="${BASE_URL}/events/${esc(ev.slug || ev.id)}"><strong>${esc(ev.title || 'Event')}</strong></a>`
+      + `${when ? ` — ${esc(when)}` : ''}${where ? ` (${esc(where)})` : ''}</li>`;
+  }).join('\n');
+
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/events">Events</a>${cfg ? ` / ${esc(cfg.h1)}` : ''}</nav>
+  <h1>${esc(h1)}</h1>
+  <p>${esc(description)}</p>
+  <h2>Upcoming Events (${events.length})</h2>
+  <ul>
+${itemsHtml || '    <li>No upcoming events listed right now — check back soon.</li>'}
+  </ul>
+</main>`;
+
+  return htmlDoc({ title, description, canonical, jsonLdItems: [breadcrumb, itemList], bodyHtml });
+}
+
+async function renderEvent(supabase, param) {
+  const byUuid = UUID_RE.test(param);
+  let query = supabase.from('events').select(EVENT_FIELDS);
+  query = byUuid ? query.eq('id', param) : query.eq('slug', param);
+  const { data: event } = await query.maybeSingle();
+
+  if (!event || event.status !== 'approved') {
+    return htmlDoc({
+      title: 'Event Not Found | CardPop',
+      description: 'This event could not be found on CardPop.',
+      canonical: `${BASE_URL}/events/${param}`,
+      robots: 'noindex, follow',
+      bodyHtml: '<main><h1>Event Not Found</h1><p>This event is not available.</p></main>',
+    });
+  }
+
+  const canonical = `${BASE_URL}/events/${event.slug || event.id}`;
+  const name = event.title || 'Trading Card Event';
+  const image = absUrl(event.image_url);
+  const location = eventLocationLine(event);
+  const when = eventDateLine(event);
+  const title = event.seo_title || `${name} | CardPop Events`;
+  const description = event.seo_description || event.short_description
+    || toText(event.description || '')
+    || `${name}${location ? ` at ${location}` : ''}${when ? ` on ${when}` : ''} — a trading card event listed on CardPop Australia.`;
+
+  const eventLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Event',
+    name,
+    ...(image ? { image } : {}),
+    description: toText(description, 500),
+    eventStatus: 'https://schema.org/EventScheduled',
+    eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+    ...(eventIsoDate(event.start_date, event.start_time) ? { startDate: eventIsoDate(event.start_date, event.start_time) } : {}),
+    ...(eventIsoDate(event.end_date || event.start_date, event.end_time) ? { endDate: eventIsoDate(event.end_date || event.start_date, event.end_time) } : {}),
+    url: canonical,
+    ...(location || event.state
+      ? { location: {
+          '@type': 'Place',
+          name: event.venue_name || location || 'Venue',
+          address: {
+            '@type': 'PostalAddress',
+            ...(event.address ? { streetAddress: event.address } : {}),
+            ...(event.suburb ? { addressLocality: event.suburb } : {}),
+            ...(event.state ? { addressRegion: event.state } : {}),
+            ...(event.postcode ? { postalCode: event.postcode } : {}),
+            addressCountry: 'AU',
+          },
+        } }
+      : {}),
+    ...(event.organizer_name ? { organizer: { '@type': 'Organization', name: event.organizer_name } } : {}),
+    ...(event.is_free
+      ? { offers: { '@type': 'Offer', price: '0', priceCurrency: 'AUD', availability: 'https://schema.org/InStock', url: event.ticket_url || event.website_url || canonical } }
+      : (event.entry_fee_aud > 0
+        ? { offers: { '@type': 'Offer', price: Number(event.entry_fee_aud).toFixed(2), priceCurrency: 'AUD', availability: 'https://schema.org/InStock', url: event.ticket_url || event.website_url || canonical } }
+        : {})),
+  };
+
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'Events', item: `${BASE_URL}/events` },
+      { '@type': 'ListItem', position: 3, name, item: canonical },
+    ],
+  };
+
+  const feeLine = event.is_free ? 'Free entry' : (event.entry_fee_aud > 0 ? `Entry: A$${Number(event.entry_fee_aud).toFixed(2)}` : '');
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/events">Events</a> / ${esc(name)}</nav>
+  <h1>${esc(name)}</h1>
+  ${image ? `<img src="${esc(image)}" alt="${esc(name)}" />` : ''}
+  <ul>
+    ${when ? `<li>Date: ${esc(when)}</li>` : ''}
+    ${location ? `<li>Location: ${esc(location)}</li>` : ''}
+    ${event.address ? `<li>Address: ${esc(event.address)}</li>` : ''}
+    ${feeLine ? `<li>${esc(feeLine)}</li>` : ''}
+    ${event.organizer_name ? `<li>Organiser: ${esc(event.organizer_name)}</li>` : ''}
+  </ul>
+  ${event.description ? `<p>${esc(toText(event.description, 800))}</p>` : ''}
+  ${event.website_url ? `<p><a href="${esc(event.website_url)}" rel="nofollow">Event website</a></p>` : ''}
+</main>`;
+
+  return htmlDoc({ title, description, canonical, ogImage: image, ogType: 'website', jsonLdItems: [eventLd, breadcrumb], bodyHtml });
+}
+
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
@@ -687,6 +873,21 @@ export default async function handler(req, res) {
 
     if (LANDINGS[rawPath]) {
       return res.status(200).send(await renderLanding(supabase, rawPath));
+    }
+
+    if (rawPath === '/events') {
+      return res.status(200).send(await renderEventsLanding(supabase, null));
+    }
+
+    const eventsMatch = rawPath.match(/^\/events\/([^/?#]+)/);
+    if (eventsMatch) {
+      const param = decodeURIComponent(eventsMatch[1]);
+      // Known category slugs render a filtered landing; everything else is an
+      // individual event (looked up by UUID or slug).
+      if (EVENT_CATEGORIES[param]) {
+        return res.status(200).send(await renderEventsLanding(supabase, param));
+      }
+      return res.status(200).send(await renderEvent(supabase, param));
     }
 
     const shopProductMatch = rawPath.match(/^\/product\/shop\/([^/?#]+)(?:\/([^/?#]+))?/);

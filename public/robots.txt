@@ -74,8 +74,8 @@ Disallow: /vault
 Disallow: /admin
 Disallow: /checkout
 
-# Sitemaps
+# Sitemap — single canonical sitemap generated at /sitemap.xml (api/sitemap.js).
+# The legacy /api/sitemap/* endpoints emitted URLs that don't match the app's
+# routes (e.g. /shop/product/:id, /vault/listing/:id), producing soft-404s and
+# wasting crawl budget, so they are intentionally no longer advertised here.
 Sitemap: https://cardpop.com.au/sitemap.xml
-Sitemap: https://cardpop.com.au/api/sitemap/products
-Sitemap: https://cardpop.com.au/api/sitemap/listings
-Sitemap: https://cardpop.com.au/api/sitemap/blog

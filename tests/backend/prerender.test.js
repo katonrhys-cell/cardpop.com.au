@@ -12,6 +12,8 @@ vi.mock('@supabase/supabase-js', () => {
       select: vi.fn(() => b),
       eq: vi.fn(() => b),
       neq: vi.fn(() => b),
+      gt: vi.fn(() => b),
+      gte: vi.fn(() => b),
       order: vi.fn(() => b),
       limit: vi.fn(() => b),
       maybeSingle: vi.fn(() => Promise.resolve(state.result)),
@@ -220,5 +222,52 @@ describe('prerender landing pages', () => {
     expect(body).toContain('<title>Browse Listings | CardPop</title>');
     expect(body).toContain('No items available right now.');
     expect(body).not.toContain('noindex');
+  });
+});
+
+describe('prerender events', () => {
+  it('renders the events landing with an Event ItemList', async () => {
+    state.listResult = { data: [
+      { id: UUID, slug: 'melbourne-card-expo', title: 'Melbourne Card Expo', start_date: '2026-08-01', venue_name: 'Royal Exhibition Building', suburb: 'Carlton', state: 'VIC' },
+    ] };
+    const { status, body } = await run('/events');
+    expect(status).toBe(200);
+    expect(body).toContain('<title>Trading Card Events, Shows &amp; Expos in Australia | CardPop</title>');
+    expect(body).toContain('"@type":"ItemList"');
+    expect(body).toContain('Melbourne Card Expo');
+    expect(body).toContain('/events/melbourne-card-expo');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('renders a category landing for a known slug', async () => {
+    state.listResult = { data: [] };
+    const { status, body } = await run('/events/card-shows');
+    expect(status).toBe(200);
+    expect(body).toContain('Trading Card Shows in Australia');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/events/card-shows" />');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('renders an individual event with Event JSON-LD and a self-canonical', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'melbourne-card-expo', title: 'Melbourne Card Expo', status: 'approved',
+      description: 'The biggest trading card expo in Victoria.', image_url: 'https://cdn.test/expo.jpg',
+      venue_name: 'Royal Exhibition Building', address: '9 Nicholson St', suburb: 'Carlton', state: 'VIC', postcode: '3053',
+      start_date: '2026-08-01', end_date: '2026-08-02', entry_fee_aud: 15, is_free: false, organizer_name: 'CardPop',
+    } };
+    const { status, body } = await run('/events/melbourne-card-expo');
+    expect(status).toBe(200);
+    expect(body).toContain('"@type":"Event"');
+    expect(body).toContain('Melbourne Card Expo');
+    expect(body).toContain('"addressRegion":"VIC"');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/events/melbourne-card-expo" />');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('returns a noindex document for an unknown event', async () => {
+    state.result = { data: null };
+    const { body } = await run('/events/does-not-exist');
+    expect(body).toContain('Event Not Found');
+    expect(body).toContain('noindex');
   });
 });
