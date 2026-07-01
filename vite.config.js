@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import { createLogger, defineConfig } from 'vite';
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import Beasties from 'beasties';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
 const allDeps = Object.keys(pkg.dependencies || {});
@@ -19,13 +20,14 @@ function homeShellPlugin() {
 	return {
 		name: 'cardpop-home-shell',
 		apply: 'build',
-		writeBundle(outputOptions) {
+		async writeBundle(outputOptions) {
 			const outDir = outputOptions.dir || path.resolve(__dirname, 'dist');
 			const indexPath = path.join(outDir, 'index.html');
 			if (!existsSync(indexPath)) return;
 
 			const builtIndex = readFileSync(indexPath, 'utf-8');
-			// Shell-less document for all non-root routes.
+			// Shell-less document for all non-root routes (CSS stays render-blocking
+			// there — those pages are React-gated, so it costs them nothing).
 			writeFileSync(path.join(outDir, 'app.html'), builtIndex, 'utf-8');
 
 			// Inject the hero shell into the "/"-only index.html.
@@ -35,7 +37,31 @@ function homeShellPlugin() {
 				return;
 			}
 			const shell = readFileSync(shellPath, 'utf-8');
-			writeFileSync(indexPath, builtIndex.replace(marker, `<div id="root">${shell}</div>`), 'utf-8');
+			let indexHtml = builtIndex.replace(marker, `<div id="root">${shell}</div>`);
+
+			// Inline the above-the-fold critical CSS and load the full stylesheet
+			// asynchronously so it no longer blocks the shell's first paint. The
+			// classic media="print"/onload swap uses an inline handler that our
+			// hardened CSP (no 'unsafe-inline' in script-src) blocks, so we strip
+			// beasties' onload and let main.jsx flip [data-async-style] to media
+			// "all" instead. Fail-safe: any error keeps the render-blocking link.
+			try {
+				const beasties = new Beasties({
+					path: outDir,
+					publicPath: '/',
+					preload: 'media',
+					pruneSource: false,
+					inlineFonts: false,
+					preloadFonts: false,
+					logLevel: 'silent',
+				});
+				const processed = await beasties.process(indexHtml);
+				indexHtml = processed.replace(/ onload="this\.media='all'"/g, ' data-async-style');
+			} catch (e) {
+				this.warn(`home-shell: critical-CSS inlining skipped (${e.message}); CSS stays render-blocking`);
+			}
+
+			writeFileSync(indexPath, indexHtml, 'utf-8');
 		},
 	};
 }

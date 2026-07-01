@@ -5,6 +5,15 @@ import App from '@/App.jsx';
 import '@/index.css';
 import '@/global.css';
 
+// The homepage ships its full stylesheet as media="print" (non-render-blocking,
+// with critical above-the-fold CSS inlined in the HTML head) so it never delays
+// first paint. Activate it as soon as the bundle runs. Other routes don't carry
+// this marker, so this is a harmless no-op there. Done here (not via an inline
+// onload handler) to keep the hardened CSP's script-src free of 'unsafe-inline'.
+if (typeof document !== 'undefined') {
+  for (const link of document.querySelectorAll('link[data-async-style]')) link.media = 'all';
+}
+
 // Lazy-load Analytics and SpeedInsights to defer their JS loading
 const Analytics = React.lazy(() => import('@vercel/analytics/react').then(m => ({ default: m.Analytics })));
 const SpeedInsights = React.lazy(() => import('@vercel/speed-insights/react').then(m => ({ default: m.SpeedInsights })));
