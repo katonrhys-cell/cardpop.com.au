@@ -271,3 +271,54 @@ describe('prerender events', () => {
     expect(body).toContain('noindex');
   });
 });
+
+describe('prerender static content pages', () => {
+  it('renders the grading hub with FAQ JSON-LD and chapter links', async () => {
+    const { status, body } = await run('/grading');
+    expect(status).toBe(200);
+    expect(body).toContain('<title>Grading Hub | CardPop');
+    expect(body).toContain('<h1>The Grading Handbook</h1>');
+    expect(body).toContain('"@type":"FAQPage"');
+    expect(body).toContain('"@type":"BreadcrumbList"');
+    expect(body).toContain('href="https://cardpop.com.au/grading/what-is-grading"');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/grading" />');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('renders a legal page (returns) with its sections', async () => {
+    const { status, body } = await run('/returns');
+    expect(status).toBe(200);
+    expect(body).toContain('<h1>Returns &amp; Refunds</h1>');
+    expect(body).toContain('Platform fee retention on refunds');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/returns" />');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('reuses shared grader lists on submission-partners', async () => {
+    const { body } = await run('/grading/submission-partners');
+    expect(body).toContain('Card Grading Australia (CGA)');
+    expect(body).toContain('How to submit');
+  });
+
+  it('escapes and renders the FAQ page questions', async () => {
+    const { body } = await run('/faq');
+    expect(body).toContain('How does the CardPop™ Vault work?');
+    expect(body).toContain('"@type":"Question"');
+  });
+});
+
+describe('prerender blog index', () => {
+  it('lists recent articles and static topic categories', async () => {
+    state.listResult = { data: [
+      { slug: 'card-parallels', title: 'Understanding Parallels', excerpt: 'A guide.', author: 'CardPop', published_at: '2026-03-01T00:00:00.000Z' },
+    ] };
+    const { status, body } = await run('/blog');
+    expect(status).toBe(200);
+    expect(body).toContain('<title>The Parallel Report | CardPop</title>');
+    expect(body).toContain('Explore by topic');
+    expect(body).toContain('/blog/card-parallels');
+    expect(body).toContain('/blog/category/grading-guides');
+    expect(body).toContain('"@type":"ItemList"');
+    expect(body).not.toContain('noindex');
+  });
+});
