@@ -17,11 +17,13 @@ const ProfilesPage = () => {
   const { isAuthenticated } = useAuth();
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('All');
 
   const fetchProfiles = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       let query = supabase
         .from('profiles')
@@ -31,7 +33,8 @@ const ProfilesPage = () => {
 
       if (activeFilter === 'Verified') query = query.eq('is_verified', true);
 
-      const { data } = await query;
+      const { data, error: fetchError } = await query;
+      if (fetchError) throw fetchError;
 
       // Deduplicate by user id to prevent duplicates
       const seen = new Set();
@@ -43,6 +46,9 @@ const ProfilesPage = () => {
 
       setProfiles(uniqueProfiles);
     } catch (err) {
+      console.error('Failed to load member profiles:', err);
+      setError('Unable to load member profiles right now. Please try again shortly.');
+      setProfiles([]);
     } finally {
       setLoading(false);
     }
@@ -135,7 +141,7 @@ const ProfilesPage = () => {
         </div>
 
         {/* Count */}
-        {!loading && (
+        {!loading && !error && (
           <p className="text-sm text-muted-foreground mb-6 font-medium">
             {filtered.length} collector{filtered.length !== 1 ? 's' : ''} found
           </p>
@@ -145,6 +151,15 @@ const ProfilesPage = () => {
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array(9).fill(0).map((_, i) => <Skeleton key={i} className="h-44 rounded-2xl" />)}
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-20 bg-muted/30 rounded-3xl border border-destructive/20 border-dashed">
+            <Users className="w-14 h-14 text-destructive mb-4 opacity-40" />
+            <p className="text-foreground text-xl font-bold mb-2">Couldn't load profiles</p>
+            <p className="text-sm text-muted-foreground mb-6">{error}</p>
+            <Button onClick={fetchProfiles} variant="outline" className="rounded-xl font-bold">
+              Try again
+            </Button>
           </div>
         ) : filtered.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

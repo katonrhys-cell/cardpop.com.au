@@ -25,6 +25,7 @@ const LocalTradersPage = () => {
   const { isAuthenticated, currentUser } = useAuth();
   const [traders, setTraders] = useState([]);
   const [stores, setStores] = useState([]);
+  const [tradersError, setTradersError] = useState(null);
   // undefined = still resolving user location; null = resolved, no state / show all
   const [selectedState, setSelectedState] = useState(undefined);
   const [search, setSearch] = useState('');
@@ -55,6 +56,7 @@ const LocalTradersPage = () => {
 
   const fetchTraders = useCallback(async () => {
     if (selectedState === undefined) return;
+    setTradersError(null);
     try {
       let query = supabase
         .from('profiles')
@@ -68,7 +70,8 @@ const LocalTradersPage = () => {
         query = query.ilike('location_state', selectedState);
       }
 
-      const { data } = await query;
+      const { data, error: fetchError } = await query;
+      if (fetchError) throw fetchError;
 
       // Deduplicate by user id to prevent duplicates
       const seen = new Set();
@@ -80,6 +83,9 @@ const LocalTradersPage = () => {
 
       setTraders(uniqueTraders);
     } catch (err) {
+      console.error('Failed to load local traders:', err);
+      setTradersError('Unable to load traders right now. Please try again shortly.');
+      setTraders([]);
     }
   }, [selectedState]);
 
@@ -381,6 +387,15 @@ const LocalTradersPage = () => {
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array(6).fill(0).map((_, i) => <Skeleton key={i} className="h-52 rounded-2xl" />)}
+          </div>
+        ) : tradersError ? (
+          <div className="flex flex-col items-center justify-center py-20 bg-muted/30 rounded-3xl border border-destructive/20 border-dashed">
+            <BadgeCheck className="w-14 h-14 text-destructive mb-4 opacity-40" />
+            <p className="text-foreground text-xl font-bold mb-2">Couldn't load traders</p>
+            <p className="text-sm text-muted-foreground mb-6">{tradersError}</p>
+            <Button onClick={fetchTraders} variant="outline" className="rounded-xl font-bold text-sm">
+              Try again
+            </Button>
           </div>
         ) : filtered.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

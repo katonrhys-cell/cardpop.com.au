@@ -35,11 +35,13 @@ const ForumPage = () => {
   const { isAuthenticated } = useAuth();
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       let query = supabase
         .from('posts')
@@ -50,9 +52,13 @@ const ForumPage = () => {
 
       if (activeCategory !== 'All') query = query.eq('category', activeCategory);
 
-      const { data } = await query;
+      const { data, error: fetchError } = await query;
+      if (fetchError) throw fetchError;
       setPosts(data || []);
     } catch (err) {
+      console.error('Failed to load discussions:', err);
+      setError('Unable to load discussions right now. Please try again shortly.');
+      setPosts([]);
     } finally {
       setLoading(false);
     }
@@ -159,6 +165,15 @@ const ForumPage = () => {
         <div className="space-y-3">
           {loading ? (
             Array(6).fill(0).map((_, i) => <Skeleton key={i} className="h-28 w-full rounded-2xl" />)
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-20 bg-muted/30 rounded-3xl border border-destructive/20 border-dashed">
+              <MessageSquare className="w-14 h-14 text-destructive mb-4 opacity-40" />
+              <p className="text-foreground text-xl font-bold mb-2">Couldn't load discussions</p>
+              <p className="text-sm text-muted-foreground mb-6">{error}</p>
+              <Button onClick={fetchPosts} variant="outline" className="rounded-xl font-bold">
+                Try again
+              </Button>
+            </div>
           ) : filtered.length > 0 ? (
             filtered.map(post => {
               const profile = post.profiles;
