@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { generateBlogPostingSchema, generateFAQStructuredData, generateBreadcrumbStructuredData } from '@/utils/seoUtils.js';
+import { htmlExcerpt } from '@/utils/htmlExcerpt.js';
 
 const CONVICTION_LABELS = ['', 'High Risk', 'Negative', 'Neutral', 'Positive', 'Strong Buy'];
 const CONVICTION_COLOURS = ['', '#dc2626', '#ea580c', '#ca8a04', '#16a34a', '#15803d'];
@@ -504,7 +505,7 @@ const BlogArticlePage = () => {
                         {related.title}
                       </h3>
                       <p className="text-sm text-muted-foreground line-clamp-2">
-                        {related.excerpt || related.content?.substring(0, 80)}...
+                        {related.excerpt || htmlExcerpt(related.content, 80)}
                       </p>
                     </div>
                   </Link>

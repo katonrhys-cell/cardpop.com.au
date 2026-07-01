@@ -22,6 +22,7 @@ const ContactPage = () => {
   const [fields, setFields] = useState(EMPTY);
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
+  const [mailtoUrl, setMailtoUrl] = useState('');
 
   const update = (key, value) => {
     setFields(prev => ({ ...prev, [key]: value }));
@@ -36,7 +37,12 @@ const ContactPage = () => {
     const body = encodeURIComponent(
       `Name: ${fields.name}\nEmail: ${fields.email}\n\nMessage:\n${fields.message}`
     );
-    window.open(`mailto:support@cardpop.com.au?subject=${subject}&body=${body}`);
+    const url = `mailto:support@cardpop.com.au?subject=${subject}&body=${body}`;
+    setMailtoUrl(url);
+    // Trigger the user's mail client. This can silently do nothing if no mail
+    // handler is registered, so the confirmation screen offers a manual link
+    // rather than asserting the client definitely opened.
+    window.location.href = url;
     setSubmitted(true);
   };
 
@@ -54,10 +60,16 @@ const ContactPage = () => {
             <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
           </div>
           <h3 className="text-2xl font-bold mb-3">Message ready to send!</h3>
-          <p className="text-muted-foreground mb-8">
-            Your email client has opened with your message pre-filled. Hit send and we'll get back to you within 1 business day (AEST).
+          <p className="text-muted-foreground mb-6">
+            We've tried to open your email app with the message pre-filled. Hit send and we'll get back to you within 1 business day (AEST).
           </p>
-          <Button variant="outline" onClick={() => { setSubmitted(false); setFields(EMPTY); }}>
+          <p className="text-sm text-muted-foreground mb-8">
+            Didn't see it open? {mailtoUrl ? (
+              <a href={mailtoUrl} className="text-primary font-semibold hover:underline">Open your email app</a>
+            ) : null} or email us directly at{' '}
+            <a href="mailto:support@cardpop.com.au" className="text-primary font-semibold hover:underline">support@cardpop.com.au</a>.
+          </p>
+          <Button variant="outline" onClick={() => { setSubmitted(false); setFields(EMPTY); setMailtoUrl(''); }}>
             Send another message
           </Button>
         </div>

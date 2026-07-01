@@ -10,18 +10,22 @@ import { Store, Search, ExternalLink, MapPin, Globe, ShieldCheck, Mail } from 'l
 const RetailersPage = () => {
   const [retailers, setRetailers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [categories, setCategories] = useState(['All']);
 
   const fetchRetailers = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
-      const { data } = await supabase
+      const { data, error: fetchError } = await supabase
         .from('business_profiles')
         .select('*')
         .eq('is_active', true)
         .order('brand_name', { ascending: true });
+
+      if (fetchError) throw fetchError;
 
       const list = data || [];
       setRetailers(list);
@@ -31,6 +35,9 @@ const RetailersPage = () => {
       );
       setCategories(cats);
     } catch (err) {
+      console.error('Failed to load retailers:', err);
+      setError('Unable to load retailers right now. Please try again shortly.');
+      setRetailers([]);
     } finally {
       setLoading(false);
     }
@@ -100,7 +107,7 @@ const RetailersPage = () => {
         </div>
 
         {/* Count */}
-        {!loading && (
+        {!loading && !error && (
           <p className="text-sm text-muted-foreground mb-6 font-medium">
             {filtered.length} retailer{filtered.length !== 1 ? 's' : ''} listed
           </p>
@@ -110,6 +117,15 @@ const RetailersPage = () => {
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {Array(6).fill(0).map((_, i) => <Skeleton key={i} className="h-52 rounded-2xl" />)}
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-20 bg-muted/30 rounded-3xl border border-destructive/20 border-dashed">
+            <Store className="w-14 h-14 text-destructive mb-4 opacity-40" />
+            <p className="text-foreground text-xl font-bold mb-2">Couldn't load retailers</p>
+            <p className="text-sm text-muted-foreground mb-6">{error}</p>
+            <Button onClick={fetchRetailers} variant="outline" className="rounded-xl font-bold">
+              Try again
+            </Button>
           </div>
         ) : filtered.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

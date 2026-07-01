@@ -19,6 +19,7 @@ const LISTING_MODES = [
 const VaultCategoryPage = () => {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -48,6 +49,7 @@ const VaultCategoryPage = () => {
   useEffect(() => {
     const fetchListings = async () => {
       setLoading(true);
+      setError(null);
       try {
         const perPage = 16;
         const from = (page - 1) * perPage;
@@ -88,6 +90,8 @@ const VaultCategoryPage = () => {
             .from('vault_items')
             .select('*', { count: 'exact' })
             .in('id', vaultItemIds)
+            .eq('is_public', true)
+            .neq('listing_type', 'Private')
             .order('created_at', { ascending: false })
             .range(from, from + perPage - 1);
 
@@ -121,6 +125,8 @@ const VaultCategoryPage = () => {
           let query = supabase
             .from('vault_items')
             .select('*', { count: 'exact' })
+            .eq('is_public', true)
+            .neq('listing_type', 'Private')
             .order('created_at', { ascending: false })
             .range(from, from + perPage - 1);
 
@@ -140,8 +146,12 @@ const VaultCategoryPage = () => {
           setTotalItems(count || 0);
           setTotalPages(Math.ceil((count || 0) / perPage));
         }
-      } catch (error) {
-        console.error('Failed to load vault listings:', error);
+      } catch (err) {
+        console.error('Failed to load vault listings:', err);
+        setError('Unable to load vault listings right now. Please try again shortly.');
+        setListings([]);
+        setTotalItems(0);
+        setTotalPages(1);
       } finally {
         setLoading(false);
       }
@@ -225,9 +235,16 @@ const VaultCategoryPage = () => {
       </div>
       
       <div className="flex-1 min-w-0">
-        <ProductGrid items={listings} loading={loading} isVault={true} />
-        
-        <PaginationControls 
+        {error ? (
+          <div className="bg-card border border-destructive/20 rounded-2xl p-10 flex flex-col items-center justify-center text-center shadow-sm">
+            <h3 className="text-lg font-bold text-foreground mb-1">Failed to load listings</h3>
+            <p className="text-muted-foreground max-w-md">{error}</p>
+          </div>
+        ) : (
+          <ProductGrid items={listings} loading={loading} isVault={true} />
+        )}
+
+        <PaginationControls
           currentPage={page} 
           totalPages={totalPages} 
           onPageChange={setPage} 

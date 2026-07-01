@@ -94,6 +94,14 @@ const AnalyticsReportsPage = () => {
           supabase.from('profiles').select('created_at')
         ]);
 
+        // Surface a partial failure instead of silently rendering zeros: if any
+        // query errored, treat the whole report as failed so the error UI shows.
+        const loadError = [
+          usersRes.error, listingsRes.error, eventsRes.error, categoriesRes.error,
+          ordersCountRes.error, recentOrdersRes.error, allOrdersRes.error, allUsersRes.error,
+        ].find(Boolean);
+        if (loadError) throw loadError;
+
         const totalRevenue = (allOrdersRes.data || []).reduce((sum, order) => sum + (order.total_aud || 0), 0);
 
         setStats({
@@ -163,6 +171,48 @@ const AnalyticsReportsPage = () => {
     }).format(value);
   };
 
+  const handleExport = () => {
+    // Export the metrics already loaded on this page as a CSV the admin can
+    // open in a spreadsheet. Guards against exporting a blank/failed report.
+    if (loading || error) return;
+
+    const csvCell = (v) => {
+      const s = v == null ? '' : String(v);
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = [
+      ['Metric', 'Value'],
+      ['Total Revenue (AUD)', stats.revenue],
+      ['Total Orders', stats.orders],
+      ['Total Users', stats.users],
+      ['Products', stats.products],
+      ['Categories', stats.categories],
+      ['Events', stats.events],
+      [],
+      ['Recent Orders'],
+      ['Order ID', 'Date', 'Buyer', 'Status', 'Amount (AUD)'],
+      ...recentOrders.map((o) => [
+        o.order_number || o.id,
+        new Date(o.created_at).toLocaleDateString('en-AU'),
+        o.profiles?.display_name || o.profiles?.username || o.buyer_id || 'Unknown User',
+        o.status || 'Pending',
+        o.total_aud || 0,
+      ]),
+    ];
+
+    const csv = rows.map((r) => r.map(csvCell).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `cardpop-analytics-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success('Analytics exported');
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <Helmet>
@@ -185,7 +235,12 @@ const AnalyticsReportsPage = () => {
             <SelectItem value="all">All Time</SelectItem>
           </SelectContent>
         </Select>
-        <Button className="rounded-xl h-10 px-4 font-bold border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white" variant="outline">
+        <Button
+          onClick={handleExport}
+          disabled={loading || !!error}
+          className="rounded-xl h-10 px-4 font-bold border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+          variant="outline"
+        >
           <Download className="w-4 h-4 mr-2" />
           Export Data
         </Button>

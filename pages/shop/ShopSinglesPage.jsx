@@ -23,7 +23,6 @@ const ShopSinglesPage = () => {
   
   // Filters and Sort State
   const [sort, setSort] = useState('created_at_desc');
-  const [condition, setCondition] = useState('all');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
 
@@ -74,7 +73,7 @@ const ShopSinglesPage = () => {
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [sort, condition, minPrice, maxPrice]);
+  }, [sort, minPrice, maxPrice]);
 
   useEffect(() => {
     const channel = supabase
@@ -112,7 +111,6 @@ const ShopSinglesPage = () => {
   };
 
   const handleClearFilters = () => {
-    setCondition('all');
     setMinPrice('');
     setMaxPrice('');
     // Must match a SelectItem value (and the initial state) or the Sort control
@@ -174,25 +172,7 @@ const ShopSinglesPage = () => {
               </div>
             </div>
             
-            {/* Condition */}
-            <div className="mb-8">
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3 block">Condition</label>
-              <Select value={condition} onValueChange={setCondition}>
-                <SelectTrigger className="w-full h-12 rounded-xl bg-background border-border focus:ring-amber-500">
-                  <SelectValue placeholder="All Conditions" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl border-border">
-                  <SelectItem value="all" className="rounded-lg cursor-pointer">All Conditions</SelectItem>
-                  <SelectItem value="Mint" className="rounded-lg cursor-pointer">Mint</SelectItem>
-                  <SelectItem value="Near Mint" className="rounded-lg cursor-pointer">Near Mint</SelectItem>
-                  <SelectItem value="Excellent" className="rounded-lg cursor-pointer">Excellent</SelectItem>
-                  <SelectItem value="Good" className="rounded-lg cursor-pointer">Good</SelectItem>
-                  <SelectItem value="Fair" className="rounded-lg cursor-pointer">Fair</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <Button 
+            <Button
               variant="outline" 
               className="w-full h-12 rounded-xl font-bold hover:bg-amber-50 hover:text-amber-700 hover:border-amber-200 dark:hover:bg-amber-900/20 dark:hover:text-amber-400 dark:hover:border-amber-900/50 transition-colors" 
               onClick={handleClearFilters}
