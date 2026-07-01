@@ -1043,8 +1043,8 @@ const Header = () => {
 
             {!authLoading && isAuthenticated && (
               <Button asChild variant="ghost" size="icon" className="hidden sm:flex relative rounded-xl hover:bg-muted">
-                <Link to="/trade-requests">
-                  <ArrowRightLeft className="h-5 w-5" />
+                <Link to="/trade-requests" aria-label={tradeCount > 0 ? `Trade requests, ${tradeCount > 99 ? '99+' : tradeCount} pending` : 'Trade requests'}>
+                  <ArrowRightLeft className="h-5 w-5" aria-hidden="true" />
                   {tradeCount > 0 && (
                     <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px] bg-accent text-accent-foreground border-none font-bold tabular-nums shadow-sm">
                       {tradeCount > 99 ? '99+' : tradeCount}
@@ -1056,8 +1056,8 @@ const Header = () => {
 
             {!authLoading && isAuthenticated && (
               <Button asChild variant="ghost" size="icon" className="hidden sm:flex relative rounded-xl hover:bg-muted">
-                <Link to="/messaging">
-                  <MessageSquare className="h-5 w-5" />
+                <Link to="/messaging" aria-label={unreadCount > 0 ? `Messages, ${unreadCount > 99 ? '99+' : unreadCount} unread` : 'Messages'}>
+                  <MessageSquare className="h-5 w-5" aria-hidden="true" />
                   {unreadCount > 0 && (
                     <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px] bg-primary text-primary-foreground border-none font-bold tabular-nums shadow-sm">
                       {unreadCount > 99 ? '99+' : unreadCount}
