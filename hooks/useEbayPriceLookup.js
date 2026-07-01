@@ -22,6 +22,7 @@ export function useEbayPriceLookup() {
       }
 
       const response = await apiServerClient.fetch(`/ebay/price-estimate?${params}`);
+      if (!response.ok) throw new Error(`Price lookup failed (${response.status})`);
       const data = await response.json();
 
       if (isMounted() && data.count > 0) {

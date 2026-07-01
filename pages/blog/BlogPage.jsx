@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { BookOpen, FileX, AlertCircle, Search, User, Calendar, ArrowRight } from 'lucide-react';
+import { htmlExcerpt } from '@/utils/htmlExcerpt.js';
 
 const CATEGORIES = [
   { slug: 'australia-focus',  label: 'Australia Focus',   desc: 'Australian trading card market and events' },
@@ -58,7 +59,7 @@ const FeaturedCard = ({ article }) => {
           {article.title}
         </h3>
         <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed mb-4 flex-1">
-          {article.excerpt || article.content?.substring(0, 130)}
+          {article.excerpt || htmlExcerpt(article.content, 130)}
         </p>
         <div className="flex items-center justify-between text-xs text-muted-foreground border-t border-border pt-4 mt-auto">
           <span className="flex items-center gap-1.5">
@@ -105,7 +106,7 @@ const ArticleCard = ({ article }) => {
           {article.title}
         </h3>
         <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed mt-auto">
-          {article.excerpt || article.content?.substring(0, 110)}
+          {article.excerpt || htmlExcerpt(article.content, 110)}
         </p>
       </div>
     </Link>

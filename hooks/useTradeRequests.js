@@ -93,7 +93,7 @@ export function useTradeRequests() {
       // listings, in either column — otherwise a card could be committed twice.
       const a = trade.initiator_listing_id;
       const b = trade.responder_listing_id;
-      await supabase
+      const { error: cancelErr } = await supabase
         .from('trades')
         .update({ status: 'cancelled' })
         .or(
@@ -102,6 +102,18 @@ export function useTradeRequests() {
         )
         .eq('status', 'proposed')
         .neq('id', trade.id);
+
+      if (cancelErr) {
+        // Roll the acceptance back to 'proposed' so we never leave a listing
+        // committed to this trade while competing proposals are still live.
+        // (Fully race-proof acceptance needs a DB transaction / constraint.)
+        await supabase
+          .from('trades')
+          .update({ status: 'proposed' })
+          .eq('id', trade.id)
+          .eq('responder_id', currentUser?.id);
+        throw cancelErr;
+      }
 
       toast.success('Trade accepted! The fee will be calculated and contact details shared.');
       return true;
