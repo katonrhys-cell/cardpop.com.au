@@ -2,10 +2,43 @@ import path from 'node:path';
 import react from '@vitejs/plugin-react';
 import { createLogger, defineConfig } from 'vite';
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
 const allDeps = Object.keys(pkg.dependencies || {});
+
+// After the build, emit two HTML entries from one Vite-built index.html:
+//   • index.html — the "/"-only document, with the static hero shell injected
+//     into #root so the LCP paints from HTML before any JS runs (Vercel serves
+//     this for "/" via the filesystem index).
+//   • app.html   — a shell-less copy served for every OTHER route via the
+//     catch-all rewrite in vercel.json, so those pages never flash the homepage
+//     hero. Both reference the identical hashed JS/CSS, so the SPA boots the same.
+function homeShellPlugin() {
+	const shellPath = path.resolve(__dirname, 'tools/home-shell.html');
+	return {
+		name: 'cardpop-home-shell',
+		apply: 'build',
+		writeBundle(outputOptions) {
+			const outDir = outputOptions.dir || path.resolve(__dirname, 'dist');
+			const indexPath = path.join(outDir, 'index.html');
+			if (!existsSync(indexPath)) return;
+
+			const builtIndex = readFileSync(indexPath, 'utf-8');
+			// Shell-less document for all non-root routes.
+			writeFileSync(path.join(outDir, 'app.html'), builtIndex, 'utf-8');
+
+			// Inject the hero shell into the "/"-only index.html.
+			const marker = '<div id="root"></div>';
+			if (!builtIndex.includes(marker)) {
+				this.warn('home-shell: `<div id="root"></div>` not found — shell not injected');
+				return;
+			}
+			const shell = readFileSync(shellPath, 'utf-8');
+			writeFileSync(indexPath, builtIndex.replace(marker, `<div id="root">${shell}</div>`), 'utf-8');
+		},
+	};
+}
 
 console.warn = () => { };
 
@@ -27,6 +60,7 @@ export default defineConfig({
 	customLogger: logger,
 	plugins: [
 		react(),
+		homeShellPlugin(),
 	],
 	server: {
 		port: 3000,

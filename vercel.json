@@ -77,7 +77,7 @@
     },
     { "source": "/hcgi/api/:path*", "destination": "/api/:path*" },
     { "source": "/api/:path*", "destination": "/api/index" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/app.html" }
   ],
   "headers": [
     {
