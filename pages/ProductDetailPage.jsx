@@ -15,6 +15,7 @@ import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, Arro
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import EbayMarketSection from '@/components/EbayMarketSection.jsx';
 import PSACertificationSection from '@/components/PSACertificationSection.jsx';
+import GradingVerificationSection from '@/components/GradingVerificationSection.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
 import useShopProductRealtimeSync from '@/hooks/useShopProductRealtimeSync.js';
 import useVaultItemRealtimeSync from '@/hooks/useVaultItemRealtimeSync.js';
@@ -493,6 +494,13 @@ const ProductDetailPage = () => {
 
             {!isShop && (
               <>
+                {(vi?.cert_number || vi?.certification_number) && (
+                  <GradingVerificationSection
+                    gradingNumber={vi?.cert_number || vi?.certification_number}
+                    gradingCompany={vi?.grading_company || 'psa'}
+                    grade={vi?.grade}
+                  />
+                )}
                 <PSACertificationSection
                   certNumber={vi?.cert_number || vi?.certification_number}
                   gradingCompany={vi?.grading_company}
