@@ -31,6 +31,7 @@ import PhotoTemplateModal from '@/components/PhotoTemplateModal.jsx';
 import { analyzePhotoQuality } from '@/utils/photoQuality.js';
 import { compressImage } from '@/utils/compressImage.js';
 import { useCardCrop } from '@/hooks/useCardCrop.js';
+import { useCardDescription } from '@/hooks/useCardDescription.js';
 import CardCropPreview from '@/components/CardCropPreview.jsx';
 import CardCornerAdjuster from '@/components/CardCornerAdjuster.jsx';
 import { warpCardWithCorners } from '@/utils/detectCard.js';
@@ -128,6 +129,7 @@ const AddEditCardPage = () => {
   const { identify: cardSightIdentify, isIdentifying, result: cardSightResult, clearResult: clearCardSight } = useCardSight();
   const { fetchPricingById, fetchPricingByName, isLoadingCsPrice, csPrice, clearCsPrice } = useCardsightPricing();
   const { isProcessing: isPhotoProcessing, previewUrl, createSlabImagePreview, reset: resetPhotoTemplate } = usePhotoTemplate();
+  const { generateDescription, isGenerating: isGeneratingDescription } = useCardDescription();
 
   // Photo template modal state
   const [photoTemplateModal, setPhotoTemplateModal] = useState({ open: false, processType: null, step: 'preview' });
@@ -499,6 +501,30 @@ const AddEditCardPage = () => {
       setIsAutoFilled(true);
       // Success/failure feedback is surfaced by useCardOCR itself.
     }
+  };
+
+  // ─── AI description generator ─────────────────────────────────────────────
+  // Builds an SEO-enhanced listing description from the details already entered
+  // and drops it into the Notes/description field.
+  const handleGenerateDescription = async () => {
+    const description = await generateDescription({
+      cardName:        formData.cardName,
+      collection:      formData.collection,
+      setName:         formData.setName,
+      cardNumber:      formData.cardNumber,
+      year:            formData.year,
+      manufacturerName: formData.manufacturerName,
+      variant:         formData.variant,
+      parallelName:    formData.parallelName || parallelOpts.find(p => p.id === parallelId)?.name || '',
+      serialNumber:    formData.serialNumber,
+      isRookie:        formData.isRookie || formData.variant.includes('Rookie Card (RC)'),
+      isFoil:          formData.isFoil,
+      isSealed:        formData.isSealed,
+      gradingCompany:  formData.gradingCompany,
+      grade:           formData.grade,
+      condition:       formData.condition,
+    });
+    if (description) set('notes', description);
   };
 
   // ─── Photo template handlers ──────────────────────────────────────────────
@@ -2813,15 +2839,35 @@ const AddEditCardPage = () => {
                   </div>
 
                   <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="notes" className="font-bold">Notes</Label>
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <Label htmlFor="notes" className="font-bold">Description &amp; Notes</Label>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={handleGenerateDescription}
+                        disabled={isGeneratingDescription || !formData.cardName?.trim()}
+                        title={!formData.cardName?.trim()
+                          ? 'Add a card name first'
+                          : 'Write an SEO-friendly description from the details above'}
+                        className="gap-1.5 border-primary/40 text-primary hover:bg-primary/5"
+                      >
+                        {isGeneratingDescription
+                          ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generating…</>
+                          : <><Wand2 className="w-3.5 h-3.5" /> Generate Description</>}
+                      </Button>
+                    </div>
                     <Textarea
                       id="notes"
                       value={formData.notes}
                       onChange={e => set('notes', e.target.value)}
-                      placeholder="Any specific details about this card's condition, history, or unique features…"
-                      rows={3}
+                      placeholder="Add details about this card's condition, history or unique features — or tap Generate Description to write an SEO-friendly one for you."
+                      rows={4}
                       className={`resize-none bg-background ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''}`}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Generate a unique, search-friendly description from the details above, then edit it to suit.
+                    </p>
                   </div>
                 </div>
               </SectionCard>

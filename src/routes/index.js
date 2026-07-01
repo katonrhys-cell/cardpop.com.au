@@ -10,6 +10,7 @@ import stripeRouter from './stripe.js';
 import verificationRouter from './verification.js';
 import integratedAiRouter from './integrated-ai.js';
 import cardOcrRouter from './card-ocr.js';
+import cardDescriptionRouter from './card-description.js';
 import gradeEstimatorRouter from './grade-estimator.js';
 import idVerificationRouter from './id-verification.js';
 import eventScraperRouter from './event-scraper.js';
@@ -43,6 +44,9 @@ export default () => {
 
     // Card OCR routes with rate limiting
     router.use('/card-ocr', cardOcrRouter);
+
+    // AI SEO description generation with rate limiting
+    router.use('/card-description', cardDescriptionRouter);
 
     // Grade estimator routes with rate limiting
     router.use('/grade-estimator', gradeEstimatorRouter);
