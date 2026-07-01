@@ -34,6 +34,8 @@ import { useCardCrop } from '@/hooks/useCardCrop.js';
 import CardCropPreview from '@/components/CardCropPreview.jsx';
 import CardCornerAdjuster from '@/components/CardCornerAdjuster.jsx';
 import { warpCardWithCorners } from '@/utils/detectCard.js';
+import DisplayStylePicker from '@/components/vault/DisplayStylePicker.jsx';
+import { canUseStyle, normalizeStyle, normalizeTier } from '@/lib/displayStyles.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -83,6 +85,9 @@ const AddEditCardPage = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const { getCategories, getParallelsByFranchise, getSubsetsBySet } = useCategories();
+
+  // Subscription tier gates which display styles the user can choose.
+  const subscriptionTier = normalizeTier(currentUser?.subscription_tier);
 
   const isEdit = !!id;
   const [loading, setLoading]           = useState(isEdit);
@@ -176,6 +181,7 @@ const AddEditCardPage = () => {
     // Listing
     tradeValue:     '',
     listingType:    'private',
+    displayStyle:   'classic',
   };
 
   const [formData, setFormData] = useState(emptyForm);
@@ -332,6 +338,7 @@ const AddEditCardPage = () => {
           notes:          card.notes          || '',
           tradeValue:     card.trade_value_aud != null ? String(card.trade_value_aud) : '',
           listingType:    (!card.listing_type || card.listing_type === 'Private') ? 'private' : card.listing_type,
+          displayStyle:   card.display_style || 'classic',
         });
         if (card.card_image) {
           const imgUrl = card.card_image.startsWith('http')
@@ -767,6 +774,11 @@ const AddEditCardPage = () => {
         trade_value_locked:  tradeAud > 0,
         listing_type:        isPublic ? formData.listingType : 'Private',
         is_public:           isPublic,
+        // Persist the chosen display style, clamped to what the user's tier
+        // allows so a locked style can never be saved by bypassing the picker.
+        display_style:       canUseStyle(formData.displayStyle, subscriptionTier)
+                               ? normalizeStyle(formData.displayStyle)
+                               : 'classic',
         // Persist CardSight ID if we got an exact match during this session
         ...(cardSightResult?.exactMatch && cardSightResult?.card?.id
           ? {
@@ -2888,6 +2900,20 @@ const AddEditCardPage = () => {
                     </p>
                   </div>
                 )}
+              </SectionCard>
+
+              {/* ── 5. Display Style ── */}
+              <SectionCard title="Display Style">
+                <p className="text-sm text-muted-foreground -mt-2">
+                  Choose how this card is showcased to collectors. Premium styles
+                  unlock with your subscription — you can always list with Classic.
+                </p>
+                <DisplayStylePicker
+                  value={formData.displayStyle}
+                  onChange={(styleKey) => set('displayStyle', styleKey)}
+                  userTier={subscriptionTier}
+                  previewSrc={imagePreview}
+                />
               </SectionCard>
 
             </div>

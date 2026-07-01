@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Star, ShieldCheck, Lock, ShoppingCart, ArrowRightLeft, Layers, ZoomIn } from 'lucide-react';
 import ImageZoomModal from '@/components/ImageZoomModal.jsx';
-import CardImage from '@/components/CardImage.jsx';
+import CardShowcase from '@/components/vault/CardShowcase.jsx';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { VARIANT_BADGES } from '@/lib/cardVariants.js';
@@ -50,13 +50,13 @@ const VaultListingCard = ({ vaultItem, listing }) => {
   return (
     <div className={`group flex flex-col h-full bg-card rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 ${borderClass}`}>
       <Link to={detailPath} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
-        <CardImage
+        <CardShowcase
           src={imgSrc}
           srcSet={imgSrcSet}
           sizes={CARD_GRID_SIZES}
           fallbackSrc={imgFallback}
           alt={vaultItem.card_name || vaultItem.name || 'Vault Image'}
-          imgClassName="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500 p-2"
+          displayStyle={vaultItem.display_style}
           width="400"
           height="500"
         />
