@@ -140,7 +140,9 @@ const MarketplacePage = () => {
         let query = supabase
           .from('listings')
           .select('*, vault_item:vault_items!inner(*, vault_images(storage_path)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)', { count: 'exact' })
-          .eq('status', 'active')
+          // Show sold items too (badged "Sold") — they stay on the marketplace
+          // until an admin archives them. Only 'archived' is hidden here.
+          .in('status', ['active', 'sold'])
           .neq('listing_type', 'vault')
           .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
 

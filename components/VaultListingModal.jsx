@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
-import { Loader2, Lock, ShoppingCart, ArrowRightLeft, Layers, DollarSign, TrendingUp } from 'lucide-react';
+import { Loader2, Lock, ShoppingCart, ArrowRightLeft, Layers, DollarSign, TrendingUp, Tag, RotateCcw } from 'lucide-react';
 import PriceRangeIndicator from '@/components/PriceRangeIndicator.jsx';
 import {
   Dialog,
@@ -69,6 +69,8 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
   const [loading, setLoading] = useState(false);
   const [priceRange, setPriceRange] = useState(null);
   const [hasActiveListing, setHasActiveListing] = useState(false);
+  const [listingStatus, setListingStatus] = useState(null);
+  const [statusSaving, setStatusSaving] = useState(false);
 
   const handleOpen = () => {
     setSelected(null);
@@ -76,15 +78,17 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
     setTradeWants('');
     setPriceRange(null);
     setHasActiveListing(false);
+    setListingStatus(null);
 
-    // Check if an active listing row actually exists (guards against orphaned vault_items state)
+    // Check if a live (non-archived) listing row exists and track its status so
+    // the seller can mark it Sold / relist it (guards against orphaned state).
     supabase
       .from('listings')
-      .select('id')
+      .select('id, status')
       .eq('vault_item_id', product.id)
       .neq('status', 'archived')
       .maybeSingle()
-      .then(({ data }) => { setHasActiveListing(!!data); });
+      .then(({ data }) => { setHasActiveListing(!!data); setListingStatus(data?.status ?? null); });
 
     // Fetch price range from DB if we have a CardSight card ID
     const csId = product?.cardsight_card_id;
@@ -201,6 +205,41 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
     }
   };
 
+  // Flip an existing marketplace listing between 'sold' and 'active'. Marking it
+  // sold keeps the card visible on the marketplace badged "Sold" (it isn't
+  // archived) and, because checkout only accepts 'active' listings, stops it from
+  // being sold to anyone else.
+  const handleSetListingStatus = async (newStatus) => {
+    if (!product) return;
+    setStatusSaving(true);
+    try {
+      const { data, error } = await supabase
+        .from('listings')
+        .update({
+          status: newStatus,
+          sold_at: newStatus === 'sold' ? new Date().toISOString() : null,
+        })
+        .eq('vault_item_id', product.id)
+        .eq('seller_id', currentUser.id)
+        .neq('status', 'archived')
+        .select('id');
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        toast.error('No live listing found to update.');
+        return;
+      }
+      setListingStatus(newStatus);
+      toast.success(newStatus === 'sold' ? 'Card marked as sold.' : 'Card relisted — available again.');
+      onUpdate?.();
+      onClose();
+    } catch (error) {
+      console.error('Listing status update error:', error);
+      toast.error(error.message || 'Failed to update listing status.');
+    } finally {
+      setStatusSaving(false);
+    }
+  };
+
   if (!product) return null;
 
   const currentOpt = OPTIONS.find(o => o.key === (product.listing_type || 'Private')) || OPTIONS[0];
@@ -263,6 +302,37 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
               );
             })}
           </div>
+
+          {/* Sold / relist — only relevant once the card has a live marketplace listing */}
+          {hasActiveListing && (
+            listingStatus === 'sold' ? (
+              <div className="rounded-xl border border-brand-red/30 bg-brand-red/5 p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-brand-red text-white font-bold uppercase tracking-wider px-2.5 py-1">Sold</Badge>
+                  <span className="text-xs text-muted-foreground">Shown as sold on the marketplace — not purchasable.</span>
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start h-10 rounded-xl font-medium"
+                  onClick={() => handleSetListingStatus('active')}
+                  disabled={statusSaving || loading}
+                >
+                  {statusSaving ? <Loader2 className="w-4 h-4 mr-3 animate-spin" /> : <RotateCcw className="w-4 h-4 mr-3 shrink-0" />}
+                  Relist (mark available again)
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full justify-start h-11 rounded-xl font-medium hover:bg-brand-red/10 hover:text-brand-red hover:border-brand-red/30"
+                onClick={() => handleSetListingStatus('sold')}
+                disabled={statusSaving || loading}
+              >
+                {statusSaving ? <Loader2 className="w-4 h-4 mr-3 animate-spin" /> : <Tag className="w-4 h-4 mr-3 shrink-0" />}
+                Mark as Sold
+              </Button>
+            )
+          )}
 
           {selected && (selected.needsPrice || selected.needsTrade) && (
             <div className="space-y-4 border border-border rounded-xl p-4 bg-muted/20">

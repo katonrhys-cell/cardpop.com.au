@@ -61,8 +61,7 @@ const ListingsManagementPage = () => {
         .order(sortColumn, { ascending });
 
       if (searchQuery) query = query.ilike('vault_items.card_name', `%${searchQuery}%`);
-      if (statusFilter === 'active') query = query.eq('status', 'active');
-      if (statusFilter === 'inactive') query = query.neq('status', 'active');
+      if (['active', 'sold', 'archived'].includes(statusFilter)) query = query.eq('status', statusFilter);
 
       const { data: items, count, error } = await query;
       if (error) throw error;
@@ -133,9 +132,32 @@ const ListingsManagementPage = () => {
     }
   };
 
-  const handleBulkStatusChange = () => {
-    // Open a bulk status modal or reuse the existing one with a bulk mode flag
-    toast.info('Bulk status update coming soon!');
+  // Archive removes a listing from the marketplace without deleting it — the
+  // intended way to clear out old sales. Sold/active both become archived.
+  const handleArchive = async (listing) => {
+    if (!window.confirm(`Archive "${listing.vault_item?.card_name || 'this listing'}"? It will be removed from the marketplace.`)) return;
+    try {
+      const { error } = await supabase.from('listings').update({ status: 'archived' }).eq('id', listing.id);
+      if (error) throw error;
+      toast.success('Listing archived');
+      fetchListings();
+      if (selectedListing?.id === listing.id) setIsDetailModalOpen(false);
+    } catch (err) {
+      toast.error('Failed to archive listing');
+    }
+  };
+
+  const handleBulkArchive = async () => {
+    if (!window.confirm(`Archive ${selectedItems.size} selected listings? They will be removed from the marketplace.`)) return;
+    try {
+      const { error } = await supabase.from('listings').update({ status: 'archived' }).in('id', Array.from(selectedItems));
+      if (error) throw error;
+      toast.success(`Archived ${selectedItems.size} listings`);
+      setSelectedItems(new Set());
+      fetchListings();
+    } catch (err) {
+      toast.error('Bulk archive encountered errors');
+    }
   };
 
   const openDetailModal = (listing) => {
@@ -187,8 +209,9 @@ const ListingsManagementPage = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active (In Stock)</SelectItem>
-                  <SelectItem value="inactive">Out of Stock</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="sold">Sold</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -279,8 +302,10 @@ const ListingsManagementPage = () => {
                       <TableCell>
                         {listing.status === 'active' ? (
                           <Badge className="bg-emerald-500/10 text-emerald-600 border-none">Active</Badge>
+                        ) : listing.status === 'sold' ? (
+                          <Badge className="bg-brand-red/10 text-brand-red border-none">Sold</Badge>
                         ) : (
-                          <Badge variant="secondary" className="bg-muted text-muted-foreground border-none capitalize">{listing.status || 'inactive'}</Badge>
+                          <Badge variant="secondary" className="bg-muted text-muted-foreground border-none capitalize">{listing.status || 'archived'}</Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-right font-medium">
@@ -298,6 +323,9 @@ const ListingsManagementPage = () => {
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => openDetailModal(listing)}>View Details</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => openStatusModal(listing)}>Change Status</DropdownMenuItem>
+                            {listing.status !== 'archived' && (
+                              <DropdownMenuItem onClick={() => handleArchive(listing)}>Archive (remove from marketplace)</DropdownMenuItem>
+                            )}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(listing)}>
                               Delete Listing
@@ -363,10 +391,10 @@ const ListingsManagementPage = () => {
         onStatusUpdated={fetchListings}
       />
 
-      <BulkActionsBar 
+      <BulkActionsBar
         selectedCount={selectedItems.size}
         onBulkDelete={handleBulkDelete}
-        onBulkStatusChange={handleBulkStatusChange}
+        onBulkArchive={handleBulkArchive}
         onClearSelection={() => setSelectedItems(new Set())}
       />
     </div>

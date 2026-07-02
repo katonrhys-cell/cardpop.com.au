@@ -90,10 +90,10 @@ describe('MarketplacePage — listing states', () => {
     expect(supabase.from).toHaveBeenCalledWith('listings');
   });
 
-  it('queries only active, non-vault listings', async () => {
+  it('queries active + sold (badged "Sold"), non-vault listings — archived are hidden', async () => {
     renderPage();
     await waitFor(() => expect(supabase.from).toHaveBeenCalled());
-    expect(h.lastCalls).toContainEqual(['eq', 'status', 'active']);
+    expect(h.lastCalls).toContainEqual(['in', 'status', ['active', 'sold']]);
     expect(h.lastCalls).toContainEqual(['neq', 'listing_type', 'vault']);
   });
 

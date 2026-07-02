@@ -58,7 +58,9 @@ const ProductDetailPage = () => {
             .from('listings')
             .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified)')
             .eq('id', id)
-            .eq('status', 'active')
+            // Sold listings still render (marked "Sold" + buy disabled); only
+            // archived listings are treated as gone.
+            .in('status', ['active', 'sold'])
             .single();
 
           if (fetchError) throw fetchError;
@@ -211,6 +213,11 @@ const ProductDetailPage = () => {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vault_items' },
         () => { if (source === 'marketplace' && fetchRef.current) fetchRef.current(); }
       )
+      // A sale (webhook) or admin action flips listings.status without touching
+      // vault_items — listen here so an open page updates to "Sold" live.
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'listings', filter: `id=eq.${id}` },
+        () => { if (source === 'marketplace' && fetchRef.current) fetchRef.current(); }
+      )
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products' },
         () => { if (source === 'shop' && fetchRef.current) fetchRef.current(); }
       )
@@ -221,6 +228,10 @@ const ProductDetailPage = () => {
 
   const handleAddToCart = () => {
     if (!product) return;
+    if (source !== 'shop' && product.status === 'sold') {
+      toast.error('This item has already sold.');
+      return;
+    }
     const priceInCents = Math.round((product.price || 0) * 100);
     const cartProduct = {
       id: product.id,
@@ -296,6 +307,7 @@ const ProductDetailPage = () => {
   }
 
   const isShop = source === 'shop';
+  const isSold = !isShop && product.status === 'sold';
   const outOfStock = isShop && product.stockQuantity !== null && product.stockQuantity <= 0;
   
   const statusBadge = isShop 
@@ -357,6 +369,12 @@ const ProductDetailPage = () => {
                 <StatusIcon className="w-3 h-3 mr-1.5 inline-block" />
                 {statusBadge.label}
               </Badge>
+
+              {isSold && (
+                <Badge className="font-bold border-none shadow-sm px-2.5 py-1 bg-brand-red text-white uppercase tracking-wider">
+                  Sold
+                </Badge>
+              )}
             </div>
 
             <h1 className="text-3xl md:text-4xl font-serif font-bold text-foreground mb-3 leading-tight text-balance">
@@ -458,6 +476,15 @@ const ProductDetailPage = () => {
                   </p>
                 )}
               </div>
+            ) : isSold ? (
+              <div className="flex flex-col gap-3 mb-8">
+                <Button size="lg" variant="secondary" className="w-full h-14 rounded-xl font-bold text-lg" disabled>
+                  <PackageX className="w-5 h-5 mr-2" /> Sold
+                </Button>
+                <p className="text-sm text-center font-medium text-muted-foreground">
+                  This item has already sold and is no longer available for purchase.
+                </p>
+              </div>
             ) : (
               <div className="flex flex-col gap-3 mb-8">
                 {product.listing_type === 'For Sale' || product.listing_type === 'For Sale & Trade' ? (
@@ -465,7 +492,7 @@ const ProductDetailPage = () => {
                     Buy Now
                   </Button>
                 ) : null}
-                
+
                 {product.listing_type === 'For Trade' || product.listing_type === 'For Sale & Trade' ? (
                   <Button size="lg" variant={product.listing_type === 'For Sale & Trade' ? 'outline' : 'default'} className="w-full h-14 rounded-xl font-bold text-lg" onClick={() => handleSecondaryAction('Propose Trade')}>
                     <ArrowRightLeft className="w-5 h-5 mr-2" /> Request Trade

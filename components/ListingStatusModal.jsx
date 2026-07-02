@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -7,40 +7,62 @@ import { Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 
+// Marketplace listings live in the `listings` table with a `status` of
+// active / sold / archived:
+//   • active   — visible on the marketplace and purchasable
+//   • sold     — visible on the marketplace, badged "Sold", not purchasable
+//   • archived — hidden from the marketplace (used to clear out old sales)
+const STATUS_OPTIONS = [
+  {
+    value: 'active',
+    label: 'Active',
+    description: 'Visible on the marketplace and available to buy.',
+    className: 'font-medium',
+  },
+  {
+    value: 'sold',
+    label: 'Sold',
+    description: 'Stays on the marketplace marked "Sold" — cannot be purchased.',
+    className: 'font-medium',
+  },
+  {
+    value: 'archived',
+    label: 'Archived',
+    description: 'Removed from the marketplace. Use this to clear out old sales.',
+    className: 'font-medium text-destructive',
+  },
+];
+
 const ListingStatusModal = ({ isOpen, onClose, listing, onStatusUpdated }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState(
-    listing?.stockQuantity > 0 ? 'active' : 'inactive'
-  );
+  const [selectedStatus, setSelectedStatus] = useState('active');
+
+  useEffect(() => {
+    if (listing?.status) setSelectedStatus(listing.status);
+  }, [listing?.status]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!listing?.id) return;
-    
+
     setIsSubmitting(true);
     try {
-      // Since officialCatalog lacks an explicit status field, 
-      // we map active to stock=1 (if currently 0) and inactive/sold to stock=0.
-      let newStock = listing.stockQuantity;
-      
-      if (selectedStatus === 'active' && listing.stockQuantity === 0) {
-        newStock = 1; // Default to 1 if making active
-      } else if (selectedStatus !== 'active') {
-        newStock = 0;
-      }
-
       const { error } = await supabase
-        .from('set_cards')
-        .update({ stockQuantity: newStock })
+        .from('listings')
+        .update({
+          status: selectedStatus,
+          // Stamp the sale time when moving to sold; clear it when reactivating.
+          sold_at: selectedStatus === 'sold' ? new Date().toISOString() : null,
+        })
         .eq('id', listing.id);
       if (error) throw error;
 
-      toast.success('Listing status updated successfully');
+      toast.success('Listing status updated');
       if (onStatusUpdated) onStatusUpdated();
       onClose();
     } catch (error) {
       console.error('Failed to update status:', error);
-      toast.error('Failed to update status');
+      toast.error(error.message || 'Failed to update status');
     } finally {
       setIsSubmitting(false);
     }
@@ -48,47 +70,31 @@ const ListingStatusModal = ({ isOpen, onClose, listing, onStatusUpdated }) => {
 
   if (!listing) return null;
 
+  const cardName = listing.vault_item?.card_name || listing.title || 'this listing';
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Change Status</DialogTitle>
           <DialogDescription>
-            Update the visibility and availability of "{listing.name}".
+            Update the marketplace visibility of &ldquo;{cardName}&rdquo;.
           </DialogDescription>
         </DialogHeader>
-        
+
         <form onSubmit={handleSubmit} className="space-y-6 py-4">
           <RadioGroup value={selectedStatus} onValueChange={setSelectedStatus} className="gap-4">
-            <div className="flex items-center space-x-3 border border-border rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors">
-              <RadioGroupItem value="active" id="active" />
-              <Label htmlFor="active" className="flex-1 cursor-pointer font-medium">
-                Active (In Stock)
-                <span className="block text-xs text-muted-foreground font-normal mt-1">
-                  Item is visible and available for purchase.
-                </span>
-              </Label>
-            </div>
-            
-            <div className="flex items-center space-x-3 border border-border rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors">
-              <RadioGroupItem value="inactive" id="inactive" />
-              <Label htmlFor="inactive" className="flex-1 cursor-pointer font-medium">
-                Inactive (Out of Stock)
-                <span className="block text-xs text-muted-foreground font-normal mt-1">
-                  Item remains in catalog but cannot be purchased.
-                </span>
-              </Label>
-            </div>
-
-            <div className="flex items-center space-x-3 border border-border rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors">
-              <RadioGroupItem value="delisted" id="delisted" />
-              <Label htmlFor="delisted" className="flex-1 cursor-pointer font-medium text-destructive">
-                Delisted (Suspended)
-                <span className="block text-xs text-muted-foreground font-normal mt-1">
-                  Hide item completely due to policy violation or removal.
-                </span>
-              </Label>
-            </div>
+            {STATUS_OPTIONS.map(opt => (
+              <div key={opt.value} className="flex items-center space-x-3 border border-border rounded-lg p-4 cursor-pointer hover:bg-muted/50 transition-colors">
+                <RadioGroupItem value={opt.value} id={opt.value} />
+                <Label htmlFor={opt.value} className={`flex-1 cursor-pointer ${opt.className}`}>
+                  {opt.label}
+                  <span className="block text-xs text-muted-foreground font-normal mt-1">
+                    {opt.description}
+                  </span>
+                </Label>
+              </div>
+            ))}
           </RadioGroup>
 
           <DialogFooter>
