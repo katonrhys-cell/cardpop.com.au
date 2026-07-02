@@ -18,15 +18,27 @@ if (typeof document !== 'undefined') {
 const Analytics = React.lazy(() => import('@vercel/analytics/react').then(m => ({ default: m.Analytics })));
 const SpeedInsights = React.lazy(() => import('@vercel/speed-insights/react').then(m => ({ default: m.SpeedInsights })));
 
+// These inject /_vercel/{insights,speed-insights}/script.js, which only exist on
+// a Vercel deployment. On localhost (local `vite preview`, e2e/CI) those paths
+// 404 and the SPA fallback returns index.html, so the browser tries to execute
+// HTML as JS ("Unexpected token '<'"). Skip them off-deployment; they still run
+// on every real Vercel host (production and *.vercel.app previews).
+const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
+const analyticsEnabled = !/^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[?::1\]?)$/.test(hostname);
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <>
     <App />
-    <Suspense fallback={null}>
-      <Analytics />
-    </Suspense>
-    <Suspense fallback={null}>
-      <SpeedInsights />
-    </Suspense>
+    {analyticsEnabled && (
+      <Suspense fallback={null}>
+        <Analytics />
+      </Suspense>
+    )}
+    {analyticsEnabled && (
+      <Suspense fallback={null}>
+        <SpeedInsights />
+      </Suspense>
+    )}
   </>
 );
 
