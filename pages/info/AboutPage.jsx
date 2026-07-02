@@ -3,43 +3,37 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
-const FEATURES = [
+const OFFERINGS = [
   {
-    title: 'Community First',
-    desc: 'Built around hobby culture, not just transactions.',
+    title: 'Market Insights',
+    desc: 'Discover pricing data and follow market trends as they move.',
   },
   {
-    title: 'Built for Collectors',
-    desc: 'Every feature is designed for real collectors and traders.',
+    title: 'Grading & Resources',
+    desc: 'Learn the hobby through grading guides and educational resources.',
   },
   {
-    title: 'Trusted Marketplace',
-    desc: 'Secure listings, verified sellers, and transparency.',
+    title: 'Collection Tracking',
+    desc: 'Track your collection and research cards, all in one place.',
+  },
+  {
+    title: 'A Real Community',
+    desc: 'Connect with a growing community that shares the same passion.',
   },
 ];
 
-const TESTIMONIALS = [
-  {
-    quote: "I've traded cards online for years and always had that nagging doubt. CardPop™ completely changed that — sold a PSA 10 without a second thought.",
-    name: 'Jake M.',
-    location: 'Sydney, NSW',
-  },
-  {
-    quote: "It genuinely feels like a card show online. The community vibe is real and everyone's been upfront. Found two grails in my first week.",
-    name: 'Sarah T.',
-    location: 'Brisbane, QLD',
-  },
-  {
-    quote: "For high-value trades, peace of mind is everything. Knowing sellers are verified before I commit makes CardPop™ the only place I buy from now.",
-    name: 'Chris W.',
-    location: 'Perth, WA',
-  },
+const BELIEFS = [
+  'The hobby is strongest when collectors trust one another.',
+  'Knowledge should be shared, not hidden.',
+  'Every collector deserves a safe, transparent place to buy and sell.',
+  'Community is more important than transactions.',
+  'Collecting should be fun, rewarding and welcoming for everyone.',
 ];
 
 const AboutPage = () => {
   return (
     <>
-      <SEOHead title="About CardPop™ | Australia's Trading Card Marketplace" description="Learn about CardPop™ Australia — Australia's premier platform for buying, selling and trading Pokemon, Magic and sports cards." />
+      <SEOHead title="About CardPop™ | Australia's Trading Card Marketplace" description="CardPop™ is Australia's home for trading card collectors — recreating the trust, excitement and community of card shows online. Buy, sell, trade, learn and connect." />
 
       {/* ── Hero ── */}
       <section className="relative overflow-hidden bg-foreground text-background px-6 py-28 md:py-36">
@@ -49,14 +43,15 @@ const AboutPage = () => {
         <div className="relative max-w-6xl mx-auto">
           <span className="inline-flex items-center gap-2 rounded-full border border-background/20 bg-background/5 px-4 py-1.5 text-xs font-bold uppercase tracking-wider mb-7">
             <span className="w-2 h-2 rounded-full bg-brand-red" aria-hidden="true" />
-            CardPop™ Australia · Buy. Sell. Collect.
+            About CardPop™ · Buy. Sell. Collect.
           </span>
-          <h1 className="text-[clamp(2.4rem,5vw,4rem)] leading-[1.05] font-extrabold mb-6 max-w-2xl">
-            Built for the hobby.<br />Powered by <span className="text-brand-red">collectors.</span>
+          <h1 className="text-[clamp(2.4rem,5vw,4rem)] leading-[1.05] font-extrabold mb-6 max-w-3xl">
+            The card show that<br />never <span className="text-brand-red">closes.</span>
           </h1>
           <p className="text-lg leading-relaxed max-w-xl opacity-70 mb-10">
-            CardPop™ Australia was created to bring the energy of card shows,
-            trade nights, and collector culture into one trusted digital marketplace.
+            Every collector remembers the moment the hobby truly clicked. CardPop™
+            was built to recreate the trust, excitement and community of card
+            shows — online, every day of the year.
           </p>
           <div className="flex flex-wrap gap-3">
             <Button asChild size="lg" className="rounded-full px-7 font-bold">
@@ -85,29 +80,35 @@ const AboutPage = () => {
             </div>
             <div className="space-y-5 text-[1.05rem] leading-[1.8] text-foreground">
               <p>
-                I'm a Melbourne-based collector who fell into the hobby and never looked back.
-                But the more I got into it, the more I hit the same wall everyone else did —
-                finding the right person to buy from was harder than it should be.
+                For me, it wasn't pulling a rare card or landing a great deal. It was
+                walking into my first card show.
               </p>
               <p>
-                Then I went to my first card show. The energy in that room was something else.
-                People talking cards, making deals on a handshake, vouching for each other without
-                a second thought. It was everything the hobby should feel like.
+                The energy was unlike anything I'd experienced before. Collectors swapping
+                stories, making deals with a handshake, helping newcomers, celebrating each
+                other's latest pickups, and vouching for people without hesitation. It wasn't
+                just about buying and selling cards — it was about being part of a community
+                built on trust.
               </p>
               <p>
-                Outside of those shows, though, that trust didn't really exist. I watched collectors
-                chasing vouches across Discord servers and Facebook groups before every trade —
-                never quite sure if the person on the other end was legitimate. For high-value cards,
-                that uncertainty isn't just frustrating. It's a real barrier.
+                That experience stayed with me. As I spent more time in the hobby, I realised
+                that feeling didn't always exist online. Outside of card shows, collectors were
+                often left searching Facebook groups and Discord servers for vouches before
+                every trade, hoping the person on the other end was genuine. Finding the right
+                card was one challenge. Knowing who to trust was another.
               </p>
               <p>
-                CardPop™ was built to solve that. A place where cards can be shared, traded, and
-                genuinely enjoyed — where your duplicates and seconds find new homes with people
-                who'll love them just as much as you did. Where verified sellers give buyers real
-                peace of mind. And where every transaction carries the same trust you'd feel shaking
-                hands at a card show.
+                For high-value cards, that uncertainty isn't just frustrating — it can stop
+                great deals from ever happening. I believed collecting deserved better.
+                So I built CardPop™.
               </p>
-              <p>The hobby wins when collectors can trust each other. That's what we're building.</p>
+              <p>
+                Our goal is simple: recreate the trust, excitement and sense of community that
+                makes card shows so special, and bring that experience online. Where duplicates
+                find new homes with people who'll appreciate them. Where verified sellers give
+                buyers real peace of mind. And where every transaction feels as comfortable as
+                shaking hands across a table at your local card show.
+              </p>
             </div>
           </div>
 
@@ -143,58 +144,101 @@ const AboutPage = () => {
         </div>
       </section>
 
-      {/* ── Features ── */}
-      <section className="bg-secondary/40 px-6 py-16 pb-24">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-5">
-          {FEATURES.map(({ title, desc }) => (
-            <div key={title} className="group bg-card border border-border rounded-2xl p-8 transition-colors hover:border-brand-red/50">
-              <div className="w-10 h-1 rounded-full bg-brand-red mb-5" aria-hidden="true" />
-              <h3 className="font-bold text-lg mb-3">{title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── Testimonials ── */}
-      <section className="bg-foreground px-6 py-24">
+      {/* ── More than a marketplace ── */}
+      <section className="bg-secondary/40 px-6 py-20 md:py-24">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <h2 className="text-background text-3xl font-extrabold mb-3">
-              What collectors are saying
+          <div className="max-w-2xl mb-12">
+            <div className="flex items-center gap-3 mb-6">
+              <span className="w-10 h-1 rounded-full bg-brand-red" aria-hidden="true" />
+              <span className="text-xs font-bold uppercase tracking-wider text-brand-red">More Than A Marketplace</span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-extrabold mb-4">
+              Australia's home for trading card collectors
             </h2>
-            <p className="text-background/50 text-sm">
-              From Melbourne to Perth — the community speaks for itself.
+            <p className="text-[1.05rem] leading-[1.8] text-muted-foreground">
+              A place to discover market insights, learn through grading guides and hobby
+              resources, track your collection, research cards, follow trends and connect
+              with a community that shares the same passion.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-            {TESTIMONIALS.map(({ quote, name, location }) => (
-              <div
-                key={name}
-                className="bg-background/5 border border-background/10 rounded-2xl p-8"
-              >
-                <span className="block text-brand-red text-5xl leading-none font-serif mb-2" aria-hidden="true">&ldquo;</span>
-                <p className="text-sm text-background/75 leading-[1.75] mb-6">{quote}</p>
-                <p className="font-bold text-background text-sm">{name}</p>
-                <p className="text-xs text-background/40 mt-0.5">{location}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {OFFERINGS.map(({ title, desc }) => (
+              <div key={title} className="group bg-card border border-border rounded-2xl p-8 transition-colors hover:border-brand-red/50">
+                <div className="w-10 h-1 rounded-full bg-brand-red mb-5" aria-hidden="true" />
+                <h3 className="font-bold text-lg mb-3">{title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── Vision ── */}
+      {/* ── What We Believe ── */}
+      <section className="bg-foreground px-6 py-24">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="text-background text-3xl font-extrabold mb-3">What we believe</h2>
+            <p className="text-background/50 text-sm">
+              The principles behind everything we build.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+            {BELIEFS.map((belief, i) => (
+              <div
+                key={belief}
+                className="bg-background/5 border border-background/10 rounded-2xl p-8"
+              >
+                <span className="block text-brand-red text-2xl font-extrabold mb-4" aria-hidden="true">
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+                <p className="text-[0.95rem] text-background/80 leading-[1.7]">{belief}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Built in Melbourne ── */}
       <section className="bg-background px-6 py-24">
-        <div className="max-w-[760px] mx-auto text-center">
+        <div className="max-w-[820px] mx-auto">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="w-10 h-1 rounded-full bg-brand-red" aria-hidden="true" />
+            <span className="text-xs font-bold uppercase tracking-wider text-brand-red">Built in Melbourne</span>
+          </div>
+          <h2 className="text-3xl md:text-4xl font-extrabold mb-5">Built for collectors, by a collector</h2>
+          <div className="space-y-5 text-[1.05rem] leading-[1.8] text-muted-foreground">
+            <p>
+              CardPop™ was founded in Melbourne by a collector who simply wanted the online
+              hobby to feel more like the card shows that inspired it. We're collectors first,
+              and that philosophy guides every decision we make.
+            </p>
+            <p>
+              Whether we're building new tools, improving the marketplace or creating
+              educational resources, our goal remains the same: help collectors spend less
+              time worrying about who they can trust, and more time enjoying the hobby they love.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Vision ── */}
+      <section className="relative overflow-hidden bg-foreground text-background px-6 py-28">
+        <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[36rem] h-[36rem] rounded-full bg-brand-red/15 blur-3xl" aria-hidden="true" />
+        <div className="relative max-w-[760px] mx-auto text-center">
           <div className="flex items-center justify-center gap-3 mb-6">
             <span className="w-10 h-1 rounded-full bg-brand-red" aria-hidden="true" />
-            <span className="text-xs font-bold uppercase tracking-wider text-brand-red">What's Next</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-brand-red">The Vision</span>
             <span className="w-10 h-1 rounded-full bg-brand-red" aria-hidden="true" />
           </div>
-          <h2 className="text-3xl font-extrabold mb-5">The future of collecting</h2>
-          <p className="text-[1.05rem] leading-[1.8] text-muted-foreground mb-10">
-            CardPop™ is building a connected ecosystem for collectors across
-            Australia and beyond — one trusted trade at a time.
+          <h2 className="text-3xl md:text-4xl font-extrabold mb-6">The card show that never closes</h2>
+          <p className="text-[1.05rem] leading-[1.8] text-background/70 mb-5">
+            A trusted place where collectors can buy, sell, learn, discover and connect —
+            every day of the year.
+          </p>
+          <p className="text-[1.05rem] leading-[1.8] text-background/70 mb-10">
+            Whether you're searching for your first rookie card, completing a lifelong
+            collection, investing in the future of the hobby or simply enjoying the journey,
+            we're grateful you've found us. Welcome to CardPop™.
           </p>
           <Button asChild size="lg" className="rounded-full px-7 font-bold">
             <Link to="/marketplace">Start Collecting</Link>

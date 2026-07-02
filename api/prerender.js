@@ -1100,25 +1100,31 @@ const STATIC_CONTENT = {
     title: "About CardPop™ | Australia's Trading Card Marketplace",
     description: "Learn about CardPop™ Australia — Australia's premier platform for buying, selling and trading Pokemon, Magic and sports cards.",
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'About', path: '/about' }],
-    h1: 'Built for the hobby. Powered by collectors.',
-    intro: 'CardPop™ Australia was created to bring the energy of card shows, trade nights, and collector culture into one trusted digital marketplace.',
+    h1: 'The card show that never closes.',
+    intro: 'Every collector remembers the moment the hobby truly clicked. CardPop™ was built to recreate the trust, excitement and community of card shows — online, every day of the year.',
     sections: [
       { h2: 'Our story', paras: [
-        'CardPop™ was started by a Melbourne-based collector who loved the hobby but struggled to find the right people to buy from. Their first card show captured what makes collecting special — people talking cards, making deals on a handshake, and vouching for each other.',
-        'Outside those shows that trust didn’t exist; collectors chased vouches across Discord and Facebook, never quite sure the other party was legitimate — a real barrier for high-value cards. CardPop™ was built to solve that: a place where duplicates find new homes, verified sellers give buyers peace of mind, and every transaction carries the trust of a handshake at a card show. “The hobby wins when collectors can trust each other.” — Reece Conway, Founder, CardPop™ Australia, Melbourne, Victoria.',
+        'For our founder, the hobby clicked at his first card show. The energy was unlike anything else — collectors swapping stories, making deals with a handshake, helping newcomers, celebrating each other’s pickups and vouching for people without hesitation. It wasn’t just about buying and selling cards; it was about being part of a community built on trust.',
+        'Outside those shows, that feeling didn’t always exist online. Collectors were left searching Facebook groups and Discord servers for vouches before every trade, hoping the other person was genuine. For high-value cards, that uncertainty can stop great deals from ever happening. So CardPop™ was built to bring the trust, excitement and community of card shows online. “Collecting deserved better.” — Reece Conway, Founder, CardPop™ Australia, Melbourne, Victoria.',
       ] },
-      { h2: 'Why CardPop', items: [
-        { text: 'Community first — built around hobby culture, not just transactions.' },
-        { text: 'Built for collectors — every feature is designed for real collectors and traders.' },
-        { text: 'Trusted marketplace — secure listings, verified sellers, and transparency.' },
+      { h2: 'More than a marketplace', items: [
+        { text: 'Market insights — discover pricing data and follow market trends as they move.' },
+        { text: 'Grading & resources — learn the hobby through grading guides and educational resources.' },
+        { text: 'Collection tracking — track your collection and research cards, all in one place.' },
+        { text: 'A real community — connect with a growing community that shares the same passion.' },
       ] },
-      { h2: 'What collectors are saying', paras: [
-        '“I’ve traded cards online for years and always had that nagging doubt. CardPop™ completely changed that — sold a PSA 10 without a second thought.” — Jake M., Sydney, NSW',
-        '“It genuinely feels like a card show online. The community vibe is real and everyone’s been upfront. Found two grails in my first week.” — Sarah T., Brisbane, QLD',
-        '“For high-value trades, peace of mind is everything. Knowing sellers are verified before I commit makes CardPop™ the only place I buy from now.” — Chris W., Perth, WA',
+      { h2: 'What we believe', items: [
+        { text: 'The hobby is strongest when collectors trust one another.' },
+        { text: 'Knowledge should be shared, not hidden.' },
+        { text: 'Every collector deserves a safe, transparent place to buy and sell.' },
+        { text: 'Community is more important than transactions.' },
+        { text: 'Collecting should be fun, rewarding and welcoming for everyone.' },
       ] },
-      { h2: 'The future of collecting', paras: [
-        'CardPop™ is building a connected ecosystem for collectors across Australia and beyond — one trusted trade at a time.',
+      { h2: 'Built in Melbourne, built for collectors', paras: [
+        'CardPop™ was founded in Melbourne by a collector who wanted the online hobby to feel more like the card shows that inspired it. We’re collectors first, and that philosophy guides every decision we make — helping collectors spend less time worrying about who they can trust, and more time enjoying the hobby they love.',
+      ] },
+      { h2: 'The card show that never closes', paras: [
+        'A trusted place where collectors can buy, sell, learn, discover and connect — every day of the year. Whether you’re searching for your first rookie card, completing a lifelong collection or simply enjoying the journey, we’re grateful you’ve found us. Welcome to CardPop™.',
       ] },
     ],
     links: [{ text: 'Explore the Marketplace', href: '/marketplace' }, { text: 'Join the Community', href: '/community' }],
