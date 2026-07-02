@@ -1105,7 +1105,7 @@ const STATIC_CONTENT = {
     sections: [
       { h2: 'Our story', paras: [
         'CardPop™ was started by a Melbourne-based collector who loved the hobby but struggled to find the right people to buy from. Their first card show captured what makes collecting special — people talking cards, making deals on a handshake, and vouching for each other.',
-        'Outside those shows that trust didn’t exist; collectors chased vouches across Discord and Facebook, never quite sure the other party was legitimate — a real barrier for high-value cards. CardPop™ was built to solve that: a place where duplicates find new homes, verified sellers give buyers peace of mind, and every transaction carries the trust of a handshake at a card show. “The hobby wins when collectors can trust each other.” — Stache Bros, CardPop™ Founders, Melbourne, Victoria.',
+        'Outside those shows that trust didn’t exist; collectors chased vouches across Discord and Facebook, never quite sure the other party was legitimate — a real barrier for high-value cards. CardPop™ was built to solve that: a place where duplicates find new homes, verified sellers give buyers peace of mind, and every transaction carries the trust of a handshake at a card show. “The hobby wins when collectors can trust each other.” — Reece Conway, Founder, CardPop™ Australia, Melbourne, Victoria.',
       ] },
       { h2: 'Why CardPop', items: [
         { text: 'Community first — built around hobby culture, not just transactions.' },
