@@ -67,4 +67,19 @@ describe('CardImage', () => {
     fireEvent.error(screen.getByAltText('A card'));
     expect(screen.getByText('No Image')).toBeInTheDocument();
   });
+
+  it('reveals a cached image that finished loading before onLoad could attach', () => {
+    // Simulate a browser-cached image: `complete` is already true (with real
+    // dimensions) at mount, so the `load` event never reaches our handler.
+    const completeSpy = vi.spyOn(HTMLImageElement.prototype, 'complete', 'get').mockReturnValue(true);
+    const widthSpy = vi.spyOn(HTMLImageElement.prototype, 'naturalWidth', 'get').mockReturnValue(400);
+
+    render(<CardImage src="https://cdn/object/a.jpg" alt="A card" />);
+
+    // Without firing onLoad the image should still be revealed (not stuck hidden).
+    expect(screen.getByAltText('A card').className).toContain('opacity-100');
+
+    completeSpy.mockRestore();
+    widthSpy.mockRestore();
+  });
 });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { markTransformsUnavailable } from '@/utils/imageUrl.js';
 
 /**
@@ -29,6 +29,7 @@ const CardImage = ({
 }) => {
   const [status, setStatus] = useState('loading'); // 'loading' | 'loaded' | 'error'
   const [useFallback, setUseFallback] = useState(false);
+  const imgRef = useRef(null);
 
   // Reset when the source changes (e.g. card re-used in a virtualised list).
   useEffect(() => {
@@ -39,6 +40,19 @@ const CardImage = ({
   const canFallback = !useFallback && fallbackSrc && fallbackSrc !== src;
   const effectiveSrc = useFallback ? fallbackSrc : src;
   const effectiveSrcSet = useFallback ? undefined : srcSet;
+
+  // A cached image can finish loading before React attaches `onLoad` — most
+  // often when the component remounts (e.g. scrolling back to a card or
+  // navigating back to the page) and the browser already has the file. In that
+  // case the `load` event never reaches our handler and the image would stay
+  // stuck at opacity-0. Sync from the element's own `complete` flag after each
+  // render so a ready image reveals itself even without an `onLoad` callback.
+  useEffect(() => {
+    const img = imgRef.current;
+    if (img && img.complete && img.naturalWidth > 0) {
+      setStatus('loaded');
+    }
+  }, [effectiveSrc]);
 
   if (!effectiveSrc || status === 'error') {
     return (
@@ -65,6 +79,7 @@ const CardImage = ({
         <div className="absolute inset-0 animate-pulse bg-muted" aria-hidden="true" />
       )}
       <img
+        ref={imgRef}
         src={effectiveSrc}
         srcSet={effectiveSrcSet}
         sizes={effectiveSrcSet ? sizes : undefined}
