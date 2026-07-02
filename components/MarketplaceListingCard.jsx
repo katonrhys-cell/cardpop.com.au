@@ -57,9 +57,10 @@ const MarketplaceListingCard = ({ listing }) => {
   const sellerId = listing.seller_id || sellerObj?.id;
   const titleSlug = slugify(vaultItem?.card_name || listing.title || 'card');
   const detailPath = `/marketplace/${listing.id}/${titleSlug}`;
+  const isSold = listing.status === 'sold';
 
   return (
-    <div className={`group flex flex-col h-full bg-card rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 ${borderClass}`}>
+    <div className={`group flex flex-col h-full bg-card rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 ${borderClass} ${isSold ? 'opacity-95' : ''}`}>
       <Link to={detailPath} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
         <CardImage
           src={imgSrc}
@@ -67,10 +68,19 @@ const MarketplaceListingCard = ({ listing }) => {
           sizes={CARD_GRID_SIZES}
           fallbackSrc={imgFallback}
           alt={listing.title || 'Listing Image'}
-          imgClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          imgClassName={`w-full h-full object-cover transition-transform duration-500 ${isSold ? 'grayscale-[35%] group-hover:scale-100' : 'group-hover:scale-105'}`}
           width="400"
           height="500"
         />
+        {/* Sold overlay — the listing stays visible but is clearly marked sold */}
+        {isSold && (
+          <>
+            <div className="absolute inset-0 bg-background/40 z-10 pointer-events-none" />
+            <div className="absolute top-3 left-3 z-20 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-widest bg-brand-red text-white shadow-md pointer-events-none">
+              Sold
+            </div>
+          </>
+        )}
         {/* Special variant badge (RC, Auto, 1st Ed) — top right */}
         {specialBadge && (
           <div className={`absolute top-3 right-3 z-10 px-2.5 py-1 rounded-full text-[11px] font-extrabold tracking-wide shadow-md ${specialBadge[1].bg} ${specialBadge[1].text}`}>
@@ -176,9 +186,12 @@ const MarketplaceListingCard = ({ listing }) => {
         
         <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-border">
           <div className="flex items-center justify-between">
-            <span className="font-extrabold text-xl tabular-nums text-foreground">
+            <span className={`font-extrabold text-xl tabular-nums ${isSold ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
               ${(listing.price_aud || 0).toFixed(2)}
             </span>
+            {isSold && (
+              <span className="text-xs font-bold uppercase tracking-wider text-brand-red">Sold</span>
+            )}
           </div>
           
           {sellerId && (

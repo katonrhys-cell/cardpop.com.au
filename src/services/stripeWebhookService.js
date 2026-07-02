@@ -13,6 +13,61 @@ async function getPlatformSetting(key, defaultValue) {
 }
 
 /**
+ * Atomically claim a listing as sold.
+ *
+ * A listing is validated as 'active' when a checkout session is created, but two
+ * buyers can create sessions for the same listing and both pay before either
+ * webhook fires. Marking it sold with a plain `.eq('id', ...)` update lets both
+ * orders confirm and both sellers get paid — the item is sold to two people.
+ *
+ * This flips the row active → sold in a single guarded statement and returns
+ * whether THIS call won the race, so the caller can pay the seller / mark other
+ * winners' orders for refund. A manual "mark as sold" from the vault also moves
+ * the row to 'sold', so a later payment for it correctly loses the claim here.
+ */
+async function claimListingSold(listingId) {
+  if (!listingId) return false;
+  const { data, error } = await supabase
+    .from('listings')
+    .update({ status: 'sold', sold_at: new Date().toISOString() })
+    .eq('id', listingId)
+    .eq('status', 'active')
+    .select('id');
+  if (error) {
+    logger.error(`[STRIPE] Failed to claim listing ${listingId} as sold: ${error.message}`);
+    return false;
+  }
+  return Array.isArray(data) && data.length > 0;
+}
+
+/**
+ * A buyer paid for a listing that was already sold to someone else. Their money
+ * was captured, so alert admins to refund and let the buyer know it's coming.
+ */
+async function flagDoubleSale({ listingId, orderId, buyerId }) {
+  logger.error(`[STRIPE] Double-sale detected on listing ${listingId} (order ${orderId || 'n/a'}) — buyer needs a refund`);
+
+  const { data: admins } = await supabase.from('profiles').select('id').eq('is_admin', true);
+  if (admins?.length) {
+    await supabase.from('notifications').insert(admins.map(a => ({
+      user_id: a.id,
+      type: 'order_double_sale',
+      title: 'Double-sale needs a refund',
+      body: `Listing ${listingId} sold twice (order ${orderId || 'n/a'}). The item was already claimed by an earlier buyer — refund this order.`,
+    }))).catch(() => {});
+  }
+
+  if (buyerId) {
+    await supabase.from('notifications').insert({
+      user_id: buyerId,
+      type: 'order_refund_pending',
+      title: 'Refund on the way',
+      body: 'The item you purchased had already sold to another buyer. Your payment will be refunded in full — no action needed.',
+    }).catch(() => {});
+  }
+}
+
+/**
  * Handle checkout.session.completed event
  * Processes both cart orders (pre-created 'pending') and single-item orders
  */
@@ -68,9 +123,14 @@ async function handleCartOrder(existing, session, stripe) {
 
   for (const line of lines) {
     if (line.type === 'listing' && line.id) {
-      await supabase.from('listings')
-        .update({ status: 'sold', sold_at: new Date().toISOString() })
-        .eq('id', line.id);
+      // Only pay the seller if THIS order won the race to sell the item. If the
+      // listing was already sold (another buyer or a manual vault mark), skip the
+      // payout and flag it so the buyer gets refunded — never sell it twice.
+      const claimed = await claimListingSold(line.id);
+      if (!claimed) {
+        await flagDoubleSale({ listingId: line.id, orderId: existing.id, buyerId: existing.buyer_id });
+        continue;
+      }
       if (line.seller_id) {
         sellerIds.add(line.seller_id);
         const proceeds = Number(line.line_total_aud || 0) - Number(line.commission_aud || 0);
@@ -199,11 +259,20 @@ async function handleSingleItemOrder(session, stripe) {
     throw insertError;
   }
 
+  // Claim the listing atomically. If it was already sold (another buyer won the
+  // race, or the seller manually marked it sold), don't sell it again: flag the
+  // order for a refund and stop before paying the seller or emailing anyone.
   if (listingId) {
-    await supabase
-      .from('listings')
-      .update({ status: 'sold', sold_at: new Date().toISOString() })
-      .eq('id', listingId);
+    const claimed = await claimListingSold(listingId);
+    if (!claimed) {
+      const { data: dupOrder } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('stripe_session_id', session.id)
+        .maybeSingle();
+      await flagDoubleSale({ listingId, orderId: dupOrder?.id, buyerId: userId });
+      return;
+    }
   }
 
   if (meta.offerId) {

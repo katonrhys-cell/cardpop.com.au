@@ -1,8 +1,8 @@
 import React from 'react';
-import { Trash2, Eye, EyeOff, CheckSquare } from 'lucide-react';
+import { Trash2, Archive, CheckSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-const BulkActionsBar = ({ selectedCount = 0, onDelete, onPublish, onUnpublish, onClear }) => {
+const BulkActionsBar = ({ selectedCount = 0, onBulkDelete, onBulkArchive, onClearSelection }) => {
   if (selectedCount === 0) return null;
 
   return (
@@ -12,22 +12,17 @@ const BulkActionsBar = ({ selectedCount = 0, onDelete, onPublish, onUnpublish, o
         {selectedCount} selected
       </div>
       <div className="h-4 w-px bg-border" />
-      {onPublish && (
-        <Button size="sm" variant="outline" onClick={onPublish}>
-          <Eye className="h-3.5 w-3.5 mr-1.5" /> Publish
+      {onBulkArchive && (
+        <Button size="sm" variant="outline" onClick={onBulkArchive}>
+          <Archive className="h-3.5 w-3.5 mr-1.5" /> Archive
         </Button>
       )}
-      {onUnpublish && (
-        <Button size="sm" variant="outline" onClick={onUnpublish}>
-          <EyeOff className="h-3.5 w-3.5 mr-1.5" /> Unpublish
-        </Button>
-      )}
-      {onDelete && (
-        <Button size="sm" variant="destructive" onClick={onDelete}>
+      {onBulkDelete && (
+        <Button size="sm" variant="destructive" onClick={onBulkDelete}>
           <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete
         </Button>
       )}
-      <Button size="sm" variant="ghost" onClick={onClear}>Clear</Button>
+      <Button size="sm" variant="ghost" onClick={onClearSelection}>Clear</Button>
     </div>
   );
 };

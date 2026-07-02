@@ -65,15 +65,16 @@ const MyVaultPage = () => {
       if (fetchError) throw fetchError;
       setTotalCount(count || 0);
 
-      // Fetch active listings for these vault items
+      // Fetch live listings (active + sold) for these vault items so the vault can
+      // link through to the marketplace and badge sold cards.
       const vaultItemIds = (data || []).map(item => item.id);
       let listingMap = {};
       if (vaultItemIds.length > 0) {
         const { data: listings } = await supabase
           .from('listings')
-          .select('id, vault_item_id, price_aud')
+          .select('id, vault_item_id, price_aud, status')
           .in('vault_item_id', vaultItemIds)
-          .eq('status', 'active');
+          .in('status', ['active', 'sold']);
 
         if (listings) {
           listings.forEach(listing => {
@@ -202,7 +203,9 @@ const MyVaultPage = () => {
             </div>
           )}
           <div className="absolute top-3 left-3 z-10 pointer-events-none flex flex-col gap-1.5 items-start">
-            {getListingBadge(card)}
+            {card.listing?.status === 'sold'
+              ? <Badge className="bg-brand-red text-white shadow-sm font-bold uppercase tracking-wider">Sold</Badge>
+              : getListingBadge(card)}
           </div>
 
           {/* Special variant badge — top right */}
