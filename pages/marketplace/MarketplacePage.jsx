@@ -251,11 +251,22 @@ const MarketplacePage = () => {
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 w-full flex-1">
 
-        {/* Filter Panel */}
-        <div className="bg-muted/30 border border-border p-4 rounded-2xl mb-6 space-y-3">
-          {/* Row 1: Search + Price */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 min-w-[200px]">
+        <div className="flex flex-col lg:flex-row gap-8">
+
+        {/* Left sidebar: Search + category filters */}
+        <aside className="w-full lg:w-72 lg:shrink-0 lg:sticky lg:top-24 lg:self-start">
+          <div className="bg-muted/30 border border-border p-4 rounded-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Search &amp; Filter</h2>
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="rounded-xl text-muted-foreground hover:text-foreground h-8 px-2">
+                  <X className="w-4 h-4 mr-1" /> Clear
+                </Button>
+              )}
+            </div>
+
+            {/* Search */}
+            <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
               <Input
                 placeholder="Search card name..."
@@ -264,127 +275,131 @@ const MarketplacePage = () => {
                 className="pl-9 h-10 rounded-xl bg-background border-border"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <Input
-                type="number"
-                placeholder="Min $"
-                value={minPrice}
-                onChange={e => setMinPrice(e.target.value)}
-                className="w-24 h-10 rounded-xl bg-background border-border"
-              />
-              <span className="text-muted-foreground text-sm font-medium">–</span>
-              <Input
-                type="number"
-                placeholder="Max $"
-                value={maxPrice}
-                onChange={e => setMaxPrice(e.target.value)}
-                className="w-24 h-10 rounded-xl bg-background border-border"
-              />
+
+            {/* Price range */}
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Price range</label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  placeholder="Min $"
+                  value={minPrice}
+                  onChange={e => setMinPrice(e.target.value)}
+                  className="flex-1 h-10 rounded-xl bg-background border-border"
+                />
+                <span className="text-muted-foreground text-sm font-medium">–</span>
+                <Input
+                  type="number"
+                  placeholder="Max $"
+                  value={maxPrice}
+                  onChange={e => setMaxPrice(e.target.value)}
+                  className="flex-1 h-10 rounded-xl bg-background border-border"
+                />
+              </div>
             </div>
-            {hasActiveFilters && (
-              <Button variant="ghost" onClick={clearFilters} className="rounded-xl text-muted-foreground hover:text-foreground ml-auto">
-                <X className="w-4 h-4 mr-2" /> Clear All
-              </Button>
-            )}
+
+            {/* Category cascade */}
+            <div className="space-y-3 pt-1">
+              <label className="block text-xs font-semibold text-muted-foreground">Browse by category</label>
+              {/* Category */}
+              <Select value={filterCat} onValueChange={setFilterCat}>
+                <SelectTrigger aria-label="Filter by category" className="w-full bg-background border-border rounded-xl font-medium">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {catOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+
+              {/* Franchise */}
+              <Select value={filterFranchise} onValueChange={setFilterFranchise} disabled={!filterCat}>
+                <SelectTrigger aria-label="Filter by franchise" className="w-full bg-background border-border rounded-xl font-medium">
+                  <SelectValue placeholder={filterCat ? 'Franchise' : '— select category —'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {franchiseOpts.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+
+              {/* Manufacturer — only show if franchise has manufacturers */}
+              {filterFranchise && mfrOpts.length > 0 && (
+                <Select value={filterMfr} onValueChange={setFilterMfr}>
+                  <SelectTrigger aria-label="Filter by manufacturer" className="w-full bg-background border-border rounded-xl font-medium">
+                    <SelectValue placeholder="Manufacturer" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {mfrOpts.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {/* Team — only show if franchise has teams (sports) */}
+              {filterFranchise && teamOpts.length > 0 && (
+                <Select value={filterTeam} onValueChange={setFilterTeam}>
+                  <SelectTrigger aria-label="Filter by team" className="w-full bg-background border-border rounded-xl font-medium">
+                    <SelectValue placeholder="Team" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teamOpts.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {/* Set — only show if franchise selected and sets exist */}
+              {filterFranchise && setOpts.length > 0 && (
+                <Select value={filterSet} onValueChange={setFilterSet}>
+                  <SelectTrigger aria-label="Filter by set or release" className="w-full bg-background border-border rounded-xl font-medium">
+                    <SelectValue placeholder="Set / Release" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {seriesGroups.map(([series, items], gi) => (
+                      <SelectGroup key={series}>
+                        {gi > 0 && <SelectSeparator />}
+                        <SelectLabel>{series}</SelectLabel>
+                        {items.map(s => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </SelectGroup>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {/* Parallel — only show when franchise has parallels */}
+              {filterFranchise && parallelOpts.length > 0 && (
+                <Select value={filterParallel} onValueChange={setFilterParallel}>
+                  <SelectTrigger aria-label="Filter by parallel or variation" className="w-full bg-background border-border rounded-xl font-medium">
+                    <SelectValue placeholder="Parallel / Variation" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {parallelOpts.map(p => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}{p.print_run ? ` /${p.print_run}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              {/* Subset — only show when a set is selected and it has subsets */}
+              {filterSet && subsetOpts.length > 0 && (
+                <Select value={filterSubset} onValueChange={setFilterSubset}>
+                  <SelectTrigger aria-label="Filter by subset or insert" className="w-full bg-background border-border rounded-xl font-medium">
+                    <SelectValue placeholder="Subset / Insert" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {subsetOpts.map(s => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
           </div>
+        </aside>
 
-          {/* Row 2: 4-level cascade */}
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Category */}
-            <Select value={filterCat} onValueChange={setFilterCat}>
-              <SelectTrigger aria-label="Filter by category" className="w-full sm:w-[160px] bg-background border-border rounded-xl font-medium">
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                {catOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-
-            {/* Franchise */}
-            <Select value={filterFranchise} onValueChange={setFilterFranchise} disabled={!filterCat}>
-              <SelectTrigger aria-label="Filter by franchise" className="w-full sm:w-[180px] bg-background border-border rounded-xl font-medium">
-                <SelectValue placeholder={filterCat ? 'Franchise' : '— select category —'} />
-              </SelectTrigger>
-              <SelectContent>
-                {franchiseOpts.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-
-            {/* Manufacturer — only show if franchise has manufacturers */}
-            {filterFranchise && mfrOpts.length > 0 && (
-              <Select value={filterMfr} onValueChange={setFilterMfr}>
-                <SelectTrigger aria-label="Filter by manufacturer" className="w-full sm:w-[200px] bg-background border-border rounded-xl font-medium">
-                  <SelectValue placeholder="Manufacturer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {mfrOpts.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            )}
-
-            {/* Team — only show if franchise has teams (sports) */}
-            {filterFranchise && teamOpts.length > 0 && (
-              <Select value={filterTeam} onValueChange={setFilterTeam}>
-                <SelectTrigger aria-label="Filter by team" className="w-full sm:w-[200px] bg-background border-border rounded-xl font-medium">
-                  <SelectValue placeholder="Team" />
-                </SelectTrigger>
-                <SelectContent>
-                  {teamOpts.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            )}
-
-            {/* Set — only show if franchise selected and sets exist */}
-            {filterFranchise && setOpts.length > 0 && (
-              <Select value={filterSet} onValueChange={setFilterSet}>
-                <SelectTrigger aria-label="Filter by set or release" className="w-full sm:w-[240px] bg-background border-border rounded-xl font-medium">
-                  <SelectValue placeholder="Set / Release" />
-                </SelectTrigger>
-                <SelectContent>
-                  {seriesGroups.map(([series, items], gi) => (
-                    <SelectGroup key={series}>
-                      {gi > 0 && <SelectSeparator />}
-                      <SelectLabel>{series}</SelectLabel>
-                      {items.map(s => (
-                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-
-            {/* Parallel — only show when franchise has parallels */}
-            {filterFranchise && parallelOpts.length > 0 && (
-              <Select value={filterParallel} onValueChange={setFilterParallel}>
-                <SelectTrigger aria-label="Filter by parallel or variation" className="w-full sm:w-[200px] bg-background border-border rounded-xl font-medium">
-                  <SelectValue placeholder="Parallel / Variation" />
-                </SelectTrigger>
-                <SelectContent>
-                  {parallelOpts.map(p => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}{p.print_run ? ` /${p.print_run}` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-
-            {/* Subset — only show when a set is selected and it has subsets */}
-            {filterSet && subsetOpts.length > 0 && (
-              <Select value={filterSubset} onValueChange={setFilterSubset}>
-                <SelectTrigger aria-label="Filter by subset or insert" className="w-full sm:w-[200px] bg-background border-border rounded-xl font-medium">
-                  <SelectValue placeholder="Subset / Insert" />
-                </SelectTrigger>
-                <SelectContent>
-                  {subsetOpts.map(s => (
-                    <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-        </div>
+        {/* Main content: listing type toggles + sort + grid */}
+        <div className="flex-1 min-w-0">
 
         {breadcrumbText && (
           <p className="text-sm font-bold text-primary mb-6 bg-primary/5 inline-block px-3 py-1 rounded-md">
@@ -536,6 +551,8 @@ const MarketplacePage = () => {
             </Button>
           </div>
         )}
+        </div>{/* end main content */}
+        </div>{/* end two-column layout */}
       </section>
     </div>
   );
