@@ -27,7 +27,8 @@ const STATIC_PAGES = [
   { loc: '/',                      lastmod: SITE_UPDATED,       freq: 'daily',   pri: '1.0' },
   { loc: '/marketplace',           lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.9' },
   { loc: '/browse',                lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.9' },
-  { loc: '/search',                lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
+  // /search is intentionally excluded — internal search-results pages offer no
+  // unique indexable content and are disallowed in robots.txt.
   { loc: '/shop',                  lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.9' },
   { loc: '/shop/sealed-boxes',     lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
   { loc: '/shop/singles',          lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
