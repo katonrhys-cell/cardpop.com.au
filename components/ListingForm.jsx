@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import GradingInput from '@/components/GradingInput.jsx';
 
 const ListingForm = ({ product, onSuccess, onCancel }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, canSell } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     playerName: product?.playerName || '',
@@ -38,6 +38,15 @@ const ListingForm = ({ product, onSuccess, onCancel }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Selling a NEW listing requires an active trial/subscription. Editing an
+    // existing listing is always allowed. The database RLS policy enforces this
+    // too; this is the friendly client-side guard.
+    if (!product && !canSell) {
+      toast('Start your free trial to list cards for sale.');
+      return;
+    }
+
     setLoading(true);
 
     try {

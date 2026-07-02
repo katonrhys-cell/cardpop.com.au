@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
+import { isEntitled } from '@/config/subscription.js';
 
 const AuthContext = createContext();
 
@@ -287,6 +288,18 @@ export const AuthProvider = ({ children }) => {
   // so that profile fields can never accidentally shadow it.
   const isVerified = session?.user?.email_confirmed_at != null;
 
+  // ── Selling entitlement (free trial / subscription) ───────────────────────
+  // Mirrors the DB `can_sell()` rule: an active/trialing/grandfathered
+  // subscription, or an unexpired trial window, grants listing/selling access.
+  // This drives UX only; the database RLS policy is the real enforcement.
+  const subscriptionStatus = profile?.subscription_status ?? null;
+  const trialEndsAt = profile?.trial_ends_at ? new Date(profile.trial_ends_at) : null;
+  const trialActive = trialEndsAt != null && trialEndsAt.getTime() > Date.now();
+  const trialDaysLeft = trialEndsAt
+    ? Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / 86_400_000))
+    : null;
+  const canSell = isEntitled(subscriptionStatus) || trialActive;
+
   // Memoize so the reference is stable across re-renders that don't change the
   // user/profile (e.g. loading/mfaRequired toggles). Consumers that key effects
   // on currentUser would otherwise re-fire on every AuthProvider render.
@@ -307,6 +320,12 @@ export const AuthProvider = ({ children }) => {
     isAdmin,
     isVerified,
     isEmailVerified: isVerified,
+    // Selling entitlement — see the derivation above.
+    canSell,
+    subscriptionStatus,
+    trialActive,
+    trialEndsAt,
+    trialDaysLeft,
     // Keep loading until the MFA assurance level for the current token is known,
     // so ProtectedRoute never flashes protected content before the check lands.
     loading: loading || (!!session && checkedToken !== session.access_token),

@@ -22,6 +22,7 @@
 - [Log In | CardPop](https://cardpop.com.au/login): No description available
 - [Manage Events | Admin Portal](https://cardpop.com.au/eventsadmin): No description available
 - [Manage Events | Admin Portal](https://cardpop.com.au/eventsmanagement): No description available
+- [Membership | CardPop](https://cardpop.com.au/accountmembership): No description available
 - [Messaging | Card Pop](https://cardpop.com.au/messaging): No description available
 - [My Balance | Card Pop](https://cardpop.com.au/userbalance): No description available
 - [My Digital Vault | CardPop](https://cardpop.com.au/myvault): No description available

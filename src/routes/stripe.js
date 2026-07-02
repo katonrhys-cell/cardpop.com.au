@@ -14,6 +14,7 @@ import { createSingleItemCheckout } from '../services/checkoutService.js';
 import { priceCart } from '../services/cartService.js';
 import { processRefund } from '../services/refundService.js';
 import { connectOnboard, getConnectStatus, getDashboardLink } from '../services/connectService.js';
+import { applyStripeSubscription } from '../services/subscriptionService.js';
 
 const router = express.Router();
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
@@ -235,6 +236,16 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         await handleDisputeClosed(stripe, event.data.object);
         break;
       }
+
+      // Membership subscription lifecycle (free trial → active → canceled).
+      // Mirrors the subscription state onto the seller's profile so the
+      // selling gate (can_sell) reflects it.
+      case 'customer.subscription.created':
+      case 'customer.subscription.updated':
+      case 'customer.subscription.deleted':
+      case 'customer.subscription.trial_will_end':
+        await applyStripeSubscription(event.data.object);
+        break;
 
       default:
         logger.debug(`[STRIPE] Unhandled event type: ${event.type}`);

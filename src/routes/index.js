@@ -7,6 +7,7 @@ import ebayRouter from './ebay.js';
 import cardsightRouter from './cardsight.js';
 import authRouter from './auth/index.js';
 import stripeRouter from './stripe.js';
+import subscriptionRouter from './subscription.js';
 import verificationRouter from './verification.js';
 import integratedAiRouter from './integrated-ai.js';
 import cardOcrRouter from './card-ocr.js';
@@ -83,6 +84,12 @@ export default () => {
     router.use('/stripe/webhook', stripeLimiter);
     router.use('/stripe', apiLimiter);
     router.use('/stripe', stripeRouter);
+
+    // Membership / free-trial subscription (Stripe + PayPal). The PayPal webhook
+    // uses the high-capacity limiter; other endpoints use the standard limiter.
+    router.use('/subscription/paypal/webhook', stripeLimiter);
+    router.use('/subscription', apiLimiter);
+    router.use('/subscription', subscriptionRouter);
 
     // Category management routes with API rate limiting
     router.use('/categories', apiLimiter);
