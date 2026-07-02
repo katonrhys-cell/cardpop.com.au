@@ -31,10 +31,16 @@ const CardImage = ({
   const [useFallback, setUseFallback] = useState(false);
   const imgRef = useRef(null);
 
-  // Reset when the source changes (e.g. card re-used in a virtualised list).
+  // Reset when the source changes (e.g. a card re-used in a virtualised list,
+  // or the session flipping to untransformed URLs after a transformed one
+  // 404s — which swaps `src` for every card at once). Only blank back to the
+  // shimmer if we have not already shown an image; if a photo is already on
+  // screen, keep it visible (opacity-100) and let the browser swap the new
+  // source in place. Forcing opacity-0 here made loaded homepage photos
+  // visibly flicker/disappear on every such re-render (e.g. while scrolling).
   useEffect(() => {
-    setStatus('loading');
     setUseFallback(false);
+    setStatus((prev) => (prev === 'loaded' ? 'loaded' : 'loading'));
   }, [src]);
 
   const canFallback = !useFallback && fallbackSrc && fallbackSrc !== src;
