@@ -134,6 +134,47 @@ const FAQ_DATA = {
 
 const isUUID = (str) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
 
+// Build a URL-safe, unique anchor id from heading text.
+const slugifyHeading = (text, used) => {
+  const base = (text || '')
+    .toLowerCase().trim()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'section';
+  let id = base;
+  let n = 2;
+  while (used.has(id)) id = `${base}-${n++}`;
+  used.add(id);
+  return id;
+};
+
+// Given sanitized article HTML, inject anchor ids onto every <h2> and return
+// both the augmented HTML and a table-of-contents list. Falls back gracefully
+// when DOMParser is unavailable (e.g. non-browser rendering).
+const buildTableOfContents = (sanitizedHtml) => {
+  if (!sanitizedHtml || typeof window === 'undefined' || typeof window.DOMParser === 'undefined') {
+    return { html: sanitizedHtml, toc: [] };
+  }
+  try {
+    const doc = new window.DOMParser().parseFromString(sanitizedHtml, 'text/html');
+    const used = new Set();
+    const toc = Array.from(doc.querySelectorAll('h2'))
+      .map((h) => {
+        const text = h.textContent.trim();
+        if (!text) return null;
+        if (!h.id) h.id = slugifyHeading(text, used);
+        else used.add(h.id);
+        h.style.scrollMarginTop = '6rem';
+        return { id: h.id, text };
+      })
+      .filter(Boolean);
+    return { html: doc.body.innerHTML, toc };
+  } catch {
+    return { html: sanitizedHtml, toc: [] };
+  }
+};
+
 // vault_items.card_image stores a Supabase Storage path, not a full URL.
 // Resolve it to a public URL (already-absolute http URLs are passed through).
 const resolveCardImage = (path) => {
@@ -254,13 +295,26 @@ const BlogArticlePage = () => {
   const articleSlug = article.slug;
   const canonicalUrl = `https://cardpop.com.au/blog/${articleSlug}`;
 
+  const wordCount = htmlContent
+    ? htmlContent.replace(/<[^>]*>/g, ' ').replace(/&[a-z]+;/gi, ' ').split(/\s+/).filter(Boolean).length
+    : 0;
+
+  const { html: contentHtml, toc } = buildTableOfContents(
+    htmlContent ? DOMPurify.sanitize(htmlContent, { ADD_ATTR: ['target'] }) : ''
+  );
+
   const blogStructuredData = generateBlogPostingSchema({
     title: article.seo_title || article.title,
     image: article.featured_image_url,
     author: article.author || 'The Parallel Report',
     publishedAt: article.published_at || article.created_at,
     updated: article.updated_at,
-    excerpt: article.seo_description || article.excerpt
+    excerpt: article.seo_description || article.excerpt,
+    url: canonicalUrl,
+    category: article.category,
+    tags: article.tags,
+    readTime: article.read_time_minutes,
+    wordCount
   });
 
   // Prefer editor-managed FAQs stored on the article; fall back to the
@@ -298,6 +352,7 @@ const BlogArticlePage = () => {
         title={article.seo_title || `${article.title} | The Parallel Report`}
         description={article.seo_description || article.excerpt || `Read ${article.title} on The Parallel Report — CardPop's trading card blog.`}
         ogImage={article.featured_image_url || undefined}
+        ogImageAlt={article.title}
         canonicalUrl={canonicalUrl}
         structuredData={structuredDataArray.length === 1 ? structuredDataArray[0] : structuredDataArray}
       />
@@ -386,16 +441,50 @@ const BlogArticlePage = () => {
 
       <div className="w-full mt-10 mb-24">
         {htmlContent ? (
-          <div
-            className="article-content w-full max-w-4xl mx-auto prose prose-neutral dark:prose-invert px-4"
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(htmlContent, { ADD_ATTR: ['target'] }) }}
-          ></div>
+          <div className="w-full max-w-4xl mx-auto px-4">
+            {toc.length >= 3 && (
+              <nav aria-label="Table of contents" className="mb-10 rounded-xl border border-border bg-muted/30 p-5">
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">On this page</p>
+                <ol className="space-y-2">
+                  {toc.map((item, i) => (
+                    <li key={item.id} className="text-sm leading-snug">
+                      <a href={`#${item.id}`} className="inline-flex gap-2 text-muted-foreground hover:text-primary transition-colors">
+                        <span className="text-primary/50 tabular-nums shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                        <span>{item.text}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+              </nav>
+            )}
+            <div
+              className="article-content prose prose-neutral dark:prose-invert"
+              dangerouslySetInnerHTML={{ __html: contentHtml }}
+            ></div>
+          </div>
         ) : (
           <div className="container-default max-w-6xl mx-auto">
             <p className="text-muted-foreground italic">No content available for this article.</p>
           </div>
         )}
       </div>
+
+      {Array.isArray(article.tags) && article.tags.length > 0 && (
+        <div className="w-full max-w-4xl mx-auto px-4 mb-16">
+          <div className="flex flex-wrap items-center gap-2 pt-8 border-t border-border">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mr-1">Topics</span>
+            {article.tags.map((tag) => (
+              <Link
+                key={tag}
+                to={`/blog?tag=${encodeURIComponent(tag)}`}
+                className="text-xs font-medium px-3 py-1 rounded-full bg-secondary text-secondary-foreground hover:bg-primary hover:text-primary-foreground transition-colors"
+              >
+                {tag}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {faqData && faqData.length > 0 && (
         <section className="border-t border-border py-14">

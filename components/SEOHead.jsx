@@ -1,7 +1,7 @@
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
 
-const SEOHead = ({ title, description, canonicalUrl, ogImage, structuredData }) => {
+const SEOHead = ({ title, description, canonicalUrl, ogImage, ogImageAlt, structuredData }) => {
   const siteName = "CardPop";
   const SITE_ORIGIN = "https://cardpop.com.au";
   const defaultTitle = `${siteName} | Australia's Trading Card Marketplace`;
@@ -24,6 +24,7 @@ const SEOHead = ({ title, description, canonicalUrl, ogImage, structuredData }) 
   const resolvedDesc = description || defaultDescription;
 
   const resolvedOgImage = ogImage || '/og-image.jpg';
+  const resolvedOgImageAlt = ogImageAlt || resolvedTitle;
 
   return (
     <Helmet>
@@ -40,12 +41,14 @@ const SEOHead = ({ title, description, canonicalUrl, ogImage, structuredData }) 
       <meta property="og:site_name" content={siteName} />
       {resolvedCanonical && <meta property="og:url" content={resolvedCanonical} />}
       {resolvedOgImage && <meta property="og:image" content={resolvedOgImage} />}
+      {resolvedOgImage && <meta property="og:image:alt" content={resolvedOgImageAlt} />}
 
       {/* Twitter */}
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={resolvedTitle} />
       <meta name="twitter:description" content={resolvedDesc} />
       {resolvedOgImage && <meta name="twitter:image" content={resolvedOgImage} />}
+      {resolvedOgImage && <meta name="twitter:image:alt" content={resolvedOgImageAlt} />}
 
       {/* Structured Data JSON-LD */}
       {structuredData && (() => {

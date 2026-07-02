@@ -228,20 +228,36 @@ export const generateProductSchema = ({
 export const generateBlogPostingSchema = (blogPost) => {
   if (!blogPost) return null;
 
+  const url = blogPost.url || (typeof window !== 'undefined' ? window.location.href : '');
+  const image = blogPost.image || blogPost.featuredImage;
+  const tags = Array.isArray(blogPost.tags) ? blogPost.tags.filter(Boolean) : [];
+  const readTime = Number(blogPost.readTime);
+  const wordCount = Number(blogPost.wordCount);
+
   return {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
     "headline": blogPost.title,
-    "image": blogPost.image || blogPost.featuredImage,
+    ...(image ? { image } : {}),
     "author": {
       "@type": "Person",
       "name": blogPost.author || "CardPop Team",
       "url": "https://cardpop.com.au/blog"
     },
+    "publisher": {
+      "@type": "Organization",
+      "name": "CardPop",
+      "logo": { "@type": "ImageObject", "url": "https://cardpop.com.au/og-image.jpg" }
+    },
     "datePublished": blogPost.publishedAt || blogPost.created,
-    "dateModified": blogPost.updated,
+    "dateModified": blogPost.updated || blogPost.publishedAt || blogPost.created,
     "description": blogPost.excerpt || blogPost.description,
-    "url": typeof window !== 'undefined' ? window.location.href : ''
+    ...(blogPost.category ? { articleSection: blogPost.category } : {}),
+    ...(tags.length ? { keywords: tags.join(', ') } : {}),
+    ...(Number.isFinite(readTime) && readTime > 0 ? { timeRequired: `PT${readTime}M` } : {}),
+    ...(Number.isFinite(wordCount) && wordCount > 0 ? { wordCount } : {}),
+    ...(url ? { mainEntityOfPage: { "@type": "WebPage", "@id": url } } : {}),
+    "url": url
   };
 };
 
