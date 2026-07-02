@@ -20,6 +20,21 @@ const CATEGORIES = [
   { value: 'news-releases',    label: 'News & Releases'   },
 ];
 
+// Mirrors the CardPop Conviction Rating™ scale rendered on the article page.
+const CONVICTION_OPTIONS = [
+  { value: '1', label: '1 · High Risk'  },
+  { value: '2', label: '2 · Negative'   },
+  { value: '3', label: '3 · Neutral'    },
+  { value: '4', label: '4 · Positive'   },
+  { value: '5', label: '5 · Strong Buy' },
+];
+
+// Comma / newline separated text ⇄ trimmed, de-duplicated string array
+const parseList = (text) =>
+  Array.from(new Set(
+    (text ?? '').split(/[\n,]/).map(t => t.trim()).filter(Boolean)
+  ));
+
 const slugify = (text) =>
   text.toLowerCase().trim()
     .replace(/[^\w\s-]/g, '')
@@ -65,6 +80,12 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
   const [featured, setFeatured] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
   const [faqs, setFaqs] = useState([]);
+  const [seoTitle, setSeoTitle] = useState('');
+  const [seoDescription, setSeoDescription] = useState('');
+  const [tags, setTags] = useState('');
+  const [marketplaceKeywords, setMarketplaceKeywords] = useState('');
+  const [convictionRating, setConvictionRating] = useState('none');
+  const [readTimeMinutes, setReadTimeMinutes] = useState('');
   const [saving, setSaving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [importedFileName, setImportedFileName] = useState('');
@@ -80,6 +101,12 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
     setFeatured(article?.featured ?? false);
     setIsPublished(article?.is_published ?? false);
     setFaqs(Array.isArray(article?.faqs) ? article.faqs : []);
+    setSeoTitle(article?.seo_title ?? '');
+    setSeoDescription(article?.seo_description ?? '');
+    setTags(Array.isArray(article?.tags) ? article.tags.join(', ') : '');
+    setMarketplaceKeywords(Array.isArray(article?.marketplace_keywords) ? article.marketplace_keywords.join(', ') : '');
+    setConvictionRating(article?.conviction_rating ? String(article.conviction_rating) : 'none');
+    setReadTimeMinutes(article?.read_time_minutes != null ? String(article.read_time_minutes) : '');
     setImportedFileName('');
   }, [article, isOpen]);
 
@@ -136,6 +163,15 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
         featured,
         is_published: isPublished,
         published_at: isPublished ? (article?.published_at ?? new Date().toISOString()) : null,
+        seo_title: seoTitle.trim() || null,
+        seo_description: seoDescription.trim() || null,
+        tags: parseList(tags),
+        marketplace_keywords: parseList(marketplaceKeywords),
+        conviction_rating: convictionRating === 'none' ? null : Number(convictionRating),
+        read_time_minutes: (() => {
+          const n = parseInt(readTimeMinutes, 10);
+          return Number.isFinite(n) && n > 0 ? n : null;
+        })(),
         faqs: (() => {
           const cleaned = faqs
             .map(f => ({ question: f.question?.trim(), answer: f.answer?.trim() }))
@@ -338,6 +374,87 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* ── SEO & Metadata ── */}
+          <div className="rounded-lg border border-border p-4 bg-muted/20 space-y-4">
+            <div>
+              <Label className="text-sm font-semibold">SEO &amp; Metadata</Label>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Powers search snippets, related-card matching, and the article header.
+              </p>
+            </div>
+
+            {/* SEO Title */}
+            <div className="space-y-1">
+              <Label>SEO Title</Label>
+              <Input
+                value={seoTitle}
+                onChange={e => setSeoTitle(e.target.value)}
+                placeholder="Search-engine title (50–60 chars). Falls back to the article title."
+              />
+            </div>
+
+            {/* SEO Description */}
+            <div className="space-y-1">
+              <Label>SEO Description</Label>
+              <Textarea
+                value={seoDescription}
+                onChange={e => setSeoDescription(e.target.value)}
+                placeholder="Meta description (150–160 chars). Falls back to the excerpt."
+                rows={2}
+              />
+            </div>
+
+            {/* Tags */}
+            <div className="space-y-1">
+              <Label>Tags <span className="text-xs font-normal text-muted-foreground">(comma separated)</span></Label>
+              <Input
+                value={tags}
+                onChange={e => setTags(e.target.value)}
+                placeholder="NBA, basketball cards, card investing…"
+              />
+            </div>
+
+            {/* Marketplace Keywords */}
+            <div className="space-y-1">
+              <Label>Marketplace Keywords <span className="text-xs font-normal text-muted-foreground">(comma separated)</span></Label>
+              <Input
+                value={marketplaceKeywords}
+                onChange={e => setMarketplaceKeywords(e.target.value)}
+                placeholder="prizm, rookie cards, giannis…"
+              />
+              <p className="text-xs text-muted-foreground">Lowercase terms matched against listing names to surface related cards on the article.</p>
+            </div>
+
+            {/* Conviction + Read time */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>Conviction Rating</Label>
+                <Select value={convictionRating} onValueChange={setConvictionRating}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None (hide)</SelectItem>
+                    {CONVICTION_OPTIONS.map(o => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">Investment thesis conviction. Leave as None for how-to / educational articles.</p>
+              </div>
+              <div className="space-y-1">
+                <Label>Read Time <span className="text-xs font-normal text-muted-foreground">(minutes)</span></Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={readTimeMinutes}
+                  onChange={e => setReadTimeMinutes(e.target.value)}
+                  placeholder="e.g. 7"
+                />
+              </div>
+            </div>
           </div>
 
           {/* ── Toggles ── */}
