@@ -83,7 +83,11 @@ const initSentry = () => {
 // execute off the critical path cuts main-thread work and long tasks during load.
 const GA_MEASUREMENT_ID = 'G-NCZ6K9VFF8';
 const loadThirdPartyScripts = () => {
-  if (!import.meta.env.PROD) return;
+  // Skip in dev and on localhost hosts (local `vite preview`, e2e/CI). On those
+  // hosts the analytics/affiliate CDNs are unreachable or proxied to an HTML
+  // error body that the browser tries to execute as JS, and they add no value
+  // off a real deployment anyway. Mirrors the analyticsEnabled gate above.
+  if (!import.meta.env.PROD || !analyticsEnabled) return;
 
   // Google Analytics (gtag.js)
   try {

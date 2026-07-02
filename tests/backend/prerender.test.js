@@ -305,6 +305,14 @@ describe('prerender static content pages', () => {
     expect(body).toContain('How does the CardPop™ Vault work?');
     expect(body).toContain('"@type":"Question"');
   });
+
+  it('renders the analytics page', async () => {
+    const { status, body } = await run('/analytics');
+    expect(status).toBe(200);
+    expect(body).toContain('<h1>Card Market Analytics</h1>');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/analytics" />');
+    expect(body).not.toContain('noindex');
+  });
 });
 
 describe('prerender blog index', () => {

@@ -29,6 +29,9 @@ Disallow: /success
 # Internal tooling
 Disallow: /diagnostics
 
+# Internal search results — no unique indexable content, avoid crawl traps
+Disallow: /search
+
 # Rate limiting for all bots
 # Please crawl at a reasonable rate (1-2 second delay between requests)
 # Contact developers@cardpop.com.au for higher rate limit requests

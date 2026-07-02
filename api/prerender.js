@@ -1316,6 +1316,25 @@ const STATIC_CONTENT = {
     ],
     links: [{ text: 'Browse the Marketplace', href: '/marketplace' }, { text: 'The Shop', href: '/shop' }],
   },
+
+  '/analytics': {
+    title: 'Card Market Analytics | CardPop',
+    description: 'Track trading card market prices and trends for Pokemon, Magic: The Gathering, Yu-Gi-Oh and more in Australia.',
+    breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Market Analytics', path: '/analytics' }],
+    h1: 'Card Market Analytics',
+    intro: 'Research sold prices, track investment trends, and identify market movers across every major trading card collection — all in one place.',
+    sections: [
+      { h2: 'Research any card', paras: ['Search any card — for example “Charizard VSTAR Brilliant Stars” — to see live eBay Australia active listings, average pricing and 30-day price history in AUD.'] },
+      { h2: 'What you can track', items: [
+        { text: '90-day high and low prices in AUD.' },
+        { text: '7-day and 30-day price changes.' },
+        { text: '90-day sales volume and an investment signal.' },
+        { text: 'Live eBay AU listings and recent sold listings.' },
+      ] },
+      { h2: 'Market movers', paras: ['See the day’s biggest advancers and decliners across Pokémon, Magic: The Gathering, Yu-Gi-Oh and sports card collections.'] },
+    ],
+    links: [{ text: 'Australian Card Markets', href: '/australian-markets' }, { text: 'Browse the Marketplace', href: '/marketplace' }, { text: 'Grading Hub', href: '/grading' }],
+  },
 };
 
 // Ordered list -> XML/HTML helpers for the static renderer.
