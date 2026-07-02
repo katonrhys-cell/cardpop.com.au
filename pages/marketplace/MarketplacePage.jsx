@@ -166,7 +166,11 @@ const MarketplacePage = () => {
         else if (filterMode === 'ForTrade') query = query.eq('accepts_trade', true);
         else if (filterMode === 'MakeOffer') query = query.eq('accepts_offers', true);
 
-        if (filterRookie) query = query.contains('vault_items.cardVariants', ['Rookie Card (RC)']);
+        // vault_items stores variants as a comma-separated text column (`variant`),
+        // not a `cardVariants` array — match the Rookie token within it. Filtering
+        // on the non-existent column returned a hard PostgREST error that surfaced
+        // as the "Connection Error" panel the moment this filter was toggled.
+        if (filterRookie) query = query.ilike('vault_items.variant', '%Rookie Card (RC)%');
 
         if (sort === 'price_asc')  query = query.order('price_aud', { ascending: true });
         else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });

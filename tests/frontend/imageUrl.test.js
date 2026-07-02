@@ -45,7 +45,18 @@ describe('getCardImage', () => {
     expect(r.srcSet).toBeNull();
   });
 
-  it('builds a responsive srcSet + untransformed fallback for a storage path', () => {
+  it('serves the untransformed public URL by default (transform add-on disabled)', () => {
+    // With image transformations off, a storage path resolves directly to the
+    // plain public URL — no /render/ request that would 403 on this project.
+    const r = getCardImage('user/card.jpg', { widths: [240, 400, 600] });
+    expect(r.src).toBe('https://cdn/object/vault-images/user/card.jpg');
+    expect(r.src).toBe(r.fallbackSrc);
+    expect(r.srcSet).toBeNull();
+    expect(r.src).not.toContain('render');
+  });
+
+  it('builds a responsive srcSet + untransformed fallback when transforms are enabled', () => {
+    vi.stubEnv('VITE_ENABLE_IMAGE_TRANSFORMS', 'true');
     const r = getCardImage('user/card.jpg', { widths: [240, 400, 600] });
     // srcSet has one entry per width, ascending, with the transform endpoint.
     expect(r.srcSet).toContain('w=240');
@@ -57,11 +68,14 @@ describe('getCardImage', () => {
     // fallback is the plain (untransformed) public URL
     expect(r.fallbackSrc).toBe('https://cdn/object/vault-images/user/card.jpg');
     expect(r.fallbackSrc).not.toContain('render');
+    vi.unstubAllEnvs();
   });
 
-  it('honours a custom bucket and quality', () => {
+  it('honours a custom bucket and quality when transforms are enabled', () => {
+    vi.stubEnv('VITE_ENABLE_IMAGE_TRANSFORMS', 'true');
     const r = getCardImage('a/b.png', { bucket: 'avatars', widths: [100], quality: 55 });
     expect(r.src).toBe('https://cdn/render/avatars/a/b.png?w=100&q=55');
+    vi.unstubAllEnvs();
   });
 
   it('stops emitting transforms once transforms are marked unavailable', () => {

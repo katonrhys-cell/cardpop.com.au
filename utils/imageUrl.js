@@ -18,6 +18,16 @@ import { supabase } from '@/lib/supabaseClient.js';
 const DEFAULT_BUCKET = 'vault-images';
 const DEFAULT_WIDTHS = [240, 400, 600];
 
+// Supabase image transformations are a paid add-on. It is currently disabled on
+// this project, so the /render/image/* endpoint returns 403 for every request —
+// which meant every card grid fired a burst of failing transform requests on
+// each load before falling back to the untransformed original. Default the
+// feature OFF so we serve the public URL directly (no wasted 403s, no image
+// flash). Flip VITE_ENABLE_IMAGE_TRANSFORMS=true if the add-on is enabled.
+// Read at call-time so the flag can be toggled in tests / at runtime.
+const transformsEnabled = () =>
+  (import.meta?.env?.VITE_ENABLE_IMAGE_TRANSFORMS ?? 'false') === 'true';
+
 // Session-scoped: set true the first time a transformed URL 404/errors.
 let transformsUnavailable = false;
 
@@ -60,8 +70,8 @@ export function getCardImage(pathOrUrl, opts = {}) {
 
   const fallbackSrc = supabase.storage.from(bucket).getPublicUrl(pathOrUrl).data.publicUrl;
 
-  // Feature known-off this session → just serve the original.
-  if (transformsUnavailable) {
+  // Feature disabled (or known-off this session) → just serve the original.
+  if (!transformsEnabled() || transformsUnavailable) {
     return { src: fallbackSrc, srcSet: null, fallbackSrc };
   }
 
