@@ -68,6 +68,21 @@ describe('CardImage', () => {
     expect(screen.getByText('No Image')).toBeInTheDocument();
   });
 
+  it('keeps an already-loaded image visible when its src changes (no blank flicker on scroll)', () => {
+    const { rerender } = render(<CardImage src="https://cdn/render/a.jpg?w=400" alt="A card" />);
+    const img = screen.getByAltText('A card');
+
+    // Photo has loaded and is on screen.
+    fireEvent.load(img);
+    expect(img.className).toContain('opacity-100');
+
+    // Session flips to untransformed URLs, so getCardImage now hands the same
+    // visual card a different `src`. Re-render with the new URL: the image must
+    // NOT blank back to opacity-0 — the browser swaps the source in place.
+    rerender(<CardImage src="https://cdn/object/a.jpg" alt="A card" />);
+    expect(screen.getByAltText('A card').className).toContain('opacity-100');
+  });
+
   it('reveals a cached image that finished loading before onLoad could attach', () => {
     // Simulate a browser-cached image: `complete` is already true (with real
     // dimensions) at mount, so the `load` event never reaches our handler.
