@@ -19,7 +19,6 @@ import categoriesRouter from './categories.js';
 import subcategoriesRouter from './subcategories.js';
 import vaultRouter from './vault.js';
 import photoTemplateRouter from './photo-template.js';
-import sitemapRouter from './sitemap.js';
 import searchSuggestionsRouter from './search-suggestions.js';
 import sellerRatingsRouter from './seller-ratings.js';
 import buyerProtectionRouter from './buyer-protection.js';

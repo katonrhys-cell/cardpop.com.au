@@ -5,6 +5,13 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const BASE_URL = 'https://cardpop.com.au';
 const TODAY = new Date().toISOString().split('T')[0];
+// Keep recently-finished events in the sitemap for a short window. Their pages
+// still pull search traffic (recaps, "was there a card show in <city>") for a
+// few weeks after the date, so dropping them the instant they end wastes the
+// indexing work. Older events fall out to avoid a growing pile of stale URLs.
+const EVENTS_SINCE = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+  .toISOString()
+  .split('T')[0];
 // Stable <lastmod> for structural/static pages. Stamping TODAY on every request
 // (even when nothing changed) trains crawlers to distrust the sitemap's dates,
 // which hurts recrawl scheduling. Bump this only when the static pages actually
@@ -102,7 +109,7 @@ export default async function handler(req, res) {
         .from('events')
         .select('id, slug, updated_at, created_at')
         .eq('status', 'approved')
-        .gte('start_date', TODAY)
+        .gte('start_date', EVENTS_SINCE)
         .order('start_date', { ascending: true })
         .limit(500),
     ]);
