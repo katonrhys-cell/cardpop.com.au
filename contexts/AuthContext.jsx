@@ -144,21 +144,28 @@ export const AuthProvider = ({ children }) => {
     };
   }, [session?.access_token]);
 
-  const signup = async (email, password, fullName) => {
+  const signup = async (email, password, fullName, captchaToken) => {
     const username = email.split('@')[0].replace(/[^a-z0-9_]/gi, '').toLowerCase();
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { full_name: fullName, username },
+        // Required when Cloudflare Turnstile CAPTCHA is enabled in Supabase.
+        // Harmlessly ignored when it isn't.
+        captchaToken,
       },
     });
     if (error) throw error;
     return data;
   };
 
-  const login = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const login = async (email, password, captchaToken) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+      options: { captchaToken },
+    });
     if (error) throw new Error(error.message);
 
     // Check if the user has a verified TOTP factor enrolled via Supabase native MFA.
@@ -202,17 +209,23 @@ export const AuthProvider = ({ children }) => {
     supabase.auth.signOut().catch(e => console.error('[AuthContext] signOut failed:', e));
   };
 
-  const resendVerificationEmail = async (email) => {
-    const { error } = await supabase.auth.resend({ type: 'signup', email });
+  const resendVerificationEmail = async (email, captchaToken) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { captchaToken },
+    });
     if (error) throw new Error(error.message);
     return true;
   };
 
-  const resetPassword = async (email) => {
+  const resetPassword = async (email, captchaToken) => {
     // Must point at a real, public route that renders PasswordResetPage so the
     // recovery link resolves (there is no /account/reset-password route).
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
+      // Required when Turnstile CAPTCHA is enabled in Supabase.
+      captchaToken,
     });
     if (error) throw new Error(error.message);
     return true;

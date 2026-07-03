@@ -189,8 +189,8 @@ describe('login', () => {
     await emitAuth('INITIAL_SESSION', null);
 
     let result;
-    await act(async () => { result = await captured.login('a@b.com', 'pw'); });
-    expect(supabase.auth.signInWithPassword).toHaveBeenCalledWith({ email: 'a@b.com', password: 'pw' });
+    await act(async () => { result = await captured.login('a@b.com', 'pw', 'captcha-tok'); });
+    expect(supabase.auth.signInWithPassword).toHaveBeenCalledWith({ email: 'a@b.com', password: 'pw', options: { captchaToken: 'captcha-tok' } });
     expect(result).toEqual(h.signInResult.data);
     expect(txt('userId')).toBe('user-1');
   });
@@ -231,11 +231,11 @@ describe('signup', () => {
     renderAuth();
     await emitAuth('INITIAL_SESSION', null);
 
-    await act(async () => { await captured.signup('John.Doe@example.com', 'pw', 'John Doe'); });
+    await act(async () => { await captured.signup('John.Doe@example.com', 'pw', 'John Doe', 'captcha-tok'); });
     expect(supabase.auth.signUp).toHaveBeenCalledWith({
       email: 'John.Doe@example.com',
       password: 'pw',
-      options: { data: { full_name: 'John Doe', username: 'johndoe' } },
+      options: { data: { full_name: 'John Doe', username: 'johndoe' }, captchaToken: 'captcha-tok' },
     });
   });
 
@@ -276,10 +276,10 @@ describe('password & verification helpers', () => {
   it('resetPassword targets the public /reset-password route', async () => {
     renderAuth();
     await emitAuth('INITIAL_SESSION', null);
-    await act(async () => { await captured.resetPassword('a@b.com'); });
+    await act(async () => { await captured.resetPassword('a@b.com', 'captcha-tok'); });
     expect(supabase.auth.resetPasswordForEmail).toHaveBeenCalledWith(
       'a@b.com',
-      { redirectTo: `${window.location.origin}/reset-password` },
+      { redirectTo: `${window.location.origin}/reset-password`, captchaToken: 'captcha-tok' },
     );
   });
 
@@ -298,8 +298,8 @@ describe('password & verification helpers', () => {
   it('resendVerificationEmail resends a signup confirmation', async () => {
     renderAuth();
     await emitAuth('INITIAL_SESSION', null);
-    await act(async () => { await captured.resendVerificationEmail('a@b.com'); });
-    expect(supabase.auth.resend).toHaveBeenCalledWith({ type: 'signup', email: 'a@b.com' });
+    await act(async () => { await captured.resendVerificationEmail('a@b.com', 'captcha-tok'); });
+    expect(supabase.auth.resend).toHaveBeenCalledWith({ type: 'signup', email: 'a@b.com', options: { captchaToken: 'captcha-tok' } });
   });
 });
 

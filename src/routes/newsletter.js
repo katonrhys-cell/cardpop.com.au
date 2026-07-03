@@ -12,10 +12,16 @@ router.post('/subscribe', async (req, res) => {
     return res.status(400).json({ error: 'A valid email address is required.' });
   }
 
-  // Bot protection. Skipped automatically when RECAPTCHA_SECRET_KEY is unset.
-  const captcha = await verifyRecaptchaToken(recaptchaToken, req.ip);
-  if (!captcha.success) {
-    return res.status(400).json({ error: 'reCAPTCHA verification failed. Please try again.' });
+  // Bot protection for the public newsletter form, which always sends a token.
+  // Verified only when a token is supplied (and skipped automatically when
+  // RECAPTCHA_SECRET_KEY is unset); trusted internal callers — e.g. the
+  // signup opt-in behind its own captcha — may omit it and rely on the rate
+  // limiter applied to this route.
+  if (recaptchaToken) {
+    const captcha = await verifyRecaptchaToken(recaptchaToken, req.ip);
+    if (!captcha.success) {
+      return res.status(400).json({ error: 'reCAPTCHA verification failed. Please try again.' });
+    }
   }
 
   try {

@@ -4,8 +4,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
-import Recaptcha from '@/components/Recaptcha.jsx';
-import { RECAPTCHA_ENABLED, verifyRecaptcha } from '@/lib/recaptcha.js';
+import Turnstile from '@/components/Turnstile.jsx';
+import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,8 +18,8 @@ const SignupPage = () => {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [recaptchaToken, setRecaptchaToken] = useState('');
-  const recaptchaRef = useRef(null);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const turnstileRef = useRef(null);
   
   const [passwordValidation, setPasswordValidation] = useState({
     length: false,
@@ -45,7 +45,7 @@ const SignupPage = () => {
 
   const score = Object.values(passwordValidation).filter(Boolean).length;
   const isPasswordValid = score === 5;
-  const isFormValid = formData.name.trim() !== '' && formData.email.trim() !== '' && isPasswordValid && termsAccepted && (!RECAPTCHA_ENABLED || Boolean(recaptchaToken));
+  const isFormValid = formData.name.trim() !== '' && formData.email.trim() !== '' && isPasswordValid && termsAccepted && (!TURNSTILE_ENABLED || Boolean(captchaToken));
 
   const handleAccountSubmit = async (e) => {
     e.preventDefault();
@@ -56,32 +56,13 @@ const SignupPage = () => {
 
     setLoading(true);
     try {
-      // Prove the request is human before creating the account. When opted in,
-      // the same verified round trip also handles the newsletter subscription
-      // (the reCAPTCHA token is single-use, so it can't be reused separately).
-      if (RECAPTCHA_ENABLED) {
-        try {
-          await verifyRecaptcha(recaptchaToken, {
-            newsletter: newsletterOptIn
-              ? { email: formData.email, firstName: formData.name.split(' ')[0] }
-              : undefined,
-          });
-        } catch (captchaErr) {
-          toast.error(captchaErr.message || 'reCAPTCHA check failed. Please try again.');
-          recaptchaRef.current?.reset();
-          setRecaptchaToken('');
-          setLoading(false);
-          return;
-        }
-      }
-
-      const result = await signup(formData.email, formData.password, formData.name);
+      // Turnstile token (when enabled) is verified server-side by Supabase Auth.
+      const result = await signup(formData.email, formData.password, formData.name, captchaToken);
       const user = result?.user;
       const session = result?.session;
 
-      // Newsletter opt-in (fire-and-forget — never blocks registration). When
-      // reCAPTCHA is enabled this is handled by the verify call above.
-      if (newsletterOptIn && !RECAPTCHA_ENABLED) {
+      // Newsletter opt-in (fire-and-forget — never blocks registration).
+      if (newsletterOptIn) {
         apiServerClient.fetch('/newsletter/subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -115,10 +96,9 @@ const SignupPage = () => {
         setSuccess(true);
       }
     } catch (error) {
-      // The reCAPTCHA token is single-use and was already consumed above, so
-      // reset the widget to let the user submit again.
-      recaptchaRef.current?.reset();
-      setRecaptchaToken('');
+      // Turnstile tokens are single-use; reset so the user can submit again.
+      turnstileRef.current?.reset();
+      setCaptchaToken('');
       toast.error(error.message || 'Registration failed. Email may already be in use.');
     } finally {
       setLoading(false);
@@ -278,10 +258,10 @@ const SignupPage = () => {
               </label>
             </div>
 
-            <Recaptcha
-              ref={recaptchaRef}
-              onVerify={setRecaptchaToken}
-              onExpire={() => setRecaptchaToken('')}
+            <Turnstile
+              ref={turnstileRef}
+              onVerify={setCaptchaToken}
+              onExpire={() => setCaptchaToken('')}
               className="flex justify-center"
             />
 
