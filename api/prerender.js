@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { COLLECTION_SEO } from '../data/collectionSeo.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -1724,6 +1725,241 @@ ${faqHtml}
   });
 }
 
+// Mirror of resolveCollectionSlug in data/collectionConfigs.js — maps URL slug
+// variations (including category aliases) onto the primary collection slug.
+const resolveCollection = (rawSlug) => {
+  if (!rawSlug) return null;
+  const s = String(rawSlug).toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  if (COLLECTION_SEO[s]) return s;
+  for (const [key, cfg] of Object.entries(COLLECTION_SEO)) {
+    if (cfg.aliases?.some((a) => a.toLowerCase() === String(rawSlug).toLowerCase())) return key;
+  }
+  return null;
+};
+
+function renderCollectionsIndex() {
+  const canonical = `${BASE_URL}/collections`;
+  const title = 'Trading Card Collections | CardPop';
+  const description = 'Browse every trading card collection on CardPop Australia — Pokémon, Magic: The Gathering, Yu-Gi-Oh, NBA, AFL, NRL and more, from verified Australian sellers.';
+
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'Collections', item: canonical },
+    ],
+  };
+
+  const itemList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'CardPop Collections',
+    numberOfItems: Object.keys(COLLECTION_SEO).length,
+    itemListElement: Object.entries(COLLECTION_SEO).map(([slug, cfg], i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      name: cfg.name,
+      url: `${BASE_URL}/collections/${slug}`,
+    })),
+  };
+
+  const itemsHtml = Object.entries(COLLECTION_SEO)
+    .map(([slug, cfg]) => `    <li><a href="${BASE_URL}/collections/${esc(slug)}"><strong>${esc(cfg.name)}</strong></a> — ${esc(cfg.description || '')}</li>`)
+    .join('\n');
+
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / Collections</nav>
+  <h1>Trading Card Collections</h1>
+  <p>${esc(description)}</p>
+  <ul>
+${itemsHtml}
+  </ul>
+</main>`;
+
+  return htmlDoc({ title, description, canonical, jsonLdItems: [breadcrumb, itemList], bodyHtml });
+}
+
+async function renderCollection(supabase, rawSlug) {
+  const slug = resolveCollection(rawSlug);
+  if (!slug) {
+    return htmlDoc({
+      title: 'Collection Not Found | CardPop',
+      description: 'This collection could not be found on CardPop.',
+      canonical: `${BASE_URL}/collections`,
+      robots: 'noindex, follow',
+      bodyHtml: '<main><h1>Collection Not Found</h1><p>This collection is not available.</p></main>',
+    });
+  }
+
+  const cfg = COLLECTION_SEO[slug];
+  // Alias slugs canonicalise to the primary collection URL.
+  const canonical = `${BASE_URL}/collections/${slug}`;
+  const title = cfg.title || `${cfg.name} | CardPop`;
+  const description = cfg.description || `Buy, sell and trade ${cfg.name} trading cards on CardPop Australia.`;
+
+  // Best-effort listing sample for the collection — category values in the DB
+  // match the collection name or one of its aliases. An empty result only
+  // trims the list; the SEO copy above still renders.
+  const categoryValues = [cfg.name, ...(cfg.aliases || [])];
+  const { data } = await supabase
+    .from('listings')
+    .select('id, slug, title, price_aud, category, vault_item:vault_items(card_name)')
+    .eq('status', 'active')
+    .in('category', categoryValues)
+    .order('created_at', { ascending: false })
+    .limit(50);
+  const listings = data || [];
+
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'Collections', item: `${BASE_URL}/collections` },
+      { '@type': 'ListItem', position: 3, name: cfg.name, item: canonical },
+    ],
+  };
+
+  const collectionPage = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: title,
+    description,
+    url: canonical,
+  };
+
+  const jsonLdItems = [collectionPage, breadcrumb];
+  if (listings.length > 0) {
+    jsonLdItems.push({
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: `${cfg.name} listings`,
+      numberOfItems: listings.length,
+      itemListElement: listings.map((l, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        name: l.title || l.vault_item?.card_name || 'Trading Card',
+        url: `${BASE_URL}/marketplace/${l.id}/${l.slug || 'listing'}`,
+      })),
+    });
+  }
+
+  const itemsHtml = listings.map((l) => {
+    const name = l.title || l.vault_item?.card_name || 'Trading Card';
+    return `    <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(l.slug || 'listing')}">${esc(name)}</a>`
+      + `${l.price_aud > 0 ? ` — A$${esc(Number(l.price_aud).toFixed(2))}` : ''}</li>`;
+  }).join('\n');
+
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/collections">Collections</a> / ${esc(cfg.name)}</nav>
+  <h1>${esc(cfg.name)} Cards in Australia</h1>
+  <p>${esc(description)}</p>
+  ${cfg.intro ? `<p>${esc(cfg.intro)}</p>` : ''}
+  <h2>Latest ${esc(cfg.name)} Listings (${listings.length})</h2>
+  <ul>
+${itemsHtml || '    <li>No active listings right now — check back soon or browse the marketplace.</li>'}
+  </ul>
+  <p><a href="${BASE_URL}/marketplace">Browse the full marketplace</a></p>
+</main>`;
+
+  return htmlDoc({ title, description, canonical, jsonLdItems, bodyHtml });
+}
+
+async function renderSeller(supabase, param) {
+  const canonicalSelf = `${BASE_URL}/seller/${param}`;
+  if (!UUID_RE.test(param)) {
+    return htmlDoc({
+      title: 'Seller Profile | CardPop',
+      description: 'View seller profiles on CardPop.',
+      canonical: canonicalSelf,
+      robots: 'noindex, follow',
+      bodyHtml: '<main><h1>Seller Profile</h1></main>',
+    });
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, store_slug, business_name, display_name, username, bio, business_tagline, avatar_url, business_logo_url, location_state, location_suburb, rating, reviews_count, is_sole_trader, is_public')
+    .eq('id', param)
+    .maybeSingle();
+
+  if (!profile || profile.is_public === false) {
+    return htmlDoc({
+      title: 'Seller Not Found | CardPop',
+      description: 'This seller profile could not be found on CardPop.',
+      canonical: canonicalSelf,
+      robots: 'noindex, follow',
+      bodyHtml: '<main><h1>Seller Not Found</h1><p>This profile is not available.</p></main>',
+    });
+  }
+
+  const name = profile.display_name || profile.business_name || profile.username || 'CardPop Seller';
+  // Sole traders have a dedicated /dealer store page (in the sitemap and
+  // prerendered) with substantially the same content — that page is canonical,
+  // so /seller/:id for them is a declared alternate rather than a duplicate.
+  const canonical = profile.is_sole_trader
+    ? `${BASE_URL}/dealer/${profile.store_slug || profile.id}`
+    : canonicalSelf;
+  const image = absUrl(profile.avatar_url || profile.business_logo_url);
+  const location = [profile.location_suburb, profile.location_state].filter(Boolean).join(', ');
+  const title = `${name} | CardPop Seller Profile`;
+  const description = profile.business_tagline || profile.bio
+    || `${name} — trading card seller on CardPop, Australia's trading card marketplace.`;
+
+  const { data: listingData } = await supabase
+    .from('listings')
+    .select('id, slug, title, price_aud, vault_item:vault_items(card_name)')
+    .eq('seller_id', profile.id)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(50);
+  const listings = listingData || [];
+
+  const person = {
+    '@context': 'https://schema.org',
+    '@type': profile.business_name ? 'Organization' : 'Person',
+    name,
+    url: canonical,
+    ...(description ? { description } : {}),
+    ...(image ? { image } : {}),
+    ...(profile.reviews_count > 0 && profile.rating > 0
+      ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: Number(profile.rating).toFixed(1), reviewCount: profile.reviews_count } }
+      : {}),
+  };
+
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'Marketplace', item: `${BASE_URL}/marketplace` },
+      { '@type': 'ListItem', position: 3, name, item: canonicalSelf },
+    ],
+  };
+
+  const itemsHtml = listings.map((l) => {
+    const cardName = l.title || l.vault_item?.card_name || 'Trading Card';
+    return `    <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(l.slug || 'listing')}">${esc(cardName)}</a>`
+      + `${l.price_aud > 0 ? ` — A$${esc(Number(l.price_aud).toFixed(2))}` : ''}</li>`;
+  }).join('\n');
+
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/marketplace">Marketplace</a> / ${esc(name)}</nav>
+  <h1>${esc(name)}</h1>
+  ${profile.business_tagline ? `<p>${esc(profile.business_tagline)}</p>` : ''}
+  ${location ? `<p>${esc(location)}</p>` : ''}
+  ${profile.bio ? `<p>${esc(profile.bio)}</p>` : ''}
+  ${profile.is_sole_trader ? `<p><a href="${esc(canonical)}">Visit this seller's store</a></p>` : ''}
+  <h2>Active Listings (${listings.length})</h2>
+  <ul>
+${itemsHtml || '    <li>No active listings at the moment.</li>'}
+  </ul>
+</main>`;
+
+  return htmlDoc({ title, description, canonical, ogImage: image, jsonLdItems: [person, breadcrumb], bodyHtml });
+}
+
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
@@ -1775,6 +2011,22 @@ export default async function handler(req, res) {
     if (dealerMatch) {
       const id = decodeURIComponent(dealerMatch[1]);
       return res.status(200).send(await renderDealer(supabase, id));
+    }
+
+    if (rawPath === '/collections') {
+      return res.status(200).send(renderCollectionsIndex());
+    }
+
+    const collectionMatch = rawPath.match(/^\/collections\/([^/?#]+)/);
+    if (collectionMatch) {
+      const slug = decodeURIComponent(collectionMatch[1]);
+      return res.status(200).send(await renderCollection(supabase, slug));
+    }
+
+    const sellerMatch = rawPath.match(/^\/seller\/([^/?#]+)/);
+    if (sellerMatch) {
+      const id = decodeURIComponent(sellerMatch[1]);
+      return res.status(200).send(await renderSeller(supabase, id));
     }
 
     const listingMatch = rawPath.match(/^\/marketplace\/([^/?#]+)(?:\/([^/?#]+))?/);

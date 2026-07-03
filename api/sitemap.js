@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { COLLECTION_SEO } from '../data/collectionSeo.js';
 
 const SUPABASE_URL = 'https://odoglvswwymyjuwlonkf.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kb2dsdnN3d3lteWp1d2xvbmtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3OTQ5NTgsImV4cCI6MjA5NDM3MDk1OH0.R5fwR42iKIEsfx1iA-fjk4YPLCH3mcmoIKkosEy6g1I';
@@ -85,6 +86,12 @@ const STATIC_PAGES = [
   { loc: '/shipping',              lastmod: '2026-05-31', freq: 'yearly',  pri: '0.4' },
   { loc: '/trust-safety',          lastmod: '2026-05-31', freq: 'yearly',  pri: '0.4' },
   { loc: '/accessibility',         lastmod: '2026-05-31', freq: 'yearly',  pri: '0.3' },
+  // Collection landing pages (config-driven, one per TCG/sport in
+  // data/collectionSeo.js) — evergreen category pages worth indexing.
+  { loc: '/collections',           lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' },
+  ...Object.keys(COLLECTION_SEO).map((slug) => (
+    { loc: `/collections/${slug}`, lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' }
+  )),
 ];
 
 

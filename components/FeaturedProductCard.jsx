@@ -43,7 +43,10 @@ const FeaturedProductCard = ({ product, seller }) => {
     if (product.id) {
       // Unified product route requires a source segment (/product/:source/:id);
       // featured cards come from vault_items, so default the source to 'vault'.
-      navigate(`/product/${product.source || 'vault'}/${product.id}`);
+      // Marketplace listings use their canonical /marketplace/:id URL instead.
+      navigate(product.source === 'marketplace'
+        ? `/marketplace/${product.id}`
+        : `/product/${product.source || 'vault'}/${product.id}`);
     }
   };
 

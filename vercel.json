@@ -24,6 +24,26 @@
       "has": [{ "type": "host", "value": "www.cardpop.com.au" }],
       "destination": "https://cardpop.com.au/:path*",
       "permanent": true
+    },
+    {
+      "source": "/product/marketplace/:id/:slug*",
+      "destination": "/marketplace/:id/:slug*",
+      "permanent": true
+    },
+    {
+      "source": "/product/marketplace/:id",
+      "destination": "/marketplace/:id",
+      "permanent": true
+    },
+    {
+      "source": "/community/events",
+      "destination": "/events",
+      "permanent": true
+    },
+    {
+      "source": "/community/events/:slug*",
+      "destination": "/events/:slug*",
+      "permanent": true
     }
   ],
   "rewrites": [
@@ -102,6 +122,21 @@
       "source": "/grading/:sub(what-is-grading|scales|companies|local-graders|submission-partners|estimator|roi-calculator)",
       "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
       "destination": "/api/prerender?path=/grading/:sub"
+    },
+    {
+      "source": "/collections",
+      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "destination": "/api/prerender?path=/collections"
+    },
+    {
+      "source": "/collections/:slug",
+      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "destination": "/api/prerender?path=/collections/:slug"
+    },
+    {
+      "source": "/seller/:id",
+      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "destination": "/api/prerender?path=/seller/:id"
     },
     {
       "source": "/prices",

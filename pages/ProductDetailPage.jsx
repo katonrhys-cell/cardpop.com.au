@@ -5,6 +5,7 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { canViewVaultProduct } from '@/utils/vaultSecurityUtils.js';
+import { slugify } from '@/lib/slugify.js';
 import { isVerified } from '@/utils/verification.js';
 import { useCart } from '@/hooks/useCart.jsx';
 import { Button } from '@/components/ui/button';
@@ -29,8 +30,11 @@ const getStatusBadge = (listingType) => {
   }
 };
 
-const ProductDetailPage = () => {
-  const { source, id } = useParams();
+// `source` can come from the route param (/product/:source/:id/:slug?) or be
+// fixed by the mounting route (/marketplace/:id/:slug? passes source="marketplace").
+const ProductDetailPage = ({ source: sourceProp }) => {
+  const { source: sourceParam, id } = useParams();
+  const source = sourceProp || sourceParam;
   const navigate = useNavigate();
   const { addToCart, setIsCartOpen } = useCart();
   const { currentUser, isAdmin, loading: authLoading } = useAuth();
@@ -342,6 +346,11 @@ const ProductDetailPage = () => {
           title={`${product.name} | CardPop`}
           description={product.description || `${product.name} — available on CardPop Australia's trading card marketplace.`}
           ogImage={product.images?.[0] || undefined}
+          canonicalUrl={source === 'marketplace'
+            // Marketplace listings canonicalise to /marketplace/:id/:slug — the
+            // URL form the sitemap and bot prerenderer advertise.
+            ? `/marketplace/${id}/${product.slug || slugify(product.name || 'listing')}`
+            : `/product/${source}/${id}/${slugify(product.name || 'product')}`}
         />
 
         <Button variant="link" className="px-0 mb-8 text-muted-foreground hover:text-primary font-medium" onClick={() => navigate(-1)}>
