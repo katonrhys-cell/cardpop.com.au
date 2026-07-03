@@ -91,7 +91,7 @@ Routes are registered in `src/routes/index.js`. Each domain has its own router f
 
 Supabase hosts the PostgreSQL database and provides Auth. The project URL is `https://odoglvswwymyjuwlonkf.supabase.co`.
 
-- **Migrations**: Schema changes are made via the Supabase dashboard or the Supabase CLI.
+- **Migrations**: The repo is the source of truth. Every schema change is a new `supabase/migrations/<timestamp>_<name>.sql` file — **never edit production directly in the SQL editor** (that causes drift). The repo is linked to the project via `supabase/config.toml` (`project_id`). On merge to `main`, `.github/workflows/supabase-migrations.yml` runs `supabase db push`, which applies only the migrations whose version isn't yet in the project's `schema_migrations` table. Locally: `supabase link --project-ref odoglvswwymyjuwlonkf` once, then `supabase db push` to apply, or `supabase migration new <name>` to scaffold. Rules: unique, monotonically increasing version prefixes (no duplicates); write idempotent DDL (`if not exists`, `create or replace`, `drop ... if exists`); keep changes backward-compatible so the schema can land before the app that uses it. CI needs two repo secrets: `SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD`. (Note: the project's `schema_migrations` also contains ~55 older dashboard-applied rows with no repo file — pre-dating this workflow; harmless, `db push` ignores them.)
 - **Frontend client** (`lib/supabaseClient.js`): Uses the public anon key. Security is enforced by RLS policies on the database.
 - **Backend client** (`src/utils/supabaseClient.js`): Uses the service role key — bypasses RLS. Never expose this key client-side.
 

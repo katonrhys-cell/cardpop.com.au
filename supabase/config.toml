@@ -1,0 +1,25 @@
+# Supabase CLI configuration.
+#
+# `project_id` links this repo to the CardPop Australia project so that
+# `supabase link` / `supabase db push` target the right database. It is the
+# project ref, not a secret. Everything the CLI needs to authenticate
+# (SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD) is supplied via environment /
+# GitHub secrets, never committed here.
+#
+# Docs: https://supabase.com/docs/guides/local-development/cli/config
+
+project_id = "odoglvswwymyjuwlonkf"
+
+[db]
+# Must match the remote Postgres major version (see the Supabase dashboard).
+major_version = 17
+
+[db.migrations]
+# Files applied in lexicographic order by their <timestamp>_<name>.sql prefix.
+schema_paths = []
+
+[api]
+enabled = true
+
+[studio]
+enabled = true
