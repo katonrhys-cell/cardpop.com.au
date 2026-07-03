@@ -732,9 +732,10 @@ const eventLocationLine = (ev) =>
   [ev.venue_name, ev.suburb, ev.state].filter(Boolean).join(', ');
 
 // schema.org startDate/endDate — combine the date with a time when we have one.
+// AEST offset matches lib/eventSeo.js; date-only values are also valid per spec.
 const eventIsoDate = (date, time) => {
   if (!date) return undefined;
-  return time ? `${date}T${time}` : date;
+  return time ? `${date}T${time}+10:00` : date;
 };
 
 const EVENT_FIELDS =
@@ -743,6 +744,67 @@ const EVENT_FIELDS =
   'entry_fee_aud, is_free, website_url, ticket_url, organizer_name, seo_title, seo_description, ' +
   'created_at, updated_at';
 
+// Full schema.org Event for a Supabase event record. Every field Google's
+// event rich-result report checks (description, image, eventStatus, offers,
+// organizer, performer, endDate) is always present, falling back to site-level
+// defaults where the record has no data — Search Console flags each missing
+// recommended field as an issue on every event page and landing-list item.
+function buildEventLd(event) {
+  const canonical = `${BASE_URL}/events/${event.slug || event.id}`;
+  const name = event.title || 'Trading Card Event';
+  const location = eventLocationLine(event);
+  const when = eventDateLine(event);
+  const description = toText(
+    event.short_description || event.description
+      || `${name}${location ? ` at ${location}` : ''}${when ? ` on ${when}` : ''} — a trading card event listed on CardPop Australia.`,
+    500,
+  );
+  const organizerName = event.organizer_name || 'CardPop';
+  const startDate = eventIsoDate(event.start_date, event.start_time);
+  const endDate = eventIsoDate(event.end_date || event.start_date, event.end_time);
+
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'Event',
+    name,
+    description,
+    image: [absUrl(event.image_url) || `${BASE_URL}/og-image.jpg`],
+    eventStatus: 'https://schema.org/EventScheduled',
+    eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
+    ...(startDate ? { startDate } : {}),
+    ...(endDate ? { endDate } : {}),
+    url: canonical,
+    location: {
+      '@type': 'Place',
+      name: event.venue_name || location || 'Venue to be announced',
+      address: {
+        '@type': 'PostalAddress',
+        ...(event.address ? { streetAddress: event.address } : {}),
+        ...(event.suburb ? { addressLocality: event.suburb } : {}),
+        ...(event.state ? { addressRegion: event.state } : {}),
+        ...(event.postcode ? { postalCode: event.postcode } : {}),
+        addressCountry: 'AU',
+      },
+    },
+    organizer: {
+      '@type': 'Organization',
+      name: organizerName,
+      url: event.website_url || canonical,
+    },
+    // Card shows have no headline act, so the organising entity stands in as
+    // the performing group (schema.org Event recommends a performer).
+    performer: { '@type': 'Organization', name: organizerName },
+    offers: {
+      '@type': 'Offer',
+      price: event.is_free ? '0' : (Number(event.entry_fee_aud) > 0 ? Number(event.entry_fee_aud).toFixed(2) : '0'),
+      priceCurrency: 'AUD',
+      availability: 'https://schema.org/InStock',
+      url: event.ticket_url || event.website_url || canonical,
+      ...(event.created_at || startDate ? { validFrom: event.created_at || startDate } : {}),
+    },
+  };
+}
+
 async function renderEventsLanding(supabase, categorySlug) {
   const cfg = categorySlug ? EVENT_CATEGORIES[categorySlug] : null;
   const canonical = categorySlug ? `${BASE_URL}/events/${categorySlug}` : `${BASE_URL}/events`;
@@ -750,7 +812,7 @@ async function renderEventsLanding(supabase, categorySlug) {
 
   let q = supabase
     .from('events')
-    .select('id, slug, title, short_description, description, image_url, venue_name, suburb, state, start_date, end_date, entry_fee_aud, is_free')
+    .select(EVENT_FIELDS)
     .eq('status', 'approved')
     .gte('start_date', today);
   if (cfg?.type) q = q.eq('event_type', cfg.type);
@@ -775,18 +837,10 @@ async function renderEventsLanding(supabase, categorySlug) {
     '@type': 'ItemList',
     name: h1,
     numberOfItems: events.length,
-    itemListElement: events.map((ev, i) => ({
-      '@type': 'ListItem',
-      position: i + 1,
-      item: {
-        '@type': 'Event',
-        name: ev.title,
-        url: `${BASE_URL}/events/${ev.slug || ev.id}`,
-        ...(ev.start_date ? { startDate: ev.start_date } : {}),
-        ...(ev.end_date ? { endDate: ev.end_date } : {}),
-        ...(eventLocationLine(ev) ? { location: { '@type': 'Place', name: ev.venue_name || eventLocationLine(ev) } } : {}),
-      },
-    })),
+    itemListElement: events.map((ev, i) => {
+      const { '@context': _c, ...item } = buildEventLd(ev);
+      return { '@type': 'ListItem', position: i + 1, item };
+    }),
   };
 
   const itemsHtml = events.map((ev) => {
@@ -835,38 +889,7 @@ async function renderEvent(supabase, param) {
     || toText(event.description || '')
     || `${name}${location ? ` at ${location}` : ''}${when ? ` on ${when}` : ''} — a trading card event listed on CardPop Australia.`;
 
-  const eventLd = {
-    '@context': 'https://schema.org',
-    '@type': 'Event',
-    name,
-    ...(image ? { image } : {}),
-    description: toText(description, 500),
-    eventStatus: 'https://schema.org/EventScheduled',
-    eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
-    ...(eventIsoDate(event.start_date, event.start_time) ? { startDate: eventIsoDate(event.start_date, event.start_time) } : {}),
-    ...(eventIsoDate(event.end_date || event.start_date, event.end_time) ? { endDate: eventIsoDate(event.end_date || event.start_date, event.end_time) } : {}),
-    url: canonical,
-    ...(location || event.state
-      ? { location: {
-          '@type': 'Place',
-          name: event.venue_name || location || 'Venue',
-          address: {
-            '@type': 'PostalAddress',
-            ...(event.address ? { streetAddress: event.address } : {}),
-            ...(event.suburb ? { addressLocality: event.suburb } : {}),
-            ...(event.state ? { addressRegion: event.state } : {}),
-            ...(event.postcode ? { postalCode: event.postcode } : {}),
-            addressCountry: 'AU',
-          },
-        } }
-      : {}),
-    ...(event.organizer_name ? { organizer: { '@type': 'Organization', name: event.organizer_name } } : {}),
-    ...(event.is_free
-      ? { offers: { '@type': 'Offer', price: '0', priceCurrency: 'AUD', availability: 'https://schema.org/InStock', url: event.ticket_url || event.website_url || canonical } }
-      : (event.entry_fee_aud > 0
-        ? { offers: { '@type': 'Offer', price: Number(event.entry_fee_aud).toFixed(2), priceCurrency: 'AUD', availability: 'https://schema.org/InStock', url: event.ticket_url || event.website_url || canonical } }
-        : {})),
-  };
+  const eventLd = { ...buildEventLd(event), description: toText(description, 500) };
 
   const breadcrumb = {
     '@context': 'https://schema.org',

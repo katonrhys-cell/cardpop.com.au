@@ -237,6 +237,14 @@ describe('prerender events', () => {
     expect(body).toContain('Melbourne Card Expo');
     expect(body).toContain('/events/melbourne-card-expo');
     expect(body).not.toContain('noindex');
+    // Every listed Event must carry the fields Google's rich-result report
+    // checks, with fallbacks when the record is sparse.
+    expect(body).toContain('"eventStatus":"https://schema.org/EventScheduled"');
+    expect(body).toContain('"offers":{"@type":"Offer"');
+    expect(body).toContain('"organizer":{"@type":"Organization","name":"CardPop"');
+    expect(body).toContain('"performer":{"@type":"Organization"');
+    expect(body).toContain('https://cardpop.com.au/og-image.jpg');
+    expect(body).toContain('"description":"Melbourne Card Expo at Royal Exhibition Building, Carlton, VIC on 2026-08-01');
   });
 
   it('renders a category landing for a known slug', async () => {
@@ -262,6 +270,21 @@ describe('prerender events', () => {
     expect(body).toContain('"addressRegion":"VIC"');
     expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/events/melbourne-card-expo" />');
     expect(body).not.toContain('noindex');
+  });
+
+  it('always emits offers, image, organizer, eventStatus and description for a sparse event', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'tiny-meetup', title: 'Tiny Meetup', status: 'approved',
+      start_date: '2026-09-05',
+    } };
+    const { body } = await run('/events/tiny-meetup');
+    expect(body).toContain('"eventStatus":"https://schema.org/EventScheduled"');
+    expect(body).toContain('"offers":{"@type":"Offer","price":"0","priceCurrency":"AUD"');
+    expect(body).toContain('"organizer":{"@type":"Organization","name":"CardPop"');
+    expect(body).toContain('"performer":{"@type":"Organization","name":"CardPop"}');
+    expect(body).toContain('"image":["https://cardpop.com.au/og-image.jpg"]');
+    expect(body).toContain('"endDate":"2026-09-05"');
+    expect(body).toContain('"description":"Tiny Meetup on 2026-09-05');
   });
 
   it('returns a noindex document for an unknown event', async () => {
