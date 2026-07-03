@@ -42,7 +42,8 @@ import {
   generateCode,
   normaliseCode,
   issueWelcomeOffer,
-  redeemTrial,
+  validateTrialCode,
+  markTrialRedeemed,
   validateWelcomeDiscount,
   welcomeDiscountCents,
   buildWelcomeDiscount,
@@ -161,37 +162,35 @@ describe('issueWelcomeOffer', () => {
   });
 });
 
-// ─── redeemTrial ──────────────────────────────────────────────────────────────
+// ─── validateTrialCode ────────────────────────────────────────────────────────
 
-describe('redeemTrial', () => {
-  it('starts the trial for a valid, unredeemed code', async () => {
-    h.queues.welcome_offers = [
-      { data: baseOffer(), error: null },        // offer lookup
-      { data: [{ id: 'offer-1' }], error: null }, // guarded claim wins
-    ];
+describe('validateTrialCode', () => {
+  it('confirms a valid, unredeemed code without touching the profile', async () => {
+    h.queues.welcome_offers = [{ data: baseOffer(), error: null }];
     h.queues.profiles = [
       { data: { subscription_status: 'none', trial_ends_at: null }, error: null },
-      { data: null, error: null },               // trial_ends_at update
     ];
 
-    const result = await redeemTrial('user-1', ' pop-abcd-2345 ');
-    expect(result.trialDays).toBe(30);
-    expect(new Date(result.trialEndsAt).getTime()).toBeGreaterThan(Date.now() + 29 * 24 * HOUR);
+    const result = await validateTrialCode('user-1', ' pop-abcd-2345 ');
+    expect(result).toEqual({ trialDays: 30 });
+    // Nothing left queued means no writes were attempted anywhere.
+    expect(h.queues.welcome_offers).toHaveLength(0);
+    expect(h.queues.profiles).toHaveLength(0);
   });
 
   it('rejects a code that does not match the user’s offer', async () => {
     h.queues.welcome_offers = [{ data: baseOffer(), error: null }];
-    await expect(redeemTrial('user-1', 'POP-WRNG-9999')).rejects.toMatchObject({ statusCode: 400 });
+    await expect(validateTrialCode('user-1', 'POP-WRNG-9999')).rejects.toMatchObject({ statusCode: 400 });
   });
 
   it('rejects an expired code', async () => {
     h.queues.welcome_offers = [{ data: baseOffer({ expires_at: past() }), error: null }];
-    await expect(redeemTrial('user-1', 'POP-ABCD-2345')).rejects.toMatchObject({ statusCode: 410 });
+    await expect(validateTrialCode('user-1', 'POP-ABCD-2345')).rejects.toMatchObject({ statusCode: 410 });
   });
 
   it('rejects a code whose trial was already claimed', async () => {
     h.queues.welcome_offers = [{ data: baseOffer({ trial_redeemed_at: past() }), error: null }];
-    await expect(redeemTrial('user-1', 'POP-ABCD-2345')).rejects.toMatchObject({ statusCode: 409 });
+    await expect(validateTrialCode('user-1', 'POP-ABCD-2345')).rejects.toMatchObject({ statusCode: 409 });
   });
 
   it('rejects when the user can already sell', async () => {
@@ -199,18 +198,19 @@ describe('redeemTrial', () => {
     h.queues.profiles = [
       { data: { subscription_status: 'trialing', trial_ends_at: null }, error: null },
     ];
-    await expect(redeemTrial('user-1', 'POP-ABCD-2345')).rejects.toMatchObject({ statusCode: 409 });
+    await expect(validateTrialCode('user-1', 'POP-ABCD-2345')).rejects.toMatchObject({ statusCode: 409 });
+  });
+});
+
+describe('markTrialRedeemed', () => {
+  it('is a no-op without a user id', async () => {
+    await markTrialRedeemed(null);
+    expect(h.queues.welcome_offers ?? []).toHaveLength(0);
   });
 
-  it('loses a concurrent redemption race safely', async () => {
-    h.queues.welcome_offers = [
-      { data: baseOffer(), error: null },
-      { data: [], error: null }, // another request claimed it first
-    ];
-    h.queues.profiles = [
-      { data: { subscription_status: 'none', trial_ends_at: null }, error: null },
-    ];
-    await expect(redeemTrial('user-1', 'POP-ABCD-2345')).rejects.toMatchObject({ statusCode: 409 });
+  it('swallows database errors (best-effort)', async () => {
+    h.queues.welcome_offers = [{ data: null, error: { message: 'boom' } }];
+    await expect(markTrialRedeemed('user-1')).resolves.toBeUndefined();
   });
 });
 

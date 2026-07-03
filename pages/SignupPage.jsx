@@ -150,8 +150,8 @@ const SignupPage = () => {
             </p>
             <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
               We've also sent your <span className="text-foreground font-bold">welcome code</span> in a separate
-              email — it unlocks the 30-day trial with no card needed, plus{' '}
-              <span className="text-foreground font-bold">10% off your first order</span>.
+              email — redeem it on the Membership page to claim your trial, plus take{' '}
+              <span className="text-foreground font-bold">10% off your first order</span> at checkout.
             </p>
             <Button asChild className="w-full h-12 font-bold">
               <Link to="/login">Go to Login</Link>

@@ -6,7 +6,7 @@ import logger from '../utils/logger.js';
 import {
   issueWelcomeOffer,
   getWelcomeOffer,
-  redeemTrial,
+  validateTrialCode,
 } from '../services/welcomeOfferService.js';
 
 const router = express.Router();
@@ -47,16 +47,19 @@ router.get('/mine', authMiddleware, async (req, res) => {
   }
 });
 
-// POST /redeem-trial — start the free selling trial with the emailed code.
-router.post('/redeem-trial', authMiddleware, async (req, res) => {
+// POST /validate-trial — confirm the emailed code. The trial itself is then
+// activated through the normal Stripe/PayPal card-on-file flow (no charge
+// until the trial ends); the subscription webhooks consume the code's trial
+// half once that subscription actually starts.
+router.post('/validate-trial', authMiddleware, async (req, res) => {
   try {
-    const result = await redeemTrial(req.user.id, req.body?.code);
-    res.json({ success: true, ...result });
+    const result = await validateTrialCode(req.user.id, req.body?.code);
+    res.json({ success: true, requiresPaymentMethod: true, ...result });
   } catch (err) {
     const code = err.statusCode || 500;
     if (code === 500) {
-      logger.error(`[WELCOME] /redeem-trial error: ${err.message}`);
-      return res.status(500).json({ error: 'Could not redeem the code. Please try again.' });
+      logger.error(`[WELCOME] /validate-trial error: ${err.message}`);
+      return res.status(500).json({ error: 'Could not validate the code. Please try again.' });
     }
     res.status(code).json({ error: err.message });
   }

@@ -79,7 +79,7 @@ export function welcomeOfferEmail({ name, code, trialDays, discountPct, expiresA
 ${codeBlock}
 <p style="margin:0 0 8px;"><strong>Your code unlocks both of these:</strong></p>
 <ul style="margin:0 0 20px;padding-left:20px;">
-<li style="margin-bottom:8px;"><strong>${trialDays} days of selling, free.</strong> Redeem your code on the Membership page and list cards for sale straight away — no card details needed.</li>
+<li style="margin-bottom:8px;"><strong>${trialDays} days of selling, free.</strong> Redeem your code on the Membership page, add a card or PayPal to activate, and pay nothing until the trial ends — cancel anytime.</li>
 <li><strong>${discountPct}% off your first order.</strong> Enter the same code at checkout and we'll take ${discountPct}% off the cards in your first purchase.</li>
 </ul>
 <p>Your code expires on <strong>${expiryStr}</strong>, so don't sit on it like a sealed booster box.</p>`;

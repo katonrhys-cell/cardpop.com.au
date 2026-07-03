@@ -2,8 +2,9 @@
  * Welcome-offer configuration — single source of truth.
  *
  * Every new registration gets a unique single-use code (e.g. POP-K7QN-4WX2),
- * emailed separately from the verification email. Redeeming it unlocks a free
- * selling trial and a percentage discount on the user's first order.
+ * emailed separately from the verification email. Redeeming it claims the free
+ * selling trial (activated via the normal Stripe/PayPal card-on-file flow) and
+ * a percentage discount on the user's first order.
  *
  * Like `config/subscription.js`, this file is dependency-free so it can be
  * imported from the React SPA (via the `@/` alias) and from the Express

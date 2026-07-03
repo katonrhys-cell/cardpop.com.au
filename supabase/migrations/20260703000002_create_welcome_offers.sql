@@ -1,8 +1,11 @@
 -- Welcome offers: a single-use promo code generated for every new registration
 -- and emailed separately from the verification email. Redeeming the code gives
 -- the new user:
---   1. a free 30-day selling trial (sets profiles.trial_ends_at, which
---      can_sell() already honours — no card required), and
+--   1. their free 30-day selling trial — the code confirms the offer, but the
+--      trial is always activated through the normal Stripe/PayPal card-on-file
+--      subscription flow (payment method required, no charge until the trial
+--      ends). trial_redeemed_at is set by the subscription webhooks once a
+--      trial actually starts.
 --   2. 10% off their first order (applied as a Stripe discount at checkout).
 --
 -- One offer per user, one redemption per benefit. All writes go through the
