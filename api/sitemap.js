@@ -50,6 +50,14 @@ const STATIC_PAGES = [
   { loc: '/shop/sealed-boxes',     lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
   { loc: '/shop/singles',          lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
   { loc: '/analytics',             lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
+  // /prices pages legitimately change every day (fresh price snapshots), so
+  // TODAY is an honest lastmod here, unlike the structural pages above.
+  { loc: '/prices',                lastmod: TODAY,              freq: 'daily',   pri: '0.9' },
+  { loc: '/prices/pokemon',        lastmod: TODAY,              freq: 'daily',   pri: '0.8' },
+  { loc: '/prices/basketball',     lastmod: TODAY,              freq: 'daily',   pri: '0.8' },
+  { loc: '/prices/one-piece',      lastmod: TODAY,              freq: 'daily',   pri: '0.8' },
+  { loc: '/prices/afl',            lastmod: TODAY,              freq: 'daily',   pri: '0.8' },
+  { loc: '/prices/nrl',            lastmod: TODAY,              freq: 'daily',   pri: '0.8' },
   { loc: '/australian-markets',    lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
   { loc: '/insider-trading',       lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.7' },
   { loc: '/grading',               lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' },
@@ -129,6 +137,13 @@ export default async function handler(req, res) {
           .gte('start_date', EVENTS_SINCE)
           .order('start_date', { ascending: true })
           .limit(500),
+        supabase
+          .from('tracked_cards')
+          .select('slug, category, updated_at, card_price_snapshots(snapshot_date)')
+          .eq('active', true)
+          .order('snapshot_date', { referencedTable: 'card_price_snapshots', ascending: false })
+          .limit(1, { referencedTable: 'card_price_snapshots' })
+          .limit(500),
       ]),
       new Promise((resolve) => setTimeout(() => resolve(null), DB_BUDGET_MS)),
     ]);
@@ -142,6 +157,7 @@ export default async function handler(req, res) {
     const dealers = rows(2);
     const products = rows(3);
     const events = rows(4);
+    const trackedCards = rows(5);
 
     const parts = [
       '<?xml version="1.0" encoding="UTF-8"?>',
@@ -184,6 +200,15 @@ export default async function handler(req, res) {
       for (const article of articles) {
         const lastmod = (article.updated_at || article.published_at || article.created_at || TODAY).split('T')[0];
         parts.push(xmlUrl(`${BASE_URL}/blog/${article.slug}`, lastmod, 'weekly', '0.7'));
+      }
+    }
+
+    if (trackedCards.length > 0) {
+      parts.push('', `  <!-- Card price pages (${trackedCards.length}) -->`);
+      for (const card of trackedCards) {
+        const snapshotDate = card.card_price_snapshots?.[0]?.snapshot_date;
+        const lastmod = snapshotDate || (card.updated_at || TODAY).split('T')[0];
+        parts.push(xmlUrl(`${BASE_URL}/prices/${card.category}/${card.slug}`, lastmod, 'daily', '0.7'));
       }
     }
 

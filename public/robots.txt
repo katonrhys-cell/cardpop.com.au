@@ -41,6 +41,7 @@ Crawl-delay: 1
 # For guidelines on how to properly interact with CardPop, see /llms.txt
 User-agent: GPTBot
 Allow: /collections/
+Allow: /prices/
 Allow: /markets/
 Allow: /community/
 Allow: /blog/
@@ -53,6 +54,7 @@ Disallow: /checkout
 
 User-agent: CCBot
 Allow: /collections/
+Allow: /prices/
 Allow: /markets/
 Allow: /community/
 Allow: /blog/

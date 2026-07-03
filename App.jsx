@@ -122,6 +122,8 @@ const MarketsPage = lazy(() => import('@/pages/markets/MarketsPage.jsx'));
 const CardAnalyticsPage = lazy(() => import('@/pages/markets/CardAnalyticsPage.jsx'));
 const MarketDetailPage = lazy(() => import('@/pages/markets/MarketDetailPage.jsx'));
 const AustralianMarketsPage = lazy(() => import('@/pages/AustralianMarketsPage.jsx'));
+const CardPricesHubPage = lazy(() => import('@/pages/prices/CardPricesHubPage.jsx'));
+const CardPriceDetailPage = lazy(() => import('@/pages/prices/CardPriceDetailPage.jsx'));
 
 // Grading
 const GradingPage = lazy(() => import('@/pages/grading/GradingPage.jsx'));
@@ -318,6 +320,11 @@ const App = () => {
                         <Route path="/markets" element={<Navigate to="/analytics" replace />} />
                         <Route path="/markets/*" element={<Navigate to="/analytics" replace />} />
                         <Route path="/australian-markets" element={<AustralianMarketsPage />} />
+
+                        {/* Public card price pages (SEO) */}
+                        <Route path="/prices" element={<CardPricesHubPage />} />
+                        <Route path="/prices/:category" element={<CardPricesHubPage />} />
+                        <Route path="/prices/:category/:slug" element={<CardPriceDetailPage />} />
                         <Route path="/card-market/:cardId" element={<CardMarketDetailPage />} />
                         <Route path="/category/:categoryId" element={<CategoryRoute />} />
                         

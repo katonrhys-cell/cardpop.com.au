@@ -15,6 +15,9 @@
       "maxDuration": 10
     }
   },
+  "crons": [
+    { "path": "/api/prices/refresh", "schedule": "30 19 * * *" }
+  ],
   "redirects": [
     {
       "source": "/:path*",
@@ -99,6 +102,16 @@
       "source": "/grading/:sub(what-is-grading|scales|companies|local-graders|submission-partners|estimator|roi-calculator)",
       "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
       "destination": "/api/prerender?path=/grading/:sub"
+    },
+    {
+      "source": "/prices",
+      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "destination": "/api/prerender?path=/prices"
+    },
+    {
+      "source": "/prices/:path*",
+      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "destination": "/api/prerender?path=/prices/:path*"
     },
     { "source": "/hcgi/api/:path*", "destination": "/api/:path*" },
     { "source": "/api/:path*", "destination": "/api/index" },

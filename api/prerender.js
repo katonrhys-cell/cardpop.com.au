@@ -1505,6 +1505,202 @@ ${articlesHtml || '    <li>New articles are on the way — check back soon.</li>
   return htmlDoc({ title, description, canonical, jsonLdItems: [breadcrumb, itemList], bodyHtml });
 }
 
+// ── Card price pages (/prices) ──────────────────────────────────────────────
+
+const PRICE_CATEGORIES = {
+  pokemon: 'Pokémon',
+  basketball: 'Basketball (NBA)',
+  'one-piece': 'One Piece',
+  afl: 'AFL',
+  nrl: 'NRL',
+};
+
+const audPrice = (value) => {
+  if (value === null || value === undefined) return null;
+  return new Intl.NumberFormat('en-AU', {
+    style: 'currency',
+    currency: 'AUD',
+    maximumFractionDigits: value >= 1000 ? 0 : 2,
+  }).format(value);
+};
+
+const priceDate = (isoDate) => new Date(`${isoDate}T00:00:00Z`)
+  .toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+
+async function renderPricesHub(supabase, categorySlug) {
+  const categoryLabel = categorySlug ? PRICE_CATEGORIES[categorySlug] : null;
+
+  let query = supabase
+    .from('tracked_cards')
+    .select('slug, name, set_name, card_number, category, card_price_snapshots(snapshot_date, raw_avg, graded_avg)')
+    .eq('active', true)
+    .order('name')
+    .order('snapshot_date', { referencedTable: 'card_price_snapshots', ascending: false })
+    .limit(1, { referencedTable: 'card_price_snapshots' });
+  if (categorySlug) query = query.eq('category', categorySlug);
+  const { data: cards } = await query;
+
+  const canonicalPath = categorySlug ? `/prices/${categorySlug}` : '/prices';
+  const title = categoryLabel
+    ? `${categoryLabel} Card Prices in AUD | CardPop`
+    : 'Trading Card Prices in AUD | CardPop';
+  const description = categoryLabel
+    ? `Live Australian-dollar market prices for ${categoryLabel} trading cards — raw and graded averages updated daily from live listings.`
+    : 'Live Australian-dollar market prices for Pokémon, NBA, One Piece, AFL and NRL trading cards. Raw and graded averages updated daily.';
+
+  const grouped = {};
+  for (const card of cards || []) (grouped[card.category] ||= []).push(card);
+  const sectionKeys = categorySlug ? [categorySlug] : Object.keys(PRICE_CATEGORIES).filter((k) => grouped[k]?.length);
+
+  const sections = sectionKeys.map((key) => {
+    const items = (grouped[key] || []).map((card) => {
+      const latest = card.card_price_snapshots?.[0];
+      const raw = audPrice(latest?.raw_avg);
+      const graded = audPrice(latest?.graded_avg);
+      const priceText = [raw && `raw avg ${raw}`, graded && `graded avg ${graded}`].filter(Boolean).join(', ');
+      const label = `${card.name}${card.set_name ? ` — ${card.set_name}` : ''}`;
+      return `<li><a href="${BASE_URL}/prices/${esc(card.category)}/${esc(card.slug)}">${esc(label)}</a>${priceText ? ` (${esc(priceText)})` : ''}</li>`;
+    }).join('\n');
+    return `<section><h2>${esc(PRICE_CATEGORIES[key])}</h2><ul>${items}</ul></section>`;
+  }).join('\n');
+
+  const jsonLd = [{
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: title,
+    description,
+    url: `${BASE_URL}${canonicalPath}`,
+  }];
+
+  return htmlDoc({
+    title,
+    description,
+    canonical: `${BASE_URL}${canonicalPath}`,
+    ogImage: `${BASE_URL}/og-image.jpg`,
+    jsonLdItems: jsonLd,
+    bodyHtml: `<main><h1>${esc(categoryLabel ? `${categoryLabel} Card Prices in AUD` : 'Trading Card Prices in AUD')}</h1>
+<p>${esc(description)}</p>
+${sections}</main>`,
+  });
+}
+
+async function renderPriceCard(supabase, categorySlug, cardSlug) {
+  const { data: card } = await supabase
+    .from('tracked_cards')
+    .select('id, slug, name, set_name, card_number, category, blurb')
+    .eq('slug', cardSlug)
+    .eq('active', true)
+    .maybeSingle();
+
+  if (!card || card.category !== categorySlug) {
+    return htmlDoc({
+      title: 'Card not found | CardPop',
+      description: 'This card price page does not exist.',
+      canonical: `${BASE_URL}/prices`,
+      robots: 'noindex, follow',
+      bodyHtml: '<main><h1>Card not found</h1></main>',
+    });
+  }
+
+  const { data: snapshots } = await supabase
+    .from('card_price_snapshots')
+    .select('snapshot_date, raw_avg, raw_min, raw_max, raw_count, graded_avg, graded_min, graded_max, graded_count')
+    .eq('card_id', card.id)
+    .order('snapshot_date', { ascending: false })
+    .limit(1);
+  const latest = snapshots?.[0] || null;
+
+  const categoryLabel = PRICE_CATEGORIES[card.category] || card.category;
+  const fullName = card.set_name ? `${card.name} — ${card.set_name}` : card.name;
+  const canonicalPath = `/prices/${card.category}/${card.slug}`;
+  const updatedOn = latest ? priceDate(latest.snapshot_date) : null;
+
+  const title = `${card.name} Price (AUD) — ${card.set_name || categoryLabel} | CardPop`;
+  const description = latest?.raw_avg
+    ? `${fullName} is listing for around ${audPrice(latest.raw_avg)} raw and ${audPrice(latest.graded_avg)} graded in Australia (updated ${updatedOn}). Live AUD prices, history and where to buy.`
+    : `Live Australian-dollar market price for ${fullName}: raw and graded averages, price history, and where to buy and sell in Australia.`;
+
+  const faqs = [
+    {
+      q: `How much is ${card.name} (${card.set_name || categoryLabel}) worth in Australia?`,
+      a: latest?.raw_avg
+        ? `As at ${updatedOn}, ungraded copies list for around ${audPrice(latest.raw_avg)} (range ${audPrice(latest.raw_min)}–${audPrice(latest.raw_max)}), while graded copies average about ${audPrice(latest.graded_avg)}. Prices are in Australian dollars and refresh daily.`
+        : 'A current AUD price is being calculated from live listings — check back shortly for the latest figure.',
+    },
+    {
+      q: 'Why do these prices differ from US price guides?',
+      a: 'US guides quote USD and reflect American supply and demand. CardPop aggregates live listings available to Australian buyers — local listings in AUD plus international listings converted at the current exchange rate — so the figure is what you would actually pay or receive here.',
+    },
+    {
+      q: `Where can I buy or sell ${card.name} in Australia?`,
+      a: 'You can buy and sell directly on the CardPop marketplace, with verified Australian sellers and buyer protection.',
+    },
+  ];
+
+  const jsonLd = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Card Prices', item: `${BASE_URL}/prices` },
+        { '@type': 'ListItem', position: 2, name: categoryLabel, item: `${BASE_URL}/prices/${card.category}` },
+        { '@type': 'ListItem', position: 3, name: card.name, item: `${BASE_URL}${canonicalPath}` },
+      ],
+    },
+    latest && (latest.raw_avg || latest.graded_avg) ? {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: fullName,
+      description: card.blurb || description,
+      category: `${categoryLabel} Trading Cards`,
+      offers: {
+        '@type': 'AggregateOffer',
+        priceCurrency: 'AUD',
+        lowPrice: latest.raw_min ?? latest.graded_min,
+        highPrice: latest.graded_max ?? latest.raw_max,
+        offerCount: (latest.raw_count || 0) + (latest.graded_count || 0),
+      },
+    } : null,
+    {
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: faqs.map(({ q, a }) => ({
+        '@type': 'Question',
+        name: q,
+        acceptedAnswer: { '@type': 'Answer', text: a },
+      })),
+    },
+  ].filter(Boolean);
+
+  const statsHtml = latest ? `<ul>
+<li>Raw average: ${esc(audPrice(latest.raw_avg) || '—')}${latest.raw_count ? ` (${latest.raw_count} listings)` : ''}</li>
+<li>Raw range: ${latest.raw_avg !== null ? `${esc(audPrice(latest.raw_min))} – ${esc(audPrice(latest.raw_max))}` : '—'}</li>
+<li>Graded average: ${esc(audPrice(latest.graded_avg) || '—')}${latest.graded_count ? ` (${latest.graded_count} listings)` : ''}</li>
+<li>Graded range: ${latest.graded_avg !== null ? `${esc(audPrice(latest.graded_min))} – ${esc(audPrice(latest.graded_max))}` : '—'}</li>
+</ul>` : '<p>The first price snapshot for this card is being collected.</p>';
+
+  const faqHtml = faqs.map(({ q, a }) => `<h3>${esc(q)}</h3><p>${esc(a)}</p>`).join('\n');
+
+  return htmlDoc({
+    title,
+    description,
+    canonical: `${BASE_URL}${canonicalPath}`,
+    ogImage: `${BASE_URL}/og-image.jpg`,
+    ogType: 'product',
+    jsonLdItems: jsonLd,
+    bodyHtml: `<main>
+<nav><a href="${BASE_URL}/prices">Card Prices</a> / <a href="${BASE_URL}/prices/${esc(card.category)}">${esc(categoryLabel)}</a></nav>
+<h1>${esc(card.name)} Price (AUD)</h1>
+<p>${esc(card.set_name || '')}${card.card_number ? ` · ${esc(card.card_number)}` : ''}${updatedOn ? ` · Updated ${esc(updatedOn)}` : ''}</p>
+${statsHtml}
+${card.blurb ? `<p>${esc(card.blurb)}</p>` : ''}
+<h2>Frequently asked questions</h2>
+${faqHtml}
+<p>Prices are aggregated daily from live eBay Australia and international listings (converted to AUD), with outliers trimmed. They reflect current asking prices, not completed sales, and are a guide only.</p>
+</main>`,
+  });
+}
+
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
@@ -1563,6 +1759,23 @@ export default async function handler(req, res) {
       const id = decodeURIComponent(listingMatch[1]);
       const slug = listingMatch[2] ? decodeURIComponent(listingMatch[2]) : undefined;
       return res.status(200).send(await renderListing(supabase, id, slug));
+    }
+
+    if (rawPath === '/prices') {
+      return res.status(200).send(await renderPricesHub(supabase, null));
+    }
+
+    const pricesMatch = rawPath.match(/^\/prices\/([^/?#]+)(?:\/([^/?#]+))?/);
+    if (pricesMatch) {
+      const category = decodeURIComponent(pricesMatch[1]);
+      const cardSlug = pricesMatch[2] ? decodeURIComponent(pricesMatch[2]) : null;
+      if (PRICE_CATEGORIES[category]) {
+        return res.status(200).send(
+          cardSlug
+            ? await renderPriceCard(supabase, category, cardSlug)
+            : await renderPricesHub(supabase, category)
+        );
+      }
     }
 
     const blogMatch = rawPath.match(/^\/blog\/([^/?#]+)/);
