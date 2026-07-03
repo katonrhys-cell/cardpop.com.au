@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CardPop is an Australian trading card marketplace. It is a full-stack application with a React SPA frontend and an Express backend, backed by Supabase (PostgreSQL + Auth). The app is deployed on Vercel. The domain `cardpop.com.au` is registered through Hostinger (DNS only — no Hostinger hosting or FTP involved).
+CardPop is an Australian trading card marketplace. It is a full-stack application with a React SPA frontend and an Express backend, backed by Supabase (PostgreSQL + Auth). The app is deployed on Vercel. The domain `cardpop.com.au` was purchased through Crazy Domains (registrar), with DNS managed through Hostinger (DNS only — no Hostinger web hosting or FTP involved; the app itself is hosted on Vercel).
 
 ## Commands
 
