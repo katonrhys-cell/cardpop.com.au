@@ -2,6 +2,7 @@ import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { sendOrderConfirmed, sendItemSold } from '../utils/emailService.js';
 import { payoutSeller } from './payoutService.js';
+import { markWelcomeDiscountRedeemed } from './welcomeOfferService.js';
 
 async function getPlatformSetting(key, defaultValue) {
   const { data } = await supabase
@@ -117,6 +118,11 @@ async function handleCartOrder(existing, session, stripe) {
     return;
   }
 
+  // Payment completed — consume the welcome-offer discount, if one was applied.
+  if (session.metadata?.welcomeOfferId) {
+    await markWelcomeDiscountRedeemed(session.metadata.welcomeOfferId, existing.id);
+  }
+
   const lines = Array.isArray(existing.order_items) ? existing.order_items : [];
   const sellerIds = new Set();
   const oversoldShopItems = [];
@@ -207,14 +213,15 @@ async function handleSingleItemOrder(session, stripe) {
   const gstAud = parseFloat(meta.gstAud || '0');
   const sellerProceeds = parseFloat(meta.sellerProceedsAud || String(itemPrice - commissionAud));
   const configId = meta.configId || null;
+  const discountAud = parseFloat(meta.discountAud || '0');
   const amountCents = session.amount_total || 0;
 
-  if (![itemPrice, commissionAud, gstAud].every(Number.isFinite)) {
+  if (![itemPrice, commissionAud, gstAud, discountAud].every(Number.isFinite)) {
     logger.error(`[STRIPE] Non-finite amount in metadata for session ${session.id} — order rejected`);
     return;
   }
 
-  const expectedTotalCents = Math.round((itemPrice + commissionAud + gstAud) * 100);
+  const expectedTotalCents = Math.round((itemPrice + commissionAud + gstAud - discountAud) * 100);
   if (Math.abs(amountCents - expectedTotalCents) > 2) {
     logger.error(`[STRIPE] Amount mismatch for session ${session.id}: Stripe=${amountCents}¢ expected=${expectedTotalCents}¢ — order rejected`);
     return;
@@ -235,6 +242,7 @@ async function handleSingleItemOrder(session, stripe) {
       total_aud: amountCents / 100,
       item_price_aud: itemPrice,
       shipping_aud: 0,
+      discount_aud: discountAud,
       platform_fee_aud: commissionAud + gstAud,
       commission_pct: commissionPct,
       gst_aud: gstAud,
@@ -321,6 +329,12 @@ async function handleSingleItemOrder(session, stripe) {
     .eq('stripe_session_id', session.id)
     .maybeSingle();
   const orderId = newOrder?.id;
+
+  // Consume the welcome-offer discount only now that payment completed and the
+  // sale is real (the double-sale refund path above leaves the code usable).
+  if (meta.welcomeOfferId) {
+    await markWelcomeDiscountRedeemed(meta.welcomeOfferId, orderId || null);
+  }
 
   if (buyerProfile?.email) {
     await sendOrderConfirmed({

@@ -12,9 +12,10 @@ const resolveImg = (path) => {
   if (path.startsWith('http')) return path;
   return supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
 };
-import { ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowRight, Loader2, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 
 import OrderSummary from '@/components/checkout/OrderSummary.jsx';
 import ShippingAddressForm from '@/components/checkout/ShippingAddressForm.jsx';
@@ -131,6 +132,11 @@ const CheckoutPage = () => {
     .map(i => ({ type: i.product?.type || 'listing', id: i.product?.id, quantity: i.quantity ?? 1 }))
     .filter(i => i.id);
 
+  // Welcome-offer promo code. `promoCode` is the applied code (sent to the
+  // server for validation and pricing); `promoInput` is just the field state.
+  const [promoInput, setPromoInput] = useState('');
+  const [promoCode, setPromoCode] = useState('');
+
   // Authoritative totals come from the server so the displayed amount always
   // matches what Stripe charges (no fabricated tax).
   const [pricing, setPricing] = useState(null);
@@ -140,19 +146,30 @@ const CheckoutPage = () => {
     apiServerClient.fetch('/stripe/calculate-cart', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: serverItems }),
+      body: JSON.stringify({ items: serverItems, ...(promoCode ? { promoCode } : {}) }),
     })
       .then(res => (res.ok ? res.json() : null))
-      .then(data => { if (!cancelled) setPricing(data); })
+      .then(data => {
+        if (cancelled) return;
+        setPricing(data);
+        if (data?.promoError) {
+          toast.error(data.promoError);
+          setPromoCode('');
+        } else if (promoCode && data?.discountAud > 0) {
+          toast.success(`Code applied — $${Number(data.discountAud).toFixed(2)} off.`);
+        }
+      })
       .catch(() => { if (!cancelled) setPricing(null); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cartItems, directItem]);
+  }, [cartItems, directItem, promoCode]);
 
   const clientSubtotal = flatItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
   const subtotal = pricing?.subtotalAud ?? clientSubtotal;
   const tax = pricing ? (Number(pricing.commissionAud || 0) + Number(pricing.gstAud || 0)) : 0;
+  const discount = pricing && !pricing.promoError ? Number(pricing.discountAud || 0) : 0;
   const total = pricing?.totalAud ?? clientSubtotal;
+  const appliedPromoCode = discount > 0 ? promoCode : '';
 
   const validateShipping = () => {
     const { firstName, lastName, address, suburb, state, postcode } = shippingData;
@@ -177,6 +194,7 @@ const CheckoutPage = () => {
           items: serverItems,
           successUrl: `${window.location.origin}/checkout-success?session_id={CHECKOUT_SESSION_ID}`,
           cancelUrl: window.location.href,
+          ...(appliedPromoCode ? { promoCode: appliedPromoCode } : {}),
           shippingAddress: {
             name,
             address: shippingData.address || '',
@@ -213,7 +231,7 @@ const CheckoutPage = () => {
             cartItems={flatItems}
             subtotal={subtotal}
             tax={tax}
-            discount={0}
+            discount={discount}
             total={total}
             onEditCart={() => navigate('/browse')}
             onNext={() => {
@@ -297,7 +315,7 @@ const CheckoutPage = () => {
             items={flatItems}
             subtotal={subtotal}
             tax={tax}
-            discount={0}
+            discount={discount}
             total={total}
             processing={processing}
             onConfirm={handleCheckoutConfirm}
@@ -340,6 +358,50 @@ const CheckoutPage = () => {
 
         <div className="max-w-2xl mx-auto">
           {renderStep()}
+
+          {step === STEPS.SUMMARY && flatItems.length > 0 && (
+            <Card className="border-border shadow-sm mt-4">
+              <CardContent className="pt-6">
+                <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
+                  <Tag className="h-4 w-4 text-primary" /> Promo code
+                </div>
+                {appliedPromoCode ? (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-mono tracking-widest">{appliedPromoCode}</span>
+                    <span className="text-green-600 font-semibold">−${discount.toFixed(2)} applied</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { setPromoCode(''); setPromoInput(''); }}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                ) : (
+                  <form
+                    className="flex gap-2"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      if (promoInput.trim()) setPromoCode(promoInput.trim().toUpperCase());
+                    }}
+                  >
+                    <Input
+                      value={promoInput}
+                      onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+                      placeholder="POP-XXXX-XXXX"
+                      autoComplete="off"
+                      className="font-mono tracking-widest uppercase"
+                      aria-label="Promo code"
+                    />
+                    <Button type="submit" variant="outline" className="shrink-0">Apply</Button>
+                  </form>
+                )}
+                <p className="mt-2 text-xs text-muted-foreground">
+                  New here? Your welcome email includes a code for 10% off your first order.
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
       </div>

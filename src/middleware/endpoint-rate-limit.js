@@ -170,4 +170,27 @@ const resendVerificationLimiter = rateLimit({
 	},
 });
 
-export { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, mfaLimiter, mfaRequestLimiter, backupCodeLimiter, reportLimiter, resendVerificationLimiter };
+// Welcome-offer issue limiter: 3 per 15 minutes keyed by the TARGET user id.
+// The endpoint is unauthenticated (a fresh signup may not have a session yet
+// when email confirmation is on) and triggers an outbound email, so it gets
+// the same tight, target-scoped cap as verification resends. The email address
+// is always taken from the auth record server-side, never from the request.
+const welcomeOfferIssueLimiter = rateLimit({
+	windowMs: 15 * 60 * 1000,
+	max: 3,
+	standardHeaders: true,
+	legacyHeaders: false,
+	keyGenerator: (req) =>
+		(typeof req.body?.userId === 'string' && req.body.userId.trim())
+			? `welcome:${req.body.userId.trim().toLowerCase()}`
+			: ipKeyGenerator(req),
+	handler: (req, res) => {
+		logger.warn('[RATE_LIMIT] Welcome offer issue limit exceeded');
+		res.status(429).json({
+			error: 'Too many requests. Please wait a while before trying again.',
+			retryAfter: req.rateLimit.resetTime,
+		});
+	},
+});
+
+export { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, mfaLimiter, mfaRequestLimiter, backupCodeLimiter, reportLimiter, resendVerificationLimiter, welcomeOfferIssueLimiter };

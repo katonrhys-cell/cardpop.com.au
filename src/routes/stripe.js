@@ -12,6 +12,7 @@ import { validateRequestBody, validateRequestQuery } from '../middleware/validat
 import { createCheckoutSchema, calculateBreakdownSchema, processRefundSchema } from '../schemas/stripeSchemas.js';
 import { createSingleItemCheckout } from '../services/checkoutService.js';
 import { priceCart } from '../services/cartService.js';
+import { validateWelcomeDiscount, welcomeDiscountCents, buildWelcomeDiscount } from '../services/welcomeOfferService.js';
 import { processRefund } from '../services/refundService.js';
 import { connectOnboard, getConnectStatus, getDashboardLink } from '../services/connectService.js';
 import { applyStripeSubscription } from '../services/subscriptionService.js';
@@ -66,15 +67,33 @@ router.post('/create-checkout', authMiddleware, validateRequestBody(createChecko
 // differs from what Stripe will charge).
 router.post('/calculate-cart', authMiddleware, async (req, res) => {
   try {
-    const { items } = req.body;
+    const { items, promoCode } = req.body;
     if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'items is required' });
     const priced = await priceCart(items, req.user.id);
+
+    // Preview the welcome-offer discount without creating any Stripe objects.
+    // An invalid code doesn't fail the whole calculation — the UI shows
+    // `promoError` inline and the undiscounted totals stay correct.
+    let discountCents = 0;
+    let promoError = null;
+    if (typeof promoCode === 'string' && promoCode.trim()) {
+      try {
+        const offer = await validateWelcomeDiscount(req.user.id, promoCode);
+        discountCents = welcomeDiscountCents(offer, priced.itemsCents);
+      } catch (promoErr) {
+        if (!promoErr.statusCode) throw promoErr;
+        promoError = promoErr.message;
+      }
+    }
+
     res.json({
       items:       priced.orderLines,
       subtotalAud: priced.itemsCents / 100,
       commissionAud: priced.commissionCents / 100,
       gstAud:      priced.gstCents / 100,
-      totalAud:    priced.grandCents / 100,
+      discountAud: discountCents / 100,
+      promoError,
+      totalAud:    (priced.grandCents - discountCents) / 100,
     });
   } catch (err) {
     const code = err.statusCode || 500;
@@ -85,7 +104,7 @@ router.post('/calculate-cart', authMiddleware, async (req, res) => {
 
 router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
   try {
-    const { items, successUrl, cancelUrl, shippingAddress } = req.body;
+    const { items, successUrl, cancelUrl, shippingAddress, promoCode } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'items is required' });
@@ -106,6 +125,22 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
       return res.status(429).json({ error: velocity.message, code: 'velocity_limit' });
     }
 
+    // Welcome-offer promo code: platform-funded amount-off coupon covering 10%
+    // of the item subtotal only (never the fee/GST lines, never seller
+    // proceeds). The webhook marks it redeemed after payment completes.
+    let discounts;
+    let discountCents = 0;
+    let welcomeOfferId = null;
+    if (typeof promoCode === 'string' && promoCode.trim()) {
+      const offer = await validateWelcomeDiscount(userId, promoCode);
+      const built = await buildWelcomeDiscount(stripe, offer, itemsCents);
+      if (built) {
+        discounts = [{ coupon: built.couponId }];
+        discountCents = built.discountCents;
+        welcomeOfferId = offer.id;
+      }
+    }
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items:           lineItems,
@@ -113,7 +148,8 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
       success_url:          successUrl,
       cancel_url:           cancelUrl,
       customer_email:       email,
-      metadata:             { userId, cartCheckout: 'true' },
+      metadata:             { userId, cartCheckout: 'true', ...(welcomeOfferId ? { welcomeOfferId } : {}) },
+      ...(discounts ? { discounts } : {}),
     });
 
     if (!session?.url) throw new Error('Stripe returned a session without a URL');
@@ -128,7 +164,8 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
       shipping_aud:      0,
       platform_fee_aud:  (commissionCents + gstCents) / 100,
       gst_aud:           gstCents / 100,
-      total_aud:         grandCents / 100,
+      discount_aud:      discountCents / 100,
+      total_aud:         (grandCents - discountCents) / 100,
       transaction_type:  'cart',
       status:            'pending',
       buyer_protection:  true,

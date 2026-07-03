@@ -4,8 +4,10 @@ import { Helmet } from 'react-helmet-async';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
 import StartTrialOptions from '@/components/StartTrialOptions.jsx';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { BadgeCheck, Clock, Loader2, Sparkles } from 'lucide-react';
+import { BadgeCheck, Clock, Gift, Loader2, Sparkles } from 'lucide-react';
 import { TRIAL_DAYS } from '@/config/subscription.js';
 
 const STATUS_LABEL = {
@@ -21,6 +23,44 @@ const AccountMembership = () => {
   const { canSell, subscriptionStatus, trialDaysLeft, refetchProfile } = useAuth();
   const [params, setParams] = useSearchParams();
   const [activating, setActivating] = useState(false);
+  const [welcomeCode, setWelcomeCode] = useState('');
+  const [redeeming, setRedeeming] = useState(false);
+
+  // Prefill the welcome-code input with the user's own unredeemed code so
+  // arriving from the offer email is one click, not a copy-paste hunt.
+  useEffect(() => {
+    if (canSell) return;
+    let cancelled = false;
+    apiServerClient.fetch('/welcome-offer/mine')
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        const offer = data?.offer;
+        if (!cancelled && offer?.code && !offer.trial_redeemed_at) setWelcomeCode(offer.code);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [canSell]);
+
+  const handleRedeemWelcomeCode = async (e) => {
+    e.preventDefault();
+    if (!welcomeCode.trim()) { toast.error('Enter your welcome code first.'); return; }
+    setRedeeming(true);
+    try {
+      const res = await apiServerClient.fetch('/welcome-offer/redeem-trial', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: welcomeCode }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not redeem the code.');
+      toast.success(`Your ${data.trialDays ?? TRIAL_DAYS}-day free trial is active. Happy selling!`);
+      await refetchProfile?.();
+    } catch (err) {
+      toast.error(err.message || 'Could not redeem the code.');
+    } finally {
+      setRedeeming(false);
+    }
+  };
 
   // Handle returns from Stripe / PayPal.
   useEffect(() => {
@@ -85,12 +125,38 @@ const AccountMembership = () => {
       </div>
 
       {!canSell && (
-        <div className="mt-8">
-          <h2 className="mb-4 font-heading text-lg font-bold text-foreground">
-            Start your {TRIAL_DAYS}-day free trial
-          </h2>
-          <StartTrialOptions returnPath="/account/membership" />
-        </div>
+        <>
+          <div className="mt-8 rounded-card border border-brand-red/30 bg-brand-red/5 p-6">
+            <div className="flex items-center gap-2 font-heading text-lg font-bold text-foreground">
+              <Gift className="h-5 w-5 text-brand-red" />
+              Have a welcome code?
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              New members get a code by email. Redeem it to start your {TRIAL_DAYS}-day free trial
+              instantly — no card details needed. The same code also gives you 10% off your first order at checkout.
+            </p>
+            <form onSubmit={handleRedeemWelcomeCode} className="mt-4 flex gap-2">
+              <Input
+                value={welcomeCode}
+                onChange={(e) => setWelcomeCode(e.target.value.toUpperCase())}
+                placeholder="POP-XXXX-XXXX"
+                autoComplete="off"
+                className="font-mono tracking-widest uppercase"
+                aria-label="Welcome code"
+              />
+              <Button type="submit" disabled={redeeming} className="shrink-0 font-bold">
+                {redeeming ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Redeem'}
+              </Button>
+            </form>
+          </div>
+
+          <div className="mt-8">
+            <h2 className="mb-4 font-heading text-lg font-bold text-foreground">
+              Start your {TRIAL_DAYS}-day free trial
+            </h2>
+            <StartTrialOptions returnPath="/account/membership" />
+          </div>
+        </>
       )}
     </div>
   );

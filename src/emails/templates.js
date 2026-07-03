@@ -64,6 +64,37 @@ function summaryTable(rows) {
 </div>`;
 }
 
+// ─── Welcome offer (new registration) ─────────────────────────────────────────
+
+export function welcomeOfferEmail({ name, code, trialDays, discountPct, expiresAt }) {
+  const expiryStr = new Date(expiresAt).toLocaleDateString('en-AU', {
+    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney',
+  });
+  const codeBlock = `<div style="background:#F9FAFB;border:2px dashed #E63946;border-radius:12px;padding:24px;text-align:center;margin:28px 0;">
+<p style="margin:0 0 8px;font-size:11px;color:#9CA3AF;letter-spacing:2.5px;text-transform:uppercase;">Your welcome code</p>
+<p style="margin:0;font-size:28px;font-weight:900;letter-spacing:3px;color:#111827;">${code}</p>
+</div>`;
+
+  const body = `<p>Welcome to CardPop — Australia's trading card marketplace. As a thank-you for joining, here's a one-time welcome gift just for you:</p>
+${codeBlock}
+<p style="margin:0 0 8px;"><strong>Your code unlocks both of these:</strong></p>
+<ul style="margin:0 0 20px;padding-left:20px;">
+<li style="margin-bottom:8px;"><strong>${trialDays} days of selling, free.</strong> Redeem your code on the Membership page and list cards for sale straight away — no card details needed.</li>
+<li><strong>${discountPct}% off your first order.</strong> Enter the same code at checkout and we'll take ${discountPct}% off the cards in your first purchase.</li>
+</ul>
+<p>Your code expires on <strong>${expiryStr}</strong>, so don't sit on it like a sealed booster box.</p>`;
+
+  return cpEmail(
+    `Your CardPop welcome gift: ${trialDays} days of selling free + ${discountPct}% off your first order.`,
+    'Your Welcome Gift Inside 🎁',
+    `Welcome aboard, ${name}!`,
+    body,
+    'https://cardpop.com.au/account/membership',
+    'Redeem My Code',
+    'This one-time offer was generated for your new CardPop account and can’t be transferred.',
+  );
+}
+
 // ─── Order confirmed (buyer) ──────────────────────────────────────────────────
 
 export function orderConfirmedEmail({ buyerName, cardName, itemPrice, total, orderId }) {
