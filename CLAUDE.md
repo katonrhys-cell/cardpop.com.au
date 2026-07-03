@@ -82,6 +82,7 @@ Routes are registered in `src/routes/index.js`. Each domain has its own router f
 | `/subcategories` | `routes/subcategories.js` | Subcategory management |
 | `/vault` | `routes/vault.js` | Vault security operations |
 | `/newsletter` | `routes/newsletter.js` | Kit.com newsletter subscription |
+| `/supplies` | `routes/supplies.js` | Supplies dropshipping: public shipping rules, admin settings/suppliers/fulfilment queue |
 
 **Auth middleware** (`src/middleware/auth.js`) validates Bearer tokens by calling `supabase.auth.getUser(token)`. The backend Supabase client (`src/utils/supabaseClient.js`) uses the `SUPABASE_SERVICE_ROLE_KEY` env var for admin-level operations.
 
@@ -109,6 +110,8 @@ Tests are split into two Vitest projects configured in `vitest.config.js`:
 - **Stripe** (`src/routes/stripe.js`): Payment processing and checkout.
 - **Kit.com** (`src/routes/newsletter.js`): Newsletter subscriptions via the Kit v4 API. Requires `KIT_API_KEY` and `KIT_FORM_ID` env vars.
 - **Shop catalogue**: Product data, pricing, stock and checkout run entirely on Supabase (`shop_products` table) and the Stripe endpoints (`src/routes/stripe.js`). The former Hostinger/Online-Store product API has been removed; `api/EcommerceApi.js` now only exports a `formatCurrency` helper and makes no external calls.
+- **Supplies dropshipping**: Trading-card supplies (sleeves, toploaders, binders, grading/shipping gear) are `shop_products` rows flagged `is_supply`, sold at `/shop/supplies`. Supplier, SKU, cost price and per-product markup live in the **admin-only** `shop_product_sourcing` table so margins never reach public reads; suppliers live in `suppliers`. Shop prices are **GST-inclusive** (GST = 1/11th of the price, extracted not added — `src/services/suppliesPricingService.js`); shipping on platform-shipped shop goods is a flat fee below a free-shipping threshold (defaults $10 / $50, stored in `platform_settings`, edited at `/admin/supply-settings`). On payment the Stripe webhook splits supply lines into `supply_fulfilments` rows (one per supplier — `src/services/supplyFulfilmentService.js`) for the semi-automated queue at `/admin/fulfilments`: admins one-click approve a pre-filled supplier order (email/CSV, blind-ship note included), then paste tracking, which marks it shipped and emails the customer. Supply availability is the admin-managed `in_stock` flag, not `stock_quantity` (no stock decrement for supplies). Order confirmations for orders containing shop goods are GST tax invoices using the business name/ABN from supply settings.
+- **Resend** (`src/utils/emailService.js`): Transactional email — order confirmations/tax invoices, shipping/tracking notifications, supplier order emails, marketplace sale/refund emails. Requires `RESEND_API_KEY`; without it, emails no-op with a logged warning.
 
 ### Deployment
 
@@ -132,6 +135,7 @@ git push main
 | `EBAY_CLIENT_SECRET` | eBay API client |
 | `KIT_API_KEY` | Kit.com newsletter |
 | `KIT_FORM_ID` | Kit.com newsletter |
+| `RESEND_API_KEY` | Transactional email (tax invoices, tracking, supplier orders) |
 | `ENCRYPTION_KEY` | MFA OTP / backup code encryption |
 | `CORS_ORIGIN` | Express CORS (set to `https://cardpop.com.au`) |
 | `APP_URL` | App base URL |

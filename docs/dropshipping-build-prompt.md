@@ -104,6 +104,24 @@ database:
 - **Fulfilment queue**: list and filter orders by status, view the pre-filled supplier
   order, one-click approve, enter tracking numbers, cancel/refund.
 
+## Mixed carts
+
+A customer's cart may mix supply items with other purchases (e.g. marketplace cards).
+Checkout stays a single Stripe payment, but behind the scenes the order splits: supply
+items form a dropship fulfilment order (entering the admin fulfilment queue), while
+other items follow their own flow, each with its own shipping and tracking.
+
+## Decided defaults (owner approved proceeding with sensible defaults)
+
+- The $10 below-threshold shipping cost is charged as a **flat $10 shipping fee at
+  checkout** (admin-editable), rather than baked into product prices — transparent and
+  guarantees the cost is always covered.
+- **AU-only shipping** at launch.
+- Supplier order emails include a **blind-shipping instruction** (no supplier branding
+  or invoices in the parcel) where the supplier supports it.
+- Transactional email via **Resend** (`RESEND_API_KEY`), degrading to a logged no-op
+  when the key is absent so dev/test never fail.
+
 ## Technical requirements
 
 - Follow all conventions in `CLAUDE.md`. Extend the existing shop — reuse

@@ -21,6 +21,7 @@ const OrderReviewSection = ({
   items = [],
   subtotal = 0,
   tax = 0,
+  shipping = null,
   discount = 0,
   total = 0,
   processing = false,
@@ -93,12 +94,22 @@ const OrderReviewSection = ({
               <span>Discount</span><span>-${Number(discount).toFixed(2)}</span>
             </div>
           )}
-          <div className="flex justify-between text-sm text-muted-foreground">
-            <span>Tax (GST 10%)</span><span>${Number(tax).toFixed(2)}</span>
-          </div>
+          {tax > 0 && (
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>Fees & GST</span><span>${Number(tax).toFixed(2)}</span>
+            </div>
+          )}
+          {shipping != null && (
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>Shipping</span>
+              {shipping > 0
+                ? <span>${Number(shipping).toFixed(2)}</span>
+                : <span className="font-semibold text-emerald-600">FREE</span>}
+            </div>
+          )}
           <Separator />
           <div className="flex justify-between font-semibold">
-            <span>Total (AUD)</span><span>${Number(total).toFixed(2)}</span>
+            <span>Total (AUD, inc. GST)</span><span>${Number(total).toFixed(2)}</span>
           </div>
         </CardContent>
       </Card>

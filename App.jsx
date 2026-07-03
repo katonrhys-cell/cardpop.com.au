@@ -61,6 +61,7 @@ const BrowseListingsPage = lazy(() => import('@/pages/BrowseListingsPage.jsx'));
 
 // Shop
 const ShopPage = lazy(() => import('@/pages/shop/ShopPage.jsx'));
+const ShopSuppliesPage = lazy(() => import('@/pages/shop/ShopSuppliesPage.jsx'));
 const ShopSealedBoxesPage = lazy(() => import('@/pages/shop/ShopSealedBoxesPage.jsx'));
 const ShopSinglesPage = lazy(() => import('@/pages/shop/ShopSinglesPage.jsx'));
 const ShopCategoryPage = lazy(() => import('@/pages/shop/ShopCategoryPage.jsx'));
@@ -152,6 +153,9 @@ const LocalMapPage = lazy(() => import('@/pages/community/LocalMapPage.jsx'));
 // Admin Dashboard Area
 const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard.jsx'));
 const ProductManagementPage = lazy(() => import('@/pages/admin/ProductManagementPage.jsx'));
+const SuppliersManagementPage = lazy(() => import('@/pages/admin/SuppliersManagementPage.jsx'));
+const FulfilmentQueuePage = lazy(() => import('@/pages/admin/FulfilmentQueuePage.jsx'));
+const SupplySettingsPage = lazy(() => import('@/pages/admin/SupplySettingsPage.jsx'));
 const UserManagementPage = lazy(() => import('@/pages/admin/UserManagementPage.jsx'));
 const UserDetailPage = lazy(() => import('@/pages/admin/UserDetailPage.jsx'));
 const SellersManagementPage = lazy(() => import('@/pages/admin/SellersManagementPage.jsx'));
@@ -262,6 +266,7 @@ const App = () => {
                         
                         {/* Shop */}
                         <Route path="/shop" element={<ShopPage />} />
+                        <Route path="/shop/supplies" element={<ShopSuppliesPage />} />
                         <Route path="/shop/sealed-boxes" element={<ShopSealedBoxesPage />} />
                         <Route path="/shop/singles" element={<ShopSinglesPage />} />
                         <Route path="/shop/category/:categorySlug" element={<ShopCategoryRoute />} />
@@ -382,6 +387,9 @@ const App = () => {
                           <Route index element={<AdminDashboard />} />
                           <Route path="events" element={<EventsAdminPage />} />
                           <Route path="products" element={<ProductManagementPage />} />
+                          <Route path="suppliers" element={<SuppliersManagementPage />} />
+                          <Route path="fulfilments" element={<FulfilmentQueuePage />} />
+                          <Route path="supply-settings" element={<SupplySettingsPage />} />
                           <Route path="users" element={<UserManagementPage />} />
                           <Route path="users/:userId" element={<UserDetailPage />} />
                           <Route path="sellers" element={<SellersManagementPage />} />

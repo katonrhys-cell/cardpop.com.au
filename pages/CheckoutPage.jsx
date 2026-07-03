@@ -151,7 +151,11 @@ const CheckoutPage = () => {
 
   const clientSubtotal = flatItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
   const subtotal = pricing?.subtotalAud ?? clientSubtotal;
-  const tax = pricing ? (Number(pricing.commissionAud || 0) + Number(pricing.gstAud || 0)) : 0;
+  // Shop prices are GST-inclusive, so the on-top charges are platform fees (+
+  // their GST) and shipping. Derive fees from the server totals so the
+  // breakdown always sums to what Stripe will charge.
+  const shipping = pricing ? Number(pricing.shippingAud || 0) : 0;
+  const tax = pricing ? Math.max(0, Math.round((Number(pricing.totalAud) - Number(pricing.subtotalAud) - shipping) * 100) / 100) : 0;
   const total = pricing?.totalAud ?? clientSubtotal;
 
   const validateShipping = () => {
@@ -213,6 +217,7 @@ const CheckoutPage = () => {
             cartItems={flatItems}
             subtotal={subtotal}
             tax={tax}
+            shipping={pricing ? shipping : null}
             discount={0}
             total={total}
             onEditCart={() => navigate('/browse')}
@@ -297,6 +302,7 @@ const CheckoutPage = () => {
             items={flatItems}
             subtotal={subtotal}
             tax={tax}
+            shipping={pricing ? shipping : null}
             discount={0}
             total={total}
             processing={processing}

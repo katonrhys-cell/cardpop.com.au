@@ -11,7 +11,7 @@ const LineItem = ({ label, value, bold }) => (
   </div>
 );
 
-const OrderSummary = ({ cartItems = [], subtotal = 0, tax = 0, discount = 0, total = 0, onEditCart, onNext }) => {
+const OrderSummary = ({ cartItems = [], subtotal = 0, tax = 0, shipping = null, discount = 0, total = 0, onEditCart, onNext }) => {
   return (
     <div className="space-y-4">
       <Card className="border-border shadow-sm">
@@ -40,9 +40,19 @@ const OrderSummary = ({ cartItems = [], subtotal = 0, tax = 0, discount = 0, tot
           <div className="space-y-1.5">
             <LineItem label="Subtotal" value={subtotal} />
             {discount > 0 && <LineItem label="Discount" value={-discount} />}
-            <LineItem label="Tax (GST)" value={tax} />
+            {tax > 0 && <LineItem label="Fees & GST" value={tax} />}
+            {shipping != null && (
+              shipping > 0
+                ? <LineItem label="Shipping" value={shipping} />
+                : (
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>Shipping</span>
+                    <span className="font-semibold text-emerald-600">FREE</span>
+                  </div>
+                )
+            )}
             <Separator />
-            <LineItem label="Total (AUD)" value={total} bold />
+            <LineItem label="Total (AUD, inc. GST)" value={total} bold />
           </div>
         </CardContent>
       </Card>

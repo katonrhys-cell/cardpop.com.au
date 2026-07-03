@@ -18,6 +18,7 @@
 - [Commission Settings | CardPop Admin](https://cardpop.com.au/commissionsettings): No description available
 - [Complete Profile | Card Pop](https://cardpop.com.au/profilecompletion): No description available
 - [Confirming Order | Card Pop](https://cardpop.com.au/checkoutsuccess): No description available
+- [Fulfilment Queue | Admin](https://cardpop.com.au/fulfilmentqueue): No description available
 - [Hierarchy Management | CardPop Admin](https://cardpop.com.au/categorymanagement): No description available
 - [Log In | CardPop](https://cardpop.com.au/login): No description available
 - [Manage Events | Admin Portal](https://cardpop.com.au/eventsadmin): No description available
@@ -48,6 +49,8 @@
 - [Sellers Management | Admin Portal](https://cardpop.com.au/sellersmanagement): No description available
 - [Sole Trader Account | CardPop](https://cardpop.com.au/accountsoletrader): No description available
 - [Subcategory Management | Admin Portal](https://cardpop.com.au/subcategorymanagement): No description available
+- [Suppliers | Admin](https://cardpop.com.au/suppliersmanagement): No description available
+- [Supply Settings | Admin](https://cardpop.com.au/supplysettings): No description available
 - [System Diagnostics | Admin](https://cardpop.com.au/systemdiagnostics): No description available
 - [System Diagnostics | Emergency Console](https://cardpop.com.au/diagnostics): No description available
 - [Transactions | Card Pop](https://cardpop.com.au/transactionhistory): No description available

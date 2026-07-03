@@ -29,6 +29,7 @@ import newsletterRouter from './newsletter.js';
 import marketDataRouter from './market-data.js';
 import catalogRouter from './catalog.js';
 import psaRouter from './psa.js';
+import suppliesRouter from './supplies.js';
 
 const router = Router();
 
@@ -131,6 +132,10 @@ export default () => {
     // Newsletter subscription
     router.use('/newsletter', apiLimiter);
     router.use('/newsletter', newsletterRouter);
+
+    // Supplies dropshipping: shipping settings + admin fulfilment queue
+    router.use('/supplies', apiLimiter);
+    router.use('/supplies', suppliesRouter);
 
     // Trade routes with email verification middleware
     // Apply auth middleware first, then trade access verification

@@ -1,7 +1,8 @@
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
-import { sendOrderConfirmed, sendItemSold } from '../utils/emailService.js';
+import { sendOrderConfirmed, sendItemSold, sendOrderTaxInvoice } from '../utils/emailService.js';
 import { payoutSeller } from './payoutService.js';
+import { createFulfilmentsForOrder } from './supplyFulfilmentService.js';
 
 async function getPlatformSetting(key, defaultValue) {
   const { data } = await supabase
@@ -76,7 +77,7 @@ async function handleCheckoutSessionCompleted(session, stripe) {
 
   const { data: existing } = await supabase
     .from('orders')
-    .select('id, status, total_aud, order_items, buyer_id')
+    .select('id, status, total_aud, gst_aud, shipping_aud, order_items, buyer_id, shipping_name, shipping_address, shipping_suburb, shipping_state, shipping_postcode')
     .eq('stripe_session_id', session.id)
     .maybeSingle();
 
@@ -140,6 +141,9 @@ async function handleCartOrder(existing, session, stripe) {
         }
       }
     } else if (line.type === 'shop' && line.id) {
+      // Dropshipped supplies carry no owned stock count — availability is the
+      // admin-managed in_stock flag, so there's nothing to decrement.
+      if (line.is_supply === true) continue;
       const { data: ok } = await supabase.rpc('decrement_shop_stock', { p_id: line.id, p_qty: line.quantity || 1 });
       if (ok === false) {
         oversoldShopItems.push(line);
@@ -176,19 +180,42 @@ async function handleCartOrder(existing, session, stripe) {
     });
   }
 
+  // Split any dropshipped supply lines into the admin fulfilment queue,
+  // one fulfilment per supplier. Idempotent, so webhook retries are safe.
+  await createFulfilmentsForOrder(existing)
+    .catch(e => logger.error(`[STRIPE] fulfilment creation failed for order ${existing.id}: ${e.message}`));
+
   if (existing.buyer_id) {
     const { data: buyerProfile } = await supabase.from('profiles')
       .select('email, display_name').eq('id', existing.buyer_id).maybeSingle();
     if (buyerProfile?.email) {
-      const itemCount = lines.reduce((n, l) => n + (l.quantity || 1), 0);
-      await sendOrderConfirmed({
-        buyerEmail: buyerProfile.email,
-        buyerName: buyerProfile.display_name || 'Collector',
-        cardName: `${itemCount} item${itemCount === 1 ? '' : 's'}`,
-        itemPrice: amountCents2 / 100,
-        total: amountCents2 / 100,
-        orderId: existing.id,
-      }).catch(e => logger.warn(`[STRIPE] cart confirm email failed: ${e.message}`));
+      const shopLines = lines.filter(l => l.type === 'shop');
+      if (shopLines.length > 0) {
+        // Platform-sold goods: the confirmation doubles as the GST tax invoice.
+        const businessName = await getPlatformSetting('business_name', 'CardPop');
+        const abn = await getPlatformSetting('business_abn', '');
+        await sendOrderTaxInvoice({
+          buyerEmail: buyerProfile.email,
+          buyerName: buyerProfile.display_name || 'Collector',
+          lines,
+          shippingAud: Number(existing.shipping_aud || 0),
+          gstAud: Number(existing.gst_aud || 0),
+          totalAud: amountCents2 / 100,
+          businessName,
+          abn,
+          orderId: existing.id,
+        }).catch(e => logger.warn(`[STRIPE] tax invoice email failed: ${e.message}`));
+      } else {
+        const itemCount = lines.reduce((n, l) => n + (l.quantity || 1), 0);
+        await sendOrderConfirmed({
+          buyerEmail: buyerProfile.email,
+          buyerName: buyerProfile.display_name || 'Collector',
+          cardName: `${itemCount} item${itemCount === 1 ? '' : 's'}`,
+          itemPrice: amountCents2 / 100,
+          total: amountCents2 / 100,
+          orderId: existing.id,
+        }).catch(e => logger.warn(`[STRIPE] cart confirm email failed: ${e.message}`));
+      }
     }
   }
 

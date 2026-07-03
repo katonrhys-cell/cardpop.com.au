@@ -5,7 +5,7 @@ import {
   ShoppingCart, Menu, Shield, MessageSquare, ArrowRightLeft,
   LayoutDashboard, Package, Users, Calendar, FileText, Building2, Layers, CheckCircle,
   Sun, Moon, ChevronDown, ArrowRight, Layers2, User, LogOut, Settings,
-  FolderTree, ListOrdered, BarChart3, Store,
+  FolderTree, ListOrdered, BarChart3, Store, Truck,
   BookOpen, Globe, Star, Award, TrendingUp, Newspaper, BadgeCheck, Ticket, Handshake,
   Calculator, MapPin, ClipboardList, HelpCircle
 } from 'lucide-react';
@@ -62,6 +62,7 @@ const BLOG_CATEGORIES = [
 
 const NAV_LINKS = [
   { label: 'Shop', href: '/shop' },
+  { label: 'Supplies', href: '/shop/supplies' },
   { label: 'Marketplace', href: '/marketplace' },
   { label: 'Analytics', href: '/analytics' },
   { label: 'Blog', href: '/blog' },
@@ -77,6 +78,7 @@ const ADMIN_LINKS = [
   { label: 'Users', href: '/admin/users', icon: Users },
   { label: 'Orders', href: '/admin/orders', icon: ListOrdered },
   { label: 'Products', href: '/admin/products', icon: Package },
+  { label: 'Fulfilments', href: '/admin/fulfilments', icon: Truck },
   { label: 'Categories', href: '/admin/categories', icon: FolderTree },
   { label: 'Brands', href: '/admin/brands', icon: Building2 },
   { label: 'Product Lines', href: '/admin/product-lines', icon: Layers },

@@ -6,7 +6,7 @@ import {
   ArrowUpRight, Server, Database, HardDrive, CheckCircle2,
   FolderTree, RefreshCw, ArrowRightLeft, Calendar,
   Tags, BarChart3, Building2, Layers, ShieldCheck, Lock, ShoppingCart, Filter, X,
-  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star, Sparkles, LayoutList, Flag, CreditCard, MessagesSquare
+  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star, Sparkles, LayoutList, Flag, CreditCard, MessagesSquare, Factory, Truck, Settings2
 } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -241,6 +241,9 @@ const AdminDashboard = () => {
         <h2 className="text-2xl font-serif font-bold text-foreground">Core Management</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <ManagementBox title="Shop Management" description="Add, edit and manage shop products." icon={ShoppingCart} link="/admin/products" />
+          <ManagementBox title="Fulfilment Queue" description="Approve dropship supply orders and add tracking." icon={Truck} link="/admin/fulfilments" />
+          <ManagementBox title="Suppliers" description="Manage dropship suppliers for card supplies." icon={Factory} link="/admin/suppliers" />
+          <ManagementBox title="Supply Settings" description="Markup, shipping threshold and tax invoice details." icon={Settings2} link="/admin/supply-settings" />
           <ManagementBox title="Brands Management" description="Add game and sports brands." icon={Building2} link="/admin/brands" />
           <ManagementBox title="Category Management" description="Organize top-level categories." icon={FolderTree} link="/admin/categories" />
           <ManagementBox title="Subcategory Management" description="Manage nested subcategories." icon={Layers2} link="/admin/subcategories" />

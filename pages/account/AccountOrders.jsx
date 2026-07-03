@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ShoppingBag, RotateCcw, Info, AlertCircle, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { ShoppingBag, RotateCcw, Info, AlertCircle, CheckCircle2, XCircle, Clock, Truck, PackageCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, differenceInDays } from 'date-fns';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
@@ -33,6 +33,15 @@ const STATUS_CONFIG = {
   refunded:          { label: 'Refunded',    color: 'bg-violet-500/10 text-violet-700 border-violet-200' },
   payment_failed:    { label: 'Failed',      color: 'bg-destructive/10 text-destructive border-destructive/20' },
   cancelled:         { label: 'Cancelled',   color: 'bg-muted text-muted-foreground border-border' },
+};
+
+const FULFILMENT_STATUS_CONFIG = {
+  awaiting_fulfilment:   { label: 'Preparing your order', Icon: Clock,        color: 'text-blue-600' },
+  ordered_with_supplier: { label: 'Being packed',         Icon: Clock,        color: 'text-amber-600' },
+  shipped:               { label: 'Shipped',              Icon: Truck,        color: 'text-emerald-600' },
+  complete:              { label: 'Delivered',            Icon: PackageCheck, color: 'text-emerald-700' },
+  cancelled:             { label: 'Cancelled',            Icon: XCircle,      color: 'text-muted-foreground' },
+  refunded:              { label: 'Refunded',             Icon: RotateCcw,    color: 'text-violet-600' },
 };
 
 const REFUND_STATUS_CONFIG = {
@@ -170,7 +179,7 @@ const RefundDialog = ({ order, onClose, onSuccess }) => {
 
 // ─── Order Card ───────────────────────────────────────────────────────────────
 
-const OrderCard = ({ order, onRefundRequest }) => {
+const OrderCard = ({ order, fulfilments = [], onRefundRequest }) => {
   const statusCfg   = STATUS_CONFIG[order.status]        || STATUS_CONFIG.payment_confirmed;
   const refundCfg   = REFUND_STATUS_CONFIG[order.refund_status];
   const daysSince   = differenceInDays(new Date(), new Date(order.created_at));
@@ -193,8 +202,33 @@ const OrderCard = ({ order, onRefundRequest }) => {
 
       {/* Item name */}
       <p className="font-semibold text-foreground">
-        {order.listing?.vault_item?.card_name || 'Trading Card Purchase'}
+        {order.listing?.vault_item?.card_name
+          || (Array.isArray(order.order_items) && order.order_items.length
+            ? order.order_items.map(l => `${(l.quantity || 1) > 1 ? `${l.quantity} x ` : ''}${l.title}`).join(', ')
+            : 'Trading Card Purchase')}
       </p>
+
+      {/* Dropship fulfilment progress (supply items) */}
+      {fulfilments.map(f => {
+        const cfg = FULFILMENT_STATUS_CONFIG[f.status] || FULFILMENT_STATUS_CONFIG.awaiting_fulfilment;
+        return (
+          <div key={f.id} className="bg-muted/30 rounded-xl p-3 space-y-1">
+            <div className={`flex items-center gap-2 text-xs font-semibold ${cfg.color}`}>
+              <cfg.Icon className="w-4 h-4" />
+              {cfg.label}
+              <span className="text-muted-foreground font-normal">
+                — {(f.items || []).map(i => `${(i.quantity || 1) > 1 ? `${i.quantity} x ` : ''}${i.title}`).join(', ')}
+              </span>
+            </div>
+            {f.tracking_number && (
+              <p className="text-xs text-muted-foreground pl-6">
+                {f.tracking_carrier || 'Australia Post'} tracking:{' '}
+                <span className="font-mono font-semibold text-foreground">{f.tracking_number}</span>
+              </p>
+            )}
+          </div>
+        );
+      })}
 
       {/* Financials */}
       <div className="grid grid-cols-3 gap-3 text-xs">
@@ -264,6 +298,7 @@ const OrderCard = ({ order, onRefundRequest }) => {
 const AccountOrders = () => {
   const { currentUser } = useAuth();
   const [orders, setOrders] = useState([]);
+  const [fulfilmentsByOrder, setFulfilmentsByOrder] = useState({});
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
   const [refundTarget, setRefundTarget] = useState(null);
@@ -280,6 +315,19 @@ const AccountOrders = () => {
         .limit(100);
       if (error) throw error;
       setOrders(data || []);
+
+      // Dropship fulfilment progress for supply items (RLS: own rows only)
+      const { data: fulfilments } = await supabase
+        .from('supply_fulfilments')
+        .select('id, order_id, status, items, tracking_number, tracking_carrier')
+        .eq('buyer_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .limit(200);
+      const byOrder = {};
+      for (const f of fulfilments || []) {
+        (byOrder[f.order_id] = byOrder[f.order_id] || []).push(f);
+      }
+      setFulfilmentsByOrder(byOrder);
     } catch (err) {
       console.error('Failed to load orders:', err);
       toast.error('Could not load your orders. Please try again.');
@@ -359,6 +407,7 @@ const AccountOrders = () => {
             <OrderCard
               key={order.id}
               order={order}
+              fulfilments={fulfilmentsByOrder[order.id] || []}
               onRefundRequest={setRefundTarget}
             />
           ))}

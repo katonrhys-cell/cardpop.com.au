@@ -212,7 +212,7 @@ describe('POST /calculate-cart', () => {
     expect(res.status).toBe(400);
   });
 
-  it('prices a shop product with GST only (no commission)', async () => {
+  it('prices a shop product GST-inclusive with free shipping over the threshold', async () => {
     gstSettings();
     mockMaybeSingle.mockResolvedValueOnce({
       data: { id: 'p1', title: 'Booster Box', price_aud: 100, stock_quantity: 5, status: 'active' },
@@ -222,8 +222,33 @@ describe('POST /calculate-cart', () => {
     expect(res.status).toBe(200);
     expect(res.body.subtotalAud).toBe(200);
     expect(res.body.commissionAud).toBe(0);
-    expect(res.body.gstAud).toBe(20);
-    expect(res.body.totalAud).toBe(220);
+    // GST is 1/11th of the GST-inclusive price, not added on top
+    expect(res.body.gstAud).toBe(18.18);
+    expect(res.body.shippingAud).toBe(0);
+    expect(res.body.totalAud).toBe(200);
+  });
+
+  it('adds the flat shipping fee below the free-shipping threshold', async () => {
+    gstSettings();
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: { id: 'p1', title: 'Penny Sleeves 100ct', price_aud: 4.95, stock_quantity: 0, status: 'active', is_supply: true, in_stock: true },
+      error: null,
+    });
+    const res = await request(app).post('/calculate-cart').send({ items: [{ type: 'shop', id: 'p1', quantity: 1 }] });
+    expect(res.status).toBe(200);
+    expect(res.body.subtotalAud).toBe(4.95);
+    expect(res.body.shippingAud).toBe(10);
+    expect(res.body.totalAud).toBe(14.95);
+  });
+
+  it('returns 409 for a supply item flagged out of stock even with counted stock', async () => {
+    gstSettings();
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: { id: 'p1', title: 'Toploaders 25ct', price_aud: 9.95, stock_quantity: 100, status: 'active', is_supply: true, in_stock: false },
+      error: null,
+    });
+    const res = await request(app).post('/calculate-cart').send({ items: [{ type: 'shop', id: 'p1', quantity: 1 }] });
+    expect(res.status).toBe(409);
   });
 });
 
@@ -284,7 +309,8 @@ describe('POST /create-cart-checkout', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.url).toBe('https://stripe.com/pay/cs_cart');
-    expect(res.body.total).toBe(110);
+    // $100 GST-inclusive, over the free-shipping threshold: charged exactly $100
+    expect(res.body.total).toBe(100);
     expect(mockStripe.checkout.sessions.create).toHaveBeenCalled();
   });
 });

@@ -5,6 +5,8 @@ import {
   itemSoldEmail,
   refundProcessedEmail,
   refundIssuedEmail,
+  orderTaxInvoiceEmail,
+  orderShippedEmail,
 } from '../emails/templates.js';
 
 const FROM = 'CardPop <noreply@cardpop.com.au>';
@@ -54,6 +56,32 @@ export async function sendRefundProcessed({ buyerEmail, buyerName, refundAmount,
     to: buyerEmail,
     subject: 'Your CardPop refund has been processed',
     html: refundProcessedEmail({ buyerName, refundAmount, orderId }),
+  });
+}
+
+export async function sendOrderTaxInvoice({ buyerEmail, buyerName, lines, shippingAud, gstAud, totalAud, businessName, abn, orderId }) {
+  await send({
+    to: buyerEmail,
+    subject: 'Your CardPop order is confirmed — tax invoice',
+    html: orderTaxInvoiceEmail({ buyerName, lines, shippingAud, gstAud, totalAud, businessName, abn, orderId }),
+  });
+}
+
+export async function sendOrderShipped({ buyerEmail, buyerName, trackingNumber, trackingCarrier, items, orderId }) {
+  await send({
+    to: buyerEmail,
+    subject: 'Your CardPop order has shipped!',
+    html: orderShippedEmail({ buyerName, trackingNumber, trackingCarrier, items, orderId }),
+  });
+}
+
+// Plain-text supplier order, rendered monospaced so line items stay aligned.
+export async function sendSupplierOrder({ to, subject, text }) {
+  await send({
+    to,
+    subject,
+    html: `<pre style="font-family:monospace;font-size:14px;white-space:pre-wrap;">${text
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>`,
   });
 }
 

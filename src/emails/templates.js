@@ -150,3 +150,55 @@ ${summaryTable([
     null,
   );
 }
+
+// ─── Tax invoice / order confirmation (buyer, orders with shop goods) ─────────
+
+export function orderTaxInvoiceEmail({ buyerName, lines, shippingAud, gstAud, totalAud, businessName, abn, orderId }) {
+  const itemRows = (lines || []).map((l) => [
+    `${l.quantity > 1 ? `${l.quantity} x ` : ''}${l.title}`,
+    `$${Number(l.line_total_aud).toFixed(2)} AUD`,
+  ]);
+  const summaryRows = [
+    ...itemRows,
+    ['Shipping', Number(shippingAud) > 0 ? `$${Number(shippingAud).toFixed(2)} AUD` : 'FREE'],
+    ['Total (inc. GST)', `$${Number(totalAud).toFixed(2)} AUD`, true],
+    ['GST included', `$${Number(gstAud).toFixed(2)} AUD`],
+  ];
+  const abnLine = abn ? `<p style="margin:16px 0 0;font-size:12px;color:#9CA3AF;">Tax invoice issued by ${businessName || 'CardPop'} — ABN ${abn}. Prices include GST.</p>` : '';
+  const body = `<p>Thanks for your order! Your payment has been received and your items are being prepared for dispatch. This email is your tax invoice.</p>
+${summaryTable(summaryRows)}
+<p>We'll email you tracking details as soon as your order ships.</p>${abnLine}`;
+
+  return cpEmail(
+    'Your CardPop order is confirmed — tax invoice inside.',
+    'Order Confirmed — Tax Invoice',
+    `Thanks, ${buyerName}!`,
+    body,
+    `https://cardpop.com.au/account/orders?order=${orderId}`,
+    'View Order',
+    'Keep this tax invoice for your records.',
+  );
+}
+
+// ─── Shipping confirmation with tracking (buyer) ──────────────────────────────
+
+export function orderShippedEmail({ buyerName, trackingNumber, trackingCarrier, items, orderId }) {
+  const itemList = (items || []).map((i) => `${i.quantity > 1 ? `${i.quantity} x ` : ''}${i.title}`).join(', ');
+  const body = `<p>Good news — your order is on its way!</p>
+${summaryTable([
+  ['Items', itemList || 'Your order'],
+  ['Carrier', trackingCarrier || 'Australia Post'],
+  ['Tracking number', trackingNumber, true],
+])}
+<p>Tracking can take up to 24 hours to become active with the carrier.</p>`;
+
+  return cpEmail(
+    `Your CardPop order has shipped — tracking ${trackingNumber}.`,
+    'Your Order Has Shipped!',
+    `Hi ${buyerName},`,
+    body,
+    `https://cardpop.com.au/account/orders?order=${orderId}`,
+    'Track Order',
+    null,
+  );
+}

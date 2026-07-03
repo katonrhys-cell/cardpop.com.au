@@ -74,6 +74,7 @@ router.post('/calculate-cart', authMiddleware, async (req, res) => {
       subtotalAud: priced.itemsCents / 100,
       commissionAud: priced.commissionCents / 100,
       gstAud:      priced.gstCents / 100,
+      shippingAud: priced.shippingCents / 100,
       totalAud:    priced.grandCents / 100,
     });
   } catch (err) {
@@ -97,7 +98,7 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
     const userId = req.user.id;
     const email  = req.user.email;
 
-    const { lineItems, orderLines, itemsCents, commissionCents, gstCents, grandCents } = await priceCart(items, userId);
+    const { lineItems, orderLines, itemsCents, commissionCents, feeGstCents, gstCents, shippingCents, grandCents } = await priceCart(items, userId);
 
     // Fraud control: cap order size / frequency for brand-new, unverified buyers.
     const velocity = await checkPurchaseVelocity({ userId, orderValueAud: grandCents / 100 });
@@ -125,8 +126,8 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
       listing_id:        null,
       stripe_session_id: session.id,
       item_price_aud:    itemsCents / 100,
-      shipping_aud:      0,
-      platform_fee_aud:  (commissionCents + gstCents) / 100,
+      shipping_aud:      shippingCents / 100,
+      platform_fee_aud:  (commissionCents + feeGstCents) / 100,
       gst_aud:           gstCents / 100,
       total_aud:         grandCents / 100,
       transaction_type:  'cart',
