@@ -221,6 +221,35 @@ const AboutPage = () => {
         </div>
       </section>
 
+      {/* ── The Parallel Report ── */}
+      <section className="bg-secondary/40 px-6 py-24">
+        <div className="max-w-[820px] mx-auto">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="w-10 h-1 rounded-full bg-brand-red" aria-hidden="true" />
+            <span className="text-xs font-bold uppercase tracking-wider text-brand-red">The Parallel Report</span>
+          </div>
+          <h2 className="text-3xl md:text-4xl font-extrabold mb-5">The research behind the report</h2>
+          <div className="space-y-5 text-[1.05rem] leading-[1.8] text-muted-foreground">
+            <p>
+              The Parallel Report is CardPop™'s research desk — the market analysis, grading
+              guides and investment insights you'll find on our blog. It isn't reheated press
+              releases or recycled listicles.
+            </p>
+            <p>
+              Every piece is grounded in personal research: hundreds of hours spent tracking
+              real sales online and, just as importantly, talking with collectors, dealers and
+              graders face-to-face at trade shows around Australia. That first-hand, on-the-floor
+              perspective is why the guides focus on what actually matters to Australian
+              collectors — real AUD costs, local submission routes, and the cards genuinely
+              moving in this market.
+            </p>
+          </div>
+          <Button asChild size="lg" className="rounded-full px-7 font-bold mt-8">
+            <Link to="/blog">Read The Parallel Report</Link>
+          </Button>
+        </div>
+      </section>
+
       {/* ── Vision ── */}
       <section className="relative overflow-hidden bg-foreground text-background px-6 py-28">
         <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[36rem] h-[36rem] rounded-full bg-brand-red/15 blur-3xl" aria-hidden="true" />

@@ -54,6 +54,27 @@ const slugify = (str = '') => String(str)
   .replace(/\s+/g, '-')
   .replace(/-+/g, '-');
 
+// Inject unique anchor ids onto every <h2> in article HTML so crawlers (and
+// Google "jump to" deep links) have stable targets. Regex-based to avoid a DOM
+// dependency in the serverless function; leaves headings that already have ids.
+const addHeadingAnchors = (html = '') => {
+  const used = new Set();
+  return String(html).replace(/<h2\b([^>]*)>([\s\S]*?)<\/h2>/gi, (match, attrs, inner) => {
+    if (/\bid\s*=/i.test(attrs)) return match;
+    const text = inner
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&amp;/gi, '&').replace(/&nbsp;/gi, ' ').replace(/&#39;|&rsquo;|&apos;/gi, "'")
+      .replace(/\s+/g, ' ').trim();
+    if (!text) return match;
+    const base = slugify(text) || 'section';
+    let id = base;
+    let n = 2;
+    while (used.has(id)) id = `${base}-${n++}`;
+    used.add(id);
+    return `<h2${attrs} id="${id}">${inner}</h2>`;
+  });
+};
+
 // Map a trading-card condition / grade to a schema.org OfferItemCondition.
 const schemaItemCondition = (c) => {
   const v = String(c || '').toLowerCase();
@@ -63,7 +84,8 @@ const schemaItemCondition = (c) => {
   return 'https://schema.org/UsedCondition';
 };
 
-function htmlDoc({ title, description, canonical, ogImage, robots, ogType = 'website', headExtra = '', jsonLdItems = [], bodyHtml = '' }) {
+function htmlDoc({ title, description, canonical, ogImage, ogImageAlt, robots, ogType = 'website', headExtra = '', jsonLdItems = [], bodyHtml = '' }) {
+  const imageAlt = ogImageAlt || title;
   const ld = jsonLdItems.length
     ? `<script type="application/ld+json">${ldJson(jsonLdItems)}</script>`
     : '';
@@ -82,10 +104,12 @@ ${robots ? `<meta name="robots" content="${esc(robots)}" />` : ''}
 <meta property="og:site_name" content="CardPop" />
 <meta property="og:url" content="${esc(canonical)}" />
 ${ogImage ? `<meta property="og:image" content="${esc(ogImage)}" />` : ''}
+${ogImage ? `<meta property="og:image:alt" content="${esc(imageAlt)}" />` : ''}
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="${esc(title)}" />
 <meta name="twitter:description" content="${esc(description)}" />
 ${ogImage ? `<meta name="twitter:image" content="${esc(ogImage)}" />` : ''}
+${ogImage ? `<meta name="twitter:image:alt" content="${esc(imageAlt)}" />` : ''}
 ${headExtra}
 ${ld}
 </head>
@@ -318,21 +342,29 @@ async function renderBlogArticle(supabase, param) {
   const published = isoDate(article.published_at || article.created_at);
   const modified = isoDate(article.updated_at || article.published_at || article.created_at);
   const author = article.author || 'CardPop Research';
+  const tags = Array.isArray(article.tags) ? article.tags.filter(Boolean) : [];
+  const readTime = Number(article.read_time_minutes);
+  const wordCount = toText(bodyContent).split(/\s+/).filter(Boolean).length;
 
   const blogPosting = {
     '@context': 'https://schema.org',
     '@type': 'BlogPosting',
     headline: article.title,
     ...(image ? { image } : {}),
-    author: { '@type': 'Person', name: author, url: `${BASE_URL}/blog` },
+    author: { '@type': 'Organization', name: author, url: `${BASE_URL}/about` },
     publisher: {
       '@type': 'Organization',
       name: 'CardPop',
+      url: `${BASE_URL}/about`,
       logo: { '@type': 'ImageObject', url: `${BASE_URL}/og-image.jpg` },
     },
     ...(published ? { datePublished: published } : {}),
     ...(modified ? { dateModified: modified } : {}),
     description,
+    ...(article.category ? { articleSection: article.category } : {}),
+    ...(tags.length ? { keywords: tags.join(', ') } : {}),
+    ...(Number.isFinite(readTime) && readTime > 0 ? { timeRequired: `PT${readTime}M` } : {}),
+    ...(wordCount > 0 ? { wordCount } : {}),
     mainEntityOfPage: { '@type': 'WebPage', '@id': canonical },
     url: canonical,
   };
@@ -376,6 +408,12 @@ async function renderBlogArticle(supabase, param) {
     article.category ? `<meta property="article:section" content="${esc(article.category)}" />` : '',
   ].filter(Boolean).join('\n');
 
+  const tagsHtml = tags.length
+    ? `<nav aria-label="Topics"><strong>Topics:</strong> ${tags
+        .map((t) => `<a href="${BASE_URL}/blog?tag=${encodeURIComponent(t)}">${esc(t)}</a>`)
+        .join(' · ')}</nav>`
+    : '';
+
   const bodyHtml = `<main>
   <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/blog">The Parallel Report</a> / ${esc(article.title)}</nav>
   <article>
@@ -383,7 +421,8 @@ async function renderBlogArticle(supabase, param) {
     <p><em>By ${esc(author)}${published ? ` — ${esc(new Date(published).toISOString().split('T')[0])}` : ''}${article.read_time_minutes ? ` · ${esc(String(article.read_time_minutes))} min read` : ''}</em></p>
     ${article.excerpt ? `<p>${esc(article.excerpt)}</p>` : ''}
     ${image ? `<img src="${esc(image)}" alt="${esc(article.title)}" />` : ''}
-    ${bodyContent || `<p>${esc(description)}</p>`}
+    ${addHeadingAnchors(bodyContent) || `<p>${esc(description)}</p>`}
+    ${tagsHtml}
   </article>
   ${faqHtml}
 </main>`;

@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -49,7 +49,7 @@ const FeaturedCard = ({ article, showBadge = true }) => {
     >
       <div className="aspect-video bg-muted relative overflow-hidden flex items-center justify-center">
         {imageUrl
-          ? <img src={imageUrl} alt={article.title} className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" />
+          ? <img src={imageUrl} alt={article.title} loading="lazy" decoding="async" className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" />
           : <ImagePlaceholder />
         }
       </div>
@@ -86,7 +86,7 @@ const ArticleCard = ({ article, showBadge = true }) => {
     >
       <div className="aspect-[16/9] bg-muted relative overflow-hidden flex items-center justify-center">
         {imageUrl
-          ? <img src={imageUrl} alt={article.title} className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" />
+          ? <img src={imageUrl} alt={article.title} loading="lazy" decoding="async" className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" />
           : <ImagePlaceholder />
         }
       </div>
@@ -115,6 +115,8 @@ const ArticleCard = ({ article, showBadge = true }) => {
 
 const BlogPage = () => {
   const { category: categoryParam } = useParams();
+  const [searchParams] = useSearchParams();
+  const tagParam = searchParams.get('tag');
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -135,16 +137,20 @@ const BlogPage = () => {
 
   useEffect(() => { fetchArticles(); }, [fetchArticles]);
 
-  // Articles for the Featured Stories strip (only on the main blog page, no search/category filter)
+  // Articles for the Featured Stories strip (only on the main blog page, no search/category/tag filter)
   const featuredArticles = useMemo(
-    () => (!categoryParam && !searchTerm ? articles.filter(a => a.featured).slice(0, 4) : []),
-    [articles, categoryParam, searchTerm]
+    () => (!categoryParam && !tagParam && !searchTerm ? articles.filter(a => a.featured).slice(0, 4) : []),
+    [articles, categoryParam, tagParam, searchTerm]
   );
 
-  // Articles for the main grid, filtered by category param or search
+  // Articles for the main grid, filtered by category param, tag param or search
   const displayedArticles = useMemo(() => {
     let filtered = articles;
     if (categoryParam) filtered = filtered.filter(a => a.category === categoryParam);
+    if (tagParam) {
+      const t = tagParam.toLowerCase();
+      filtered = filtered.filter(a => Array.isArray(a.tags) && a.tags.some(tag => tag?.toLowerCase() === t));
+    }
     if (searchTerm.trim()) {
       const q = searchTerm.toLowerCase();
       filtered = filtered.filter(a =>
@@ -154,7 +160,7 @@ const BlogPage = () => {
       );
     }
     return filtered;
-  }, [articles, categoryParam, searchTerm]);
+  }, [articles, categoryParam, tagParam, searchTerm]);
 
   // Article count per category for the Explore section
   const categoryCounts = useMemo(() => {
@@ -164,10 +170,16 @@ const BlogPage = () => {
   }, [articles]);
 
   const activeCategory = categoryParam ? CATEGORY_MAP[categoryParam] : null;
-  const pageTitle = activeCategory ? `${activeCategory} | Blog` : 'The Parallel Report | CardPop';
+  const pageTitle = activeCategory
+    ? `${activeCategory} | Blog`
+    : tagParam
+      ? `${tagParam} articles | The Parallel Report`
+      : 'The Parallel Report | CardPop';
   const pageDescription = activeCategory
     ? `${activeCategory} from The Parallel Report by CardPop — trading card analysis, guides and insights for Australian Pokémon, MTG and sports card collectors.`
-    : 'The Parallel Report by CardPop — trading card news, market analysis, grading guides and investment insights for Australian Pokémon, MTG and sports card collectors.';
+    : tagParam
+      ? `Articles tagged “${tagParam}” from The Parallel Report by CardPop — trading card analysis, guides and insights for Australian collectors.`
+      : 'The Parallel Report by CardPop — trading card news, market analysis, grading guides and investment insights for Australian Pokémon, MTG and sports card collectors.';
 
   return (
     <div className="min-h-[100dvh] bg-background">
@@ -182,12 +194,14 @@ const BlogPage = () => {
         <div className="container-default">
           <BookOpen className="w-12 h-12 text-primary mx-auto mb-6" />
           <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            {activeCategory ? activeCategory : 'The Parallel Report'}
+            {activeCategory || tagParam || 'The Parallel Report'}
           </h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
             {activeCategory
               ? `Showing all articles in ${activeCategory}`
-              : 'Insights, news, and deep-dives from the forefront of the collecting world.'}
+              : tagParam
+                ? `Showing all articles tagged “${tagParam}”`
+                : 'Insights, news, and deep-dives from the forefront of the collecting world.'}
           </p>
           <div className="max-w-md mx-auto relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
@@ -217,7 +231,7 @@ const BlogPage = () => {
         )}
 
         {/* ── Explore by Topic ── */}
-        {!categoryParam && !searchTerm && !loading && (
+        {!categoryParam && !tagParam && !searchTerm && !loading && (
           <section>
             <h2 className="text-2xl font-bold mb-6">Explore by Topic</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -247,15 +261,17 @@ const BlogPage = () => {
 
         {/* ── All / Filtered Articles ── */}
         <section>
-          {activeCategory && (
+          {(activeCategory || tagParam) && (
             <div className="mb-6">
               <Link to="/blog" className="inline-flex items-center text-sm text-primary font-semibold hover:underline mb-3">
                 ← All Articles
               </Link>
-              <h2 className="text-2xl font-bold">{activeCategory}</h2>
+              <h2 className="text-2xl font-bold">
+                {activeCategory || `Tagged: ${tagParam}`}
+              </h2>
             </div>
           )}
-          {!activeCategory && !searchTerm && !loading && displayedArticles.length > 0 && (
+          {!activeCategory && !tagParam && !searchTerm && !loading && displayedArticles.length > 0 && (
             <h2 className="text-2xl font-bold mb-6">Latest Articles</h2>
           )}
 
@@ -292,9 +308,11 @@ const BlogPage = () => {
                   ? `No articles match "${searchTerm}". Try different keywords.`
                   : activeCategory
                     ? `No articles in ${activeCategory} yet. Check back soon.`
-                    : "We're working on new content. Check back soon."}
+                    : tagParam
+                      ? `No articles tagged “${tagParam}” yet. Check back soon.`
+                      : "We're working on new content. Check back soon."}
               </p>
-              {(searchTerm || activeCategory) && (
+              {(searchTerm || activeCategory || tagParam) && (
                 <Button variant="outline" className="mt-6" asChild>
                   <Link to="/blog">View All Articles</Link>
                 </Button>
