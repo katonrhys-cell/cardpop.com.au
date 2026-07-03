@@ -1,0 +1,14 @@
+-- Placeholder for a migration version that exists only in the production
+-- project's supabase_migrations.schema_migrations table (hand-applied via the
+-- dashboard / Supabase assistant on 2026-07-03 at 05:14 UTC, most likely the
+-- welcome-offers schema while PR #476 was in development).
+--
+-- Without a local file carrying this exact version prefix, `supabase db push`
+-- aborts with "Remote migration versions not found in local migrations
+-- directory", which blocked every migration deploy on 2026-07-03. This file
+-- restores the 1:1 match between repo and remote history.
+--
+-- Intentionally a no-op: production already ran the real statements under this
+-- version, and the repo's own migrations (all idempotent) define the actual
+-- schema for fresh environments.
+select 1 where false;
