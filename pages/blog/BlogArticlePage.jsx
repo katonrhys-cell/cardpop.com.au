@@ -433,8 +433,15 @@ const BlogArticlePage = () => {
 
       {imageUrl && (
         <div className="container-default max-w-4xl mx-auto mt-4 mb-4">
-          <div className="rounded-2xl overflow-hidden bg-muted shadow-lg">
-             <img src={imageUrl} alt={article.title} className="block w-full h-auto" />
+          <div className="rounded-2xl overflow-hidden bg-muted shadow-lg aspect-video">
+             <img
+               src={imageUrl}
+               alt={article.title}
+               className="block w-full h-full object-cover"
+               fetchPriority="high"
+               loading="eager"
+               decoding="async"
+             />
           </div>
         </div>
       )}
@@ -526,7 +533,7 @@ const BlogArticlePage = () => {
                   >
                     <div className="aspect-[3/4] bg-muted relative overflow-hidden">
                       {cardImageUrl ? (
-                        <img src={cardImageUrl} alt={card.card_name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                        <img src={cardImageUrl} alt={card.card_name} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center">
                           <FileText className="w-8 h-8 text-muted-foreground opacity-20" />
@@ -582,7 +589,7 @@ const BlogArticlePage = () => {
                   >
                     <div className="aspect-[16/9] bg-muted relative overflow-hidden">
                       {relImg ? (
-                        <img src={relImg} alt={related.title} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
+                        <img src={relImg} alt={related.title} loading="lazy" decoding="async" className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500" />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center text-muted-foreground bg-secondary/50">
                           <FileText className="w-8 h-8 opacity-20" />

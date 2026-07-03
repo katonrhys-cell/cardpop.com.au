@@ -49,7 +49,7 @@ const FeaturedCard = ({ article }) => {
     >
       <div className="aspect-video bg-muted relative overflow-hidden flex items-center justify-center">
         {imageUrl
-          ? <img src={imageUrl} alt={article.title} className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" />
+          ? <img src={imageUrl} alt={article.title} loading="lazy" decoding="async" className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" />
           : <ImagePlaceholder />
         }
       </div>
@@ -86,7 +86,7 @@ const ArticleCard = ({ article }) => {
     >
       <div className="aspect-[16/9] bg-muted relative overflow-hidden flex items-center justify-center">
         {imageUrl
-          ? <img src={imageUrl} alt={article.title} className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" />
+          ? <img src={imageUrl} alt={article.title} loading="lazy" decoding="async" className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" />
           : <ImagePlaceholder />
         }
       </div>
