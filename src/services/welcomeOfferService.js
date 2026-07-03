@@ -14,9 +14,12 @@ import {
  * Welcome-offer lifecycle: issue a unique code when a user registers, email it
  * to them separately from the verification email, then redeem it in two halves:
  *
- *  - trial:    sets profiles.trial_ends_at, which `can_sell()` (RLS) and the
- *              frontend's `canSell` already honour. subscription_status is left
- *              untouched so the trial expires naturally with the timestamp.
+ *  - trial:    the code confirms the 30-day free-trial offer, but the trial
+ *              itself is always activated through the normal Stripe/PayPal
+ *              card-on-file subscription flow (`StartTrialOptions`) — a payment
+ *              method is required, and no charge happens until the trial ends.
+ *              `validateTrialCode` only checks the code; `markTrialRedeemed` is
+ *              called by the subscription webhooks once a trial actually starts.
  *  - discount: validated at checkout and applied as a Stripe amount-off coupon
  *              covering DISCOUNT_PCT of the item subtotal (fees/GST excluded,
  *              seller proceeds unaffected — the platform funds the discount).
@@ -133,10 +136,12 @@ export async function getWelcomeOffer(userId) {
 }
 
 /**
- * Redeem the trial half of the code: start the user's free selling trial by
- * setting trial_ends_at. Throws httpError(4xx) with a user-facing message.
+ * Validate the trial half of the code. This does NOT start the trial — the
+ * trial is always activated through the Stripe/PayPal card-on-file flow, and
+ * the subscription webhooks call `markTrialRedeemed` once it actually starts.
+ * Throws httpError(4xx) with a user-facing message.
  */
-export async function redeemTrial(userId, rawCode) {
+export async function validateTrialCode(userId, rawCode) {
   const code = normaliseCode(rawCode);
   if (!code) throw httpError(400, 'Please enter your welcome code.');
 
@@ -163,30 +168,23 @@ export async function redeemTrial(userId, rawCode) {
     (profile?.trial_ends_at && new Date(profile.trial_ends_at).getTime() > Date.now());
   if (alreadyEntitled) throw httpError(409, 'Your account can already sell — no trial needed.');
 
-  // Guarded update wins the race if the same code is redeemed twice at once.
-  const { data: claimed, error: claimErr } = await supabase
+  logger.info(`[WELCOME] ${userId} confirmed trial code — awaiting payment method`);
+  return { trialDays: offer.trial_days };
+}
+
+/**
+ * Consume the trial half of the code once a trial/subscription actually starts
+ * (called by the Stripe/PayPal subscription webhooks). Best-effort and
+ * idempotent — most users simply won't have an unredeemed offer.
+ */
+export async function markTrialRedeemed(userId) {
+  if (!userId) return;
+  const { error } = await supabase
     .from('welcome_offers')
     .update({ trial_redeemed_at: new Date().toISOString() })
-    .eq('id', offer.id)
-    .is('trial_redeemed_at', null)
-    .select('id');
-  if (claimErr) throw claimErr;
-  if (!claimed || claimed.length === 0) {
-    throw httpError(409, 'This code’s free trial has already been claimed.');
-  }
-
-  const trialEndsAt = new Date(Date.now() + offer.trial_days * 86400 * 1000).toISOString();
-  const { error: profileErr } = await supabase
-    .from('profiles')
-    .update({ trial_ends_at: trialEndsAt })
-    .eq('id', userId);
-  if (profileErr) {
-    logger.error(`[WELCOME] Trial redeemed but profile update failed for ${userId}: ${profileErr.message}`);
-    throw new Error('Could not start your trial — please contact support.');
-  }
-
-  logger.info(`[WELCOME] ${userId} redeemed trial via code (ends ${trialEndsAt})`);
-  return { trialEndsAt, trialDays: offer.trial_days };
+    .eq('user_id', userId)
+    .is('trial_redeemed_at', null);
+  if (error) logger.warn(`[WELCOME] Failed to mark trial redeemed for ${userId}: ${error.message}`);
 }
 
 /**

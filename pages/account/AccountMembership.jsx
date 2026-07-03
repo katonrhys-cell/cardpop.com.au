@@ -25,6 +25,7 @@ const AccountMembership = () => {
   const [activating, setActivating] = useState(false);
   const [welcomeCode, setWelcomeCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);
+  const [codeConfirmed, setCodeConfirmed] = useState(false);
 
   // Prefill the welcome-code input with the user's own unredeemed code so
   // arriving from the offer email is one click, not a copy-paste hunt.
@@ -46,17 +47,17 @@ const AccountMembership = () => {
     if (!welcomeCode.trim()) { toast.error('Enter your welcome code first.'); return; }
     setRedeeming(true);
     try {
-      const res = await apiServerClient.fetch('/welcome-offer/redeem-trial', {
+      const res = await apiServerClient.fetch('/welcome-offer/validate-trial', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: welcomeCode }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Could not redeem the code.');
-      toast.success(`Your ${data.trialDays ?? TRIAL_DAYS}-day free trial is active. Happy selling!`);
-      await refetchProfile?.();
+      if (!res.ok) throw new Error(data.error || 'Could not validate the code.');
+      setCodeConfirmed(true);
+      toast.success('Code confirmed! Add a card or PayPal below to start your free trial.');
     } catch (err) {
-      toast.error(err.message || 'Could not redeem the code.');
+      toast.error(err.message || 'Could not validate the code.');
     } finally {
       setRedeeming(false);
     }
@@ -132,22 +133,30 @@ const AccountMembership = () => {
               Have a welcome code?
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              New members get a code by email. Redeem it to start your {TRIAL_DAYS}-day free trial
-              instantly — no card details needed. The same code also gives you 10% off your first order at checkout.
+              New members get a code by email. Redeem it to claim your {TRIAL_DAYS}-day free trial —
+              add a card or PayPal to activate, and you won't be charged until the trial ends.
+              The same code also gives you 10% off your first order at checkout.
             </p>
-            <form onSubmit={handleRedeemWelcomeCode} className="mt-4 flex gap-2">
-              <Input
-                value={welcomeCode}
-                onChange={(e) => setWelcomeCode(e.target.value.toUpperCase())}
-                placeholder="POP-XXXX-XXXX"
-                autoComplete="off"
-                className="font-mono tracking-widest uppercase"
-                aria-label="Welcome code"
-              />
-              <Button type="submit" disabled={redeeming} className="shrink-0 font-bold">
-                {redeeming ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Redeem'}
-              </Button>
-            </form>
+            {codeConfirmed ? (
+              <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-green-600">
+                <BadgeCheck className="h-4 w-4" />
+                Code confirmed — choose Stripe or PayPal below to start your {TRIAL_DAYS} free days.
+              </p>
+            ) : (
+              <form onSubmit={handleRedeemWelcomeCode} className="mt-4 flex gap-2">
+                <Input
+                  value={welcomeCode}
+                  onChange={(e) => setWelcomeCode(e.target.value.toUpperCase())}
+                  placeholder="POP-XXXX-XXXX"
+                  autoComplete="off"
+                  className="font-mono tracking-widest uppercase"
+                  aria-label="Welcome code"
+                />
+                <Button type="submit" disabled={redeeming} className="shrink-0 font-bold">
+                  {redeeming ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Redeem'}
+                </Button>
+              </form>
+            )}
           </div>
 
           <div className="mt-8">

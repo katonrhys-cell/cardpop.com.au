@@ -1,6 +1,7 @@
 import stripe from '../utils/stripeClient.js';
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
+import { markTrialRedeemed } from './welcomeOfferService.js';
 
 /**
  * Subscription / free-trial state management.
@@ -95,6 +96,9 @@ export async function applyStripeSubscription(subscription) {
     logger.error(`[SUB] Failed to apply Stripe subscription for ${userId}: ${error.message}`);
     return;
   }
+  // A started trial/subscription consumes the welcome code's trial half so
+  // offer state stays accurate (e.g. for expiry-reminder targeting).
+  if (['trialing', 'active'].includes(status)) await markTrialRedeemed(userId);
   logger.info(`[SUB] ${userId} → ${status} (stripe ${subscription.id})`);
 }
 
@@ -131,6 +135,7 @@ export async function applyPaypalSubscription({ userId, paypalSubscriptionId, st
     logger.error(`[SUB] Failed to apply PayPal subscription for ${userId}: ${error.message}`);
     return;
   }
+  if (['trialing', 'active'].includes(status)) await markTrialRedeemed(userId);
   logger.info(`[SUB] ${userId} → ${status} (paypal ${paypalSubscriptionId})`);
 }
 
