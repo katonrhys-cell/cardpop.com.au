@@ -195,7 +195,7 @@ The following auction-adjacent code already exists and must be built on — not 
 | Backend | Express.js → Vercel Serverless Function (`api/index.js`) |
 | Monitoring | Datadog synthetic tests + Vercel Analytics + Speed Insights |
 | Deployment | **GitHub Actions → Vercel** (auto-deploy on push to `main`) |
-| Domain | `cardpop.online` — DNS via Hostinger, resolves to Vercel |
+| Domain | `cardpop.com.au` — DNS via Hostinger, resolves to Vercel |
 
 > **Architecture note (June 2026):** The platform previously used PocketBase alongside Supabase. PocketBase has been fully removed — its client, the `pb_migrations/` and `pb_hooks/` directories, and the `pocketbase` npm dependency are all gone. All data, auth, real-time, file storage, and server-side automation now run on Supabase.
 
@@ -1220,4 +1220,4 @@ Resolve these before Phase 2 implementation begins.
 
 *CardPop Australia — PRD v1.2 · June 2026*
 *Prepared for internal product and engineering use. Confidential.*
-*cardpop.online · Explore. Trade. Collect.*
+*cardpop.com.au · Explore. Trade. Collect.*

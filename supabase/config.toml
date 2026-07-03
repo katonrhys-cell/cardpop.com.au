@@ -66,9 +66,8 @@ enabled = true
 # constructing URLs used in emails. Primary domain is cardpop.com.au.
 site_url = "https://cardpop.com.au"
 # A list of *exact* URLs that auth providers are permitted to redirect to
-# post authentication. cardpop.online is kept in the allow-list in case it is
-# still serving/redirecting.
-additional_redirect_urls = ["https://cardpop.com.au", "https://cardpop.online", "http://127.0.0.1:3000"]
+# post authentication.
+additional_redirect_urls = ["https://cardpop.com.au", "http://127.0.0.1:3000"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour).
 jwt_expiry = 3600
 # Allow/disallow new user signups to your project.
