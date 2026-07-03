@@ -351,10 +351,11 @@ async function renderBlogArticle(supabase, param) {
     '@type': 'BlogPosting',
     headline: article.title,
     ...(image ? { image } : {}),
-    author: { '@type': 'Person', name: author, url: `${BASE_URL}/blog` },
+    author: { '@type': 'Organization', name: author, url: `${BASE_URL}/about` },
     publisher: {
       '@type': 'Organization',
       name: 'CardPop',
+      url: `${BASE_URL}/about`,
       logo: { '@type': 'ImageObject', url: `${BASE_URL}/og-image.jpg` },
     },
     ...(published ? { datePublished: published } : {}),

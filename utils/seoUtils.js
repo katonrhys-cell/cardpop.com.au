@@ -240,13 +240,14 @@ export const generateBlogPostingSchema = (blogPost) => {
     "headline": blogPost.title,
     ...(image ? { image } : {}),
     "author": {
-      "@type": "Person",
-      "name": blogPost.author || "CardPop Team",
-      "url": "https://cardpop.com.au/blog"
+      "@type": "Organization",
+      "name": blogPost.author || "CardPop",
+      "url": "https://cardpop.com.au/about"
     },
     "publisher": {
       "@type": "Organization",
       "name": "CardPop",
+      "url": "https://cardpop.com.au/about",
       "logo": { "@type": "ImageObject", "url": "https://cardpop.com.au/og-image.jpg" }
     },
     "datePublished": blogPost.publishedAt || blogPost.created,
