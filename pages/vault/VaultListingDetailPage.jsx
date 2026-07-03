@@ -12,8 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { ShoppingCart, ShieldCheck, BarChart3 } from 'lucide-react';
 import PSAPopPanel from '@/components/PSAPopPanel.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
-import GradingVerificationSection from '@/components/GradingVerificationSection.jsx';
-import PSACertificationSection from '@/components/PSACertificationSection.jsx';
+import CertificationVerificationSection from '@/components/CertificationVerificationSection.jsx';
 import { getCardAttributeRows } from '@/lib/cardAttributeLabels.js';
 
 const VaultListingDetailPage = () => {
@@ -204,21 +203,16 @@ const VaultListingDetailPage = () => {
               </div>
             )}
 
-            {/* Grading Verification Section */}
-            {listing?.grading_number && (
-              <GradingVerificationSection
-                gradingNumber={listing.grading_number}
-                gradingCompany={listing.grading_company || 'psa'}
-                grade={vi?.grade}
-              />
-            )}
           </div>
 
-          {/* PSA Certification Details Section */}
-          <PSACertificationSection
-            certNumber={vi?.cert_number || listing?.grading_number}
-            gradingCompany={vi?.grading_company || listing?.grading_company}
-          />
+          {/* Certification Verification Section */}
+          {(vi?.cert_number || listing?.grading_number) && (
+            <CertificationVerificationSection
+              certNumber={vi?.cert_number || listing?.grading_number}
+              gradingCompany={vi?.grading_company || listing?.grading_company || 'psa'}
+              grade={vi?.grade}
+            />
+          )}
 
           <BuyerProtection className="mb-8" />
 

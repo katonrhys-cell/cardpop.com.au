@@ -7,8 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ShieldCheck, MessageCircle, User, TrendingUp, Loader2, Flag } from 'lucide-react';
 import ReportModal from '@/components/ReportModal.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
-import GradingVerificationSection from '@/components/GradingVerificationSection.jsx';
-import PSACertificationSection from '@/components/PSACertificationSection.jsx';
+import CertificationVerificationSection from '@/components/CertificationVerificationSection.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
 
 const MarketplaceListingPage = () => {
@@ -161,20 +160,14 @@ const MarketplaceListingPage = () => {
              </div>
           </div>
 
-          {/* Grading Verification Section */}
+          {/* Certification Verification Section */}
           {(listing?.grading_number || listing?.vault_item?.cert_number) && (
-            <GradingVerificationSection
-              gradingNumber={listing.grading_number || listing.vault_item?.cert_number}
+            <CertificationVerificationSection
+              certNumber={listing.grading_number || listing.vault_item?.cert_number}
               gradingCompany={listing.grading_company || listing.vault_item?.grading_company || 'psa'}
               grade={listing.vault_item?.grade}
             />
           )}
-
-          {/* PSA Certification Details Section */}
-          <PSACertificationSection
-            certNumber={listing?.vault_item?.cert_number || listing?.grading_number}
-            gradingCompany={listing?.vault_item?.grading_company || listing?.grading_company}
-          />
 
           {/* CardSight market price reference */}
           {(csPriceLoading || csPrice) && (
