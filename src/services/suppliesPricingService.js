@@ -6,7 +6,7 @@ import { getPlatformSetting } from './stripeWebhookService.js';
 // platform_settings with these code-level defaults, so the feature works
 // before any admin has saved a value.
 export const SUPPLIES_SETTING_DEFAULTS = {
-  supplies_default_markup_pct: 60,
+  supplies_default_markup_pct: 100,
   free_shipping_threshold_aud: 50,
   flat_shipping_fee_aud: 10,
   business_name: 'CardPop',

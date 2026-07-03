@@ -32,7 +32,7 @@ const INITIAL_SOURCING = {
   markup_pct: '',
 };
 
-const DEFAULT_MARKUP_PCT = 60;
+const DEFAULT_MARKUP_PCT = 100;
 
 // Mirrors the server's suggestRetailPriceAud: markup over cost, rounded UP to
 // the nearest 5 cents (GST-inclusive retail).
