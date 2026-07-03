@@ -27,6 +27,7 @@ import recommendationsRouter from './recommendations.js';
 import priceHistoryRouter from './price-history.js';
 import newsletterRouter from './newsletter.js';
 import marketDataRouter from './market-data.js';
+import pricesRouter from './prices.js';
 import catalogRouter from './catalog.js';
 import psaRouter from './psa.js';
 
@@ -121,6 +122,10 @@ export default () => {
 
     router.use('/price-history', apiLimiter);
     router.use('/price-history', priceHistoryRouter);
+
+    // Public card price pages: snapshot refresh (cron + on-demand)
+    router.use('/prices', apiLimiter);
+    router.use('/prices', pricesRouter);
 
     router.use('/buyer-protection', apiLimiter);
     router.use('/buyer-protection', buyerProtectionRouter);
