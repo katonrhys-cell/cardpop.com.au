@@ -251,14 +251,21 @@ const App = () => {
                         <Route path="/marketplace" element={<MarketplacePage />} />
                         {/* Orphaned category route (no inbound links, MarketplacePage doesn't read the param) — redirect to the base marketplace */}
                         <Route path="/marketplace/category/:category" element={<Navigate to="/marketplace" replace />} />
-                        {/* Redirect old marketplace listing URL format to new product route */}
-                        <Route path="/marketplace/:id/:slug?" element={<MarketplaceListingRedirect />} />
+                        {/* Canonical marketplace listing URL — the sitemap, bot prerenderer and
+                            most internal links all use /marketplace/:id/:slug, so the listing page
+                            renders here directly (no client redirect that would create a duplicate
+                            URL for Google to index). */}
+                        <Route path="/marketplace/:id/:slug?" element={<ProductDetailPage source="marketplace" />} />
                         <Route path="/browse" element={<BrowseListingsPage />} />
 
                         {/* Public Profile Routes */}
                         <Route path="/seller/:userId" element={<PublicSellerProfilePage />} />
                         <Route path="/dealer/:userId" element={<SoleTraderStorePage />} />
-                        
+
+                        {/* Legacy alias — /product/marketplace/... redirects to the canonical
+                            /marketplace/:id/:slug (server-side 301 in vercel.json covers full loads;
+                            this covers in-app navigations from stale links). */}
+                        <Route path="/product/marketplace/:id/:slug?" element={<MarketplaceListingRedirect />} />
                         {/* Unified Product Route — optional slug is cosmetic, id is used for fetching */}
                         <Route path="/product/:source/:id/:slug?" element={<ProductDetailPage />} />
                         

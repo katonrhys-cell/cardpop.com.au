@@ -12,6 +12,7 @@ vi.mock('@supabase/supabase-js', () => {
       select: vi.fn(() => b),
       eq: vi.fn(() => b),
       neq: vi.fn(() => b),
+      in: vi.fn(() => b),
       gt: vi.fn(() => b),
       gte: vi.fn(() => b),
       order: vi.fn(() => b),
@@ -351,5 +352,87 @@ describe('prerender blog index', () => {
     expect(body).toContain('/blog/category/grading-guides');
     expect(body).toContain('"@type":"ItemList"');
     expect(body).not.toContain('noindex');
+  });
+});
+
+describe('prerender collections', () => {
+  it('renders the collections index with links to every collection', async () => {
+    const { status, body } = await run('/collections');
+    expect(status).toBe(200);
+    expect(body).toContain('<title>Trading Card Collections | CardPop</title>');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/collections" />');
+    expect(body).toContain('/collections/pokemon');
+    expect(body).toContain('/collections/nba');
+    expect(body).toContain('"@type":"ItemList"');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('renders a collection page with SEO copy and listing links', async () => {
+    state.listResult = { data: [
+      { id: UUID, slug: 'charizard-base-set', title: 'Charizard Base Set', price_aud: 450, category: 'Pokemon', vault_item: { card_name: 'Charizard' } },
+    ] };
+    const { status, body } = await run('/collections/pokemon');
+    expect(status).toBe(200);
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/collections/pokemon" />');
+    expect(body).toContain('Pokémon Cards for Sale in Australia');
+    expect(body).toContain(`/marketplace/${UUID}/charizard-base-set`);
+    expect(body).toContain('"@type":"CollectionPage"');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('canonicalises alias slugs to the primary collection URL', async () => {
+    const { status, body } = await run('/collections/Pokemon');
+    expect(status).toBe(200);
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/collections/pokemon" />');
+  });
+
+  it('returns noindex for an unknown collection', async () => {
+    const { status, body } = await run('/collections/beyblades');
+    expect(status).toBe(200);
+    expect(body).toContain('noindex');
+  });
+});
+
+describe('prerender seller profiles', () => {
+  it('renders a regular seller with a self-canonical and their listings', async () => {
+    state.result = { data: {
+      id: UUID, display_name: 'CardShark', bio: 'Collector since 1999.',
+      rating: 4.8, reviews_count: 12, is_sole_trader: false, is_public: true,
+    } };
+    state.listResult = { data: [
+      { id: UUID, slug: 'jordan-fleer', title: 'Jordan Fleer 1986', price_aud: 900, vault_item: { card_name: 'Michael Jordan' } },
+    ] };
+    const { status, body } = await run(`/seller/${UUID}`);
+    expect(status).toBe(200);
+    expect(body).toContain(`<link rel="canonical" href="https://cardpop.com.au/seller/${UUID}" />`);
+    expect(body).toContain('CardShark');
+    expect(body).toContain(`/marketplace/${UUID}/jordan-fleer`);
+    expect(body).not.toContain('noindex');
+  });
+
+  it('canonicalises sole traders to their dealer store page', async () => {
+    state.result = { data: {
+      id: UUID, display_name: 'Poke Den', business_name: 'Poke Den',
+      store_slug: 'poke-den', is_sole_trader: true, is_public: true,
+    } };
+    const { status, body } = await run(`/seller/${UUID}`);
+    expect(status).toBe(200);
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/dealer/poke-den" />');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('returns noindex for a missing or private profile', async () => {
+    state.result = { data: null };
+    const { body } = await run(`/seller/${UUID}`);
+    expect(body).toContain('noindex');
+
+    state.result = { data: { id: UUID, display_name: 'Hidden', is_public: false } };
+    const { body: privateBody } = await run(`/seller/${UUID}`);
+    expect(privateBody).toContain('noindex');
+  });
+
+  it('returns a noindex doc for a non-UUID seller id', async () => {
+    const { body } = await run('/seller/not-a-uuid');
+    expect(body).toContain('noindex');
   });
 });

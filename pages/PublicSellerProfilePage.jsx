@@ -141,7 +141,14 @@ const PublicSellerProfilePage = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <SEOHead title={seller ? `${seller.display_name || seller.name || 'Seller'} | CardPop Profile` : 'Seller Profile | CardPop'} description={seller ? `${seller.display_name || seller.name || 'This seller'} is a trading card seller on CardPop Australia.` : 'View seller profile on CardPop'} />
+      <SEOHead
+        title={seller ? `${seller.display_name || seller.name || 'Seller'} | CardPop Profile` : 'Seller Profile | CardPop'}
+        description={seller ? `${seller.display_name || seller.name || 'This seller'} is a trading card seller on CardPop Australia.` : 'View seller profile on CardPop'}
+        // Sole traders have a dedicated /dealer store page (prerendered + in the
+        // sitemap) with the same content — declare it canonical so Google doesn't
+        // treat the two URLs as competing duplicates. Matches api/prerender.js.
+        canonicalUrl={seller?.is_sole_trader ? `/dealer/${seller.store_slug || seller.id}` : undefined}
+      />
 
       {/* Profile Header Banner */}
       <div className="bg-[hsl(var(--profile-bg))] border-b border-[hsl(var(--section-divider))]">
