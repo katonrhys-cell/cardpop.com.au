@@ -18,8 +18,18 @@ const EVENTS_SINCE = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
 // change; DB-driven URLs below keep their real updated_at timestamps.
 const SITE_UPDATED = '2026-06-30';
 
+// Sitemap <loc> values must be XML-escaped. Slugs come straight from the DB, so
+// a stray & (or < >) in one slug would otherwise produce invalid XML and make
+// Google reject the whole sitemap ("Sitemap could not be read").
+const xmlEscape = (str = '') => String(str)
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&apos;');
+
 const xmlUrl = (loc, lastmod, changefreq, priority) =>
-  `  <url>\n    <loc>${loc}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
+  `  <url>\n    <loc>${xmlEscape(loc)}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
 
 const slugify = (str = '') => String(str)
   .toLowerCase()
@@ -79,46 +89,59 @@ export default async function handler(req, res) {
       auth: { persistSession: false },
     });
 
-    const [articlesRes, listingsRes, dealersRes, productsRes, eventsRes] = await Promise.all([
-      supabase
-        .from('blog_articles')
-        .select('slug, updated_at, published_at, created_at')
-        .eq('is_published', true)
-        .not('slug', 'is', null)
-        .order('published_at', { ascending: false })
-        .limit(200),
-      supabase
-        .from('listings')
-        .select('id, slug, updated_at, created_at')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(500),
-      supabase
-        .from('profiles')
-        .select('id, store_slug, updated_at')
-        .eq('is_sole_trader', true)
-        .eq('is_public', true)
-        .limit(500),
-      supabase
-        .from('shop_products')
-        .select('id, title, updated_at, created_at')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .limit(500),
-      supabase
-        .from('events')
-        .select('id, slug, updated_at, created_at')
-        .eq('status', 'approved')
-        .gte('start_date', EVENTS_SINCE)
-        .order('start_date', { ascending: true })
-        .limit(500),
+    // The Vercel function is capped at 10s (see vercel.json). If Supabase is
+    // slow the function would otherwise 504, which Google reports as a
+    // "temporary processing error". Race the DB work against a shorter budget
+    // and fall back to an empty result set so we always emit valid XML (at
+    // least the static pages) with a 200 well within the cap.
+    const DB_BUDGET_MS = 7000;
+    const dbData = await Promise.race([
+      Promise.allSettled([
+        supabase
+          .from('blog_articles')
+          .select('slug, updated_at, published_at, created_at')
+          .eq('is_published', true)
+          .not('slug', 'is', null)
+          .order('published_at', { ascending: false })
+          .limit(200),
+        supabase
+          .from('listings')
+          .select('id, slug, updated_at, created_at')
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(500),
+        supabase
+          .from('profiles')
+          .select('id, store_slug, updated_at')
+          .eq('is_sole_trader', true)
+          .eq('is_public', true)
+          .limit(500),
+        supabase
+          .from('shop_products')
+          .select('id, title, updated_at, created_at')
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(500),
+        supabase
+          .from('events')
+          .select('id, slug, updated_at, created_at')
+          .eq('status', 'approved')
+          .gte('start_date', EVENTS_SINCE)
+          .order('start_date', { ascending: true })
+          .limit(500),
+      ]),
+      new Promise((resolve) => setTimeout(() => resolve(null), DB_BUDGET_MS)),
     ]);
 
-    const articles = articlesRes.data ?? [];
-    const listings = listingsRes.data ?? [];
-    const dealers = dealersRes.data ?? [];
-    const products = productsRes.data ?? [];
-    const events = eventsRes.data ?? [];
+    // Promise.allSettled means one slow/failing table degrades that section
+    // only, not the whole sitemap. On timeout dbData is null → static-only.
+    const rows = (i) =>
+      (dbData?.[i]?.status === 'fulfilled' ? dbData[i].value.data : null) ?? [];
+    const articles = rows(0);
+    const listings = rows(1);
+    const dealers = rows(2);
+    const products = rows(3);
+    const events = rows(4);
 
     const parts = [
       '<?xml version="1.0" encoding="UTF-8"?>',
