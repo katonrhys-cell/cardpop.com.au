@@ -10,9 +10,27 @@ import '@/global.css';
 // first paint. Activate it as soon as the bundle runs. Other routes don't carry
 // this marker, so this is a harmless no-op there. Done here (not via an inline
 // onload handler) to keep the hardened CSP's script-src free of 'unsafe-inline'.
-if (typeof document !== 'undefined') {
-  for (const link of document.querySelectorAll('link[data-async-style]')) link.media = 'all';
-}
+//
+// Returns a promise that resolves once every activated stylesheet has finished
+// loading, so the first React render can wait for it. Without the wait, the JS
+// bundle can win the race against the (low-priority, media="print") CSS fetch
+// on a cold cache: React then mounts the full header/footer with only the
+// inlined critical CSS — a flash of unstyled content until the sheet lands.
+// The static shell stays on screen while we wait, so nothing looks stalled.
+const activateDeferredStylesheets = () => {
+  if (typeof document === 'undefined') return Promise.resolve();
+  const pending = [];
+  for (const link of document.querySelectorAll('link[data-async-style]')) {
+    link.media = 'all';
+    if (!link.sheet) {
+      pending.push(new Promise((resolve) => {
+        link.addEventListener('load', resolve, { once: true });
+        link.addEventListener('error', resolve, { once: true });
+      }));
+    }
+  }
+  return Promise.all(pending);
+};
 
 // Lazy-load Analytics and SpeedInsights to defer their JS loading
 const Analytics = React.lazy(() => import('@vercel/analytics/react').then(m => ({ default: m.Analytics })));
@@ -26,21 +44,32 @@ const SpeedInsights = React.lazy(() => import('@vercel/speed-insights/react').th
 const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
 const analyticsEnabled = !/^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[?::1\]?)$/.test(hostname);
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <>
-    <App />
-    {analyticsEnabled && (
-      <Suspense fallback={null}>
-        <Analytics />
-      </Suspense>
-    )}
-    {analyticsEnabled && (
-      <Suspense fallback={null}>
-        <SpeedInsights />
-      </Suspense>
-    )}
-  </>
-);
+const renderApp = () => {
+  ReactDOM.createRoot(document.getElementById('root')).render(
+    <>
+      <App />
+      {analyticsEnabled && (
+        <Suspense fallback={null}>
+          <Analytics />
+        </Suspense>
+      )}
+      {analyticsEnabled && (
+        <Suspense fallback={null}>
+          <SpeedInsights />
+        </Suspense>
+      )}
+    </>
+  );
+};
+
+// Mount only after the deferred stylesheet is applied (see above). Routes with
+// no [data-async-style] link (app.html, dev server) resolve immediately, so
+// this adds zero delay there. The 2s race is a fail-safe: if the CSS fetch
+// stalls or errors, the app still boots rather than staying a static shell.
+Promise.race([
+  activateDeferredStylesheets(),
+  new Promise((resolve) => setTimeout(resolve, 2000)),
+]).then(renderApp);
 
 // Register Service Worker for offline support and caching (deferred until idle)
 const registerServiceWorker = () => {
