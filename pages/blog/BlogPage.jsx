@@ -27,7 +27,7 @@ const CategoryBadge = ({ slug }) => {
   const label = CATEGORY_MAP[slug] || slug;
   if (!label) return null;
   return (
-    <span className="absolute -top-3 right-4 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm pointer-events-none">
+    <span className="absolute -top-3 right-0 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm pointer-events-none">
       {label}
     </span>
   );
