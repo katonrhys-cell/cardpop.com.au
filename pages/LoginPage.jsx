@@ -4,6 +4,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import OAuthButtons from '@/components/OAuthButtons.jsx';
 import Turnstile from '@/components/Turnstile.jsx';
 import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
 import { Button } from '@/components/ui/button.jsx';
@@ -284,6 +285,9 @@ const LoginPage = () => {
                         <>Sign In <ArrowRight className="w-5 h-5 ml-2" /></>
                       )}
                     </Button>
+
+                    <OAuthButtons redirectTo={`${window.location.origin}${from}`} disabled={loading} />
+
                     <div className="text-center text-sm text-muted-foreground">
                       Don't have an account?{' '}
                       <Link to="/signup" className="font-bold text-primary hover:underline">

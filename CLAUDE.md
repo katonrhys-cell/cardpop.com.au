@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CardPop is an Australian trading card marketplace. It is a full-stack application with a React SPA frontend and an Express backend, backed by Supabase (PostgreSQL + Auth). The app is deployed on Vercel. The domain `cardpop.online` is registered through Hostinger (DNS only — no Hostinger hosting or FTP involved).
+CardPop is an Australian trading card marketplace. It is a full-stack application with a React SPA frontend and an Express backend, backed by Supabase (PostgreSQL + Auth). The app is deployed on Vercel. The domain `cardpop.com.au` was purchased through Crazy Domains (registrar) and its nameserver setting is configured in Hostinger, but those nameservers point to Vercel (`ns1.vercel-dns.com` / `ns2.vercel-dns.com`) — so Vercel is authoritative for DNS and also hosts the app. Live DNS records (A/CNAME/MX/TXT) must therefore be edited in the Vercel dashboard, not Hostinger's DNS editor.
 
 ## Commands
 
@@ -133,7 +133,7 @@ git push main
 | `KIT_API_KEY` | Kit.com newsletter |
 | `KIT_FORM_ID` | Kit.com newsletter |
 | `ENCRYPTION_KEY` | MFA OTP / backup code encryption |
-| `CORS_ORIGIN` | Express CORS (set to `https://cardpop.online`) |
+| `CORS_ORIGIN` | Express CORS (set to `https://cardpop.com.au`) |
 | `APP_URL` | App base URL |
 
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are public and already hardcoded in `lib/supabaseClient.js` — no need to add them as Vercel secrets.

@@ -1,25 +1,90 @@
-# Supabase CLI configuration.
+# For detailed configuration reference documentation, visit:
+# https://supabase.com/docs/guides/local-development/cli/config
 #
-# `project_id` links this repo to the CardPop Australia project so that
-# `supabase link` / `supabase db push` target the right database. It is the
-# project ref, not a secret. Everything the CLI needs to authenticate
-# (SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD) is supplied via environment /
-# GitHub secrets, never committed here.
-#
-# Docs: https://supabase.com/docs/guides/local-development/cli/config
-
+# project_id is the reference id of your Supabase project. It links this repo to
+# the remote project so the GitHub integration and `supabase db push` know which
+# database to target. For CardPop this is the ref from the project URL
+# (https://odoglvswwymyjuwlonkf.supabase.co).
 project_id = "odoglvswwymyjuwlonkf"
 
+[api]
+enabled = true
+# Port to use for the API URL when running the local stack.
+port = 54321
+# Schemas to expose in your API. Tables, views and stored procedures in these
+# schemas will get API endpoints. `public` and `graphql_public` schemas are
+# included by default.
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
 [db]
-# Must match the remote Postgres major version (see the Supabase dashboard).
+# Port to use for the local database URL.
+port = 54322
+# Port used by db diff command to initialize the shadow database.
+shadow_port = 54320
+# The database major version to use. This has to be the same as your remote
+# database's. Run `SHOW server_version;` on the remote database to check.
 major_version = 17
 
 [db.migrations]
-# Files applied in lexicographic order by their <timestamp>_<name>.sql prefix.
+# Specifies an ordered list of schema files that describe your database.
 schema_paths = []
 
-[api]
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[db.seed]
+# If enabled, seeds the database after migrations during a db reset.
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[realtime]
 enabled = true
 
 [studio]
 enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+
+# Email testing server. Emails sent with the local dev stack are captured here.
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+# The base URL of your website. Used as an allow-list for redirects and for
+# constructing URLs used in emails. Primary domain is cardpop.com.au.
+site_url = "https://cardpop.com.au"
+# A list of *exact* URLs that auth providers are permitted to redirect to
+# post authentication.
+additional_redirect_urls = ["https://cardpop.com.au", "http://127.0.0.1:3000"]
+# How long tokens are valid for, in seconds. Defaults to 3600 (1 hour).
+jwt_expiry = 3600
+# Allow/disallow new user signups to your project.
+enable_signups = true
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
+
+# Preserve the existing email/password + MFA flow. GitHub/Google OAuth providers
+# are configured in the Supabase dashboard (Auth → Providers), not here, unless
+# you later choose to manage them declaratively.
+
+[analytics]
+enabled = false
+
+# Configures branch/preview databases created by the GitHub integration.
+[branching]
+# Automatically run migrations in supabase/migrations against each preview
+# branch when it is created.

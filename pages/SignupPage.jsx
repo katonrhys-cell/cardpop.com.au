@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import OAuthButtons from '@/components/OAuthButtons.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
 import Turnstile from '@/components/Turnstile.jsx';
 import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
@@ -274,6 +275,11 @@ const SignupPage = () => {
               {loading ? 'Creating Account...' : 'Create Secure Account'}
             </Button>
           </form>
+
+          <div className="mt-6">
+            <OAuthButtons redirectTo={`${window.location.origin}/account`} disabled={loading} />
+          </div>
+
           <div className="mt-8 text-center text-sm text-muted-foreground pt-6 border-t border-border">
             Already have an account? <Link to="/login" className="text-primary hover:underline font-bold ml-1">Sign In</Link>
           </div>
