@@ -29,6 +29,7 @@ import newsletterRouter from './newsletter.js';
 import marketDataRouter from './market-data.js';
 import catalogRouter from './catalog.js';
 import psaRouter from './psa.js';
+import welcomeOfferRouter from './welcome-offer.js';
 
 const router = Router();
 
@@ -131,6 +132,10 @@ export default () => {
     // Newsletter subscription
     router.use('/newsletter', apiLimiter);
     router.use('/newsletter', newsletterRouter);
+
+    // Registration welcome offer (code issue / trial redemption)
+    router.use('/welcome-offer', apiLimiter);
+    router.use('/welcome-offer', welcomeOfferRouter);
 
     // Trade routes with email verification middleware
     // Apply auth middleware first, then trade access verification

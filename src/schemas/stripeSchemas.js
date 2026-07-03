@@ -14,6 +14,7 @@ export const createCheckoutSchema = z.object({
     state: z.string().optional(),
     postcode: z.string().optional(),
   }).optional(),
+  promoCode: z.string().trim().max(32).optional(),
 }).refine(
   (data) => data.listingId || data.offerId || data.bidId,
   { message: 'One of listingId, offerId, or bidId is required' }

@@ -71,6 +71,17 @@ const SignupPage = () => {
         });
       }
 
+      // Issue the welcome offer (unique code → 30-day trial + 10% off first
+      // order) — arrives as its own email, separate from verification.
+      // Fire-and-forget: never blocks registration.
+      if (user?.id) {
+        apiServerClient.fetch('/welcome-offer/issue', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id }),
+        }).catch(() => {});
+      }
+
       // Send the verification email regardless of the newsletter choice.
       if (user?.id) {
         try {
@@ -133,9 +144,14 @@ const SignupPage = () => {
               We've sent a verification link to <span className="text-foreground font-bold">{formData.email}</span>.
               Check your email to verify your account and complete your profile.
             </p>
-            <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
+            <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
               Once you sign in, start your <span className="text-foreground font-bold">30-day free trial</span> to
               list and sell cards — add a card or PayPal to begin, and cancel anytime before the trial ends.
+            </p>
+            <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
+              We've also sent your <span className="text-foreground font-bold">welcome code</span> in a separate
+              email — it unlocks the 30-day trial with no card needed, plus{' '}
+              <span className="text-foreground font-bold">10% off your first order</span>.
             </p>
             <Button asChild className="w-full h-12 font-bold">
               <Link to="/login">Go to Login</Link>

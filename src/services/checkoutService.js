@@ -3,6 +3,7 @@ import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { calculateBreakdown } from './commissionService.js';
 import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
+import { validateWelcomeDiscount, buildWelcomeDiscount } from './welcomeOfferService.js';
 
 export async function createSingleItemCheckout(req, res) {
   try {
@@ -13,6 +14,7 @@ export async function createSingleItemCheckout(req, res) {
       successUrl,
       cancelUrl,
       shippingAddress,
+      promoCode,
     } = req.body;
 
     const userId = req.user.id;
@@ -123,6 +125,20 @@ export async function createSingleItemCheckout(req, res) {
       if (s.postcode) metadata.shippingPostcode = String(s.postcode).slice(0, 10);
     }
 
+    // Welcome-offer promo code: platform-funded amount-off coupon covering 10%
+    // of the item price only (never the fee/GST lines, never seller proceeds).
+    // The webhook marks it redeemed after payment completes.
+    let discounts;
+    if (promoCode) {
+      const offer = await validateWelcomeDiscount(userId, promoCode);
+      const built = await buildWelcomeDiscount(stripe, offer, Math.round(breakdown.itemPrice * 100));
+      if (built) {
+        discounts = [{ coupon: built.couponId }];
+        metadata.welcomeOfferId = offer.id;
+        metadata.discountAud = String(built.discountCents / 100);
+      }
+    }
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: lineItems,
@@ -131,6 +147,7 @@ export async function createSingleItemCheckout(req, res) {
       cancel_url: cancelUrl,
       customer_email: email,
       metadata,
+      ...(discounts ? { discounts } : {}),
     });
 
     if (!session?.url) throw new Error('Stripe returned a session without a URL');
@@ -138,7 +155,8 @@ export async function createSingleItemCheckout(req, res) {
     logger.info(`[STRIPE] Session created: ${session.id} for listing ${listingId}`);
     res.json({ url: session.url, sessionId: session.id, breakdown });
   } catch (err) {
-    logger.error(`[STRIPE] create-checkout error: ${err.message}`);
-    res.status(500).json({ error: err.message });
+    const code = err.statusCode || 500;
+    if (code === 500) logger.error(`[STRIPE] create-checkout error: ${err.message}`);
+    res.status(code).json({ error: err.message });
   }
 }

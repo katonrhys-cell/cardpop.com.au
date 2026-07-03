@@ -5,6 +5,7 @@ import {
   itemSoldEmail,
   refundProcessedEmail,
   refundIssuedEmail,
+  welcomeOfferEmail,
 } from '../emails/templates.js';
 
 const FROM = 'CardPop <noreply@cardpop.com.au>';
@@ -23,14 +24,27 @@ function getClient() {
 
 async function send({ to, subject, html }) {
   const client = getClient();
-  if (!client) return;
+  if (!client) return false;
   try {
     const { error } = await client.emails.send({ from: FROM, to, subject, html });
-    if (error) logger.error(`[EMAIL] Send failed to ${to}: ${error.message}`);
-    else logger.info(`[EMAIL] Sent "${subject}" → ${to}`);
+    if (error) {
+      logger.error(`[EMAIL] Send failed to ${to}: ${error.message}`);
+      return false;
+    }
+    logger.info(`[EMAIL] Sent "${subject}" → ${to}`);
+    return true;
   } catch (err) {
     logger.error(`[EMAIL] Unexpected error sending to ${to}: ${err.message}`);
+    return false;
   }
+}
+
+export async function sendWelcomeOffer({ to, name, code, trialDays, discountPct, expiresAt }) {
+  return send({
+    to,
+    subject: `Your CardPop welcome gift: ${trialDays} days free + ${discountPct}% off`,
+    html: welcomeOfferEmail({ name, code, trialDays, discountPct, expiresAt }),
+  });
 }
 
 export async function sendOrderConfirmed({ buyerEmail, buyerName, cardName, itemPrice, total, orderId }) {
