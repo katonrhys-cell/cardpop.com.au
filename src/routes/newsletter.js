@@ -1,43 +1,28 @@
 import logger from '../utils/logger.js';
 import express from 'express';
+import { subscribeToNewsletter } from '../utils/newsletter.js';
+import { verifyRecaptchaToken } from '../utils/recaptcha.js';
 
 const router = express.Router();
 
-const KIT_API_BASE = 'https://api.kit.com/v4';
-
 router.post('/subscribe', async (req, res) => {
-  const { email, firstName } = req.body;
+  const { email, firstName, recaptchaToken } = req.body;
 
   if (!email || typeof email !== 'string' || !email.includes('@')) {
     return res.status(400).json({ error: 'A valid email address is required.' });
   }
 
-  const apiKey = process.env.KIT_API_KEY;
-  const formId = process.env.KIT_FORM_ID;
-
-  if (!apiKey || !formId) {
-    return res.status(503).json({ error: 'Newsletter service is not configured.' });
+  // Bot protection. Skipped automatically when RECAPTCHA_SECRET_KEY is unset.
+  const captcha = await verifyRecaptchaToken(recaptchaToken, req.ip);
+  if (!captcha.success) {
+    return res.status(400).json({ error: 'reCAPTCHA verification failed. Please try again.' });
   }
 
   try {
-    const response = await fetch(`${KIT_API_BASE}/forms/${formId}/subscribers`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        email_address: email.trim().toLowerCase(),
-        ...(firstName?.trim() && { first_name: firstName.trim() }),
-      }),
-    });
-
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
-      const message = body?.errors?.[0]?.message || body?.message || 'Subscription failed.';
-      return res.status(response.status).json({ error: message });
+    const result = await subscribeToNewsletter(email, firstName);
+    if (!result.ok) {
+      return res.status(result.status).json({ error: result.error });
     }
-
     return res.status(200).json({ success: true });
   } catch (err) {
     logger.error('[newsletter] subscribe error:', err);

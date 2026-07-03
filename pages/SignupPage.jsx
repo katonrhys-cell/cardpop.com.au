@@ -1,9 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
+import Recaptcha from '@/components/Recaptcha.jsx';
+import { RECAPTCHA_ENABLED, verifyRecaptcha } from '@/lib/recaptcha.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,6 +18,8 @@ const SignupPage = () => {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [recaptchaToken, setRecaptchaToken] = useState('');
+  const recaptchaRef = useRef(null);
   
   const [passwordValidation, setPasswordValidation] = useState({
     length: false,
@@ -41,7 +45,7 @@ const SignupPage = () => {
 
   const score = Object.values(passwordValidation).filter(Boolean).length;
   const isPasswordValid = score === 5;
-  const isFormValid = formData.name.trim() !== '' && formData.email.trim() !== '' && isPasswordValid && termsAccepted;
+  const isFormValid = formData.name.trim() !== '' && formData.email.trim() !== '' && isPasswordValid && termsAccepted && (!RECAPTCHA_ENABLED || Boolean(recaptchaToken));
 
   const handleAccountSubmit = async (e) => {
     e.preventDefault();
@@ -52,12 +56,32 @@ const SignupPage = () => {
 
     setLoading(true);
     try {
+      // Prove the request is human before creating the account. When opted in,
+      // the same verified round trip also handles the newsletter subscription
+      // (the reCAPTCHA token is single-use, so it can't be reused separately).
+      if (RECAPTCHA_ENABLED) {
+        try {
+          await verifyRecaptcha(recaptchaToken, {
+            newsletter: newsletterOptIn
+              ? { email: formData.email, firstName: formData.name.split(' ')[0] }
+              : undefined,
+          });
+        } catch (captchaErr) {
+          toast.error(captchaErr.message || 'reCAPTCHA check failed. Please try again.');
+          recaptchaRef.current?.reset();
+          setRecaptchaToken('');
+          setLoading(false);
+          return;
+        }
+      }
+
       const result = await signup(formData.email, formData.password, formData.name);
       const user = result?.user;
       const session = result?.session;
 
-      // Newsletter opt-in (fire-and-forget — never blocks registration).
-      if (newsletterOptIn) {
+      // Newsletter opt-in (fire-and-forget — never blocks registration). When
+      // reCAPTCHA is enabled this is handled by the verify call above.
+      if (newsletterOptIn && !RECAPTCHA_ENABLED) {
         apiServerClient.fetch('/newsletter/subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -91,6 +115,10 @@ const SignupPage = () => {
         setSuccess(true);
       }
     } catch (error) {
+      // The reCAPTCHA token is single-use and was already consumed above, so
+      // reset the widget to let the user submit again.
+      recaptchaRef.current?.reset();
+      setRecaptchaToken('');
       toast.error(error.message || 'Registration failed. Email may already be in use.');
     } finally {
       setLoading(false);
@@ -249,6 +277,13 @@ const SignupPage = () => {
                 </span>
               </label>
             </div>
+
+            <Recaptcha
+              ref={recaptchaRef}
+              onVerify={setRecaptchaToken}
+              onExpire={() => setRecaptchaToken('')}
+              className="flex justify-center"
+            />
 
             <Button
               type="submit"

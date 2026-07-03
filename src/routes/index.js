@@ -26,6 +26,7 @@ import wishlistRouter from './wishlist.js';
 import recommendationsRouter from './recommendations.js';
 import priceHistoryRouter from './price-history.js';
 import newsletterRouter from './newsletter.js';
+import recaptchaRouter from './recaptcha.js';
 import marketDataRouter from './market-data.js';
 import catalogRouter from './catalog.js';
 import psaRouter from './psa.js';
@@ -129,7 +130,12 @@ export default () => {
     router.use('/search-suggestions', searchSuggestionsRouter);
 
     // Newsletter subscription
+    router.use('/newsletter', apiLimiter);
     router.use('/newsletter', newsletterRouter);
+
+    // reCAPTCHA verification for client-side auth flows (signup / login)
+    router.use('/recaptcha', apiLimiter);
+    router.use('/recaptcha', recaptchaRouter);
 
     // Trade routes with email verification middleware
     // Apply auth middleware first, then trade access verification

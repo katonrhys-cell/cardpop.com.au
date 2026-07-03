@@ -1,9 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import Recaptcha from '@/components/Recaptcha.jsx';
+import { RECAPTCHA_ENABLED, verifyRecaptcha } from '@/lib/recaptcha.js';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Label } from '@/components/ui/label.jsx';
@@ -42,6 +44,8 @@ const LoginPage = () => {
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
+  const [recaptchaToken, setRecaptchaToken] = useState('');
+  const recaptchaRef = useRef(null);
 
   // MFA state
   const [mfaStep, setMfaStep] = useState(false);
@@ -71,8 +75,25 @@ const LoginPage = () => {
       return;
     }
 
+    if (RECAPTCHA_ENABLED && !recaptchaToken) {
+      toast.error('Please complete the reCAPTCHA challenge.');
+      return;
+    }
+
     setLoading(true);
     try {
+      if (RECAPTCHA_ENABLED) {
+        try {
+          await verifyRecaptcha(recaptchaToken);
+        } catch (captchaErr) {
+          toast.error(captchaErr.message || 'reCAPTCHA check failed. Please try again.');
+          recaptchaRef.current?.reset();
+          setRecaptchaToken('');
+          setLoading(false);
+          return;
+        }
+      }
+
       const result = await login(trimmedEmail, trimmedPassword);
 
       if (result.requiresMfa) {
@@ -94,6 +115,9 @@ const LoginPage = () => {
       // Shake the lock on failure
       setLockState('error');
       setTimeout(() => setLockState('locked'), 500);
+      // The reCAPTCHA token was consumed by the verify call; reset for a retry.
+      recaptchaRef.current?.reset();
+      setRecaptchaToken('');
       toast.error(error.message || 'Failed to log in. Please check your credentials.');
     } finally {
       setLoading(false);
@@ -252,12 +276,18 @@ const LoginPage = () => {
                         disabled={loading}
                       />
                     </div>
+                    <Recaptcha
+                      ref={recaptchaRef}
+                      onVerify={setRecaptchaToken}
+                      onExpire={() => setRecaptchaToken('')}
+                      className="flex justify-center pt-1"
+                    />
                   </CardContent>
                   <CardFooter className="flex flex-col space-y-4 pt-2">
                     <Button
                       type="submit"
                       className="w-full font-bold h-12 text-base rounded-xl"
-                      disabled={loading}
+                      disabled={loading || (RECAPTCHA_ENABLED && !recaptchaToken)}
                     >
                       {loading ? (
                         <Loader2 className="w-5 h-5 animate-spin" />
