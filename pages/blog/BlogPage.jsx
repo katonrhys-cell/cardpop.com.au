@@ -27,7 +27,7 @@ const CategoryBadge = ({ slug }) => {
   const label = CATEGORY_MAP[slug] || slug;
   if (!label) return null;
   return (
-    <span className="absolute top-1/2 -right-3 -translate-y-1/2 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm pointer-events-none">
+    <span className="absolute -top-3 right-0 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm pointer-events-none">
       {label}
     </span>
   );
@@ -40,7 +40,7 @@ const ImagePlaceholder = () => (
 );
 
 // Large card for Featured Stories (2-col grid)
-const FeaturedCard = ({ article }) => {
+const FeaturedCard = ({ article, showBadge = true }) => {
   const imageUrl = article.featured_image_url || null;
   return (
     <Link
@@ -53,7 +53,7 @@ const FeaturedCard = ({ article }) => {
           : <ImagePlaceholder />
         }
       </div>
-      <CategoryBadge slug={article.category} />
+      {showBadge && <CategoryBadge slug={article.category} />}
       <div className="p-6 flex flex-col flex-1">
         <h3 className="font-bold text-xl mb-2 line-clamp-2 group-hover:text-primary transition-colors leading-snug">
           {article.title}
@@ -77,7 +77,7 @@ const FeaturedCard = ({ article }) => {
 };
 
 // Standard card for the main articles grid (3-col)
-const ArticleCard = ({ article }) => {
+const ArticleCard = ({ article, showBadge = true }) => {
   const imageUrl = article.featured_image_url || null;
   return (
     <Link
@@ -90,7 +90,7 @@ const ArticleCard = ({ article }) => {
           : <ImagePlaceholder />
         }
       </div>
-      <CategoryBadge slug={article.category} />
+      {showBadge && <CategoryBadge slug={article.category} />}
       <div className="p-5 flex flex-col flex-1">
         <div className="flex items-center justify-between mb-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
@@ -280,7 +280,7 @@ const BlogPage = () => {
           ) : displayedArticles.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {displayedArticles.map(article => (
-                <ArticleCard key={article.id} article={article} />
+                <ArticleCard key={article.id} article={article} showBadge={!categoryParam} />
               ))}
             </div>
           ) : (
