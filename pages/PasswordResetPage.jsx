@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,8 @@ import { toast } from 'sonner';
 import { KeyRound, ShieldCheck, Mail } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import Turnstile from '@/components/Turnstile.jsx';
+import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
 
 const PasswordResetPage = () => {
   // 'request' = ask for the recovery email; 'update' = arrived via the email
@@ -18,6 +20,8 @@ const PasswordResetPage = () => {
   const [email, setEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
+  const turnstileRef = useRef(null);
   const navigate = useNavigate();
   const { resetPassword, updatePassword } = useAuth();
 
@@ -34,12 +38,19 @@ const PasswordResetPage = () => {
 
   const handleRequestReset = async (e) => {
     e.preventDefault();
+    if (TURNSTILE_ENABLED && !captchaToken) {
+      toast.error('Please complete the verification challenge.');
+      return;
+    }
     setLoading(true);
     try {
-      await resetPassword(email);
+      await resetPassword(email, captchaToken);
       setRequestSent(true);
       toast.success('If an account exists for this email, a recovery link is on its way.');
     } catch (error) {
+      // Turnstile tokens are single-use; reset for a retry.
+      turnstileRef.current?.reset();
+      setCaptchaToken('');
       toast.error(error.message || 'Failed to send recovery email.');
     } finally {
       setLoading(false);
@@ -100,7 +111,13 @@ const PasswordResetPage = () => {
                     className="bg-background text-foreground h-12 rounded-xl font-medium border-border focus-visible:ring-primary"
                   />
                 </div>
-                <Button type="submit" className="w-full h-12 rounded-full font-bold shadow-sm" disabled={loading || !email}>
+                <Turnstile
+                  ref={turnstileRef}
+                  onVerify={setCaptchaToken}
+                  onExpire={() => setCaptchaToken('')}
+                  className="flex justify-center"
+                />
+                <Button type="submit" className="w-full h-12 rounded-full font-bold shadow-sm" disabled={loading || !email || (TURNSTILE_ENABLED && !captchaToken)}>
                   {loading ? 'Sending...' : 'Send Recovery Link'}
                 </Button>
               </form>
