@@ -129,6 +129,7 @@ export default () => {
     router.use('/search-suggestions', searchSuggestionsRouter);
 
     // Newsletter subscription
+    router.use('/newsletter', apiLimiter);
     router.use('/newsletter', newsletterRouter);
 
     // Trade routes with email verification middleware

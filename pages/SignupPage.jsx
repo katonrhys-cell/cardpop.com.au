@@ -1,9 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
+import Turnstile from '@/components/Turnstile.jsx';
+import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,6 +18,8 @@ const SignupPage = () => {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const turnstileRef = useRef(null);
   
   const [passwordValidation, setPasswordValidation] = useState({
     length: false,
@@ -41,7 +45,7 @@ const SignupPage = () => {
 
   const score = Object.values(passwordValidation).filter(Boolean).length;
   const isPasswordValid = score === 5;
-  const isFormValid = formData.name.trim() !== '' && formData.email.trim() !== '' && isPasswordValid && termsAccepted;
+  const isFormValid = formData.name.trim() !== '' && formData.email.trim() !== '' && isPasswordValid && termsAccepted && (!TURNSTILE_ENABLED || Boolean(captchaToken));
 
   const handleAccountSubmit = async (e) => {
     e.preventDefault();
@@ -52,7 +56,8 @@ const SignupPage = () => {
 
     setLoading(true);
     try {
-      const result = await signup(formData.email, formData.password, formData.name);
+      // Turnstile token (when enabled) is verified server-side by Supabase Auth.
+      const result = await signup(formData.email, formData.password, formData.name, captchaToken);
       const user = result?.user;
       const session = result?.session;
 
@@ -91,6 +96,9 @@ const SignupPage = () => {
         setSuccess(true);
       }
     } catch (error) {
+      // Turnstile tokens are single-use; reset so the user can submit again.
+      turnstileRef.current?.reset();
+      setCaptchaToken('');
       toast.error(error.message || 'Registration failed. Email may already be in use.');
     } finally {
       setLoading(false);
@@ -249,6 +257,13 @@ const SignupPage = () => {
                 </span>
               </label>
             </div>
+
+            <Turnstile
+              ref={turnstileRef}
+              onVerify={setCaptchaToken}
+              onExpire={() => setCaptchaToken('')}
+              className="flex justify-center"
+            />
 
             <Button
               type="submit"

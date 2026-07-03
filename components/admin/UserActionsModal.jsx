@@ -9,7 +9,7 @@ const ACTION_LABELS = {
   reset_password: { title: 'Reset Password', description: 'Send a password reset email to the user.', variant: 'default' },
 };
 
-const UserActionsModal = ({ isOpen, onClose, actionType, user, onConfirm }) => {
+const UserActionsModal = ({ isOpen, onClose, actionType, user, onConfirm, extraContent = null, confirmDisabled = false }) => {
   const action = ACTION_LABELS[actionType] ?? { title: 'Confirm Action', description: 'Are you sure?', variant: 'default' };
 
   return (
@@ -25,9 +25,10 @@ const UserActionsModal = ({ isOpen, onClose, actionType, user, onConfirm }) => {
           {action.description}
           {(user?.display_name || user?.username) && <> User: <strong>{user.display_name || user.username}</strong></>}
         </p>
+        {extraContent}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button variant={action.variant} onClick={() => { onConfirm?.(); onClose?.(); }}>
+          <Button variant={action.variant} disabled={confirmDisabled} onClick={() => { onConfirm?.(); onClose?.(); }}>
             Confirm
           </Button>
         </DialogFooter>

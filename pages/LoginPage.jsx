@@ -1,9 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import Turnstile from '@/components/Turnstile.jsx';
+import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
 import { Button } from '@/components/ui/button.jsx';
 import { Input } from '@/components/ui/input.jsx';
 import { Label } from '@/components/ui/label.jsx';
@@ -42,6 +44,8 @@ const LoginPage = () => {
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading]   = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const turnstileRef = useRef(null);
 
   // MFA state
   const [mfaStep, setMfaStep] = useState(false);
@@ -71,9 +75,15 @@ const LoginPage = () => {
       return;
     }
 
+    if (TURNSTILE_ENABLED && !captchaToken) {
+      toast.error('Please complete the verification challenge.');
+      return;
+    }
+
     setLoading(true);
     try {
-      const result = await login(trimmedEmail, trimmedPassword);
+      // Turnstile token (when enabled) is verified server-side by Supabase Auth.
+      const result = await login(trimmedEmail, trimmedPassword, captchaToken);
 
       if (result.requiresMfa) {
         setMfaData(result);
@@ -94,6 +104,9 @@ const LoginPage = () => {
       // Shake the lock on failure
       setLockState('error');
       setTimeout(() => setLockState('locked'), 500);
+      // Turnstile tokens are single-use; reset for a retry.
+      turnstileRef.current?.reset();
+      setCaptchaToken('');
       toast.error(error.message || 'Failed to log in. Please check your credentials.');
     } finally {
       setLoading(false);
@@ -252,12 +265,18 @@ const LoginPage = () => {
                         disabled={loading}
                       />
                     </div>
+                    <Turnstile
+                      ref={turnstileRef}
+                      onVerify={setCaptchaToken}
+                      onExpire={() => setCaptchaToken('')}
+                      className="flex justify-center pt-1"
+                    />
                   </CardContent>
                   <CardFooter className="flex flex-col space-y-4 pt-2">
                     <Button
                       type="submit"
                       className="w-full font-bold h-12 text-base rounded-xl"
-                      disabled={loading}
+                      disabled={loading || (TURNSTILE_ENABLED && !captchaToken)}
                     >
                       {loading ? (
                         <Loader2 className="w-5 h-5 animate-spin" />
@@ -333,6 +352,8 @@ const LoginPage = () => {
                         setMfaCode('');
                         setPassword('');
                         setLockState('locked');
+                        turnstileRef.current?.reset();
+                        setCaptchaToken('');
                       }}
                       disabled={loading}
                     >

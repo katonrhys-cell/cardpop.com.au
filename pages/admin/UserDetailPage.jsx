@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ChevronLeft, Mail, MapPin, Calendar, ShieldAlert, KeyRound, Trash2, CheckCircle2, AlertCircle, User, BadgeCheck, Sparkles, Store } from 'lucide-react';
@@ -16,6 +16,8 @@ import UserStatsCard from '@/components/admin/UserStatsCard.jsx';
 import UserActionsModal from '@/components/admin/UserActionsModal.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { isVerified } from '@/utils/verification.js';
+import Turnstile from '@/components/Turnstile.jsx';
+import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
 
 /**
  * DATA RELATIONSHIPS DOCUMENTATION:
@@ -34,9 +36,13 @@ const UserDetailPage = () => {
   
   const [actionModal, setActionModal] = useState({ isOpen: false, type: null });
   const [flagSaving, setFlagSaving] = useState(false);
+  // Turnstile token for the password-reset action (Supabase CAPTCHA gates the
+  // recover endpoint even for admin-triggered resets).
+  const [resetCaptchaToken, setResetCaptchaToken] = useState('');
+  const resetTurnstileRef = useRef(null);
 
   const openAction = (type) => setActionModal({ isOpen: true, type });
-  const closeAction = () => setActionModal({ isOpen: false, type: null });
+  const closeAction = () => { setActionModal({ isOpen: false, type: null }); setResetCaptchaToken(''); };
 
   // Toggle a sole-trader store flag (verification / promotion). These appear on
   // the public Local Traders directory and will later gate behind subscription tiers.
@@ -74,6 +80,7 @@ const UserDetailPage = () => {
         if (!user?.email) { toast.error('No email on file for this user.'); return; }
         const { error: resetErr } = await supabase.auth.resetPasswordForEmail(user.email, {
           redirectTo: `${window.location.origin}/reset-password`,
+          captchaToken: resetCaptchaToken,
         });
         if (resetErr) throw resetErr;
         toast.success('Password reset email sent to the user.');
@@ -318,6 +325,14 @@ const UserDetailPage = () => {
         actionType={actionModal.type}
         user={user}
         onConfirm={handleConfirmAction}
+        confirmDisabled={actionModal.type === 'reset_password' && TURNSTILE_ENABLED && !resetCaptchaToken}
+        extraContent={actionModal.type === 'reset_password' && TURNSTILE_ENABLED ? (
+          <Turnstile
+            ref={resetTurnstileRef}
+            onVerify={setResetCaptchaToken}
+            onExpire={() => setResetCaptchaToken('')}
+          />
+        ) : null}
       />
     </div>
   );

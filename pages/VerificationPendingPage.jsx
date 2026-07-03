@@ -1,24 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { ShieldAlert, Mail, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import Turnstile from '@/components/Turnstile.jsx';
+import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
 
 const VerificationPendingPage = () => {
   const { currentUser, resendVerificationEmail, logout } = useAuth();
   const [isResending, setIsResending] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const turnstileRef = useRef(null);
 
   const handleResend = async () => {
     if (!currentUser?.email) return;
-    
+    if (TURNSTILE_ENABLED && !captchaToken) {
+      toast.error('Please complete the verification challenge below.');
+      return;
+    }
+
     setIsResending(true);
     try {
-      await resendVerificationEmail(currentUser.email);
+      await resendVerificationEmail(currentUser.email, captchaToken);
       toast.success('Verification email sent! Please check your inbox.');
     } catch (error) {
       toast.error('Failed to send verification email. Please try again later.');
     } finally {
+      // Turnstile tokens are single-use; reset so a repeat resend can get one.
+      turnstileRef.current?.reset();
+      setCaptchaToken('');
       setIsResending(false);
     }
   };
@@ -53,10 +64,20 @@ const VerificationPendingPage = () => {
             </ol>
           </div>
           
+          {TURNSTILE_ENABLED && (
+            <div className="flex justify-center mb-6">
+              <Turnstile
+                ref={turnstileRef}
+                onVerify={setCaptchaToken}
+                onExpire={() => setCaptchaToken('')}
+              />
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button 
-              onClick={handleResend} 
-              disabled={isResending}
+            <Button
+              onClick={handleResend}
+              disabled={isResending || (TURNSTILE_ENABLED && !captchaToken)}
               className="h-12 px-6 rounded-full font-bold shadow-sm"
             >
               <Mail className="w-4 h-4 mr-2" />
