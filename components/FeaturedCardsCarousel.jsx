@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Sparkles, ImageOff, ZoomIn } from 'lucide-react';
-import ImageZoomModal from '@/components/ImageZoomModal.jsx';
+const ImageZoomModal = lazy(() => import('@/components/ImageZoomModal.jsx'));
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -294,12 +294,16 @@ const FeaturedCardsCarousel = () => {
         </motion.div>
       </div>
 
-      <ImageZoomModal
-        isOpen={!!zoomImage}
-        onClose={() => setZoomImage(null)}
-        imageUrl={zoomImage?.url}
-        altText={zoomImage?.alt}
-      />
+      {!!zoomImage && (
+        <Suspense fallback={null}>
+          <ImageZoomModal
+            isOpen={!!zoomImage}
+            onClose={() => setZoomImage(null)}
+            imageUrl={zoomImage?.url}
+            altText={zoomImage?.alt}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };

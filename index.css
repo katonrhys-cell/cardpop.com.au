@@ -11,14 +11,20 @@
   src: url('/fonts/syne-latin-var.woff2') format('woff2');
 }
 
-/* Metric-adjusted fallback for Syne — reduces layout shift if Syne isn't cached yet */
+/* Metric-adjusted fallback for Syne — reduces layout shift if Syne isn't cached yet.
+   size-adjust is deliberately a touch LARGER than a pure metric match: the homepage
+   LCP is the hero <h1> painted from the static HTML shell with this fallback, and
+   Chrome only re-assigns LCP to a later paint if that paint is BIGGER. Keeping the
+   fallback's painted area ≥ real Syne's means the React-rendered h1 (which arrives
+   seconds later on slow mobile) can never steal LCP from the shell's first paint.
+   Mirror any change here into the inline critical CSS in index.html. */
 @font-face {
   font-family: 'Syne Fallback';
-  src: local('Arial');
+  src: local('Arial'), local('Roboto'), local('Liberation Sans'), local('DejaVu Sans');
   ascent-override: 94%;
   descent-override: 26%;
   line-gap-override: 0%;
-  size-adjust: 107%;
+  size-adjust: 115%;
 }
 
 @tailwind base;
@@ -287,6 +293,54 @@
 @keyframes marquee {
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }
+}
+
+/* ═══════════════════════════════════════════════════════
+   HOMEPAGE ENTRANCE ANIMATIONS — CSS replacements for the
+   framer-motion tweens the homepage used to ship. Keeping
+   these in CSS keeps framer-motion (~110 kB + ~1.5 s of
+   main-thread execution on a mid-range phone) off the
+   homepage's critical path. Elements start visible unless
+   a component explicitly hides them until in view.
+   ═══════════════════════════════════════════════════════ */
+
+@keyframes anim-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes anim-reveal-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes anim-pop-in {
+  from { opacity: 0; transform: scale(0.9); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes anim-ticker-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes anim-slide-in-right {
+  from { opacity: 0; transform: translateX(50px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes anim-slide-in-left {
+  from { opacity: 0; transform: translateX(-50px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.anim-fade-in        { animation: anim-fade-in 0.6s ease-out both; }
+.anim-reveal-up      { animation: anim-reveal-up 0.5s ease-out both; }
+.anim-pop-in         { animation: anim-pop-in 0.5s ease-out both; }
+.anim-ticker-in      { animation: anim-ticker-in 0.4s ease-out both; }
+.anim-slide-in-right { animation: anim-slide-in-right 0.22s ease-in-out both; }
+.anim-slide-in-left  { animation: anim-slide-in-left 0.22s ease-in-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-in, .anim-reveal-up, .anim-pop-in, .anim-ticker-in,
+  .anim-slide-in-right, .anim-slide-in-left {
+    animation: none;
+  }
 }
 /* ═══════════════════════════════════════════════════════
    PROSE STYLES — Generic content container spacing
