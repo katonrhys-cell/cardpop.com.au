@@ -100,9 +100,13 @@ const GradingScalePage = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Explicit canonical: this page is routed at both /grading/scales/:scale
+          and /grading/guide/:scale (and both forms are linked internally) —
+          pin one so the two URLs don't compete as duplicates. */}
       <SEOHead
         title={`${company.name} Grading Scale — ${company.full} | CardPop Grading Hub`}
         description={`Complete ${company.name} grading scale breakdown for Australian collectors. Learn what each ${company.name} grade means and how to maximise your submission results.`}
+        canonicalUrl={`/grading/scales/${scale}`}
       />
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">

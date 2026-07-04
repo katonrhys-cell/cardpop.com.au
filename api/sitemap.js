@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { COLLECTION_SEO } from '../data/collectionSeo.js';
+import { BLOG_CATEGORIES } from '../data/blogCategories.js';
 
 const SUPABASE_URL = 'https://odoglvswwymyjuwlonkf.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kb2dsdnN3d3lteWp1d2xvbmtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3OTQ5NTgsImV4cCI6MjA5NDM3MDk1OH0.R5fwR42iKIEsfx1iA-fjk4YPLCH3mcmoIKkosEy6g1I';
@@ -76,7 +77,12 @@ const STATIC_PAGES = [
   { loc: '/events/community-events', lastmod: SITE_UPDATED,     freq: 'daily',   pri: '0.8' },
   { loc: '/events/store-events',   lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
   { loc: '/community/local-traders', lastmod: SITE_UPDATED,     freq: 'daily',   pri: '0.7' },
+  { loc: '/community/whatnot',     lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.5' },
   { loc: '/blog',                  lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' },
+  // Blog category hubs — prerendered for bots and linked from the site header.
+  ...BLOG_CATEGORIES.map((c) => (
+    { loc: `/blog/category/${c.slug}`, lastmod: SITE_UPDATED,   freq: 'weekly',  pri: '0.6' }
+  )),
   { loc: '/about',                 lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
   { loc: '/contact',               lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
   { loc: '/faq',                   lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },

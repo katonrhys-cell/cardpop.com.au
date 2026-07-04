@@ -54,9 +54,19 @@
       "destination": "/api/prerender?path=/community/local-traders"
     },
     {
+      "source": "/community/whatnot",
+      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "destination": "/api/prerender?path=/community/whatnot"
+    },
+    {
       "source": "/dealer/:slug*",
       "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
       "destination": "/api/prerender?path=/dealer/:slug*"
+    },
+    {
+      "source": "/blog/category/:slug",
+      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "destination": "/api/prerender?path=/blog/category/:slug"
     },
     {
       "source": "/blog/:slug",
