@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import { createLogger, defineConfig } from 'vite';
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import Beasties from 'beasties';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
@@ -15,6 +16,61 @@ const allDeps = Object.keys(pkg.dependencies || {});
 //   • app.html   — a shell-less copy served for every OTHER route via the
 //     catch-all rewrite in vercel.json, so those pages never flash the homepage
 //     hero. Both reference the identical hashed JS/CSS, so the SPA boots the same.
+// CSP `strict-dynamic` bootstrap. The parser-inserted module entry tag can't be
+// allowlisted by hash in a static vercel.json (its filename hash changes every
+// build), so we swap it for this CONSTANT inline script: the build-varying bits
+// (entry URL + modulepreload list) travel in data attributes, which a CSP hash
+// does not cover — the script text (and therefore its sha256 in vercel.json's
+// script-src) stays identical across builds. The bootstrap re-injects the
+// preloads and a module <script> for the entry; being non-parser-inserted,
+// both are trusted under 'strict-dynamic'. (It must NOT use dynamic import()
+// for the entry — Chrome does not extend strict-dynamic trust to import()
+// from classic scripts, only to injected script elements and to import()
+// from module scripts.) The v() path check pins loads to same-origin
+// /assets/*.js so a markup-injected copy of this hashed script can't be
+// aimed at a foreign URL, and the one-off Trusted Types policy satisfies
+// require-trusted-types-for before the app's default policy exists.
+// If you change this string you MUST update the sha256 in vercel.json — the
+// build fails with the new value otherwise.
+const CSP_BOOTSTRAP = '(function(){var s=document.currentScript,d=s.dataset,h=document.head;function v(p){return p.lastIndexOf("/assets/",0)===0&&p.indexOf("..")<0&&p.slice(-3)===".js"}var tt=window.trustedTypes,pol=tt&&tt.createPolicy?tt.createPolicy("cardpop#bootstrap",{createScriptURL:function(u){return u}}):null;(d.preload||"").split(",").forEach(function(p){if(v(p)){var l=document.createElement("link");l.rel="modulepreload";l.href=p;l.crossOrigin="";h.appendChild(l)}});if(v(d.entry)){var m=document.createElement("script");m.type="module";m.crossOrigin="";m.src=pol?pol.createScriptURL(d.entry):d.entry;h.appendChild(m)}})()';
+
+const ENTRY_SCRIPT_RE = /<script type="module" crossorigin src="([^"]+)"><\/script>/;
+
+function applyCspBootstrap(html, warn) {
+	const entryMatch = html.match(ENTRY_SCRIPT_RE);
+	if (!entryMatch) {
+		warn('csp-bootstrap: module entry <script> not found — HTML left untouched');
+		return html;
+	}
+	const preloads = [];
+	html = html.replace(/\s*<link rel="modulepreload" crossorigin href="([^"]+)">/g, (_, href) => {
+		preloads.push(href);
+		return '';
+	});
+	return html.replace(
+		ENTRY_SCRIPT_RE,
+		`<script data-entry="${entryMatch[1]}" data-preload="${preloads.join(',')}">${CSP_BOOTSTRAP}</script>`
+	);
+}
+
+// Guard against drift: the bootstrap text emitted into the final HTML (after
+// beasties re-serialization) must still hash to the value pinned in
+// vercel.json's script-src, or the browser will refuse to run the app.
+function verifyCspBootstrap(ctx, htmlFiles) {
+	const hash = `'sha256-${createHash('sha256').update(CSP_BOOTSTRAP, 'utf8').digest('base64')}'`;
+	const vercelCfg = readFileSync(path.resolve(__dirname, 'vercel.json'), 'utf-8');
+	if (!vercelCfg.includes(hash)) {
+		ctx.error(`csp-bootstrap: vercel.json script-src is missing ${hash} — update every Content-Security-Policy header`);
+	}
+	for (const file of htmlFiles) {
+		const emitted = readFileSync(file, 'utf-8').match(/<script data-entry[^>]*>([\s\S]*?)<\/script>/);
+		if (!emitted) continue; // applyCspBootstrap already warned
+		if (emitted[1] !== CSP_BOOTSTRAP) {
+			ctx.error(`csp-bootstrap: inline bootstrap in ${file} was altered post-transform — its hash no longer matches vercel.json`);
+		}
+	}
+}
+
 function homeShellPlugin() {
 	const shellPath = path.resolve(__dirname, 'tools/home-shell.html');
 	return {
@@ -25,7 +81,7 @@ function homeShellPlugin() {
 			const indexPath = path.join(outDir, 'index.html');
 			if (!existsSync(indexPath)) return;
 
-			const builtIndex = readFileSync(indexPath, 'utf-8');
+			const builtIndex = applyCspBootstrap(readFileSync(indexPath, 'utf-8'), (m) => this.warn(m));
 			// Shell-less document for all non-root routes (CSS stays render-blocking
 			// there — those pages are React-gated, so it costs them nothing).
 			writeFileSync(path.join(outDir, 'app.html'), builtIndex, 'utf-8');
@@ -62,6 +118,7 @@ function homeShellPlugin() {
 			}
 
 			writeFileSync(indexPath, indexHtml, 'utf-8');
+			verifyCspBootstrap(this, [indexPath, path.join(outDir, 'app.html')]);
 		},
 	};
 }
