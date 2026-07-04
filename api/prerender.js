@@ -32,7 +32,7 @@ const ldJson = (items) => {
 const absUrl = (u) => (!u ? undefined : (u.startsWith('http') ? u : `${BASE_URL}${u}`));
 
 // Optional image CDN in front of Supabase Storage (see
-// docs/image-cdn-cloudfront.md). Mirrors utils/imageUrl.js but reads the
+// docs/image-cdn.md). Mirrors utils/imageUrl.js but reads the
 // server-side env var, since this file runs as a Vercel function.
 const IMAGE_CDN_ORIGIN = (() => {
   const host = process.env.IMAGE_CDN_HOST || process.env.VITE_IMAGE_CDN_HOST;

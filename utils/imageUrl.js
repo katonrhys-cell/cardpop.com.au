@@ -18,13 +18,14 @@ import { supabase } from '@/lib/supabaseClient.js';
 const DEFAULT_BUCKET = 'vault-images';
 const DEFAULT_WIDTHS = [240, 400, 600];
 
-// Optional image CDN (e.g. an AWS CloudFront distribution in front of Supabase
-// Storage). Supabase egress is metered — including CDN-cache hits — while
-// CloudFront's always-free tier is 1 TB/month, so serving images through it
-// takes storage traffic off the Supabase quota. When VITE_IMAGE_CDN_HOST is
-// set (e.g. `dxxxxxxxx.cloudfront.net`), public storage URLs are rewritten to
-// that host; when unset, everything below is a no-op and URLs stay on
-// Supabase. See docs/image-cdn-cloudfront.md.
+// Optional image CDN in front of Supabase Storage (a Cloudflare Worker on
+// img.cardpop.com.au — see cloudflare/image-proxy-worker.js — or any host
+// that proxies /storage/v1/... paths). Supabase egress is metered — including
+// its own CDN's cache hits — so serving images through an external CDN takes
+// storage traffic off the Supabase quota. When VITE_IMAGE_CDN_HOST is set
+// (e.g. `img.cardpop.com.au`), public storage URLs are rewritten to that
+// host; when unset, everything below is a no-op and URLs stay on Supabase.
+// See docs/image-cdn.md.
 let cdnOrigin = normalizeCdnHost(import.meta.env?.VITE_IMAGE_CDN_HOST);
 
 function normalizeCdnHost(host) {
