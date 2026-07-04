@@ -52,7 +52,8 @@ router.post('/slab-image', authMiddleware, upload.single('image'), async (req, r
       .from('vault-images')
       .upload(fileName, compressedBuffer, {
         contentType: 'image/webp',
-        upsert: false
+        upsert: false,
+        cacheControl: '31536000'
       });
 
     if (uploadError) {

@@ -92,8 +92,10 @@ const AccountProfile = () => {
       if (avatarFile) {
         const compressed = await compressImage(avatarFile, { maxDimension: 512, quality: 0.85 });
         const ext = compressed.name.split('.').pop();
-        const path = `avatars/${currentUser.id}.${ext}`;
-        const { error: uploadErr } = await supabase.storage.from('avatars').upload(path, compressed, { upsert: true });
+        // Timestamped name (not a fixed per-user path) so the file is
+        // immutable and can carry a long-lived cache header.
+        const path = `avatars/${currentUser.id}-${Date.now()}.${ext}`;
+        const { error: uploadErr } = await supabase.storage.from('avatars').upload(path, compressed, { upsert: true, cacheControl: '31536000' });
         if (uploadErr) throw uploadErr;
         avatar_url = supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
       } else if (removeAvatar) {

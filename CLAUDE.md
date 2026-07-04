@@ -110,6 +110,14 @@ Tests are split into two Vitest projects configured in `vitest.config.js`:
 - **Kit.com** (`src/routes/newsletter.js`): Newsletter subscriptions via the Kit v4 API. Requires `KIT_API_KEY` and `KIT_FORM_ID` env vars.
 - **Shop catalogue**: Product data, pricing, stock and checkout run entirely on Supabase (`shop_products` table) and the Stripe endpoints (`src/routes/stripe.js`). The former Hostinger/Online-Store product API has been removed; `api/EcommerceApi.js` now only exports a `formatCurrency` helper and makes no external calls.
 
+### Image serving & Supabase egress
+
+Supabase meters ALL storage egress (including its own CDN's cache hits) against the plan quota, so image traffic is managed in three layers (see `docs/image-cdn-cloudfront.md`):
+
+1. **Immutable uploads with long cache headers**: every storage upload uses a timestamped filename and `cacheControl: '31536000'`. Never reuse a storage path for changed content — upload to a new timestamped path and update the DB reference (avatars etc. already work this way). `scripts/backfill-image-cache-headers.mjs` retrofits old objects.
+2. **Service worker** (`public/sw.js`): storage image URLs (`/storage/v1/object|render/image/public/`) are cached cache-first on the client (capped, oldest-first eviction), so returning visitors generate ~no image egress.
+3. **Optional CDN in front of Supabase Storage** (AWS CloudFront free tier): when `VITE_IMAGE_CDN_HOST` is set, `utils/imageUrl.js` rewrites storage URLs onto the CDN. **At render time, always build image URLs via `publicImageUrl(pathOrUrl, bucket?)` or `getCardImage()` from `utils/imageUrl.js` — don't call `supabase.storage.getPublicUrl()` directly.** Exception: URLs *stored in the DB* (e.g. `image_url` columns written by admin forms) intentionally stay canonical Supabase URLs so the CDN host can change later.
+
 ### Deployment
 
 GitHub Actions (`.github/workflows/deploy.yml`) deploys to Vercel on every push to `main`:
@@ -135,5 +143,7 @@ git push main
 | `ENCRYPTION_KEY` | MFA OTP / backup code encryption |
 | `CORS_ORIGIN` | Express CORS (set to `https://cardpop.com.au`) |
 | `APP_URL` | App base URL |
+| `VITE_IMAGE_CDN_HOST` | *(optional)* Image CDN host (e.g. CloudFront) — frontend image URLs |
+| `IMAGE_CDN_HOST` | *(optional)* Same host, for `api/prerender.js` og:image URLs |
 
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are public and already hardcoded in `lib/supabaseClient.js` — no need to add them as Vercel secrets.

@@ -17,13 +17,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 // Resolve a vault image reference (storage path or full URL) to a usable URL.
 const resolveVaultImage = (raw) => {
   if (!raw) return null;
-  return raw.startsWith('http')
-    ? raw
-    : supabase.storage.from('vault-images').getPublicUrl(raw).data.publicUrl;
+  return publicImageUrl(raw);
 };
 
 const EMPTY_FORM = { name: '', subtitle: '', rarity: '', value: '', accent: DEFAULT_ACCENT };
@@ -152,7 +151,7 @@ const HeroShowcaseAdminPage = () => {
       if (!file) return null;
       const ext = file.name.split('.').pop().toLowerCase();
       const path = `hero-showcase/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('media').upload(path, file);
+      const { error: upErr } = await supabase.storage.from('media').upload(path, file, { cacheControl: '31536000' });
       if (upErr) throw upErr;
       return supabase.storage.from('media').getPublicUrl(path).data.publicUrl;
     }

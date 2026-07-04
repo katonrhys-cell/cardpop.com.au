@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import VaultListingCard from '@/components/VaultListingCard.jsx';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const BADGE_META = {
   authentic:          { label: '100% Authentic',     desc: 'All cards verified before listing',                   Icon: CheckCircle2 },
@@ -160,9 +161,7 @@ const SoleTraderStorePage = () => {
       ? (item.vault_item?.vault_images?.[0]?.storage_path || item.vault_item?.card_image)
       : (item.vault_images?.[0]?.storage_path || item.card_image);
     if (!path) return undefined;
-    return path.startsWith('http')
-      ? path
-      : supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
+    return publicImageUrl(path);
   };
 
   // Product + Offer JSON-LD for each item shown in the store.

@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { MessageSquare, Search, TrendingUp, Clock, Plus, Flame, Pin } from 'lucide-react';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const CATEGORIES = ['All', 'General', 'Trading', 'Grading', 'Market Talk', 'Buying Advice', 'Show & Tell', 'Events'];
 
@@ -73,8 +74,7 @@ const ForumPage = () => {
   const resolveAvatar = (profile) => {
     const raw = profile?.avatar_url || profile?.profile_photo_or_character;
     if (!raw) return null;
-    if (raw.startsWith('http')) return raw;
-    return supabase.storage.from('vault-images').getPublicUrl(raw).data.publicUrl;
+    return publicImageUrl(raw);
   };
 
   return (

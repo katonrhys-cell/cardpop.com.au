@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { generateBlogPostingSchema, generateFAQStructuredData, generateBreadcrumbStructuredData } from '@/utils/seoUtils.js';
 import { htmlExcerpt } from '@/utils/htmlExcerpt.js';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const CONVICTION_LABELS = ['', 'High Risk', 'Negative', 'Neutral', 'Positive', 'Strong Buy'];
 const CONVICTION_COLOURS = ['', '#dc2626', '#ea580c', '#ca8a04', '#16a34a', '#15803d'];
@@ -179,9 +180,7 @@ const buildTableOfContents = (sanitizedHtml) => {
 // Resolve it to a public URL (already-absolute http URLs are passed through).
 const resolveCardImage = (path) => {
   if (!path) return null;
-  return path.startsWith('http')
-    ? path
-    : supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
+  return publicImageUrl(path);
 };
 
 const BlogArticlePage = () => {

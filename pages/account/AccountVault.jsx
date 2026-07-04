@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 import VaultListingModal from '@/components/VaultListingModal.jsx';
 import PSAPopPanel from '@/components/PSAPopPanel.jsx';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const CONDITION_LABELS = {
   mint: 'Mint', near_mint: 'Near Mint', excellent: 'Excellent',
@@ -121,9 +122,7 @@ const AccountVault = () => {
     const psaRaw = card.cardsight_card_id ? psaMap[card.cardsight_card_id] ?? null : null;
     let imageUrl = null;
     if (card.card_image) {
-      imageUrl = card.card_image.startsWith('http')
-        ? card.card_image
-        : supabase.storage.from('vault-images').getPublicUrl(card.card_image).data.publicUrl;
+      imageUrl = publicImageUrl(card.card_image);
     }
     const isForTrade = card.listing_type === 'For Trade' || card.listing_type === 'For Sale & Trade';
 
