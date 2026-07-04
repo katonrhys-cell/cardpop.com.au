@@ -239,7 +239,15 @@ export default defineConfig({
 					// auto-split radix keeps the shared core eager while each primitive
 					// rides along with the lazy page that actually uses it.
 					if (id.includes('react-router')) return 'vendor-router';
-					if (id.includes('react-hook-form') || id.includes('@hookform') || id.includes('zod')) return 'vendor-forms';
+					// NOTE: react-hook-form / zod / @hookform are deliberately NOT forced
+					// into a vendor-forms chunk. Because react-hook-form imports
+					// react/jsx-runtime, rolldown hoisted a shared react helper into that
+					// chunk; the eager entry needs jsx-runtime, so it statically pulled the
+					// whole vendor-forms chunk — dragging ~40 KB gzip of zod + react-hook-form
+					// onto the critical path even though only lazy form pages (login, signup,
+					// checkout, admin) use them. Same failure mode documented for
+					// framer-motion and radix above. Letting rolldown auto-split forms keeps
+					// them off first paint, riding along with the lazy page that needs them.
 					if (id.includes('@sentry')) return 'vendor-sentry';
 					if (id.includes('date-fns') || id.includes('react-day-picker')) return 'vendor-dates';
 					if (id.includes('@stripe') || id.includes('stripe')) return 'vendor-stripe';
