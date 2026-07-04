@@ -15,6 +15,7 @@ import { useEbayPriceLookup } from '@/hooks/useEbayPriceLookup.js';
 import CardScanPanel from '@/components/CardScanPanel.jsx';
 import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 import { getVariantGroups } from '@/lib/cardVariants.js';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const INITIAL_STATE = {
   name: '',
@@ -121,8 +122,7 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
           if (card.images && card.images.length > 0) {
             const urls = card.images.map(img => {
               if (!img || typeof img !== 'string') return null;
-              if (img.startsWith('http')) return img;
-              return supabase.storage.from('vault-images').getPublicUrl(img).data.publicUrl;
+              return publicImageUrl(img);
             }).filter(Boolean);
             setPreviewUrls(urls);
             setSelectedFiles(card.images.map(img => ({ isExisting: true, filename: img })));

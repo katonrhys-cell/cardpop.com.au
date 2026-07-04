@@ -12,13 +12,12 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const resolveVaultImage = (item) => {
   const raw = item?.image_urls?.[0] || item?.vault_images?.[0]?.storage_path || null;
   if (!raw) return null;
-  return raw.startsWith('http')
-    ? raw
-    : supabase.storage.from('vault-images').getPublicUrl(raw).data.publicUrl;
+  return publicImageUrl(raw);
 };
 
 const VAULT_SELECT = 'id, card_name, estimated_value_aud, condition, collection_type, image_urls, vault_images(*)';

@@ -7,7 +7,12 @@ const CACHE_NAMES = {
   STATIC: 'cardpop-static-v3',
   DYNAMIC: 'cardpop-dynamic-v3',
   PAGES: 'cardpop-pages-v3',
+  IMAGES: 'cardpop-images-v1',
 };
+
+// Cap the image cache so it can't grow without bound (entries are evicted
+// oldest-first). Card photos average ~100-300 KB, so this is roughly 100 MB.
+const MAX_IMAGE_ENTRIES = 500;
 
 // Only precache the app shell. Vite emits content-hashed asset filenames
 // (assets/*.js|css) that aren't known at SW-author time, and the previous list
@@ -97,6 +102,47 @@ const cacheFirst = async (request) => {
   }
 };
 
+// Helper: Cache First for storage-hosted images (Supabase Storage or the
+// image CDN in front of it). Supabase meters ALL storage egress — even CDN
+// cache hits — against the plan's quota, so re-downloading unchanged card
+// photos on every visit is what blows the free tier's egress limit. Uploaded
+// images are immutable (timestamped filenames), so once fetched they can be
+// served from the local cache indefinitely.
+const isStorageImage = (url) =>
+  /\/storage\/v1\/(object|render\/image)\/public\//.test(url.pathname);
+
+const trimCache = async (cacheName, maxEntries) => {
+  const cache = await caches.open(cacheName);
+  const keys = await cache.keys();
+  // cache.keys() returns entries in insertion order — delete oldest first.
+  for (let i = 0; i < keys.length - maxEntries; i++) {
+    await cache.delete(keys[i]);
+  }
+};
+
+const imageCacheFirst = async (request) => {
+  const cache = await caches.open(CACHE_NAMES.IMAGES);
+  const cached = await cache.match(request.url);
+  if (cached) return cached;
+
+  try {
+    // <img> tags issue no-cors requests, whose opaque responses can't be
+    // inspected and are stored with a large quota padding. Storage serves
+    // `Access-Control-Allow-Origin: *`, so re-issue as a CORS request to get
+    // a normal, cacheable response.
+    const response = await fetch(request.url, { mode: 'cors' });
+    if (response.ok) {
+      await cache.put(request.url, response.clone());
+      trimCache(CACHE_NAMES.IMAGES, MAX_IMAGE_ENTRIES).catch(() => {});
+    }
+    return response;
+  } catch (error) {
+    // CORS fetch failed (offline, or an origin without CORS) — fall back to
+    // the untouched original request.
+    return fetch(request);
+  }
+};
+
 // Helper: Stale While Revalidate strategy
 const staleWhileRevalidate = async (request) => {
   const cached = await caches.match(request);
@@ -119,7 +165,16 @@ const staleWhileRevalidate = async (request) => {
 // Fetch: route requests to appropriate strategy
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  const { pathname } = new URL(request.url);
+  const url = new URL(request.url);
+  const { pathname } = url;
+
+  // Cache First for storage-hosted images (card photos, avatars, media).
+  // These previously fell through to Network First, which re-downloaded every
+  // image on every page view and burned through the Supabase egress quota.
+  if (request.method === 'GET' && isStorageImage(url)) {
+    event.respondWith(imageCacheFirst(request));
+    return;
+  }
 
   // Network First for API calls
   if (pathname.startsWith('/api') || pathname.startsWith('/hcgi/api')) {

@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getCollectionImage } from '@/data/collectionImages.js';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const TCG_BRANDS = ['PSA', 'BGS', 'Beckett', 'CGC', 'Raw'];
 const SPORTS_BRANDS = ['Panini', 'Topps', 'Upper Deck', 'Bowman', 'Fleer'];
@@ -44,7 +45,7 @@ const PublicCollectionsPage = () => {
       const getImageUrl = (item) => {
         const img = item.image || item.card_image;
         if (!img) return null;
-        return img.startsWith('http') ? img : supabase.storage.from('vault-images').getPublicUrl(img).data.publicUrl;
+        return publicImageUrl(img);
       };
 
       const processVaultItem = (item) => {

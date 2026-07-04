@@ -19,6 +19,7 @@ import VaultListingModal from '@/components/VaultListingModal.jsx';
 import { VARIANT_BADGES } from '@/lib/cardVariants.js';
 import { slugify } from '@/lib/slugify.js';
 import GradeBadge from '@/components/GradeBadge.jsx';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const CONDITION_LABELS = {
   mint: 'Mint', near_mint: 'Near Mint', excellent: 'Excellent',
@@ -150,9 +151,7 @@ const MyVaultPage = () => {
   const renderCard = (card) => {
     let imageUrl = null;
     if (card.card_image) {
-      imageUrl = card.card_image.startsWith('http')
-        ? card.card_image
-        : supabase.storage.from('vault-images').getPublicUrl(card.card_image).data.publicUrl;
+      imageUrl = publicImageUrl(card.card_image);
     }
 
     const isForTrade = card.listing_type === 'For Trade' || card.listing_type === 'For Sale & Trade';

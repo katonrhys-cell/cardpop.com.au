@@ -283,7 +283,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         const compressed = await compressImage(imageFile);
         const ext = compressed.name.split('.').pop() || 'jpg';
         const path = `events/${Date.now()}.${ext}`;
-        const { error: upErr } = await supabase.storage.from('events').upload(path, compressed, { upsert: true });
+        const { error: upErr } = await supabase.storage.from('events').upload(path, compressed, { upsert: true, cacheControl: '31536000' });
         if (upErr) throw upErr; // don't silently save the event without its cover image
         image_url = supabase.storage.from('events').getPublicUrl(path).data.publicUrl;
       } else if (removeExistingImage) {

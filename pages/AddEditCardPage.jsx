@@ -37,6 +37,7 @@ import CardCornerAdjuster from '@/components/CardCornerAdjuster.jsx';
 import { warpCardWithCorners } from '@/utils/detectCard.js';
 import DisplayStylePicker from '@/components/vault/DisplayStylePicker.jsx';
 import { canUseStyle, normalizeStyle, normalizeTier } from '@/lib/displayStyles.js';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -343,14 +344,12 @@ const AddEditCardPage = () => {
           displayStyle:   card.display_style || 'classic',
         });
         if (card.card_image) {
-          const imgUrl = card.card_image.startsWith('http')
-            ? card.card_image
-            : supabase.storage.from('vault-images').getPublicUrl(card.card_image).data.publicUrl;
+          const imgUrl = publicImageUrl(card.card_image);
           if (!cancelled) setImagePreview(imgUrl);
         }
         if (card.card_images?.length) {
           const urls = card.card_images.map(p =>
-            p.startsWith('http') ? p : supabase.storage.from('vault-images').getPublicUrl(p).data.publicUrl
+            publicImageUrl(p)
           );
           const filled = Array.from({ length: 5 }, (_, i) => urls[i] ?? null);
           if (!cancelled) setExtraPreviews(filled);
@@ -579,7 +578,11 @@ const AddEditCardPage = () => {
       const filePath = `${currentUser.id}/template-${id}-${Date.now()}.jpg`;
       const { error: uploadError } = await supabase.storage
         .from('vault-images')
-        .upload(filePath, blob, { upsert: true, contentType: blob.type || 'image/jpeg' });
+        .upload(filePath, blob, {
+          upsert: true,
+          contentType: blob.type || 'image/jpeg',
+          cacheControl: '31536000',
+        });
       if (uploadError) throw uploadError;
 
       const { error: updateError } = await supabase
@@ -592,7 +595,7 @@ const AddEditCardPage = () => {
       setPhotoTemplateModal({ open: false, processType: null, step: 'preview' });
       resetPhotoTemplate();
       setImageFile(null);
-      setImagePreview(supabase.storage.from('vault-images').getPublicUrl(filePath).data.publicUrl);
+      setImagePreview(publicImageUrl(filePath));
       toast.success('Photo formatted successfully!');
     } catch (error) {
       toast.error('Failed to upload processed image');
@@ -728,7 +731,7 @@ const AddEditCardPage = () => {
         const filePath = `${currentUser.id}/${Date.now()}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from('vault-images')
-          .upload(filePath, compressed, { upsert: true });
+          .upload(filePath, compressed, { upsert: true, cacheControl: '31536000' });
         if (uploadError) throw uploadError;
         cardImagePath = filePath;
       }
@@ -741,7 +744,7 @@ const AddEditCardPage = () => {
         const filePath = `${currentUser.id}/${Date.now()}-extra-${Math.random().toString(36).slice(2)}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from('vault-images')
-          .upload(filePath, compressed, { upsert: true });
+          .upload(filePath, compressed, { upsert: true, cacheControl: '31536000' });
         if (uploadError) throw uploadError;
         extraImagePaths.push(filePath);
       }

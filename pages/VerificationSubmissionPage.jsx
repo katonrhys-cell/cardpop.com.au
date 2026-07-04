@@ -132,10 +132,12 @@ const VerificationSubmissionPage = () => {
       if (profilePhoto) {
         const compressed = await compressImage(profilePhoto, { maxDimension: 512, quality: 0.85 });
         const fileExt = compressed.name.split('.').pop();
-        const filePath = `avatars/${currentUser.id}.${fileExt}`;
+        // Timestamped name (not a fixed per-user path) so the file is
+        // immutable and can carry a long-lived cache header.
+        const filePath = `avatars/${currentUser.id}-${Date.now()}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from('vault-images')
-          .upload(filePath, compressed, { upsert: true });
+          .upload(filePath, compressed, { upsert: true, cacheControl: '31536000' });
         if (uploadError) throw uploadError;
         profilePhotoPath = filePath;
       }

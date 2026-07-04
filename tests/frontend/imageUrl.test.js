@@ -24,10 +24,14 @@ import {
   markTransformsUnavailable,
   areTransformsUnavailable,
   _resetTransformState,
+  toCdnUrl,
+  publicImageUrl,
+  _setCdnHostForTests,
 } from '@/utils/imageUrl.js';
 
 beforeEach(() => {
   _resetTransformState();
+  _setCdnHostForTests(null);
 });
 
 describe('getCardImage', () => {
@@ -77,5 +81,84 @@ describe('getCardImage', () => {
 
   it('exposes a sensible default sizes string', () => {
     expect(CARD_GRID_SIZES).toMatch(/vw/);
+  });
+});
+
+describe('toCdnUrl', () => {
+  const storageUrl =
+    'https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/object/public/vault-images/user/card.jpg';
+
+  it('is a no-op when no CDN host is configured', () => {
+    expect(toCdnUrl(storageUrl)).toBe(storageUrl);
+  });
+
+  it('rewrites Supabase storage URLs onto the configured CDN host', () => {
+    _setCdnHostForTests('dxxxx.cloudfront.net');
+    expect(toCdnUrl(storageUrl)).toBe(
+      'https://dxxxx.cloudfront.net/storage/v1/object/public/vault-images/user/card.jpg'
+    );
+  });
+
+  it('accepts a host with protocol and trailing slash', () => {
+    _setCdnHostForTests('https://cdn.cardpop.com.au/');
+    expect(toCdnUrl(storageUrl)).toBe(
+      'https://cdn.cardpop.com.au/storage/v1/object/public/vault-images/user/card.jpg'
+    );
+  });
+
+  it('rewrites render/image (transform) URLs too', () => {
+    _setCdnHostForTests('dxxxx.cloudfront.net');
+    const renderUrl =
+      'https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/render/image/public/vault-images/user/card.jpg?width=240';
+    expect(toCdnUrl(renderUrl)).toBe(
+      'https://dxxxx.cloudfront.net/storage/v1/render/image/public/vault-images/user/card.jpg?width=240'
+    );
+  });
+
+  it('leaves non-Supabase URLs and non-strings alone', () => {
+    _setCdnHostForTests('dxxxx.cloudfront.net');
+    expect(toCdnUrl('https://example.com/pic.png')).toBe('https://example.com/pic.png');
+    expect(toCdnUrl(null)).toBeNull();
+    expect(toCdnUrl(undefined)).toBeNull();
+  });
+});
+
+describe('publicImageUrl', () => {
+  it('returns null for missing input', () => {
+    expect(publicImageUrl(null)).toBeNull();
+    expect(publicImageUrl('')).toBeNull();
+    expect(publicImageUrl(undefined)).toBeNull();
+  });
+
+  it('builds a public URL from a storage path (default bucket)', () => {
+    expect(publicImageUrl('user/card.jpg')).toBe(
+      'https://cdn/object/vault-images/user/card.jpg'
+    );
+  });
+
+  it('honours a custom bucket', () => {
+    expect(publicImageUrl('a/b.png', 'avatars')).toBe('https://cdn/object/avatars/a/b.png');
+  });
+
+  it('passes absolute non-Supabase URLs through untouched', () => {
+    const url = 'https://example.com/legacy.jpg';
+    expect(publicImageUrl(url)).toBe(url);
+  });
+});
+
+describe('getCardImage with a CDN host', () => {
+  // The mocked getPublicUrl returns https://cdn/... which doesn't match the
+  // Supabase URL shape, so CDN rewriting of built URLs is covered by the
+  // toCdnUrl tests above. Here we just check absolute Supabase URLs stored in
+  // the DB get rewritten when passed straight in.
+  it('rewrites stored absolute Supabase URLs', () => {
+    _setCdnHostForTests('dxxxx.cloudfront.net');
+    const stored =
+      'https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/object/public/vault-images/u/c.webp';
+    const r = getCardImage(stored);
+    expect(r.src).toBe(
+      'https://dxxxx.cloudfront.net/storage/v1/object/public/vault-images/u/c.webp'
+    );
+    expect(r.fallbackSrc).toBe(r.src);
   });
 });

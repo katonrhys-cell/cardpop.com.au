@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import VaultListingCard from '@/components/VaultListingCard.jsx';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const PublicSellerProfilePage = () => {
   const { userId } = useParams();
@@ -133,9 +134,7 @@ const PublicSellerProfilePage = () => {
   }
 
   const avatarUrl = seller.profile_photo_or_character
-    ? (seller.profile_photo_or_character.startsWith('http')
-        ? seller.profile_photo_or_character
-        : supabase.storage.from('vault-images').getPublicUrl(seller.profile_photo_or_character).data.publicUrl)
+    ? (publicImageUrl(seller.profile_photo_or_character))
     : null;
   const sellerVerified = seller.is_admin === true || isVerified(seller.is_verified);
 

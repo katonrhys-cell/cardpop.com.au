@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { BadgeCheck, Search, MapPin, Star, Package, ArrowRight, ShieldCheck, Store, Sparkles } from 'lucide-react';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const AU_STATES = [
   { code: 'NSW', label: 'New South Wales' },
@@ -130,8 +131,7 @@ const LocalTradersPage = () => {
   const resolveAvatar = (t) => {
     const raw = t.avatar_url || t.profile_photo_or_character;
     if (!raw) return null;
-    if (raw.startsWith('http')) return raw;
-    return supabase.storage.from('vault-images').getPublicUrl(raw).data.publicUrl;
+    return publicImageUrl(raw);
   };
 
   const stateLabel = selectedState

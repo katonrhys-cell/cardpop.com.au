@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Link } from 'react-router-dom';
 import { VerificationBadge } from '@/components/VerificationBadge.jsx';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const UserProfilePage = () => {
   const { currentUser } = useAuth();
@@ -114,10 +115,12 @@ const UserProfilePage = () => {
       if (avatarFile) {
         const compressed = await compressImage(avatarFile, { maxDimension: 512, quality: 0.85 });
         const fileExt = compressed.name.split('.').pop();
-        const filePath = `avatars/${currentUser.id}.${fileExt}`;
+        // Timestamped name (not a fixed per-user path) so the file is
+        // immutable and can carry a long-lived cache header.
+        const filePath = `avatars/${currentUser.id}-${Date.now()}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from('vault-images')
-          .upload(filePath, compressed, { upsert: true });
+          .upload(filePath, compressed, { upsert: true, cacheControl: '31536000' });
         if (uploadError) throw uploadError;
         updatePayload.profile_photo_or_character = filePath;
       } else if (removeAvatar) {
@@ -169,9 +172,7 @@ const UserProfilePage = () => {
   // Generate fallback UI if public profile doesn't exist
   const isProfileEmpty = !profile && !isEditing;
   const currentPhotoUrl = profile?.profile_photo_or_character
-    ? (profile.profile_photo_or_character.startsWith('http')
-        ? profile.profile_photo_or_character
-        : supabase.storage.from('vault-images').getPublicUrl(profile.profile_photo_or_character).data.publicUrl)
+    ? (publicImageUrl(profile.profile_photo_or_character))
     : null;
 
   return (

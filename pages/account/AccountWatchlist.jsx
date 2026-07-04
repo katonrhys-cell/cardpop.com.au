@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { slugify } from '@/lib/slugify.js';
 import { toast } from 'sonner';
 import GradeBadge from '@/components/GradeBadge.jsx';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 // ── Auction countdown ─────────────────────────────────────────────────────────
 const useCountdown = (endAt) => {
@@ -74,7 +75,7 @@ const WatchlistRow = ({ entry, onRemove }) => {
     || vi?.vault_images?.[0]?.storage_path
     || null;
   const imgSrc = imgPath
-    ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
+    ? (publicImageUrl(imgPath))
     : null;
   const detailPath = `/marketplace/${listing.id}/${slugify(vi?.card_name || 'card')}`;
   const statusCfg = getStatusCfg(listing);
