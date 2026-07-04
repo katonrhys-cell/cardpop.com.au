@@ -50,6 +50,8 @@ const categoriesValue = {
   getManufacturersByFranchise: vi.fn(arr), getTeamsByFranchise: vi.fn(arr),
   getSetsByFranchiseAndManufacturer: vi.fn(arr), getCategoriesByGroup: vi.fn(arr),
   getParallelsByFranchise: vi.fn(arr), getSubsetsBySet: vi.fn(arr),
+  getAllFranchises: vi.fn(arr), getAllManufacturers: vi.fn(arr), getAllTeams: vi.fn(arr),
+  getAllSets: vi.fn(arr), getAllParallels: vi.fn(arr), getAllSubsets: vi.fn(arr),
   getSubcategoriesByCategory: vi.fn(arr), getBrandsBySubcategory: vi.fn(arr),
   getSeriesByBrand: vi.fn(arr), buildNameMap: vi.fn(async () => ({})),
 };
