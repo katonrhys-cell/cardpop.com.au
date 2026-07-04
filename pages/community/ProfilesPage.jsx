@@ -64,7 +64,7 @@ const ProfilesPage = () => {
     : profiles;
 
   const resolveAvatar = (profile) => {
-    const raw = profile?.avatar_url || profile?.profile_photo_or_character;
+    const raw = profile?.avatar_url || profile?.business_logo_url || profile?.profile_photo_or_character;
     if (!raw) return null;
     if (raw.startsWith('http')) return raw;
     return supabase.storage.from('vault-images').getPublicUrl(raw).data.publicUrl;
