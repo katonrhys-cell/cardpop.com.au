@@ -12,6 +12,8 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const BASE_URL = 'https://cardpop.com.au';
 
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+
 const esc = (s = '') => String(s)
   .replace(/&/g, '&amp;')
   .replace(/</g, '&lt;')
@@ -1989,8 +1991,6 @@ export default async function handler(req, res) {
   const rawPath = String(req.query.path || '').split('?')[0];
 
   try {
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-
     if (rawPath === '/community/local-traders') {
       return res.status(200).send(await renderLocalTraders(supabase));
     }
