@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext.jsx';
-import { toast } from 'sonner';
 
 const ProtectedAdminRoute = ({ children }) => {
   const { isAuthenticated, isAdmin, loading, profileLoading } = useAuth();
@@ -9,7 +8,12 @@ const ProtectedAdminRoute = ({ children }) => {
 
   useEffect(() => {
     if (!loading && !profileLoading && isAuthenticated && !isAdmin) {
-      toast.error('Access denied. Administrator privileges required.');
+      // Defer the sonner import so this eagerly-loaded route guard doesn't drag
+      // the toast library onto the app's initial critical path — the message
+      // only ever fires for the rare non-admin who reaches an /admin URL.
+      import('sonner').then(({ toast }) =>
+        toast.error('Access denied. Administrator privileges required.'),
+      );
     }
   }, [loading, profileLoading, isAuthenticated, isAdmin]);
 
