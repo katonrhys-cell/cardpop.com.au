@@ -366,7 +366,7 @@ const HomePage = () => {
               }}
             >
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
-              CardPop<sup className="text-[0.5em]" style={{textDecoration: 'none'}}>™</sup> Live
+              CardPop<sup className="text-[0.5em]">™</sup> Live
               <span className="text-white/30 font-normal">·</span>
               <span className="text-white/60 font-semibold normal-case tracking-normal">Australia's Card Show</span>
             </div>
