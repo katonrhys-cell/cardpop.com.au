@@ -1960,6 +1960,136 @@ ${itemsHtml || '    <li>No active listings at the moment.</li>'}
   return htmlDoc({ title, description, canonical, ogImage: image, jsonLdItems: [person, breadcrumb], bodyHtml });
 }
 
+// ── Store directory pages (/card-shops) ─────────────────────────────────────
+
+const DIRECTORY_CITIES = {
+  sydney:           { label: 'Sydney',         state: 'NSW' },
+  newcastle:        { label: 'Newcastle',      state: 'NSW' },
+  wollongong:       { label: 'Wollongong',     state: 'NSW' },
+  'central-coast':  { label: 'Central Coast',  state: 'NSW' },
+  canberra:         { label: 'Canberra',       state: 'ACT' },
+  melbourne:        { label: 'Melbourne',      state: 'VIC' },
+  geelong:          { label: 'Geelong',        state: 'VIC' },
+  ballarat:         { label: 'Ballarat',       state: 'VIC' },
+  bendigo:          { label: 'Bendigo',        state: 'VIC' },
+  adelaide:         { label: 'Adelaide',       state: 'SA' },
+  hobart:           { label: 'Hobart',         state: 'TAS' },
+  launceston:       { label: 'Launceston',     state: 'TAS' },
+  brisbane:         { label: 'Brisbane',       state: 'QLD' },
+  'gold-coast':     { label: 'Gold Coast',     state: 'QLD' },
+  'sunshine-coast': { label: 'Sunshine Coast', state: 'QLD' },
+  cairns:           { label: 'Cairns',         state: 'QLD' },
+  townsville:       { label: 'Townsville',     state: 'QLD' },
+  toowoomba:        { label: 'Toowoomba',      state: 'QLD' },
+  perth:            { label: 'Perth',          state: 'WA' },
+  darwin:           { label: 'Darwin',         state: 'NT' },
+};
+
+async function renderStoresHub(supabase) {
+  const { data: stores } = await supabase
+    .from('local_game_stores')
+    .select('slug, name, suburb, city, state')
+    .eq('status', 'approved')
+    .order('name')
+    .limit(500);
+
+  const counts = {};
+  for (const store of stores || []) counts[store.city] = (counts[store.city] || 0) + 1;
+
+  const title = 'Card Shops & Card Shows in Australia — Store Directory | CardPop';
+  const description = 'Find trading card shops near you: Pokémon, sports cards, One Piece and TCG stores across Sydney, Melbourne, Brisbane, Perth, Adelaide and more — plus upcoming card shows.';
+
+  const cityLinks = Object.entries(DIRECTORY_CITIES)
+    .filter(([slug]) => counts[slug] > 0)
+    .map(([slug, info]) =>
+      `<li><a href="${BASE_URL}/card-shops/${esc(slug)}">Card shops in ${esc(info.label)}, ${esc(info.state)}</a> (${counts[slug]})</li>`)
+    .join('\n');
+
+  return htmlDoc({
+    title,
+    description,
+    canonical: `${BASE_URL}/card-shops`,
+    ogImage: `${BASE_URL}/og-image.jpg`,
+    jsonLdItems: [{
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      name: title,
+      description,
+      url: `${BASE_URL}/card-shops`,
+    }],
+    bodyHtml: `<main><h1>Australian Card Shops &amp; Shows</h1>
+<p>${esc(description)}</p>
+<ul>${cityLinks}</ul>
+<p><a href="${BASE_URL}/card-shops/add">Add your store — free listing</a></p></main>`,
+  });
+}
+
+async function renderStoresCity(supabase, citySlug) {
+  const cityInfo = DIRECTORY_CITIES[citySlug];
+  const { data: stores } = await supabase
+    .from('local_game_stores')
+    .select('slug, name, suburb, city, state, website, categories, description')
+    .eq('status', 'approved')
+    .eq('city', citySlug)
+    .order('name')
+    .limit(200);
+
+  const title = `Card Shops in ${cityInfo.label} — Pokémon, TCG & Sports Card Stores | CardPop`;
+  const description = `Find trading card shops in ${cityInfo.label}, ${cityInfo.state}: local stores for Pokémon, sports cards, One Piece and other TCGs, plus upcoming card shows near ${cityInfo.label}.`;
+
+  const storeItems = (stores || []).map((store) => {
+    const line = [store.suburb, store.state].filter(Boolean).join(', ');
+    return `<li><strong>${esc(store.name)}</strong>${line ? ` — ${esc(line)}` : ''}${store.description ? `<br/>${esc(store.description)}` : ''}${store.website ? ` <a href="${esc(store.website)}" rel="noopener">Website</a>` : ''}</li>`;
+  }).join('\n');
+
+  const jsonLd = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Card Shops', item: `${BASE_URL}/card-shops` },
+        { '@type': 'ListItem', position: 2, name: cityInfo.label, item: `${BASE_URL}/card-shops/${citySlug}` },
+      ],
+    },
+    (stores || []).length ? {
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: `Card shops in ${cityInfo.label}`,
+      numberOfItems: stores.length,
+      itemListElement: stores.map((store, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        item: {
+          '@type': 'LocalBusiness',
+          name: store.name,
+          ...(store.website ? { url: store.website } : {}),
+          address: {
+            '@type': 'PostalAddress',
+            ...(store.suburb ? { addressLocality: store.suburb } : {}),
+            addressRegion: store.state,
+            addressCountry: 'AU',
+          },
+        },
+      })),
+    } : null,
+  ].filter(Boolean);
+
+  return htmlDoc({
+    title,
+    description,
+    canonical: `${BASE_URL}/card-shops/${citySlug}`,
+    ogImage: `${BASE_URL}/og-image.jpg`,
+    jsonLdItems: jsonLd,
+    bodyHtml: `<main>
+<nav><a href="${BASE_URL}/card-shops">Card Shops</a></nav>
+<h1>Card Shops in ${esc(cityInfo.label)}</h1>
+<p>${esc(description)}</p>
+<ul>${storeItems || '<li>No stores listed yet — know one? Add it below.</li>'}</ul>
+<p><a href="${BASE_URL}/card-shops/add">Add your store — free listing</a> · <a href="${BASE_URL}/events">Card events calendar</a></p>
+</main>`,
+  });
+}
+
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
@@ -2038,6 +2168,26 @@ export default async function handler(req, res) {
 
     if (rawPath === '/prices') {
       return res.status(200).send(await renderPricesHub(supabase, null));
+    }
+
+    if (rawPath === '/card-shops') {
+      return res.status(200).send(await renderStoresHub(supabase));
+    }
+
+    const storesCityMatch = rawPath.match(/^\/card-shops\/([^/?#]+)/);
+    if (storesCityMatch) {
+      const citySlug = decodeURIComponent(storesCityMatch[1]);
+      if (DIRECTORY_CITIES[citySlug]) {
+        return res.status(200).send(await renderStoresCity(supabase, citySlug));
+      }
+      if (citySlug === 'add') {
+        return res.status(200).send(htmlDoc({
+          title: 'Add Your Card Store — Free Listing | CardPop',
+          description: 'List your trading card store in CardPop\'s free Australian card shop directory and get found by collectors in your city.',
+          canonical: `${BASE_URL}/card-shops/add`,
+          bodyHtml: '<main><h1>Add your card store</h1><p>Free listing in the Australian card shop directory. Submissions are reviewed before going live.</p></main>',
+        }));
+      }
     }
 
     const pricesMatch = rawPath.match(/^\/prices\/([^/?#]+)(?:\/([^/?#]+))?/);

@@ -61,6 +61,7 @@ const Footer = () => {
               <li><Link to="/marketplace" className="hover:text-primary transition-colors">Marketplace</Link></li>
               <li><Link to="/analytics" className="hover:text-primary transition-colors">Analytics</Link></li>
               <li><Link to="/prices" className="hover:text-primary transition-colors">Card Prices (AUD)</Link></li>
+              <li><Link to="/card-shops" className="hover:text-primary transition-colors">Card Shop Directory</Link></li>
               <li><Link to="/grading" className="hover:text-primary transition-colors">Grading Hub</Link></li>
               <li><Link to="/photography-standard" className="hover:text-primary transition-colors">Photography Guide</Link></li>
             </ul>

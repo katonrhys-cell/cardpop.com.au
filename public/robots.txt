@@ -42,6 +42,7 @@ Crawl-delay: 1
 User-agent: GPTBot
 Allow: /collections/
 Allow: /prices/
+Allow: /card-shops/
 Allow: /markets/
 Allow: /community/
 Allow: /blog/
@@ -55,6 +56,7 @@ Disallow: /checkout
 User-agent: CCBot
 Allow: /collections/
 Allow: /prices/
+Allow: /card-shops/
 Allow: /markets/
 Allow: /community/
 Allow: /blog/
