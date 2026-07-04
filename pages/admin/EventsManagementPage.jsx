@@ -13,7 +13,6 @@ import EventScraperPanel from '@/components/EventScraperPanel.jsx';
 import EventFormModal from '@/components/EventFormModal.jsx';
 
 const STATUS_STYLES = {
-  approved:       'bg-emerald-500/10 text-emerald-700 border-emerald-200 dark:text-emerald-400',
   pending_review: 'bg-amber-500/10 text-amber-700 border-amber-200 dark:text-amber-400',
   cancelled:      'bg-muted text-muted-foreground border-border',
   completed:      'bg-blue-500/10 text-blue-700 border-blue-200 dark:text-blue-400',
@@ -21,7 +20,6 @@ const STATUS_STYLES = {
 };
 
 const STATUS_LABELS = {
-  approved:       'Live',
   pending_review: 'Pending',
   cancelled:      'Cancelled',
   completed:      'Completed',
@@ -156,7 +154,6 @@ const EventsManagementPage = () => {
                 <tr>
                   <th className="px-6 py-4 font-bold">Event</th>
                   <th className="px-6 py-4 font-bold hidden md:table-cell">Date & Location</th>
-                  <th className="px-6 py-4 font-bold hidden sm:table-cell">Type</th>
                   <th className="px-6 py-4 font-bold">Status</th>
                   <th className="px-6 py-4 font-bold text-right">Actions</th>
                 </tr>
@@ -202,11 +199,6 @@ const EventsManagementPage = () => {
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 hidden sm:table-cell">
-                      <Badge variant="outline" className="capitalize text-xs font-medium">
-                        {event.event_type?.replace(/_/g, ' ') || '—'}
-                      </Badge>
-                    </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <Switch
@@ -214,12 +206,14 @@ const EventsManagementPage = () => {
                           onCheckedChange={() => handleQuickTogglePublished(event)}
                           disabled={event.status === 'completed' || event.status === 'rejected'}
                         />
-                        <Badge
-                          variant="outline"
-                          className={`text-xs font-bold ${STATUS_STYLES[event.status] || STATUS_STYLES.cancelled}`}
-                        >
-                          {STATUS_LABELS[event.status] || event.status}
-                        </Badge>
+                        {event.status !== 'approved' && (
+                          <Badge
+                            variant="outline"
+                            className={`text-xs font-bold ${STATUS_STYLES[event.status] || STATUS_STYLES.cancelled}`}
+                          >
+                            {STATUS_LABELS[event.status] || event.status}
+                          </Badge>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
