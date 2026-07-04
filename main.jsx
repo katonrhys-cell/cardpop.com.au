@@ -1,4 +1,7 @@
 
+// Must come first: registers the Trusted Types default policy before any code
+// touches a DOM XSS sink (the enforced CSP requires Trusted Types for scripts).
+import '@/lib/trustedTypesPolicy.js';
 import React, { Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from '@/App.jsx';

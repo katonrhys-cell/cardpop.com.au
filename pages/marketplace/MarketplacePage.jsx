@@ -269,6 +269,8 @@ const MarketplacePage = () => {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
               <Input
+                name="marketplace-search"
+                aria-label="Search card name"
                 placeholder="Search card name..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
@@ -278,10 +280,13 @@ const MarketplacePage = () => {
 
             {/* Price range */}
             <div>
-              <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Price range</label>
+              <label htmlFor="marketplace-min-price" className="block text-xs font-semibold text-muted-foreground mb-1.5">Price range</label>
               <div className="flex items-center gap-2">
                 <Input
                   type="number"
+                  id="marketplace-min-price"
+                  name="marketplace-min-price"
+                  aria-label="Minimum price"
                   placeholder="Min $"
                   value={minPrice}
                   onChange={e => setMinPrice(e.target.value)}
@@ -290,6 +295,8 @@ const MarketplacePage = () => {
                 <span className="text-muted-foreground text-sm font-medium">–</span>
                 <Input
                   type="number"
+                  name="marketplace-max-price"
+                  aria-label="Maximum price"
                   placeholder="Max $"
                   value={maxPrice}
                   onChange={e => setMaxPrice(e.target.value)}
@@ -300,10 +307,10 @@ const MarketplacePage = () => {
 
             {/* Category cascade */}
             <div className="space-y-3 pt-1">
-              <label className="block text-xs font-semibold text-muted-foreground">Browse by category</label>
+              <label htmlFor="marketplace-category" className="block text-xs font-semibold text-muted-foreground">Browse by category</label>
               {/* Category */}
               <Select value={filterCat} onValueChange={setFilterCat}>
-                <SelectTrigger aria-label="Filter by category" className="w-full bg-background border-border rounded-xl font-medium">
+                <SelectTrigger id="marketplace-category" aria-label="Filter by category" className="w-full bg-background border-border rounded-xl font-medium">
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>
                 <SelectContent>

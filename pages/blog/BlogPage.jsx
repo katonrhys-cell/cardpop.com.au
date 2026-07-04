@@ -207,6 +207,8 @@ const BlogPage = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <Input
               type="text"
+              name="blog-search"
+              aria-label="Search articles by title or author"
               placeholder="Search articles by title or author..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
