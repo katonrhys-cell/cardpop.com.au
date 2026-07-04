@@ -16,12 +16,20 @@
     }
   },
   "crons": [
-    { "path": "/api/prices/refresh", "schedule": "30 19 * * *" }
+    {
+      "path": "/api/prices/refresh",
+      "schedule": "30 19 * * *"
+    }
   ],
   "redirects": [
     {
       "source": "/:path*",
-      "has": [{ "type": "host", "value": "www.cardpop.com.au" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "www.cardpop.com.au"
+        }
+      ],
       "destination": "https://cardpop.com.au/:path*",
       "permanent": true
     },
@@ -47,144 +55,340 @@
     }
   ],
   "rewrites": [
-    { "source": "/sitemap.xml", "destination": "/api/sitemap" },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
+    },
     {
       "source": "/community/local-traders",
-      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
       "destination": "/api/prerender?path=/community/local-traders"
     },
     {
       "source": "/dealer/:slug*",
-      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
       "destination": "/api/prerender?path=/dealer/:slug*"
     },
     {
       "source": "/blog/:slug",
-      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
       "destination": "/api/prerender?path=/blog/:slug"
     },
     {
       "source": "/marketplace/:id/:slug*",
-      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
       "destination": "/api/prerender?path=/marketplace/:id/:slug*"
     },
     {
       "source": "/product/shop/:id/:slug*",
-      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
       "destination": "/api/prerender?path=/product/shop/:id/:slug*"
     },
     {
       "source": "/marketplace",
-      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
       "destination": "/api/prerender?path=/marketplace"
     },
     {
       "source": "/browse",
-      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
       "destination": "/api/prerender?path=/browse"
     },
     {
       "source": "/shop/sealed-boxes",
-      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
       "destination": "/api/prerender?path=/shop/sealed-boxes"
     },
     {
       "source": "/shop/singles",
-      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
       "destination": "/api/prerender?path=/shop/singles"
     },
     {
       "source": "/shop",
-      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
       "destination": "/api/prerender?path=/shop"
     },
     {
       "source": "/events",
-      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
       "destination": "/api/prerender?path=/events"
     },
     {
       "source": "/events/:slug",
-      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
       "destination": "/api/prerender?path=/events/:slug"
     },
     {
       "source": "/:page(about|contact|faq|privacy-policy|terms|returns|shipping|trust-safety|accessibility|community|australian-markets|insider-trading|analytics|blog)",
-      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
       "destination": "/api/prerender?path=/:page"
     },
     {
       "source": "/grading",
-      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
       "destination": "/api/prerender?path=/grading"
     },
     {
       "source": "/grading/:sub(what-is-grading|scales|companies|local-graders|submission-partners|estimator|roi-calculator)",
-      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
       "destination": "/api/prerender?path=/grading/:sub"
     },
     {
       "source": "/collections",
-      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
       "destination": "/api/prerender?path=/collections"
     },
     {
       "source": "/collections/:slug",
-      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
       "destination": "/api/prerender?path=/collections/:slug"
     },
     {
       "source": "/seller/:id",
-      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
       "destination": "/api/prerender?path=/seller/:id"
     },
     {
       "source": "/prices",
-      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
       "destination": "/api/prerender?path=/prices"
     },
     {
       "source": "/prices/:path*",
-      "has": [{ "type": "header", "key": "user-agent", "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*" }],
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
       "destination": "/api/prerender?path=/prices/:path*"
     },
-    { "source": "/hcgi/api/:path*", "destination": "/api/:path*" },
-    { "source": "/api/:path*", "destination": "/api/index" },
-    { "source": "/(.*)", "destination": "/app.html" }
+    {
+      "source": "/card-shops",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
+      "destination": "/api/prerender?path=/card-shops"
+    },
+    {
+      "source": "/card-shops/:path*",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
+      "destination": "/api/prerender?path=/card-shops/:path*"
+    },
+    {
+      "source": "/hcgi/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/app.html"
+    }
   ],
   "headers": [
     {
       "source": "/assets/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        }
       ]
     },
     {
       "source": "/images/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        }
       ]
     },
     {
       "source": "/(.*).woff2",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" },
-        { "key": "Content-Type", "value": "font/woff2" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        },
+        {
+          "key": "Content-Type",
+          "value": "font/woff2"
+        }
       ]
     },
     {
       "source": "/index.html",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=3600, must-revalidate" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "X-XSS-Protection", "value": "1; mode=block" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=()" },
-        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" },
-        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600, must-revalidate"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=(), payment=()"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains; preload"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        },
         {
           "key": "Content-Security-Policy",
           "value": "default-src 'self'; script-src 'self' 'sha256-Nc1DEmsdgWrKwBkWS427rxkv6LYF1WwidO0b4t2X7jI=' 'strict-dynamic' 'wasm-unsafe-eval' 'unsafe-inline' https://*.impactcdn.com https://www.googletagmanager.com https://www.google.com https://www.gstatic.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; connect-src 'self' https://odoglvswwymyjuwlonkf.supabase.co wss://odoglvswwymyjuwlonkf.supabase.co https://api.stripe.com https://*.ingest.us.sentry.io https://*.impactcdn.com https://staticimgly.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://stats.g.doubleclick.net https://www.google.com https://challenges.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; frame-src https://www.google.com https://challenges.cloudflare.com https://td.doubleclick.net; object-src 'none'; base-uri 'self'; form-action 'self'; require-trusted-types-for 'script'; trusted-types 'allow-duplicates' *;"
@@ -194,14 +398,38 @@
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" },
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "X-XSS-Protection", "value": "1; mode=block" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=()" },
-        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" },
-        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=0, must-revalidate"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=(), payment=()"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains; preload"
+        },
+        {
+          "key": "Cross-Origin-Opener-Policy",
+          "value": "same-origin"
+        },
         {
           "key": "Content-Security-Policy",
           "value": "default-src 'self'; script-src 'self' 'sha256-Nc1DEmsdgWrKwBkWS427rxkv6LYF1WwidO0b4t2X7jI=' 'strict-dynamic' 'wasm-unsafe-eval' 'unsafe-inline' https://*.impactcdn.com https://www.googletagmanager.com https://www.google.com https://www.gstatic.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https:; connect-src 'self' https://odoglvswwymyjuwlonkf.supabase.co wss://odoglvswwymyjuwlonkf.supabase.co https://api.stripe.com https://*.ingest.us.sentry.io https://*.impactcdn.com https://staticimgly.com https://www.googletagmanager.com https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://stats.g.doubleclick.net https://www.google.com https://challenges.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; frame-src https://www.google.com https://challenges.cloudflare.com https://td.doubleclick.net; object-src 'none'; base-uri 'self'; form-action 'self'; require-trusted-types-for 'script'; trusted-types 'allow-duplicates' *;"
@@ -211,8 +439,14 @@
     {
       "source": "/api/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
-        { "key": "Access-Control-Allow-Credentials", "value": "true" }
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        },
+        {
+          "key": "Access-Control-Allow-Credentials",
+          "value": "true"
+        }
       ]
     }
   ]

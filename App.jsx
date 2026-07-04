@@ -125,6 +125,11 @@ const AustralianMarketsPage = lazy(() => import('@/pages/AustralianMarketsPage.j
 const CardPricesHubPage = lazy(() => import('@/pages/prices/CardPricesHubPage.jsx'));
 const CardPriceDetailPage = lazy(() => import('@/pages/prices/CardPriceDetailPage.jsx'));
 
+// Store directory
+const CardShopsHubPage = lazy(() => import('@/pages/stores/CardShopsHubPage.jsx'));
+const CardShopsCityPage = lazy(() => import('@/pages/stores/CardShopsCityPage.jsx'));
+const AddStorePage = lazy(() => import('@/pages/stores/AddStorePage.jsx'));
+
 // Grading
 const GradingPage = lazy(() => import('@/pages/grading/GradingPage.jsx'));
 const GradingScalePage = lazy(() => import('@/pages/grading/GradingScalePage.jsx'));
@@ -180,6 +185,7 @@ const FeaturedCardsAdminPage = lazy(() => import('@/pages/FeaturedCardsAdminPage
 const HeroShowcaseAdminPage = lazy(() => import('@/pages/admin/HeroShowcaseAdminPage.jsx'));
 const CollectionSectionsAdminPage = lazy(() => import('@/pages/admin/CollectionSectionsAdminPage.jsx'));
 const ChatModerationPage = lazy(() => import('@/pages/admin/ChatModerationPage.jsx'));
+const StoreDirectoryAdminPage = lazy(() => import('@/pages/admin/StoreDirectoryAdminPage.jsx'));
 const ListingsManagementPage = lazy(() => import('@/pages/ListingsManagementPage.jsx'));
 
 // Previously-orphaned pages now wired up
@@ -332,6 +338,11 @@ const App = () => {
                         <Route path="/prices" element={<CardPricesHubPage />} />
                         <Route path="/prices/:category" element={<CardPricesHubPage />} />
                         <Route path="/prices/:category/:slug" element={<CardPriceDetailPage />} />
+
+                        {/* Store directory (SEO) */}
+                        <Route path="/card-shops" element={<CardShopsHubPage />} />
+                        <Route path="/card-shops/add" element={<AddStorePage />} />
+                        <Route path="/card-shops/:city" element={<CardShopsCityPage />} />
                         <Route path="/card-market/:cardId" element={<CardMarketDetailPage />} />
                         <Route path="/category/:categoryId" element={<CategoryRoute />} />
                         
@@ -423,6 +434,7 @@ const App = () => {
                           <Route path="collection-sections" element={<CollectionSectionsAdminPage />} />
                           <Route path="all-listings" element={<ListingsManagementPage />} />
                           <Route path="messages" element={<ChatModerationPage />} />
+                          <Route path="store-directory" element={<StoreDirectoryAdminPage />} />
                         </Route>
                         
                         {/* --- CATCH-ALL 404 ROUTE --- */}

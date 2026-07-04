@@ -28,6 +28,7 @@ import priceHistoryRouter from './price-history.js';
 import newsletterRouter from './newsletter.js';
 import marketDataRouter from './market-data.js';
 import pricesRouter from './prices.js';
+import storesRouter from './stores.js';
 import catalogRouter from './catalog.js';
 import psaRouter from './psa.js';
 import welcomeOfferRouter from './welcome-offer.js';
@@ -127,6 +128,10 @@ export default () => {
     // Public card price pages: snapshot refresh (cron + on-demand)
     router.use('/prices', apiLimiter);
     router.use('/prices', pricesRouter);
+
+    // Local game store directory submissions
+    router.use('/stores', apiLimiter);
+    router.use('/stores', storesRouter);
 
     router.use('/buyer-protection', apiLimiter);
     router.use('/buyer-protection', buyerProtectionRouter);

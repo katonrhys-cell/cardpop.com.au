@@ -151,6 +151,11 @@ export default async function handler(req, res) {
           .order('snapshot_date', { referencedTable: 'card_price_snapshots', ascending: false })
           .limit(1, { referencedTable: 'card_price_snapshots' })
           .limit(500),
+        supabase
+          .from('local_game_stores')
+          .select('city, updated_at')
+          .eq('status', 'approved')
+          .limit(500),
       ]),
       new Promise((resolve) => setTimeout(() => resolve(null), DB_BUDGET_MS)),
     ]);
@@ -165,6 +170,7 @@ export default async function handler(req, res) {
     const products = rows(3);
     const events = rows(4);
     const trackedCards = rows(5);
+    const directoryStores = rows(6);
 
     const parts = [
       '<?xml version="1.0" encoding="UTF-8"?>',
@@ -207,6 +213,25 @@ export default async function handler(req, res) {
       for (const article of articles) {
         const lastmod = (article.updated_at || article.published_at || article.created_at || TODAY).split('T')[0];
         parts.push(xmlUrl(`${BASE_URL}/blog/${article.slug}`, lastmod, 'weekly', '0.7'));
+      }
+    }
+
+    if (directoryStores.length > 0) {
+      // Store directory: hub + one page per city that actually has approved
+      // stores (empty city pages would be thin/soft-404 territory).
+      const cityLastmod = {};
+      for (const store of directoryStores) {
+        const updated = (store.updated_at || '').split('T')[0];
+        if (!cityLastmod[store.city] || updated > cityLastmod[store.city]) {
+          cityLastmod[store.city] = updated || TODAY;
+        }
+      }
+      const cities = Object.keys(cityLastmod);
+      parts.push('', `  <!-- Store directory (${cities.length} cities) -->`);
+      const newestUpdate = Object.values(cityLastmod).sort().pop() || TODAY;
+      parts.push(xmlUrl(`${BASE_URL}/card-shops`, newestUpdate, 'weekly', '0.8'));
+      for (const city of cities) {
+        parts.push(xmlUrl(`${BASE_URL}/card-shops/${city}`, cityLastmod[city], 'weekly', '0.7'));
       }
     }
 
