@@ -46,7 +46,10 @@ const CardPopLogo = ({
         {/* Wordmark */}
           <span className="font-serif font-bold tracking-wide leading-none text-[1.55rem]">
           <span className={cardText}>Card</span>
-          <span className="text-primary">Pop<sup className={`text-[0.5em] leading-none ${cardText}`} style={{textDecoration: 'none'}}>™</sup></span>
+          {/* ™ is positioned absolutely so it doesn't widen the wordmark —
+              otherwise the AUSTRALIA divider line stretches underneath it
+              and reads as an underlined ™. */}
+          <span className="text-primary relative">Pop<sup className={`absolute left-full top-0 text-[0.5em] leading-none ${cardText}`}>™</sup></span>
         </span>
 
         {/* Australia subtitle */}
