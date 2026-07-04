@@ -33,7 +33,10 @@ export const CategoryHierarchyProvider = ({ children }) => {
           ]);
         }
       } catch (err) {
-        console.error("Context Error fetching categories:", err);
+        // warn, not error: this provider runs on every page load and the UI
+        // degrades gracefully — a console.error here fails Lighthouse's
+        // best-practices audit for every visitor whenever the fetch hiccups.
+        console.warn("Context Error fetching categories:", err);
         setError(err.message);
       } finally {
         setLoading(false);

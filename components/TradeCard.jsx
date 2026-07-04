@@ -2,13 +2,10 @@ import React, { useState } from 'react';
 import { CheckCircle2, XCircle, Clock, ArrowRightLeft, ImageOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/lib/supabaseClient.js';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
-const resolveImageUrl = (path) => {
-  if (!path || typeof path !== 'string') return null;
-  if (path.startsWith('http')) return path;
-  return supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
-};
+// Storage path or absolute URL → CDN-aware public URL.
+const resolveImageUrl = (path) => publicImageUrl(path);
 
 // The trade row exposes a 'proposed' status while it awaits a response; older
 // data may use 'pending'. Both mean "awaiting action".

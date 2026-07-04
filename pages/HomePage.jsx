@@ -1,8 +1,7 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
-import { motion, useInView, AnimatePresence } from 'framer-motion';
 import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -11,10 +10,44 @@ import VaultListingCard from '@/components/VaultListingCard.jsx';
 import SellerCard from '@/components/SellerCard.jsx';
 import FeaturedSellerCard from '@/components/FeaturedSellerCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
-import HeroCardShowcase from '@/components/HeroCardShowcase.jsx';
 import { fetchActiveShowcaseCards } from '@/lib/heroShowcase.js';
 
+// NOTE: this page intentionally imports NOTHING from framer-motion. The library
+// costs ~110 kB of JS and ~1.5 s of main-thread execution on a mid-range phone
+// (it was the top "Reduce JavaScript execution time" and "Forced reflow" culprit
+// in PageSpeed Insights). All entrance animations below are plain CSS
+// (see "HOMEPAGE ENTRANCE ANIMATIONS" in index.css) triggered by a tiny
+// IntersectionObserver hook. The animated hero showcase still uses
+// framer-motion, but it is desktop-only, so it's lazy-loaded behind a
+// matchMedia gate and phones never download it.
+const HeroCardShowcase = lazy(() => import('@/components/HeroCardShowcase.jsx'));
+
 import { HOMEPAGE_CATEGORIES } from '@/components/CategoryIcons.jsx';
+
+// ─── In-view reveal (framer-motion whileInView replacement) ─────────────────
+// Returns [ref, inView]; inView flips to true once the element scrolls within
+// rootMargin of the viewport and stays true (equivalent to viewport.once).
+const useRevealOnce = (rootMargin = '-60px') => {
+  const ref = useRef(null);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    if (typeof IntersectionObserver === 'undefined') {
+      setInView(true);
+      return undefined;
+    }
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some(e => e.isIntersecting)) {
+        setInView(true);
+        io.disconnect();
+      }
+    }, { rootMargin });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [rootMargin]);
+  return [ref, inView];
+};
 
 // ─── Animated counter ────────────────────────────────────────────────────────
 const useCountUp = (end, inView, isDecimal = false) => {
@@ -151,16 +184,6 @@ const StatItem = ({ value, suffix, label, isDecimal, inView }) => {
   );
 };
 
-// ─── Animation variants ───────────────────────────────────────────────────────
-const containerVariants = {
-  hidden:  { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
-};
-const itemVariants = {
-  hidden:  { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
-};
-
 // ─── Component ────────────────────────────────────────────────────────────────
 const HomePage = () => {
   const [featuredCards, setFeaturedCards]     = useState([]);
@@ -184,8 +207,23 @@ const HomePage = () => {
     return () => clearInterval(id);
   }, []);
 
-  const statsRef   = useRef(null);
-  const statsInView = useInView(statsRef, { once: true, margin: '-80px' });
+  const [statsRef, statsInView] = useRevealOnce('-80px');
+  const [categoriesRef, categoriesInView] = useRevealOnce('0px');
+  const [howRef, howInView] = useRevealOnce('-60px');
+  const [cardsRef, cardsInView] = useRevealOnce('-100px');
+  const [sellersRef, sellersInView] = useRevealOnce('-100px');
+
+  // The animated hero showcase is hidden below lg (CSS `hidden lg:block`), so
+  // only desktop viewports pay for its chunk (and framer-motion inside it).
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const onChange = (e) => setIsDesktop(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -237,13 +275,16 @@ const HomePage = () => {
   }, []);
 
   // Hero showcase cards are admin-configurable; fall back to the built-in set.
+  // Skipped on mobile — the showcase never renders there, so the query would
+  // be wasted work.
   useEffect(() => {
+    if (!isDesktop) return undefined;
     let isMounted = true;
     fetchActiveShowcaseCards().then((cards) => {
       if (isMounted && cards.length > 0) setHeroCards(cards);
     });
     return () => { isMounted = false; };
-  }, []);
+  }, [isDesktop]);
 
   return (
     <div className="min-h-screen bg-background font-sans overflow-hidden">
@@ -299,7 +340,11 @@ const HomePage = () => {
         <div className="absolute bottom-0 left-[10%] w-[28rem] h-[28rem] bg-blue-600/8 rounded-full blur-3xl pointer-events-none" />
 
         {/* ── Animated card showcase — shelf → stand (desktop only) ── */}
-        <HeroCardShowcase cards={heroCards} />
+        {isDesktop && (
+          <Suspense fallback={null}>
+            <HeroCardShowcase cards={heroCards} />
+          </Suspense>
+        )}
 
         {/* ── Hero text ── */}
         <div className="max-w-5xl mx-auto w-full relative z-10 lg:pr-[460px] xl:pr-[480px]">
@@ -310,12 +355,10 @@ const HomePage = () => {
               the small, non-LCP badge and trust chips animate below. */}
           <div className="text-center lg:text-left">
             {/* LIVE show badge */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.15, duration: 0.5 }}
-              className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-8 border text-sm font-black tracking-wider uppercase"
+            <div
+              className="anim-pop-in inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-8 border text-sm font-black tracking-wider uppercase"
               style={{
+                animationDelay: '0.15s',
                 background: 'rgba(220,38,38,0.12)',
                 borderColor: 'rgba(220,38,38,0.35)',
                 color: '#f87171',
@@ -323,10 +366,10 @@ const HomePage = () => {
               }}
             >
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
-              CardPop<sup className="text-[0.5em]" style={{textDecoration: 'none'}}>™</sup> Live
+              CardPop<sup className="text-[0.5em]">™</sup> Live
               <span className="text-white/30 font-normal">·</span>
               <span className="text-white/60 font-semibold normal-case tracking-normal">Australia's Card Show</span>
-            </motion.div>
+            </div>
 
             <h1 className="text-5xl md:text-6xl lg:text-[4.25rem] font-bold font-serif tracking-normal text-balance mb-6 leading-[1.2] text-white">
               The Card Show{' '}
@@ -377,11 +420,9 @@ const HomePage = () => {
             </div>
 
             {/* Trust chips */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5, duration: 0.6 }}
-              className="flex flex-wrap items-center justify-center lg:justify-start gap-3"
+            <div
+              className="anim-fade-in flex flex-wrap items-center justify-center lg:justify-start gap-3"
+              style={{ animationDelay: '0.5s' }}
             >
               {[
                 { icon: <ShieldCheck className="w-3.5 h-3.5" />, label: 'Buyer Protected' },
@@ -396,29 +437,24 @@ const HomePage = () => {
                   {icon}{label}
                 </span>
               ))}
-            </motion.div>
+            </div>
           </div>
         </div>
 
         {/* ── Live price ticker strip at hero bottom ── */}
         <div className="absolute bottom-0 left-0 right-0 overflow-hidden border-t" style={{ borderColor: 'rgba(255,255,255,0.07)', background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(12px)' }}>
           <div className="py-2.5 px-6 flex items-center justify-center" style={{ height: '32px' }}>
-            <AnimatePresence mode="wait">
-              <motion.div
+            {/* Keyed remount replays the CSS enter animation on every rotation */}
+              <div
                 key={tickerIdx}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.4 }}
-                className="flex items-center gap-2 text-xs"
+                className="anim-ticker-in flex items-center gap-2 text-xs"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0 animate-pulse" />
                 <span className="font-bold text-zinc-200">{ACTIVITY_FEED[tickerIdx].user}</span>
                 <span className="text-zinc-500">{ACTIVITY_FEED[tickerIdx].action}</span>
                 <span className="font-black text-yellow-400">{ACTIVITY_FEED[tickerIdx].price}</span>
                 <span className="text-zinc-600">{ACTIVITY_FEED[tickerIdx].time}</span>
-              </motion.div>
-            </AnimatePresence>
+              </div>
           </div>
         </div>
       </section>
@@ -448,15 +484,12 @@ const HomePage = () => {
           </div>
 
           {/* Mobile: touch swipe through all 24 */}
-          <div className="sm:hidden flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory scrollbar-hide -mx-4 px-4">
+          <div ref={categoriesRef} className="sm:hidden flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory scrollbar-hide -mx-4 px-4">
             {CATEGORIES.map((cat, i) => (
-              <motion.div
+              <div
                 key={cat.name}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.2, delay: Math.min(i, 8) * 0.03 }}
-                className="flex-shrink-0 snap-start w-32"
+                className={`flex-shrink-0 snap-start w-32 ${categoriesInView ? 'anim-reveal-up' : 'opacity-0'}`}
+                style={categoriesInView ? { animationDuration: '0.2s', animationDelay: `${Math.min(i, 8) * 0.03}s` } : undefined}
               >
                 <Link
                   to={cat.slug ? `/collections/${cat.slug}` : '/marketplace'}
@@ -465,7 +498,7 @@ const HomePage = () => {
                   <cat.Icon className="w-9 h-9 drop-shadow-sm" />
                   <span className="text-[11px] font-bold leading-tight text-white drop-shadow-sm">{cat.name}</span>
                 </Link>
-              </motion.div>
+              </div>
             ))}
           </div>
 
@@ -480,16 +513,13 @@ const HomePage = () => {
             </button>
 
             <div className="flex-1 overflow-hidden">
-              <div className="flex gap-4">
-                <AnimatePresence mode="popLayout" initial={false}>
+              {/* Keyed on deskStart so paging remounts the row and replays the
+                  directional slide-in (CSS replacement for AnimatePresence) */}
+              <div key={deskStart} className="flex gap-4">
                   {deskCats.map((cat) => (
-                    <motion.div
+                    <div
                       key={cat.slug}
-                      layout
-                      initial={{ opacity: 0, x: deskDir > 0 ? 50 : -50 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: deskDir > 0 ? -50 : 50 }}
-                      transition={{ duration: 0.22, ease: 'easeInOut' }}
+                      className={deskDir > 0 ? 'anim-slide-in-right' : 'anim-slide-in-left'}
                       style={{ width: `calc((100% - ${(DESK_VISIBLE - 1) * 16}px) / ${DESK_VISIBLE})`, flexShrink: 0 }}
                     >
                       <Link
@@ -499,9 +529,8 @@ const HomePage = () => {
                         <cat.Icon className="w-9 h-9 drop-shadow-sm" />
                         <span className="text-[11px] font-bold leading-tight text-white drop-shadow-sm">{cat.name}</span>
                       </Link>
-                    </motion.div>
+                    </div>
                   ))}
-                </AnimatePresence>
               </div>
             </div>
 
@@ -594,18 +623,15 @@ const HomePage = () => {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+          <div ref={howRef} className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
             {/* Connecting line — desktop only */}
             <div className="hidden md:block absolute top-10 left-[calc(16.67%+1.5rem)] right-[calc(16.67%+1.5rem)] h-px bg-gradient-to-r from-primary/20 via-primary/60 to-primary/20 z-0" />
 
             {HOW_IT_WORKS.map((step, i) => (
-              <motion.div
+              <div
                 key={step.step}
-                initial={{ opacity: 0, y: 24 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: '-60px' }}
-                transition={{ duration: 0.5, delay: i * 0.15 }}
-                className="relative z-10 flex flex-col items-center text-center"
+                className={`relative z-10 flex flex-col items-center text-center ${howInView ? 'anim-reveal-up' : 'opacity-0'}`}
+                style={howInView ? { animationDelay: `${i * 0.15}s` } : undefined}
               >
                 {/* Step number badge */}
                 <div className="w-20 h-20 rounded-2xl bg-primary flex items-center justify-center mb-6 shadow-lg shadow-primary/20 relative">
@@ -616,7 +642,7 @@ const HomePage = () => {
                 </div>
                 <h3 className="text-xl font-bold mb-3 font-serif">{step.title}</h3>
                 <p className="text-muted-foreground text-sm leading-relaxed max-w-xs">{step.desc}</p>
-              </motion.div>
+              </div>
             ))}
           </div>
 
@@ -652,19 +678,20 @@ const HomePage = () => {
               ))}
             </div>
           ) : featuredCards.length > 0 ? (
-            <motion.div
-              variants={containerVariants}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: '-100px' }}
+            <div
+              ref={cardsRef}
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
             >
-              {featuredCards.map(card => (
-                <motion.div key={card.id} variants={itemVariants}>
+              {featuredCards.map((card, i) => (
+                <div
+                  key={card.id}
+                  className={cardsInView ? 'anim-reveal-up' : 'opacity-0'}
+                  style={cardsInView ? { animationDelay: `${i * 0.1}s` } : undefined}
+                >
                   <VaultListingCard vaultItem={card} />
-                </motion.div>
+                </div>
               ))}
-            </motion.div>
+            </div>
           ) : (
             <div className="text-center py-12 bg-background rounded-3xl border border-border">
               <p className="text-muted-foreground font-medium">No recent cards available at the moment.</p>
@@ -725,19 +752,20 @@ const HomePage = () => {
               ))}
             </div>
           ) : featuredSellers.length > 0 ? (
-            <motion.div
-              variants={containerVariants}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: '-100px' }}
+            <div
+              ref={sellersRef}
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
             >
-              {featuredSellers.map(seller => (
-                <motion.div key={seller.id} variants={itemVariants}>
+              {featuredSellers.map((seller, i) => (
+                <div
+                  key={seller.id}
+                  className={sellersInView ? 'anim-reveal-up' : 'opacity-0'}
+                  style={sellersInView ? { animationDelay: `${i * 0.1}s` } : undefined}
+                >
                   <FeaturedSellerCard seller={seller} />
-                </motion.div>
+                </div>
               ))}
-            </motion.div>
+            </div>
           ) : (
             <div className="text-center py-12 bg-muted rounded-3xl border border-border shadow-sm">
               <p className="text-muted-foreground font-medium">Seller profiles are currently being updated.</p>

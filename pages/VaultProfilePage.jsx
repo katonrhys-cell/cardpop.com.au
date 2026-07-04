@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { VerificationBadge } from '@/components/VerificationBadge.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import { toast } from 'sonner';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const VaultProfilePage = () => {
   const { currentUser, isVerified } = useAuth();
@@ -60,9 +61,7 @@ const VaultProfilePage = () => {
           emailVisibility: record.email_visibility || false
         });
         if (record.avatar) {
-          const avatarUrl = record.avatar.startsWith('http')
-            ? record.avatar
-            : supabase.storage.from('vault-images').getPublicUrl(record.avatar).data.publicUrl;
+          const avatarUrl = publicImageUrl(record.avatar);
           setAvatarPreview(avatarUrl);
         }
 
@@ -123,10 +122,12 @@ const VaultProfilePage = () => {
       if (avatarFile) {
         const compressed = await compressImage(avatarFile, { maxDimension: 512, quality: 0.85 });
         const fileExt = compressed.name.split('.').pop();
-        const filePath = `avatars/${currentUser.id}.${fileExt}`;
+        // Timestamped name (not a fixed per-user path) so the file is
+        // immutable and can carry a long-lived cache header.
+        const filePath = `avatars/${currentUser.id}-${Date.now()}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
           .from('vault-images')
-          .upload(filePath, compressed, { upsert: true });
+          .upload(filePath, compressed, { upsert: true, cacheControl: '31536000' });
         if (uploadError) throw uploadError;
         updatePayload.avatar = filePath;
       }
@@ -160,9 +161,7 @@ const VaultProfilePage = () => {
     });
     setAvatarFile(null);
     if (profile?.avatar) {
-      const avatarUrl = profile.avatar.startsWith('http')
-        ? profile.avatar
-        : supabase.storage.from('vault-images').getPublicUrl(profile.avatar).data.publicUrl;
+      const avatarUrl = publicImageUrl(profile.avatar);
       setAvatarPreview(avatarUrl);
     } else {
       setAvatarPreview(null);
@@ -424,7 +423,7 @@ const VaultProfilePage = () => {
                 >
                   {card.card_image ? (
                     <img
-                      src={card.card_image.startsWith('http') ? card.card_image : supabase.storage.from('vault-images').getPublicUrl(card.card_image).data.publicUrl}
+                      src={publicImageUrl(card.card_image)}
                       alt={card.card_name}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />

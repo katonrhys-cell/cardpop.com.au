@@ -89,7 +89,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
       const compressed = await compressImage(entry);
       const ext = compressed.name?.split('.').pop() || 'jpg';
       const path = `shop-products/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('media').upload(path, compressed, { upsert: true });
+      const { error: upErr } = await supabase.storage.from('media').upload(path, compressed, { upsert: true, cacheControl: '31536000' });
       if (upErr) throw new Error(`Image upload failed: ${upErr.message}`);
       urls.push(supabase.storage.from('media').getPublicUrl(path).data.publicUrl);
     }

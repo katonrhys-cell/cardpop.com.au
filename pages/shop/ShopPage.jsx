@@ -118,8 +118,10 @@ const ShopPage = () => {
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-8">
           <div className="relative w-full sm:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search products..." 
+            <Input
+              name="shop-search"
+              aria-label="Search products"
+              placeholder="Search products..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               className="pl-9 h-11 rounded-xl bg-card border-border"

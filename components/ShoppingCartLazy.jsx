@@ -17,12 +17,23 @@ const ShoppingCartLazy = () => {
   const { isCartOpen } = useCart();
   const [hasOpened, setHasOpened] = useState(false);
 
-  // Warm the chunk when the browser is idle so the first open is instant.
+  // Warm the chunk on the user's FIRST interaction so opening the cart is
+  // instant. Warming at idle (the previous approach) pulled framer-motion +
+  // Radix into the initial load window on every visit — ~110 kB of parse and
+  // execute that PageSpeed counted against TBT/unused JS even though the cart
+  // never opened. A user can't open the cart without interacting first, so
+  // this loses nothing.
   useEffect(() => {
-    const ric = window.requestIdleCallback || ((cb) => setTimeout(cb, 1500));
-    const cic = window.cancelIdleCallback || clearTimeout;
-    const handle = ric(() => { prefetchCart(); });
-    return () => cic(handle);
+    const events = ['pointerdown', 'keydown', 'touchstart'];
+    let warmed = false;
+    const warm = () => {
+      if (warmed) return;
+      warmed = true;
+      for (const evt of events) window.removeEventListener(evt, warm);
+      prefetchCart();
+    };
+    for (const evt of events) window.addEventListener(evt, warm, { once: true, passive: true });
+    return () => { for (const evt of events) window.removeEventListener(evt, warm); };
   }, []);
 
   useEffect(() => {

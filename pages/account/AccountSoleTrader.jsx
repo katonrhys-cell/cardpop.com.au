@@ -128,8 +128,10 @@ const AccountSoleTrader = () => {
       if (logoFile) {
         const compressed = await compressImage(logoFile, { maxDimension: 512, quality: 0.85 });
         const ext  = compressed.name.split('.').pop();
-        const path = `business-logos/${currentUser.id}.${ext}`;
-        const { error: uploadErr } = await supabase.storage.from('avatars').upload(path, compressed, { upsert: true });
+        // Timestamped name (not a fixed per-user path) so the file is
+        // immutable and can carry a long-lived cache header.
+        const path = `business-logos/${currentUser.id}-${Date.now()}.${ext}`;
+        const { error: uploadErr } = await supabase.storage.from('avatars').upload(path, compressed, { upsert: true, cacheControl: '31536000' });
         if (uploadErr) throw uploadErr;
         business_logo_url = supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
       } else if (removeLogo) {

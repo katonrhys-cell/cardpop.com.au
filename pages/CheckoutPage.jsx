@@ -7,11 +7,8 @@ import apiServerClient from '@/lib/apiServerClient.js';
 import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 
-const resolveImg = (path) => {
-  if (!path || typeof path !== 'string') return null;
-  if (path.startsWith('http')) return path;
-  return supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
-};
+// Storage path or absolute URL → CDN-aware public URL.
+const resolveImg = (path) => publicImageUrl(path);
 import { ArrowRight, Loader2, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +19,7 @@ import ShippingAddressForm from '@/components/checkout/ShippingAddressForm.jsx';
 import BillingAddressForm from '@/components/checkout/BillingAddressForm.jsx';
 import PaymentMethodSelector from '@/components/checkout/PaymentMethodSelector.jsx';
 import OrderReviewSection from '@/components/checkout/OrderReviewSection.jsx';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const STEPS = { SUMMARY: 1, SHIPPING: 2, BILLING: 3, PAYMENT: 4, REVIEW: 5 };
 const STEP_LABELS = ['Cart', 'Ship', 'Bill', 'Pay', 'Review'];

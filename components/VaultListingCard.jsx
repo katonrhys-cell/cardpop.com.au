@@ -1,8 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { Star, ShieldCheck, Lock, ShoppingCart, ArrowRightLeft, Layers, ZoomIn } from 'lucide-react';
-import ImageZoomModal from '@/components/ImageZoomModal.jsx';
+// Lazy: the zoom modal drags framer-motion (~110 kB) with it, and this card
+// renders on the homepage — load the modal only when a zoom is opened.
+const ImageZoomModal = lazy(() => import('@/components/ImageZoomModal.jsx'));
 import CardShowcase from '@/components/vault/CardShowcase.jsx';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
@@ -97,12 +99,16 @@ const VaultListingCard = ({ vaultItem, listing }) => {
         )}
       </Link>
 
-      <ImageZoomModal
-        isOpen={zoomOpen}
-        onClose={() => setZoomOpen(false)}
-        imageUrl={imgSrc}
-        altText={vaultItem.card_name || vaultItem.name || 'Card Image'}
-      />
+      {zoomOpen && (
+        <Suspense fallback={null}>
+          <ImageZoomModal
+            isOpen={zoomOpen}
+            onClose={() => setZoomOpen(false)}
+            imageUrl={imgSrc}
+            altText={vaultItem.card_name || vaultItem.name || 'Card Image'}
+          />
+        </Suspense>
+      )}
       
       <div className="p-5 flex flex-col flex-1">
         <Link to={detailPath} className="block mb-3">

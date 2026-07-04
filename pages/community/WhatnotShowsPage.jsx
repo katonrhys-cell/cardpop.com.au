@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { CalendarDays, ExternalLink, Plus, Tv2, Trash2, Clock, X, Star, ImageIcon } from 'lucide-react';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const WhatnotIcon = ({ className = 'w-5 h-5' }) => (
   <svg viewBox="0 0 32 32" fill="none" aria-hidden="true" className={className}>
@@ -141,7 +142,7 @@ const WhatnotShowsPage = () => {
         const path = `whatnot-shows/${currentUser.id}/${Date.now()}.${ext}`;
         const { error: uploadErr } = await supabase.storage
           .from('vault-images')
-          .upload(path, compressed, { upsert: true });
+          .upload(path, compressed, { upsert: true, cacheControl: '31536000' });
         if (uploadErr) throw uploadErr;
         preview_image_url = supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
       }
@@ -199,8 +200,7 @@ const WhatnotShowsPage = () => {
   const resolveAvatarUrl = (profile) => {
     const raw = profile?.avatar_url || profile?.profile_photo_or_character;
     if (!raw) return null;
-    if (raw.startsWith('http')) return raw;
-    return supabase.storage.from('vault-images').getPublicUrl(raw).data.publicUrl;
+    return publicImageUrl(raw);
   };
 
   return (

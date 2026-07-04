@@ -12,13 +12,10 @@ import { useCart } from '@/hooks/useCart.jsx';
 import { formatCurrency } from '@/utils/formatCurrency.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabaseClient.js';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
-const resolveImg = (path) => {
-  if (!path || typeof path !== 'string') return null;
-  if (path.startsWith('http')) return path;
-  return supabase.storage.from('vault-images').getPublicUrl(path).data.publicUrl;
-};
+// Storage path or absolute URL → CDN-aware public URL.
+const resolveImg = (path) => publicImageUrl(path);
 
 const ShoppingCart = () => {
   const { cartItems, isCartOpen, setIsCartOpen, removeFromCart, updateQuantity, getCartTotal } = useCart();

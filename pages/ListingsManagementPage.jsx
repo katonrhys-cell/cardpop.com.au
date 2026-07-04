@@ -19,6 +19,7 @@ import ListingAnalyticsDashboard from '@/components/ListingAnalyticsDashboard.js
 import ListingDetailModal from '@/components/ListingDetailModal.jsx';
 import ListingStatusModal from '@/components/ListingStatusModal.jsx';
 import BulkActionsBar from '@/components/BulkActionsBar.jsx';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const ListingsManagementPage = () => {
   const [listings, setListings] = useState([]);
@@ -271,7 +272,7 @@ const ListingsManagementPage = () => {
                     const vi = listing.vault_item;
                     const rawImg = vi?.card_image || (Array.isArray(vi?.card_images) ? vi.card_images[0] : null);
                     const imgSrc = rawImg
-                      ? (rawImg.startsWith('http') ? rawImg : supabase.storage.from('vault-images').getPublicUrl(rawImg).data.publicUrl)
+                      ? (publicImageUrl(rawImg))
                       : null;
                     return (
                     <TableRow key={listing.id} className="admin-table-row">

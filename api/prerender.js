@@ -12,6 +12,8 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const BASE_URL = 'https://cardpop.com.au';
 
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+
 const esc = (s = '') => String(s)
   .replace(/&/g, '&amp;')
   .replace(/</g, '&lt;')
@@ -28,6 +30,34 @@ const ldJson = (items) => {
 };
 
 const absUrl = (u) => (!u ? undefined : (u.startsWith('http') ? u : `${BASE_URL}${u}`));
+
+// Optional image CDN in front of Supabase Storage (see
+// docs/image-cdn-cloudfront.md). Mirrors utils/imageUrl.js but reads the
+// server-side env var, since this file runs as a Vercel function.
+const IMAGE_CDN_ORIGIN = (() => {
+  const host = process.env.IMAGE_CDN_HOST || process.env.VITE_IMAGE_CDN_HOST;
+  if (!host) return null;
+  const trimmed = host.trim().replace(/\/+$/, '');
+  return /^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`;
+})();
+
+const SUPABASE_STORAGE_URL_RE =
+  /^https?:\/\/[^/]+\.supabase\.(co|in)(\/storage\/v1\/(?:object|render\/image)\/public\/.+)$/;
+
+const toCdnUrl = (url) => {
+  if (!IMAGE_CDN_ORIGIN || typeof url !== 'string') return url ?? undefined;
+  const match = url.match(SUPABASE_STORAGE_URL_RE);
+  return match ? `${IMAGE_CDN_ORIGIN}${match[2]}` : url;
+};
+
+// Storage path or absolute URL → CDN-aware public image URL (og:image etc).
+const publicImageUrl = (pathOrUrl) => {
+  if (!pathOrUrl) return undefined;
+  if (/^https?:\/\//.test(pathOrUrl)) return toCdnUrl(pathOrUrl);
+  return toCdnUrl(
+    supabase.storage.from('vault-images').getPublicUrl(pathOrUrl).data.publicUrl
+  );
+};
 
 // Strip <script>/<style> blocks from admin-authored article HTML before
 // embedding it in the prerendered body. Content is trusted (our own CMS), but
@@ -273,9 +303,7 @@ async function renderDealer(supabase, param) {
     const cardName = l.vault_item?.card_name || 'Trading Card';
     const url = `${BASE_URL}/marketplace/${l.id}/${l.slug || 'listing'}`;
     const imgPath = l.vault_item?.vault_images?.[0]?.storage_path || l.vault_item?.card_image;
-    const img = imgPath
-      ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
-      : undefined;
+    const img = publicImageUrl(imgPath);
     const product = {
       '@type': 'Product',
       name: cardName,
@@ -463,9 +491,7 @@ async function renderListing(supabase, id, slugParam) {
   const card = listing.vault_item || {};
   const cardName = listing.title || card.card_name || 'Trading Card';
   const imgPath = listing.images?.[0] || card.vault_images?.[0]?.storage_path || card.card_image;
-  const image = imgPath
-    ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
-    : undefined;
+  const image = publicImageUrl(imgPath);
   const price = listing.price_aud ?? listing.price;
   const condition = listing.condition || card.condition;
   const grade = listing.grade || card.grade;
@@ -659,9 +685,7 @@ async function renderLanding(supabase, path) {
       .limit(50);
     items = (data || []).map(l => {
       const imgPath = l.vault_item?.vault_images?.[0]?.storage_path || l.vault_item?.card_image;
-      const image = imgPath
-        ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
-        : undefined;
+      const image = publicImageUrl(imgPath);
       return {
         name: l.title || l.vault_item?.card_name || 'Trading Card',
         url: `${BASE_URL}/marketplace/${l.id}/${l.slug || 'listing'}`,
@@ -2097,8 +2121,6 @@ export default async function handler(req, res) {
   const rawPath = String(req.query.path || '').split('?')[0];
 
   try {
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-
     if (rawPath === '/community/local-traders') {
       return res.status(200).send(await renderLocalTraders(supabase));
     }

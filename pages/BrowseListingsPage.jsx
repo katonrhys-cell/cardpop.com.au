@@ -141,9 +141,9 @@ const BrowseListingsPage = () => {
               
               <div className="space-y-5">
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-foreground">Category</label>
+                  <label htmlFor="browse-category" className="text-sm font-bold text-foreground">Category</label>
                   <Select value={category} onValueChange={handleCategoryChange}>
-                    <SelectTrigger className="bg-background border-border">
+                    <SelectTrigger id="browse-category" className="bg-background border-border">
                       <SelectValue placeholder="All Categories" />
                     </SelectTrigger>
                     <SelectContent>
@@ -157,9 +157,9 @@ const BrowseListingsPage = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-bold text-foreground">Sort By</label>
+                  <label htmlFor="browse-sort" className="text-sm font-bold text-foreground">Sort By</label>
                   <Select value={sort} onValueChange={setSort}>
-                    <SelectTrigger className="bg-background border-border">
+                    <SelectTrigger id="browse-sort" className="bg-background border-border">
                       <SelectValue placeholder="Sort by" />
                     </SelectTrigger>
                     <SelectContent>
@@ -220,9 +220,9 @@ const BrowseListingsPage = () => {
           </SheetHeader>
           <div className="space-y-5">
             <div className="space-y-2">
-              <label className="text-sm font-bold text-foreground">Category</label>
+              <label htmlFor="browse-category-mobile" className="text-sm font-bold text-foreground">Category</label>
               <Select value={category} onValueChange={(v) => { handleCategoryChange(v); setMobileFiltersOpen(false); }}>
-                <SelectTrigger className="bg-background border-border">
+                <SelectTrigger id="browse-category-mobile" className="bg-background border-border">
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
@@ -235,9 +235,9 @@ const BrowseListingsPage = () => {
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-bold text-foreground">Sort By</label>
+              <label htmlFor="browse-sort-mobile" className="text-sm font-bold text-foreground">Sort By</label>
               <Select value={sort} onValueChange={(v) => { setSort(v); setMobileFiltersOpen(false); }}>
-                <SelectTrigger className="bg-background border-border">
+                <SelectTrigger id="browse-sort-mobile" className="bg-background border-border">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
                 <SelectContent>
