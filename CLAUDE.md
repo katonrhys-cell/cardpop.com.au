@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CardPop is an Australian trading card marketplace. It is a full-stack application with a React SPA frontend and an Express backend, backed by Supabase (PostgreSQL + Auth). The app is deployed on Vercel. The domain `cardpop.com.au` was purchased through Crazy Domains (registrar) and its nameserver setting is configured in Hostinger, but those nameservers point to Vercel (`ns1.vercel-dns.com` / `ns2.vercel-dns.com`) — so Vercel is authoritative for DNS and also hosts the app. Live DNS records (A/CNAME/MX/TXT) must therefore be edited in the Vercel dashboard, not Hostinger's DNS editor.
+CardPop is an Australian trading card marketplace. It is a full-stack application with a React SPA frontend and an Express backend, backed by Supabase (PostgreSQL + Auth). The app is deployed on Vercel. The domain `cardpop.com.au` was purchased through Crazy Domains (registrar), but its nameservers now point to Cloudflare (`coco.ns.cloudflare.com` / `clayton.ns.cloudflare.com`) — so **Cloudflare is authoritative for DNS** and proxies traffic in front of Vercel, which hosts the app. Live DNS records (A/CNAME/MX/TXT) must be edited in the Cloudflare dashboard — not Vercel's or Hostinger's DNS editors. (Verify with `dig NS cardpop.com.au` before assuming — the nameservers have moved before: Hostinger → Vercel → Cloudflare.)
 
 ## Commands
 
@@ -112,11 +112,11 @@ Tests are split into two Vitest projects configured in `vitest.config.js`:
 
 ### Image serving & Supabase egress
 
-Supabase meters ALL storage egress (including its own CDN's cache hits) against the plan quota, so image traffic is managed in three layers (see `docs/image-cdn-cloudfront.md`):
+Supabase meters ALL storage egress (including its own CDN's cache hits) against the plan quota, so image traffic is managed in three layers (see `docs/image-cdn.md`):
 
 1. **Immutable uploads with long cache headers**: every storage upload uses a timestamped filename and `cacheControl: '31536000'`. Never reuse a storage path for changed content — upload to a new timestamped path and update the DB reference (avatars etc. already work this way). `scripts/backfill-image-cache-headers.mjs` retrofits old objects.
 2. **Service worker** (`public/sw.js`): storage image URLs (`/storage/v1/object|render/image/public/`) are cached cache-first on the client (capped, oldest-first eviction), so returning visitors generate ~no image egress.
-3. **Optional CDN in front of Supabase Storage** (AWS CloudFront free tier): when `VITE_IMAGE_CDN_HOST` is set, `utils/imageUrl.js` rewrites storage URLs onto the CDN. **At render time, always build image URLs via `publicImageUrl(pathOrUrl, bucket?)` or `getCardImage()` from `utils/imageUrl.js` — don't call `supabase.storage.getPublicUrl()` directly.** Exception: URLs *stored in the DB* (e.g. `image_url` columns written by admin forms) intentionally stay canonical Supabase URLs so the CDN host can change later.
+3. **CDN in front of Supabase Storage** — a Cloudflare Worker on `img.cardpop.com.au` (source: `cloudflare/image-proxy-worker.js`, deployed via the Cloudflare dashboard): when `VITE_IMAGE_CDN_HOST` is set, `utils/imageUrl.js` rewrites storage URLs onto the CDN. **At render time, always build image URLs via `publicImageUrl(pathOrUrl, bucket?)` or `getCardImage()` from `utils/imageUrl.js` — don't call `supabase.storage.getPublicUrl()` directly.** Exception: URLs *stored in the DB* (e.g. `image_url` columns written by admin forms) intentionally stay canonical Supabase URLs so the CDN host can change later.
 
 ### Deployment
 

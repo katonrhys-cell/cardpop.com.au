@@ -32,7 +32,7 @@ const ldJson = (items) => {
 const absUrl = (u) => (!u ? undefined : (u.startsWith('http') ? u : `${BASE_URL}${u}`));
 
 // Optional image CDN in front of Supabase Storage (see
-// docs/image-cdn-cloudfront.md). Mirrors utils/imageUrl.js but reads the
+// docs/image-cdn.md). Mirrors utils/imageUrl.js but reads the
 // server-side env var, since this file runs as a Vercel function.
 const IMAGE_CDN_ORIGIN = (() => {
   const host = process.env.IMAGE_CDN_HOST || process.env.VITE_IMAGE_CDN_HOST;
@@ -51,12 +51,13 @@ const toCdnUrl = (url) => {
 };
 
 // Storage path or absolute URL → CDN-aware public image URL (og:image etc).
+// Built from the constant rather than a Supabase client: getPublicUrl is pure
+// string concatenation, and no client exists at module scope here (handlers
+// create theirs per-request).
 const publicImageUrl = (pathOrUrl) => {
   if (!pathOrUrl) return undefined;
   if (/^https?:\/\//.test(pathOrUrl)) return toCdnUrl(pathOrUrl);
-  return toCdnUrl(
-    supabase.storage.from('vault-images').getPublicUrl(pathOrUrl).data.publicUrl
-  );
+  return toCdnUrl(`${SUPABASE_URL}/storage/v1/object/public/vault-images/${pathOrUrl}`);
 };
 
 // Strip <script>/<style> blocks from admin-authored article HTML before
