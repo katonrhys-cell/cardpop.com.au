@@ -71,6 +71,16 @@ function verifyCspBootstrap(ctx, htmlFiles) {
 	}
 }
 
+// The metric-adjusted fallback face for Syne, injected into the "/" document's
+// critical CSS after beasties runs (beasties' inlineFonts keeps url() faces like
+// Syne itself but drops local()-only faces, so this one needs manual injection).
+// It must be available before the full stylesheet arrives: the hero <h1> — the
+// homepage LCP element — paints from the static shell with this fallback, and
+// its size-adjust is deliberately oversized so no later Syne repaint can become
+// a larger LCP candidate (see index.css). Keep in sync with index.css.
+const SYNE_FALLBACK_FONT_FACE =
+	"@font-face{font-family:'Syne Fallback';src:local('Arial'),local('Roboto'),local('Liberation Sans'),local('DejaVu Sans');ascent-override:94%;descent-override:26%;line-gap-override:0%;size-adjust:115%}";
+
 function homeShellPlugin() {
 	const shellPath = path.resolve(__dirname, 'tools/home-shell.html');
 	return {
@@ -107,7 +117,13 @@ function homeShellPlugin() {
 					publicPath: '/',
 					preload: 'media',
 					pruneSource: false,
-					inlineFonts: false,
+					// Inline the @font-face declarations (Syne + metric-adjusted 'Syne
+					// Fallback') into the critical CSS. Without them the shell's hero
+					// <h1> paints in an arbitrary system font with no size-adjust, so
+					// the later React repaint registers as a larger LCP candidate and
+					// drags LCP from ~0.8s to whenever the JS bundle lands (see the
+					// 'Syne Fallback' comment in index.css).
+					inlineFonts: true,
 					preloadFonts: false,
 					logLevel: 'silent',
 				});
@@ -115,6 +131,15 @@ function homeShellPlugin() {
 				indexHtml = processed.replace(/ onload="this\.media='all'"/g, ' data-async-style');
 			} catch (e) {
 				this.warn(`home-shell: critical-CSS inlining skipped (${e.message}); CSS stays render-blocking`);
+			}
+
+			// Beasties drops the local()-only 'Syne Fallback' face from the inlined
+			// critical CSS — put it back so the shell's LCP <h1> paints with the
+			// oversized metric-adjusted fallback (see SYNE_FALLBACK_FONT_FACE above).
+			if (indexHtml.includes('<style>')) {
+				indexHtml = indexHtml.replace('<style>', `<style>${SYNE_FALLBACK_FONT_FACE}`);
+			} else {
+				this.warn('home-shell: no inline <style> found — Syne Fallback face not injected');
 			}
 
 			writeFileSync(indexPath, indexHtml, 'utf-8');
@@ -193,6 +218,12 @@ export default defineConfig({
 					// @sentry/react), which a loose includes('/react/') would wrongly
 					// pull into vendor-react and drag onto the critical path.
 					if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'vendor-react';
+					// NOTE: lucide-react is deliberately NOT forced into one manual chunk.
+					// A single vendor-icons chunk dragged EVERY icon used anywhere in the
+					// app (~45 KB) onto the critical path, because the eager Header/hero
+					// import a handful of icons and the whole chunk came with them.
+					// Letting rolldown auto-split keeps eager icons tiny while each page's
+					// icons ride along with that page's lazy chunk.
 					// NOTE: framer-motion is deliberately NOT forced into its own manual
 					// chunk. When it was, rolldown hoisted a shared react/jsx-runtime
 					// helper into that chunk, and because the eager entry needs jsx-runtime
@@ -200,7 +231,6 @@ export default defineConfig({
 					// ~37 KB of animation code on the critical path even though only lazy
 					// pages use it. Letting rolldown auto-split framer-motion keeps it off
 					// the initial load (loaded on-demand with the pages that animate).
-					if (id.includes('lucide-react')) return 'vendor-icons';
 					// NOTE: @radix-ui is deliberately NOT forced into one manual chunk.
 					// The eager Header only needs a couple of primitives (dialog/slot),
 					// but a single vendor-radix chunk dragged EVERY radix primitive used

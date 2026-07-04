@@ -1,8 +1,9 @@
 
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, ZoomIn } from 'lucide-react';
-import ImageZoomModal from '@/components/ImageZoomModal.jsx';
+// Lazy: the zoom modal drags framer-motion with it — load it only on demand.
+const ImageZoomModal = lazy(() => import('@/components/ImageZoomModal.jsx'));
 import CardImage from '@/components/CardImage.jsx';
 import { getCardImage, CARD_GRID_SIZES } from '@/utils/imageUrl.js';
 import { isVerified } from '@/utils/verification.js';
@@ -127,12 +128,16 @@ const MarketplaceListingCard = ({ listing }) => {
         )}
       </Link>
 
-      <ImageZoomModal
-        isOpen={zoomOpen}
-        onClose={() => setZoomOpen(false)}
-        imageUrl={imgSrc}
-        altText={listing.title || 'Card Image'}
-      />
+      {zoomOpen && (
+        <Suspense fallback={null}>
+          <ImageZoomModal
+            isOpen={zoomOpen}
+            onClose={() => setZoomOpen(false)}
+            imageUrl={imgSrc}
+            altText={listing.title || 'Card Image'}
+          />
+        </Suspense>
+      )}
       
       <div className="p-5 flex flex-col flex-1">
         <Link to={detailPath} className="block mb-2">

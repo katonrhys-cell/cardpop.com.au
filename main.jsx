@@ -89,9 +89,16 @@ const registerServiceWorker = () => {
   }
 };
 
-// Error monitoring is deferred until the browser is idle so the ~87 kB (gzip)
-// Sentry SDK — replay + tracing included — never blocks first paint. The React
-// ErrorBoundary still catches render crashes during the brief pre-init window.
+// Error monitoring is deferred until the browser is idle so the Sentry SDK
+// never blocks first paint. The React ErrorBoundary still catches render
+// crashes during the brief pre-init window.
+//
+// Session Replay is deliberately NOT enabled: referencing replayIntegration
+// pulls ~150 kB (~50 kB gzip) of extra SDK into the bundle and was the single
+// biggest "unused JavaScript" / "legacy JavaScript" line in PageSpeed Insights.
+// Error events and performance traces still flow; only the pixel-level session
+// recordings are gone. If replays are ever needed again, prefer
+// Sentry.lazyLoadIntegration('replayIntegration') over re-adding it here.
 const initSentry = () => {
   import('@sentry/react')
     .then((Sentry) => {
@@ -99,11 +106,8 @@ const initSentry = () => {
         dsn: import.meta.env.VITE_SENTRY_DSN || 'https://7dfd1130af7b40d7d508a4902e85a1d9@o4511534905884672.ingest.us.sentry.io/4511534921416704',
         integrations: [
           Sentry.browserTracingIntegration(),
-          Sentry.replayIntegration(),
         ],
         tracesSampleRate: 0.2,
-        replaysSessionSampleRate: 0.1,
-        replaysOnErrorSampleRate: 1.0,
         environment: import.meta.env.MODE || 'production',
       });
     })
@@ -150,12 +154,36 @@ if (typeof window !== 'undefined') {
   // Register service worker after page load for offline support
   registerServiceWorker();
 
-  // Defer error monitoring and third-party tags until the browser is idle so
-  // none of them block first paint or hydration.
-  const initDeferred = () => { initSentry(); loadThirdPartyScripts(); };
+  // Defer error monitoring until the browser is idle so it never blocks first
+  // paint or hydration.
   if ('requestIdleCallback' in window) {
-    window.requestIdleCallback(initDeferred, { timeout: 5000 });
+    window.requestIdleCallback(initSentry, { timeout: 5000 });
   } else {
-    window.setTimeout(initDeferred, 3000);
+    window.setTimeout(initSentry, 3000);
+  }
+
+  // Analytics/affiliate tags wait for the first user interaction (or a few
+  // seconds after `load` as a fallback for users who never touch the page).
+  // Loading them at idle still landed their ~200 kB of parse/execute inside
+  // the initial load window on mid-range phones — the largest third-party
+  // slice of PageSpeed's "Reduce unused JavaScript" and main-thread work.
+  // A visitor's first pageview is still recorded; it just arrives a moment
+  // later than the tag's own bootstrap would send it.
+  let tagsLoaded = false;
+  const interactionEvents = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
+  const loadTagsOnce = () => {
+    if (tagsLoaded) return;
+    tagsLoaded = true;
+    for (const evt of interactionEvents) window.removeEventListener(evt, loadTagsOnce);
+    loadThirdPartyScripts();
+  };
+  for (const evt of interactionEvents) {
+    window.addEventListener(evt, loadTagsOnce, { once: true, passive: true });
+  }
+  const armTagFallback = () => { window.setTimeout(loadTagsOnce, 4000); };
+  if (document.readyState === 'complete') {
+    armTagFallback();
+  } else {
+    window.addEventListener('load', armTagFallback, { once: true });
   }
 }

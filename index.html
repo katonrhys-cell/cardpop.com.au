@@ -24,6 +24,12 @@
     <!-- Prevent CLS: width+height attrs + height:auto lets browser compute aspect-ratio before load -->
     <!-- Critical CSS: minimal above-the-fold styles to enable rendering without full CSS file -->
     <style>
+      /* NOTE: the @font-face declarations for Syne and the metric-adjusted
+         'Syne Fallback' live in index.css and are inlined into this critical
+         CSS at build time (beasties `inlineFonts: true` in vite.config.js).
+         They MUST be present in the shell so the hero <h1> (the LCP element)
+         paints with the oversized fallback — see the comment in index.css. */
+
       /* Base styles — enable fast first paint */
       html { -webkit-text-size-adjust: 100%; }
       body {
