@@ -47,6 +47,13 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        # --include-all: the 2026-07-03 hand-applied change (version
+        # 20260703051406, see the placeholder migration of that name) sits
+        # ABOVE several repo migrations that were never applied because every
+        # push that day failed on the history-drift check. Without the flag the
+        # CLI refuses to apply local migrations whose version is lower than the
+        # newest remote one. All repo migrations are idempotent, so applying
+        # stragglers out of order is safe.
         run: |
           supabase link --project-ref odoglvswwymyjuwlonkf
-          supabase db push
+          supabase db push --include-all
