@@ -222,7 +222,10 @@ const PrivacyPolicyPage = () => {
 
   return (
     <div className="min-h-screen bg-background font-sans flex flex-col">
-      <SEOHead title="Privacy Policy | CardPop" description="CardPop's privacy policy — how we collect, use and protect your personal information on our Australian trading card marketplace." />
+      {/* Explicit canonical: this page is routed at both /privacy and
+          /privacy-policy — without it each URL self-canonicalises and Google
+          sees two competing duplicates. */}
+      <SEOHead title="Privacy Policy | CardPop" description="CardPop's privacy policy — how we collect, use and protect your personal information on our Australian trading card marketplace." canonicalUrl="/privacy-policy" />
 
       {/* Header Section */}
       <section className="bg-card border-b border-border py-16 md:py-24 relative overflow-hidden">
