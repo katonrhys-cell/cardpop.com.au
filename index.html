@@ -7,10 +7,11 @@
     <meta name="theme-color" content="#CE1126" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#1F2937" media="(prefers-color-scheme: dark)" />
 
-    <!-- Hreflang tags for international SEO -->
-    <link rel="alternate" hreflang="en-au" href="https://cardpop.com.au/" />
-    <link rel="alternate" hreflang="en" href="https://cardpop.com.au/" />
-    <link rel="alternate" hreflang="x-default" href="https://cardpop.com.au/" />
+    <!-- NO hreflang tags here: this document is served for every SPA route
+         (copied to app.html at build), so static hreflang links pointing at
+         "/" would declare the homepage as the alternate of every page —
+         Search Console then reports those pages as "Alternate page with
+         proper canonical tag" and drops them. Single-locale site: no hreflang. -->
 
     <!-- Core Web Vitals: preconnect only to origins used on first paint.
          Fonts are now self-hosted (same-origin) so no font-CDN preconnect is

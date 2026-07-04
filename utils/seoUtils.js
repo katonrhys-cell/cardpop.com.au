@@ -240,8 +240,8 @@ export const generateBlogPostingSchema = (blogPost) => {
     "headline": blogPost.title,
     ...(image ? { image } : {}),
     "author": {
-      "@type": "Organization",
-      "name": blogPost.author || "CardPop",
+      "@type": "Person",
+      "name": blogPost.author || "Reece Conway",
       "url": "https://cardpop.com.au/about"
     },
     "publisher": {

@@ -52,7 +52,9 @@ const MiniListingCard = ({ listing, accentHex, badge }) => {
   const price = listing.estimated_value_aud ?? listing.price_aud ?? listing.price ?? 0;
   const title = listing.card_name ?? listing.title ?? listing.name ?? 'Untitled';
   const source = listing.source ?? 'vault';
-  const detailPath = `/product/${source}/${listing.id}/${slugify(title)}`;
+  const detailPath = source === 'marketplace'
+    ? `/marketplace/${listing.id}/${slugify(title)}`
+    : `/product/${source}/${listing.id}/${slugify(title)}`;
   const grade = listing.grade;
   const gradingCompany = listing.grading_company;
 
@@ -115,7 +117,9 @@ const HolyGrailCard = ({ card, accentHex }) => {
   const sellerId = card.owner_id;
   const avatarSrc = card.owner?.avatar_url || null;
   const source = card.source ?? 'vault';
-  const detailPath = `/product/${source}/${card.id}/${slugify(title)}`;
+  const detailPath = source === 'marketplace'
+    ? `/marketplace/${card.id}/${slugify(title)}`
+    : `/product/${source}/${card.id}/${slugify(title)}`;
 
   return (
     <motion.div

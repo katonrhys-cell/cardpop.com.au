@@ -5,6 +5,7 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { canViewVaultProduct } from '@/utils/vaultSecurityUtils.js';
+import { slugify } from '@/lib/slugify.js';
 import { isVerified } from '@/utils/verification.js';
 import { useCart } from '@/hooks/useCart.jsx';
 import { Button } from '@/components/ui/button';
@@ -14,8 +15,7 @@ import { toast } from 'sonner';
 import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, ArrowRightLeft, Layers } from 'lucide-react';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import EbayMarketSection from '@/components/EbayMarketSection.jsx';
-import PSACertificationSection from '@/components/PSACertificationSection.jsx';
-import GradingVerificationSection from '@/components/GradingVerificationSection.jsx';
+import CertificationVerificationSection from '@/components/CertificationVerificationSection.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
 import useShopProductRealtimeSync from '@/hooks/useShopProductRealtimeSync.js';
 import useVaultItemRealtimeSync from '@/hooks/useVaultItemRealtimeSync.js';
@@ -30,8 +30,11 @@ const getStatusBadge = (listingType) => {
   }
 };
 
-const ProductDetailPage = () => {
-  const { source, id } = useParams();
+// `source` can come from the route param (/product/:source/:id/:slug?) or be
+// fixed by the mounting route (/marketplace/:id/:slug? passes source="marketplace").
+const ProductDetailPage = ({ source: sourceProp }) => {
+  const { source: sourceParam, id } = useParams();
+  const source = sourceProp || sourceParam;
   const navigate = useNavigate();
   const { addToCart, setIsCartOpen } = useCart();
   const { currentUser, isAdmin, loading: authLoading } = useAuth();
@@ -343,6 +346,11 @@ const ProductDetailPage = () => {
           title={`${product.name} | CardPop`}
           description={product.description || `${product.name} — available on CardPop Australia's trading card marketplace.`}
           ogImage={product.images?.[0] || undefined}
+          canonicalUrl={source === 'marketplace'
+            // Marketplace listings canonicalise to /marketplace/:id/:slug — the
+            // URL form the sitemap and bot prerenderer advertise.
+            ? `/marketplace/${id}/${product.slug || slugify(product.name || 'listing')}`
+            : `/product/${source}/${id}/${slugify(product.name || 'product')}`}
         />
 
         <Button variant="link" className="px-0 mb-8 text-muted-foreground hover:text-primary font-medium" onClick={() => navigate(-1)}>
@@ -522,16 +530,12 @@ const ProductDetailPage = () => {
             {!isShop && (
               <>
                 {(vi?.cert_number || vi?.certification_number) && (
-                  <GradingVerificationSection
-                    gradingNumber={vi?.cert_number || vi?.certification_number}
+                  <CertificationVerificationSection
+                    certNumber={vi?.cert_number || vi?.certification_number}
                     gradingCompany={vi?.grading_company || 'psa'}
                     grade={vi?.grade}
                   />
                 )}
-                <PSACertificationSection
-                  certNumber={vi?.cert_number || vi?.certification_number}
-                  gradingCompany={vi?.grading_company}
-                />
                 <EbayMarketSection
                   cardName={product.name}
                   cardSet={vi?.set_name || product.set}

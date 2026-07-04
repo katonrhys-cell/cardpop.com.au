@@ -1,0 +1,178 @@
+// Pure-data SEO copy for the /collections/:slug pages.
+//
+// Extracted from data/collectionConfigs.js (the CollectionPage source of
+// truth) so the Vercel serverless functions (api/prerender.js, api/sitemap.js)
+// can import it without dragging in the JSX icon components that
+// collectionConfigs.js imports. If you edit seoTitle/seoDescription/seoIntro
+// or add a collection in collectionConfigs.js, mirror the change here.
+
+export const COLLECTION_SEO = {
+  "pokemon": {
+    name: "Pokémon",
+    aliases: ["Pokemon","Pokémon TCG","pokemon"],
+    title: "Pokémon Cards for Sale in Australia | CardPop",
+    description: "Buy, sell and trade Pokémon Trading Card Game singles and sealed products from verified Australian sellers. Browse vintage holos, PSA-graded slabs, and the latest Scarlet & Violet expansions — all priced in AUD.",
+    intro: "The Pokémon Trading Card Game has captivated collectors worldwide since 1999. From the iconic Base Set Charizard to the crown-jewels of modern Scarlet & Violet, Australian collectors have always been among the most passionate on the planet. CardPop is Australia's home for Pokémon cards — connecting buyers and sellers across every state with secure escrow trading, real-time market data, and a community of verified collectors who live and breathe the game. Whether you're hunting a PSA 10 Shadowless Blastoise or picking up the latest Paldea Evolved booster display, you'll find it here.",
+  },
+  "magic": {
+    name: "Magic: The Gathering",
+    aliases: ["Magic: The Gathering","Magic","MTG"],
+    title: "Magic: The Gathering Cards Australia | CardPop",
+    description: "Buy and sell MTG singles, sealed product and Commander staples from verified Australian sellers. Browse Standard, Pioneer, Modern and Legacy formats — priced in AUD.",
+    intro: "Magic: The Gathering is the world's premier trading card game — a vast, ever-expanding multiverse spanning over 30 years of iconic cards. From the legendary Power Nine to the latest Bloomburrow and Duskmourn sets, Australian Magic players demand the best. CardPop connects you with verified local sellers for singles, sealed product, and rare foils across all formats and eras.",
+  },
+  "yugioh": {
+    name: "Yu-Gi-Oh!",
+    aliases: ["Yu-Gi-Oh","Yu-Gi-Oh!","YuGiOh","Yugioh"],
+    title: "Yu-Gi-Oh! Cards Australia | CardPop",
+    description: "Browse Yu-Gi-Oh! singles, tournament staples and vintage pieces from verified Australian sellers. Buy and sell in AUD with confidence.",
+    intro: "Yu-Gi-Oh! has been capturing duelists' imaginations since 1999. From the original Legend of Blue Eyes White Dragon to the latest Age of Overlord, Australian collectors have a deep passion for rare ghost rares, prismatic secret rares, and vintage 1st Edition power cards.",
+  },
+  "dragonball": {
+    name: "Dragon Ball",
+    aliases: ["Dragon Ball","Dragon Ball Super","DBS"],
+    title: "Dragon Ball Super Card Game Australia | CardPop",
+    description: "Buy and sell Dragon Ball Super Card Game singles and sealed product from verified Australian sellers.",
+    intro: "The Dragon Ball Super Card Game brings Goku, Vegeta, and the whole Z-Fighter roster to the tabletop. Australian collectors love the stunning Full Art Awakened cards and the chase pieces from premium anniversary sets.",
+  },
+  "onepiece": {
+    name: "One Piece",
+    aliases: ["One Piece","One Piece Card Game","OPCG"],
+    title: "One Piece Card Game Australia | CardPop",
+    description: "Buy and sell One Piece Card Game singles from verified Australian sellers. Browse Monkey D. Luffy alt arts and Secret Rares in AUD.",
+    intro: "The One Piece Card Game has taken Australia by storm since its 2022 launch. With stunning Secret Rare alt arts and the explosive chase for Luffy's landmark Special Cards, demand has never been higher. Shop verified singles and sealed product from Aussie collectors.",
+  },
+  "lorcana": {
+    name: "Disney Lorcana",
+    aliases: ["Disney Lorcana","Lorcana"],
+    title: "Disney Lorcana Cards Australia | CardPop",
+    description: "Buy and sell Disney Lorcana singles from verified Australian sellers. Browse Enchanted rares and foils from every chapter.",
+    intro: "Disney Lorcana has enchanted collectors since its 2023 debut. The stunning Enchanted rarity cards — with their unique portrait-style art — have become the crown jewels of the hobby. Find every chapter from The First Chapter to Azurite Sea and beyond on CardPop.",
+  },
+  "digimon": {
+    name: "Digimon",
+    aliases: ["Digimon","Digimon Card Game","DCG"],
+    title: "Digimon Card Game Australia | CardPop",
+    description: "Buy and sell Digimon Card Game singles from verified Australian sellers. Browse Alternate Art Digimon in AUD.",
+    intro: "The Digimon Card Game has built one of the most passionate communities in Australia. With breathtaking alternate art cards and a growing competitive scene, it's the perfect time to start or expand your collection.",
+  },
+  "final-fantasy": {
+    name: "Final Fantasy",
+    aliases: ["Final Fantasy","FFTCG"],
+    title: "Final Fantasy TCG Australia | CardPop",
+    description: "Buy and sell Final Fantasy TCG singles from verified Australian collectors.",
+    intro: "The Final Fantasy Trading Card Game combines stunning artwork from the beloved game franchise with deep strategic gameplay. Iconic characters like Cloud, Lightning, Terra and Sephiroth shine as chase cards.",
+  },
+  "riftbound": {
+    name: "Riftbound",
+    aliases: ["Riftbound"],
+    title: "Riftbound Cards Australia | CardPop",
+    description: "Buy and sell Riftbound singles from verified Australian collectors.",
+    intro: "Riftbound is one of the exciting new entries in the TCG space, bringing dimensional rift mechanics to competitive and casual play. Get in early and start building your collection.",
+  },
+  "tmnt": {
+    name: "TMNT",
+    aliases: ["TMNT","Teenage Mutant Ninja Turtles"],
+    title: "TMNT Cards Australia | CardPop",
+    description: "Buy and sell Teenage Mutant Ninja Turtles card game singles from verified Australian collectors.",
+    intro: "Heroes in a half shell — the TMNT card game brings Leonardo, Donatello, Michelangelo and Raphael to the tabletop in spectacular style.",
+  },
+  "nba": {
+    name: "NBA Cards",
+    aliases: ["NBA","NBA Cards","Basketball"],
+    title: "NBA Basketball Cards Australia | CardPop",
+    description: "Buy and sell NBA basketball cards from verified Australian sellers. Browse Panini Prizm, Topps Chrome, and rookie auto slabs — priced in AUD.",
+    intro: "Australian NBA fans are among the world's most passionate — and our love of collecting Luka, Wembanyama, and LeBron rookie cards is no different. CardPop connects Australian NBA card collectors with verified sellers for Panini Prizm parallels, National Treasures patches, and PSA-graded slabs across every generation of the game.",
+  },
+  "nbl": {
+    name: "NBL Cards",
+    aliases: ["NBL","NBL Cards","National Basketball League"],
+    title: "NBL Basketball Cards Australia | CardPop",
+    description: "Buy and sell NBL National Basketball League cards from verified Australian collectors.",
+    intro: "The National Basketball League is Australia's premier professional basketball competition and the NBL card market is growing fast. Collect your favourite Boomers, Breakers, Kings and Hawks players.",
+  },
+  "afl": {
+    name: "AFL Cards",
+    aliases: ["AFL","AFL Cards","Australian Football"],
+    title: "AFL Football Cards Australia | CardPop",
+    description: "Buy and sell AFL football cards from verified Australian collectors. Browse Select AFL Footy Cards, Teamcoach, and vintage releases in AUD.",
+    intro: "Australian Rules Football is part of our national identity — and AFL trading cards have been treasured by fans since the 1960s. From vintage Scanlens tobacco cards to modern Select Footy Stars, Australian collectors are passionate about owning a piece of our football history. Shop verified AFL singles and sets on CardPop.",
+  },
+  "nrl": {
+    name: "NRL Cards",
+    aliases: ["NRL","NRL Cards","Rugby League"],
+    title: "NRL Rugby League Cards Australia | CardPop",
+    description: "Buy and sell NRL National Rugby League cards from verified Australian collectors.",
+    intro: "Rugby League is embedded in the culture of New South Wales and Queensland — and NRL trading cards have been a staple of Aussie childhood since the Select era. Browse vintage and modern NRL singles.",
+  },
+  "cricket": {
+    name: "Cricket Cards",
+    aliases: ["Cricket","Cricket Cards"],
+    title: "Cricket Cards Australia | CardPop",
+    description: "Buy and sell cricket trading cards from verified Australian collectors. Browse vintage Bradman pieces and modern Topps Chrome cricket in AUD.",
+    intro: "Cricket is Australia's summer game and cricket trading cards carry a rich history — from vintage 1930s tobacco cards of Don Bradman to the modern Topps Chrome Cricket era. Australian collectors love the history, the legends, and the thrill of the chase.",
+  },
+  "nfl": {
+    name: "NFL Cards",
+    aliases: ["NFL","NFL Cards","American Football"],
+    title: "NFL Football Cards Australia | CardPop",
+    description: "Buy and sell NFL football cards from verified Australian collectors. Browse Panini Prizm, National Treasures, and Patrick Mahomes rookies in AUD.",
+    intro: "NFL cards have exploded in Australia over the past decade — driven by the global rise of the game and the chase for rookie autos from the next generation of gridiron greats.",
+  },
+  "mlb": {
+    name: "MLB",
+    aliases: ["MLB","Baseball","Baseball Cards"],
+    title: "MLB Cards Australia | CardPop",
+    description: "Buy and sell MLB cards from verified Australian collectors. Browse Topps Chrome, Bowman Chrome prospects, and vintage T206 pieces.",
+    intro: "MLB cards are one of the most storied collecting hobbies in the world, with a history stretching back over 100 years. Australian collectors have a growing passion for the hobby — from vintage Honus Wagner reprints to modern Shohei Ohtani rookies.",
+  },
+  "soccer": {
+    name: "Soccer Cards",
+    aliases: ["Soccer","Soccer Cards","Football Cards"],
+    title: "Soccer Football Cards Australia | CardPop",
+    description: "Buy and sell soccer football cards from verified Australian collectors. Browse Topps Chrome UEFA, Panini Prizm FIFA and Matildas cards.",
+    intro: "Soccer card collecting has surged in Australia thanks to the success of our national teams and the global popularity of the Premier League and Champions League. From vintage Merlin stickers to modern Topps Chrome refractors, find your football cards on CardPop.",
+  },
+  "formula-1": {
+    name: "Formula 1 Cards",
+    aliases: ["Formula 1","F1","Formula One","F1 Cards"],
+    title: "Formula 1 Cards Australia | CardPop",
+    description: "Buy and sell Formula 1 trading cards from verified Australian collectors. Browse Topps Chrome F1, Turbo Attax, and autograph cards.",
+    intro: "Formula 1 has found a massive new audience in Australia and around the world, and the trading card hobby has followed. From Lewis Hamilton rookie autos to Max Verstappen limited parallels, CardPop is your pit stop for F1 card collecting.",
+  },
+  "tennis": {
+    name: "Tennis Cards",
+    aliases: ["Tennis","Tennis Cards"],
+    title: "Tennis Cards Australia | CardPop",
+    description: "Buy and sell tennis trading cards from verified Australian collectors.",
+    intro: "Tennis is part of Australia's DNA — and trading cards of Lleyton Hewitt, Ash Barty, Nick Kyrgios and the world's greatest players are highly collectible. Find rare auto cards and graded slabs on CardPop.",
+  },
+  "golf": {
+    name: "Golf Cards",
+    aliases: ["Golf","Golf Cards"],
+    title: "Golf Cards Australia | CardPop",
+    description: "Buy and sell golf trading cards from verified Australian collectors. Browse Tiger Woods, Greg Norman, and modern PGA Tour autos.",
+    intro: "Golf cards have surged in popularity driven by the tiger effect and a new generation of collectors chasing early Tiger Woods rookie cards. Australian golf legends like Greg Norman are also highly sought after.",
+  },
+  "wrestling": {
+    name: "Wrestling Cards",
+    aliases: ["Wrestling","WWE","Wrestling Cards"],
+    title: "Wrestling Cards Australia | CardPop",
+    description: "Buy and sell wrestling trading cards from verified Australian collectors. Browse WWE Prizm, Topps Chrome WWE, and vintage Hasbro releases.",
+    intro: "Wrestling card collecting combines nostalgia and modern hobby excitement. From vintage Hasbro figures and cards of Hulk Hogan to modern WWE Prizm autos of Roman Reigns and Cody Rhodes, Australian collectors are passionate about the sport of kings.",
+  },
+  "ufc": {
+    name: "UFC Cards",
+    aliases: ["UFC","UFC Cards","MMA"],
+    title: "UFC MMA Cards Australia | CardPop",
+    description: "Buy and sell UFC MMA trading cards from verified Australian collectors. Browse Panini Prizm UFC, Topps Chrome UFC, and fighter autos.",
+    intro: "UFC and MMA cards are one of the fastest-growing areas of the sports card hobby. Australia has produced some legendary fighters and Australian collectors are passionate about the sport. Browse fighter autographs, patch cards, and rare parallels on CardPop.",
+  },
+  "nhl": {
+    name: "NHL Cards",
+    aliases: ["NHL","NHL Cards","Ice Hockey"],
+    title: "NHL Ice Hockey Cards Australia | CardPop",
+    description: "Buy and sell NHL ice hockey cards from verified Australian collectors. Browse Upper Deck Series, Parkhurst, and Connor McDavid autos.",
+    intro: "Ice hockey card collecting has a devoted following in Australia. From vintage Parkhurst cards of Bobby Orr and Wayne Gretzky to modern Upper Deck Series One and Connor McDavid rookie patches, the NHL hobby is deep and passionate.",
+  },
+};
