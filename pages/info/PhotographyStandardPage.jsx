@@ -33,9 +33,12 @@ const PhotographyStandardPage = () => {
       eyebrow="Seller Guide"
       icon={Camera}
     >
+      {/* Explicit canonical: routed at both /photography-standard and
+          /photography-guide — pin one so the alias doesn't self-canonicalise. */}
       <SEOHead
         title="Photography Standard | CardPop"
         description="The CardPop Photography Standard: equipment recommendations, image requirements, graded card photo rules and quality guidelines for trading card listings."
+        canonicalUrl="/photography-standard"
       />
 
       <p>

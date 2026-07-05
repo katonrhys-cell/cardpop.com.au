@@ -115,6 +115,62 @@ export const useCategories = () => {
     return data ?? [];
   }, []);
 
+  // --- "All" variants: let filter UIs offer every option at a level even when
+  // the parent level hasn't been chosen yet ---
+
+  // Every franchise across all root categories
+  const getAllFranchises = useCallback(async () => {
+    const all = await getCategories();
+    return all.filter(c => c.parent_id !== null);
+  }, [getCategories]);
+
+  const getAllManufacturers = useCallback(async () => {
+    const { data } = await supabase
+      .from('manufacturers')
+      .select('*')
+      .eq('is_active', true)
+      .order('name');
+    return data ?? [];
+  }, []);
+
+  const getAllTeams = useCallback(async () => {
+    const { data } = await supabase
+      .from('teams')
+      .select('*')
+      .eq('is_active', true)
+      .order('name');
+    return data ?? [];
+  }, []);
+
+  const getAllSets = useCallback(async (manufacturerId = '') => {
+    let query = supabase
+      .from('sets')
+      .select('*')
+      .eq('is_active', true)
+      .order('name', { ascending: false });
+    if (manufacturerId) query = query.eq('manufacturer_id', manufacturerId);
+    const { data } = await query;
+    return data ?? [];
+  }, []);
+
+  const getAllParallels = useCallback(async () => {
+    const { data } = await supabase
+      .from('parallels')
+      .select('*')
+      .eq('is_active', true)
+      .order('name');
+    return data ?? [];
+  }, []);
+
+  const getAllSubsets = useCallback(async () => {
+    const { data } = await supabase
+      .from('subsets')
+      .select('*, set:sets(name)')
+      .eq('is_active', true)
+      .order('name');
+    return data ?? [];
+  }, []);
+
   // Subcategories are now represented as categories with parent_id set
   const getSubcategoriesByCategory = useCallback(async (categoryId) => {
     if (!categoryId) return [];
@@ -211,6 +267,12 @@ export const useCategories = () => {
     getCategoriesByGroup,
     getParallelsByFranchise,
     getSubsetsBySet,
+    getAllFranchises,
+    getAllManufacturers,
+    getAllTeams,
+    getAllSets,
+    getAllParallels,
+    getAllSubsets,
     getSubcategoriesByCategory,
     // Legacy aliases — must be stable refs so consumers can safely list them in
     // effect dependency arrays without triggering an infinite render loop.
