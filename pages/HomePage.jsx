@@ -228,8 +228,6 @@ const HomePage = () => {
   useEffect(() => {
     let isMounted = true;
 
-    // Defer data fetching until after first paint using requestIdleCallback / setTimeout
-    // This prevents Supabase queries from blocking LCP
     const fetchHomeData = async () => {
       try {
         // Use 5-minute cache for homepage data (user sees fresh content on repeat visits)
@@ -263,13 +261,12 @@ const HomePage = () => {
       }
     };
 
-    // Schedule fetch to run after first paint / initial render
-    if ('requestIdleCallback' in window) {
-      window.requestIdleCallback(fetchHomeData, { timeout: 2000 });
-    } else {
-      const timer = setTimeout(fetchHomeData, 100);
-      return () => clearTimeout(timer);
-    }
+    // Fire immediately: effects already run after the first paint, and the
+    // query cost is network wait, not main-thread work. Deferring this to
+    // requestIdleCallback (with its 2s timeout) meant the Supabase round-trip
+    // only STARTED after all chunk parsing settled — the skeleton sections
+    // were the last thing to resolve by a wide margin.
+    fetchHomeData();
 
     return () => { isMounted = false; };
   }, []);
