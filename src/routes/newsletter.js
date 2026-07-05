@@ -6,7 +6,7 @@ import { verifyRecaptchaToken } from '../utils/recaptcha.js';
 const router = express.Router();
 
 router.post('/subscribe', async (req, res) => {
-  const { email, firstName, recaptchaToken } = req.body;
+  const { email, firstName, recaptchaToken, list } = req.body;
 
   if (!email || typeof email !== 'string' || !email.includes('@')) {
     return res.status(400).json({ error: 'A valid email address is required.' });
@@ -25,7 +25,11 @@ router.post('/subscribe', async (req, res) => {
   }
 
   try {
-    const result = await subscribeToNewsletter(email, firstName);
+    // Only 'launch' is a recognised alternate list; anything else falls
+    // through to the default newsletter form.
+    const result = await subscribeToNewsletter(email, firstName, {
+      list: list === 'launch' ? 'launch' : undefined,
+    });
     if (!result.ok) {
       return res.status(result.status).json({ error: result.error });
     }

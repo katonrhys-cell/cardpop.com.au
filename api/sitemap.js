@@ -77,6 +77,7 @@ const STATIC_PAGES = [
   { loc: '/events/store-events',   lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
   { loc: '/community/local-traders', lastmod: SITE_UPDATED,     freq: 'daily',   pri: '0.7' },
   { loc: '/blog',                  lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' },
+  { loc: '/launch',                lastmod: '2026-07-05', freq: 'monthly', pri: '0.6' },
   { loc: '/about',                 lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
   { loc: '/contact',               lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
   { loc: '/faq',                   lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },

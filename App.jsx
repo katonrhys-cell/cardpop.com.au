@@ -33,6 +33,7 @@ import MarketplaceListingRedirect from '@/components/MarketplaceListingRedirect.
 
 // Core & Auth
 const HomePage = lazy(() => import('@/pages/HomePage.jsx'));
+const LaunchPage = lazy(() => import('@/pages/LaunchPage.jsx'));
 const LoginPage = lazy(() => import('@/pages/LoginPage.jsx'));
 const SignupPage = lazy(() => import('@/pages/SignupPage.jsx'));
 const PasswordResetPage = lazy(() => import('@/pages/PasswordResetPage.jsx'));
@@ -48,6 +49,12 @@ const CollectionRoute = () => { const { collectionSlug } = useParams(); return <
 
 // Redirects /community/events/:eventId → /events/:eventId
 const RedirectEventDetail = () => { const { eventId } = useParams(); return <Navigate to={`/events/${eventId}`} replace />; };
+
+// Pre-launch mode: while VITE_COMING_SOON=true the homepage redirects to the
+// /launch email-capture page. Deep links to every other page keep working, and
+// /launch itself stays reachable regardless of the flag. Flip the env var off
+// in Vercel (and redeploy) on launch day.
+const COMING_SOON = import.meta.env.VITE_COMING_SOON === 'true';
 
 // Resets the error boundary on every route change so a page error doesn't persist to other pages
 const RouteErrorBoundary = ({ children }) => {
@@ -232,8 +239,9 @@ const App = () => {
                     <Suspense fallback={<PageLoader />}>
                       <Routes>
                         {/* --- PUBLIC ROUTES --- */}
-                        <Route path="/" element={<Suspense fallback={<HeroSection />}><HomePage /></Suspense>} />
-                        
+                        <Route path="/" element={COMING_SOON ? <Navigate to="/launch" replace /> : <Suspense fallback={<HeroSection />}><HomePage /></Suspense>} />
+                        <Route path="/launch" element={<LaunchPage />} />
+
                         {/* Auth */}
                         <Route path="/logout" element={<LogoutPage />} />
                         <Route path="/login" element={<LoginPage />} />

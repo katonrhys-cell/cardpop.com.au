@@ -10,11 +10,14 @@ const KIT_API_BASE = 'https://api.kit.com/v4';
  *
  * @param {string} email
  * @param {string} [firstName]
+ * @param {{ list?: 'launch' }} [options] — list 'launch' targets the pre-launch
+ *   notify form (KIT_LAUNCH_FORM_ID), falling back to the main newsletter form
+ *   until that env var is configured.
  * @returns {Promise<{ ok: true } | { ok: false, status: number, error: string }>}
  */
-export async function subscribeToNewsletter(email, firstName) {
+export async function subscribeToNewsletter(email, firstName, { list } = {}) {
   const apiKey = process.env.KIT_API_KEY;
-  const formId = process.env.KIT_FORM_ID;
+  const formId = (list === 'launch' && process.env.KIT_LAUNCH_FORM_ID) || process.env.KIT_FORM_ID;
 
   if (!apiKey || !formId) {
     return { ok: false, status: 503, error: 'Newsletter service is not configured.' };

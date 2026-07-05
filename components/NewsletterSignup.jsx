@@ -7,7 +7,15 @@ import apiServerClient from '@/lib/apiServerClient.js';
 import Recaptcha from '@/components/Recaptcha.jsx';
 import { RECAPTCHA_ENABLED } from '@/lib/recaptcha.js';
 
-const NewsletterSignup = ({ className = '' }) => {
+const NewsletterSignup = ({
+  className = '',
+  // Alternate Kit list to subscribe to (e.g. 'launch' for the pre-launch
+  // notify list). Omitted for the default newsletter form.
+  list,
+  buttonLabel = 'Subscribe',
+  successMessage = "You're subscribed!",
+  toastMessage = "You're subscribed! Welcome to the CardPop community.",
+}) => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
@@ -28,7 +36,7 @@ const NewsletterSignup = ({ className = '' }) => {
       const res = await apiServerClient.fetch('/newsletter/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), recaptchaToken }),
+        body: JSON.stringify({ email: email.trim(), recaptchaToken, ...(list && { list }) }),
       });
 
       if (!res.ok) {
@@ -38,7 +46,7 @@ const NewsletterSignup = ({ className = '' }) => {
 
       setSubscribed(true);
       setEmail('');
-      toast.success('You\'re subscribed! Welcome to the CardPop community.');
+      toast.success(toastMessage);
     } catch (err) {
       // The token is single-use; reset so the user can try again.
       recaptchaRef.current?.reset();
@@ -53,7 +61,7 @@ const NewsletterSignup = ({ className = '' }) => {
     return (
       <div className={`flex items-center gap-2 text-sm text-green-600 dark:text-green-500 font-medium ${className}`}>
         <Mail className="w-4 h-4 shrink-0" />
-        <span>You're subscribed!</span>
+        <span>{successMessage}</span>
       </div>
     );
   }
@@ -76,7 +84,7 @@ const NewsletterSignup = ({ className = '' }) => {
           disabled={loading || !email.trim() || (RECAPTCHA_ENABLED && !recaptchaToken)}
           className="h-10 shrink-0"
         >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Subscribe'}
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : buttonLabel}
         </Button>
       </div>
       <Recaptcha
