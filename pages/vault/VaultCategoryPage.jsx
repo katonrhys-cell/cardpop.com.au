@@ -96,7 +96,7 @@ const VaultCategoryPage = () => {
             .range(from, from + perPage - 1);
 
           if (filterCat) query = query.eq('category_id', filterCat);
-          if (filterRookie) query = query.contains('cardVariants', ['Rookie Card (RC)']);
+          if (filterRookie) query = query.eq('is_rookie', true);
 
           const { data, count, error } = await query;
           if (error) throw error;
@@ -131,7 +131,7 @@ const VaultCategoryPage = () => {
             .range(from, from + perPage - 1);
 
           if (filterCat) query = query.eq('category_id', filterCat);
-          if (filterRookie) query = query.contains('cardVariants', ['Rookie Card (RC)']);
+          if (filterRookie) query = query.eq('is_rookie', true);
 
           const { data, count, error } = await query;
           if (error) throw error;

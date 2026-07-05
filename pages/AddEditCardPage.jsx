@@ -770,7 +770,9 @@ const AddEditCardPage = () => {
         variant:             formData.variant.length ? formData.variant.join(', ') : null,
         is_foil:             formData.isFoil,
         is_sealed:           formData.isSealed,
-        is_rookie:           formData.isRookie,
+        // A card counts as a rookie whether the user ticked the attribute or
+        // picked the "Rookie Card (RC)" variant chip — filters query this flag
+        is_rookie:           formData.isRookie || formData.variant.includes('Rookie Card (RC)'),
         is_refractor:        formData.variant.includes('Refractor'),
         serial_number:       formData.serialNumber?.trim() || null,
         is_auto:             formData.isAuto,
