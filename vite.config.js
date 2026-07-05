@@ -32,7 +32,14 @@ const allDeps = Object.keys(pkg.dependencies || {});
 // require-trusted-types-for before the app's default policy exists.
 // If you change this string you MUST update the sha256 in vercel.json — the
 // build fails with the new value otherwise.
-const CSP_BOOTSTRAP = '(function(){var s=document.currentScript,d=s.dataset,h=document.head;function v(p){return p.lastIndexOf("/assets/",0)===0&&p.indexOf("..")<0&&p.slice(-3)===".js"}var tt=window.trustedTypes,pol=tt&&tt.createPolicy?tt.createPolicy("cardpop#bootstrap",{createScriptURL:function(u){return u}}):null;(d.preload||"").split(",").forEach(function(p){if(v(p)){var l=document.createElement("link");l.rel="modulepreload";l.href=p;l.crossOrigin="";h.appendChild(l)}});if(v(d.entry)){var m=document.createElement("script");m.type="module";m.crossOrigin="";m.src=pol?pol.createScriptURL(d.entry):d.entry;h.appendChild(m)}})()';
+// data-preload-low is a second, OPTIONAL list injected with fetchPriority="low"
+// (a no-op expando in browsers without fetchpriority support): the homepage's
+// lazy route chunks preload there so they fill spare bandwidth without
+// competing with the critical entry/vendor chunks. It must be injected via
+// this trusted script, not as parser-inserted <link> tags — under
+// 'strict-dynamic' the browser blocks modulepreloads that don't originate
+// from an already-trusted script.
+const CSP_BOOTSTRAP = '(function(){var s=document.currentScript,d=s.dataset,h=document.head;function v(p){return p.lastIndexOf("/assets/",0)===0&&p.indexOf("..")<0&&p.slice(-3)===".js"}function ld(t,lo){(t||"").split(",").forEach(function(p){if(v(p)){var l=document.createElement("link");l.rel="modulepreload";l.href=p;l.crossOrigin="";if(lo)l.fetchPriority="low";h.appendChild(l)}})}var tt=window.trustedTypes,pol=tt&&tt.createPolicy?tt.createPolicy("cardpop#bootstrap",{createScriptURL:function(u){return u}}):null;ld(d.preload);if(v(d.entry)){var m=document.createElement("script");m.type="module";m.crossOrigin="";m.src=pol?pol.createScriptURL(d.entry):d.entry;h.appendChild(m)}ld(d.preloadLow,1)})()';
 
 const ENTRY_SCRIPT_RE = /<script type="module" crossorigin src="([^"]+)"><\/script>/;
 
@@ -71,6 +78,72 @@ function verifyCspBootstrap(ctx, htmlFiles) {
 	}
 }
 
+// Walk a route entry chunk's static import graph and return every JS chunk
+// (and imported CSS file) it needs. Used to extend index.html's modulepreload
+// list with the homepage's lazy chunk graph: without this, the browser learns
+// about HomePage.jsx (and its ~50 icon/component chunks) only AFTER the entry
+// bundle has downloaded, parsed and mounted React — a second full network
+// round-trip that stretches the static-shell → full-render gap by seconds on
+// mobile. Preloading them in parallel with the critical path collapses that
+// waterfall. Only index.html gets this (it is only ever served for "/");
+// app.html routes vary, so they keep the default on-demand loading.
+function collectRouteChunkFiles(bundle, facadeSuffix) {
+	const entryFile = Object.keys(bundle).find((f) => {
+		const c = bundle[f];
+		return c.type === 'chunk' && c.facadeModuleId?.endsWith(facadeSuffix);
+	});
+	if (!entryFile) return null;
+	const js = [];
+	const css = new Set();
+	const seen = new Set();
+	const visit = (file) => {
+		if (seen.has(file)) return;
+		seen.add(file);
+		const chunk = bundle[file];
+		if (!chunk || chunk.type !== 'chunk') return;
+		js.push(file);
+		for (const c of chunk.viteMetadata?.importedCss ?? []) css.add(c);
+		for (const imp of chunk.imports ?? []) visit(imp);
+	};
+	visit(entryFile);
+	return { js, css: [...css] };
+}
+
+// Append the homepage route's chunk files to the CSP bootstrap's data-preload
+// list (deduped against the critical-path preloads already there) and emit
+// <link rel="preload" as="style"> for its CSS. Attribute-only change: the
+// bootstrap script text — and therefore its CSP hash — is untouched.
+function addHomeRoutePreloads(html, bundle, warn) {
+	const files = collectRouteChunkFiles(bundle, 'pages/HomePage.jsx');
+	if (!files) {
+		warn('home-shell: HomePage chunk not found in bundle — route preloads skipped');
+		return html;
+	}
+	const preloadAttr = html.match(/data-preload="([^"]*)"/);
+	const entryAttr = html.match(/data-entry="([^"]*)"/);
+	if (!preloadAttr) {
+		warn('home-shell: data-preload attribute not found — route preloads skipped');
+		return html;
+	}
+	const existing = new Set(preloadAttr[1].split(',').filter(Boolean));
+	if (entryAttr) existing.add(entryAttr[1]);
+	const extra = files.js.map((f) => `/${f}`).filter((f) => !existing.has(f));
+	if (extra.length > 0) {
+		// Low-priority list so these never contend with the critical-path chunks
+		// (see the data-preload-low note above CSP_BOOTSTRAP).
+		html = html.replace(preloadAttr[0], `${preloadAttr[0]} data-preload-low="${extra.join(',')}"`);
+	}
+	// Chunks shared with the entry report the main index-*.css as their imported
+	// CSS — skip anything the document already references (it's inlined/preloaded
+	// separately) so only genuinely lazy stylesheets get a preload.
+	const cssPreloads = files.css
+		.filter((f) => !html.includes(`href="/${f}"`))
+		.map((f) => `<link rel="preload" as="style" fetchpriority="low" crossorigin href="/${f}">`)
+		.join('');
+	if (cssPreloads) html = html.replace('</head>', `${cssPreloads}</head>`);
+	return html;
+}
+
 // The metric-adjusted fallback face for Syne, injected into the "/" document's
 // critical CSS after beasties runs (beasties' inlineFonts keeps url() faces like
 // Syne itself but drops local()-only faces, so this one needs manual injection).
@@ -86,7 +159,7 @@ function homeShellPlugin() {
 	return {
 		name: 'cardpop-home-shell',
 		apply: 'build',
-		async writeBundle(outputOptions) {
+		async writeBundle(outputOptions, bundle) {
 			const outDir = outputOptions.dir || path.resolve(__dirname, 'dist');
 			const indexPath = path.join(outDir, 'index.html');
 			if (!existsSync(indexPath)) return;
@@ -129,9 +202,27 @@ function homeShellPlugin() {
 				});
 				const processed = await beasties.process(indexHtml);
 				indexHtml = processed.replace(/ onload="this\.media='all'"/g, ' data-async-style');
+
+				// The deferred (media="print") stylesheet is fetched at the browser's
+				// LOWEST priority, so on slow connections it loses the bandwidth race
+				// against the JS chunks — and main.jsx gates the React mount on it
+				// (2s fail-safe), leaving the static shell up even after the JS is
+				// ready. A preload at as="style" priority makes it arrive alongside
+				// the critical JS instead; same URL, so no double-download.
+				indexHtml = indexHtml.replace(
+					/<link rel="stylesheet"([^>]*?) media="print" data-async-style>/g,
+					(tag, attrs) => {
+						const href = attrs.match(/href="([^"]+)"/)?.[1];
+						return href ? `<link rel="preload" as="style" crossorigin href="${href}">${tag}` : tag;
+					},
+				);
 			} catch (e) {
 				this.warn(`home-shell: critical-CSS inlining skipped (${e.message}); CSS stays render-blocking`);
 			}
+
+			// Preload the homepage route's lazy chunk graph in parallel with the
+			// critical path (see collectRouteChunkFiles above).
+			indexHtml = addHomeRoutePreloads(indexHtml, bundle, (m) => this.warn(m));
 
 			// Beasties drops the local()-only 'Syne Fallback' face from the inlined
 			// critical CSS — put it back so the shell's LCP <h1> paints with the
