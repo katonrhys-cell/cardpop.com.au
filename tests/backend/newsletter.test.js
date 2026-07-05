@@ -22,20 +22,25 @@ function fetchResponse({ ok = true, status = 200, body = {} } = {}) {
   };
 }
 
-const ORIGINAL_ENV = { KIT_API_KEY: process.env.KIT_API_KEY, KIT_FORM_ID: process.env.KIT_FORM_ID };
+const ORIGINAL_ENV = {
+  KIT_API_KEY: process.env.KIT_API_KEY,
+  KIT_FORM_ID: process.env.KIT_FORM_ID,
+  KIT_LAUNCH_FORM_ID: process.env.KIT_LAUNCH_FORM_ID,
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.KIT_API_KEY = 'kit_test_key';
   process.env.KIT_FORM_ID = 'form_123';
+  delete process.env.KIT_LAUNCH_FORM_ID;
   global.fetch = vi.fn();
 });
 
 afterEach(() => {
-  process.env.KIT_API_KEY = ORIGINAL_ENV.KIT_API_KEY;
-  process.env.KIT_FORM_ID = ORIGINAL_ENV.KIT_FORM_ID;
-  if (ORIGINAL_ENV.KIT_API_KEY === undefined) delete process.env.KIT_API_KEY;
-  if (ORIGINAL_ENV.KIT_FORM_ID === undefined) delete process.env.KIT_FORM_ID;
+  for (const [key, value] of Object.entries(ORIGINAL_ENV)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
 });
 
 // ─── validation ───────────────────────────────────────────────────────────────
@@ -115,6 +120,39 @@ describe('POST /subscribe — success', () => {
 
     const body = JSON.parse(global.fetch.mock.calls[0][1].body);
     expect(body).not.toHaveProperty('first_name');
+  });
+});
+
+// ─── launch list ────────────────────────────────────────────────────────────────
+
+describe('POST /subscribe — launch list', () => {
+  it('uses KIT_LAUNCH_FORM_ID when list is "launch" and it is configured', async () => {
+    process.env.KIT_LAUNCH_FORM_ID = 'form_launch_456';
+    global.fetch.mockResolvedValue(fetchResponse({ ok: true }));
+
+    const res = await request(app).post('/subscribe').send({ email: 'a@b.com', list: 'launch' });
+
+    expect(res.status).toBe(200);
+    expect(global.fetch.mock.calls[0][0]).toBe('https://api.kit.com/v4/forms/form_launch_456/subscribers');
+  });
+
+  it('falls back to KIT_FORM_ID when list is "launch" but KIT_LAUNCH_FORM_ID is unset', async () => {
+    global.fetch.mockResolvedValue(fetchResponse({ ok: true }));
+
+    const res = await request(app).post('/subscribe').send({ email: 'a@b.com', list: 'launch' });
+
+    expect(res.status).toBe(200);
+    expect(global.fetch.mock.calls[0][0]).toBe('https://api.kit.com/v4/forms/form_123/subscribers');
+  });
+
+  it('ignores unrecognised list values and uses the default form', async () => {
+    process.env.KIT_LAUNCH_FORM_ID = 'form_launch_456';
+    global.fetch.mockResolvedValue(fetchResponse({ ok: true }));
+
+    const res = await request(app).post('/subscribe').send({ email: 'a@b.com', list: 'something-else' });
+
+    expect(res.status).toBe(200);
+    expect(global.fetch.mock.calls[0][0]).toBe('https://api.kit.com/v4/forms/form_123/subscribers');
   });
 });
 

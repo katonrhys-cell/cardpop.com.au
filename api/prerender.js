@@ -1197,6 +1197,23 @@ const STATIC_CONTENT = {
   },
 
 
+  '/launch': {
+    title: "CardPop — Australia's Trading Card Marketplace | Launching Late 2026",
+    description: "CardPop is launching late 2026: buy, sell and trade Pokémon, Magic and sports cards on Australia's new trading card marketplace. Join the launch list to be first in.",
+    breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Launch', path: '/launch' }],
+    h1: "Australia's new home for trading cards is almost here.",
+    intro: 'Buy, sell and trade Pokémon, Magic: The Gathering and sports cards with collectors you can trust — backed by live Australian market prices. Join the launch list to be first in when we open the doors, late 2026.',
+    sections: [
+      { h2: "What's coming", items: [
+        { text: 'Buy, sell & trade — a trusted Australian marketplace for Pokémon, Magic, sports cards and more.' },
+        { text: 'Collection vault — track every card you own, with photos, conditions and live values in one place.' },
+        { text: 'Live AU market prices — real Australian sold prices and market trends, not overseas guesswork.' },
+        { text: 'Community & events — find local card shows, traders and collectors right across Australia.' },
+      ] },
+    ],
+    links: [{ text: 'About CardPop', href: '/about' }],
+  },
+
   '/about': {
     title: "About CardPop™ | Australia's Trading Card Marketplace",
     description: "Learn about CardPop™ Australia — Australia's premier platform for buying, selling and trading Pokemon, Magic and sports cards.",
