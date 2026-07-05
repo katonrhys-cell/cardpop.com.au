@@ -31,7 +31,6 @@
 - [My Vault | CardPop](https://cardpop.com.au/accountvault): No description available
 - [Notification Settings | CardPop](https://cardpop.com.au/accountnotificationsettings): No description available
 - [Notifications | CardPop](https://cardpop.com.au/accountnotifications): No description available
-- [Offers | CardPop](https://cardpop.com.au/accountoffers): No description available
 - [Official Shop Management | Admin](https://cardpop.com.au/productmanagement): No description available
 - [Platform Settings | Admin](https://cardpop.com.au/adminsettings): No description available
 - [Product Lines Management | Admin Portal](https://cardpop.com.au/productlinesmanagement): No description available
