@@ -7,12 +7,14 @@ import useVaultItemRealtimeSync from '@/hooks/useVaultItemRealtimeSync.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search, RefreshCw, AlertCircle, Users, X, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
   Select, SelectContent, SelectGroup, SelectItem,
   SelectLabel, SelectSeparator, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
+import RookieJerseyIcon from '@/components/icons/RookieJerseyIcon.jsx';
 import { toast } from 'sonner';
 
 // Sentinel for the "Any …" option in each dropdown — Radix Select can't use ''
@@ -230,7 +232,8 @@ const MarketplacePage = () => {
         else if (filterMode === 'ForTrade') query = query.eq('accepts_trade', true);
         else if (filterMode === 'MakeOffer') query = query.eq('accepts_offers', true);
 
-        if (filterRookie) query = query.contains('vault_items.cardVariants', ['Rookie Card (RC)']);
+        // is_rookie is set by the add-card form (attribute tick or RC variant)
+        if (filterRookie) query = query.eq('vault_items.is_rookie', true);
 
         if (sort === 'price_asc')  query = query.order('price_aud', { ascending: true });
         else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
@@ -508,6 +511,22 @@ const MarketplacePage = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Card attributes */}
+            <div className="pt-1">
+              <span className="block text-xs font-semibold text-muted-foreground mb-2">Card attributes</span>
+              <label
+                htmlFor="marketplace-rookie"
+                className="flex items-center gap-2.5 cursor-pointer rounded-xl border border-border bg-background px-3 py-2.5 font-medium text-sm hover:bg-muted/50 transition-colors"
+              >
+                <Checkbox
+                  id="marketplace-rookie"
+                  checked={filterRookie}
+                  onCheckedChange={v => setFilterRookie(v === true)}
+                />
+                <RookieJerseyIcon className="w-4 h-4 shrink-0" /> Rookie Card
+              </label>
+            </div>
           </div>
         </aside>
 
@@ -557,13 +576,6 @@ const MarketplacePage = () => {
               onClick={() => setFilterMode('ForTrade')}
             >
               For Trade
-            </Button>
-            <Button
-              variant="outline"
-              className={`rounded-full px-5 font-bold ${filterRookie ? 'bg-amber-500 text-white shadow-md border-none hover:bg-amber-600' : 'bg-background hover:bg-amber-500 hover:text-white hover:border-amber-500'}`}
-              onClick={() => setFilterRookie(r => !r)}
-            >
-              🏅 Rookie Cards
             </Button>
           </div>
 

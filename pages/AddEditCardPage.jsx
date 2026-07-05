@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import CardHierarchySelector from '@/components/CardHierarchySelector.jsx';
+import RookieJerseyIcon from '@/components/icons/RookieJerseyIcon.jsx';
 import { COLLECTION_CONFIGS } from '@/data/collectionConfigs.js';
 import { useCollectionEras } from '@/hooks/useCollectionEras.js';
 import { getVariantGroups } from '@/lib/cardVariants.js';
@@ -770,7 +771,9 @@ const AddEditCardPage = () => {
         variant:             formData.variant.length ? formData.variant.join(', ') : null,
         is_foil:             formData.isFoil,
         is_sealed:           formData.isSealed,
-        is_rookie:           formData.isRookie,
+        // A card counts as a rookie whether the user ticked the attribute or
+        // picked the "Rookie Card (RC)" variant chip — filters query this flag
+        is_rookie:           formData.isRookie || formData.variant.includes('Rookie Card (RC)'),
         is_refractor:        formData.variant.includes('Refractor'),
         serial_number:       formData.serialNumber?.trim() || null,
         is_auto:             formData.isAuto,
@@ -1454,7 +1457,7 @@ const AddEditCardPage = () => {
                       {[
                         { key: 'isFoil',   label: '🃏 Individual Card (Single)', desc: 'A single individual card' },
                         { key: 'isSealed', label: '📦 Sealed Product', desc: 'Booster, box, or sealed item' },
-                        { key: 'isRookie', label: '🏆 Rookie Card',    desc: 'First-year professional card' },
+                        { key: 'isRookie', label: <span className="inline-flex items-center gap-1.5"><RookieJerseyIcon className="w-4 h-4" /> Rookie Card</span>, desc: 'First-year professional card' },
                       ].map(({ key, label, desc }) => (
                         <button
                           key={key}
