@@ -2,6 +2,46 @@ import stripe from '../utils/stripeClient.js';
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 
+// Create a Stripe Connect (Express) account for a seller and persist its id onto
+// their profile. Idempotent: if the profile already has an account id it is
+// returned unchanged and no Stripe call is made. This is the single source of
+// truth for how a CardPop seller account is shaped — the on-demand onboarding
+// flow below and the bulk backfill script (scripts/backfill-seller-connect-accounts.mjs)
+// both go through here so they can never drift apart.
+//
+// @param existingAccountId  the profile's current stripe_connect_account_id (may be null)
+// @returns {Promise<{ accountId: string, created: boolean }>}
+export async function ensureSellerConnectAccount(userId, existingAccountId = null) {
+  if (existingAccountId) {
+    return { accountId: existingAccountId, created: false };
+  }
+
+  const account = await stripe.accounts.create({
+    type: 'express',
+    country: 'AU',
+    capabilities: {
+      card_payments: { requested: true },
+      transfers: { requested: true },
+    },
+    business_type: 'individual',
+    metadata: { cardpop_user_id: userId },
+  });
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ stripe_connect_account_id: account.id, stripe_connect_onboarded: false })
+    .eq('id', userId);
+
+  if (error) {
+    // The account exists in Stripe but we failed to record it — surface loudly so
+    // the caller doesn't create a second orphaned account on the next attempt.
+    logger.error(`[STRIPE CONNECT] Created account ${account.id} but failed to persist for user ${userId}: ${error.message}`);
+    throw new Error(`Could not save Stripe account id: ${error.message}`);
+  }
+
+  return { accountId: account.id, created: true };
+}
+
 export async function connectOnboard(req, res) {
   try {
     const userId = req.user.id;
@@ -17,26 +57,7 @@ export async function connectOnboard(req, res) {
       .eq('id', userId)
       .maybeSingle();
 
-    let accountId = profile?.stripe_connect_account_id;
-
-    if (!accountId) {
-      const account = await stripe.accounts.create({
-        type: 'express',
-        country: 'AU',
-        capabilities: {
-          card_payments: { requested: true },
-          transfers: { requested: true },
-        },
-        business_type: 'individual',
-        metadata: { cardpop_user_id: userId },
-      });
-      accountId = account.id;
-
-      await supabase
-        .from('profiles')
-        .update({ stripe_connect_account_id: accountId, stripe_connect_onboarded: false })
-        .eq('id', userId);
-    }
+    const { accountId } = await ensureSellerConnectAccount(userId, profile?.stripe_connect_account_id);
 
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
