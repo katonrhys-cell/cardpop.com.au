@@ -1,31 +1,46 @@
 import stripe from '../utils/stripeClient.js';
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
+import { SELLER_CONFIGURATIONS, buildSellerAccountParams, isPayoutReady } from '../utils/sellerAccountShape.js';
 
-// Create a Stripe Connect (Express) account for a seller and persist its id onto
-// their profile. Idempotent: if the profile already has an account id it is
-// returned unchanged and no Stripe call is made. This is the single source of
-// truth for how a CardPop seller account is shaped — the on-demand onboarding
-// flow below and the bulk backfill script (scripts/backfill-seller-connect-accounts.mjs)
-// both go through here so they can never drift apart.
+// ─────────────────────────────────────────────────────────────────────────────
+// Seller accounts run on the Stripe v2 Accounts API (`stripe.v2.core.accounts`).
+//
+// Each seller is a v2 unified Account with a `recipient` configuration whose
+// `stripe_transfers` capability lets the platform push their sale proceeds to
+// them via `stripe.transfers.create({ destination })` — exactly the money flow
+// payoutService.js already uses. The platform is the losses/fees collector.
+// The account shape lives in ../utils/sellerAccountShape.js so this flow and the
+// backfill script share it verbatim.
+//
+// Only the *account object* is v2. Charges, transfers, refunds, coupons and
+// subscriptions remain on the existing v1 APIs — Stripe designed v2 accounts to
+// interoperate with them, so nothing else in the money path changes.
+//
+// The account id (still stored in profiles.stripe_connect_account_id) is used as
+// a transfer destination, so payoutService needs no change. The onboarded flag
+// is derived from the recipient config's stripe_transfers capability status.
+//
+// VERIFY IN STRIPE TEST MODE before going live: (1) v2 accounts are enabled on
+// the platform account and the pinned API version supports them; (2) a v2
+// recipient id is accepted as a `transfers.create` destination.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Create a v2 seller account and persist its id onto the profile. Idempotent: if
+// the profile already has an account id it is returned unchanged and no Stripe
+// call is made. Single source of truth for seller-account shape — the on-demand
+// onboarding flow and the bulk backfill (scripts/backfill-seller-connect-accounts.mjs)
+// both go through here so they can't drift.
 //
 // @param existingAccountId  the profile's current stripe_connect_account_id (may be null)
+// @param opts               { email, displayName } used to prefill the account
 // @returns {Promise<{ accountId: string, created: boolean }>}
-export async function ensureSellerConnectAccount(userId, existingAccountId = null) {
+export async function ensureSellerConnectAccount(userId, existingAccountId = null, opts = {}) {
   if (existingAccountId) {
     return { accountId: existingAccountId, created: false };
   }
 
-  const account = await stripe.accounts.create({
-    type: 'express',
-    country: 'AU',
-    capabilities: {
-      card_payments: { requested: true },
-      transfers: { requested: true },
-    },
-    business_type: 'individual',
-    metadata: { cardpop_user_id: userId },
-  });
+  const account = await stripe.v2.core.accounts.create(buildSellerAccountParams(userId, opts));
 
   const { error } = await supabase
     .from('profiles')
@@ -35,7 +50,7 @@ export async function ensureSellerConnectAccount(userId, existingAccountId = nul
   if (error) {
     // The account exists in Stripe but we failed to record it — surface loudly so
     // the caller doesn't create a second orphaned account on the next attempt.
-    logger.error(`[STRIPE CONNECT] Created account ${account.id} but failed to persist for user ${userId}: ${error.message}`);
+    logger.error(`[STRIPE CONNECT] Created v2 account ${account.id} but failed to persist for user ${userId}: ${error.message}`);
     throw new Error(`Could not save Stripe account id: ${error.message}`);
   }
 
@@ -57,13 +72,22 @@ export async function connectOnboard(req, res) {
       .eq('id', userId)
       .maybeSingle();
 
-    const { accountId } = await ensureSellerConnectAccount(userId, profile?.stripe_connect_account_id);
+    const { accountId } = await ensureSellerConnectAccount(userId, profile?.stripe_connect_account_id, {
+      email: req.user.email,
+      displayName: profile?.display_name || profile?.full_name || undefined,
+    });
 
-    const accountLink = await stripe.accountLinks.create({
+    // v2 hosted onboarding link (replaces v1 accountLinks.create).
+    const accountLink = await stripe.v2.core.accountLinks.create({
       account: accountId,
-      refresh_url: refreshUrl,
-      return_url: returnUrl,
-      type: 'account_onboarding',
+      use_case: {
+        type: 'account_onboarding',
+        account_onboarding: {
+          configurations: SELLER_CONFIGURATIONS,
+          refresh_url: refreshUrl,
+          return_url: returnUrl,
+        },
+      },
     });
 
     logger.info(`[STRIPE CONNECT] Onboarding link created for user ${userId}`);
@@ -88,8 +112,10 @@ export async function getConnectStatus(req, res) {
       return res.json({ connected: false, onboarded: false, wallet_balance_aud: profile?.wallet_balance_aud || 0 });
     }
 
-    const account = await stripe.accounts.retrieve(profile.stripe_connect_account_id);
-    const onboarded = account.details_submitted && account.payouts_enabled;
+    const account = await stripe.v2.core.accounts.retrieve(profile.stripe_connect_account_id, {
+      include: ['configuration.recipient', 'requirements'],
+    });
+    const onboarded = isPayoutReady(account);
 
     if (onboarded !== profile.stripe_connect_onboarded) {
       await supabase
@@ -102,8 +128,10 @@ export async function getConnectStatus(req, res) {
       connected: true,
       onboarded,
       accountId: profile.stripe_connect_account_id,
-      detailsSubmitted: account.details_submitted,
-      payoutsEnabled: account.payouts_enabled,
+      // Recipient accounts have no separate "details submitted" vs "payouts
+      // enabled" split like v1 Express did; payout-readiness is the single gate.
+      detailsSubmitted: onboarded,
+      payoutsEnabled: onboarded,
       wallet_balance_aud: profile?.wallet_balance_aud || 0,
     });
   } catch (err) {
@@ -126,8 +154,29 @@ export async function getDashboardLink(req, res) {
       return res.status(400).json({ error: 'No Stripe account connected' });
     }
 
-    const loginLink = await stripe.accounts.createLoginLink(profile.stripe_connect_account_id);
-    res.json({ url: loginLink.url });
+    // The account was created with `dashboard: 'express'`, so the seller reaches
+    // their Express dashboard via a v2 account link (account_update use case).
+    // This doubles as the "manage / update details" entry point. account_update
+    // requires a refresh_url, so fall back to APP_URL if the caller sent none.
+    const base = (process.env.APP_URL || '').replace(/\/$/, '');
+    const returnUrl = req.body?.returnUrl || (base ? `${base}/account/wallet` : undefined);
+    const refreshUrl = req.body?.refreshUrl || returnUrl;
+    if (!refreshUrl) {
+      return res.status(500).json({ error: 'Dashboard link requires a return URL (set APP_URL or send returnUrl)' });
+    }
+
+    const link = await stripe.v2.core.accountLinks.create({
+      account: profile.stripe_connect_account_id,
+      use_case: {
+        type: 'account_update',
+        account_update: {
+          configurations: SELLER_CONFIGURATIONS,
+          refresh_url: refreshUrl,
+          ...(returnUrl ? { return_url: returnUrl } : {}),
+        },
+      },
+    });
+    res.json({ url: link.url });
   } catch (err) {
     logger.error(`[STRIPE CONNECT] /connect/dashboard-link error: ${err.message}`);
     res.status(500).json({ error: err.message });
