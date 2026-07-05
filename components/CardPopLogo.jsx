@@ -48,8 +48,11 @@ const CardPopLogo = ({
           <span className={cardText}>Card</span>
           {/* ™ is positioned absolutely so it doesn't widen the wordmark —
               otherwise the AUSTRALIA divider line stretches underneath it
-              and reads as an underlined ™. */}
-          <span className="text-primary relative">Pop<sup className={`absolute left-full top-0 text-[0.5em] leading-none ${cardText}`}>™</sup></span>
+              and reads as an underlined ™. font-sans keeps it out of the
+              "Syne Fallback" face, whose size-adjust/ascent-override inflate
+              and misplace the glyph. top-[0.22em] hangs the mark from the
+              wordmark's cap line, per standard trademark lockup practice. */}
+          <span className="text-primary relative">Pop<sup className={`absolute left-full top-[0.22em] text-[0.65em] font-sans font-normal tracking-normal leading-none ${cardText}`}>™</sup></span>
         </span>
 
         {/* Australia subtitle */}
