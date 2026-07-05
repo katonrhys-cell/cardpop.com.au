@@ -6,6 +6,7 @@ import ProductGrid from '@/components/ProductGrid.jsx';
 import PaginationControls from '@/components/PaginationControls.jsx';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import RookieJerseyIcon from '@/components/icons/RookieJerseyIcon.jsx';
 import { X } from 'lucide-react';
 
 const LISTING_MODES = [
@@ -216,7 +217,7 @@ const VaultCategoryPage = () => {
           className={`rounded-full px-5 font-bold ${filterRookie ? 'bg-amber-400 text-amber-900 shadow-md border-none hover:bg-amber-400' : 'bg-background hover:text-amber-700 hover:border-amber-400'}`}
           onClick={() => { setFilterRookie(r => !r); setPage(1); }}
         >
-          🏅 Rookie Cards
+          <RookieJerseyIcon className="w-4 h-4 mr-1.5" /> Rookie Cards
         </Button>
       </div>
 

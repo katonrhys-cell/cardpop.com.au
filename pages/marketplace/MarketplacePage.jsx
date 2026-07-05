@@ -14,6 +14,7 @@ import {
   SelectLabel, SelectSeparator, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
+import RookieJerseyIcon from '@/components/icons/RookieJerseyIcon.jsx';
 import { toast } from 'sonner';
 
 // Sentinel for the "Any …" option in each dropdown — Radix Select can't use ''
@@ -523,7 +524,7 @@ const MarketplacePage = () => {
                   checked={filterRookie}
                   onCheckedChange={v => setFilterRookie(v === true)}
                 />
-                🏅 Rookie Card
+                <RookieJerseyIcon className="w-4 h-4 shrink-0" /> Rookie Card
               </label>
             </div>
           </div>
