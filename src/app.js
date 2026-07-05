@@ -9,6 +9,7 @@ import morgan from 'morgan';
 import routes from './routes/index.js';
 import { errorMiddleware } from './middleware/error.js';
 import { globalRateLimit } from './middleware/global-rate-limit.js';
+import { isCloudflareIp } from './utils/cloudflareIps.js';
 import { secureHeadersMiddleware, noCacheHeaders } from './middleware/secureHeaders.js';
 import logger from './utils/logger.js';
 import { BodyLimit } from './constants/common.js';
@@ -24,11 +25,22 @@ const app = express();
 // Trust proxy controls how req.ip is derived from X-Forwarded-For, which every
 // IP-based control depends on (global rate limit, login lockout keyed on
 // (email, ip), audit logs). Trusting the entire chain ('true') lets a client
-// spoof X-Forwarded-For and bypass those controls, so trust only the known
-// number of front proxies instead. On Vercel that is a single hop (default 1);
-// override with TRUST_PROXY_HOPS if the deployment adds more proxies.
-const trustProxyHops = Number.parseInt(process.env.TRUST_PROXY_HOPS ?? '1', 10);
-app.set('trust proxy', Number.isNaN(trustProxyHops) ? 1 : trustProxyHops);
+// spoof X-Forwarded-For and bypass those controls, so trust is bounded:
+//
+//  - The first TRUST_PROXY_HOPS hops (default 1 — Vercel's front proxy, which
+//    appends the true connecting peer to X-Forwarded-For) are always trusted.
+//  - Beyond that, a hop is trusted only if it is a Cloudflare edge address.
+//    Production traffic flows client → Cloudflare → Vercel, so the peer Vercel
+//    records is a Cloudflare IP; trusting it lets Express walk one entry
+//    further and resolve req.ip to the real visitor. A request that bypasses
+//    Cloudflare (e.g. straight to the *.vercel.app host) gets no such trust:
+//    any X-Forwarded-For it invents sits behind its own untrusted connecting
+//    address, so req.ip is the attacker's real IP — spoofing stays impossible.
+const trustProxyHops = (() => {
+	const parsed = Number.parseInt(process.env.TRUST_PROXY_HOPS ?? '1', 10);
+	return Number.isNaN(parsed) ? 1 : parsed;
+})();
+app.set('trust proxy', (addr, hop) => hop < trustProxyHops || isCloudflareIp(addr));
 
 app.use(secureHeadersMiddleware);
 app.use(helmet({

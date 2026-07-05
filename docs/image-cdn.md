@@ -24,7 +24,11 @@ as the no-code alternative.
 The Worker source is `cloudflare/image-proxy-worker.js` (this repo is the
 source of truth — if the Worker ever changes, edit it here and re-paste). It
 proxies `/storage/v1/object/public/*` to Supabase and caches responses at
-Cloudflare's edge for a year. Free-tier limit: 100k requests/day — the app's
+Cloudflare's edge for a year. It also canonicalises query strings before
+fetching the origin (stripped entirely on object paths; transform params
+allowlisted, ladder-snapped and sorted on render paths), so cache-busting
+query strings can't be used to replay origin egress — see the comments in the
+Worker source and `docs/ddos-protection.md`. Free-tier limit: 100k requests/day — the app's
 service worker means each visitor fetches each image roughly once ever, so
 this is ample headroom.
 
