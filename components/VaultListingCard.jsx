@@ -1,7 +1,7 @@
 
 import React, { useState, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, ShieldCheck, Lock, ShoppingCart, ArrowRightLeft, Layers, ZoomIn } from 'lucide-react';
+import { Star, ShieldCheck, Lock, ShoppingCart, ArrowRightLeft, Layers, ZoomIn, HandCoins } from 'lucide-react';
 // Lazy: the zoom modal drags framer-motion (~110 kB) with it, and this card
 // renders on the homepage — load the modal only when a zoom is opened.
 const ImageZoomModal = lazy(() => import('@/components/ImageZoomModal.jsx'));
@@ -20,6 +20,7 @@ const getStatusBadge = (listingType) => {
     case 'For Sale': return { className: 'badge-vault-sale', icon: ShoppingCart };
     case 'For Trade': return { className: 'badge-vault-trade', icon: ArrowRightLeft };
     case 'For Sale & Trade': return { className: 'badge-vault-both', icon: Layers };
+    case 'Expression of Interest': return { className: 'badge-vault-eoi', icon: HandCoins };
     default: return { className: 'bg-muted text-muted-foreground', icon: Lock };
   }
 };

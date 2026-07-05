@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
-import { Loader2, Lock, ShoppingCart, ArrowRightLeft, Layers, DollarSign, TrendingUp, Tag, RotateCcw } from 'lucide-react';
+import { Loader2, Lock, ShoppingCart, ArrowRightLeft, Layers, DollarSign, TrendingUp, Tag, RotateCcw, HandCoins } from 'lucide-react';
 import PriceRangeIndicator from '@/components/PriceRangeIndicator.jsx';
 import {
   Dialog,
@@ -59,12 +59,24 @@ const OPTIONS = [
     needsPrice: true,
     needsTrade: true,
   },
+  {
+    key: 'Expression of Interest',
+    label: 'Expression of Interest',
+    icon: HandCoins,
+    className: 'hover:bg-sky-500/10 hover:text-sky-600 hover:border-sky-500/30',
+    badgeClass: 'bg-sky-500/10 text-sky-700 border-sky-200',
+    listingType: 'expression_of_interest',
+    isPublic: true,
+    needsRange: true,
+  },
 ];
 
 const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
   const { currentUser } = useAuth();
   const [selected, setSelected] = useState(null);
   const [price, setPrice] = useState('');
+  const [rangeMin, setRangeMin] = useState('');
+  const [rangeMax, setRangeMax] = useState('');
   const [tradeWants, setTradeWants] = useState('');
   const [loading, setLoading] = useState(false);
   const [priceRange, setPriceRange] = useState(null);
@@ -75,6 +87,8 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
   const handleOpen = () => {
     setSelected(null);
     setPrice(product?.estimated_value_aud ? String(product.estimated_value_aud) : '');
+    setRangeMin('');
+    setRangeMax('');
     setTradeWants('');
     setPriceRange(null);
     setHasActiveListing(false);
@@ -84,11 +98,16 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
     // the seller can mark it Sold / relist it (guards against orphaned state).
     supabase
       .from('listings')
-      .select('id, status')
+      .select('id, status, price_min_aud, price_max_aud')
       .eq('vault_item_id', product.id)
       .neq('status', 'archived')
       .maybeSingle()
-      .then(({ data }) => { setHasActiveListing(!!data); setListingStatus(data?.status ?? null); });
+      .then(({ data }) => {
+        setHasActiveListing(!!data);
+        setListingStatus(data?.status ?? null);
+        if (data?.price_min_aud != null) setRangeMin(String(data.price_min_aud));
+        if (data?.price_max_aud != null) setRangeMax(String(data.price_max_aud));
+      });
 
     // Fetch price range from DB if we have a CardSight card ID
     const csId = product?.cardsight_card_id;
@@ -106,6 +125,12 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
     setSelected(opt);
     if (opt.needsPrice && !price) {
       setPrice(product?.estimated_value_aud ? String(product.estimated_value_aud) : '');
+    }
+    // Suggest a range around the estimated value the first time EOI is picked.
+    if (opt.needsRange && !rangeMin && !rangeMax && product?.estimated_value_aud) {
+      const ev = Number(product.estimated_value_aud);
+      setRangeMin((ev * 0.8).toFixed(2));
+      setRangeMax((ev * 1.2).toFixed(2));
     }
   };
 
@@ -136,6 +161,23 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
       }
     }
 
+    if (selected.needsRange) {
+      const min = Number(rangeMin);
+      const max = Number(rangeMax);
+      if (!rangeMin || isNaN(min) || min <= 0 || !rangeMax || isNaN(max) || max <= 0) {
+        toast.error('Please enter the price range you are looking for.');
+        return;
+      }
+      if (max < min) {
+        toast.error('The maximum of your price range must be at least the minimum.');
+        return;
+      }
+      if (effectiveFloor !== null && max < effectiveFloor) {
+        toast.error('The top of this price range is below the minimum allowed for this listing. Please raise it.');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       // Update vault item visibility/type
@@ -161,6 +203,12 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
           // so a fixed-price-but-trade-open listing is no longer invisible to it.
           accepts_trade: !!selected.needsTrade,
           price_aud: selected.needsPrice ? Number(price) : null,
+          // Expression of Interest: no fixed price — publish the range the
+          // seller wants offers in, and flag the listing as offer-enabled so
+          // the marketplace "Make Offer" filter picks it up.
+          price_min_aud: selected.needsRange ? Number(rangeMin) : null,
+          price_max_aud: selected.needsRange ? Number(rangeMax) : null,
+          ...(selected.needsRange ? { accepts_offers: true } : {}),
           trade_wants: selected.needsTrade ? (tradeWants.trim() || null) : null,
           listed_at: new Date().toISOString(),
         };
@@ -334,8 +382,43 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
             )
           )}
 
-          {selected && (selected.needsPrice || selected.needsTrade) && (
+          {selected && (selected.needsPrice || selected.needsTrade || selected.needsRange) && (
             <div className="space-y-4 border border-border rounded-xl p-4 bg-muted/20">
+              {selected.needsRange && (
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-semibold">Price range you're looking for (AUD) *</Label>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        type="number"
+                        min={0.01}
+                        step="0.01"
+                        value={rangeMin}
+                        onChange={e => setRangeMin(e.target.value)}
+                        placeholder="Min"
+                        className="pl-9 bg-background"
+                      />
+                    </div>
+                    <span className="text-muted-foreground font-bold">–</span>
+                    <div className="relative flex-1">
+                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        type="number"
+                        min={0.01}
+                        step="0.01"
+                        value={rangeMax}
+                        onChange={e => setRangeMax(e.target.value)}
+                        placeholder="Max"
+                        className={`pl-9 bg-background ${effectiveFloor !== null && rangeMax !== '' && Number(rangeMax) < effectiveFloor ? 'border-destructive' : ''}`}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Buyers will see this range and make offers — you can accept, decline or counter each one.
+                  </p>
+                </div>
+              )}
               {selected.needsPrice && (
                 <div className="space-y-1.5">
                   <Label className="text-sm font-semibold">Sale Price (AUD) *</Label>

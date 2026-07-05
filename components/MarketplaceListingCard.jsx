@@ -191,9 +191,18 @@ const MarketplaceListingCard = ({ listing }) => {
         
         <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-border">
           <div className="flex items-center justify-between">
-            <span className={`font-extrabold text-xl tabular-nums ${isSold ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
-              ${(listing.price_aud || 0).toFixed(2)}
-            </span>
+            {listing.listing_type === 'expression_of_interest' ? (
+              <span className={`font-extrabold tabular-nums ${isSold ? 'text-muted-foreground line-through' : 'text-foreground'} ${listing.price_min_aud != null && listing.price_max_aud != null ? 'text-base' : 'text-xl'}`}>
+                {listing.price_min_aud != null && listing.price_max_aud != null
+                  ? `$${Number(listing.price_min_aud).toFixed(2)} – $${Number(listing.price_max_aud).toFixed(2)}`
+                  : 'Open to offers'}
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-sky-600">Seeking offers</span>
+              </span>
+            ) : (
+              <span className={`font-extrabold text-xl tabular-nums ${isSold ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+                ${(listing.price_aud || 0).toFixed(2)}
+              </span>
+            )}
             {isSold && (
               <span className="text-xs font-bold uppercase tracking-wider text-brand-red">Sold</span>
             )}

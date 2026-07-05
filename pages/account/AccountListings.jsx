@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-import { List, Plus, RefreshCw, AlertCircle, Trash2, Edit, PackageOpen, ShoppingCart, ArrowRightLeft, Layers, Tag } from 'lucide-react';
+import { List, Plus, RefreshCw, AlertCircle, Trash2, Edit, PackageOpen, ShoppingCart, ArrowRightLeft, Layers, Tag, HandCoins } from 'lucide-react';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,7 @@ const STATUS_CONFIG = {
   'active':          { label: 'Active',           className: 'bg-emerald-500/10 text-emerald-700 border-emerald-300 dark:text-emerald-400', icon: ShoppingCart },
   'For Trade':       { label: 'For Trade',        className: 'bg-blue-500/10 text-blue-700 border-blue-300 dark:text-blue-400', icon: ArrowRightLeft },
   'For Sale & Trade':{ label: 'Sale & Trade',     className: 'bg-violet-500/10 text-violet-700 border-violet-300 dark:text-violet-400', icon: Layers },
+  'Expression of Interest': { label: 'Expression of Interest', className: 'bg-sky-500/10 text-sky-700 border-sky-300 dark:text-sky-400', icon: HandCoins },
   'sold':            { label: 'Sold',             className: 'bg-muted text-muted-foreground border-border', icon: ShoppingCart },
   'Sold':            { label: 'Sold',             className: 'bg-muted text-muted-foreground border-border', icon: ShoppingCart },
 };
@@ -246,7 +247,11 @@ const AccountListings = () => {
                         )}
                       </TableCell>
                       <TableCell className="tabular-nums font-medium">
-                        {listing.price_aud != null ? `$${Number(listing.price_aud).toFixed(2)}` : '—'}
+                        {listing.price_aud != null
+                          ? `$${Number(listing.price_aud).toFixed(2)}`
+                          : (listing.price_min_aud != null && listing.price_max_aud != null)
+                            ? `$${Number(listing.price_min_aud).toFixed(2)} – $${Number(listing.price_max_aud).toFixed(2)}`
+                            : '—'}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm tabular-nums">
                         {listing.created_at ? new Date(listing.created_at).toLocaleDateString() : '—'}

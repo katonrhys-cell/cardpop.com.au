@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -12,13 +12,15 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, ArrowRightLeft, Layers } from 'lucide-react';
+import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, ArrowRightLeft, Layers, HandCoins, Tag } from 'lucide-react';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import EbayMarketSection from '@/components/EbayMarketSection.jsx';
 import CertificationVerificationSection from '@/components/CertificationVerificationSection.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
 import useShopProductRealtimeSync from '@/hooks/useShopProductRealtimeSync.js';
 import useVaultItemRealtimeSync from '@/hooks/useVaultItemRealtimeSync.js';
+// Lazy: only needed once a buyer taps "Make an Offer".
+const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
 
 const getStatusBadge = (listingType) => {
   switch (listingType) {
@@ -26,6 +28,7 @@ const getStatusBadge = (listingType) => {
     case 'For Sale': return { className: 'badge-vault-sale', icon: ShoppingCart };
     case 'For Trade': return { className: 'badge-vault-trade', icon: ArrowRightLeft };
     case 'For Sale & Trade': return { className: 'badge-vault-both', icon: Layers };
+    case 'Expression of Interest': return { className: 'badge-vault-eoi', icon: HandCoins };
     default: return { className: 'bg-muted text-muted-foreground', icon: Lock };
   }
 };
@@ -43,6 +46,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [seller, setSeller] = useState(null);
+  const [offerOpen, setOfferOpen] = useState(false);
   const fetchRef = useRef(null);
 
   useEffect(() => {
@@ -80,7 +84,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
             vi.vault_images.forEach(img => { if (img.storage_path && !images.includes(img.storage_path)) images.push(img.storage_path); });
           }
 
-          const listingTypeMap = { fixed: 'For Sale', auction: 'For Sale', trade: 'For Trade', vault: 'Private' };
+          const listingTypeMap = { fixed: 'For Sale', auction: 'For Sale', trade: 'For Trade', vault: 'Private', expression_of_interest: 'Expression of Interest' };
 
           setProduct({
             ...listing,
@@ -313,6 +317,10 @@ const ProductDetailPage = ({ source: sourceProp }) => {
   const isShop = source === 'shop';
   const isSold = !isShop && product.status === 'sold';
   const outOfStock = isShop && product.stockQuantity !== null && product.stockQuantity <= 0;
+  // Expression of Interest: no fixed price — the seller published a target
+  // range and buyers negotiate through offers.
+  const isEOI = !isShop && product.listing_type === 'Expression of Interest';
+  const canOffer = !isShop && !isSold && source === 'marketplace' && (isEOI || product.accepts_offers);
   
   const statusBadge = isShop 
     ? { label: product.visibility === 'public' ? 'Shop + Marketplace' : 'Shop Only', config: { className: 'bg-primary text-primary-foreground', icon: Store } }
@@ -432,18 +440,36 @@ const ProductDetailPage = ({ source: sourceProp }) => {
             )}
 
             <div className="mb-8">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Estimated Value / Price</p>
-              <div className="flex items-end gap-3">
-                <span className="text-4xl font-extrabold tabular-nums tracking-tight text-foreground">
-                  ${(product.price || 0).toFixed(2)}
-                </span>
-                {product.retail_price_aud && Number(product.price || 0) < Number(product.retail_price_aud) && (
-                  <span className="text-lg text-muted-foreground line-through pb-1">
-                    ${Number(product.retail_price_aud).toFixed(2)}
-                  </span>
-                )}
-                {isShop && <span className="text-sm font-medium text-muted-foreground pb-1">+ Shipping</span>}
-              </div>
+              {isEOI ? (
+                <>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Seller Is Looking For</p>
+                  <div className="flex items-end gap-3">
+                    <span className="text-4xl font-extrabold tabular-nums tracking-tight text-foreground">
+                      {product.price_min_aud != null && product.price_max_aud != null
+                        ? `$${Number(product.price_min_aud).toFixed(2)} – $${Number(product.price_max_aud).toFixed(2)}`
+                        : 'Open to offers'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1.5">
+                    This card is listed as an expression of interest — make an offer in (or near) this range.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Estimated Value / Price</p>
+                  <div className="flex items-end gap-3">
+                    <span className="text-4xl font-extrabold tabular-nums tracking-tight text-foreground">
+                      ${(product.price || 0).toFixed(2)}
+                    </span>
+                    {product.retail_price_aud && Number(product.price || 0) < Number(product.retail_price_aud) && (
+                      <span className="text-lg text-muted-foreground line-through pb-1">
+                        ${Number(product.retail_price_aud).toFixed(2)}
+                      </span>
+                    )}
+                    {isShop && <span className="text-sm font-medium text-muted-foreground pb-1">+ Shipping</span>}
+                  </div>
+                </>
+              )}
             </div>
 
             {seller && (
@@ -502,6 +528,18 @@ const ProductDetailPage = ({ source: sourceProp }) => {
                   </Button>
                 ) : null}
 
+                {canOffer && (
+                  <Button
+                    size="lg"
+                    variant={isEOI ? 'default' : 'outline'}
+                    className="w-full h-14 rounded-xl font-bold text-lg shadow-md"
+                    onClick={() => setOfferOpen(true)}
+                  >
+                    {isEOI ? <HandCoins className="w-5 h-5 mr-2" /> : <Tag className="w-5 h-5 mr-2" />}
+                    Make an Offer
+                  </Button>
+                )}
+
                 {product.listing_type === 'For Trade' || product.listing_type === 'For Sale & Trade' ? (
                   <Button size="lg" variant={product.listing_type === 'For Sale & Trade' ? 'outline' : 'default'} className="w-full h-14 rounded-xl font-bold text-lg" onClick={() => handleSecondaryAction('Propose Trade')}>
                     <ArrowRightLeft className="w-5 h-5 mr-2" /> Request Trade
@@ -514,6 +552,12 @@ const ProductDetailPage = ({ source: sourceProp }) => {
                   </Button>
                 )}
               </div>
+            )}
+
+            {offerOpen && (
+              <Suspense fallback={null}>
+                <MakeOfferModal isOpen={offerOpen} onClose={() => setOfferOpen(false)} listing={product} />
+              </Suspense>
             )}
 
             <div className="space-y-4 pt-6 border-t border-border">
