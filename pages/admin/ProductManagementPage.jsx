@@ -119,8 +119,10 @@ const ProductManagementPage = () => {
         <div className="p-4 border-b border-border bg-muted/20 flex gap-4">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search products..." 
+            <Input
+              name="admin-product-search"
+              aria-label="Search products"
+              placeholder="Search products..."
               className="pl-9 h-10 rounded-xl bg-background border-border text-foreground"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}

@@ -1,0 +1,108 @@
+# Serving images through a free CDN
+
+## Why
+
+Supabase meters **all** storage egress against the plan's quota — including
+requests served from its own CDN cache ("Cached Egress"). CardPop's card
+photos, avatars and media all live in Supabase Storage, so image traffic is
+what exhausts the free plan's 5 GB/month egress allowance.
+
+The app supports an image CDN out of the box: when the `VITE_IMAGE_CDN_HOST`
+env var is set, every image URL the frontend builds points at the CDN instead
+of Supabase (`utils/imageUrl.js`), and `api/prerender.js` does the same for
+og:image URLs via `IMAGE_CDN_HOST`. When unset, everything behaves exactly as
+before. The CDN passes the `/storage/v1/...` path through verbatim, so only
+the hostname changes.
+
+Two free options below. **Option A (Cloudflare) is the one in use** — the
+`cardpop.com.au` zone already lives on Cloudflare, so the image host is a
+first-party subdomain with unmetered bandwidth. Option B (CloudFront) is kept
+as the no-code alternative.
+
+## Option A — Cloudflare Worker on `img.cardpop.com.au` (in use)
+
+The Worker source is `cloudflare/image-proxy-worker.js` (this repo is the
+source of truth — if the Worker ever changes, edit it here and re-paste). It
+proxies `/storage/v1/object/public/*` to Supabase and caches responses at
+Cloudflare's edge for a year. It also canonicalises query strings before
+fetching the origin (stripped entirely on object paths; transform params
+allowlisted, ladder-snapped and sorted on render paths), so cache-busting
+query strings can't be used to replay origin egress — see the comments in the
+Worker source and `docs/ddos-protection.md`. Free-tier limit: 100k requests/day — the app's
+service worker means each visitor fetches each image roughly once ever, so
+this is ample headroom.
+
+### Setup (~10 minutes, all in the Cloudflare dashboard)
+
+1. **Create the Worker**: Cloudflare dashboard → Workers & Pages → Create →
+   Worker. Name it `cardpop-image-proxy`, deploy the hello-world, then Edit
+   code → replace with the contents of `cloudflare/image-proxy-worker.js` →
+   Deploy.
+2. **Attach the domain**: Worker → Settings → Domains & Routes → Add →
+   Custom domain → `img.cardpop.com.au`. Cloudflare creates the DNS record
+   and TLS certificate automatically (this is why a Custom Domain beats a
+   manually-added route).
+3. **Verify the proxy** (grab any card image path from the site or the
+   Supabase dashboard):
+   ```
+   curl -sI "https://img.cardpop.com.au/storage/v1/object/public/vault-images/<some-path>.webp" | grep -i "cf-cache-status\|cache-control"
+   ```
+   First request: `cf-cache-status: MISS`. Second: `HIT`. Hits never touch
+   Supabase.
+4. **Point the app at it**: Vercel dashboard → Settings → Environment
+   Variables (Production):
+
+   | Variable | Value |
+   |---|---|
+   | `VITE_IMAGE_CDN_HOST` | `img.cardpop.com.au` |
+   | `IMAGE_CDN_HOST` | `img.cardpop.com.au` |
+
+5. **Redeploy** (push to `main`, or Vercel → Deployments → Redeploy).
+   `VITE_*` vars are baked in at build time, so a redeploy is required.
+6. **Confirm on the site**: open cardpop.com.au, DevTools → Network → Img —
+   card images should load from `img.cardpop.com.au`.
+
+**Rollback**: delete the two env vars and redeploy — image URLs revert to
+Supabase immediately. The Worker can stay deployed; it costs nothing.
+
+## Option B — AWS CloudFront (alternative, no code)
+
+CloudFront's always-free tier is 1 TB/month egress + 10M requests and does
+not expire. No Worker code — pure console configuration:
+
+1. CloudFront → Create distribution: origin `odoglvswwymyjuwlonkf.supabase.co`
+   (HTTPS only), GET/HEAD, compress on, redirect HTTP→HTTPS, price class
+   "All" (includes Australia).
+2. Custom cache policy: min TTL `86400`, max `31536000`, default `604800`;
+   query strings **All**; headers/cookies **None**; Gzip+Brotli on.
+3. Optionally restrict behaviors to `/storage/v1/object/public/*` so the
+   distribution can't proxy the Supabase Auth/REST API.
+4. Set `VITE_IMAGE_CDN_HOST` / `IMAGE_CDN_HOST` to the distribution domain
+   (`dxxxxxxxx.cloudfront.net`) in Vercel and redeploy.
+
+## What this covers (and what it doesn't)
+
+- **Covered**: every image URL built at render time from a storage path —
+  card grids, listing pages, avatars, checkout thumbnails, blog covers —
+  plus stored absolute Supabase URLs passed through `publicImageUrl()` /
+  `toCdnUrl()` (`utils/imageUrl.js`).
+- **Not covered**: absolute Supabase URLs stored in the database and rendered
+  directly by an `<img src={row.image_url}>` without going through the helper
+  (some admin-uploaded content: category icons, event covers, hero/media
+  images). These still resolve to Supabase — the service worker's image cache
+  keeps their repeat traffic near zero for returning visitors. If they ever
+  become a significant egress source, route them through `publicImageUrl()`
+  at render time too.
+
+## Related pieces in this repo
+
+- `cloudflare/image-proxy-worker.js` — the Worker source (Option A).
+- `utils/imageUrl.js` — `toCdnUrl()` / `publicImageUrl()`, the host swap.
+- `public/sw.js` — service worker caches storage images cache-first on the
+  client, so returning visitors generate almost no image egress even
+  without the CDN.
+- Upload sites set `cacheControl: '31536000'` (files are immutable —
+  timestamped names), so browsers and CDNs can cache aggressively.
+- `scripts/backfill-image-cache-headers.mjs` — one-off script to re-upload
+  pre-existing images with the long cache header (and recompress oversized
+  ones if `sharp` is installed).

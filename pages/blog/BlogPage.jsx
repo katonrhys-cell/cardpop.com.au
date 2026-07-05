@@ -8,15 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { BookOpen, FileX, AlertCircle, Search, User, Calendar, ArrowRight } from 'lucide-react';
 import { htmlExcerpt } from '@/utils/htmlExcerpt.js';
-
-const CATEGORIES = [
-  { slug: 'australia-focus',  label: 'Australia Focus',   desc: 'Australian trading card market and events' },
-  { slug: 'beginner-guides',  label: 'Beginner Guides',   desc: 'Essential guides for new collectors and traders' },
-  { slug: 'card-spotlight',   label: 'Card Spotlight',    desc: 'Deep dives into iconic and valuable cards' },
-  { slug: 'grading-guides',   label: 'Grading Hub',       desc: 'Card grading standards and preparation guides' },
-  { slug: 'investing-value',  label: 'Investing & Value', desc: 'Investment strategies and card valuation insights' },
-  { slug: 'news-releases',    label: 'News & Releases',   desc: 'Latest TCG releases and industry news' },
-];
+import { BLOG_CATEGORIES as CATEGORIES } from '@/data/blogCategories.js';
 
 const CATEGORY_MAP = Object.fromEntries(CATEGORIES.map(c => [c.slug, c.label]));
 
@@ -207,6 +199,8 @@ const BlogPage = () => {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <Input
               type="text"
+              name="blog-search"
+              aria-label="Search articles by title or author"
               placeholder="Search articles by title or author..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}

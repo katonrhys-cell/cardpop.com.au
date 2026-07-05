@@ -112,16 +112,18 @@ describe('prerender blog articles', () => {
     expect(body).not.toContain('"@type":"FAQPage"');
   });
 
-  it('returns noindex when the article is missing', async () => {
+  it('returns a 404 with noindex when the article is missing', async () => {
     state.result = { data: null };
-    const { body } = await run('/blog/does-not-exist');
+    const { status, body } = await run('/blog/does-not-exist');
+    expect(status).toBe(404);
     expect(body).toContain('name="robots" content="noindex, follow"');
     expect(body).toContain('Article Not Found');
   });
 
-  it('returns noindex for an unpublished article', async () => {
+  it('returns a 404 with noindex for an unpublished article', async () => {
     state.result = { data: { id: UUID, slug: 'draft', title: 'Draft', is_published: false } };
-    const { body } = await run('/blog/draft');
+    const { status, body } = await run('/blog/draft');
+    expect(status).toBe(404);
     expect(body).toContain('noindex');
   });
 });
@@ -146,15 +148,17 @@ describe('prerender marketplace listings', () => {
     expect(body).toContain('Charizard Base Set');
   });
 
-  it('returns noindex for a sold/inactive listing', async () => {
+  it('returns a 404 with noindex for a sold/inactive listing', async () => {
     state.result = { data: { id: UUID, slug: 'sold-card', title: 'Sold Card', status: 'sold' } };
-    const { body } = await run('/marketplace/' + UUID + '/sold-card');
+    const { status, body } = await run('/marketplace/' + UUID + '/sold-card');
+    expect(status).toBe(404);
     expect(body).toContain('noindex');
     expect(body).toContain('Listing Unavailable');
   });
 
-  it('returns a generic noindex doc for a non-UUID id', async () => {
-    const { body } = await run('/marketplace/category/pokemon');
+  it('returns a 404 noindex doc for a non-UUID id', async () => {
+    const { status, body } = await run('/marketplace/category/pokemon');
+    expect(status).toBe(404);
     expect(body).toContain('noindex');
     expect(body).toContain('CardPop Marketplace');
   });
@@ -185,9 +189,10 @@ describe('prerender shop products', () => {
     expect(body).toContain('schema.org/OutOfStock');
   });
 
-  it('returns noindex for an inactive product', async () => {
+  it('returns a 404 with noindex for an inactive product', async () => {
     state.result = { data: { id: UUID, title: 'Draft', status: 'draft' } };
-    const { body } = await run('/product/shop/' + UUID + '/draft');
+    const { status, body } = await run('/product/shop/' + UUID + '/draft');
+    expect(status).toBe(404);
     expect(body).toContain('noindex');
     expect(body).toContain('Product Unavailable');
   });
@@ -288,9 +293,10 @@ describe('prerender events', () => {
     expect(body).toContain('"description":"Tiny Meetup on 2026-09-05');
   });
 
-  it('returns a noindex document for an unknown event', async () => {
+  it('returns a 404 noindex document for an unknown event', async () => {
     state.result = { data: null };
-    const { body } = await run('/events/does-not-exist');
+    const { status, body } = await run('/events/does-not-exist');
+    expect(status).toBe(404);
     expect(body).toContain('Event Not Found');
     expect(body).toContain('noindex');
   });
@@ -386,9 +392,9 @@ describe('prerender collections', () => {
     expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/collections/pokemon" />');
   });
 
-  it('returns noindex for an unknown collection', async () => {
+  it('returns a 404 with noindex for an unknown collection', async () => {
     const { status, body } = await run('/collections/beyblades');
-    expect(status).toBe(200);
+    expect(status).toBe(404);
     expect(body).toContain('noindex');
   });
 });
@@ -421,18 +427,68 @@ describe('prerender seller profiles', () => {
     expect(body).not.toContain('noindex');
   });
 
-  it('returns noindex for a missing or private profile', async () => {
+  it('returns a 404 with noindex for a missing or private profile', async () => {
     state.result = { data: null };
-    const { body } = await run(`/seller/${UUID}`);
+    const { status, body } = await run(`/seller/${UUID}`);
+    expect(status).toBe(404);
     expect(body).toContain('noindex');
 
     state.result = { data: { id: UUID, display_name: 'Hidden', is_public: false } };
-    const { body: privateBody } = await run(`/seller/${UUID}`);
+    const { status: privateStatus, body: privateBody } = await run(`/seller/${UUID}`);
+    expect(privateStatus).toBe(404);
     expect(privateBody).toContain('noindex');
   });
 
-  it('returns a noindex doc for a non-UUID seller id', async () => {
-    const { body } = await run('/seller/not-a-uuid');
+  it('returns a 404 noindex doc for a non-UUID seller id', async () => {
+    const { status, body } = await run('/seller/not-a-uuid');
+    expect(status).toBe(404);
     expect(body).toContain('noindex');
+  });
+});
+
+describe('prerender blog category pages', () => {
+  it('renders a known category with its articles and a self-canonical', async () => {
+    state.listResult = { data: [
+      { slug: 'first-binder', id: UUID, title: 'Your First Binder', excerpt: 'Where to start.', author: 'CardPop Research', published_at: '2026-06-01T00:00:00.000Z' },
+    ] };
+    const { status, body } = await run('/blog/category/beginner-guides');
+    expect(status).toBe(200);
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/blog/category/beginner-guides" />');
+    expect(body).toContain('<h1>Beginner Guides</h1>');
+    expect(body).toContain('/blog/first-binder');
+    expect(body).toContain('"@type":"ItemList"');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('links the other categories from a category page', async () => {
+    const { body } = await run('/blog/category/beginner-guides');
+    expect(body).toContain('/blog/category/investing-value');
+    expect(body).not.toContain('href="https://cardpop.com.au/blog/category/beginner-guides">Beginner');
+  });
+
+  it('returns a 404 with noindex for an unknown category', async () => {
+    const { status, body } = await run('/blog/category/knitting');
+    expect(status).toBe(404);
+    expect(body).toContain('noindex');
+    expect(body).toContain('Category Not Found');
+  });
+});
+
+describe('prerender unknown paths', () => {
+  it('returns a 404 with noindex instead of a 200 shell', async () => {
+    const { status, body } = await run('/definitely/not/a/page');
+    expect(status).toBe(404);
+    expect(body).toContain('noindex');
+    expect(body).toContain('Page Not Found');
+  });
+});
+
+describe('prerender whatnot page', () => {
+  it('renders the whatnot static page for bots', async () => {
+    const { status, body } = await run('/community/whatnot');
+    expect(status).toBe(200);
+    expect(body).toContain('<title>Whatnot Shows | CardPop Community</title>');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/community/whatnot" />');
+    expect(body).not.toContain('noindex');
   });
 });

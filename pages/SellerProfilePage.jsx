@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import ProductCard from '@/components/ProductCard';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const SellerProfilePage = () => {
   const { sellerId } = useParams();
@@ -41,7 +42,7 @@ const SellerProfilePage = () => {
         const mappedProducts = (items ?? []).map(c => {
           const imgPath = c.card_image || c.vault_images?.[0]?.storage_path || null;
           const imgSrc = imgPath
-            ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
+            ? (publicImageUrl(imgPath))
             : null;
           return {
           id: c.id,

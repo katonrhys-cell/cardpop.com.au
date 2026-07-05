@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { COLLECTION_SEO } from '../data/collectionSeo.js';
+import { BLOG_CATEGORIES, BLOG_CATEGORY_MAP } from '../data/blogCategories.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -11,6 +12,8 @@ const SUPABASE_URL = 'https://odoglvswwymyjuwlonkf.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kb2dsdnN3d3lteWp1d2xvbmtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3OTQ5NTgsImV4cCI6MjA5NDM3MDk1OH0.R5fwR42iKIEsfx1iA-fjk4YPLCH3mcmoIKkosEy6g1I';
 
 const BASE_URL = 'https://cardpop.com.au';
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
 
 const esc = (s = '') => String(s)
   .replace(/&/g, '&amp;')
@@ -28,6 +31,35 @@ const ldJson = (items) => {
 };
 
 const absUrl = (u) => (!u ? undefined : (u.startsWith('http') ? u : `${BASE_URL}${u}`));
+
+// Optional image CDN in front of Supabase Storage (see
+// docs/image-cdn.md). Mirrors utils/imageUrl.js but reads the
+// server-side env var, since this file runs as a Vercel function.
+const IMAGE_CDN_ORIGIN = (() => {
+  const host = process.env.IMAGE_CDN_HOST || process.env.VITE_IMAGE_CDN_HOST;
+  if (!host) return null;
+  const trimmed = host.trim().replace(/\/+$/, '');
+  return /^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`;
+})();
+
+const SUPABASE_STORAGE_URL_RE =
+  /^https?:\/\/[^/]+\.supabase\.(co|in)(\/storage\/v1\/(?:object|render\/image)\/public\/.+)$/;
+
+const toCdnUrl = (url) => {
+  if (!IMAGE_CDN_ORIGIN || typeof url !== 'string') return url ?? undefined;
+  const match = url.match(SUPABASE_STORAGE_URL_RE);
+  return match ? `${IMAGE_CDN_ORIGIN}${match[2]}` : url;
+};
+
+// Storage path or absolute URL → CDN-aware public image URL (og:image etc).
+// Built from the constant rather than a Supabase client: getPublicUrl is pure
+// string concatenation, and no client exists at module scope here (handlers
+// create theirs per-request).
+const publicImageUrl = (pathOrUrl) => {
+  if (!pathOrUrl) return undefined;
+  if (/^https?:\/\//.test(pathOrUrl)) return toCdnUrl(pathOrUrl);
+  return toCdnUrl(`${SUPABASE_URL}/storage/v1/object/public/vault-images/${pathOrUrl}`);
+};
 
 // Strip <script>/<style> blocks from admin-authored article HTML before
 // embedding it in the prerendered body. Content is trusted (our own CMS), but
@@ -121,6 +153,16 @@ ${bodyHtml}
 </html>`;
 }
 
+// Render results are either a plain HTML string (served with 200) or
+// { status, html }. Missing/removed content must be a real 404 — the previous
+// behaviour of 200 + noindex made Google treat every sold listing, deleted
+// article and typo URL as a live-but-excluded page ("Excluded by 'noindex'
+// tag" in Search Console) and keep recrawling it, instead of dropping it as
+// "Not found (404)".
+const notFound = (opts) => ({ status: 404, html: htmlDoc({ robots: 'noindex, follow', ...opts }) });
+const sendDoc = (res, doc) =>
+  typeof doc === 'string' ? res.status(200).send(doc) : res.status(doc.status || 200).send(doc.html);
+
 async function renderLocalTraders(supabase) {
   const { data } = await supabase
     .from('profiles')
@@ -206,11 +248,10 @@ async function renderDealer(supabase, param) {
   const canonical = `${BASE_URL}/dealer/${dealer?.store_slug || param}`;
 
   if (!dealer || !dealer.is_sole_trader || dealer.is_public === false) {
-    return htmlDoc({
+    return notFound({
       title: 'Store Unavailable | CardPop',
       description: 'This dealer store could not be found on CardPop.',
       canonical,
-      robots: 'noindex, follow',
       bodyHtml: '<main><h1>Store Unavailable</h1><p>This dealer store is not available.</p></main>',
     });
   }
@@ -273,9 +314,7 @@ async function renderDealer(supabase, param) {
     const cardName = l.vault_item?.card_name || 'Trading Card';
     const url = `${BASE_URL}/marketplace/${l.id}/${l.slug || 'listing'}`;
     const imgPath = l.vault_item?.vault_images?.[0]?.storage_path || l.vault_item?.card_image;
-    const img = imgPath
-      ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
-      : undefined;
+    const img = publicImageUrl(imgPath);
     const product = {
       '@type': 'Product',
       name: cardName,
@@ -325,11 +364,10 @@ async function renderBlogArticle(supabase, param) {
   const { data: article } = await query.maybeSingle();
 
   if (!article || article.is_published === false) {
-    return htmlDoc({
+    return notFound({
       title: 'Article Not Found | CardPop',
       description: 'This article could not be found on CardPop.',
       canonical: `${BASE_URL}/blog/${param}`,
-      robots: 'noindex, follow',
       bodyHtml: '<main><h1>Article Not Found</h1><p>This article is not available.</p></main>',
     });
   }
@@ -343,6 +381,10 @@ async function renderBlogArticle(supabase, param) {
   const published = isoDate(article.published_at || article.created_at);
   const modified = isoDate(article.updated_at || article.published_at || article.created_at);
   const author = article.author || 'CardPop Research';
+  // blog_articles.category stores the slug; show the human label in metadata.
+  const categoryLabel = article.category
+    ? (BLOG_CATEGORY_MAP[article.category]?.label || article.category)
+    : null;
   const tags = Array.isArray(article.tags) ? article.tags.filter(Boolean) : [];
   const readTime = Number(article.read_time_minutes);
   const wordCount = toText(bodyContent).split(/\s+/).filter(Boolean).length;
@@ -362,7 +404,7 @@ async function renderBlogArticle(supabase, param) {
     ...(published ? { datePublished: published } : {}),
     ...(modified ? { dateModified: modified } : {}),
     description,
-    ...(article.category ? { articleSection: article.category } : {}),
+    ...(categoryLabel ? { articleSection: categoryLabel } : {}),
     ...(tags.length ? { keywords: tags.join(', ') } : {}),
     ...(Number.isFinite(readTime) && readTime > 0 ? { timeRequired: `PT${readTime}M` } : {}),
     ...(wordCount > 0 ? { wordCount } : {}),
@@ -376,7 +418,7 @@ async function renderBlogArticle(supabase, param) {
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
       { '@type': 'ListItem', position: 2, name: 'The Parallel Report', item: `${BASE_URL}/blog` },
-      ...(article.category ? [{ '@type': 'ListItem', position: 3, name: article.category, item: `${BASE_URL}/blog/category/${encodeURIComponent(article.category)}` }] : []),
+      ...(article.category ? [{ '@type': 'ListItem', position: 3, name: categoryLabel, item: `${BASE_URL}/blog/category/${encodeURIComponent(article.category)}` }] : []),
       { '@type': 'ListItem', position: article.category ? 4 : 3, name: article.title, item: canonical },
     ],
   };
@@ -406,7 +448,7 @@ async function renderBlogArticle(supabase, param) {
     `<meta property="article:published_time" content="${esc(published || '')}" />`,
     `<meta property="article:modified_time" content="${esc(modified || '')}" />`,
     `<meta property="article:author" content="${esc(author)}" />`,
-    article.category ? `<meta property="article:section" content="${esc(article.category)}" />` : '',
+    categoryLabel ? `<meta property="article:section" content="${esc(categoryLabel)}" />` : '',
   ].filter(Boolean).join('\n');
 
   const tagsHtml = tags.length
@@ -433,29 +475,27 @@ async function renderBlogArticle(supabase, param) {
 
 async function renderListing(supabase, id, slugParam) {
   if (!UUID_RE.test(id)) {
-    return htmlDoc({
+    return notFound({
       title: 'CardPop Marketplace',
       description: 'Buy, sell and trade trading cards on CardPop.',
       canonical: `${BASE_URL}/marketplace`,
-      robots: 'noindex, follow',
       bodyHtml: '<main><h1>CardPop Marketplace</h1></main>',
     });
   }
 
   const { data: listing } = await supabase
     .from('listings')
-    .select('id, slug, title, description, price, price_aud, category, condition, grade, grading_company, status, images, accepts_offers, created_at, updated_at, seller_id, vault_item:vault_items(card_name, set_name, year, condition, grade, grading_company, card_image, vault_images(storage_path)), seller:profiles!seller_id(username, display_name, business_name, store_slug)')
+    .select('id, slug, title, description, price, price_aud, price_min_aud, price_max_aud, category, condition, grade, grading_company, status, images, accepts_offers, created_at, updated_at, seller_id, vault_item:vault_items(card_name, set_name, year, condition, grade, grading_company, card_image, vault_images(storage_path)), seller:profiles!seller_id(username, display_name, business_name, store_slug)')
     .eq('id', id)
     .maybeSingle();
 
   const canonical = `${BASE_URL}/marketplace/${id}/${listing?.slug || slugParam || 'listing'}`;
 
   if (!listing || listing.status !== 'active') {
-    return htmlDoc({
+    return notFound({
       title: 'Listing Unavailable | CardPop',
       description: 'This marketplace listing is no longer available on CardPop.',
       canonical,
-      robots: 'noindex, follow',
       bodyHtml: '<main><h1>Listing Unavailable</h1><p>This listing is sold or no longer active.</p></main>',
     });
   }
@@ -463,9 +503,7 @@ async function renderListing(supabase, id, slugParam) {
   const card = listing.vault_item || {};
   const cardName = listing.title || card.card_name || 'Trading Card';
   const imgPath = listing.images?.[0] || card.vault_images?.[0]?.storage_path || card.card_image;
-  const image = imgPath
-    ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
-    : undefined;
+  const image = publicImageUrl(imgPath);
   const price = listing.price_aud ?? listing.price;
   const condition = listing.condition || card.condition;
   const grade = listing.grade || card.grade;
@@ -512,7 +550,11 @@ async function renderListing(supabase, id, slugParam) {
   <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/marketplace">Marketplace</a> / ${esc(cardName)}</nav>
   <h1>${esc(cardName)}</h1>
   ${image ? `<img src="${esc(image)}" alt="${esc(cardName)}" />` : ''}
-  ${price > 0 ? `<p><strong>A$${esc(Number(price).toFixed(2))}</strong>${listing.accepts_offers ? ' (offers accepted)' : ''}</p>` : ''}
+  ${price > 0
+    ? `<p><strong>A$${esc(Number(price).toFixed(2))}</strong>${listing.accepts_offers ? ' (offers accepted)' : ''}</p>`
+    : (listing.price_min_aud != null && listing.price_max_aud != null
+      ? `<p><strong>Seeking offers: A$${esc(Number(listing.price_min_aud).toFixed(2))} – A$${esc(Number(listing.price_max_aud).toFixed(2))}</strong></p>`
+      : '')}
   ${setLine ? `<p>${esc(setLine)}</p>` : ''}
   <ul>
     ${condition ? `<li>Condition: ${esc(condition)}</li>` : ''}
@@ -527,11 +569,10 @@ async function renderListing(supabase, id, slugParam) {
 
 async function renderShopProduct(supabase, id, slugParam) {
   if (!UUID_RE.test(id)) {
-    return htmlDoc({
+    return notFound({
       title: 'CardPop Shop',
       description: 'Shop official CardPop sealed products, singles and accessories.',
       canonical: `${BASE_URL}/shop`,
-      robots: 'noindex, follow',
       bodyHtml: '<main><h1>CardPop Shop</h1></main>',
     });
   }
@@ -546,11 +587,10 @@ async function renderShopProduct(supabase, id, slugParam) {
   const canonical = `${BASE_URL}/product/shop/${id}/${slug}`;
 
   if (!product || product.status !== 'active') {
-    return htmlDoc({
+    return notFound({
       title: 'Product Unavailable | CardPop',
       description: 'This product is no longer available in the CardPop shop.',
       canonical,
-      robots: 'noindex, follow',
       bodyHtml: '<main><h1>Product Unavailable</h1><p>This product is sold out or no longer listed.</p></main>',
     });
   }
@@ -659,9 +699,7 @@ async function renderLanding(supabase, path) {
       .limit(50);
     items = (data || []).map(l => {
       const imgPath = l.vault_item?.vault_images?.[0]?.storage_path || l.vault_item?.card_image;
-      const image = imgPath
-        ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
-        : undefined;
+      const image = publicImageUrl(imgPath);
       return {
         name: l.title || l.vault_item?.card_name || 'Trading Card',
         url: `${BASE_URL}/marketplace/${l.id}/${l.slug || 'listing'}`,
@@ -712,14 +750,15 @@ ${itemsHtml || '    <li>No items available right now.</li>'}
   return htmlDoc({ title: cfg.title, description: cfg.description, canonical, jsonLdItems: [collectionPage, itemList, breadcrumb], bodyHtml });
 }
 
-// Event category landing pages. `type` filters by the event_type enum where a
-// matching value exists; null means "show all upcoming events" (used for
-// categories that don't yet map to a distinct enum value).
+// Event category landing pages. `type` filters by the event_type enum using
+// the SAME values the SPA passes (App.jsx defaultType) — when trade/store
+// events rendered with type null they showed ALL events, making them exact
+// duplicates of /events for crawlers (and different from what humans see).
 const EVENT_CATEGORIES = {
   'card-shows':       { type: 'card_show',       h1: 'Trading Card Shows in Australia',       label: 'card shows' },
-  'trade-events':     { type: null,              h1: 'Trading Card Trade Events',             label: 'trade events' },
+  'trade-events':     { type: 'trade_event',     h1: 'Trading Card Trade Events',             label: 'trade events' },
   'community-events': { type: 'community_event', h1: 'Trading Card Community Events',          label: 'community events' },
-  'store-events':     { type: null,              h1: 'Trading Card Store Events',             label: 'store events' },
+  'store-events':     { type: 'lgs_event',       h1: 'Trading Card Store Events',             label: 'store events' },
 };
 
 const eventDateLine = (ev) => {
@@ -871,11 +910,10 @@ async function renderEvent(supabase, param) {
   const { data: event } = await query.maybeSingle();
 
   if (!event || event.status !== 'approved') {
-    return htmlDoc({
+    return notFound({
       title: 'Event Not Found | CardPop',
       description: 'This event could not be found on CardPop.',
       canonical: `${BASE_URL}/events/${param}`,
-      robots: 'noindex, follow',
       bodyHtml: '<main><h1>Event Not Found</h1><p>This event is not available.</p></main>',
     });
   }
@@ -1372,6 +1410,19 @@ const STATIC_CONTENT = {
     ],
   },
 
+  '/community/whatnot': {
+    title: 'Whatnot Shows | CardPop Community',
+    description: 'Find live trading card breaks and auctions from Australian sellers on Whatnot. Watch, bid and win.',
+    breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Community', path: '/community' }, { name: 'Whatnot Shows', path: '/community/whatnot' }],
+    h1: 'Whatnot Shows',
+    intro: "Advertise your upcoming Whatnot live shows to the CardPop community. Let collectors know when you're going live.",
+    sections: [
+      { h2: 'Live shows from Australian sellers', paras: ['Australian trading card sellers list their upcoming Whatnot live shows here \u2014 pack breaks, singles auctions and box openings. Check the schedule and tune in when they go live.'] },
+      { h2: 'Promote your show', paras: ['Selling on Whatnot? List your upcoming shows on CardPop for free and reach thousands of Australian collectors before you go live.'] },
+    ],
+    links: [{ text: 'Community Hub', href: '/community' }, { text: 'Trading Card Events', href: '/events' }, { text: 'Local Traders', href: '/community/local-traders' }],
+  },
+
   '/australian-markets': {
     title: 'Australian Card Markets | CardPop',
     description: 'Explore trading card markets across Australia. Find local card shops, events and trading communities near you.',
@@ -1489,15 +1540,6 @@ async function renderBlogIndex(supabase) {
     .limit(50);
   const articles = data || [];
 
-  const CATEGORIES = [
-    { slug: 'australia-focus', name: 'Australia Focus', desc: 'Australian trading card market and events.' },
-    { slug: 'beginner-guides', name: 'Beginner Guides', desc: 'Essential guides for new collectors and traders.' },
-    { slug: 'card-spotlight', name: 'Card Spotlight', desc: 'Deep dives into iconic and valuable cards.' },
-    { slug: 'grading-guides', name: 'Grading Hub', desc: 'Card grading standards and preparation guides.' },
-    { slug: 'investing-value', name: 'Investing & Value', desc: 'Investment strategies and card valuation insights.' },
-    { slug: 'news-releases', name: 'News & Releases', desc: 'Latest TCG releases and industry news.' },
-  ];
-
   const breadcrumb = {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
@@ -1514,8 +1556,8 @@ async function renderBlogIndex(supabase) {
     itemListElement: articles.map((a, i) => ({ '@type': 'ListItem', position: i + 1, url: `${BASE_URL}/blog/${a.slug || a.id}`, name: a.title })),
   };
 
-  const categoriesHtml = CATEGORIES.map((c) =>
-    `    <li><a href="${BASE_URL}/blog/category/${esc(c.slug)}"><strong>${esc(c.name)}</strong></a> — ${esc(c.desc)}</li>`
+  const categoriesHtml = BLOG_CATEGORIES.map((c) =>
+    `    <li><a href="${BASE_URL}/blog/category/${esc(c.slug)}"><strong>${esc(c.label)}</strong></a> — ${esc(c.desc)}</li>`
   ).join('\n');
 
   const articlesHtml = articles.map((a) => {
@@ -1539,6 +1581,84 @@ ${categoriesHtml}
   <h2>Latest articles (${articles.length})</h2>
   <ul>
 ${articlesHtml || '    <li>New articles are on the way — check back soon.</li>'}
+  </ul>
+  </section>
+</main>`;
+
+  return htmlDoc({ title, description, canonical, jsonLdItems: [breadcrumb, itemList], bodyHtml });
+}
+
+// Blog category pages (/blog/category/:slug). These are linked from the
+// site-wide header and the blog index, so bots crawl them constantly — before
+// this renderer existed they fell through to the generic noindex fallback and
+// showed up in Search Console as "Excluded by 'noindex' tag".
+async function renderBlogCategory(supabase, slug) {
+  const cfg = BLOG_CATEGORY_MAP[slug];
+  if (!cfg) {
+    return notFound({
+      title: 'Category Not Found | CardPop',
+      description: 'This blog category could not be found on CardPop.',
+      canonical: `${BASE_URL}/blog`,
+      bodyHtml: '<main><h1>Category Not Found</h1><p>This blog category is not available.</p></main>',
+    });
+  }
+
+  const canonical = `${BASE_URL}/blog/category/${slug}`;
+  const title = `${cfg.label} | The Parallel Report — CardPop`;
+  const description = `${cfg.desc}. Articles from The Parallel Report by CardPop — trading card analysis, guides and insights for Australian collectors.`;
+
+  // blog_articles.category stores the category slug (see data/blogCategories.js).
+  const { data } = await supabase
+    .from('blog_articles')
+    .select('slug, id, title, excerpt, author, published_at, created_at')
+    .eq('is_published', true)
+    .eq('category', slug)
+    .order('published_at', { ascending: false })
+    .limit(100);
+  const articles = data || [];
+
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'The Parallel Report', item: `${BASE_URL}/blog` },
+      { '@type': 'ListItem', position: 3, name: cfg.label, item: canonical },
+    ],
+  };
+  const itemList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: `${cfg.label} — The Parallel Report`,
+    numberOfItems: articles.length,
+    itemListElement: articles.map((a, i) => ({ '@type': 'ListItem', position: i + 1, url: `${BASE_URL}/blog/${a.slug || a.id}`, name: a.title })),
+  };
+
+  const articlesHtml = articles.map((a) => {
+    const date = (a.published_at || a.created_at || '').split('T')[0];
+    const author = a.author || 'CardPop Australia';
+    return `    <li><a href="${BASE_URL}/blog/${esc(a.slug || a.id)}"><strong>${esc(a.title || 'Untitled')}</strong></a>`
+      + `${a.excerpt ? ` — ${esc(toText(a.excerpt, 160))}` : ''} <em>(${esc(author)}${date ? `, ${esc(date)}` : ''})</em></li>`;
+  }).join('\n');
+
+  const otherCategoriesHtml = BLOG_CATEGORIES.filter((c) => c.slug !== slug)
+    .map((c) => `    <li><a href="${BASE_URL}/blog/category/${esc(c.slug)}">${esc(c.label)}</a> — ${esc(c.desc)}</li>`)
+    .join('\n');
+
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/blog">The Parallel Report</a> / ${esc(cfg.label)}</nav>
+  <h1>${esc(cfg.label)}</h1>
+  <p>${esc(description)}</p>
+  <section>
+  <h2>Articles (${articles.length})</h2>
+  <ul>
+${articlesHtml || '    <li>New articles are on the way — check back soon.</li>'}
+  </ul>
+  </section>
+  <section>
+  <h2>More topics</h2>
+  <ul>
+${otherCategoriesHtml}
   </ul>
   </section>
 </main>`;
@@ -1634,11 +1754,10 @@ async function renderPriceCard(supabase, categorySlug, cardSlug) {
     .maybeSingle();
 
   if (!card || card.category !== categorySlug) {
-    return htmlDoc({
+    return notFound({
       title: 'Card not found | CardPop',
       description: 'This card price page does not exist.',
       canonical: `${BASE_URL}/prices`,
-      robots: 'noindex, follow',
       bodyHtml: '<main><h1>Card not found</h1></main>',
     });
   }
@@ -1800,11 +1919,10 @@ ${itemsHtml}
 async function renderCollection(supabase, rawSlug) {
   const slug = resolveCollection(rawSlug);
   if (!slug) {
-    return htmlDoc({
+    return notFound({
       title: 'Collection Not Found | CardPop',
       description: 'This collection could not be found on CardPop.',
       canonical: `${BASE_URL}/collections`,
-      robots: 'noindex, follow',
       bodyHtml: '<main><h1>Collection Not Found</h1><p>This collection is not available.</p></main>',
     });
   }
@@ -1886,11 +2004,10 @@ ${itemsHtml || '    <li>No active listings right now — check back soon or brow
 async function renderSeller(supabase, param) {
   const canonicalSelf = `${BASE_URL}/seller/${param}`;
   if (!UUID_RE.test(param)) {
-    return htmlDoc({
+    return notFound({
       title: 'Seller Profile | CardPop',
       description: 'View seller profiles on CardPop.',
       canonical: canonicalSelf,
-      robots: 'noindex, follow',
       bodyHtml: '<main><h1>Seller Profile</h1></main>',
     });
   }
@@ -1902,11 +2019,10 @@ async function renderSeller(supabase, param) {
     .maybeSingle();
 
   if (!profile || profile.is_public === false) {
-    return htmlDoc({
+    return notFound({
       title: 'Seller Not Found | CardPop',
       description: 'This seller profile could not be found on CardPop.',
       canonical: canonicalSelf,
-      robots: 'noindex, follow',
       bodyHtml: '<main><h1>Seller Not Found</h1><p>This profile is not available.</p></main>',
     });
   }
@@ -1977,6 +2093,136 @@ ${itemsHtml || '    <li>No active listings at the moment.</li>'}
   return htmlDoc({ title, description, canonical, ogImage: image, jsonLdItems: [person, breadcrumb], bodyHtml });
 }
 
+// ── Store directory pages (/card-shops) ─────────────────────────────────────
+
+const DIRECTORY_CITIES = {
+  sydney:           { label: 'Sydney',         state: 'NSW' },
+  newcastle:        { label: 'Newcastle',      state: 'NSW' },
+  wollongong:       { label: 'Wollongong',     state: 'NSW' },
+  'central-coast':  { label: 'Central Coast',  state: 'NSW' },
+  canberra:         { label: 'Canberra',       state: 'ACT' },
+  melbourne:        { label: 'Melbourne',      state: 'VIC' },
+  geelong:          { label: 'Geelong',        state: 'VIC' },
+  ballarat:         { label: 'Ballarat',       state: 'VIC' },
+  bendigo:          { label: 'Bendigo',        state: 'VIC' },
+  adelaide:         { label: 'Adelaide',       state: 'SA' },
+  hobart:           { label: 'Hobart',         state: 'TAS' },
+  launceston:       { label: 'Launceston',     state: 'TAS' },
+  brisbane:         { label: 'Brisbane',       state: 'QLD' },
+  'gold-coast':     { label: 'Gold Coast',     state: 'QLD' },
+  'sunshine-coast': { label: 'Sunshine Coast', state: 'QLD' },
+  cairns:           { label: 'Cairns',         state: 'QLD' },
+  townsville:       { label: 'Townsville',     state: 'QLD' },
+  toowoomba:        { label: 'Toowoomba',      state: 'QLD' },
+  perth:            { label: 'Perth',          state: 'WA' },
+  darwin:           { label: 'Darwin',         state: 'NT' },
+};
+
+async function renderStoresHub(supabase) {
+  const { data: stores } = await supabase
+    .from('local_game_stores')
+    .select('slug, name, suburb, city, state')
+    .eq('status', 'approved')
+    .order('name')
+    .limit(500);
+
+  const counts = {};
+  for (const store of stores || []) counts[store.city] = (counts[store.city] || 0) + 1;
+
+  const title = 'Card Shops & Card Shows in Australia — Store Directory | CardPop';
+  const description = 'Find trading card shops near you: Pokémon, sports cards, One Piece and TCG stores across Sydney, Melbourne, Brisbane, Perth, Adelaide and more — plus upcoming card shows.';
+
+  const cityLinks = Object.entries(DIRECTORY_CITIES)
+    .filter(([slug]) => counts[slug] > 0)
+    .map(([slug, info]) =>
+      `<li><a href="${BASE_URL}/card-shops/${esc(slug)}">Card shops in ${esc(info.label)}, ${esc(info.state)}</a> (${counts[slug]})</li>`)
+    .join('\n');
+
+  return htmlDoc({
+    title,
+    description,
+    canonical: `${BASE_URL}/card-shops`,
+    ogImage: `${BASE_URL}/og-image.jpg`,
+    jsonLdItems: [{
+      '@context': 'https://schema.org',
+      '@type': 'CollectionPage',
+      name: title,
+      description,
+      url: `${BASE_URL}/card-shops`,
+    }],
+    bodyHtml: `<main><h1>Australian Card Shops &amp; Shows</h1>
+<p>${esc(description)}</p>
+<ul>${cityLinks}</ul>
+<p><a href="${BASE_URL}/card-shops/add">Add your store — free listing</a></p></main>`,
+  });
+}
+
+async function renderStoresCity(supabase, citySlug) {
+  const cityInfo = DIRECTORY_CITIES[citySlug];
+  const { data: stores } = await supabase
+    .from('local_game_stores')
+    .select('slug, name, suburb, city, state, website, categories, description')
+    .eq('status', 'approved')
+    .eq('city', citySlug)
+    .order('name')
+    .limit(200);
+
+  const title = `Card Shops in ${cityInfo.label} — Pokémon, TCG & Sports Card Stores | CardPop`;
+  const description = `Find trading card shops in ${cityInfo.label}, ${cityInfo.state}: local stores for Pokémon, sports cards, One Piece and other TCGs, plus upcoming card shows near ${cityInfo.label}.`;
+
+  const storeItems = (stores || []).map((store) => {
+    const line = [store.suburb, store.state].filter(Boolean).join(', ');
+    return `<li><strong>${esc(store.name)}</strong>${line ? ` — ${esc(line)}` : ''}${store.description ? `<br/>${esc(store.description)}` : ''}${store.website ? ` <a href="${esc(store.website)}" rel="noopener">Website</a>` : ''}</li>`;
+  }).join('\n');
+
+  const jsonLd = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Card Shops', item: `${BASE_URL}/card-shops` },
+        { '@type': 'ListItem', position: 2, name: cityInfo.label, item: `${BASE_URL}/card-shops/${citySlug}` },
+      ],
+    },
+    (stores || []).length ? {
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: `Card shops in ${cityInfo.label}`,
+      numberOfItems: stores.length,
+      itemListElement: stores.map((store, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        item: {
+          '@type': 'LocalBusiness',
+          name: store.name,
+          ...(store.website ? { url: store.website } : {}),
+          address: {
+            '@type': 'PostalAddress',
+            ...(store.suburb ? { addressLocality: store.suburb } : {}),
+            addressRegion: store.state,
+            addressCountry: 'AU',
+          },
+        },
+      })),
+    } : null,
+  ].filter(Boolean);
+
+  return htmlDoc({
+    title,
+    description,
+    canonical: `${BASE_URL}/card-shops/${citySlug}`,
+    ogImage: `${BASE_URL}/og-image.jpg`,
+    jsonLdItems: jsonLd,
+    bodyHtml: `<main>
+<nav><a href="${BASE_URL}/card-shops">Card Shops</a></nav>
+<h1>Card Shops in ${esc(cityInfo.label)}</h1>
+<p>${esc(description)}</p>
+<ul>${storeItems || '<li>No stores listed yet — know one? Add it below.</li>'}</ul>
+<p><a href="${BASE_URL}/card-shops/add">Add your store — free listing</a> · <a href="${BASE_URL}/events">Card events calendar</a></p>
+</main>`,
+  });
+}
+
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
@@ -1984,26 +2230,24 @@ export default async function handler(req, res) {
   const rawPath = String(req.query.path || '').split('?')[0];
 
   try {
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
-
     if (rawPath === '/community/local-traders') {
-      return res.status(200).send(await renderLocalTraders(supabase));
+      return sendDoc(res, await renderLocalTraders(supabase));
     }
 
     if (LANDINGS[rawPath]) {
-      return res.status(200).send(await renderLanding(supabase, rawPath));
+      return sendDoc(res, await renderLanding(supabase, rawPath));
     }
 
     if (rawPath === '/blog') {
-      return res.status(200).send(await renderBlogIndex(supabase));
+      return sendDoc(res, await renderBlogIndex(supabase));
     }
 
     if (STATIC_CONTENT[rawPath]) {
-      return res.status(200).send(renderStaticContent(rawPath));
+      return sendDoc(res, renderStaticContent(rawPath));
     }
 
     if (rawPath === '/events') {
-      return res.status(200).send(await renderEventsLanding(supabase, null));
+      return sendDoc(res, await renderEventsLanding(supabase, null));
     }
 
     const eventsMatch = rawPath.match(/^\/events\/([^/?#]+)/);
@@ -2012,49 +2256,69 @@ export default async function handler(req, res) {
       // Known category slugs render a filtered landing; everything else is an
       // individual event (looked up by UUID or slug).
       if (EVENT_CATEGORIES[param]) {
-        return res.status(200).send(await renderEventsLanding(supabase, param));
+        return sendDoc(res, await renderEventsLanding(supabase, param));
       }
-      return res.status(200).send(await renderEvent(supabase, param));
+      return sendDoc(res, await renderEvent(supabase, param));
     }
 
     const shopProductMatch = rawPath.match(/^\/product\/shop\/([^/?#]+)(?:\/([^/?#]+))?/);
     if (shopProductMatch) {
       const id = decodeURIComponent(shopProductMatch[1]);
       const slug = shopProductMatch[2] ? decodeURIComponent(shopProductMatch[2]) : undefined;
-      return res.status(200).send(await renderShopProduct(supabase, id, slug));
+      return sendDoc(res, await renderShopProduct(supabase, id, slug));
     }
 
     const dealerMatch = rawPath.match(/^\/dealer\/([^/?#]+)/);
     if (dealerMatch) {
       const id = decodeURIComponent(dealerMatch[1]);
-      return res.status(200).send(await renderDealer(supabase, id));
+      return sendDoc(res, await renderDealer(supabase, id));
     }
 
     if (rawPath === '/collections') {
-      return res.status(200).send(renderCollectionsIndex());
+      return sendDoc(res, renderCollectionsIndex());
     }
 
     const collectionMatch = rawPath.match(/^\/collections\/([^/?#]+)/);
     if (collectionMatch) {
       const slug = decodeURIComponent(collectionMatch[1]);
-      return res.status(200).send(await renderCollection(supabase, slug));
+      return sendDoc(res, await renderCollection(supabase, slug));
     }
 
     const sellerMatch = rawPath.match(/^\/seller\/([^/?#]+)/);
     if (sellerMatch) {
       const id = decodeURIComponent(sellerMatch[1]);
-      return res.status(200).send(await renderSeller(supabase, id));
+      return sendDoc(res, await renderSeller(supabase, id));
     }
 
     const listingMatch = rawPath.match(/^\/marketplace\/([^/?#]+)(?:\/([^/?#]+))?/);
     if (listingMatch) {
       const id = decodeURIComponent(listingMatch[1]);
       const slug = listingMatch[2] ? decodeURIComponent(listingMatch[2]) : undefined;
-      return res.status(200).send(await renderListing(supabase, id, slug));
+      return sendDoc(res, await renderListing(supabase, id, slug));
     }
 
     if (rawPath === '/prices') {
-      return res.status(200).send(await renderPricesHub(supabase, null));
+      return sendDoc(res, await renderPricesHub(supabase, null));
+    }
+
+    if (rawPath === '/card-shops') {
+      return res.status(200).send(await renderStoresHub(supabase));
+    }
+
+    const storesCityMatch = rawPath.match(/^\/card-shops\/([^/?#]+)/);
+    if (storesCityMatch) {
+      const citySlug = decodeURIComponent(storesCityMatch[1]);
+      if (DIRECTORY_CITIES[citySlug]) {
+        return res.status(200).send(await renderStoresCity(supabase, citySlug));
+      }
+      if (citySlug === 'add') {
+        return res.status(200).send(htmlDoc({
+          title: 'Add Your Card Store — Free Listing | CardPop',
+          description: 'List your trading card store in CardPop\'s free Australian card shop directory and get found by collectors in your city.',
+          canonical: `${BASE_URL}/card-shops/add`,
+          bodyHtml: '<main><h1>Add your card store</h1><p>Free listing in the Australian card shop directory. Submissions are reviewed before going live.</p></main>',
+        }));
+      }
     }
 
     const pricesMatch = rawPath.match(/^\/prices\/([^/?#]+)(?:\/([^/?#]+))?/);
@@ -2062,36 +2326,44 @@ export default async function handler(req, res) {
       const category = decodeURIComponent(pricesMatch[1]);
       const cardSlug = pricesMatch[2] ? decodeURIComponent(pricesMatch[2]) : null;
       if (PRICE_CATEGORIES[category]) {
-        return res.status(200).send(
-          cardSlug
-            ? await renderPriceCard(supabase, category, cardSlug)
-            : await renderPricesHub(supabase, category)
-        );
+        return sendDoc(res, cardSlug
+          ? await renderPriceCard(supabase, category, cardSlug)
+          : await renderPricesHub(supabase, category));
       }
+    }
+
+    const blogCategoryMatch = rawPath.match(/^\/blog\/category\/([^/?#]+)/);
+    if (blogCategoryMatch) {
+      return sendDoc(res, await renderBlogCategory(supabase, decodeURIComponent(blogCategoryMatch[1])));
     }
 
     const blogMatch = rawPath.match(/^\/blog\/([^/?#]+)/);
     if (blogMatch && decodeURIComponent(blogMatch[1]) !== 'category') {
       const param = decodeURIComponent(blogMatch[1]);
-      return res.status(200).send(await renderBlogArticle(supabase, param));
+      return sendDoc(res, await renderBlogArticle(supabase, param));
     }
 
-    // Unknown path — return a minimal, non-indexable document.
-    return res.status(200).send(htmlDoc({
-      title: 'CardPop | Australia\'s Trading Card Marketplace',
-      description: 'Buy, sell and trade trading cards on CardPop.',
+    // Unknown path — a real 404 so crawlers drop the URL instead of tracking
+    // it as an excluded-by-noindex page forever.
+    return sendDoc(res, notFound({
+      title: 'Page Not Found | CardPop',
+      description: 'The page you are looking for could not be found on CardPop.',
       canonical: `${BASE_URL}${rawPath || '/'}`,
-      robots: 'noindex, follow',
-      bodyHtml: '<main><h1>CardPop</h1></main>',
+      bodyHtml: '<main><h1>Page Not Found</h1><p>This page does not exist on CardPop.</p></main>',
     }));
   } catch (err) {
     console.error('Prerender error:', err);
-    return res.status(200).send(htmlDoc({
-      title: 'CardPop',
-      description: 'Buy, sell and trade trading cards on CardPop.',
+    // Transient failure (e.g. Supabase timeout). Answer 503 so crawlers retry
+    // later and keep the currently indexed copy — a 200 + noindex here told
+    // Google to DEINDEX a perfectly good page whenever a recrawl coincided
+    // with a database hiccup. Never cache the error response.
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Retry-After', '300');
+    return res.status(503).send(htmlDoc({
+      title: 'CardPop | Temporarily Unavailable',
+      description: 'CardPop is temporarily unavailable. Please try again shortly.',
       canonical: `${BASE_URL}${rawPath || '/'}`,
-      robots: 'noindex, follow',
-      bodyHtml: '<main><h1>CardPop</h1></main>',
+      bodyHtml: '<main><h1>Temporarily unavailable</h1><p>Please try again in a few minutes.</p></main>',
     }));
   }
 }

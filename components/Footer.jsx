@@ -61,6 +61,7 @@ const Footer = () => {
               <li><Link to="/marketplace" className="hover:text-primary transition-colors">Marketplace</Link></li>
               <li><Link to="/analytics" className="hover:text-primary transition-colors">Analytics</Link></li>
               <li><Link to="/prices" className="hover:text-primary transition-colors">Card Prices (AUD)</Link></li>
+              <li><Link to="/card-shops" className="hover:text-primary transition-colors">Card Shop Directory</Link></li>
               <li><Link to="/grading" className="hover:text-primary transition-colors">Grading Hub</Link></li>
               <li><Link to="/photography-standard" className="hover:text-primary transition-colors">Photography Guide</Link></li>
             </ul>
@@ -92,7 +93,7 @@ const Footer = () => {
 
         <div className="border-t border-border pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
           <p className="text-muted-foreground text-sm font-medium">
-            © {new Date().getFullYear()} CardPop<sup className="text-[0.6em]" style={{textDecoration: 'none'}}>™</sup> Australia. All rights reserved.
+            © {new Date().getFullYear()} CardPop™ Australia. All rights reserved.
           </p>
           <p className="text-muted-foreground text-sm">
             Made with ❤️ for the Australian trading card community

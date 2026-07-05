@@ -85,12 +85,13 @@ describe('ProtectedRoute', () => {
     expect(screen.getByText('Protected Content')).toBeInTheDocument();
   });
 
-  it('renders VerificationPendingPage when authenticated but unverified and requireVerification=true', () => {
+  it('renders VerificationPendingPage when authenticated but unverified and requireVerification=true', async () => {
     renderProtected(
       { loading: false, isAuthenticated: true, isEmailVerified: false },
       { requireVerification: true },
     );
-    expect(screen.getByText('Verification Pending')).toBeInTheDocument();
+    // VerificationPendingPage is now lazily loaded, so wait for it to resolve.
+    expect(await screen.findByText('Verification Pending')).toBeInTheDocument();
     expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
   });
 

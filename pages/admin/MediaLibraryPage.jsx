@@ -86,7 +86,7 @@ const MediaLibraryPage = () => {
       // with a doubled extension (e.g. "name.png.png") in the storage path/URL.
       const base = uploadData.filename.trim().replace(/\.[^/.]+$/, '').replace(/\s+/g, '_');
       const path = `media/${Date.now()}-${base}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('media').upload(path, selectedFile);
+      const { error: upErr } = await supabase.storage.from('media').upload(path, selectedFile, { cacheControl: '31536000' });
       if (upErr) throw upErr;
       const publicUrl = supabase.storage.from('media').getPublicUrl(path).data.publicUrl;
 

@@ -1,8 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, ShieldCheck, Lock, ShoppingCart, ArrowRightLeft, Layers, ZoomIn } from 'lucide-react';
-import ImageZoomModal from '@/components/ImageZoomModal.jsx';
+import { Star, ShieldCheck, Lock, ShoppingCart, ArrowRightLeft, Layers, ZoomIn, HandCoins } from 'lucide-react';
+// Lazy: the zoom modal drags framer-motion (~110 kB) with it, and this card
+// renders on the homepage — load the modal only when a zoom is opened.
+const ImageZoomModal = lazy(() => import('@/components/ImageZoomModal.jsx'));
 import CardShowcase from '@/components/vault/CardShowcase.jsx';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
@@ -18,6 +20,7 @@ const getStatusBadge = (listingType) => {
     case 'For Sale': return { className: 'badge-vault-sale', icon: ShoppingCart };
     case 'For Trade': return { className: 'badge-vault-trade', icon: ArrowRightLeft };
     case 'For Sale & Trade': return { className: 'badge-vault-both', icon: Layers };
+    case 'Expression of Interest': return { className: 'badge-vault-eoi', icon: HandCoins };
     default: return { className: 'bg-muted text-muted-foreground', icon: Lock };
   }
 };
@@ -97,12 +100,16 @@ const VaultListingCard = ({ vaultItem, listing }) => {
         )}
       </Link>
 
-      <ImageZoomModal
-        isOpen={zoomOpen}
-        onClose={() => setZoomOpen(false)}
-        imageUrl={imgSrc}
-        altText={vaultItem.card_name || vaultItem.name || 'Card Image'}
-      />
+      {zoomOpen && (
+        <Suspense fallback={null}>
+          <ImageZoomModal
+            isOpen={zoomOpen}
+            onClose={() => setZoomOpen(false)}
+            imageUrl={imgSrc}
+            altText={vaultItem.card_name || vaultItem.name || 'Card Image'}
+          />
+        </Suspense>
+      )}
       
       <div className="p-5 flex flex-col flex-1">
         <Link to={detailPath} className="block mb-3">

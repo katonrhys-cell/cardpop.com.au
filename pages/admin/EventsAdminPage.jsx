@@ -140,7 +140,7 @@ const EventsAdminPage = () => {
       if (imageFile) {
         const compressed = await compressImage(imageFile);
         const path = `events/${Date.now()}-${compressed.name}`;
-        const { error: upErr } = await supabase.storage.from('events').upload(path, compressed, { upsert: true });
+        const { error: upErr } = await supabase.storage.from('events').upload(path, compressed, { upsert: true, cacheControl: '31536000' });
         if (!upErr) image_url = supabase.storage.from('events').getPublicUrl(path).data.publicUrl;
       }
 

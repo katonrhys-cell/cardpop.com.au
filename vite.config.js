@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import { createLogger, defineConfig } from 'vite';
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import Beasties from 'beasties';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
@@ -15,17 +16,155 @@ const allDeps = Object.keys(pkg.dependencies || {});
 //   • app.html   — a shell-less copy served for every OTHER route via the
 //     catch-all rewrite in vercel.json, so those pages never flash the homepage
 //     hero. Both reference the identical hashed JS/CSS, so the SPA boots the same.
+// CSP `strict-dynamic` bootstrap. The parser-inserted module entry tag can't be
+// allowlisted by hash in a static vercel.json (its filename hash changes every
+// build), so we swap it for this CONSTANT inline script: the build-varying bits
+// (entry URL + modulepreload list) travel in data attributes, which a CSP hash
+// does not cover — the script text (and therefore its sha256 in vercel.json's
+// script-src) stays identical across builds. The bootstrap re-injects the
+// preloads and a module <script> for the entry; being non-parser-inserted,
+// both are trusted under 'strict-dynamic'. (It must NOT use dynamic import()
+// for the entry — Chrome does not extend strict-dynamic trust to import()
+// from classic scripts, only to injected script elements and to import()
+// from module scripts.) The v() path check pins loads to same-origin
+// /assets/*.js so a markup-injected copy of this hashed script can't be
+// aimed at a foreign URL, and the one-off Trusted Types policy satisfies
+// require-trusted-types-for before the app's default policy exists.
+// If you change this string you MUST update the sha256 in vercel.json — the
+// build fails with the new value otherwise.
+// data-preload-low is a second, OPTIONAL list injected with fetchPriority="low"
+// (a no-op expando in browsers without fetchpriority support): the homepage's
+// lazy route chunks preload there so they fill spare bandwidth without
+// competing with the critical entry/vendor chunks. It must be injected via
+// this trusted script, not as parser-inserted <link> tags — under
+// 'strict-dynamic' the browser blocks modulepreloads that don't originate
+// from an already-trusted script.
+const CSP_BOOTSTRAP = '(function(){var s=document.currentScript,d=s.dataset,h=document.head;function v(p){return p.lastIndexOf("/assets/",0)===0&&p.indexOf("..")<0&&p.slice(-3)===".js"}function ld(t,lo){(t||"").split(",").forEach(function(p){if(v(p)){var l=document.createElement("link");l.rel="modulepreload";l.href=p;l.crossOrigin="";if(lo)l.fetchPriority="low";h.appendChild(l)}})}var tt=window.trustedTypes,pol=tt&&tt.createPolicy?tt.createPolicy("cardpop#bootstrap",{createScriptURL:function(u){return u}}):null;ld(d.preload);if(v(d.entry)){var m=document.createElement("script");m.type="module";m.crossOrigin="";m.src=pol?pol.createScriptURL(d.entry):d.entry;h.appendChild(m)}ld(d.preloadLow,1)})()';
+
+const ENTRY_SCRIPT_RE = /<script type="module" crossorigin src="([^"]+)"><\/script>/;
+
+function applyCspBootstrap(html, warn) {
+	const entryMatch = html.match(ENTRY_SCRIPT_RE);
+	if (!entryMatch) {
+		warn('csp-bootstrap: module entry <script> not found — HTML left untouched');
+		return html;
+	}
+	const preloads = [];
+	html = html.replace(/\s*<link rel="modulepreload" crossorigin href="([^"]+)">/g, (_, href) => {
+		preloads.push(href);
+		return '';
+	});
+	return html.replace(
+		ENTRY_SCRIPT_RE,
+		`<script data-entry="${entryMatch[1]}" data-preload="${preloads.join(',')}">${CSP_BOOTSTRAP}</script>`
+	);
+}
+
+// Guard against drift: the bootstrap text emitted into the final HTML (after
+// beasties re-serialization) must still hash to the value pinned in
+// vercel.json's script-src, or the browser will refuse to run the app.
+function verifyCspBootstrap(ctx, htmlFiles) {
+	const hash = `'sha256-${createHash('sha256').update(CSP_BOOTSTRAP, 'utf8').digest('base64')}'`;
+	const vercelCfg = readFileSync(path.resolve(__dirname, 'vercel.json'), 'utf-8');
+	if (!vercelCfg.includes(hash)) {
+		ctx.error(`csp-bootstrap: vercel.json script-src is missing ${hash} — update every Content-Security-Policy header`);
+	}
+	for (const file of htmlFiles) {
+		const emitted = readFileSync(file, 'utf-8').match(/<script data-entry[^>]*>([\s\S]*?)<\/script>/);
+		if (!emitted) continue; // applyCspBootstrap already warned
+		if (emitted[1] !== CSP_BOOTSTRAP) {
+			ctx.error(`csp-bootstrap: inline bootstrap in ${file} was altered post-transform — its hash no longer matches vercel.json`);
+		}
+	}
+}
+
+// Walk a route entry chunk's static import graph and return every JS chunk
+// (and imported CSS file) it needs. Used to extend index.html's modulepreload
+// list with the homepage's lazy chunk graph: without this, the browser learns
+// about HomePage.jsx (and its ~50 icon/component chunks) only AFTER the entry
+// bundle has downloaded, parsed and mounted React — a second full network
+// round-trip that stretches the static-shell → full-render gap by seconds on
+// mobile. Preloading them in parallel with the critical path collapses that
+// waterfall. Only index.html gets this (it is only ever served for "/");
+// app.html routes vary, so they keep the default on-demand loading.
+function collectRouteChunkFiles(bundle, facadeSuffix) {
+	const entryFile = Object.keys(bundle).find((f) => {
+		const c = bundle[f];
+		return c.type === 'chunk' && c.facadeModuleId?.endsWith(facadeSuffix);
+	});
+	if (!entryFile) return null;
+	const js = [];
+	const css = new Set();
+	const seen = new Set();
+	const visit = (file) => {
+		if (seen.has(file)) return;
+		seen.add(file);
+		const chunk = bundle[file];
+		if (!chunk || chunk.type !== 'chunk') return;
+		js.push(file);
+		for (const c of chunk.viteMetadata?.importedCss ?? []) css.add(c);
+		for (const imp of chunk.imports ?? []) visit(imp);
+	};
+	visit(entryFile);
+	return { js, css: [...css] };
+}
+
+// Append the homepage route's chunk files to the CSP bootstrap's data-preload
+// list (deduped against the critical-path preloads already there) and emit
+// <link rel="preload" as="style"> for its CSS. Attribute-only change: the
+// bootstrap script text — and therefore its CSP hash — is untouched.
+function addHomeRoutePreloads(html, bundle, warn) {
+	const files = collectRouteChunkFiles(bundle, 'pages/HomePage.jsx');
+	if (!files) {
+		warn('home-shell: HomePage chunk not found in bundle — route preloads skipped');
+		return html;
+	}
+	const preloadAttr = html.match(/data-preload="([^"]*)"/);
+	const entryAttr = html.match(/data-entry="([^"]*)"/);
+	if (!preloadAttr) {
+		warn('home-shell: data-preload attribute not found — route preloads skipped');
+		return html;
+	}
+	const existing = new Set(preloadAttr[1].split(',').filter(Boolean));
+	if (entryAttr) existing.add(entryAttr[1]);
+	const extra = files.js.map((f) => `/${f}`).filter((f) => !existing.has(f));
+	if (extra.length > 0) {
+		// Low-priority list so these never contend with the critical-path chunks
+		// (see the data-preload-low note above CSP_BOOTSTRAP).
+		html = html.replace(preloadAttr[0], `${preloadAttr[0]} data-preload-low="${extra.join(',')}"`);
+	}
+	// Chunks shared with the entry report the main index-*.css as their imported
+	// CSS — skip anything the document already references (it's inlined/preloaded
+	// separately) so only genuinely lazy stylesheets get a preload.
+	const cssPreloads = files.css
+		.filter((f) => !html.includes(`href="/${f}"`))
+		.map((f) => `<link rel="preload" as="style" fetchpriority="low" crossorigin href="/${f}">`)
+		.join('');
+	if (cssPreloads) html = html.replace('</head>', `${cssPreloads}</head>`);
+	return html;
+}
+
+// The metric-adjusted fallback face for Syne, injected into the "/" document's
+// critical CSS after beasties runs (beasties' inlineFonts keeps url() faces like
+// Syne itself but drops local()-only faces, so this one needs manual injection).
+// It must be available before the full stylesheet arrives: the hero <h1> — the
+// homepage LCP element — paints from the static shell with this fallback, and
+// its size-adjust is deliberately oversized so no later Syne repaint can become
+// a larger LCP candidate (see index.css). Keep in sync with index.css.
+const SYNE_FALLBACK_FONT_FACE =
+	"@font-face{font-family:'Syne Fallback';src:local('Arial'),local('Roboto'),local('Liberation Sans'),local('DejaVu Sans');ascent-override:94%;descent-override:26%;line-gap-override:0%;size-adjust:115%}";
+
 function homeShellPlugin() {
 	const shellPath = path.resolve(__dirname, 'tools/home-shell.html');
 	return {
 		name: 'cardpop-home-shell',
 		apply: 'build',
-		async writeBundle(outputOptions) {
+		async writeBundle(outputOptions, bundle) {
 			const outDir = outputOptions.dir || path.resolve(__dirname, 'dist');
 			const indexPath = path.join(outDir, 'index.html');
 			if (!existsSync(indexPath)) return;
 
-			const builtIndex = readFileSync(indexPath, 'utf-8');
+			const builtIndex = applyCspBootstrap(readFileSync(indexPath, 'utf-8'), (m) => this.warn(m));
 			// Shell-less document for all non-root routes (CSS stays render-blocking
 			// there — those pages are React-gated, so it costs them nothing).
 			writeFileSync(path.join(outDir, 'app.html'), builtIndex, 'utf-8');
@@ -51,17 +190,51 @@ function homeShellPlugin() {
 					publicPath: '/',
 					preload: 'media',
 					pruneSource: false,
-					inlineFonts: false,
+					// Inline the @font-face declarations (Syne + metric-adjusted 'Syne
+					// Fallback') into the critical CSS. Without them the shell's hero
+					// <h1> paints in an arbitrary system font with no size-adjust, so
+					// the later React repaint registers as a larger LCP candidate and
+					// drags LCP from ~0.8s to whenever the JS bundle lands (see the
+					// 'Syne Fallback' comment in index.css).
+					inlineFonts: true,
 					preloadFonts: false,
 					logLevel: 'silent',
 				});
 				const processed = await beasties.process(indexHtml);
 				indexHtml = processed.replace(/ onload="this\.media='all'"/g, ' data-async-style');
+
+				// The deferred (media="print") stylesheet is fetched at the browser's
+				// LOWEST priority, so on slow connections it loses the bandwidth race
+				// against the JS chunks — and main.jsx gates the React mount on it
+				// (2s fail-safe), leaving the static shell up even after the JS is
+				// ready. A preload at as="style" priority makes it arrive alongside
+				// the critical JS instead; same URL, so no double-download.
+				indexHtml = indexHtml.replace(
+					/<link rel="stylesheet"([^>]*?) media="print" data-async-style>/g,
+					(tag, attrs) => {
+						const href = attrs.match(/href="([^"]+)"/)?.[1];
+						return href ? `<link rel="preload" as="style" crossorigin href="${href}">${tag}` : tag;
+					},
+				);
 			} catch (e) {
 				this.warn(`home-shell: critical-CSS inlining skipped (${e.message}); CSS stays render-blocking`);
 			}
 
+			// Preload the homepage route's lazy chunk graph in parallel with the
+			// critical path (see collectRouteChunkFiles above).
+			indexHtml = addHomeRoutePreloads(indexHtml, bundle, (m) => this.warn(m));
+
+			// Beasties drops the local()-only 'Syne Fallback' face from the inlined
+			// critical CSS — put it back so the shell's LCP <h1> paints with the
+			// oversized metric-adjusted fallback (see SYNE_FALLBACK_FONT_FACE above).
+			if (indexHtml.includes('<style>')) {
+				indexHtml = indexHtml.replace('<style>', `<style>${SYNE_FALLBACK_FONT_FACE}`);
+			} else {
+				this.warn('home-shell: no inline <style> found — Syne Fallback face not injected');
+			}
+
 			writeFileSync(indexPath, indexHtml, 'utf-8');
+			verifyCspBootstrap(this, [indexPath, path.join(outDir, 'app.html')]);
 		},
 	};
 }
@@ -136,6 +309,12 @@ export default defineConfig({
 					// @sentry/react), which a loose includes('/react/') would wrongly
 					// pull into vendor-react and drag onto the critical path.
 					if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'vendor-react';
+					// NOTE: lucide-react is deliberately NOT forced into one manual chunk.
+					// A single vendor-icons chunk dragged EVERY icon used anywhere in the
+					// app (~45 KB) onto the critical path, because the eager Header/hero
+					// import a handful of icons and the whole chunk came with them.
+					// Letting rolldown auto-split keeps eager icons tiny while each page's
+					// icons ride along with that page's lazy chunk.
 					// NOTE: framer-motion is deliberately NOT forced into its own manual
 					// chunk. When it was, rolldown hoisted a shared react/jsx-runtime
 					// helper into that chunk, and because the eager entry needs jsx-runtime
@@ -143,7 +322,6 @@ export default defineConfig({
 					// ~37 KB of animation code on the critical path even though only lazy
 					// pages use it. Letting rolldown auto-split framer-motion keeps it off
 					// the initial load (loaded on-demand with the pages that animate).
-					if (id.includes('lucide-react')) return 'vendor-icons';
 					// NOTE: @radix-ui is deliberately NOT forced into one manual chunk.
 					// The eager Header only needs a couple of primitives (dialog/slot),
 					// but a single vendor-radix chunk dragged EVERY radix primitive used
@@ -152,7 +330,15 @@ export default defineConfig({
 					// auto-split radix keeps the shared core eager while each primitive
 					// rides along with the lazy page that actually uses it.
 					if (id.includes('react-router')) return 'vendor-router';
-					if (id.includes('react-hook-form') || id.includes('@hookform') || id.includes('zod')) return 'vendor-forms';
+					// NOTE: react-hook-form / zod / @hookform are deliberately NOT forced
+					// into a vendor-forms chunk. Because react-hook-form imports
+					// react/jsx-runtime, rolldown hoisted a shared react helper into that
+					// chunk; the eager entry needs jsx-runtime, so it statically pulled the
+					// whole vendor-forms chunk — dragging ~40 KB gzip of zod + react-hook-form
+					// onto the critical path even though only lazy form pages (login, signup,
+					// checkout, admin) use them. Same failure mode documented for
+					// framer-motion and radix above. Letting rolldown auto-split forms keeps
+					// them off first paint, riding along with the lazy page that needs them.
 					if (id.includes('@sentry')) return 'vendor-sentry';
 					if (id.includes('date-fns') || id.includes('react-day-picker')) return 'vendor-dates';
 					if (id.includes('@stripe') || id.includes('stripe')) return 'vendor-stripe';

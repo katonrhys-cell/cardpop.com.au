@@ -21,6 +21,7 @@ import { slugify } from '@/lib/slugify.js';
 import { CARD_VARIANTS, getCardVariants } from '@/lib/cardVariants.js';
 import { fetchPinnedSectionItems, mergePinned } from '@/lib/collectionSections.js';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 // ─── Hero floating icon animation ───────────────────────────────────────────
 const floatVariants = {
@@ -47,7 +48,7 @@ const CardSkeleton = () => (
 const MiniListingCard = ({ listing, accentHex, badge }) => {
   const imgPath = listing.card_image || listing.vault_images?.[0]?.storage_path || null;
   const imgSrc = imgPath
-    ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
+    ? (publicImageUrl(imgPath))
     : null;
   const price = listing.estimated_value_aud ?? listing.price_aud ?? listing.price ?? 0;
   const title = listing.card_name ?? listing.title ?? listing.name ?? 'Untitled';
@@ -109,7 +110,7 @@ const MiniListingCard = ({ listing, accentHex, badge }) => {
 const HolyGrailCard = ({ card, accentHex }) => {
   const imgPath = card.card_image || card.vault_images?.[0]?.storage_path || null;
   const imgSrc = imgPath
-    ? (imgPath.startsWith('http') ? imgPath : supabase.storage.from('vault-images').getPublicUrl(imgPath).data.publicUrl)
+    ? (publicImageUrl(imgPath))
     : null;
   const price = card.estimated_value_aud ?? 0;
   const title = card.card_name ?? 'Featured Card';

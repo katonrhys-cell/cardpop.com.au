@@ -2,23 +2,36 @@
 
 /* Brand heading font — self-hosted (same-origin) Syne variable font, latin
    subset, weight axis 400–800. Self-hosting replaces the flaky runtime Google
-   Fonts loader so headings render Syne reliably across the site. */
+   Fonts loader so headings render Syne reliably across the site.
+   unicode-range is the standard latin subset MINUS U+2122 (™): Syne's own ™
+   glyph is drawn with a built-in underline, which reads as an underlined
+   trademark mark in the logo and headings. Excluding the codepoint makes ™
+   fall through to the fallback fonts, whose ™ has no underline. */
 @font-face {
   font-family: 'Syne';
   font-style: normal;
   font-weight: 400 800;
   font-display: swap;
   src: url('/fonts/syne-latin-var.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2191, U+2193,
+    U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-/* Metric-adjusted fallback for Syne — reduces layout shift if Syne isn't cached yet */
+/* Metric-adjusted fallback for Syne — reduces layout shift if Syne isn't cached yet.
+   size-adjust is deliberately a touch LARGER than a pure metric match: the homepage
+   LCP is the hero <h1> painted from the static HTML shell with this fallback, and
+   Chrome only re-assigns LCP to a later paint if that paint is BIGGER. Keeping the
+   fallback's painted area ≥ real Syne's means the React-rendered h1 (which arrives
+   seconds later on slow mobile) can never steal LCP from the shell's first paint.
+   Mirror any change here into the inline critical CSS in index.html. */
 @font-face {
   font-family: 'Syne Fallback';
-  src: local('Arial');
+  src: local('Arial'), local('Roboto'), local('Liberation Sans'), local('DejaVu Sans');
   ascent-override: 94%;
   descent-override: 26%;
   line-gap-override: 0%;
-  size-adjust: 107%;
+  size-adjust: 115%;
 }
 
 @tailwind base;
@@ -99,6 +112,8 @@
     --vault-trade-foreground:   0 0% 100%;
     --vault-both:               38 92% 50%;
     --vault-both-foreground:    215 28% 17%;
+    --vault-eoi:                199 89% 48%;
+    --vault-eoi-foreground:     0 0% 100%;
 
     /* ── Profile Tokens ─────────────────────────────────────────────── */
     --profile-bg:       0 0% 100%;
@@ -175,6 +190,8 @@
     --vault-trade-foreground:   0 0% 100%;
     --vault-both:               38 92% 50%;
     --vault-both-foreground:    215 28% 10%;
+    --vault-eoi:                199 89% 55%;
+    --vault-eoi-foreground:     215 28% 10%;
 
     /* ── Profile Tokens (Dark) ──────────────────────────────────────── */
     --profile-bg:       215 28% 13%;
@@ -244,6 +261,11 @@
     color: hsl(var(--vault-both-foreground));
     border: none;
   }
+  .badge-vault-eoi {
+    background-color: hsl(var(--vault-eoi));
+    color: hsl(var(--vault-eoi-foreground));
+    border: none;
+  }
 
   /* Drag and Drop Styles */
   .dragging {
@@ -287,6 +309,54 @@
 @keyframes marquee {
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }
+}
+
+/* ═══════════════════════════════════════════════════════
+   HOMEPAGE ENTRANCE ANIMATIONS — CSS replacements for the
+   framer-motion tweens the homepage used to ship. Keeping
+   these in CSS keeps framer-motion (~110 kB + ~1.5 s of
+   main-thread execution on a mid-range phone) off the
+   homepage's critical path. Elements start visible unless
+   a component explicitly hides them until in view.
+   ═══════════════════════════════════════════════════════ */
+
+@keyframes anim-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes anim-reveal-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes anim-pop-in {
+  from { opacity: 0; transform: scale(0.9); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes anim-ticker-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes anim-slide-in-right {
+  from { opacity: 0; transform: translateX(50px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes anim-slide-in-left {
+  from { opacity: 0; transform: translateX(-50px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.anim-fade-in        { animation: anim-fade-in 0.6s ease-out both; }
+.anim-reveal-up      { animation: anim-reveal-up 0.5s ease-out both; }
+.anim-pop-in         { animation: anim-pop-in 0.5s ease-out both; }
+.anim-ticker-in      { animation: anim-ticker-in 0.4s ease-out both; }
+.anim-slide-in-right { animation: anim-slide-in-right 0.22s ease-in-out both; }
+.anim-slide-in-left  { animation: anim-slide-in-left 0.22s ease-in-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-fade-in, .anim-reveal-up, .anim-pop-in, .anim-ticker-in,
+  .anim-slide-in-right, .anim-slide-in-left {
+    animation: none;
+  }
 }
 /* ═══════════════════════════════════════════════════════
    PROSE STYLES — Generic content container spacing

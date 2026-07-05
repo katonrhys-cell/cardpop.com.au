@@ -18,6 +18,56 @@ import { supabase } from '@/lib/supabaseClient.js';
 const DEFAULT_BUCKET = 'vault-images';
 const DEFAULT_WIDTHS = [240, 400, 600];
 
+// Optional image CDN in front of Supabase Storage (a Cloudflare Worker on
+// img.cardpop.com.au — see cloudflare/image-proxy-worker.js — or any host
+// that proxies /storage/v1/... paths). Supabase egress is metered — including
+// its own CDN's cache hits — so serving images through an external CDN takes
+// storage traffic off the Supabase quota. When VITE_IMAGE_CDN_HOST is set
+// (e.g. `img.cardpop.com.au`), public storage URLs are rewritten to that
+// host; when unset, everything below is a no-op and URLs stay on Supabase.
+// See docs/image-cdn.md.
+let cdnOrigin = normalizeCdnHost(import.meta.env?.VITE_IMAGE_CDN_HOST);
+
+function normalizeCdnHost(host) {
+  if (!host || typeof host !== 'string') return null;
+  const trimmed = host.trim().replace(/\/+$/, '');
+  if (!trimmed) return null;
+  return /^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+// For tests — override the CDN origin without stubbing import.meta.env.
+export function _setCdnHostForTests(host) {
+  cdnOrigin = normalizeCdnHost(host);
+}
+
+// Matches the origin of a Supabase storage public URL, keeping the
+// `/storage/v1/...` path intact so the CDN can proxy it verbatim.
+const SUPABASE_STORAGE_URL_RE =
+  /^https?:\/\/[^/]+\.supabase\.(co|in)(\/storage\/v1\/(?:object|render\/image)\/public\/.+)$/;
+
+/**
+ * Rewrite a Supabase storage public URL onto the image CDN, if one is
+ * configured. Any other URL (external images, signed URLs, null) is returned
+ * unchanged, so this is always safe to apply.
+ */
+export function toCdnUrl(url) {
+  if (!cdnOrigin || typeof url !== 'string') return url ?? null;
+  const match = url.match(SUPABASE_STORAGE_URL_RE);
+  return match ? `${cdnOrigin}${match[2]}` : url;
+}
+
+/**
+ * Public URL for an image that may be stored as a bucket path or an absolute
+ * URL (both shapes exist in the database). Routes through the image CDN when
+ * configured. Use this instead of calling `getPublicUrl` directly at render
+ * time.
+ */
+export function publicImageUrl(pathOrUrl, bucket = DEFAULT_BUCKET) {
+  if (!pathOrUrl || typeof pathOrUrl !== 'string') return null;
+  if (isHttp(pathOrUrl)) return toCdnUrl(pathOrUrl);
+  return toCdnUrl(supabase.storage.from(bucket).getPublicUrl(pathOrUrl).data.publicUrl);
+}
+
 // Session-scoped: set true the first time a transformed URL 404/errors.
 let transformsUnavailable = false;
 
@@ -55,10 +105,13 @@ export function getCardImage(pathOrUrl, opts = {}) {
 
   // Already an absolute URL (legacy/external image) — nothing to transform.
   if (isHttp(pathOrUrl)) {
-    return { src: pathOrUrl, srcSet: null, fallbackSrc: pathOrUrl };
+    const direct = toCdnUrl(pathOrUrl);
+    return { src: direct, srcSet: null, fallbackSrc: direct };
   }
 
-  const fallbackSrc = supabase.storage.from(bucket).getPublicUrl(pathOrUrl).data.publicUrl;
+  const fallbackSrc = toCdnUrl(
+    supabase.storage.from(bucket).getPublicUrl(pathOrUrl).data.publicUrl
+  );
 
   // Feature known-off this session → just serve the original.
   if (transformsUnavailable) {
@@ -66,9 +119,11 @@ export function getCardImage(pathOrUrl, opts = {}) {
   }
 
   const at = (width) =>
-    supabase.storage.from(bucket).getPublicUrl(pathOrUrl, {
-      transform: { width, quality, resize: 'cover' },
-    }).data.publicUrl;
+    toCdnUrl(
+      supabase.storage.from(bucket).getPublicUrl(pathOrUrl, {
+        transform: { width, quality, resize: 'cover' },
+      }).data.publicUrl
+    );
 
   const sorted = [...widths].sort((a, b) => a - b);
   const srcSet = sorted.map((w) => `${at(w)} ${w}w`).join(', ');

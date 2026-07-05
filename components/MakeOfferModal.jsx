@@ -25,9 +25,17 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
   const [submitted, setSubmitted] = useState(false);
 
   const listingPrice = listing?.price_aud || 0;
+  // Expression-of-interest listings have no fixed price — the seller publishes
+  // an indicative range instead, and the offer UI anchors on that.
+  const rangeMin = listing?.price_min_aud != null ? Number(listing.price_min_aud) : null;
+  const rangeMax = listing?.price_max_aud != null ? Number(listing.price_max_aud) : null;
+  const isRange = listingPrice <= 0 && (rangeMin != null || rangeMax != null);
   const numericAmount = parseFloat(amount) || 0;
   const savings = listingPrice - numericAmount;
   const savingsPct = listingPrice > 0 ? (savings / listingPrice) * 100 : 0;
+  const withinRange = isRange && numericAmount > 0
+    && (rangeMin == null || numericAmount >= rangeMin)
+    && (rangeMax == null || numericAmount <= rangeMax);
 
   const handleClose = () => {
     if (submitting) return;
@@ -35,10 +43,6 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
     setMessage('');
     setSubmitted(false);
     onClose();
-  };
-
-  const handleQuickPick = (pct) => {
-    setAmount((listingPrice * pct).toFixed(2));
   };
 
   const handleSubmit = async () => {
@@ -55,7 +59,8 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
       toast.error('Please enter a valid offer amount');
       return;
     }
-    if (numericAmount > listingPrice * 1.5) {
+    const sanityCap = isRange ? (rangeMax ?? rangeMin) : listingPrice;
+    if (sanityCap > 0 && numericAmount > sanityCap * 1.5) {
       toast.error('Offer amount seems unusually high');
       return;
     }
@@ -122,16 +127,30 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
               {/* Price context */}
               <div className="flex items-center justify-between p-4 bg-muted/50 rounded-xl border border-border">
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-0.5">Asking Price</p>
-                  <p className="text-2xl font-extrabold tabular-nums">${listingPrice.toFixed(2)}</p>
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-0.5">
+                    {isRange ? "Seller Is Looking For" : 'Asking Price'}
+                  </p>
+                  <p className="text-2xl font-extrabold tabular-nums">
+                    {isRange
+                      ? `$${(rangeMin ?? rangeMax).toFixed(2)}${rangeMax != null && rangeMin != null ? ` – $${rangeMax.toFixed(2)}` : ''}`
+                      : `$${listingPrice.toFixed(2)}`}
+                  </p>
                 </div>
                 {numericAmount > 0 && (
                   <div className="text-right">
                     <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-0.5">Your Offer</p>
-                    <p className={`text-2xl font-extrabold tabular-nums ${numericAmount < listingPrice ? 'text-primary' : 'text-foreground'}`}>
+                    <p className={`text-2xl font-extrabold tabular-nums ${!isRange && numericAmount < listingPrice ? 'text-primary' : 'text-foreground'}`}>
                       ${numericAmount.toFixed(2)}
                     </p>
-                    {savings > 0 && (
+                    {isRange ? (
+                      withinRange ? (
+                        <p className="text-xs text-emerald-600 font-bold">Within the seller's range</p>
+                      ) : (
+                        <p className="text-xs text-amber-600 font-bold">
+                          {rangeMin != null && numericAmount < rangeMin ? "Below the seller's range" : "Above the seller's range"}
+                        </p>
+                      )
+                    ) : savings > 0 && (
                       <p className="text-xs text-emerald-600 font-bold">Save ${savings.toFixed(2)} ({savingsPct.toFixed(0)}% off)</p>
                     )}
                   </div>
@@ -142,19 +161,26 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Quick select</p>
                 <div className="grid grid-cols-3 gap-2">
-                  {QUICK_PERCENTAGES.map(({ label, pct }) => (
+                  {(isRange
+                    ? [
+                        { label: 'Low end', value: rangeMin ?? rangeMax },
+                        { label: 'Middle', value: ((rangeMin ?? rangeMax) + (rangeMax ?? rangeMin)) / 2 },
+                        { label: 'Top end', value: rangeMax ?? rangeMin },
+                      ]
+                    : QUICK_PERCENTAGES.map(({ label, pct }) => ({ label, value: listingPrice * pct }))
+                  ).map(({ label, value }) => (
                     <button
                       key={label}
                       type="button"
-                      onClick={() => handleQuickPick(pct)}
+                      onClick={() => setAmount(value.toFixed(2))}
                       className={`px-3 py-2.5 rounded-xl border text-sm font-bold transition-colors ${
-                        amount === (listingPrice * pct).toFixed(2)
+                        amount === value.toFixed(2)
                           ? 'bg-primary text-primary-foreground border-primary'
                           : 'bg-card border-border hover:border-primary/50 hover:bg-muted/60'
                       }`}
                     >
                       <span className="block">{label}</span>
-                      <span className="block text-[11px] font-normal opacity-70">${(listingPrice * pct).toFixed(2)}</span>
+                      <span className="block text-[11px] font-normal opacity-70">${value.toFixed(2)}</span>
                     </button>
                   ))}
                 </div>

@@ -2,7 +2,7 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
-import { Toaster } from '@/components/ui/sonner';
+import Toaster from '@/components/ToasterLazy.jsx';
 
 // Contexts
 import { AuthProvider } from '@/contexts/AuthContext.jsx';
@@ -12,7 +12,10 @@ import { CategoryHierarchyProvider } from '@/contexts/CategoryContext.jsx';
 
 // Layouts & Core Components
 import Header from '@/components/Header.jsx';
-import Footer from '@/components/Footer.jsx';
+// Footer sits below the fold and pulls NewsletterSignup → sonner. Lazy-loading
+// keeps that (and the toast library) off the initial critical path; it hydrates
+// as the page settles, well before the user can scroll to it.
+const Footer = lazy(() => import('@/components/Footer.jsx'));
 import ScrollToTop from '@/components/ScrollToTop.jsx';
 import ProtectedRoute from '@/components/ProtectedRoute.jsx';
 import ProtectedAdminRoute from '@/components/ProtectedAdminRoute.jsx';
@@ -132,6 +135,11 @@ const AustralianMarketsPage = lazy(() => import('@/pages/AustralianMarketsPage.j
 const CardPricesHubPage = lazy(() => import('@/pages/prices/CardPricesHubPage.jsx'));
 const CardPriceDetailPage = lazy(() => import('@/pages/prices/CardPriceDetailPage.jsx'));
 
+// Store directory
+const CardShopsHubPage = lazy(() => import('@/pages/stores/CardShopsHubPage.jsx'));
+const CardShopsCityPage = lazy(() => import('@/pages/stores/CardShopsCityPage.jsx'));
+const AddStorePage = lazy(() => import('@/pages/stores/AddStorePage.jsx'));
+
 // Grading
 const GradingPage = lazy(() => import('@/pages/grading/GradingPage.jsx'));
 const GradingScalePage = lazy(() => import('@/pages/grading/GradingScalePage.jsx'));
@@ -187,6 +195,7 @@ const FeaturedCardsAdminPage = lazy(() => import('@/pages/FeaturedCardsAdminPage
 const HeroShowcaseAdminPage = lazy(() => import('@/pages/admin/HeroShowcaseAdminPage.jsx'));
 const CollectionSectionsAdminPage = lazy(() => import('@/pages/admin/CollectionSectionsAdminPage.jsx'));
 const ChatModerationPage = lazy(() => import('@/pages/admin/ChatModerationPage.jsx'));
+const StoreDirectoryAdminPage = lazy(() => import('@/pages/admin/StoreDirectoryAdminPage.jsx'));
 const ListingsManagementPage = lazy(() => import('@/pages/ListingsManagementPage.jsx'));
 
 // Previously-orphaned pages now wired up
@@ -340,6 +349,11 @@ const App = () => {
                         <Route path="/prices" element={<CardPricesHubPage />} />
                         <Route path="/prices/:category" element={<CardPricesHubPage />} />
                         <Route path="/prices/:category/:slug" element={<CardPriceDetailPage />} />
+
+                        {/* Store directory (SEO) */}
+                        <Route path="/card-shops" element={<CardShopsHubPage />} />
+                        <Route path="/card-shops/add" element={<AddStorePage />} />
+                        <Route path="/card-shops/:city" element={<CardShopsCityPage />} />
                         <Route path="/card-market/:cardId" element={<CardMarketDetailPage />} />
                         <Route path="/category/:categoryId" element={<CategoryRoute />} />
                         
@@ -431,6 +445,7 @@ const App = () => {
                           <Route path="collection-sections" element={<CollectionSectionsAdminPage />} />
                           <Route path="all-listings" element={<ListingsManagementPage />} />
                           <Route path="messages" element={<ChatModerationPage />} />
+                          <Route path="store-directory" element={<StoreDirectoryAdminPage />} />
                         </Route>
                         
                         {/* --- CATCH-ALL 404 ROUTE --- */}
@@ -440,7 +455,9 @@ const App = () => {
                     </RouteErrorBoundary>
                   </main>
                   
-                  <Footer />
+                  <Suspense fallback={null}>
+                    <Footer />
+                  </Suspense>
                   <ShoppingCart />
                   <Toaster position="bottom-right" richColors closeButton />
                 </div>

@@ -23,16 +23,42 @@ on:
     paths:
       - 'supabase/migrations/**'
       - 'supabase/config.toml'
+  # Duplicate-version check on PRs: two branches picking the same version
+  # prefix (e.g. both choosing <date>000001) has now broken db push twice —
+  # the version is the PRIMARY KEY of schema_migrations, so the second file
+  # can never be applied. Catch it before merge instead of at deploy time.
+  pull_request:
+    paths:
+      - 'supabase/migrations/**'
   # Allow a manual re-run from the Actions tab if a push ever fails.
   workflow_dispatch:
 
 # Never let two migration pushes overlap, and never cancel one mid-apply.
 concurrency:
-  group: supabase-migrations
+  group: supabase-migrations-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  check-versions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Fail on duplicate migration version prefixes
+        run: |
+          dups=$(ls supabase/migrations | grep -oE '^[0-9]+' | sort | uniq -d)
+          if [ -n "$dups" ]; then
+            echo "::error::Duplicate migration version prefix(es): $dups"
+            echo "Each migration needs a unique version — rename one file (e.g. bump to the current timestamp)."
+            exit 1
+          fi
+          echo "All migration versions unique."
+
   db-push:
+    # Deploy only on pushes to main; PRs run the version check alone.
+    if: github.event_name != 'pull_request'
+    needs: check-versions
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -47,6 +73,13 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        # --include-all: the 2026-07-03 hand-applied change (version
+        # 20260703051406, see the placeholder migration of that name) sits
+        # ABOVE several repo migrations that were never applied because every
+        # push that day failed on the history-drift check. Without the flag the
+        # CLI refuses to apply local migrations whose version is lower than the
+        # newest remote one. All repo migrations are idempotent, so applying
+        # stragglers out of order is safe.
         run: |
           supabase link --project-ref odoglvswwymyjuwlonkf
-          supabase db push
+          supabase db push --include-all

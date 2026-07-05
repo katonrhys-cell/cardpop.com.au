@@ -61,6 +61,19 @@ function renderHeader() {
 beforeEach(() => {
   vi.clearAllMocks();
   document.body.style.pointerEvents = '';
+  // The Header's desktop Row-2 nav is gated behind useIsDesktop (a min-width
+  // media query). Report a desktop viewport so the dropdown tests exercise it;
+  // the mobile hamburger tests are unaffected (the Sheet renders regardless).
+  window.matchMedia = vi.fn().mockImplementation((query) => ({
+    matches: query.includes('min-width: 1024px'),
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  }));
 });
 
 // ─── Mobile hamburger menu ────────────────────────────────────────────────────
@@ -70,11 +83,12 @@ describe('Header mobile hamburger menu — consecutive navigations', () => {
     const user = userEvent.setup();
     renderHeader();
 
-    // First selection: open hamburger, tap "Shop"
+    // First selection: open hamburger, tap "Shop". The Sheet body is lazily
+    // loaded, so wait for its links to appear.
     await user.click(screen.getByRole('button', { name: /open menu/i }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toBeInTheDocument();
-    await user.click(screen.getByRole('link', { name: 'Shop' }));
+    await user.click(await screen.findByRole('link', { name: 'Shop' }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/shop'));
 
     // Sheet must be fully closed and the page must be interactive again
@@ -84,7 +98,7 @@ describe('Header mobile hamburger menu — consecutive navigations', () => {
     // Second selection: open hamburger again, tap "Marketplace"
     await user.click(screen.getByRole('button', { name: /open menu/i }));
     await screen.findByRole('dialog');
-    await user.click(screen.getByRole('link', { name: 'Marketplace' }));
+    await user.click(await screen.findByRole('link', { name: 'Marketplace' }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/marketplace'));
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -97,16 +111,16 @@ describe('Header mobile hamburger menu — consecutive navigations', () => {
 
     await user.click(screen.getByRole('button', { name: /open menu/i }));
     await screen.findByRole('dialog');
-    await user.click(screen.getByRole('button', { name: /trading card games/i }));
-    await user.click(screen.getByRole('button', { name: 'Pokémon' }));
+    await user.click(await screen.findByRole('button', { name: /trading card games/i }));
+    await user.click(await screen.findByRole('button', { name: 'Pokémon' }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/collections/pokemon'));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(document.body.style.pointerEvents).not.toBe('none');
 
     await user.click(screen.getByRole('button', { name: /open menu/i }));
     await screen.findByRole('dialog');
-    await user.click(screen.getByRole('button', { name: /sporting cards/i }));
-    await user.click(screen.getByRole('button', { name: 'NBA' }));
+    await user.click(await screen.findByRole('button', { name: /sporting cards/i }));
+    await user.click(await screen.findByRole('button', { name: 'NBA' }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/collections/nba'));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(document.body.style.pointerEvents).not.toBe('none');
@@ -120,13 +134,14 @@ describe('Header desktop dropdowns — consecutive navigations', () => {
     const user = userEvent.setup();
     renderHeader();
 
-    await user.hover(screen.getByRole('button', { name: /browse collections/i }));
-    await user.click(screen.getByRole('link', { name: 'Pokémon' }));
+    // The Row-2 nav is lazy; wait for the trigger before interacting.
+    await user.hover(await screen.findByRole('button', { name: /browse collections/i }));
+    await user.click(await screen.findByRole('link', { name: 'Pokémon' }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/collections/pokemon'));
 
     await user.unhover(screen.getByTestId('current-path'));
-    await user.hover(screen.getByRole('button', { name: /browse collections/i }));
-    await user.click(screen.getByRole('link', { name: 'NBA' }));
+    await user.hover(await screen.findByRole('button', { name: /browse collections/i }));
+    await user.click(await screen.findByRole('link', { name: 'NBA' }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/collections/nba'));
   });
 
@@ -134,12 +149,12 @@ describe('Header desktop dropdowns — consecutive navigations', () => {
     const user = userEvent.setup();
     renderHeader();
 
-    await user.hover(screen.getByRole('button', { name: 'Community' }));
-    await user.click(screen.getByRole('link', { name: /forum/i }));
+    await user.hover(await screen.findByRole('button', { name: 'Community' }));
+    await user.click(await screen.findByRole('link', { name: /forum/i }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/community/forum'));
 
     // Marketplace is a plain top-level nav link (Grading is now a dropdown).
-    await user.click(screen.getByRole('link', { name: 'Marketplace' }));
+    await user.click(await screen.findByRole('link', { name: 'Marketplace' }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/marketplace'));
   });
 
@@ -149,15 +164,15 @@ describe('Header desktop dropdowns — consecutive navigations', () => {
 
     // user.click moves the mouse onto the trigger first, so the hover handler
     // opens the menu and the click must not immediately close it again.
-    await user.click(screen.getByRole('button', { name: /browse collections/i }));
-    expect(screen.queryByRole('link', { name: 'Pokémon' })).toBeInTheDocument();
+    await user.click(await screen.findByRole('button', { name: /browse collections/i }));
+    expect(await screen.findByRole('link', { name: 'Pokémon' })).toBeInTheDocument();
   });
 
   it('touch tap opens the dropdown and a second tap navigates', async () => {
     const user = userEvent.setup();
     renderHeader();
 
-    await user.pointer({ keys: '[TouchA]', target: screen.getByRole('button', { name: /browse collections/i }) });
+    await user.pointer({ keys: '[TouchA]', target: await screen.findByRole('button', { name: /browse collections/i }) });
     const pokemonLink = await screen.findByRole('link', { name: 'Pokémon' });
     await user.pointer({ keys: '[TouchA]', target: pokemonLink });
     await user.click(pokemonLink);
@@ -174,7 +189,7 @@ describe('Header body pointer-events failsafe', () => {
 
     await user.click(screen.getByRole('button', { name: /open menu/i }));
     await screen.findByRole('dialog');
-    await user.click(screen.getByRole('link', { name: 'Shop' }));
+    await user.click(await screen.findByRole('link', { name: 'Shop' }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/shop'));
 
     // Simulate the Radix scroll-lock leak: body left unclickable after close

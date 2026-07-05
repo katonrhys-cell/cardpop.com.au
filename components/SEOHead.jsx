@@ -1,7 +1,7 @@
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
 
-const SEOHead = ({ title, description, canonicalUrl, ogImage, ogImageAlt, structuredData }) => {
+const SEOHead = ({ title, description, canonicalUrl, ogImage, ogImageAlt, structuredData, noindex = false }) => {
   const siteName = "CardPop";
   const SITE_ORIGIN = "https://cardpop.com.au";
   const defaultTitle = `${siteName} | Australia's Trading Card Marketplace`;
@@ -30,6 +30,12 @@ const SEOHead = ({ title, description, canonicalUrl, ogImage, ogImageAlt, struct
     <Helmet>
       <title>{resolvedTitle}</title>
       <meta name="description" content={resolvedDesc} />
+
+      {/* noindex for pages that should never appear in search results (e.g.
+          the 404 page — without it, Google's JS render of an unknown URL is a
+          200 with content, which gets classified as a soft 404 or worse,
+          indexed). */}
+      {noindex && <meta name="robots" content="noindex" />}
 
       {/* Canonical */}
       {resolvedCanonical && <link rel="canonical" href={resolvedCanonical} />}

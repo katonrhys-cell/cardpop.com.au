@@ -71,6 +71,8 @@ const NewsletterSignup = ({
       <div className="flex gap-2">
         <Input
           type="email"
+          name="email"
+          autoComplete="email"
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}

@@ -7,13 +7,49 @@ import useVaultItemRealtimeSync from '@/hooks/useVaultItemRealtimeSync.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search, RefreshCw, AlertCircle, Users, X, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import {
   Select, SelectContent, SelectGroup, SelectItem,
   SelectLabel, SelectSeparator, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
+import RookieJerseyIcon from '@/components/icons/RookieJerseyIcon.jsx';
 import { toast } from 'sonner';
+
+// Sentinel for the "Any …" option in each dropdown — Radix Select can't use ''
+const ANY = '__any__';
+
+// Headline players offered as a quick filter. `term` is matched against the
+// card name (ilike), so keep it to the distinctive part of the name where
+// spelling/diacritics vary across sets.
+const POPULAR_PLAYERS = [
+  { label: 'LeBron James',          term: 'LeBron James' },
+  { label: 'Stephen Curry',         term: 'Stephen Curry' },
+  { label: 'Victor Wembanyama',     term: 'Wembanyama' },
+  { label: 'Michael Jordan',        term: 'Michael Jordan' },
+  { label: 'Kobe Bryant',           term: 'Kobe Bryant' },
+  { label: 'Giannis Antetokounmpo', term: 'Giannis' },
+  { label: 'Luka Dončić',           term: 'Luka Don' },
+  { label: 'Kevin Durant',          term: 'Kevin Durant' },
+  { label: 'Jayson Tatum',          term: 'Jayson Tatum' },
+  { label: 'Anthony Edwards',       term: 'Anthony Edwards' },
+];
+
+// Renders select items split into labelled groups
+const GroupedSelectItems = ({ groups, getItemLabel }) => (
+  groups.map(([label, items], gi) => (
+    <SelectGroup key={label}>
+      {gi > 0 && <SelectSeparator />}
+      <SelectLabel>{label}</SelectLabel>
+      {items.map(item => (
+        <SelectItem key={item.id} value={item.id}>
+          {getItemLabel ? getItemLabel(item) : item.name}
+        </SelectItem>
+      ))}
+    </SelectGroup>
+  ))
+);
 
 const MarketplacePage = () => {
   const [listings, setListings] = useState([]);
@@ -36,6 +72,13 @@ const MarketplacePage = () => {
     getSetsByFranchiseAndManufacturer,
     getParallelsByFranchise,
     getSubsetsBySet,
+    getAllFranchises,
+    getAllManufacturers,
+    getAllTeams,
+    getAllSets,
+    getAllParallels,
+    getAllSubsets,
+    buildNameMap,
   } = useCategories();
 
   const [filterCat, setFilterCat]           = useState('');
@@ -45,6 +88,7 @@ const MarketplacePage = () => {
   const [filterSet, setFilterSet]           = useState('');
   const [filterParallel, setFilterParallel] = useState('');
   const [filterSubset, setFilterSubset]     = useState('');
+  const [filterPlayer, setFilterPlayer]     = useState('');
 
   const [catOpts, setCatOpts]             = useState([]);
   const [franchiseOpts, setFranchiseOpts] = useState([]);
@@ -55,6 +99,9 @@ const MarketplacePage = () => {
   const [subsetOpts, setSubsetOpts]       = useState([]);
 
   const [catNames, setCatNames] = useState({});
+  // id → name for every category (roots + franchises) — used to label the
+  // groups when a dropdown shows its full unscoped list
+  const [allNames, setAllNames] = useState({});
 
   // Search and price
   const [search, setSearch]     = useState('');
@@ -77,7 +124,7 @@ const MarketplacePage = () => {
     return () => clearTimeout(t);
   }, [minPrice, maxPrice]);
 
-  // Load root categories once
+  // Load root categories + full category name map once
   useEffect(() => {
     getRootCategories().then(cats => {
       setCatOpts(cats);
@@ -85,49 +132,67 @@ const MarketplacePage = () => {
       cats.forEach(c => { map[c.id] = c.name; });
       setCatNames(map);
     });
-  }, [getRootCategories]);
+    buildNameMap().then(setAllNames);
+  }, [getRootCategories, buildNameMap]);
 
-  // Cascade: category → franchises
+  // Franchise options: scoped to the selected category, otherwise all franchises.
+  // Every level stays selectable even when its parent hasn't been chosen.
   useEffect(() => {
-    setFilterFranchise(''); setFilterMfr(''); setFilterTeam(''); setFilterSet(''); setFilterParallel(''); setFilterSubset('');
-    setFranchiseOpts([]); setMfrOpts([]); setTeamOpts([]); setSetOpts([]); setParallelOpts([]); setSubsetOpts([]);
-    if (filterCat) getFranchisesByCategory(filterCat).then(setFranchiseOpts);
-  }, [filterCat, getFranchisesByCategory]);
+    setFilterFranchise('');
+    (filterCat ? getFranchisesByCategory(filterCat) : getAllFranchises()).then(setFranchiseOpts);
+  }, [filterCat, getFranchisesByCategory, getAllFranchises]);
 
-  // Cascade: franchise → manufacturers + teams + sets + parallels
+  // Manufacturer / team / parallel options: scoped to franchise, otherwise all
   useEffect(() => {
-    setFilterMfr(''); setFilterTeam(''); setFilterSet(''); setFilterParallel(''); setFilterSubset('');
-    setMfrOpts([]); setTeamOpts([]); setSetOpts([]); setParallelOpts([]); setSubsetOpts([]);
+    setFilterMfr(''); setFilterTeam(''); setFilterParallel('');
     if (filterFranchise) {
       getManufacturersByFranchise(filterFranchise).then(setMfrOpts);
       getTeamsByFranchise(filterFranchise).then(setTeamOpts);
-      getSetsByFranchiseAndManufacturer(filterFranchise, '').then(setSetOpts);
       getParallelsByFranchise(filterFranchise).then(setParallelOpts);
+    } else {
+      getAllManufacturers().then(setMfrOpts);
+      getAllTeams().then(setTeamOpts);
+      getAllParallels().then(setParallelOpts);
     }
-  }, [filterFranchise, getManufacturersByFranchise, getTeamsByFranchise, getSetsByFranchiseAndManufacturer, getParallelsByFranchise]);
+  }, [filterFranchise, getManufacturersByFranchise, getTeamsByFranchise, getParallelsByFranchise, getAllManufacturers, getAllTeams, getAllParallels]);
 
-  // Cascade: manufacturer → refine sets
+  // Set options: scoped to franchise (and refined by manufacturer), otherwise all
   useEffect(() => {
-    setFilterSet(''); setFilterSubset(''); setSubsetOpts([]);
-    if (filterFranchise) {
-      getSetsByFranchiseAndManufacturer(filterFranchise, filterMfr || '').then(setSetOpts);
-    }
-  }, [filterMfr, filterFranchise, getSetsByFranchiseAndManufacturer]);
+    setFilterSet('');
+    (filterFranchise
+      ? getSetsByFranchiseAndManufacturer(filterFranchise, filterMfr || '')
+      : getAllSets(filterMfr || '')
+    ).then(setSetOpts);
+  }, [filterMfr, filterFranchise, getSetsByFranchiseAndManufacturer, getAllSets]);
 
-  // Cascade: set → subsets
+  // Subset options: scoped to the selected set, otherwise all
   useEffect(() => {
-    setFilterSubset(''); setSubsetOpts([]);
-    if (filterSet) getSubsetsBySet(filterSet).then(setSubsetOpts);
-  }, [filterSet, getSubsetsBySet]);
+    setFilterSubset('');
+    (filterSet ? getSubsetsBySet(filterSet) : getAllSubsets()).then(setSubsetOpts);
+  }, [filterSet, getSubsetsBySet, getAllSubsets]);
 
-  // Group sets by series
+  // Group sets by series when scoped to a franchise; by franchise when unscoped
   const groupedSets = setOpts.reduce((acc, s) => {
-    const g = s.series || 'Other';
+    const g = (filterFranchise ? s.series : allNames[s.category_id]) || 'Other';
     if (!acc[g]) acc[g] = [];
     acc[g].push(s);
     return acc;
   }, {});
   const seriesGroups = Object.entries(groupedSets).sort(([a], [b]) => a.localeCompare(b));
+
+  // Group an unscoped option list by its franchise name for readability
+  const groupByFranchise = (opts) => {
+    const acc = {};
+    opts.forEach(o => {
+      const g = allNames[o.franchise_id] || 'Other';
+      if (!acc[g]) acc[g] = [];
+      acc[g].push(o);
+    });
+    return Object.entries(acc).sort(([a], [b]) => a.localeCompare(b));
+  };
+
+  // Map the "Any …" sentinel back to an empty filter value
+  const clearable = (setter) => (v) => setter(v === ANY ? '' : v);
 
   // Main listings fetch
   useEffect(() => {
@@ -157,6 +222,7 @@ const MarketplacePage = () => {
         if (filterParallel) query = query.eq('vault_items.parallel_id', filterParallel);
         if (filterSubset)   query = query.eq('vault_items.subset_id', filterSubset);
 
+        if (filterPlayer) query = query.ilike('vault_items.card_name', `%${filterPlayer}%`);
         if (debouncedSearch.trim()) query = query.ilike('vault_items.card_name', `%${debouncedSearch.trim()}%`);
         if (debouncedMin && !isNaN(debouncedMin)) query = query.gte('price_aud', Number(debouncedMin));
         if (debouncedMax && !isNaN(debouncedMax)) query = query.lte('price_aud', Number(debouncedMax));
@@ -166,7 +232,8 @@ const MarketplacePage = () => {
         else if (filterMode === 'ForTrade') query = query.eq('accepts_trade', true);
         else if (filterMode === 'MakeOffer') query = query.eq('accepts_offers', true);
 
-        if (filterRookie) query = query.contains('vault_items.cardVariants', ['Rookie Card (RC)']);
+        // is_rookie is set by the add-card form (attribute tick or RC variant)
+        if (filterRookie) query = query.eq('vault_items.is_rookie', true);
 
         if (sort === 'price_asc')  query = query.order('price_aud', { ascending: true });
         else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
@@ -189,13 +256,13 @@ const MarketplacePage = () => {
     fetchRef.current = run;
     run();
     return () => { cancelled = true; };
-  }, [page, sort, filterMode, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
+  }, [page, sort, filterMode, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, filterPlayer, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
 
   // Reset to the first page whenever the filters/sort change so the user never
   // lands on an out-of-range page (the stale-fetch is cancelled by the guard).
   useEffect(() => {
     setPage(0);
-  }, [sort, filterMode, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
+  }, [sort, filterMode, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, filterPlayer, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
 
   // Realtime subscription to vault_items changes to refresh listings
   useEffect(() => {
@@ -211,7 +278,7 @@ const MarketplacePage = () => {
 
   const clearFilters = () => {
     setFilterCat(''); setFilterFranchise(''); setFilterMfr(''); setFilterTeam(''); setFilterSet('');
-    setFilterParallel(''); setFilterSubset('');
+    setFilterParallel(''); setFilterSubset(''); setFilterPlayer('');
     setFilterMode('All'); setFilterRookie(false);
     setSearch(''); setMinPrice(''); setMaxPrice('');
   };
@@ -224,12 +291,13 @@ const MarketplacePage = () => {
     const catName      = catNames[filterCat];
     const parallelName = parallelOpts.find(p => p.id === filterParallel)?.name;
     const subsetName   = subsetOpts.find(s => s.id === filterSubset)?.name;
-    const parts = [catName, frName, teamName, mfrName, setName, parallelName, subsetName].filter(Boolean);
+    const playerName   = POPULAR_PLAYERS.find(p => p.term === filterPlayer)?.label;
+    const parts = [catName, frName, teamName, mfrName, setName, parallelName, subsetName, playerName].filter(Boolean);
     return parts.length ? `Filtering by: ${parts.join(' › ')}` : null;
   };
 
   const breadcrumbText = getBreadcrumb();
-  const hasActiveFilters = filterCat || filterFranchise || filterMfr || filterTeam || filterSet || filterParallel || filterSubset || filterMode !== 'All' || filterRookie || search || minPrice || maxPrice;
+  const hasActiveFilters = filterCat || filterFranchise || filterMfr || filterTeam || filterSet || filterParallel || filterSubset || filterPlayer || filterMode !== 'All' || filterRookie || search || minPrice || maxPrice;
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans pb-20">
@@ -269,6 +337,8 @@ const MarketplacePage = () => {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
               <Input
+                name="marketplace-search"
+                aria-label="Search card name"
                 placeholder="Search card name..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
@@ -278,10 +348,13 @@ const MarketplacePage = () => {
 
             {/* Price range */}
             <div>
-              <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Price range</label>
+              <label htmlFor="marketplace-min-price" className="block text-xs font-semibold text-muted-foreground mb-1.5">Price range</label>
               <div className="flex items-center gap-2">
                 <Input
                   type="number"
+                  id="marketplace-min-price"
+                  name="marketplace-min-price"
+                  aria-label="Minimum price"
                   placeholder="Min $"
                   value={minPrice}
                   onChange={e => setMinPrice(e.target.value)}
@@ -290,6 +363,8 @@ const MarketplacePage = () => {
                 <span className="text-muted-foreground text-sm font-medium">–</span>
                 <Input
                   type="number"
+                  name="marketplace-max-price"
+                  aria-label="Maximum price"
                   placeholder="Max $"
                   value={maxPrice}
                   onChange={e => setMaxPrice(e.target.value)}
@@ -298,102 +373,159 @@ const MarketplacePage = () => {
               </div>
             </div>
 
-            {/* Category cascade */}
+            {/* Popular players */}
+            <div>
+              <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Popular players</label>
+              <Select value={filterPlayer} onValueChange={clearable(setFilterPlayer)}>
+                <SelectTrigger aria-label="Filter by player" className="w-full bg-background border-border rounded-xl font-medium">
+                  <SelectValue placeholder="Player" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ANY}>Any player</SelectItem>
+                  {POPULAR_PLAYERS.map(p => (
+                    <SelectItem key={p.term} value={p.term}>{p.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Category cascade — every level is always open and selectable;
+                picking a parent just narrows the options below it */}
             <div className="space-y-3 pt-1">
-              <label className="block text-xs font-semibold text-muted-foreground">Browse by category</label>
+              <label htmlFor="marketplace-category" className="block text-xs font-semibold text-muted-foreground">Browse by category</label>
               {/* Category */}
-              <Select value={filterCat} onValueChange={setFilterCat}>
-                <SelectTrigger aria-label="Filter by category" className="w-full bg-background border-border rounded-xl font-medium">
+              <Select value={filterCat} onValueChange={clearable(setFilterCat)}>
+                <SelectTrigger id="marketplace-category" aria-label="Filter by category" className="w-full bg-background border-border rounded-xl font-medium">
                   <SelectValue placeholder="Category" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value={ANY}>Any category</SelectItem>
                   {catOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
 
               {/* Franchise */}
-              <Select value={filterFranchise} onValueChange={setFilterFranchise} disabled={!filterCat}>
+              <Select value={filterFranchise} onValueChange={clearable(setFilterFranchise)}>
                 <SelectTrigger aria-label="Filter by franchise" className="w-full bg-background border-border rounded-xl font-medium">
-                  <SelectValue placeholder={filterCat ? 'Franchise' : '— select category —'} />
+                  <SelectValue placeholder="Franchise" />
                 </SelectTrigger>
                 <SelectContent>
-                  {franchiseOpts.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+                  <SelectItem value={ANY}>Any franchise</SelectItem>
+                  {filterCat
+                    ? franchiseOpts.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)
+                    : <GroupedSelectItems groups={(() => {
+                        const acc = {};
+                        franchiseOpts.forEach(f => {
+                          const g = catNames[f.parent_id] || 'Other';
+                          if (!acc[g]) acc[g] = [];
+                          acc[g].push(f);
+                        });
+                        return Object.entries(acc).sort(([a], [b]) => a.localeCompare(b));
+                      })()} />}
                 </SelectContent>
               </Select>
 
-              {/* Manufacturer — only show if franchise has manufacturers */}
-              {filterFranchise && mfrOpts.length > 0 && (
-                <Select value={filterMfr} onValueChange={setFilterMfr}>
-                  <SelectTrigger aria-label="Filter by manufacturer" className="w-full bg-background border-border rounded-xl font-medium">
-                    <SelectValue placeholder="Manufacturer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {mfrOpts.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              )}
+              {/* Manufacturer */}
+              <Select value={filterMfr} onValueChange={clearable(setFilterMfr)}>
+                <SelectTrigger aria-label="Filter by manufacturer" className="w-full bg-background border-border rounded-xl font-medium">
+                  <SelectValue placeholder="Manufacturer" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ANY}>Any manufacturer</SelectItem>
+                  {filterFranchise
+                    ? mfrOpts.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)
+                    : <GroupedSelectItems groups={groupByFranchise(mfrOpts)} />}
+                </SelectContent>
+              </Select>
 
-              {/* Team — only show if franchise has teams (sports) */}
-              {filterFranchise && teamOpts.length > 0 && (
-                <Select value={filterTeam} onValueChange={setFilterTeam}>
-                  <SelectTrigger aria-label="Filter by team" className="w-full bg-background border-border rounded-xl font-medium">
-                    <SelectValue placeholder="Team" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {teamOpts.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              )}
+              {/* Team */}
+              <Select value={filterTeam} onValueChange={clearable(setFilterTeam)}>
+                <SelectTrigger aria-label="Filter by team" className="w-full bg-background border-border rounded-xl font-medium">
+                  <SelectValue placeholder="Team" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ANY}>Any team</SelectItem>
+                  {filterFranchise
+                    ? teamOpts.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)
+                    : <GroupedSelectItems groups={groupByFranchise(teamOpts)} />}
+                </SelectContent>
+              </Select>
 
-              {/* Set — only show if franchise selected and sets exist */}
-              {filterFranchise && setOpts.length > 0 && (
-                <Select value={filterSet} onValueChange={setFilterSet}>
-                  <SelectTrigger aria-label="Filter by set or release" className="w-full bg-background border-border rounded-xl font-medium">
-                    <SelectValue placeholder="Set / Release" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {seriesGroups.map(([series, items], gi) => (
-                      <SelectGroup key={series}>
-                        {gi > 0 && <SelectSeparator />}
-                        <SelectLabel>{series}</SelectLabel>
-                        {items.map(s => (
-                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                        ))}
-                      </SelectGroup>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              {/* Set / Release */}
+              <Select value={filterSet} onValueChange={clearable(setFilterSet)}>
+                <SelectTrigger aria-label="Filter by set or release" className="w-full bg-background border-border rounded-xl font-medium">
+                  <SelectValue placeholder="Set / Release" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ANY}>Any set</SelectItem>
+                  {seriesGroups.map(([series, items], gi) => (
+                    <SelectGroup key={series}>
+                      {gi > 0 && <SelectSeparator />}
+                      <SelectLabel>{series}</SelectLabel>
+                      {items.map(s => (
+                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ))}
+                </SelectContent>
+              </Select>
 
-              {/* Parallel — only show when franchise has parallels */}
-              {filterFranchise && parallelOpts.length > 0 && (
-                <Select value={filterParallel} onValueChange={setFilterParallel}>
-                  <SelectTrigger aria-label="Filter by parallel or variation" className="w-full bg-background border-border rounded-xl font-medium">
-                    <SelectValue placeholder="Parallel / Variation" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {parallelOpts.map(p => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}{p.print_run ? ` /${p.print_run}` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              {/* Parallel / Variation */}
+              <Select value={filterParallel} onValueChange={clearable(setFilterParallel)}>
+                <SelectTrigger aria-label="Filter by parallel or variation" className="w-full bg-background border-border rounded-xl font-medium">
+                  <SelectValue placeholder="Parallel / Variation" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ANY}>Any parallel</SelectItem>
+                  {filterFranchise
+                    ? parallelOpts.map(p => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name}{p.print_run ? ` /${p.print_run}` : ''}
+                        </SelectItem>
+                      ))
+                    : <GroupedSelectItems
+                        groups={groupByFranchise(parallelOpts)}
+                        getItemLabel={p => `${p.name}${p.print_run ? ` /${p.print_run}` : ''}`}
+                      />}
+                </SelectContent>
+              </Select>
 
-              {/* Subset — only show when a set is selected and it has subsets */}
-              {filterSet && subsetOpts.length > 0 && (
-                <Select value={filterSubset} onValueChange={setFilterSubset}>
-                  <SelectTrigger aria-label="Filter by subset or insert" className="w-full bg-background border-border rounded-xl font-medium">
-                    <SelectValue placeholder="Subset / Insert" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {subsetOpts.map(s => (
-                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
+              {/* Subset / Insert */}
+              <Select value={filterSubset} onValueChange={clearable(setFilterSubset)}>
+                <SelectTrigger aria-label="Filter by subset or insert" className="w-full bg-background border-border rounded-xl font-medium">
+                  <SelectValue placeholder="Subset / Insert" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ANY}>Any subset</SelectItem>
+                  {filterSet
+                    ? subsetOpts.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)
+                    : <GroupedSelectItems groups={(() => {
+                        const acc = {};
+                        subsetOpts.forEach(s => {
+                          const g = s.set?.name || 'Other';
+                          if (!acc[g]) acc[g] = [];
+                          acc[g].push(s);
+                        });
+                        return Object.entries(acc).sort(([a], [b]) => a.localeCompare(b));
+                      })()} />}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Card attributes */}
+            <div className="pt-1">
+              <span className="block text-xs font-semibold text-muted-foreground mb-2">Card attributes</span>
+              <label
+                htmlFor="marketplace-rookie"
+                className="flex items-center gap-2.5 cursor-pointer rounded-xl border border-border bg-background px-3 py-2.5 font-medium text-sm hover:bg-muted/50 transition-colors"
+              >
+                <Checkbox
+                  id="marketplace-rookie"
+                  checked={filterRookie}
+                  onCheckedChange={v => setFilterRookie(v === true)}
+                />
+                <RookieJerseyIcon className="w-4 h-4 shrink-0" /> Rookie Card
+              </label>
             </div>
           </div>
         </aside>
@@ -444,13 +576,6 @@ const MarketplacePage = () => {
               onClick={() => setFilterMode('ForTrade')}
             >
               For Trade
-            </Button>
-            <Button
-              variant="outline"
-              className={`rounded-full px-5 font-bold ${filterRookie ? 'bg-amber-500 text-white shadow-md border-none hover:bg-amber-600' : 'bg-background hover:bg-amber-500 hover:text-white hover:border-amber-500'}`}
-              onClick={() => setFilterRookie(r => !r)}
-            >
-              🏅 Rookie Cards
             </Button>
           </div>
 

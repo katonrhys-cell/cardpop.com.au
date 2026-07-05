@@ -65,8 +65,10 @@ const NotificationItem = ({ notification, onRead }) => {
     </div>
   );
 
-  if (notification.action_url) {
-    return <Link to={notification.action_url} className="block">{inner}</Link>;
+  // The DB column is `link`; `action_url` kept as a legacy fallback.
+  const href = notification.link || notification.action_url;
+  if (href) {
+    return <Link to={href} className="block">{inner}</Link>;
   }
   return inner;
 };

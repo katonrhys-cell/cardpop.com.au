@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-import { List, Plus, RefreshCw, AlertCircle, Trash2, Edit, PackageOpen, ShoppingCart, ArrowRightLeft, Layers, Tag } from 'lucide-react';
+import { List, Plus, RefreshCw, AlertCircle, Trash2, Edit, PackageOpen, ShoppingCart, ArrowRightLeft, Layers, Tag, HandCoins } from 'lucide-react';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,11 +20,27 @@ const STATUS_CONFIG = {
   'active':          { label: 'Active',           className: 'bg-emerald-500/10 text-emerald-700 border-emerald-300 dark:text-emerald-400', icon: ShoppingCart },
   'For Trade':       { label: 'For Trade',        className: 'bg-blue-500/10 text-blue-700 border-blue-300 dark:text-blue-400', icon: ArrowRightLeft },
   'For Sale & Trade':{ label: 'Sale & Trade',     className: 'bg-violet-500/10 text-violet-700 border-violet-300 dark:text-violet-400', icon: Layers },
+  'Expression of Interest': { label: 'Expression of Interest', className: 'bg-sky-500/10 text-sky-700 border-sky-300 dark:text-sky-400', icon: HandCoins },
   'sold':            { label: 'Sold',             className: 'bg-muted text-muted-foreground border-border', icon: ShoppingCart },
   'Sold':            { label: 'Sold',             className: 'bg-muted text-muted-foreground border-border', icon: ShoppingCart },
 };
 
 const getStatusConfig = (status) => STATUS_CONFIG[status] ?? { label: status ?? 'Unknown', className: 'bg-muted text-muted-foreground border-border', icon: List };
+
+// Listings created from the vault only store a vault_item_id reference — the
+// card's name/set/grade live on the joined vault_items row, so read the
+// listing's own columns first and fall back to the vault item.
+const getCardDetails = (listing) => {
+  const item = listing?.vault_item ?? {};
+  return {
+    name:           listing?.card_name ?? listing?.title ?? item.card_name ?? null,
+    setName:        listing?.set_name ?? item.set_name ?? null,
+    cardNumber:     listing?.card_number ?? item.card_number ?? null,
+    gradingCompany: listing?.grading_company ?? item.grading_company ?? null,
+    grade:          listing?.grade ?? item.grade ?? null,
+    condition:      listing?.condition ?? item.condition ?? null,
+  };
+};
 
 const AccountListings = () => {
   const { currentUser } = useAuth();
@@ -52,7 +68,7 @@ const AccountListings = () => {
       try {
         const { data, error: fetchError } = await supabase
           .from('listings')
-          .select('*')
+          .select('*, vault_item:vault_items(card_name, set_name, card_number, grading_company, grade, condition)')
           .eq('seller_id', uid)
           .order('created_at', { ascending: false })
           .limit(100);
@@ -194,16 +210,17 @@ const AccountListings = () => {
                 {listings.map((listing) => {
                   const cfg = getStatusConfig(listing.status);
                   const StatusIcon = cfg.icon;
+                  const card = getCardDetails(listing);
                   return (
                     <TableRow key={listing.id}>
                       <TableCell className="font-bold px-6">
                         <div className="max-w-[240px]">
-                          <p className="truncate">{listing.card_name || listing.title || '—'}</p>
-                          {listing.set_name && (
-                            <p className="text-xs text-muted-foreground font-normal mt-0.5">{listing.set_name}</p>
+                          <p className="truncate">{card.name || '—'}</p>
+                          {card.setName && (
+                            <p className="text-xs text-muted-foreground font-normal mt-0.5">{card.setName}</p>
                           )}
-                          {listing.card_number && (
-                            <p className="text-xs text-muted-foreground font-normal mt-0.5">#{listing.card_number}</p>
+                          {card.cardNumber && (
+                            <p className="text-xs text-muted-foreground font-normal mt-0.5">#{card.cardNumber}</p>
                           )}
                         </div>
                       </TableCell>
@@ -221,16 +238,20 @@ const AccountListings = () => {
                         </div>
                       </TableCell>
                       <TableCell className="text-sm">
-                        {listing.grading_company && listing.grading_company !== 'raw' ? (
+                        {card.gradingCompany && card.gradingCompany !== 'raw' ? (
                           <Badge variant="secondary" className="text-[11px] font-bold bg-muted/50 text-muted-foreground uppercase">
-                            {listing.grading_company} {listing.grade || ''}
+                            {card.gradingCompany} {card.grade || ''}
                           </Badge>
                         ) : (
-                          <span className="text-muted-foreground capitalize">{listing.condition?.replace(/_/g, ' ') || '—'}</span>
+                          <span className="text-muted-foreground capitalize">{card.condition?.replace(/_/g, ' ') || '—'}</span>
                         )}
                       </TableCell>
                       <TableCell className="tabular-nums font-medium">
-                        {listing.price_aud != null ? `$${Number(listing.price_aud).toFixed(2)}` : '—'}
+                        {listing.price_aud != null
+                          ? `$${Number(listing.price_aud).toFixed(2)}`
+                          : (listing.price_min_aud != null && listing.price_max_aud != null)
+                            ? `$${Number(listing.price_min_aud).toFixed(2)} – $${Number(listing.price_max_aud).toFixed(2)}`
+                            : '—'}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm tabular-nums">
                         {listing.created_at ? new Date(listing.created_at).toLocaleDateString() : '—'}
@@ -260,7 +281,7 @@ const AccountListings = () => {
           <DialogHeader>
             <DialogTitle className="font-serif text-xl">Update Listing Status</DialogTitle>
             <DialogDescription>
-              Change visibility for <span className="font-bold text-foreground">{editListing?.card_name || editListing?.title}</span>.
+              Change visibility for <span className="font-bold text-foreground">{getCardDetails(editListing).name || 'this listing'}</span>.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
@@ -305,7 +326,7 @@ const AccountListings = () => {
           <DialogHeader>
             <DialogTitle className="font-serif text-xl">Remove Listing</DialogTitle>
             <DialogDescription>
-              Are you sure you want to remove <span className="font-bold text-foreground">{deleteTarget?.card_name || deleteTarget?.title}</span> from your listings? This cannot be undone.
+              Are you sure you want to remove <span className="font-bold text-foreground">{getCardDetails(deleteTarget).name || 'this listing'}</span> from your listings? This cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 mt-4">
