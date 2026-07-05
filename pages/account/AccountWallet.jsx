@@ -91,7 +91,12 @@ const AccountWallet = () => {
   const handleDashboard = async () => {
     setOpeningDashboard(true);
     try {
-      const res = await apiServerClient.fetch('/stripe/connect/dashboard-link', { method: 'POST' });
+      const returnUrl = `${window.location.origin}/account/wallet`;
+      const res = await apiServerClient.fetch('/stripe/connect/dashboard-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ returnUrl, refreshUrl: returnUrl }),
+      });
       if (!res.ok) throw new Error('Could not open Stripe dashboard');
       const { url } = await res.json();
       window.open(url, '_blank', 'noopener,noreferrer');

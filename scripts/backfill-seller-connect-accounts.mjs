@@ -1,4 +1,4 @@
-// One-off backfill that pre-creates a Stripe Connect (Express) account for every
+// One-off backfill that pre-creates a Stripe v2 recipient account for every
 // existing seller who doesn't have one yet.
 //
 // Normally an account is created lazily the first time a seller opens the payout
@@ -8,9 +8,12 @@
 // KYC/onboarding — the seller still has to submit their details via the account
 // link before payouts are enabled (stripe_connect_onboarded stays false).
 //
-// Account shape is defined in exactly one place — `ensureSellerConnectAccount`
-// in src/services/connectService.js — so this backfill can never drift from the
-// on-demand flow.
+// The account shape is defined in exactly one place —
+// src/utils/sellerAccountShape.js (buildSellerAccountParams) — so this backfill
+// can never drift from the on-demand flow.
+//
+// Assumes a clean cutover to v2 (no pre-existing v1 `acct_…` Express accounts).
+// If live v1 accounts exist, migrate/handle those separately first.
 //
 // Who counts as a "seller": by default, profiles entitled to sell
 // (subscription_status in trialing/active/grandfathered, or an unexpired trial),
@@ -30,6 +33,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
+import { buildSellerAccountParams } from '../src/utils/sellerAccountShape.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -91,7 +95,7 @@ async function* sellersNeedingAccount() {
   for (;;) {
     let query = supabase
       .from('profiles')
-      .select('id, display_name, full_name, subscription_status, trial_ends_at, stripe_connect_account_id')
+      .select('id, email, display_name, full_name, subscription_status, trial_ends_at, stripe_connect_account_id')
       .is('stripe_connect_account_id', null)
       .order('id', { ascending: true })
       .range(from, from + PAGE - 1);
@@ -138,17 +142,13 @@ for await (const seller of sellersNeedingAccount()) {
   }
 
   try {
-    // Mirror the on-demand flow exactly.
-    const account = await stripe.accounts.create({
-      type: 'express',
-      country: 'AU',
-      capabilities: {
-        card_payments: { requested: true },
-        transfers: { requested: true },
-      },
-      business_type: 'individual',
-      metadata: { cardpop_user_id: seller.id },
-    });
+    // Mirror the on-demand flow exactly (shared v2 recipient-account shape).
+    const account = await stripe.v2.core.accounts.create(
+      buildSellerAccountParams(seller.id, {
+        email: seller.email || undefined,
+        displayName: seller.display_name || seller.full_name || undefined,
+      })
+    );
 
     const { error: updErr } = await supabase
       .from('profiles')
