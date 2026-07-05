@@ -118,6 +118,10 @@ Supabase meters ALL storage egress (including its own CDN's cache hits) against 
 2. **Service worker** (`public/sw.js`): storage image URLs (`/storage/v1/object|render/image/public/`) are cached cache-first on the client (capped, oldest-first eviction), so returning visitors generate ~no image egress.
 3. **CDN in front of Supabase Storage** — a Cloudflare Worker on `img.cardpop.com.au` (source: `cloudflare/image-proxy-worker.js`, deployed via the Cloudflare dashboard): when `VITE_IMAGE_CDN_HOST` is set, `utils/imageUrl.js` rewrites storage URLs onto the CDN. **At render time, always build image URLs via `publicImageUrl(pathOrUrl, bucket?)` or `getCardImage()` from `utils/imageUrl.js` — don't call `supabase.storage.getPublicUrl()` directly.** Exception: URLs *stored in the DB* (e.g. `image_url` columns written by admin forms) intentionally stay canonical Supabase URLs so the CDN host can change later.
 
+### DDoS & abuse protection
+
+Cloudflare (proxying all traffic) is the volumetric DDoS layer; Express rate limiters (`src/middleware/global-rate-limit.js`, `src/middleware/endpoint-rate-limit.js`) handle targeted abuse. `src/app.js` sets a `trust proxy` function that trusts Cloudflare's published edge ranges (`src/utils/cloudflareIps.js`) so `req.ip` is the real visitor, not a Cloudflare edge IP — every IP-keyed control depends on this. Dashboard-side settings (Bot Fight Mode, WAF, edge rate-limit rule, Under-Attack playbook, Supabase quota hardening) are documented in `docs/ddos-protection.md`.
+
 ### Deployment
 
 GitHub Actions (`.github/workflows/deploy.yml`) deploys to Vercel on every push to `main`:
