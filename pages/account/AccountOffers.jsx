@@ -52,8 +52,14 @@ const OfferCard = ({ offer, perspective, onAction, actionLoading, onCounter }) =
         </div>
 
         <h3 className="font-bold text-base mb-1 truncate">{cardName}</h3>
-        {listingPrice && (
+        {listingPrice ? (
           <p className="text-xs text-muted-foreground mb-2">Listed at {formatCurrency(listingPrice)}</p>
+        ) : (offer.listing?.price_min_aud != null || offer.listing?.price_max_aud != null) && (
+          <p className="text-xs text-muted-foreground mb-2">
+            Seller seeking {formatCurrency(offer.listing.price_min_aud ?? offer.listing.price_max_aud)}
+            {offer.listing.price_max_aud != null && offer.listing.price_min_aud != null
+              && ` – ${formatCurrency(offer.listing.price_max_aud)}`}
+          </p>
         )}
 
         <p className="font-extrabold text-xl text-foreground tabular-nums mb-1">
@@ -82,6 +88,42 @@ const OfferCard = ({ offer, perspective, onAction, actionLoading, onCounter }) =
           </p>
         )}
       </div>
+
+      {/* A countered offer is back in the buyer's court — they accept or
+          decline the seller's counter from their Sent tab. */}
+      {status === 'countered' && !isReceived && (
+        <div className="flex sm:flex-col gap-2 shrink-0 self-start sm:self-center">
+          <Button
+            size="sm"
+            className="rounded-xl font-bold bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5"
+            disabled={!!actionLoading}
+            onClick={() => onAction(offer.id, 'accepted', perspective)}
+          >
+            {actionLoading === `${offer.id}_accept`
+              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              : <CheckCircle2 className="w-3.5 h-3.5" />}
+            Accept Counter
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="rounded-xl font-bold text-destructive border-destructive/30 hover:bg-destructive/10 gap-1.5"
+            disabled={!!actionLoading}
+            onClick={() => onAction(offer.id, 'declined', perspective)}
+          >
+            {actionLoading === `${offer.id}_decline`
+              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              : <XCircle className="w-3.5 h-3.5" />}
+            Decline
+          </Button>
+        </div>
+      )}
+
+      {status === 'countered' && isReceived && (
+        <div className="shrink-0 self-start sm:self-center text-xs text-muted-foreground italic">
+          Waiting on the buyer's response
+        </div>
+      )}
 
       {isPending && (
         <div className="flex sm:flex-col gap-2 shrink-0 self-start sm:self-center">
@@ -173,7 +215,7 @@ const AccountOffers = () => {
           .from('offers')
           .select(`
             *,
-            listing:listings(id, price_aud, vault_item:vault_items(card_name, card_image)),
+            listing:listings(id, price_aud, price_min_aud, price_max_aud, listing_type, vault_item:vault_items(card_name, card_image)),
             buyer:profiles!buyer_id(display_name, username, avatar_url, rating, reviews_count)
           `)
           .eq('seller_id', currentUser.id)
@@ -182,7 +224,7 @@ const AccountOffers = () => {
           .from('offers')
           .select(`
             *,
-            listing:listings(id, price_aud, vault_item:vault_items(card_name, card_image)),
+            listing:listings(id, price_aud, price_min_aud, price_max_aud, listing_type, vault_item:vault_items(card_name, card_image)),
             seller:profiles!seller_id(display_name, username, avatar_url, rating, reviews_count)
           `)
           .eq('buyer_id', currentUser.id)

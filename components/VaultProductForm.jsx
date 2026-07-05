@@ -612,6 +612,7 @@ const VaultProductForm = ({ card = null, onSuccess, onCancel }) => {
                   <SelectItem value="For Sale">For Sale (Marketplace)</SelectItem>
                   <SelectItem value="For Trade">For Trade</SelectItem>
                   <SelectItem value="For Sale & Trade">Both Sale & Trade</SelectItem>
+                  <SelectItem value="Expression of Interest">Expression of Interest (Offers Only)</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1">

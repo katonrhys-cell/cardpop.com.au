@@ -112,6 +112,8 @@
     --vault-trade-foreground:   0 0% 100%;
     --vault-both:               38 92% 50%;
     --vault-both-foreground:    215 28% 17%;
+    --vault-eoi:                199 89% 48%;
+    --vault-eoi-foreground:     0 0% 100%;
 
     /* ── Profile Tokens ─────────────────────────────────────────────── */
     --profile-bg:       0 0% 100%;
@@ -188,6 +190,8 @@
     --vault-trade-foreground:   0 0% 100%;
     --vault-both:               38 92% 50%;
     --vault-both-foreground:    215 28% 10%;
+    --vault-eoi:                199 89% 55%;
+    --vault-eoi-foreground:     215 28% 10%;
 
     /* ── Profile Tokens (Dark) ──────────────────────────────────────── */
     --profile-bg:       215 28% 13%;
@@ -255,6 +259,11 @@
   .badge-vault-both {
     background-color: hsl(var(--vault-both));
     color: hsl(var(--vault-both-foreground));
+    border: none;
+  }
+  .badge-vault-eoi {
+    background-color: hsl(var(--vault-eoi));
+    color: hsl(var(--vault-eoi-foreground));
     border: none;
   }
 

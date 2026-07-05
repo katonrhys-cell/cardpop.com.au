@@ -485,7 +485,7 @@ async function renderListing(supabase, id, slugParam) {
 
   const { data: listing } = await supabase
     .from('listings')
-    .select('id, slug, title, description, price, price_aud, category, condition, grade, grading_company, status, images, accepts_offers, created_at, updated_at, seller_id, vault_item:vault_items(card_name, set_name, year, condition, grade, grading_company, card_image, vault_images(storage_path)), seller:profiles!seller_id(username, display_name, business_name, store_slug)')
+    .select('id, slug, title, description, price, price_aud, price_min_aud, price_max_aud, category, condition, grade, grading_company, status, images, accepts_offers, created_at, updated_at, seller_id, vault_item:vault_items(card_name, set_name, year, condition, grade, grading_company, card_image, vault_images(storage_path)), seller:profiles!seller_id(username, display_name, business_name, store_slug)')
     .eq('id', id)
     .maybeSingle();
 
@@ -550,7 +550,11 @@ async function renderListing(supabase, id, slugParam) {
   <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/marketplace">Marketplace</a> / ${esc(cardName)}</nav>
   <h1>${esc(cardName)}</h1>
   ${image ? `<img src="${esc(image)}" alt="${esc(cardName)}" />` : ''}
-  ${price > 0 ? `<p><strong>A$${esc(Number(price).toFixed(2))}</strong>${listing.accepts_offers ? ' (offers accepted)' : ''}</p>` : ''}
+  ${price > 0
+    ? `<p><strong>A$${esc(Number(price).toFixed(2))}</strong>${listing.accepts_offers ? ' (offers accepted)' : ''}</p>`
+    : (listing.price_min_aud != null && listing.price_max_aud != null
+      ? `<p><strong>Seeking offers: A$${esc(Number(listing.price_min_aud).toFixed(2))} – A$${esc(Number(listing.price_max_aud).toFixed(2))}</strong></p>`
+      : '')}
   ${setLine ? `<p>${esc(setLine)}</p>` : ''}
   <ul>
     ${condition ? `<li>Condition: ${esc(condition)}</li>` : ''}

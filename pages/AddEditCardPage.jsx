@@ -4,7 +4,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, ChevronDown, Sparkles, Loader2,
   Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X, Crop,
-  Frame, Wand2, SlidersHorizontal,
+  Frame, Wand2, SlidersHorizontal, HandCoins,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -58,6 +58,7 @@ const LISTING_OPTIONS = [
   { value: 'For Sale',        label: 'For Sale',    description: 'List with a price',   Icon: ShoppingCart,    activeClass: 'border-emerald-500 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400', iconClass: 'text-emerald-500' },
   { value: 'For Trade',       label: 'For Trade',   description: 'Open to trades',      Icon: ArrowRightLeft,  activeClass: 'border-violet-500 bg-violet-500/10 text-violet-700 dark:text-violet-400', iconClass: 'text-violet-500' },
   { value: 'For Sale & Trade', label: 'Sale & Trade', description: 'Both options open', Icon: Layers,          activeClass: 'border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-400', iconClass: 'text-amber-500' },
+  { value: 'Expression of Interest', label: 'Expression of Interest', description: 'Invite offers in a price range', Icon: HandCoins, activeClass: 'border-sky-500 bg-sky-500/10 text-sky-700 dark:text-sky-400', iconClass: 'text-sky-500' },
 ];
 
 // ─── Section heading ──────────────────────────────────────────────────────────
@@ -184,6 +185,8 @@ const AddEditCardPage = () => {
     // Listing
     tradeValue:     '',
     listingType:    'private',
+    offerMin:       '',
+    offerMax:       '',
     displayStyle:   'classic',
   };
 
@@ -343,6 +346,21 @@ const AddEditCardPage = () => {
           listingType:    (!card.listing_type || card.listing_type === 'Private') ? 'private' : card.listing_type,
           displayStyle:   card.display_style || 'classic',
         });
+        // The EOI price range lives on the listings row, not vault_items.
+        supabase
+          .from('listings')
+          .select('price_min_aud, price_max_aud')
+          .eq('vault_item_id', id)
+          .neq('status', 'archived')
+          .maybeSingle()
+          .then(({ data }) => {
+            if (cancelled || !data) return;
+            setFormData(f => ({
+              ...f,
+              offerMin: data.price_min_aud != null ? String(data.price_min_aud) : f.offerMin,
+              offerMax: data.price_max_aud != null ? String(data.price_max_aud) : f.offerMax,
+            }));
+          });
         if (card.card_image) {
           const imgUrl = publicImageUrl(card.card_image);
           if (!cancelled) setImagePreview(imgUrl);
@@ -631,6 +649,13 @@ const AddEditCardPage = () => {
         }
       }
     }
+    if (formData.listingType === 'Expression of Interest') {
+      const min = parseFloat(formData.offerMin);
+      const max = parseFloat(formData.offerMax);
+      if (!min || min <= 0) newErrors.offerMin = 'Enter the minimum of the price range you want offers in';
+      if (!max || max <= 0) newErrors.offerMax = 'Enter the maximum of the price range you want offers in';
+      else if (min > 0 && max < min) newErrors.offerMax = 'Must be at least the minimum of the range';
+    }
     if (isEdit && lockedBaseValue !== null) {
       const ev = parseFloat(formData.estimatedValue) || 0;
       if (ev < lockedBaseValue)
@@ -652,6 +677,7 @@ const AddEditCardPage = () => {
     const isPublic = formData.listingType !== 'private';
     const isSale   = formData.listingType === 'For Sale' || formData.listingType === 'For Sale & Trade';
     const acceptsTrade = formData.listingType === 'For Trade' || formData.listingType === 'For Sale & Trade';
+    const isEOI    = formData.listingType === 'Expression of Interest';
     try {
       if (!isPublic) {
         // Going private — archive any active listing.
@@ -667,10 +693,15 @@ const AddEditCardPage = () => {
       const listingPayload = {
         vault_item_id: cardId,
         seller_id:     currentUser.id,
-        listing_type:  isSale ? 'fixed' : 'trade',
+        listing_type:  isEOI ? 'expression_of_interest' : (isSale ? 'fixed' : 'trade'),
         status:        'active',
         accepts_trade: acceptsTrade,
         price_aud:     isSale ? (parseFloat(formData.estimatedValue) || null) : null,
+        // Expression of Interest: no fixed price — publish the seller's target
+        // range and open the listing to offers.
+        price_min_aud: isEOI ? (parseFloat(formData.offerMin) || null) : null,
+        price_max_aud: isEOI ? (parseFloat(formData.offerMax) || null) : null,
+        ...(isEOI ? { accepts_offers: true } : {}),
         listed_at:     new Date().toISOString(),
       };
 
@@ -2946,6 +2977,49 @@ const AddEditCardPage = () => {
                       {isEdit && lockedBaseValue !== null
                         ? `Floor: $${lockedBaseValue.toFixed(2)} — the value in traded cards you'd accept`
                         : "The value in traded cards you'd accept"}
+                    </p>
+                  </div>
+                )}
+
+                {formData.listingType === 'Expression of Interest' && (
+                  <div className="space-y-2 pt-3 border-t border-border">
+                    <Label className="font-bold flex items-center gap-1.5">
+                      <HandCoins className="w-4 h-4 text-sky-500" /> Price Range You're Looking For (AUD)
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
+                        <input
+                          id="offerMin"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={formData.offerMin}
+                          onChange={e => set('offerMin', e.target.value)}
+                          placeholder="Min"
+                          className={`flex h-11 w-full rounded-md border bg-background px-3 py-2 text-sm pl-8 tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${errors.offerMin ? 'border-destructive' : 'border-input'}`}
+                        />
+                      </div>
+                      <span className="text-muted-foreground font-bold">–</span>
+                      <div className="relative flex-1">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
+                        <input
+                          id="offerMax"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={formData.offerMax}
+                          onChange={e => set('offerMax', e.target.value)}
+                          placeholder="Max"
+                          className={`flex h-11 w-full rounded-md border bg-background px-3 py-2 text-sm pl-8 tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${errors.offerMax ? 'border-destructive' : 'border-input'}`}
+                        />
+                      </div>
+                    </div>
+                    {(errors.offerMin || errors.offerMax) && (
+                      <p className="text-xs text-destructive">{errors.offerMin || errors.offerMax}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Buyers see this range and make offers — you can accept, decline or counter each one from your account.
                     </p>
                   </div>
                 )}
