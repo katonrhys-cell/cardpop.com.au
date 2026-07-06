@@ -422,6 +422,12 @@ const AccountDashboard = () => {
               </Link>
             </Button>
             <Button asChild variant="outline" className="w-full justify-between h-14 rounded-xl border-border hover:bg-primary/5 hover:text-primary transition-colors shadow-sm">
+              <Link to="/account/partner">
+                <span className="font-bold text-foreground">Partner Dashboard</span>
+                <ArrowRight className="w-5 h-5 text-muted-foreground" />
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="w-full justify-between h-14 rounded-xl border-border hover:bg-primary/5 hover:text-primary transition-colors shadow-sm">
               <Link to="/marketplace">
                 <span className="font-bold text-foreground">Browse Marketplace</span>
                 <ArrowRight className="w-5 h-5 text-muted-foreground" />

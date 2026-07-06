@@ -3,6 +3,7 @@ import logger from '../utils/logger.js';
 import { sendOrderConfirmed, sendItemSold } from '../utils/emailService.js';
 import { payoutSeller } from './payoutService.js';
 import { markWelcomeDiscountRedeemed } from './welcomeOfferService.js';
+import { recordShopOrderReferral } from './partnerService.js';
 
 async function getPlatformSetting(key, defaultValue) {
   const { data } = await supabase
@@ -121,6 +122,17 @@ async function handleCartOrder(existing, session, stripe) {
   // Payment completed — consume the welcome-offer discount, if one was applied.
   if (session.metadata?.welcomeOfferId) {
     await markWelcomeDiscountRedeemed(session.metadata.welcomeOfferId, existing.id);
+  }
+
+  // Referred order: book the partner's commission (idempotent, best-effort).
+  if (session.metadata?.partnerId) {
+    await recordShopOrderReferral({
+      partnerId: session.metadata.partnerId,
+      orderId: existing.id,
+      referredUserId: existing.buyer_id,
+      orderLines: Array.isArray(existing.order_items) ? existing.order_items : [],
+      discountCents: parseInt(session.metadata.partnerDiscountCents || '0', 10) || 0,
+    });
   }
 
   const lines = Array.isArray(existing.order_items) ? existing.order_items : [];

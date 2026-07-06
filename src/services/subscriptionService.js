@@ -2,6 +2,7 @@ import stripe from '../utils/stripeClient.js';
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { markTrialRedeemed } from './welcomeOfferService.js';
+import { recordSubscriptionReferral } from './partnerService.js';
 
 /**
  * Subscription / free-trial state management.
@@ -99,6 +100,20 @@ export async function applyStripeSubscription(subscription) {
   // A started trial/subscription consumes the welcome code's trial half so
   // offer state stays accurate (e.g. for expiry-reminder targeting).
   if (['trialing', 'active'].includes(status)) await markTrialRedeemed(userId);
+
+  // Referred subscription: 'active' means the first invoice was paid (trial
+  // conversions included), so book the partner's one-off commission. The
+  // expected first payment was stamped into the metadata at checkout;
+  // idempotent per referred user, so repeat 'active' updates are no-ops.
+  if (status === 'active' && subscription.metadata?.partnerId) {
+    const fallbackCents = subscription.items?.data?.[0]?.price?.unit_amount || 0;
+    await recordSubscriptionReferral({
+      partnerId: subscription.metadata.partnerId,
+      referredUserId: userId,
+      firstPaymentCents: parseInt(subscription.metadata.partnerFirstPaymentCents || '0', 10) || fallbackCents,
+    });
+  }
+
   logger.info(`[SUB] ${userId} → ${status} (stripe ${subscription.id})`);
 }
 

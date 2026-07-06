@@ -354,7 +354,9 @@ const GradingPage = () => (
           Join the CardPop Retailer Network. Expand your reach, manage your inventory with our
           integrated tools, and connect with thousands of active Australian collectors.
         </p>
-        <Button size="lg" className="w-full px-10 sm:w-auto">Apply as Partner</Button>
+        <Button size="lg" asChild className="w-full px-10 sm:w-auto">
+          <Link to="/partners">Apply as Partner</Link>
+        </Button>
       </section>
 
     </div>

@@ -32,6 +32,7 @@ import storesRouter from './stores.js';
 import catalogRouter from './catalog.js';
 import psaRouter from './psa.js';
 import welcomeOfferRouter from './welcome-offer.js';
+import partnersRouter from './partners.js';
 
 const router = Router();
 
@@ -146,6 +147,10 @@ export default () => {
     // Registration welcome offer (code issue / trial redemption)
     router.use('/welcome-offer', apiLimiter);
     router.use('/welcome-offer', welcomeOfferRouter);
+
+    // Partner program (applications, dashboard, referral tracking, payouts)
+    router.use('/partners', apiLimiter);
+    router.use('/partners', partnersRouter);
 
     // Trade routes with email verification middleware
     // Apply auth middleware first, then trade access verification

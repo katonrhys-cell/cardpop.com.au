@@ -32,6 +32,7 @@
 - [Notification Settings | CardPop](https://cardpop.com.au/accountnotificationsettings): No description available
 - [Notifications | CardPop](https://cardpop.com.au/accountnotifications): No description available
 - [Official Shop Management | Admin](https://cardpop.com.au/productmanagement): No description available
+- [Partner Dashboard | CardPop](https://cardpop.com.au/accountpartner): No description available
 - [Platform Settings | Admin](https://cardpop.com.au/adminsettings): No description available
 - [Product Lines Management | Admin Portal](https://cardpop.com.au/productlinesmanagement): No description available
 - [Public Profile | CardPop](https://cardpop.com.au/userprofile): No description available
