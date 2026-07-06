@@ -88,7 +88,8 @@ const AdminVerificationDashboard = () => {
         const { data, error } = await query;
         if (error) throw error;
         if (!cancelled) setVerifications(data ?? []);
-      } catch {
+      } catch (err) {
+        console.error('Failed to load verifications:', err);
         toast.error('Failed to load verifications');
       } finally {
         if (!cancelled) setLoading(false);
