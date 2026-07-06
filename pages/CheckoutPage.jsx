@@ -9,10 +9,11 @@ import { toast } from 'sonner';
 
 // Storage path or absolute URL → CDN-aware public URL.
 const resolveImg = (path) => publicImageUrl(path);
-import { ArrowRight, Loader2, Tag } from 'lucide-react';
+import { ArrowRight, Loader2, Tag, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 
 import OrderSummary from '@/components/checkout/OrderSummary.jsx';
 import ShippingAddressForm from '@/components/checkout/ShippingAddressForm.jsx';
@@ -139,6 +140,17 @@ const CheckoutPage = () => {
   const [promoInput, setPromoInput] = useState(() => getReferralCode());
   const [promoCode, setPromoCode] = useState(() => getReferralCode());
 
+  // Wallet balance (Stripe Customer Balance — CardPop holds no ledger of its
+  // own). Mutually exclusive with a promo code; toggling one clears the other.
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [useWallet, setUseWallet] = useState(false);
+  useEffect(() => {
+    apiServerClient.fetch('/wallet/balance')
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => { if (data) setWalletBalance(Number(data.balanceAud) || 0); })
+      .catch(() => {});
+  }, []);
+
   // Authoritative totals come from the server so the displayed amount always
   // matches what Stripe charges (no fabricated tax).
   const [pricing, setPricing] = useState(null);
@@ -148,7 +160,10 @@ const CheckoutPage = () => {
     apiServerClient.fetch('/stripe/calculate-cart', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items: serverItems, ...(promoCode ? { promoCode } : {}) }),
+      body: JSON.stringify({
+        items: serverItems,
+        ...(useWallet ? { useWalletBalance: true } : (promoCode ? { promoCode } : {})),
+      }),
     })
       .then(res => (res.ok ? res.json() : null))
       .then(data => {
@@ -157,14 +172,14 @@ const CheckoutPage = () => {
         if (data?.promoError) {
           toast.error(data.promoError);
           setPromoCode('');
-        } else if (promoCode && data?.discountAud > 0) {
+        } else if (promoCode && !useWallet && data?.discountAud > 0) {
           toast.success(`Code applied — $${Number(data.discountAud).toFixed(2)} off.`);
         }
       })
       .catch(() => { if (!cancelled) setPricing(null); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cartItems, directItem, promoCode]);
+  }, [cartItems, directItem, promoCode, useWallet]);
 
   const clientSubtotal = flatItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
   const subtotal = pricing?.subtotalAud ?? clientSubtotal;
@@ -196,7 +211,7 @@ const CheckoutPage = () => {
           items: serverItems,
           successUrl: `${window.location.origin}/checkout-success?session_id={CHECKOUT_SESSION_ID}`,
           cancelUrl: window.location.href,
-          ...(appliedPromoCode ? { promoCode: appliedPromoCode } : {}),
+          ...(useWallet ? { useWalletBalance: true } : (appliedPromoCode ? { promoCode: appliedPromoCode } : {})),
           shippingAddress: {
             name,
             address: shippingData.address || '',
@@ -361,6 +376,29 @@ const CheckoutPage = () => {
         <div className="max-w-2xl mx-auto">
           {renderStep()}
 
+          {step === STEPS.SUMMARY && flatItems.length > 0 && walletBalance > 0 && (
+            <Card className="border-border shadow-sm mt-4">
+              <CardContent className="pt-6">
+                <label className="flex items-center gap-3 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={useWallet}
+                    onCheckedChange={(checked) => {
+                      setUseWallet(!!checked);
+                      if (checked) { setPromoCode(''); setPromoInput(''); }
+                    }}
+                  />
+                  <span className="flex items-center gap-2 font-semibold text-foreground">
+                    <Wallet className="h-4 w-4 text-primary" /> Use wallet balance
+                  </span>
+                  <span className="ml-auto text-muted-foreground">${walletBalance.toFixed(2)} available</span>
+                </label>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Applies toward this order — can't be combined with a promo code.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           {step === STEPS.SUMMARY && flatItems.length > 0 && (
             <Card className="border-border shadow-sm mt-4">
               <CardContent className="pt-6">
@@ -384,7 +422,7 @@ const CheckoutPage = () => {
                     className="flex gap-2"
                     onSubmit={(e) => {
                       e.preventDefault();
-                      if (promoInput.trim()) setPromoCode(promoInput.trim().toUpperCase());
+                      if (promoInput.trim()) { setUseWallet(false); setPromoCode(promoInput.trim().toUpperCase()); }
                     }}
                   >
                     <Input
@@ -394,8 +432,9 @@ const CheckoutPage = () => {
                       autoComplete="off"
                       className="font-mono tracking-widest uppercase"
                       aria-label="Promo code"
+                      disabled={useWallet}
                     />
-                    <Button type="submit" variant="outline" className="shrink-0">Apply</Button>
+                    <Button type="submit" variant="outline" className="shrink-0" disabled={useWallet}>Apply</Button>
                   </form>
                 )}
                 <p className="mt-2 text-xs text-muted-foreground">

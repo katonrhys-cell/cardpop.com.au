@@ -24,11 +24,11 @@
 - [Manage Events | Admin Portal](https://cardpop.com.au/eventsmanagement): No description available
 - [Membership | CardPop](https://cardpop.com.au/accountmembership): No description available
 - [Messaging | Card Pop](https://cardpop.com.au/messaging): No description available
-- [My Balance | Card Pop](https://cardpop.com.au/userbalance): No description available
 - [My Digital Vault | CardPop](https://cardpop.com.au/myvault): No description available
 - [My Events | CardPop](https://cardpop.com.au/accountevents): No description available
 - [My Listings | CardPop](https://cardpop.com.au/accountlistings): No description available
 - [My Vault | CardPop](https://cardpop.com.au/accountvault): No description available
+- [My Wallet | Card Pop](https://cardpop.com.au/userbalance): No description available
 - [Notification Settings | CardPop](https://cardpop.com.au/accountnotificationsettings): No description available
 - [Notifications | CardPop](https://cardpop.com.au/accountnotifications): No description available
 - [Official Shop Management | Admin](https://cardpop.com.au/productmanagement): No description available

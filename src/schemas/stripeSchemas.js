@@ -15,9 +15,13 @@ export const createCheckoutSchema = z.object({
     postcode: z.string().optional(),
   }).optional(),
   promoCode: z.string().trim().max(32).optional(),
+  useWalletBalance: z.boolean().optional(),
 }).refine(
   (data) => data.listingId || data.offerId || data.bidId,
   { message: 'One of listingId, offerId, or bidId is required' }
+).refine(
+  (data) => !(data.promoCode && data.useWalletBalance),
+  { message: 'Apply either a promo code or your wallet balance, not both.' }
 );
 
 export const calculateBreakdownSchema = z.object({

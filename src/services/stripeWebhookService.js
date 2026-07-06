@@ -4,6 +4,7 @@ import { sendOrderConfirmed, sendItemSold } from '../utils/emailService.js';
 import { payoutSeller } from './payoutService.js';
 import { markWelcomeDiscountRedeemed } from './welcomeOfferService.js';
 import { recordShopOrderReferral } from './partnerService.js';
+import { debitWallet } from './walletService.js';
 
 async function getPlatformSetting(key, defaultValue) {
   const { data } = await supabase
@@ -122,6 +123,18 @@ async function handleCartOrder(existing, session, stripe) {
   // Payment completed — consume the welcome-offer discount, if one was applied.
   if (session.metadata?.welcomeOfferId) {
     await markWelcomeDiscountRedeemed(session.metadata.welcomeOfferId, existing.id);
+  }
+
+  // Payment completed — spend the wallet balance the buyer applied at checkout.
+  // Only debited now (not when the session was created) so an abandoned
+  // checkout never touches the balance.
+  if (session.metadata?.walletCents) {
+    const walletCents = parseInt(session.metadata.walletCents, 10) || 0;
+    const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
+    if (walletCents > 0 && customerId) {
+      await debitWallet(stripe, customerId, walletCents, `Applied to order ${existing.id}`, `wallet-debit-${session.id}`)
+        .catch(e => logger.error(`[WALLET] debit failed for order ${existing.id}: ${e.message}`));
+    }
   }
 
   // Referred order: book the partner's commission (idempotent, best-effort).
@@ -292,6 +305,18 @@ async function handleSingleItemOrder(session, stripe) {
         .maybeSingle();
       await flagDoubleSale({ listingId, orderId: dupOrder?.id, buyerId: userId });
       return;
+    }
+  }
+
+  // Payment completed — spend the wallet balance the buyer applied at checkout.
+  // Only debited now (not when the session was created) so an abandoned
+  // checkout never touches the balance.
+  if (meta.walletCents) {
+    const walletCents = parseInt(meta.walletCents, 10) || 0;
+    const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
+    if (walletCents > 0 && customerId) {
+      await debitWallet(stripe, customerId, walletCents, `Applied to order for session ${session.id}`, `wallet-debit-${session.id}`)
+        .catch(e => logger.error(`[WALLET] debit failed for session ${session.id}: ${e.message}`));
     }
   }
 
