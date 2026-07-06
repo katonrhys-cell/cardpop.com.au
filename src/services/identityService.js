@@ -103,11 +103,17 @@ export async function createIdentitySession(req, res) {
       ? requested
       : '/verify-identity';
 
+    // With STRIPE_IDENTITY_FLOW_ID set, the session uses a Verification Flow
+    // configured in the Stripe dashboard (document types, selfie check, etc.
+    // all come from the flow — the API forbids passing type/options alongside
+    // it). Without it, fall back to an inline document + selfie config.
+    const flowId = process.env.STRIPE_IDENTITY_FLOW_ID;
     const session = await stripe.identity.verificationSessions.create({
-      type: 'document',
+      ...(flowId
+        ? { verification_flow: flowId }
+        : { type: 'document', options: { document: { require_matching_selfie: true } } }),
       metadata: { userId },
       ...(req.user.email ? { provided_details: { email: req.user.email } } : {}),
-      options: { document: { require_matching_selfie: true } },
       return_url: `${appBase()}${returnPath}`,
     });
 

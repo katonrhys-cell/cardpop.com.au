@@ -140,6 +140,7 @@ git push main
 | `SUPABASE_SERVICE_ROLE_KEY` | Backend Supabase client (admin) |
 | `STRIPE_SECRET_KEY` | Stripe routes |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook verification |
+| `STRIPE_IDENTITY_FLOW_ID` | *(optional)* Stripe Identity Verification Flow (`vf_...`) for signup ID checks — falls back to an inline document+selfie config |
 | `EBAY_APP_ID` | eBay API client |
 | `EBAY_CLIENT_SECRET` | eBay API client |
 | `KIT_API_KEY` | Kit.com newsletter |

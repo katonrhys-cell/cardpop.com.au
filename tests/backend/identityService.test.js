@@ -108,6 +108,10 @@ describe('applyIdentitySession', () => {
 describe('createIdentitySession', () => {
   const req = (body = {}) => ({ user: { id: 'user-1', email: 'a@b.com' }, body });
 
+  beforeEach(() => {
+    delete process.env.STRIPE_IDENTITY_FLOW_ID;
+  });
+
   it('rejects with 409 when the profile is already verified', async () => {
     supabaseState.profile = { verification_status: 'approved', is_verified: true };
     const res = mockRes();
@@ -131,6 +135,22 @@ describe('createIdentitySession', () => {
 
     expect(supabaseState.updates[0].payload.stripe_identity_session_id).toBe('vs_new');
     expect(res.json).toHaveBeenCalledWith({ url: 'https://verify.stripe.com/x', sessionId: 'vs_new' });
+  });
+
+  it('uses the dashboard Verification Flow (no inline type/options) when configured', async () => {
+    process.env.STRIPE_IDENTITY_FLOW_ID = 'vf_123';
+    mockStripe.identity.verificationSessions.create.mockResolvedValue({
+      id: 'vs_flow', url: 'https://verify.stripe.com/f',
+    });
+    const res = mockRes();
+    await createIdentitySession(req(), res);
+
+    const params = mockStripe.identity.verificationSessions.create.mock.calls[0][0];
+    expect(params.verification_flow).toBe('vf_123');
+    expect('type' in params).toBe(false);
+    expect('options' in params).toBe(false);
+    expect(params.metadata.userId).toBe('user-1');
+    expect(supabaseState.updates[0].payload.stripe_identity_session_id).toBe('vs_flow');
   });
 
   it('refuses an absolute/protocol-relative returnPath and falls back to /verify-identity', async () => {
