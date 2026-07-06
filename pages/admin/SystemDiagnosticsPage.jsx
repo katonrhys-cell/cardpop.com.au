@@ -11,10 +11,10 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const TABLES_TO_CHECK = [
-  'profiles', 'vault_items', 'vault_images', 'listings', 'orders', 'order_items',
-  'reviews', 'trades', 'messages', 'conversations', 'events', 'event_attendees',
-  'categories', 'grading_companies', 'grading_scales', 'notifications',
-  'shipping_addresses', 'blog_posts', 'market_data', 'media_assets', 'disputes',
+  'profiles', 'vault_items', 'vault_images', 'listings', 'orders',
+  'reviews', 'trades', 'messages', 'events', 'event_rsvps',
+  'categories', 'grading_companies', 'notifications',
+  'shipping_addresses', 'blog_articles', 'market_data', 'media_assets', 'disputes',
 ];
 
 const SystemDiagnosticsPage = () => {
