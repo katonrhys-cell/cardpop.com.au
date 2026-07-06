@@ -10,6 +10,7 @@ import {
   loginLimiter,
   passwordResetLimiter,
   stripeLimiter,
+  apiLimiter,
   mfaLimiter,
   backupCodeLimiter,
 } from '../../../src/middleware/endpoint-rate-limit.js';
@@ -112,13 +113,58 @@ describe('backupCodeLimiter — keyed by authenticated user', () => {
   });
 });
 
-describe('stripeLimiter — only applies to webhook paths', () => {
-  it('does not rate limit non-webhook paths', async () => {
+describe('stripeLimiter — applies uniformly wherever mounted (no internal path filtering)', () => {
+  // stripeLimiter used to carry its own `skip` based on req.path, but req.path
+  // is relative to the mount point — a request to exactly '/stripe/webhook'
+  // saw req.path === '/' inside a middleware mounted at '/stripe/webhook',
+  // making the skip condition always true and this limiter permanently dead.
+  // Scoping now happens entirely via WHERE it's mounted (routes/index.js
+  // mounts it only at the exact webhook paths), not via a path check here.
+  it('counts every request it sees toward its own 1000/min cap, regardless of path', async () => {
     const app = appWith(stripeLimiter);
     const ip = '10.40.0.1';
     for (let i = 0; i < 20; i++) {
       const res = await request(app).post('/charge').set('X-Forwarded-For', ip);
+      expect(res.status).toBe(200); // well under the 1000/min cap
+    }
+  });
+});
+
+describe('Stripe webhook mount pattern (mirrors routes/index.js)', () => {
+  // Regression test for the double-throttling bug: router.use('/stripe',
+  // apiLimiter) used to apply unconditionally, so a burst of webhook retries
+  // got throttled at the standard 100/min cap despite stripeLimiter's
+  // 1000/min allowance. The apiLimiter mount must skip the (mount-relative)
+  // '/webhook' path.
+  function mountStripeLikeRoutesIndex() {
+    const app = express();
+    app.use(express.json());
+    const stripeSubRouter = express.Router();
+    stripeSubRouter.post('/webhook', (_req, res) => res.json({ ok: true, via: 'webhook' }));
+    stripeSubRouter.post('/other', (_req, res) => res.json({ ok: true, via: 'other' }));
+
+    app.use('/stripe/webhook', stripeLimiter);
+    app.use('/stripe', (req, res, next) => (req.path === '/webhook' ? next() : apiLimiter(req, res, next)));
+    app.use('/stripe', stripeSubRouter);
+    return app;
+  }
+
+  it('lets webhook traffic exceed the standard 100/min apiLimiter cap', async () => {
+    const app = mountStripeLikeRoutesIndex();
+    const ip = '10.50.0.1';
+    for (let i = 0; i < 110; i++) {
+      const res = await request(app).post('/stripe/webhook').set('X-Forwarded-For', ip);
       expect(res.status).toBe(200);
     }
+  });
+
+  it('still applies the standard apiLimiter to non-webhook stripe endpoints', async () => {
+    const app = mountStripeLikeRoutesIndex();
+    const ip = '10.50.0.2';
+    for (let i = 0; i < 100; i++) {
+      expect((await request(app).post('/stripe/other').set('X-Forwarded-For', ip)).status).toBe(200);
+    }
+    const blocked = await request(app).post('/stripe/other').set('X-Forwarded-For', ip);
+    expect(blocked.status).toBe(429);
   });
 });

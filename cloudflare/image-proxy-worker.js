@@ -73,13 +73,21 @@ export default {
       return new Response('Not found', { status: 404 });
     }
 
-    // cacheEverything + cacheTtl keeps successful responses at Cloudflare's
-    // edge for a year regardless of the origin's Cache-Control (some older
-    // uploads still carry max-age=3600). Uploads use immutable timestamped
-    // filenames, so long TTLs can never serve stale content.
+    // cacheEverything + cacheTtlByStatus keeps successful responses at
+    // Cloudflare's edge for a year regardless of the origin's Cache-Control
+    // (some older uploads still carry max-age=3600). Uploads use immutable
+    // timestamped filenames, so long TTLs can never serve stale content for
+    // a 2xx. But a flat `cacheTtl` applies to EVERY status, including a
+    // transient 404/5xx (a deleted object, a race with an in-flight upload,
+    // an origin outage) — that would cache the error at the edge for a full
+    // year, showing every visitor a broken image long after the origin
+    // recovered. cacheTtlByStatus scopes the long TTL to 2xx only.
     const search = canonicalSearch(url.pathname, url.searchParams);
     const originResponse = await fetch(`${ORIGIN}${url.pathname}${search}`, {
-      cf: { cacheEverything: true, cacheTtl: 31536000 },
+      cf: {
+        cacheEverything: true,
+        cacheTtlByStatus: { '200-299': 31536000, '300-399': 0, '400-599': 0 },
+      },
     });
 
     const headers = new Headers(originResponse.headers);

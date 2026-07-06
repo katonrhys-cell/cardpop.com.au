@@ -17,6 +17,12 @@ export const globalRateLimit = rateLimit({
 			retryAfter: req.rateLimit.resetTime,
 		});
 	},
-	// Skip rate limiting for certain safe endpoints (e.g., health checks)
-	skip: (req) => req.path === '/health',
+	// Skip rate limiting for certain safe endpoints (e.g., health checks).
+	// This middleware runs before the api router is mounted at '/', '/hcgi/api'
+	// and '/api' (see app.js), so req.path here is the full incoming path —
+	// '/api/health' or '/hcgi/api/health' in production, never the bare
+	// '/health' the router itself sees. Matching only the exact string left
+	// this skip permanently dead in production, letting a health-check poller
+	// count toward (and potentially trip) the 50-req/5-min global cap.
+	skip: (req) => req.path.endsWith('/health'),
 });

@@ -60,7 +60,14 @@ const apiLimiter = rateLimit({
 	},
 });
 
-// Stripe webhook rate limiter: 1000 requests per minute
+// Stripe/PayPal webhook rate limiter: 1000 requests per minute. Only ever
+// mounted directly at the exact webhook paths (see routes/index.js), so no
+// skip condition is needed here — router.use(path, stripeLimiter) already
+// scopes it. A `skip` keyed on req.path used to live here, but req.path is
+// relative to the mount point (so it read '/' for a request to exactly
+// '/stripe/webhook'), making the skip condition always true and this
+// limiter permanently dead — webhook traffic silently fell through to the
+// standard 100/min apiLimiter instead.
 const stripeLimiter = rateLimit({
 	windowMs: 60 * 1000,
 	max: 1000,
@@ -68,10 +75,6 @@ const stripeLimiter = rateLimit({
 	standardHeaders: true,
 	legacyHeaders: false,
 	keyGenerator: (req) => ipKeyGenerator(req),
-	skip: (req) => {
-		// Only apply to webhook endpoint
-		return !req.path.includes('/webhook');
-	},
 });
 
 // MFA verify rate limiter: 5 attempts per 15 minutes, keyed by the authenticated

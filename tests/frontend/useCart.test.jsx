@@ -175,6 +175,20 @@ describe('getCartTotal', () => {
     // 1000 + 250*2 = 1500
     expect(result.current.getCartTotal()).toBe('$15.00');
   });
+
+  it('falls back to a formatted dollar total when the variant has no currency_info (every real add-to-cart call site)', async () => {
+    // formatCurrency() returns "" (rather than throwing) when currencyInfo is
+    // absent, and no production add-to-cart call site ever sets
+    // variant.currency_info — so this is the shape every real cart hits.
+    const { result } = mount();
+    const product = {
+      id: 'p1',
+      title: 'Product p1',
+      variants: [{ id: 'p1-v1', price_in_cents: 1500 }],
+    };
+    await act(async () => { await result.current.addToCart(product); });
+    expect(result.current.getCartTotal()).toBe('$15.00');
+  });
 });
 
 // ─── persistence & sync ───────────────────────────────────────────────────────

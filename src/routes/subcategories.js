@@ -87,7 +87,13 @@ router.patch('/:id', authMiddleware, async (req, res) => {
   if (name?.trim()) updateData.name = name.trim();
   if (slug?.trim()) updateData.slug = slug.trim();
   if (description !== undefined) updateData.description = description?.trim() || null;
-  if (parentId) updateData.parent_id = parentId;
+  if (parentId) {
+    if (parentId === id) return res.status(400).json({ error: 'A subcategory cannot be its own parent' });
+    const { data: parent, error: parentErr } = await supabase
+      .from('categories').select('id').eq('id', parentId).single();
+    if (parentErr || !parent) return res.status(404).json({ error: 'Parent category not found' });
+    updateData.parent_id = parentId;
+  }
 
   const { data: updated, error } = await supabase
     .from('categories').update(updateData).eq('id', id).select().single();

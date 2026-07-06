@@ -101,4 +101,13 @@ describe('worker fetch handler', () => {
     expect(res.status).toBe(404);
     expect(res.headers.get('Cache-Control')).not.toBe('public, max-age=31536000, immutable');
   });
+
+  it('scopes the year-long edge cache TTL to 2xx only, so a transient error is never pinned at the edge for a year', async () => {
+    await run(OBJECT_PATH);
+    const cf = fetchSpy.mock.calls[0][1].cf;
+    expect(cf.cacheEverything).toBe(true);
+    expect(cf.cacheTtlByStatus['200-299']).toBe(31536000);
+    expect(cf.cacheTtlByStatus['400-599']).toBe(0);
+    expect(cf.cacheTtl).toBeUndefined();
+  });
 });
