@@ -23,6 +23,7 @@ import { processRefund } from '../services/refundService.js';
 import { connectOnboard, getConnectStatus, getDashboardLink } from '../services/connectService.js';
 import { createIdentitySession, getIdentityStatus, applyIdentitySession } from '../services/identityService.js';
 import { applyStripeSubscription } from '../services/subscriptionService.js';
+import { ensureWalletCustomer, getWalletBalanceCents, handleWalletTopup } from '../services/walletService.js';
 
 const router = express.Router();
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
@@ -74,8 +75,11 @@ router.post('/create-checkout', authMiddleware, validateRequestBody(createChecko
 // differs from what Stripe will charge).
 router.post('/calculate-cart', authMiddleware, async (req, res) => {
   try {
-    const { items, promoCode } = req.body;
+    const { items, promoCode, useWalletBalance } = req.body;
     if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'items is required' });
+    if (promoCode && useWalletBalance) {
+      return res.status(400).json({ error: 'Apply either a promo code or your wallet balance, not both.' });
+    }
     const priced = await priceCart(items, req.user.id);
 
     // Preview the promo discount without creating any Stripe objects. Codes in
@@ -85,6 +89,8 @@ router.post('/calculate-cart', authMiddleware, async (req, res) => {
     // and the undiscounted totals stay correct.
     let discountCents = 0;
     let promoError = null;
+    let walletBalanceCents = 0;
+    let walletAppliedCents = 0;
     if (typeof promoCode === 'string' && promoCode.trim()) {
       try {
         if (isWelcomeCodeFormat(promoCode)) {
@@ -99,6 +105,10 @@ router.post('/calculate-cart', authMiddleware, async (req, res) => {
         if (!promoErr.statusCode) throw promoErr;
         promoError = promoErr.message;
       }
+    } else if (useWalletBalance) {
+      // Live read from Stripe — CardPop keeps no local wallet ledger for buyers.
+      walletBalanceCents = await getWalletBalanceCents(stripe, req.user.id);
+      walletAppliedCents = Math.min(walletBalanceCents, priced.grandCents);
     }
 
     res.json({
@@ -106,9 +116,11 @@ router.post('/calculate-cart', authMiddleware, async (req, res) => {
       subtotalAud: priced.itemsCents / 100,
       commissionAud: priced.commissionCents / 100,
       gstAud:      priced.gstCents / 100,
-      discountAud: discountCents / 100,
+      discountAud: (discountCents + walletAppliedCents) / 100,
+      walletBalanceAud: walletBalanceCents / 100,
+      walletAppliedAud: walletAppliedCents / 100,
       promoError,
-      totalAud:    (priced.grandCents - discountCents) / 100,
+      totalAud:    (priced.grandCents - discountCents - walletAppliedCents) / 100,
     });
   } catch (err) {
     const code = err.statusCode || 500;
@@ -119,13 +131,16 @@ router.post('/calculate-cart', authMiddleware, async (req, res) => {
 
 router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
   try {
-    const { items, successUrl, cancelUrl, shippingAddress, promoCode } = req.body;
+    const { items, successUrl, cancelUrl, shippingAddress, promoCode, useWalletBalance } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'items is required' });
     }
     if (!successUrl || !cancelUrl) {
       return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
+    }
+    if (promoCode && useWalletBalance) {
+      return res.status(400).json({ error: 'Apply either a promo code or your wallet balance, not both.' });
     }
 
     const userId = req.user.id;
@@ -148,6 +163,8 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
     let discountCents = 0;
     let welcomeOfferId = null;
     let partnerMeta = {};
+    let walletCents = 0;
+    let walletCustomerId = null;
     if (typeof promoCode === 'string' && promoCode.trim()) {
       if (isWelcomeCodeFormat(promoCode)) {
         const offer = await validateWelcomeDiscount(userId, promoCode);
@@ -172,6 +189,24 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
           partnerDiscountCents: String(discountCents),
         };
       }
+    } else if (useWalletBalance) {
+      // Wallet balance lives on the Stripe Customer, not our DB — spend it as a
+      // one-off coupon on this session, then debit it in the webhook only once
+      // payment actually completes (never pre-emptively, in case checkout is
+      // abandoned).
+      walletCustomerId = await ensureWalletCustomer(stripe, userId, { email });
+      const availableCents = await getWalletBalanceCents(stripe, userId);
+      walletCents = Math.min(availableCents, grandCents);
+      if (walletCents > 0) {
+        const coupon = await stripe.coupons.create({
+          amount_off: walletCents,
+          currency: 'aud',
+          duration: 'once',
+          name: 'CardPop wallet balance',
+        });
+        discounts = [{ coupon: coupon.id }];
+        discountCents = walletCents;
+      }
     }
 
     const session = await stripe.checkout.sessions.create({
@@ -180,8 +215,13 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
       mode:                 'payment',
       success_url:          successUrl,
       cancel_url:           cancelUrl,
-      customer_email:       email,
-      metadata:             { userId, cartCheckout: 'true', ...(welcomeOfferId ? { welcomeOfferId } : {}), ...partnerMeta },
+      ...(walletCustomerId ? { customer: walletCustomerId } : { customer_email: email }),
+      metadata:             {
+        userId, cartCheckout: 'true',
+        ...(welcomeOfferId ? { welcomeOfferId } : {}),
+        ...partnerMeta,
+        ...(walletCents > 0 ? { walletCents: String(walletCents) } : {}),
+      },
       ...(discounts ? { discounts } : {}),
     });
 
@@ -287,9 +327,15 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
   try {
     switch (event.type) {
-      case 'checkout.session.completed':
-        await handleCheckoutSessionCompleted(event.data.object, stripe);
+      case 'checkout.session.completed': {
+        const session = event.data.object;
+        if (session.metadata?.walletTopup === 'true') {
+          await handleWalletTopup(session, stripe);
+        } else {
+          await handleCheckoutSessionCompleted(session, stripe);
+        }
         break;
+      }
 
       case 'payment_intent.payment_failed':
         await handlePaymentFailed(event.data.object);

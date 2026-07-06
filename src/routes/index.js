@@ -33,6 +33,7 @@ import catalogRouter from './catalog.js';
 import psaRouter from './psa.js';
 import welcomeOfferRouter from './welcome-offer.js';
 import partnersRouter from './partners.js';
+import walletRouter from './wallet.js';
 
 const router = Router();
 
@@ -151,6 +152,10 @@ export default () => {
     // Partner program (applications, dashboard, referral tracking, payouts)
     router.use('/partners', apiLimiter);
     router.use('/partners', partnersRouter);
+
+    // Buyer prepaid wallet (Stripe Customer Balance top-up + balance read)
+    router.use('/wallet', apiLimiter);
+    router.use('/wallet', walletRouter);
 
     // Trade routes with email verification middleware
     // Apply auth middleware first, then trade access verification

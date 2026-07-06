@@ -4,6 +4,7 @@ import logger from '../utils/logger.js';
 import { calculateBreakdown } from './commissionService.js';
 import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
 import { validateWelcomeDiscount, buildWelcomeDiscount } from './welcomeOfferService.js';
+import { ensureWalletCustomer, getWalletBalanceCents } from './walletService.js';
 
 export async function createSingleItemCheckout(req, res) {
   try {
@@ -15,6 +16,7 @@ export async function createSingleItemCheckout(req, res) {
       cancelUrl,
       shippingAddress,
       promoCode,
+      useWalletBalance,
     } = req.body;
 
     const userId = req.user.id;
@@ -129,6 +131,7 @@ export async function createSingleItemCheckout(req, res) {
     // of the item price only (never the fee/GST lines, never seller proceeds).
     // The webhook marks it redeemed after payment completes.
     let discounts;
+    let walletCustomerId = null;
     if (promoCode) {
       const offer = await validateWelcomeDiscount(userId, promoCode);
       const built = await buildWelcomeDiscount(stripe, offer, Math.round(breakdown.itemPrice * 100));
@@ -136,6 +139,26 @@ export async function createSingleItemCheckout(req, res) {
         discounts = [{ coupon: built.couponId }];
         metadata.welcomeOfferId = offer.id;
         metadata.discountAud = String(built.discountCents / 100);
+      }
+    } else if (useWalletBalance) {
+      // Wallet balance lives on the Stripe Customer, not our DB — spend it as a
+      // one-off coupon on this session, then debit it in the webhook only once
+      // payment actually completes (never pre-emptively, in case checkout is
+      // abandoned).
+      walletCustomerId = await ensureWalletCustomer(stripe, userId, { email });
+      const buyerTotalCents = Math.round(buyerTotal * 100);
+      const availableCents = await getWalletBalanceCents(stripe, userId);
+      const walletCents = Math.min(availableCents, buyerTotalCents);
+      if (walletCents > 0) {
+        const coupon = await stripe.coupons.create({
+          amount_off: walletCents,
+          currency: 'aud',
+          duration: 'once',
+          name: 'CardPop wallet balance',
+        });
+        discounts = [{ coupon: coupon.id }];
+        metadata.walletCents = String(walletCents);
+        metadata.discountAud = String(walletCents / 100);
       }
     }
 
@@ -145,7 +168,7 @@ export async function createSingleItemCheckout(req, res) {
       mode: 'payment',
       success_url: successUrl,
       cancel_url: cancelUrl,
-      customer_email: email,
+      ...(walletCustomerId ? { customer: walletCustomerId } : { customer_email: email }),
       metadata,
       ...(discounts ? { discounts } : {}),
     });
