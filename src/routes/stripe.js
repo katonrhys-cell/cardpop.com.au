@@ -14,7 +14,7 @@ import { createSingleItemCheckout } from '../services/checkoutService.js';
 import { priceCart } from '../services/cartService.js';
 import { validateWelcomeDiscount, welcomeDiscountCents, buildWelcomeDiscount } from '../services/welcomeOfferService.js';
 import { processRefund } from '../services/refundService.js';
-import { connectOnboard, getConnectStatus, getDashboardLink } from '../services/connectService.js';
+import { connectOnboard, getConnectStatus, getDashboardLink, handleConnectAccountUpdated } from '../services/connectService.js';
 import { applyStripeSubscription } from '../services/subscriptionService.js';
 
 const router = express.Router();
@@ -282,6 +282,13 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       case 'customer.subscription.deleted':
       case 'customer.subscription.trial_will_end':
         await applyStripeSubscription(event.data.object);
+        break;
+
+      // Connected-account identity/KYC updates: Stripe verifies seller identity
+      // during Connect onboarding, so mirror its decision onto the profile's
+      // Verified badge (Connect is the sole identity-verification path).
+      case 'account.updated':
+        await handleConnectAccountUpdated(event.data.object);
         break;
 
       default:

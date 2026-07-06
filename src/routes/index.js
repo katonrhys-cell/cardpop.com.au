@@ -13,7 +13,6 @@ import integratedAiRouter from './integrated-ai.js';
 import cardOcrRouter from './card-ocr.js';
 import cardDescriptionRouter from './card-description.js';
 import gradeEstimatorRouter from './grade-estimator.js';
-import idVerificationRouter from './id-verification.js';
 import eventScraperRouter from './event-scraper.js';
 import categoriesRouter from './categories.js';
 import subcategoriesRouter from './subcategories.js';
@@ -53,9 +52,6 @@ export default () => {
 
     // Grade estimator routes with rate limiting
     router.use('/grade-estimator', gradeEstimatorRouter);
-
-    // ID verification name extraction
-    router.use('/id-verification', idVerificationRouter);
 
     // Event scraper routes with API rate limiting
     router.use('/event-scraper', apiLimiter);

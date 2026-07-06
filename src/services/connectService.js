@@ -59,7 +59,7 @@ export async function getConnectStatus(req, res) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('stripe_connect_account_id, stripe_connect_onboarded, wallet_balance_aud')
+      .select('stripe_connect_account_id, stripe_connect_onboarded, is_verified, wallet_balance_aud')
       .eq('id', userId)
       .maybeSingle();
 
@@ -68,13 +68,23 @@ export async function getConnectStatus(req, res) {
     }
 
     const account = await stripe.accounts.retrieve(profile.stripe_connect_account_id);
-    const onboarded = account.details_submitted && account.payouts_enabled;
+    const onboarded = Boolean(account.details_submitted && account.payouts_enabled);
 
-    if (onboarded !== profile.stripe_connect_onboarded) {
-      await supabase
-        .from('profiles')
-        .update({ stripe_connect_onboarded: onboarded })
-        .eq('id', userId);
+    // Stripe performs the identity (KYC) checks during Connect onboarding and
+    // only enables payouts once identity is verified — so a payouts-enabled
+    // account is our source of truth for "identity verified". Promote the
+    // profile's badge fields from that signal; the platform never stores the
+    // underlying ID documents. We only ever promote (never revoke) here, so a
+    // transient payout hiccup can't strip a badge and users verified under the
+    // old manual flow keep their status.
+    const update = {};
+    if (onboarded !== profile.stripe_connect_onboarded) update.stripe_connect_onboarded = onboarded;
+    if (onboarded && !profile.is_verified) {
+      update.is_verified = true;
+      update.verification_status = 'approved';
+    }
+    if (Object.keys(update).length) {
+      await supabase.from('profiles').update(update).eq('id', userId);
     }
 
     res.json({
@@ -110,5 +120,30 @@ export async function getDashboardLink(req, res) {
   } catch (err) {
     logger.error(`[STRIPE CONNECT] /connect/dashboard-link error: ${err.message}`);
     res.status(500).json({ error: err.message });
+  }
+}
+
+// Connect webhook handler for `account.updated`. When Stripe finishes (or
+// changes) a connected account's KYC/verification, mirror the payout state onto
+// the user's profile so the Verified badge tracks Stripe's decision without any
+// manual review. The connected account carries `metadata.cardpop_user_id`
+// (stamped at creation) so we can map the event back to a user. Promote-only:
+// we set the badge when payouts turn on but never clear an existing badge here.
+export async function handleConnectAccountUpdated(account) {
+  const userId = account?.metadata?.cardpop_user_id;
+  if (!userId) return; // Not a CardPop-managed connected account.
+
+  const onboarded = Boolean(account.details_submitted && account.payouts_enabled);
+  const update = { stripe_connect_onboarded: onboarded };
+  if (onboarded) {
+    update.is_verified = true;
+    update.verification_status = 'approved';
+  }
+
+  const { error } = await supabase.from('profiles').update(update).eq('id', userId);
+  if (error) {
+    logger.error(`[STRIPE CONNECT] account.updated sync failed for ${userId}: ${error.message}`);
+  } else {
+    logger.info(`[STRIPE CONNECT] account.updated → user ${userId} onboarded=${onboarded}`);
   }
 }

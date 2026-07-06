@@ -4,6 +4,7 @@
 
 ## Pages
 - [Account Dashboard | CardPop](https://cardpop.com.au/accountdashboard): No description available
+- [Account Verification | CardPop](https://cardpop.com.au/verificationsubmission): No description available
 - [Add Your First Card | Card Pop](https://cardpop.com.au/addyourfirstcard): No description available
 - [Admin - Collection Sections | CardPop](https://cardpop.com.au/collectionsectionsadmin): No description available
 - [Admin - Hero Showcase | CardPop](https://cardpop.com.au/heroshowcaseadmin): No description available
@@ -19,6 +20,7 @@
 - [Complete Profile | Card Pop](https://cardpop.com.au/profilecompletion): No description available
 - [Confirming Order | Card Pop](https://cardpop.com.au/checkoutsuccess): No description available
 - [Hierarchy Management | CardPop Admin](https://cardpop.com.au/categorymanagement): No description available
+- [Identity Verification | CardPop](https://cardpop.com.au/accountverification): No description available
 - [Log In | CardPop](https://cardpop.com.au/login): No description available
 - [Manage Events | Admin Portal](https://cardpop.com.au/eventsadmin): No description available
 - [Manage Events | Admin Portal](https://cardpop.com.au/eventsmanagement): No description available
@@ -57,6 +59,5 @@
 - [Vault Profile | CardPop](https://cardpop.com.au/vaultprofile): No description available
 - [Verification Management | Admin](https://cardpop.com.au/adminverificationdashboard): No description available
 - [Verification Pending | Card Pop](https://cardpop.com.au/verificationpending): No description available
-- [Verification Status | CardPop](https://cardpop.com.au/verificationsubmission): No description available
 - [Wallet & Payouts | CardPop](https://cardpop.com.au/accountwallet): No description available
 - [Watchlist | CardPop](https://cardpop.com.au/accountwatchlist): No description available

@@ -1,180 +1,43 @@
-
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { ShieldCheck, Upload, ArrowRight, ArrowLeft, CheckCircle, Clock } from 'lucide-react';
+import { ShieldCheck, ArrowRight, CheckCircle, Lock } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
-import { compressImage } from '@/utils/compressImage.js';
+import apiServerClient from '@/lib/apiServerClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import { isVerified } from '@/utils/verification.js';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { toast } from 'sonner';
+
+// Identity verification is handled entirely by Stripe. When a seller onboards
+// with Stripe Connect to receive payouts, Stripe performs the KYC / identity
+// checks and only enables payouts once identity is confirmed — CardPop never
+// collects or stores government ID documents itself. This page explains that
+// and routes users to the Stripe onboarding (which lives in the wallet).
 
 const VerificationSubmissionPage = () => {
   const { currentUser } = useAuth();
-  const navigate = useNavigate();
-  
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [existingStatus, setExistingStatus] = useState(null);
-  const [step, setStep] = useState(1);
-
-  // Form Data
-  const [legalName, setLegalName] = useState('');
-  const [address, setAddress] = useState('');
-  const [phone, setPhone] = useState('');
-  const [idPhoto, setIdPhoto] = useState(null);
-  const [idPhotoPreview, setIdPhotoPreview] = useState(null);
-
-  const [displayName, setDisplayName] = useState('');
-  const [profilePhoto, setProfilePhoto] = useState(null);
-  const [profilePhotoPreview, setProfilePhotoPreview] = useState(null);
+  const [onboarded, setOnboarded] = useState(false);
 
   useEffect(() => {
-    let isMounted = true;
-    
-    const checkExisting = async () => {
-      if (!currentUser) return;
+    if (!currentUser?.id) { setLoading(false); return; }
+    let cancelled = false;
+    const run = async () => {
       try {
-        // user_verification is stubbed — check profiles table for verification_status
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('verification_status')
-          .eq('id', currentUser.id)
-          .maybeSingle();
-
-        if (isMounted && profileData?.verification_status) {
-          setExistingStatus(profileData.verification_status);
+        const [profileRes, statusRes] = await Promise.all([
+          supabase.from('profiles').select('is_verified').eq('id', currentUser.id).maybeSingle(),
+          apiServerClient.fetch('/stripe/connect/status').then(r => (r.ok ? r.json() : null)).catch(() => null),
+        ]);
+        if (!cancelled) {
+          setOnboarded(isVerified(profileRes.data?.is_verified) || Boolean(statusRes?.onboarded));
         }
-      } catch (err) {
-        // silently ignore
       } finally {
-        if (isMounted) setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
-    
-    checkExisting();
-    return () => { isMounted = false; };
-  }, [currentUser]);
-
-  const handleIdPhotoChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    if (file.size > 20 * 1024 * 1024) {
-      toast.error('File size exceeds 20MB limit.');
-      return;
-    }
-    
-    setIdPhoto(file);
-    const reader = new FileReader();
-    reader.onloadend = () => setIdPhotoPreview(reader.result);
-    reader.readAsDataURL(file);
-  };
-
-  const handleProfilePhotoChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    if (file.size > 20 * 1024 * 1024) {
-      toast.error('File size exceeds 20MB limit.');
-      return;
-    }
-    
-    setProfilePhoto(file);
-    const reader = new FileReader();
-    reader.onloadend = () => setProfilePhotoPreview(reader.result);
-    reader.readAsDataURL(file);
-  };
-
-  const handleNext = () => {
-    if (!legalName.trim() || !address.trim() || !phone.trim() || !idPhoto) {
-      toast.error('Please fill all required fields and upload an ID photo.');
-      return;
-    }
-    
-    const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s./0-9]*$/;
-    if (!phoneRegex.test(phone)) {
-      toast.error('Please enter a valid phone number.');
-      return;
-    }
-
-    setStep(2);
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!displayName.trim()) {
-      toast.error('Display name is required for your public profile.');
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      // 1. Upload ID photo to the PRIVATE verification-docs bucket.
-      // Identity documents must never live in the public vault-images bucket —
-      // that bucket serves images by unauthenticated URL. verification-docs is
-      // private and only reachable via short-lived signed URLs (see the admin
-      // review dashboard). The path is keyed on the user id as the first folder
-      // segment to satisfy the bucket's per-user RLS policy.
-      let idPhotoPath = null;
-      if (idPhoto) {
-        // Keep IDs large and high quality so details stay legible for review.
-        const compressed = await compressImage(idPhoto, { maxDimension: 2200, quality: 0.9 });
-        const fileExt = compressed.name.split('.').pop();
-        const filePath = `${currentUser.id}/id_${Date.now()}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage
-          .from('verification-docs')
-          .upload(filePath, compressed, { upsert: true });
-        if (uploadError) throw uploadError;
-        idPhotoPath = filePath;
-      }
-
-      // 2. Upload profile photo if provided
-      let profilePhotoPath = null;
-      if (profilePhoto) {
-        const compressed = await compressImage(profilePhoto, { maxDimension: 512, quality: 0.85 });
-        const fileExt = compressed.name.split('.').pop();
-        // Timestamped name (not a fixed per-user path) so the file is
-        // immutable and can carry a long-lived cache header.
-        const filePath = `avatars/${currentUser.id}-${Date.now()}.${fileExt}`;
-        const { error: uploadError } = await supabase.storage
-          .from('vault-images')
-          .upload(filePath, compressed, { upsert: true, cacheControl: '31536000' });
-        if (uploadError) throw uploadError;
-        profilePhotoPath = filePath;
-      }
-
-      // 3. Update profiles table with verification data and pending status
-      const profileUpdate = {
-        display_name: displayName,
-        legal_name: legalName,
-        address,
-        phone_number: phone,
-        verification_status: 'pending',
-        is_verified: false,
-        updated_at: new Date().toISOString()
-      };
-      if (idPhotoPath) profileUpdate.id_photo = idPhotoPath;
-      if (profilePhotoPath) profileUpdate.profile_photo_or_character = profilePhotoPath;
-
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update(profileUpdate)
-        .eq('id', currentUser.id);
-
-      if (updateError) throw updateError;
-
-      toast.success('Verification request submitted successfully!');
-      setExistingStatus('pending');
-    } catch (err) {
-      toast.error(err.message || 'Failed to submit verification request.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+    run();
+    return () => { cancelled = true; };
+  }, [currentUser?.id]);
 
   if (loading) {
     return (
@@ -184,42 +47,10 @@ const VerificationSubmissionPage = () => {
     );
   }
 
-  if (existingStatus) {
-    return (
-      <div className="max-w-xl mx-auto px-4 py-24 text-center">
-        <Helmet><title>Verification Status | CardPop</title></Helmet>
-        <div className="bg-card border border-border p-10 rounded-3xl shadow-sm flex flex-col items-center">
-          {existingStatus === 'approved' ? (
-            <>
-              <CheckCircle className="w-16 h-16 text-emerald-500 mb-6" />
-              <h1 className="text-3xl font-serif font-bold mb-4">Account Verified</h1>
-              <p className="text-muted-foreground mb-8">Your account identity has been successfully verified.</p>
-            </>
-          ) : existingStatus === 'rejected' ? (
-            <>
-              <ShieldCheck className="w-16 h-16 text-destructive mb-6" />
-              <h1 className="text-3xl font-serif font-bold mb-4">Verification Rejected</h1>
-              <p className="text-muted-foreground mb-8">Unfortunately, your verification was not approved. Please contact support.</p>
-            </>
-          ) : (
-            <>
-              <Clock className="w-16 h-16 text-amber-500 mb-6" />
-              <h1 className="text-3xl font-serif font-bold mb-4">Submission Received</h1>
-              <p className="text-muted-foreground mb-8">Your verification request is currently pending admin review. We will notify you once processing is complete.</p>
-            </>
-          )}
-          <Button onClick={() => navigate('/profile')} className="rounded-xl font-bold h-12 px-8">
-            Return to Profile
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="max-w-2xl mx-auto px-4 py-12 lg:py-20 font-sans">
       <Helmet><title>Account Verification | CardPop</title></Helmet>
-      
+
       <div className="mb-10 text-center">
         <h1 className="text-3xl md:text-4xl font-serif font-bold tracking-tight mb-4">Verify Your Identity</h1>
         <p className="text-muted-foreground text-lg text-balance">
@@ -227,135 +58,56 @@ const VerificationSubmissionPage = () => {
         </p>
       </div>
 
-      <div className="bg-card border border-border rounded-3xl shadow-sm overflow-hidden">
-        {/* Progress Bar */}
-        <div className="flex border-b border-border bg-muted/20">
-          <div className={`flex-1 py-4 px-6 text-center text-sm font-bold border-r border-border transition-colors ${step === 1 ? 'text-primary bg-primary/5' : 'text-muted-foreground'}`}>
-            1. Legal Documents
-          </div>
-          <div className={`flex-1 py-4 px-6 text-center text-sm font-bold transition-colors ${step === 2 ? 'text-primary bg-primary/5' : 'text-muted-foreground'}`}>
-            2. Public Profile
-          </div>
+      {onboarded ? (
+        <div className="bg-card border border-border rounded-3xl shadow-sm p-10 flex flex-col items-center text-center">
+          <CheckCircle className="w-16 h-16 text-emerald-500 mb-6" />
+          <h2 className="text-2xl font-serif font-bold mb-3">Identity Verified</h2>
+          <p className="text-muted-foreground mb-8 max-w-md">
+            Your identity has been verified through Stripe and your profile displays the Verified badge.
+          </p>
+          <Button asChild className="rounded-xl font-bold h-12 px-8">
+            <Link to="/account/wallet">Go to Wallet</Link>
+          </Button>
         </div>
-
-        <div className="p-6 md:p-10">
-          {step === 1 && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-              <div className="space-y-2">
-                <Label className="font-bold">Full Legal Name *</Label>
-                <Input 
-                  value={legalName} 
-                  onChange={(e) => setLegalName(e.target.value)} 
-                  placeholder="As it appears on your ID" 
-                  className="bg-background h-12 rounded-xl"
-                />
+      ) : (
+        <div className="bg-card border border-border rounded-3xl shadow-sm overflow-hidden">
+          <div className="p-6 md:p-10 space-y-6">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+                <Lock className="w-6 h-6 text-primary" />
               </div>
-
-              <div className="space-y-2">
-                <Label className="font-bold">Residential Address *</Label>
-                <Input 
-                  value={address} 
-                  onChange={(e) => setAddress(e.target.value)} 
-                  placeholder="Street, City, State, ZIP" 
-                  className="bg-background h-12 rounded-xl"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="font-bold">Phone Number *</Label>
-                <Input 
-                  type="tel"
-                  value={phone} 
-                  onChange={(e) => setPhone(e.target.value)} 
-                  placeholder="+1 (555) 000-0000" 
-                  className="bg-background h-12 rounded-xl"
-                />
-              </div>
-
-              <div className="space-y-3 pt-4">
-                <Label className="font-bold">Government Issued ID *</Label>
-                <p className="text-xs text-muted-foreground">Upload a clear photo of your Passport, Driver's License, or National ID. (Max 20MB)</p>
-                
-                <div className="border-2 border-dashed border-border rounded-2xl p-6 flex flex-col items-center justify-center bg-muted/10 relative hover:bg-muted/30 transition-colors">
-                  {idPhotoPreview ? (
-                    <div className="w-full flex flex-col items-center">
-                      <img src={idPhotoPreview} alt="ID Preview" className="max-h-48 rounded-xl object-contain mb-4" />
-                      <Button variant="outline" size="sm" onClick={() => { setIdPhoto(null); setIdPhotoPreview(null); }} className="rounded-full">
-                        Remove Photo
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <Upload className="w-10 h-10 text-muted-foreground mb-3 opacity-50" />
-                      <Label htmlFor="id-upload" className="cursor-pointer">
-                        <span className="bg-primary text-primary-foreground px-4 py-2 rounded-xl font-bold shadow-sm inline-block">Select Image</span>
-                        <Input id="id-upload" type="file" accept="image/jpeg, image/png, image/gif, image/webp" className="hidden" onChange={handleIdPhotoChange} />
-                      </Label>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div className="pt-6 flex justify-end">
-                <Button onClick={handleNext} className="h-12 px-8 rounded-xl font-bold">
-                  Next Step <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
+              <div>
+                <h2 className="text-xl font-bold mb-1">Verify securely with Stripe</h2>
+                <p className="text-sm text-muted-foreground">
+                  Identity verification is handled by Stripe as part of seller payout onboarding.
+                  You’ll complete a short, secure check on Stripe’s platform, where your government
+                  ID is verified directly. CardPop never sees or stores your documents — once Stripe
+                  confirms your identity, your Verified badge is applied automatically.
+                </p>
               </div>
             </div>
-          )}
 
-          {step === 2 && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-              <div className="bg-blue-50 text-blue-800 p-4 rounded-xl text-sm font-medium border border-blue-100 mb-6">
-                Your legal identity details are kept strictly private. Set up the public profile that other collectors will see below.
-              </div>
+            <ul className="space-y-3">
+              {[
+                'Verified badge on your profile and listings',
+                'Documents stay with Stripe, never stored by CardPop',
+                'Automatic — no manual review or waiting on an admin',
+              ].map(item => (
+                <li key={item} className="flex items-center gap-3 text-sm">
+                  <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
 
-              <div className="space-y-2">
-                <Label className="font-bold">Public Display Name *</Label>
-                <Input 
-                  value={displayName} 
-                  onChange={(e) => setDisplayName(e.target.value)} 
-                  placeholder="e.g., VaultHunter99" 
-                  className="bg-background h-12 rounded-xl"
-                />
-              </div>
-
-              <div className="space-y-3 pt-4">
-                <Label className="font-bold">Profile Photo or Avatar (Optional)</Label>
-                <p className="text-xs text-muted-foreground">Upload a public profile picture. (Max 20MB)</p>
-                
-                <div className="border-2 border-dashed border-border rounded-2xl p-6 flex flex-col items-center justify-center bg-muted/10 relative hover:bg-muted/30 transition-colors">
-                  {profilePhotoPreview ? (
-                    <div className="w-full flex flex-col items-center">
-                      <img src={profilePhotoPreview} alt="Profile Preview" className="w-32 h-32 rounded-full object-cover mb-4 border-4 border-background shadow-sm" />
-                      <Button variant="outline" size="sm" onClick={() => { setProfilePhoto(null); setProfilePhotoPreview(null); }} className="rounded-full">
-                        Remove Photo
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      <Upload className="w-10 h-10 text-muted-foreground mb-3 opacity-50" />
-                      <Label htmlFor="profile-upload" className="cursor-pointer">
-                        <span className="bg-secondary text-secondary-foreground px-4 py-2 rounded-xl font-bold shadow-sm inline-block border border-border">Select Image</span>
-                        <Input id="profile-upload" type="file" accept="image/jpeg, image/png, image/gif, image/webp" className="hidden" onChange={handleProfilePhotoChange} />
-                      </Label>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div className="pt-6 flex items-center justify-between">
-                <Button variant="ghost" onClick={() => setStep(1)} className="h-12 px-6 rounded-xl font-medium">
-                  <ArrowLeft className="w-4 h-4 mr-2" /> Back
-                </Button>
-                <Button onClick={handleSubmit} disabled={submitting} className="h-12 px-8 rounded-xl font-bold shadow-sm">
-                  {submitting ? 'Submitting...' : 'Submit Verification'}
-                </Button>
-              </div>
-            </div>
-          )}
+            <Button asChild className="w-full h-12 px-8 rounded-xl font-bold gap-2">
+              <Link to="/account/wallet">
+                Verify with Stripe <ArrowRight className="w-4 h-4" />
+              </Link>
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
