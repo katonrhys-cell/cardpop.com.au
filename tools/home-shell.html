@@ -6,16 +6,91 @@
   takes over seamlessly. Every OTHER route is served the shell-less app.html.
 
   Keep this visually in sync with components/HeroSection.jsx (same <h1>, copy and
-  layout). It uses the same Tailwind classes, which are present in the built CSS
-  because HeroSection uses them. Decorative spotlights and CTA/chip icons are
-  omitted here for brevity — they fade in imperceptibly when React mounts and are
-  not the LCP element.
+  layout) and with the anonymous first-commit state of components/Header.jsx
+  (logo, search bar, icon placeholders, nav row — same Tailwind classes and
+  dimensions, so React's takeover causes no visible header change or layout
+  shift). It uses only Tailwind classes that are present in the built CSS
+  because Header/HeroSection use them. Decorative spotlights and CTA/chip icons
+  are omitted here for brevity — they fade in imperceptibly when React mounts
+  and are not the LCP element.
+
+  Deliberately contains NO <button> elements — interactive controls are inert
+  <span>/<a> lookalikes until React replaces them (real <a href> links where a
+  destination exists, so the header is usable even before hydration).
 -->
 <div class="flex flex-col min-h-screen bg-background text-foreground">
   <header class="sticky top-0 z-50 w-full bg-background border-b border-border/50">
     <div class="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
+      <!-- Row 1: logo + search + action placeholders — mirrors Header.jsx row 1 -->
       <div class="relative flex items-center py-3 border-b border-border/40">
-        <span class="flex items-center h-10 text-xl font-extrabold font-serif text-foreground">CardPop</span>
+        <a href="/" aria-label="CardPop — back to home" class="shrink-0 relative z-10 flex items-center">
+          <span class="inline-flex items-center gap-2.5">
+            <svg viewBox="0 0 56 68" fill="none" aria-hidden="true" class="text-primary shrink-0 w-9 h-[44px]">
+              <rect x="17" y="0.5" width="22" height="11" rx="4" stroke="currentColor" stroke-width="2.5"/>
+              <rect x="20.5" y="3" width="15" height="5" rx="2" fill="currentColor" opacity="0.22"/>
+              <rect x="1.5" y="9" width="53" height="58" rx="6" stroke="currentColor" stroke-width="2.5"/>
+              <rect x="8" y="17" width="40" height="43" rx="4" stroke="currentColor" stroke-width="2"/>
+              <rect x="14" y="23" width="28" height="31" rx="2.5" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>
+            </svg>
+            <span class="flex flex-col leading-none">
+              <span class="font-serif font-bold tracking-wide leading-none text-[1.55rem]"><span class="text-foreground">Card</span><span class="text-primary">Pop<sup class="text-[0.5em] leading-none text-foreground" style="text-decoration:none">™</sup></span></span>
+              <span class="flex items-center gap-1.5 mt-1 text-[9px] font-bold tracking-[0.28em] uppercase text-muted-foreground">
+                <span class="flex-1 h-px bg-border"></span>
+                Australia
+                <span class="flex-1 h-px bg-border"></span>
+              </span>
+            </span>
+          </span>
+        </a>
+
+        <!-- Search lookalike — absolutely centred like the real SearchBar -->
+        <div class="absolute inset-x-0 hidden lg:flex justify-center pointer-events-none">
+          <div class="w-full max-w-xl pointer-events-auto px-4">
+            <div class="relative w-full max-w-md" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <div class="flex h-11 w-full items-center rounded-full border border-[hsl(var(--input-border))] bg-background pl-9 pr-10 text-base md:text-sm shadow-sm text-muted-foreground">Search cards, sets, sellers...</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex-1"></div>
+
+        <!-- Theme toggle placeholder (moon = light-mode default) -->
+        <span class="inline-flex items-center justify-center h-11 w-11 shrink-0 rounded-xl" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        </span>
+
+        <!-- Cart placeholder -->
+        <span class="inline-flex items-center justify-center h-11 w-11 shrink-0 rounded-xl" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+        </span>
+
+        <!-- Account area — matches Header's authLoading skeleton (Login xl-only + Join Vault widths) -->
+        <div class="hidden md:flex items-center gap-2 shrink-0" aria-hidden="true">
+          <div class="h-9 w-[57px] rounded-xl bg-muted animate-pulse hidden xl:block"></div>
+          <div class="h-9 w-[84px] rounded-xl bg-muted animate-pulse"></div>
+        </div>
+
+        <!-- Mobile hamburger placeholder -->
+        <span class="lg:hidden inline-flex items-center justify-center h-11 w-11 shrink-0 rounded-xl" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6"><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+        </span>
+      </div>
+
+      <!-- Row 2: nav links (desktop only) — mirrors Header.jsx row 2; dropdown
+           triggers link to their hub pages until React swaps in the real menus -->
+      <div class="hidden lg:flex items-center py-1.5">
+        <nav class="flex items-center justify-evenly w-full">
+          <a href="/marketplace" class="flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium whitespace-nowrap text-muted-foreground">Browse Collections<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a>
+          <a href="/shop" class="px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium whitespace-nowrap text-muted-foreground">Shop</a>
+          <a href="/marketplace" class="px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium whitespace-nowrap text-muted-foreground">Marketplace</a>
+          <a href="/analytics" class="px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium whitespace-nowrap text-muted-foreground">Analytics</a>
+          <a href="/blog" class="flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium whitespace-nowrap text-muted-foreground">Blog<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a>
+          <a href="/community" class="flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium whitespace-nowrap text-muted-foreground">Community<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a>
+          <a href="/events" class="flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium whitespace-nowrap text-muted-foreground">Events<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a>
+          <a href="/grading" class="flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium whitespace-nowrap text-muted-foreground">Grading<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a>
+          <a href="/about" class="px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium whitespace-nowrap text-muted-foreground">About</a>
+        </nav>
       </div>
     </div>
   </header>
