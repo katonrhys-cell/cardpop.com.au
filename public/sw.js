@@ -4,9 +4,17 @@
 // - Stale While Revalidate for HTML pages (serve cached, update in background)
 
 const CACHE_NAMES = {
-  STATIC: 'cardpop-static-v3',
-  DYNAMIC: 'cardpop-dynamic-v3',
-  PAGES: 'cardpop-pages-v3',
+  // v4: purge caches that may hold Supabase REST responses. Until this
+  // version the fetch handler's "HTML pages" branch matched extension-less
+  // CROSS-ORIGIN paths too (e.g. odoglvswwymyjuwlonkf.supabase.co/rest/v1/…),
+  // so live data — homepage featured cards/sellers among it — was served
+  // stale-while-revalidate from the PAGES cache: one cached empty/aged
+  // response and the homepage stayed empty on every subsequent visit,
+  // regardless of what the database returned. The activate handler deletes
+  // anything not named below, so bumping the suffix evicts the bad entries.
+  STATIC: 'cardpop-static-v4',
+  DYNAMIC: 'cardpop-dynamic-v4',
+  PAGES: 'cardpop-pages-v4',
   IMAGES: 'cardpop-images-v1',
 };
 
@@ -168,13 +176,27 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   const { pathname } = url;
 
+  // Never intercept mutations — caching a POST/PATCH response is a spec
+  // violation (cache.put throws) and there is nothing useful to cache.
+  if (request.method !== 'GET') return;
+
   // Cache First for storage-hosted images (card photos, avatars, media).
   // These previously fell through to Network First, which re-downloaded every
   // image on every page view and burned through the Supabase egress quota.
-  if (request.method === 'GET' && isStorageImage(url)) {
+  if (isStorageImage(url)) {
     event.respondWith(imageCacheFirst(request));
     return;
   }
+
+  // Any other cross-origin request — above all Supabase REST/Auth calls
+  // (odoglvswwymyjuwlonkf.supabase.co/rest/v1/…, /auth/v1/…) — must go
+  // straight to the network. Their extension-less paths used to fall into the
+  // stale-while-revalidate branch below, which (a) served DB query results
+  // from cache first, so the homepage showed stale or empty featured
+  // cards/sellers no matter what the database returned, and (b) matched
+  // cached responses while ignoring the Authorization header, blurring
+  // logged-in/logged-out state.
+  if (url.origin !== self.location.origin) return;
 
   // Network First for API calls
   if (pathname.startsWith('/api') || pathname.startsWith('/hcgi/api')) {
