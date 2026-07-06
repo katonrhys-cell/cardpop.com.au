@@ -89,6 +89,7 @@ const UserProfilePage = lazy(() => import('@/pages/UserProfilePage.jsx'));
 const SecuritySettingsPage = lazy(() => import('@/pages/SecuritySettingsPage.jsx'));
 const UserBalancePage = lazy(() => import('@/pages/UserBalancePage.jsx'));
 const VerificationSubmissionPage = lazy(() => import('@/pages/VerificationSubmissionPage.jsx'));
+const VerifyIdentityPage = lazy(() => import('@/pages/VerifyIdentityPage.jsx'));
 
 // Public Profiles
 const PublicSellerProfilePage = lazy(() => import('@/pages/PublicSellerProfilePage.jsx'));
@@ -300,6 +301,7 @@ const App = () => {
                         {/* User Profiles & Settings */}
                         <Route path="/profile" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
                         <Route path="/verify-account" element={<ProtectedRoute><VerificationSubmissionPage /></ProtectedRoute>} />
+                        <Route path="/verify-identity" element={<ProtectedRoute><VerifyIdentityPage /></ProtectedRoute>} />
                         <Route path="/security" element={<ProtectedRoute><SecuritySettingsPage /></ProtectedRoute>} />
                         <Route path="/balance" element={<ProtectedRoute><UserBalancePage /></ProtectedRoute>} />
                         
