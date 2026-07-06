@@ -58,9 +58,7 @@ const SystemDiagnosticsPage = () => {
     // 2. Check API Server Connection
     const apiStartTime = performance.now();
     try {
-      // Attempting to hit a standard health check endpoint. 
-      // If it 404s, the server is still reachable, just missing the route.
-      const res = await apiServerClient.fetch('/health-check');
+      const res = await apiServerClient.fetch('/health');
       setSystemStatus(prev => ({
         ...prev,
         apiServer: { 
