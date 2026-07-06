@@ -140,7 +140,8 @@ const SubcategoryManagementPage = () => {
     try {
       let icon_url = selectedSubcategory?.icon_url ?? null;
       if (formData.icon instanceof File) {
-        const path = `categories/${Date.now()}-icon-${formData.icon.name}`;
+        const safeName = formData.icon.name.replace(/[/\\]/g, '');
+        const path = `categories/${Date.now()}-icon-${safeName}`;
         const { error: upErr } = await supabase.storage.from('categories').upload(path, formData.icon, { upsert: true, cacheControl: '31536000' });
         if (upErr) throw upErr; // don't silently save without the uploaded icon
         icon_url = supabase.storage.from('categories').getPublicUrl(path).data.publicUrl;

@@ -39,7 +39,7 @@ export async function createSingleItemCheckout(req, res) {
     if (offerId) {
       const { data: offer } = await supabase
         .from('offers')
-        .select('amount_aud, status, buyer_id, listing_id')
+        .select('amount_aud, counter_amount_aud, status, buyer_id, listing_id')
         .eq('id', offerId)
         .maybeSingle();
 
@@ -49,13 +49,26 @@ export async function createSingleItemCheckout(req, res) {
       if (!['pending', 'countered'].includes(offer.status)) {
         return res.status(400).json({ error: 'Offer is no longer valid' });
       }
-      itemPrice = Number(offer.amount_aud);
+      // A 'countered' offer means the seller proposed a different price —
+      // checking out on it is how the buyer accepts that counter, so the
+      // counter amount (not the buyer's original, pre-counter amount) is what
+      // must be charged.
+      itemPrice = Number(
+        offer.status === 'countered' && offer.counter_amount_aud != null
+          ? offer.counter_amount_aud
+          : offer.amount_aud
+      );
     }
 
     // Derive the commission tier from server-side context, NEVER the request
     // body. Trusting a client transactionType let a buyer pass 'trade' (often a
     // 0% tier) on a normal fixed-price purchase to avoid the platform fee.
-    const transactionType = offerId ? 'offer' : (bidId ? 'auction' : 'fixed');
+    // bidId is intentionally never trusted for this either: there is no
+    // bids table/auction feature backing it, so it can't be validated the way
+    // offerId is above — treating its mere presence as proof of an auction let
+    // a buyer force the (often lower) auction commission tier onto any
+    // ordinary fixed-price listing.
+    const transactionType = offerId ? 'offer' : 'fixed';
 
     const cardName = listing.vault_item?.card_name || listing.title || 'Trading Card';
     const breakdown = await calculateBreakdown({ ...listing, price_aud: itemPrice }, transactionType);

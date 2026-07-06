@@ -15,6 +15,14 @@ vi.mock('dns/promises', () => ({
   lookup: mockDnsLookup,
 }));
 
+// The route fetches via undici's own fetch/Agent (not the Node global fetch) so
+// the custom DNS-pinning dispatcher works — mock that module directly.
+const mockFetch = vi.hoisted(() => vi.fn());
+vi.mock('undici', () => ({
+  fetch: mockFetch,
+  Agent: class {},
+}));
+
 vi.mock('../../src/middleware/auth.js', () => ({
   authMiddleware: (req, _res, next) => { req.user = { id: 'user-1', app_metadata: { is_admin: true } }; next(); },
   isAdminUser: async (req) => req.user?.app_metadata?.is_admin === true,
@@ -44,7 +52,7 @@ vi.mock('../../src/utils/supabaseClient.js', () => ({
   },
 }));
 
-import eventScraperRouter from '../../src/routes/event-scraper.js';
+import eventScraperRouter, { ssrfSafeLookup } from '../../src/routes/event-scraper.js';
 
 function makeApp() {
   const app = express();
@@ -102,10 +110,10 @@ describe('POST /scrape-event-url', () => {
   });
 
   it('returns fetched text content for a valid https url', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    mockFetch.mockResolvedValue({
       ok: true,
       text: async () => '<html><body><p>Pokemon Card Show this Saturday!</p></body></html>',
-    }));
+    });
 
     const res = await request(app)
       .post('/scrape-event-url')
@@ -117,10 +125,10 @@ describe('POST /scrape-event-url', () => {
   });
 
   it('strips script and style tags from the response', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    mockFetch.mockResolvedValue({
       ok: true,
       text: async () => '<html><head><style>.a{}</style></head><body><script>alert(1)</script><p>Clean</p></body></html>',
-    }));
+    });
 
     const res = await request(app)
       .post('/scrape-event-url')
@@ -132,7 +140,7 @@ describe('POST /scrape-event-url', () => {
   });
 
   it('returns 400 when the fetch call throws', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
+    mockFetch.mockRejectedValue(new Error('Network error'));
 
     const res = await request(app)
       .post('/scrape-event-url')
@@ -142,11 +150,11 @@ describe('POST /scrape-event-url', () => {
   });
 
   it('returns 400 when the fetched page returns a non-ok status', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+    mockFetch.mockResolvedValue({
       ok: false,
       status: 404,
       statusText: 'Not Found',
-    }));
+    });
 
     const res = await request(app)
       .post('/scrape-event-url')
@@ -155,16 +163,75 @@ describe('POST /scrape-event-url', () => {
     expect(res.status).toBe(400);
   });
 
-  it('blocks SSRF to a private/link-local address (e.g. cloud metadata)', async () => {
-    mockDnsLookup.mockResolvedValueOnce([{ address: '169.254.169.254', family: 4 }]);
-    vi.stubGlobal('fetch', vi.fn());
+  it('blocks a literal private/loopback IP url before ever calling fetch', async () => {
+    const res = await request(app)
+      .post('/scrape-event-url')
+      .send({ url: 'http://127.0.0.1/latest' });
+
+    expect(res.status).toBe(400);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('routes the connection through the SSRF-pinning dispatcher', async () => {
+    // Regression coverage for the wiring: fetch must be called with a
+    // dispatcher (ssrfSafeDispatcher), not the bare hostname-based call a
+    // DNS-rebinding attacker could exploit if the check and the connection
+    // used two independent lookups. The actual blocking behaviour of that
+    // dispatcher's lookup function is covered directly below.
+    mockFetch.mockResolvedValue({ ok: true, text: async () => '<p>ok</p>' });
 
     const res = await request(app)
       .post('/scrape-event-url')
-      .send({ url: 'https://metadata.evil.example/latest' });
+      .send({ url: 'https://example.com/event' });
 
-    expect(res.status).toBe(400);
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(mockFetch).toHaveBeenCalledWith(
+      'https://example.com/event',
+      expect.objectContaining({ dispatcher: expect.anything() }),
+    );
+  });
+});
+
+// ─── ssrfSafeLookup (the DNS-rebinding-safe dispatcher lookup) ────────────────
+
+describe('ssrfSafeLookup', () => {
+  it('rejects a hostname that resolves to a private/link-local address', async () => {
+    mockDnsLookup.mockResolvedValueOnce([{ address: '169.254.169.254', family: 4 }]);
+
+    await new Promise((resolve) => {
+      ssrfSafeLookup('metadata.evil.example', {}, (err) => {
+        expect(err).toBeInstanceOf(Error);
+        expect(err.message).toMatch(/private address/);
+        resolve();
+      });
+    });
+  });
+
+  it('allows a hostname that resolves to a public address, returning the validated address', async () => {
+    mockDnsLookup.mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }]);
+
+    await new Promise((resolve) => {
+      ssrfSafeLookup('example.com', {}, (err, address, family) => {
+        expect(err).toBeNull();
+        expect(address).toBe('93.184.216.34');
+        expect(family).toBe(4);
+        resolve();
+      });
+    });
+  });
+
+  it('rejects when any resolved address is private, even if others are public (DNS-rebinding-adjacent multi-A-record case)', async () => {
+    mockDnsLookup.mockResolvedValueOnce([
+      { address: '93.184.216.34', family: 4 },
+      { address: '169.254.169.254', family: 4 },
+    ]);
+
+    await new Promise((resolve) => {
+      ssrfSafeLookup('mixed.evil.example', { all: true }, (err) => {
+        expect(err).toBeInstanceOf(Error);
+        resolve();
+      });
+    });
   });
 });
 

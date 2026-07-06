@@ -131,7 +131,8 @@ const ProductLinesManagementPage = () => {
     try {
       let image_url = selectedLine?.image_url ?? null;
       if (formData.image instanceof File) {
-        const path = `categories/${Date.now()}-${formData.image.name}`;
+        const safeName = formData.image.name.replace(/[/\\]/g, '');
+        const path = `categories/${Date.now()}-${safeName}`;
         const { error: upErr } = await supabase.storage.from('categories').upload(path, formData.image, { upsert: true, cacheControl: '31536000' });
         if (upErr) throw upErr; // don't silently save without the uploaded image
         image_url = supabase.storage.from('categories').getPublicUrl(path).data.publicUrl;

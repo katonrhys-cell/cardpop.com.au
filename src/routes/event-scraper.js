@@ -2,6 +2,7 @@ import 'dotenv/config';
 import dns from 'dns/promises';
 import net from 'net';
 import express from 'express';
+import { Agent, fetch as undiciFetch } from 'undici';
 import logger from '../utils/logger.js';
 import { stream } from '../api/integrated-ai.js';
 import { EventScraperPrompt } from '../constants/prompts.js';
@@ -43,35 +44,60 @@ function isPrivateIp(ip) {
 }
 
 /**
- * Resolve the URL's host and reject any request that would hit a private,
- * loopback or link-local address. Prevents SSRF (e.g. cloud metadata at
- * 169.254.169.254, internal services) via an attacker-supplied URL.
+ * Reject direct IP-literal or localhost hosts up front. Cheap and
+ * deterministic — no DNS involved, so it can't be raced. Hostnames that go
+ * through actual DNS resolution are protected separately by ssrfSafeLookup
+ * below, which pins the connection to the address it validates.
  */
-async function assertPublicUrl(url) {
+function assertNotLiteralPrivateAddress(url) {
   const { hostname } = new URL(url);
-  // Direct IP literal in the host.
   if (net.isIP(hostname)) {
     if (isPrivateIp(hostname)) throw new Error('Blocked: private address');
     return;
   }
   if (hostname.toLowerCase() === 'localhost') throw new Error('Blocked: localhost');
-  const records = await dns.lookup(hostname, { all: true });
-  if (!records.length || records.some(r => isPrivateIp(r.address))) {
-    throw new Error('Blocked: host resolves to a private address');
-  }
 }
+
+/**
+ * Custom DNS lookup used by the dispatcher below. A prior implementation
+ * resolved the hostname once to validate it, then let fetch() re-resolve the
+ * same hostname independently for the actual connection — a DNS-rebinding
+ * attacker (short-TTL record) could pass the check with a public IP and
+ * connect to a private one (e.g. cloud metadata 169.254.169.254) moments
+ * later. Running the check *as* the lookup that undici connects with closes
+ * that window: whatever address is validated here is the exact address the
+ * socket connects to.
+ */
+export function ssrfSafeLookup(hostname, options, callback) {
+  const opts = typeof options === 'function' ? {} : options;
+  const cb = typeof options === 'function' ? options : callback;
+  dns.lookup(hostname, { ...opts, all: true })
+    .then((addresses) => {
+      if (!addresses.length) return cb(new Error(`Blocked: ${hostname} has no DNS records`));
+      if (addresses.some((a) => isPrivateIp(a.address))) {
+        return cb(new Error(`Blocked: ${hostname} resolves to a private address`));
+      }
+      if (opts.all) return cb(null, addresses);
+      const { address, family } = addresses[0];
+      return cb(null, address, family);
+    })
+    .catch(cb);
+}
+
+const ssrfSafeDispatcher = new Agent({ connect: { lookup: ssrfSafeLookup } });
 
 async function fetchWebpageContent(url) {
   logger.info(`[EVENT_SCRAPER] Fetching content from URL: ${url}`);
 
-  // SSRF guard: validate the resolved address before issuing the request.
-  await assertPublicUrl(url);
+  // SSRF guard: literal IP/localhost checked here; DNS-resolved hostnames are
+  // pinned to their validated address via ssrfSafeDispatcher below.
+  assertNotLiteralPrivateAddress(url);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10000);
 
   try {
-    const response = await fetch(url, {
+    const response = await undiciFetch(url, {
       method: 'GET',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -81,6 +107,7 @@ async function fetchWebpageContent(url) {
         'Connection': 'keep-alive',
         'Upgrade-Insecure-Requests': '1',
       },
+      dispatcher: ssrfSafeDispatcher,
       signal: controller.signal,
     });
 

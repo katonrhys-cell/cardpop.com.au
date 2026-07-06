@@ -135,7 +135,10 @@ export const CartProvider = ({ children }) => {
     
     try {
       const currencyInfo = cartItems[0]?.variant?.currency_info;
-      return formatCurrency(totalInCents, currencyInfo);
+      // formatCurrency returns "" (rather than throwing) when currencyInfo is
+      // absent, which every current add-to-cart call site leaves unset — fall
+      // back the same way the catch block below does.
+      return formatCurrency(totalInCents, currencyInfo) || `$${(totalInCents / 100).toFixed(2)}`;
     } catch (e) {
       return `$${(totalInCents / 100).toFixed(2)}`;
     }

@@ -83,15 +83,19 @@ export default () => {
     router.use('/catalog', apiLimiter);
     router.use('/catalog', catalogRouter);
     
-    // Stripe: high-capacity limiter for the webhook, standard for other endpoints
+    // Stripe: high-capacity limiter for the webhook, standard for other endpoints.
+    // The apiLimiter mount below must skip the webhook sub-path — otherwise a
+    // burst of Stripe retries hits both limiters and gets throttled at the
+    // standard 100/min cap despite stripeLimiter's 1000/min allowance (req.path
+    // here is relative to the '/stripe' mount, so the webhook is '/webhook').
     router.use('/stripe/webhook', stripeLimiter);
-    router.use('/stripe', apiLimiter);
+    router.use('/stripe', (req, res, next) => (req.path === '/webhook' ? next() : apiLimiter(req, res, next)));
     router.use('/stripe', stripeRouter);
 
     // Membership / free-trial subscription (Stripe + PayPal). The PayPal webhook
     // uses the high-capacity limiter; other endpoints use the standard limiter.
     router.use('/subscription/paypal/webhook', stripeLimiter);
-    router.use('/subscription', apiLimiter);
+    router.use('/subscription', (req, res, next) => (req.path === '/paypal/webhook' ? next() : apiLimiter(req, res, next)));
     router.use('/subscription', subscriptionRouter);
 
     // Category management routes with API rate limiting

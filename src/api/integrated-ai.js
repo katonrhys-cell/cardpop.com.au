@@ -158,7 +158,11 @@ const SquashableSSEEventTypes = new Set([
  */
 export async function uploadImagesToSupabase({ images }) {
 	const uploadPromises = images.map(async (file) => {
-		const ext = file.originalname.split('.').pop() || 'jpg';
+		// Use the magic-byte-detected extension (set by the file-upload
+		// middleware), never the client-supplied originalname — a filename with
+		// no '.' (e.g. "x/../../evil") makes originalname.split('.').pop()
+		// return the whole string, injecting extra path segments into the key.
+		const ext = file.detectedExt || 'jpg';
 		const path = `ocr/${crypto.randomBytes(8).toString('hex')}.${ext}`;
 
 		const { buffer, contentType } = await compressImageBuffer(file.buffer, file.mimetype);

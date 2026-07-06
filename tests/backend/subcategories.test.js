@@ -167,6 +167,34 @@ describe('PATCH /:id', () => {
     const res = await request(app).patch('/nonexistent').send({ name: 'x' });
     expect(res.status).toBe(404);
   });
+
+  it('returns 400 when parentId equals the subcategory itself', async () => {
+    mockSupabase.from.mockReturnValueOnce(makeBuilder({ data: { id: 'sub-1' }, error: null })); // fetch check
+    const res = await request(app).patch('/sub-1').send({ parentId: 'sub-1' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/cannot be its own parent/i);
+  });
+
+  it('returns 404 when the new parentId does not reference an existing category', async () => {
+    mockSupabase.from
+      .mockReturnValueOnce(makeBuilder({ data: { id: 'sub-1' }, error: null }))  // fetch check
+      .mockReturnValueOnce(makeBuilder({ data: null, error: { code: 'PGRST116' } })); // parent lookup
+    const res = await request(app).patch('/sub-1').send({ parentId: 'nonexistent-cat' });
+    expect(res.status).toBe(404);
+    expect(res.body.error).toMatch(/parent category not found/i);
+  });
+
+  it('updates parent_id when the new parentId references an existing category', async () => {
+    const updated = { ...SUB, parent_id: 'cat-2' };
+    mockSupabase.from
+      .mockReturnValueOnce(makeBuilder({ data: { id: 'sub-1' }, error: null }))   // fetch check
+      .mockReturnValueOnce(makeBuilder({ data: { id: 'cat-2' }, error: null }))   // parent lookup
+      .mockReturnValueOnce(makeBuilder({ data: updated, error: null }))          // update
+      .mockReturnValueOnce(makeBuilder({ data: null, error: null }));            // audit
+    const res = await request(app).patch('/sub-1').send({ parentId: 'cat-2' });
+    expect(res.status).toBe(200);
+    expect(res.body.parent_id).toBe('cat-2');
+  });
 });
 
 // ─── DELETE /:id ──────────────────────────────────────────────────────────────

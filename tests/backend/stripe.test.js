@@ -112,6 +112,39 @@ describe('POST /create-checkout', () => {
     const res = await request(app).post('/create-checkout').send(VALID_CHECKOUT_BODY);
     expect(res.status).toBe(500);
   });
+
+  it("charges the seller's counter amount, not the buyer's original offer, when checking out on a countered offer", async () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: MOCK_LISTING, error: null }) // listing lookup
+      .mockResolvedValueOnce({
+        data: {
+          amount_aud: 50,
+          counter_amount_aud: 80,
+          status: 'countered',
+          buyer_id: 'user-123',
+          listing_id: 'listing-1',
+        },
+        error: null,
+      }); // offer lookup
+    mockStripe.checkout.sessions.create.mockResolvedValue({ id: 'cs_1', url: 'https://stripe.com/pay/cs_1' });
+
+    const res = await request(app).post('/create-checkout').send({ ...VALID_CHECKOUT_BODY, offerId: 'offer-1' });
+
+    expect(res.status).toBe(200);
+    const [[sessionArgs]] = mockStripe.checkout.sessions.create.mock.calls;
+    const itemLine = sessionArgs.line_items.find((li) => li.price_data.product_data.name === 'Charizard VMAX');
+    expect(itemLine.price_data.unit_amount).toBe(8000);
+  });
+
+  it('never trusts a client-supplied bidId to change the commission transaction type', async () => {
+    mockStripe.checkout.sessions.create.mockResolvedValue({ id: 'cs_1', url: 'https://stripe.com/pay/cs_1' });
+
+    const res = await request(app).post('/create-checkout').send({ ...VALID_CHECKOUT_BODY, bidId: 'fake-bid-id' });
+
+    expect(res.status).toBe(200);
+    const [[sessionArgs]] = mockStripe.checkout.sessions.create.mock.calls;
+    expect(sessionArgs.metadata.transactionType).toBe('fixed');
+  });
 });
 
 // ─── GET /session/:sessionId ──────────────────────────────────────────────────
