@@ -15,6 +15,7 @@ import { priceCart } from '../services/cartService.js';
 import { validateWelcomeDiscount, welcomeDiscountCents, buildWelcomeDiscount } from '../services/welcomeOfferService.js';
 import { processRefund } from '../services/refundService.js';
 import { connectOnboard, getConnectStatus, getDashboardLink } from '../services/connectService.js';
+import { createIdentitySession, getIdentityStatus, applyIdentitySession } from '../services/identityService.js';
 import { applyStripeSubscription } from '../services/subscriptionService.js';
 
 const router = express.Router();
@@ -274,6 +275,14 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         break;
       }
 
+      // Stripe Identity document checks (signup ID verification): mirror the
+      // outcome onto profiles.is_verified / verification_status.
+      case 'identity.verification_session.verified':
+      case 'identity.verification_session.processing':
+      case 'identity.verification_session.requires_input':
+        await applyIdentitySession(event.data.object);
+        break;
+
       // Membership subscription lifecycle (free trial → active → canceled).
       // Mirrors the subscription state onto the seller's profile so the
       // selling gate (can_sell) reflects it.
@@ -300,6 +309,11 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 // Calculates retained fee server-side; never trusts client-supplied amounts.
 
 router.post('/refund', authMiddleware, validateRequestBody(processRefundSchema), processRefund);
+
+// ─── Identity verification (Stripe Identity, embedded in signup) ─────────────
+
+router.post('/identity/session', authMiddleware, createIdentitySession);
+router.get('/identity/status', authMiddleware, getIdentityStatus);
 
 // ─── POST /connect/onboard ───────────────────────────────────────────────────
 

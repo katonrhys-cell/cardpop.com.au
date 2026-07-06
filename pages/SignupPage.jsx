@@ -98,12 +98,13 @@ const SignupPage = () => {
 
       toast.success('Account created successfully!');
 
-      // If email confirmation is disabled the user already has a live session, so
-      // we can collect a payment method now (card at registration). Otherwise
-      // they must verify their email first; the card is collected on their first
-      // sign-in via the membership page (which the selling gate also points to).
+      // If email confirmation is disabled the user already has a live session,
+      // so the signup flow continues straight into Stripe Identity ID
+      // verification, then on to the membership page (card at registration).
+      // Otherwise they must verify their email first; ID verification and the
+      // card are collected on their first sign-in.
       if (session?.access_token) {
-        navigate('/account/membership?welcome=1');
+        navigate('/verify-identity?welcome=1');
       } else {
         setSuccess(true);
       }
@@ -145,8 +146,10 @@ const SignupPage = () => {
               Check your email to verify your account and complete your profile.
             </p>
             <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-              Once you sign in, start your <span className="text-foreground font-bold">30-day free trial</span> to
-              list and sell cards — add a card or PayPal to begin, and cancel anytime before the trial ends.
+              Once you sign in, verify your <span className="text-foreground font-bold">ID</span> (a quick photo of
+              your licence or passport, handled securely by Stripe), then start your{' '}
+              <span className="text-foreground font-bold">30-day free trial</span> to list and sell cards — add a
+              card or PayPal to begin, and cancel anytime before the trial ends.
             </p>
             <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
               We've also sent your <span className="text-foreground font-bold">welcome code</span> in a separate
