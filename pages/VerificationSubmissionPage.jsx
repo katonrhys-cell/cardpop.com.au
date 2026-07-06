@@ -113,15 +113,20 @@ const VerificationSubmissionPage = () => {
 
     setSubmitting(true);
     try {
-      // 1. Upload ID photo to storage
+      // 1. Upload ID photo to the PRIVATE verification-docs bucket.
+      // Identity documents must never live in the public vault-images bucket —
+      // that bucket serves images by unauthenticated URL. verification-docs is
+      // private and only reachable via short-lived signed URLs (see the admin
+      // review dashboard). The path is keyed on the user id as the first folder
+      // segment to satisfy the bucket's per-user RLS policy.
       let idPhotoPath = null;
       if (idPhoto) {
         // Keep IDs large and high quality so details stay legible for review.
         const compressed = await compressImage(idPhoto, { maxDimension: 2200, quality: 0.9 });
         const fileExt = compressed.name.split('.').pop();
-        const filePath = `verification/${currentUser.id}/id.${fileExt}`;
+        const filePath = `${currentUser.id}/id_${Date.now()}.${fileExt}`;
         const { error: uploadError } = await supabase.storage
-          .from('vault-images')
+          .from('verification-docs')
           .upload(filePath, compressed, { upsert: true });
         if (uploadError) throw uploadError;
         idPhotoPath = filePath;
