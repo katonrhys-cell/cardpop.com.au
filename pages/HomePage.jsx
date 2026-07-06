@@ -242,6 +242,12 @@ const HomePage = () => {
           ),
         ]);
 
+        // Supabase resolves with { data, error } instead of throwing — an
+        // unlogged error here renders the empty state with no trace, which
+        // makes "cards aren't loading" reports undiagnosable from the field.
+        if (listingsRes?.error) console.error('[HomePage] featured cards query failed:', listingsRes.error);
+        if (sellersRes?.error) console.error('[HomePage] featured sellers query failed:', sellersRes.error);
+
         if (isMounted) {
           setFeaturedCards(listingsRes.data ?? []);
 
@@ -256,6 +262,7 @@ const HomePage = () => {
           setFeaturedSellers(uniqueSellers);
         }
       } catch (error) {
+        console.error('[HomePage] home data fetch failed:', error);
       } finally {
         if (isMounted) setLoading(false);
       }
