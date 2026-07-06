@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { CreditCard, Loader2, ShieldCheck } from 'lucide-react';
 import { TRIAL_DAYS, SUBSCRIPTION_PRICE_AUD, PAYMENT_PROVIDERS } from '@/config/subscription.js';
+import { getReferralCode } from '@/lib/referral.js';
 
 /**
  * Payment-method capture that starts the free trial via Stripe or PayPal.
@@ -25,7 +26,9 @@ const StartTrialOptions = ({ returnPath = '/account/membership' }) => {
       const res = await apiServerClient.fetch('/subscription/stripe/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ successUrl, cancelUrl }),
+        // A partner ?ref=CODE captured this session attributes the referral;
+        // the server validates it and simply ignores an invalid code.
+        body: JSON.stringify({ successUrl, cancelUrl, ...(getReferralCode() ? { refCode: getReferralCode() } : {}) }),
       });
       const data = await res.json();
       if (!res.ok || !data.url) throw new Error(data.error || 'Could not start checkout');

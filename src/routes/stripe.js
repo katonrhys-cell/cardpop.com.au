@@ -13,6 +13,12 @@ import { createCheckoutSchema, calculateBreakdownSchema, processRefundSchema } f
 import { createSingleItemCheckout } from '../services/checkoutService.js';
 import { priceCart } from '../services/cartService.js';
 import { validateWelcomeDiscount, welcomeDiscountCents, buildWelcomeDiscount } from '../services/welcomeOfferService.js';
+import {
+  isWelcomeCodeFormat,
+  validatePartnerCode,
+  partnerDiscountCents,
+  buildPartnerDiscount,
+} from '../services/partnerService.js';
 import { processRefund } from '../services/refundService.js';
 import { connectOnboard, getConnectStatus, getDashboardLink } from '../services/connectService.js';
 import { createIdentitySession, getIdentityStatus, applyIdentitySession } from '../services/identityService.js';
@@ -72,15 +78,23 @@ router.post('/calculate-cart', authMiddleware, async (req, res) => {
     if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'items is required' });
     const priced = await priceCart(items, req.user.id);
 
-    // Preview the welcome-offer discount without creating any Stripe objects.
-    // An invalid code doesn't fail the whole calculation — the UI shows
-    // `promoError` inline and the undiscounted totals stay correct.
+    // Preview the promo discount without creating any Stripe objects. Codes in
+    // the POP-XXXX-XXXX shape are personal welcome offers; anything else is a
+    // partner referral code (discounts shop items only). An invalid code
+    // doesn't fail the whole calculation — the UI shows `promoError` inline
+    // and the undiscounted totals stay correct.
     let discountCents = 0;
     let promoError = null;
     if (typeof promoCode === 'string' && promoCode.trim()) {
       try {
-        const offer = await validateWelcomeDiscount(req.user.id, promoCode);
-        discountCents = welcomeDiscountCents(offer, priced.itemsCents);
+        if (isWelcomeCodeFormat(promoCode)) {
+          const offer = await validateWelcomeDiscount(req.user.id, promoCode);
+          discountCents = welcomeDiscountCents(offer, priced.itemsCents);
+        } else {
+          const partner = await validatePartnerCode(req.user.id, promoCode);
+          discountCents = partnerDiscountCents(partner, priced.orderLines);
+          if (discountCents <= 0) promoError = 'This code applies to CardPop Shop items only.';
+        }
       } catch (promoErr) {
         if (!promoErr.statusCode) throw promoErr;
         promoError = promoErr.message;
@@ -126,19 +140,37 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
       return res.status(429).json({ error: velocity.message, code: 'velocity_limit' });
     }
 
-    // Welcome-offer promo code: platform-funded amount-off coupon covering 10%
-    // of the item subtotal only (never the fee/GST lines, never seller
-    // proceeds). The webhook marks it redeemed after payment completes.
+    // Promo code: platform-funded amount-off coupon. POP-XXXX-XXXX codes are
+    // personal welcome offers (10% of the whole item subtotal); anything else
+    // is a partner referral code (partner's % off the SHOP-item subtotal, and
+    // the webhook books the partner's commission after payment completes).
     let discounts;
     let discountCents = 0;
     let welcomeOfferId = null;
+    let partnerMeta = {};
     if (typeof promoCode === 'string' && promoCode.trim()) {
-      const offer = await validateWelcomeDiscount(userId, promoCode);
-      const built = await buildWelcomeDiscount(stripe, offer, itemsCents);
-      if (built) {
-        discounts = [{ coupon: built.couponId }];
-        discountCents = built.discountCents;
-        welcomeOfferId = offer.id;
+      if (isWelcomeCodeFormat(promoCode)) {
+        const offer = await validateWelcomeDiscount(userId, promoCode);
+        const built = await buildWelcomeDiscount(stripe, offer, itemsCents);
+        if (built) {
+          discounts = [{ coupon: built.couponId }];
+          discountCents = built.discountCents;
+          welcomeOfferId = offer.id;
+        }
+      } else {
+        const partner = await validatePartnerCode(userId, promoCode);
+        const built = await buildPartnerDiscount(stripe, partner, partnerDiscountCents(partner, orderLines));
+        if (built) {
+          discounts = [{ coupon: built.couponId }];
+          discountCents = built.discountCents;
+        }
+        // Attribute the order even when the discount rounds to zero — the
+        // partner's commission doesn't depend on the customer's discount.
+        partnerMeta = {
+          partnerId: partner.id,
+          partnerCode: partner.code,
+          partnerDiscountCents: String(discountCents),
+        };
       }
     }
 
@@ -149,7 +181,7 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
       success_url:          successUrl,
       cancel_url:           cancelUrl,
       customer_email:       email,
-      metadata:             { userId, cartCheckout: 'true', ...(welcomeOfferId ? { welcomeOfferId } : {}) },
+      metadata:             { userId, cartCheckout: 'true', ...(welcomeOfferId ? { welcomeOfferId } : {}), ...partnerMeta },
       ...(discounts ? { discounts } : {}),
     });
 

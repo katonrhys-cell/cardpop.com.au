@@ -29,6 +29,7 @@ import HeroSection from '@/components/HeroSection.jsx';
 import ShoppingCart from '@/components/ShoppingCartLazy.jsx';
 import AdminLayout from '@/components/AdminLayout.jsx';
 import MarketplaceListingRedirect from '@/components/MarketplaceListingRedirect.jsx';
+import ReferralCapture from '@/components/ReferralCapture.jsx';
 
 // ==========================================
 // LAZY LOADED PAGES (Performance Optimized)
@@ -136,6 +137,11 @@ const AustralianMarketsPage = lazy(() => import('@/pages/AustralianMarketsPage.j
 const CardPricesHubPage = lazy(() => import('@/pages/prices/CardPricesHubPage.jsx'));
 const CardPriceDetailPage = lazy(() => import('@/pages/prices/CardPriceDetailPage.jsx'));
 
+// Partner program
+const PartnersPage = lazy(() => import('@/pages/partners/PartnersPage.jsx'));
+const PartnerApplyPage = lazy(() => import('@/pages/partners/PartnerApplyPage.jsx'));
+const AccountPartner = lazy(() => import('@/pages/account/AccountPartner.jsx'));
+
 // Store directory
 const CardShopsHubPage = lazy(() => import('@/pages/stores/CardShopsHubPage.jsx'));
 const CardShopsCityPage = lazy(() => import('@/pages/stores/CardShopsCityPage.jsx'));
@@ -197,6 +203,7 @@ const HeroShowcaseAdminPage = lazy(() => import('@/pages/admin/HeroShowcaseAdmin
 const CollectionSectionsAdminPage = lazy(() => import('@/pages/admin/CollectionSectionsAdminPage.jsx'));
 const ChatModerationPage = lazy(() => import('@/pages/admin/ChatModerationPage.jsx'));
 const StoreDirectoryAdminPage = lazy(() => import('@/pages/admin/StoreDirectoryAdminPage.jsx'));
+const PartnersManagementPage = lazy(() => import('@/pages/admin/PartnersManagementPage.jsx'));
 const ListingsManagementPage = lazy(() => import('@/pages/ListingsManagementPage.jsx'));
 
 // Previously-orphaned pages now wired up
@@ -236,6 +243,7 @@ const App = () => {
             <CategoryHierarchyProvider>
               <Router>
                 <ScrollToTop />
+                <ReferralCapture />
                 <div className="flex flex-col min-h-screen bg-background text-foreground">
                   <Helmet>
                     <title>CardPop | Australia's Trading Card Marketplace</title>
@@ -324,6 +332,7 @@ const App = () => {
                         <Route path="/account/events" element={<ProtectedRoute><AccountEvents /></ProtectedRoute>} />
                         <Route path="/account/sole-trader" element={<ProtectedRoute><AccountSoleTrader /></ProtectedRoute>} />
                         <Route path="/account/membership" element={<ProtectedRoute><AccountMembership /></ProtectedRoute>} />
+                        <Route path="/account/partner" element={<ProtectedRoute><AccountPartner /></ProtectedRoute>} />
                         
                         {/* Vault & Trading */}
                         <Route path="/vault" element={<ProtectedRoute><MyVaultPage /></ProtectedRoute>} />
@@ -351,6 +360,10 @@ const App = () => {
                         <Route path="/prices" element={<CardPricesHubPage />} />
                         <Route path="/prices/:category" element={<CardPricesHubPage />} />
                         <Route path="/prices/:category/:slug" element={<CardPriceDetailPage />} />
+
+                        {/* Partner program */}
+                        <Route path="/partners" element={<PartnersPage />} />
+                        <Route path="/partners/apply" element={<ProtectedRoute><PartnerApplyPage /></ProtectedRoute>} />
 
                         {/* Store directory (SEO) */}
                         <Route path="/card-shops" element={<CardShopsHubPage />} />
@@ -448,6 +461,7 @@ const App = () => {
                           <Route path="all-listings" element={<ListingsManagementPage />} />
                           <Route path="messages" element={<ChatModerationPage />} />
                           <Route path="store-directory" element={<StoreDirectoryAdminPage />} />
+                          <Route path="partners" element={<PartnersManagementPage />} />
                         </Route>
                         
                         {/* --- CATCH-ALL 404 ROUTE --- */}

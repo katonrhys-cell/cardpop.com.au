@@ -20,6 +20,7 @@ import BillingAddressForm from '@/components/checkout/BillingAddressForm.jsx';
 import PaymentMethodSelector from '@/components/checkout/PaymentMethodSelector.jsx';
 import OrderReviewSection from '@/components/checkout/OrderReviewSection.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import { getReferralCode } from '@/lib/referral.js';
 
 const STEPS = { SUMMARY: 1, SHIPPING: 2, BILLING: 3, PAYMENT: 4, REVIEW: 5 };
 const STEP_LABELS = ['Cart', 'Ship', 'Bill', 'Pay', 'Review'];
@@ -130,10 +131,13 @@ const CheckoutPage = () => {
     .map(i => ({ type: i.product?.type || 'listing', id: i.product?.id, quantity: i.quantity ?? 1 }))
     .filter(i => i.id);
 
-  // Welcome-offer promo code. `promoCode` is the applied code (sent to the
-  // server for validation and pricing); `promoInput` is just the field state.
-  const [promoInput, setPromoInput] = useState('');
-  const [promoCode, setPromoCode] = useState('');
+  // Promo code (welcome offer or partner referral code). `promoCode` is the
+  // applied code (sent to the server for validation and pricing); `promoInput`
+  // is just the field state. A ?ref=CODE partner link captured earlier in the
+  // session pre-fills and auto-applies — the server rejects it harmlessly if
+  // it's stale or invalid.
+  const [promoInput, setPromoInput] = useState(() => getReferralCode());
+  const [promoCode, setPromoCode] = useState(() => getReferralCode());
 
   // Authoritative totals come from the server so the displayed amount always
   // matches what Stripe charges (no fabricated tax).

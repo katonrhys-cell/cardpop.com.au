@@ -16,6 +16,7 @@ import {
   verifyPaypalWebhook,
 } from '../utils/paypalClient.js';
 import { TRIAL_DAYS } from '../../config/subscription.js';
+import { validatePartnerCode } from '../services/partnerService.js';
 
 const router = express.Router();
 
@@ -42,7 +43,7 @@ router.post('/stripe/checkout', authMiddleware, async (req, res) => {
       return res.status(503).json({ error: 'Subscriptions are not configured yet.' });
     }
 
-    const { successUrl, cancelUrl } = req.body;
+    const { successUrl, cancelUrl, refCode } = req.body;
     if (!successUrl || !cancelUrl) {
       return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
     }
@@ -50,18 +51,51 @@ router.post('/stripe/checkout', authMiddleware, async (req, res) => {
     const userId = req.user.id;
     const customerId = await getOrCreateStripeCustomer(userId, req.user.email);
 
+    // Partner referral: the partner's % comes off the first invoice (a 'once'
+    // coupon — with a trial that's the trial-end invoice), and the commission
+    // is booked when the subscription first turns active. The expected first
+    // payment is stamped into the subscription metadata now so the webhook
+    // doesn't have to re-derive pricing. An invalid ref code never blocks the
+    // trial — it's silently dropped.
+    let discounts;
+    const subMetadata = { userId };
+    if (typeof refCode === 'string' && refCode.trim()) {
+      try {
+        const partner = await validatePartnerCode(userId, refCode);
+        const price = await stripe.prices.retrieve(priceId);
+        const unitAmount = price?.unit_amount || 0;
+        const firstPaymentCents = Math.round(unitAmount * (1 - Number(partner.discount_pct) / 100));
+        if (Number(partner.discount_pct) > 0) {
+          const coupon = await stripe.coupons.create({
+            percent_off: Number(partner.discount_pct),
+            duration: 'once',
+            name: `Partner ${partner.code} ${Number(partner.discount_pct)}% off`,
+          });
+          discounts = [{ coupon: coupon.id }];
+        }
+        subMetadata.partnerId = partner.id;
+        subMetadata.partnerCode = partner.code;
+        subMetadata.partnerFirstPaymentCents = String(firstPaymentCents);
+        logger.info(`[SUB] Referral ${partner.code} attached to checkout for ${userId}`);
+      } catch (refErr) {
+        if (!refErr.statusCode) throw refErr;
+        logger.info(`[SUB] Ignoring invalid ref code for ${userId}: ${refErr.message}`);
+      }
+    }
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
       subscription_data: {
         trial_period_days: TRIAL_DAYS,
-        metadata: { userId },
+        metadata: subMetadata,
       },
       payment_method_collection: 'always', // require a card even during the trial
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata: { userId, kind: 'subscription' },
+      ...(discounts ? { discounts } : {}),
     });
 
     if (!session?.url) throw new Error('Stripe returned a session without a URL');
