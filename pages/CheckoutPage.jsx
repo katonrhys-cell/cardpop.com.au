@@ -347,25 +347,33 @@ const CheckoutPage = () => {
       <div className="max-w-4xl mx-auto px-4">
 
         <div className="mb-10">
-          <div className="flex items-center justify-between relative max-w-2xl mx-auto">
-            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-border -z-10 rounded-full" />
+          <div className="relative max-w-2xl mx-auto">
+            {/* Connector track — inset to sit between the first and last circle centres (each step occupies 1/N of the width, so the centres are 1/2N in from each edge) */}
+            <div className="absolute top-4 left-[12.5%] right-[12.5%] h-1 -translate-y-1/2 bg-border rounded-full" />
             <div
-              className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary -z-10 rounded-full transition-all duration-500"
-              style={{ width: `${((step - 1) / (STEP_LABELS.length - 1)) * 100}%` }}
+              className="absolute top-4 left-[12.5%] h-1 -translate-y-1/2 bg-primary rounded-full transition-all duration-500"
+              style={{ width: `${((step - 1) / (STEP_LABELS.length - 1)) * 75}%` }}
             />
-            {STEP_LABELS.map((_, i) => i + 1).map((idx) => (
-              <div
-                key={idx}
-                className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-colors duration-300 ${step >= idx ? 'bg-primary text-white shadow-md' : 'bg-card text-muted-foreground border-2 border-border'}`}
-              >
-                {idx}
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-between max-w-2xl mx-auto mt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            {STEP_LABELS.map((label, i) => (
-              <span key={label} className={step >= i + 1 ? 'text-primary' : ''}>{label}</span>
-            ))}
+            <div className="relative flex">
+              {STEP_LABELS.map((label, i) => {
+                const idx = i + 1;
+                const active = step >= idx;
+                return (
+                  <div key={label} className="flex flex-1 flex-col items-center gap-2">
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-colors duration-300 ${active ? 'bg-primary text-white shadow-md' : 'bg-card text-muted-foreground border-2 border-border'}`}
+                    >
+                      {idx}
+                    </div>
+                    <span
+                      className={`text-xs font-semibold uppercase tracking-wider transition-colors duration-300 ${active ? 'text-primary' : 'text-muted-foreground'}`}
+                    >
+                      {label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 
