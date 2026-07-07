@@ -156,6 +156,28 @@ describe('POST /generate', () => {
     expect(res.body.error).toMatch(/could not generate/i);
   });
 
+  it('returns 503 with a service-unavailable message when the Anthropic account is out of credit', async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: async () => '{"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."}}',
+    });
+
+    const res = await request(app).post('/generate').send({ card: validCard });
+
+    expect(res.status).toBe(503);
+    expect(res.body.error).toMatch(/temporarily unavailable/i);
+  });
+
+  it('returns 503 when Anthropic rejects the API key (401)', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 401, text: async () => 'authentication_error' });
+
+    const res = await request(app).post('/generate').send({ card: validCard });
+
+    expect(res.status).toBe(503);
+    expect(res.body.error).toMatch(/temporarily unavailable/i);
+  });
+
   it('returns 502 when the model returns an empty description', async () => {
     mockFetch.mockResolvedValue(anthropicOk('   '));
 
