@@ -1,6 +1,7 @@
 import express from 'express';
 import supabase from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
+import { escapeLike } from '../utils/escapeLike.js';
 
 const router = express.Router();
 
@@ -72,7 +73,7 @@ router.post('/submit', async (req, res) => {
     const { data: existing, error: existingError } = await supabase
       .from('local_game_stores')
       .select('id')
-      .ilike('name', name)
+      .ilike('name', escapeLike(name))
       .eq('city', city)
       .maybeSingle();
     if (existingError) throw new Error(existingError.message);

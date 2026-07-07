@@ -42,6 +42,18 @@ describe('errorMiddleware', () => {
     expect(res.body).not.toHaveProperty('stack');
   });
 
+  it('fails closed (hides message and stack) when NODE_ENV is unset', () => {
+    // A deploy that forgets to set NODE_ENV must not fall through to the
+    // verbose branch and leak stack traces to the client.
+    delete process.env.NODE_ENV;
+    const res = makeRes();
+    errorMiddleware(new Error('sensitive detail'), {}, res, vi.fn());
+
+    expect(res.statusCode).toBe(500);
+    expect(res.body.message).toBe('Something went wrong!');
+    expect(res.body).not.toHaveProperty('stack');
+  });
+
   it('delegates to next when headers have already been sent', () => {
     const err = new Error('late');
     const res = makeRes({ headersSent: true });

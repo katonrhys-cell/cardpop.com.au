@@ -42,6 +42,7 @@ vi.mock('../../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
+import { supabase } from '../../../src/utils/supabaseClient.js';
 import {
   normalisePartnerCode,
   isWelcomeCodeFormat,
@@ -198,6 +199,17 @@ describe('validatePartnerCode', () => {
   it('blocks self-referral', async () => {
     h.queues.partners = [{ data: approvedPartner(), error: null }];
     await expect(validatePartnerCode('partner-user', 'TOPDECK10')).rejects.toMatchObject({ statusCode: 403 });
+  });
+
+  it('escapes LIKE wildcards in the submitted code so it cannot wildcard-match an unrelated partner', async () => {
+    // A raw ilike('code', code) treats a submitted '%' or '_' as a wildcard,
+    // letting an attacker match (and redeem the discount of) an arbitrary
+    // partner without knowing their real code.
+    h.queues.partners = [{ data: approvedPartner(), error: null }];
+    await validatePartnerCode('buyer-1', '%');
+
+    const partnersBuilder = supabase.from.mock.results.at(-1).value;
+    expect(partnersBuilder.ilike).toHaveBeenCalledWith('code', '\\%');
   });
 });
 

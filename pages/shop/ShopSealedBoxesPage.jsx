@@ -5,7 +5,6 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, SlidersHorizontal, PackageX, Package } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCart } from '@/hooks/useCart.jsx';
-import useShopProductRealtimeSync from '@/hooks/useShopProductRealtimeSync.js';
 import { toast } from 'sonner';
 import ProductCard from '@/components/ProductCard.jsx';
 import { Button } from '@/components/ui/button';
@@ -76,9 +75,11 @@ const ShopSealedBoxesPage = () => {
   }, [sort, minPrice, maxPrice]);
 
   useEffect(() => {
+    // Scoped to this page's own product_type so a change to a different
+    // category (e.g. singles) doesn't refetch every open sealed-boxes page.
     const channel = supabase
       .channel('shop-sealed-boxes')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products' },
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products', filter: 'product_type=eq.sealed' },
         () => { if (fetchRef.current) fetchRef.current(); }
       )
       .subscribe();
