@@ -2,7 +2,10 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 
-const mockSupabase = vi.hoisted(() => ({ from: vi.fn() }));
+const mockSupabase = vi.hoisted(() => ({
+  from: vi.fn(),
+  auth: { admin: { updateUserById: vi.fn(() => Promise.resolve({ data: {}, error: null })) } },
+}));
 const mockIsAdminUser = vi.hoisted(() => vi.fn());
 const mockPayoutSeller = vi.hoisted(() => vi.fn());
 
@@ -55,7 +58,8 @@ describe('admin gate', () => {
     const r1 = await request(app).patch('/admin/users/u2/role').send({ is_admin: true });
     const r2 = await request(app).patch('/admin/verifications/v1').send({ status: 'approved' });
     const r3 = await request(app).patch('/admin/refunds/r1').send({ action: 'approve' });
-    expect([r1.status, r2.status, r3.status]).toEqual([403, 403, 403]);
+    const r4 = await request(app).patch('/admin/users/u2/status').send({ status: 'suspended' });
+    expect([r1.status, r2.status, r3.status, r4.status]).toEqual([403, 403, 403, 403]);
     expect(mockSupabase.from).not.toHaveBeenCalled();
   });
 });
@@ -84,6 +88,53 @@ describe('PATCH /users/:userId/role', () => {
   it('returns 500 on a db error', async () => {
     queueFrom(makeBuilder({ data: null, error: new Error('db down') }));
     const res = await request(app).patch('/admin/users/u2/role').send({ is_admin: true });
+    expect(res.status).toBe(500);
+  });
+});
+
+// ─── PATCH /users/:userId/status ───────────────────────────────────────────────
+
+describe('PATCH /users/:userId/status', () => {
+  it('suspends a user: flips is_active and bans the auth user indefinitely', async () => {
+    queueFrom(makeBuilder({ data: { id: 'u2', is_active: false, is_deleted: false }, error: null }), makeBuilder()); // profile update + audit insert
+    const res = await request(app).patch('/admin/users/u2/status').send({ status: 'suspended' });
+    expect(res.status).toBe(200);
+    expect(res.body.user).toEqual({ id: 'u2', is_active: false, is_deleted: false });
+    expect(mockSupabase.auth.admin.updateUserById).toHaveBeenCalledWith('u2', { ban_duration: '876000h' });
+  });
+
+  it('reactivates a user: restores is_active/is_deleted and lifts the ban', async () => {
+    queueFrom(makeBuilder({ data: { id: 'u2', is_active: true, is_deleted: false }, error: null }), makeBuilder());
+    const res = await request(app).patch('/admin/users/u2/status').send({ status: 'active' });
+    expect(res.status).toBe(200);
+    expect(mockSupabase.auth.admin.updateUserById).toHaveBeenCalledWith('u2', { ban_duration: 'none' });
+  });
+
+  it('soft-deletes a user: sets is_deleted alongside is_active=false and bans', async () => {
+    const updateBuilder = makeBuilder({ data: { id: 'u2', is_active: false, is_deleted: true }, error: null });
+    queueFrom(updateBuilder, makeBuilder());
+    const res = await request(app).patch('/admin/users/u2/status').send({ status: 'deleted' });
+    expect(res.status).toBe(200);
+    expect(updateBuilder.update).toHaveBeenCalledWith({ is_active: false, is_deleted: true });
+    expect(mockSupabase.auth.admin.updateUserById).toHaveBeenCalledWith('u2', { ban_duration: '876000h' });
+  });
+
+  it('refuses to let an admin change their own account status', async () => {
+    const res = await request(app).patch('/admin/users/admin-1/status').send({ status: 'suspended' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/your own account status/i);
+    expect(mockSupabase.from).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid status', async () => {
+    const res = await request(app).patch('/admin/users/u2/status').send({ status: 'banned-forever' });
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 500 when the ban call fails', async () => {
+    queueFrom(makeBuilder({ data: { id: 'u2' }, error: null }));
+    mockSupabase.auth.admin.updateUserById.mockResolvedValueOnce({ data: null, error: new Error('gotrue down') });
+    const res = await request(app).patch('/admin/users/u2/status').send({ status: 'suspended' });
     expect(res.status).toBe(500);
   });
 });

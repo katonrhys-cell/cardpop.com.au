@@ -34,6 +34,7 @@ import psaRouter from './psa.js';
 import welcomeOfferRouter from './welcome-offer.js';
 import partnersRouter from './partners.js';
 import walletRouter from './wallet.js';
+import adminRouter from './admin.js';
 
 const router = Router();
 
@@ -160,6 +161,12 @@ export default () => {
     // Buyer prepaid wallet (Stripe Customer Balance top-up + balance read)
     router.use('/wallet', apiLimiter);
     router.use('/wallet', walletRouter);
+
+    // Privileged admin operations (service-role writes gated by authMiddleware +
+    // isAdminUser inside the router itself). Was fully built and tested but never
+    // actually mounted, so every one of these endpoints 404'd in production.
+    router.use('/admin', apiLimiter);
+    router.use('/admin', adminRouter);
 
     // Trade routes with email verification middleware
     // Apply auth middleware first, then trade access verification

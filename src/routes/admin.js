@@ -4,7 +4,7 @@ import stripe from '../utils/stripeClient.js';
 import { payoutSeller } from '../services/payoutService.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import { validateRequestBody, validateRequestParams, validateRequestQuery } from '../middleware/validateRequest.js';
-import { setUserRoleSchema, setUserRoleBodySchema, reviewVerificationSchema, reviewVerificationBodySchema, processRefundSchema, processRefundBodySchema, getDisputesSchema, resolveDisputeSchema, resolveDisputeBodySchema } from '../schemas/adminSchemas.js';
+import { setUserRoleSchema, setUserRoleBodySchema, reviewVerificationSchema, reviewVerificationBodySchema, processRefundSchema, processRefundBodySchema, getDisputesSchema, resolveDisputeSchema, resolveDisputeBodySchema, setUserStatusSchema, setUserStatusBodySchema } from '../schemas/adminSchemas.js';
 import logger from '../utils/logger.js';
 
 const router = Router();
@@ -57,6 +57,59 @@ router.patch('/users/:userId/role', validateRequestParams(setUserRoleSchema), va
   } catch (err) {
     logger.error(`[ADMIN] Failed to update admin flag: ${err.message}`);
     res.status(500).json({ error: 'Failed to update admin status' });
+  }
+});
+
+// ─── Suspend / reactivate / soft-delete a user account ────────────────────────
+// Previously "Suspend" only flipped profiles.is_active — a client-side write
+// that hid the account from public listings (HomePage's featured sellers,
+// SellersManagementPage) but never actually blocked sign-in, and "Delete" was
+// a disabled no-op with no backend support at all. Both now also ban the
+// Supabase auth user (GoTrue checks banned_until on every sign-in/refresh),
+// so a suspended or deleted account is actually locked out, not just hidden.
+// 'deleted' is a permanent-looking soft-disable, not a row deletion — all
+// historical orders/listings/reviews are kept; there is no "undelete" UI.
+const INDEFINITE_BAN = '876000h'; // ~100 years — lifted explicitly via 'active'
+router.patch('/users/:userId/status', validateRequestParams(setUserStatusSchema), validateRequestBody(setUserStatusBodySchema), async (req, res) => {
+  const { userId } = req.params;
+  const { status } = req.body;
+
+  if (userId === req.user.id) {
+    return res.status(400).json({ error: 'You cannot change your own account status' });
+  }
+
+  try {
+    const profileUpdate = status === 'active'
+      ? { is_active: true, is_deleted: false }
+      : status === 'suspended'
+        ? { is_active: false }
+        : { is_active: false, is_deleted: true }; // 'deleted'
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(profileUpdate)
+      .eq('id', userId)
+      .select('id, is_active, is_deleted')
+      .single();
+    if (error) throw error;
+
+    const { error: banErr } = await supabase.auth.admin.updateUserById(userId, {
+      ban_duration: status === 'active' ? 'none' : INDEFINITE_BAN,
+    });
+    if (banErr) throw banErr;
+
+    await supabase.from('audit_logs').insert({
+      user_id: req.user.id,
+      event_type: 'update_user_status',
+      description: `Set account status=${status} for user ${userId}`,
+      status: 'success',
+    }).catch(() => {});
+
+    logger.info(`[ADMIN] ${req.user.id} set status=${status} for ${userId}`);
+    res.json({ success: true, user: data });
+  } catch (err) {
+    logger.error(`[ADMIN] Failed to update user status: ${err.message}`);
+    res.status(500).json({ error: 'Failed to update account status' });
   }
 });
 
