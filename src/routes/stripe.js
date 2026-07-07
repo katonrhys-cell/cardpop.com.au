@@ -7,7 +7,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
 import { handleDisputeCreated, handleDisputeClosed } from '../services/disputeService.js';
 import { calculateBreakdown } from '../services/commissionService.js';
-import { handleCheckoutSessionCompleted, handlePaymentFailed, getPlatformSetting } from '../services/stripeWebhookService.js';
+import { handleCheckoutSessionCompleted, handlePaymentFailed, handleCheckoutSessionExpired, getPlatformSetting } from '../services/stripeWebhookService.js';
 import { validateRequestBody, validateRequestQuery } from '../middleware/validateRequest.js';
 import { createCheckoutSchema, calculateBreakdownSchema, processRefundSchema } from '../schemas/stripeSchemas.js';
 import { createSingleItemCheckout } from '../services/checkoutService.js';
@@ -24,6 +24,7 @@ import { connectOnboard, getConnectStatus, getDashboardLink } from '../services/
 import { createIdentitySession, getIdentityStatus, applyIdentitySession } from '../services/identityService.js';
 import { applyStripeSubscription } from '../services/subscriptionService.js';
 import { ensureWalletCustomer, getWalletBalanceCents, handleWalletTopup } from '../services/walletService.js';
+import { validateShippingAddress } from '../utils/addressValidation.js';
 
 const router = express.Router();
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
@@ -131,16 +132,35 @@ router.post('/calculate-cart', authMiddleware, async (req, res) => {
 
 router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
   try {
-    const { items, successUrl, cancelUrl, shippingAddress, promoCode, useWalletBalance } = req.body;
+    const { items, successUrl, cancelUrl, returnUrl, uiMode, shippingAddress, promoCode, useWalletBalance } = req.body;
+
+    // 'embedded' renders Stripe's payment form inline on our own page (no
+    // redirect away); 'hosted' redirects to Stripe's own checkout page. Both
+    // create an identical Checkout Session — only how the buyer sees it differs.
+    const embedded = uiMode === 'embedded';
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'items is required' });
     }
-    if (!successUrl || !cancelUrl) {
+    if (embedded) {
+      if (!returnUrl) return res.status(400).json({ error: 'returnUrl is required' });
+    } else if (!successUrl || !cancelUrl) {
       return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
     }
     if (promoCode && useWalletBalance) {
       return res.status(400).json({ error: 'Apply either a promo code or your wallet balance, not both.' });
+    }
+
+    // Authoritative "real, deliverable address" gate. The client autocompletes
+    // via Google Places, but a bypassed frontend can't slip a fake address past
+    // this server-side check (fails open only when no API key is configured).
+    const addressCheck = await validateShippingAddress(shippingAddress || {});
+    if (!addressCheck.valid) {
+      const message = addressCheck.reason === 'request-failed'
+        ? 'We could not verify that shipping address right now. Please try again.'
+        : 'That shipping address could not be verified. Please select a valid address from the suggestions.';
+      logger.warn(`[STRIPE] cart checkout blocked — address ${addressCheck.reason || 'invalid'}`);
+      return res.status(400).json({ error: message, code: 'address_unverified' });
     }
 
     const userId = req.user.id;
@@ -210,11 +230,19 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
     }
 
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      // Let Stripe present every method enabled on the account (Card, Link /
+      // Apple Pay / Google Pay, PayPal, Afterpay/Clearpay) and show each only
+      // when the order is eligible — enable the individual methods in the
+      // Stripe Dashboard → Settings → Payment methods.
+      automatic_payment_methods: { enabled: true },
+      billing_address_collection: 'auto',
       line_items:           lineItems,
       mode:                 'payment',
-      success_url:          successUrl,
-      cancel_url:           cancelUrl,
+      // Embedded checkout keeps the buyer on our page and returns to return_url
+      // once payment completes; hosted checkout redirects out and back.
+      ...(embedded
+        ? { ui_mode: 'embedded', return_url: returnUrl }
+        : { success_url: successUrl, cancel_url: cancelUrl }),
       ...(walletCustomerId ? { customer: walletCustomerId } : { customer_email: email }),
       metadata:             {
         userId, cartCheckout: 'true',
@@ -225,9 +253,12 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
       ...(discounts ? { discounts } : {}),
     });
 
-    if (!session?.url) throw new Error('Stripe returned a session without a URL');
+    if (embedded ? !session?.client_secret : !session?.url) {
+      throw new Error('Stripe returned an incomplete checkout session');
+    }
 
     const s = shippingAddress || {};
+    const streetLine = s.address2 ? `${s.address2}, ${s.address || ''}`.trim() : (s.address || '');
     const { error: orderErr } = await supabase.from('orders').insert({
       buyer_id:          userId,
       seller_id:         null,
@@ -244,7 +275,7 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
       buyer_protection:  true,
       order_items:       orderLines,
       shipping_name:     s.name     ? String(s.name).slice(0, 100)     : null,
-      shipping_address:  s.address  ? String(s.address).slice(0, 200)  : null,
+      shipping_address:  streetLine ? String(streetLine).slice(0, 200)  : null,
       shipping_suburb:   s.suburb   ? String(s.suburb).slice(0, 100)   : null,
       shipping_state:    s.state    ? String(s.state).slice(0, 50)     : null,
       shipping_postcode: s.postcode ? String(s.postcode).slice(0, 10)  : null,
@@ -255,8 +286,12 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
       throw new Error('Could not record the order');
     }
 
-    logger.info(`[STRIPE] Cart session created: ${session.id} (${orderLines.length} items, $${grandCents / 100})`);
-    res.json({ url: session.url, sessionId: session.id, total: grandCents / 100 });
+    logger.info(`[STRIPE] Cart session created: ${session.id} (${orderLines.length} items, $${grandCents / 100}, ${embedded ? 'embedded' : 'hosted'})`);
+    res.json({
+      ...(embedded ? { clientSecret: session.client_secret } : { url: session.url }),
+      sessionId: session.id,
+      total: grandCents / 100,
+    });
   } catch (err) {
     const code = err.statusCode || 500;
     if (code === 500) logger.error(`[STRIPE] create-cart-checkout error: ${err.message}`);
@@ -325,6 +360,22 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     return res.status(400).json({ error: 'Webhook signature verification failed' });
   }
 
+  // Event-level idempotency: skip an event we've already fully processed, so a
+  // Stripe redelivery doesn't re-run handlers. Fail-open — if the dedup table is
+  // unreachable (or not yet migrated), fall through and let the per-handler
+  // guards (unique stripe_session_id, compare-and-swap on status) do their job.
+  try {
+    const { data: seen } = await supabase
+      .from('stripe_webhook_events')
+      .select('event_id')
+      .eq('event_id', event.id)
+      .maybeSingle();
+    if (seen) {
+      logger.info(`[STRIPE] Event ${event.id} (${event.type}) already processed, skipping`);
+      return res.json({ received: true, deduped: true });
+    }
+  } catch { /* dedup unavailable — process anyway */ }
+
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -336,6 +387,10 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         }
         break;
       }
+
+      case 'checkout.session.expired':
+        await handleCheckoutSessionExpired(event.data.object);
+        break;
 
       case 'payment_intent.payment_failed':
         await handlePaymentFailed(event.data.object);
@@ -374,6 +429,17 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       default:
         logger.debug(`[STRIPE] Unhandled event type: ${event.type}`);
     }
+
+    // Record the event as processed only after the handler succeeded, so a
+    // handler that throws (→ 500) isn't marked done and Stripe's retry will
+    // reprocess it. Best-effort: a dedup-table write failure must not fail an
+    // otherwise-successful webhook (Stripe would retry and reprocess, which the
+    // per-handler guards already tolerate).
+    await supabase
+      .from('stripe_webhook_events')
+      .insert({ event_id: event.id, type: event.type })
+      .then(({ error }) => { if (error && error.code !== '23505') logger.warn(`[STRIPE] dedup record failed for ${event.id}: ${error.message}`); })
+      .catch(() => {});
 
     res.json({ received: true });
   } catch (err) {

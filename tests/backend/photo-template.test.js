@@ -43,7 +43,14 @@ beforeEach(() => {
   });
 });
 
-const IMG = Buffer.from('fake-image-bytes');
+// A real 1x1 PNG. The upload middleware now validates magic bytes, so fixtures
+// must be genuine image data, not arbitrary bytes.
+const IMG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMCAoK1LrErAAAAAElFTkSuQmCC',
+  'base64',
+);
+// Arbitrary non-image bytes — must now be rejected by magic-byte validation.
+const NOT_AN_IMAGE = Buffer.from('fake-image-bytes');
 
 // ─── POST /slab-image ─────────────────────────────────────────────────────────
 
@@ -120,5 +127,11 @@ describe('POST /validate-image', () => {
     expect(res.body.success).toBe(true);
     expect(res.body.size).toBe(IMG.length);
     expect(res.body.mimetype).toBe('image/png');
+  });
+
+  it('rejects a file whose bytes are not a real image (magic-byte validation)', async () => {
+    const res = await request(app).post('/validate-image').attach('image', NOT_AN_IMAGE, 'card.png');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/not a valid image/i);
   });
 });

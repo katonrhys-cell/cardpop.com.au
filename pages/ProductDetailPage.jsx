@@ -17,8 +17,6 @@ import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import EbayMarketSection from '@/components/EbayMarketSection.jsx';
 import CertificationVerificationSection from '@/components/CertificationVerificationSection.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
-import useShopProductRealtimeSync from '@/hooks/useShopProductRealtimeSync.js';
-import useVaultItemRealtimeSync from '@/hooks/useVaultItemRealtimeSync.js';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
 
@@ -216,9 +214,19 @@ const ProductDetailPage = ({ source: sourceProp }) => {
   }, [id, source, currentUser, isAdmin, authLoading, navigate]);
 
   useEffect(() => {
+    // For a marketplace listing, `id` is the listings.id — the vault_item's
+    // own id (needed to filter that table) is only known once the listing
+    // fetch above resolves, so this listener subscribes unfiltered for the
+    // brief window before product loads, then narrows once vault_item.id is
+    // available. Without a filter here, every client viewing any marketplace
+    // product refetches on every vault_items UPDATE anywhere on the site.
+    const vaultItemId = product?.vault_item?.id;
     const channel = supabase
       .channel(`product-detail-${id}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vault_items' },
+      .on('postgres_changes',
+        vaultItemId
+          ? { event: 'UPDATE', schema: 'public', table: 'vault_items', filter: `id=eq.${vaultItemId}` }
+          : { event: 'UPDATE', schema: 'public', table: 'vault_items' },
         () => { if (source === 'marketplace' && fetchRef.current) fetchRef.current(); }
       )
       // A sale (webhook) or admin action flips listings.status without touching
@@ -226,13 +234,14 @@ const ProductDetailPage = ({ source: sourceProp }) => {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'listings', filter: `id=eq.${id}` },
         () => { if (source === 'marketplace' && fetchRef.current) fetchRef.current(); }
       )
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products' },
+      // `id` is shop_products.id directly for a shop-sourced product.
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products', filter: `id=eq.${id}` },
         () => { if (source === 'shop' && fetchRef.current) fetchRef.current(); }
       )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [id, source]);
+  }, [id, source, product?.vault_item?.id]);
 
   const handleAddToCart = () => {
     if (!product) return;

@@ -49,6 +49,12 @@ const UserManagementPage = () => {
           supabase.from('orders').select('id', { count: 'exact', head: true }).or(`buyer_id.eq.${u.id},seller_id.eq.${u.id}`),
         ]);
 
+        // Supabase resolves (rather than rejects) on a query error, so the
+        // catch below never fires for one — log it so a false "0" isn't
+        // completely silent, while still falling back gracefully per-row.
+        if (vaultRes.error || ordersRes.error) {
+          console.error(`[UserManagementPage] related-count error for user ${u.id}:`, vaultRes.error, ordersRes.error);
+        }
         newCounts[u.id] = { vault: vaultRes.count ?? 0, orders: ordersRes.count ?? 0 };
       } catch (e) {
         newCounts[u.id] = { vault: 0, orders: 0 };

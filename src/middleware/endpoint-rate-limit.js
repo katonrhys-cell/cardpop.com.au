@@ -77,44 +77,6 @@ const stripeLimiter = rateLimit({
 	keyGenerator: (req) => ipKeyGenerator(req),
 });
 
-// MFA verify rate limiter: 5 attempts per 15 minutes, keyed by the authenticated
-// user id. The /verify route runs authMiddleware before this limiter, so req.user
-// is always populated. Keying on the body-supplied mfaId was bypassable: an
-// attacker could rotate mfaId (or omit it to fall back to a spoofable IP key) to
-// evade the cap while brute-forcing a single session.
-const mfaLimiter = rateLimit({
-	windowMs: 15 * 60 * 1000,
-	max: 5,
-	standardHeaders: true,
-	legacyHeaders: false,
-	keyGenerator: (req) => req.user?.id || ipKeyGenerator(req),
-	handler: (req, res) => {
-		logger.warn(`[RATE_LIMIT] MFA verify rate limit exceeded for user: ${req.user?.id}`);
-		res.status(429).json({
-			error: 'Too many verification attempts, please try again later',
-			retryAfter: req.rateLimit.resetTime,
-		});
-	},
-});
-
-// MFA request (OTP issue) limiter: bounds how often a user can trigger an OTP
-// email + mfa_sessions row. Kept separate from mfaLimiter so verify attempts and
-// OTP requests don't share one budget (and can't starve each other).
-const mfaRequestLimiter = rateLimit({
-	windowMs: 15 * 60 * 1000,
-	max: 5,
-	standardHeaders: true,
-	legacyHeaders: false,
-	keyGenerator: (req) => req.user?.id || ipKeyGenerator(req),
-	handler: (req, res) => {
-		logger.warn(`[RATE_LIMIT] MFA request rate limit exceeded for user: ${req.user?.id}`);
-		res.status(429).json({
-			error: 'Too many verification code requests, please try again later',
-			retryAfter: req.rateLimit.resetTime,
-		});
-	},
-});
-
 // Backup code verify rate limiter: 5 attempts per 15 minutes per authenticated user.
 // The route already requires authMiddleware so req.user is always populated here.
 const backupCodeLimiter = rateLimit({
@@ -196,4 +158,4 @@ const welcomeOfferIssueLimiter = rateLimit({
 	},
 });
 
-export { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, mfaLimiter, mfaRequestLimiter, backupCodeLimiter, reportLimiter, resendVerificationLimiter, welcomeOfferIssueLimiter };
+export { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, backupCodeLimiter, reportLimiter, resendVerificationLimiter, welcomeOfferIssueLimiter };

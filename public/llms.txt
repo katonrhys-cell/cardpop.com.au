@@ -7,7 +7,6 @@
 - [Add Your First Card | Card Pop](https://cardpop.com.au/addyourfirstcard): No description available
 - [Admin - Collection Sections | CardPop](https://cardpop.com.au/collectionsectionsadmin): No description available
 - [Admin - Hero Showcase | CardPop](https://cardpop.com.au/heroshowcaseadmin): No description available
-- [Admin - Manage Events | CardPop](https://cardpop.com.au/eventsadmin): No description available
 - [Admin - Manage Featured Cards | CardPop](https://cardpop.com.au/featuredcardsadmin): No description available
 - [Brand Management | Admin Portal](https://cardpop.com.au/brandsmanagement): No description available
 - [Card Pop](https://cardpop.com.au/addeditcard): No description available
@@ -20,7 +19,6 @@
 - [Confirming Order | Card Pop](https://cardpop.com.au/checkoutsuccess): No description available
 - [Hierarchy Management | CardPop Admin](https://cardpop.com.au/categorymanagement): No description available
 - [Log In | CardPop](https://cardpop.com.au/login): No description available
-- [Manage Events | Admin Portal](https://cardpop.com.au/eventsadmin): No description available
 - [Manage Events | Admin Portal](https://cardpop.com.au/eventsmanagement): No description available
 - [Membership | CardPop](https://cardpop.com.au/accountmembership): No description available
 - [Messaging | Card Pop](https://cardpop.com.au/messaging): No description available

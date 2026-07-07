@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { formatDistanceToNow } from 'date-fns';
+import { toast } from 'sonner';
 
 const StarRating = ({ rating, size = 'sm' }) => {
   const sz = size === 'sm' ? 'w-3.5 h-3.5' : 'w-5 h-5';
@@ -98,6 +99,11 @@ const AccountReviews = () => {
           supabase.from('profiles').select('rating, reviews_count').eq('id', uid).single(),
         ]);
         if (!cancelled) {
+          const failed = [receivedRes, givenRes, profileRes].some(r => r.error);
+          if (failed) {
+            console.error('Failed to load reviews:', receivedRes.error, givenRes.error, profileRes.error);
+            toast.error('Some review data failed to load — the totals below may be incomplete.');
+          }
           setReceived(receivedRes.data ?? []);
           setGiven(givenRes.data ?? []);
           setProfile(profileRes.data);

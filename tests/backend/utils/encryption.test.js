@@ -57,4 +57,11 @@ describe('encrypt / decrypt', () => {
   it('throws when decrypting a tampered ciphertext', () => {
     expect(() => decrypt('this-is-not-valid-ciphertext')).toThrow();
   });
+
+  it('no longer accepts the legacy CryptoJS AES-CBC format (removed: no live rows used it, and it had no integrity check)', () => {
+    // A legacy-format string starts with 'U2FsdGVkX1' (base64 for 'Salted__').
+    // It must now be treated like any other malformed input, not silently
+    // decrypted via a weaker, unauthenticated cipher.
+    expect(() => decrypt('U2FsdGVkX1+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=')).toThrow();
+  });
 });

@@ -2,6 +2,10 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 
+vi.mock('../../src/middleware/auth.js', () => ({
+  optionalAuthMiddleware: (req, _res, next) => { if (req.headers.authorization) req.user = { id: 'u1' }; next(); },
+}));
+
 import newsletterRouter from '../../src/routes/newsletter.js';
 
 function makeApp() {
@@ -26,6 +30,7 @@ const ORIGINAL_ENV = {
   KIT_API_KEY: process.env.KIT_API_KEY,
   KIT_FORM_ID: process.env.KIT_FORM_ID,
   KIT_LAUNCH_FORM_ID: process.env.KIT_LAUNCH_FORM_ID,
+  RECAPTCHA_SECRET_KEY: process.env.RECAPTCHA_SECRET_KEY,
 };
 
 beforeEach(() => {
@@ -33,6 +38,7 @@ beforeEach(() => {
   process.env.KIT_API_KEY = 'kit_test_key';
   process.env.KIT_FORM_ID = 'form_123';
   delete process.env.KIT_LAUNCH_FORM_ID;
+  delete process.env.RECAPTCHA_SECRET_KEY;
   global.fetch = vi.fn();
 });
 
@@ -153,6 +159,47 @@ describe('POST /subscribe — launch list', () => {
 
     expect(res.status).toBe(200);
     expect(global.fetch.mock.calls[0][0]).toBe('https://api.kit.com/v4/forms/form_123/subscribers');
+  });
+});
+
+// ─── reCAPTCHA gate ─────────────────────────────────────────────────────────────
+
+describe('POST /subscribe — reCAPTCHA gate', () => {
+  it('rejects an anonymous request with no token once RECAPTCHA_SECRET_KEY is configured', async () => {
+    process.env.RECAPTCHA_SECRET_KEY = 'secret';
+
+    const res = await request(app).post('/subscribe').send({ email: 'a@b.com' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/reCAPTCHA/i);
+    // Never reaches Kit — rejected before the upstream call.
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('subscribes when a valid recaptchaToken is supplied', async () => {
+    process.env.RECAPTCHA_SECRET_KEY = 'secret';
+    global.fetch
+      .mockResolvedValueOnce(fetchResponse({ ok: true, body: { success: true } })) // siteverify
+      .mockResolvedValueOnce(fetchResponse({ ok: true, body: { subscriber: {} } })); // Kit
+
+    const res = await request(app).post('/subscribe').send({ email: 'a@b.com', recaptchaToken: 'tok' });
+
+    expect(res.status).toBe(200);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('lets an authenticated caller (e.g. the signup opt-in) skip the token entirely', async () => {
+    process.env.RECAPTCHA_SECRET_KEY = 'secret';
+    global.fetch.mockResolvedValue(fetchResponse({ ok: true, body: { subscriber: {} } }));
+
+    const res = await request(app)
+      .post('/subscribe')
+      .set('Authorization', 'Bearer sometoken')
+      .send({ email: 'a@b.com' });
+
+    expect(res.status).toBe(200);
+    // Only the Kit call — siteverify is skipped for authenticated callers.
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 });
 

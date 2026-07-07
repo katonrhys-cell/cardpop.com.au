@@ -1,6 +1,5 @@
 import 'dotenv/config';
 import crypto from 'crypto';
-import CryptoJS from 'crypto-js';
 
 const RAW_KEY = process.env.ENCRYPTION_KEY;
 if (!RAW_KEY) {
@@ -14,8 +13,7 @@ if (RAW_KEY.length < 32) {
 const KEY = crypto.createHash('sha256').update(RAW_KEY).digest();
 
 // AES-256-GCM: authenticated encryption — confidentiality + integrity.
-// New format: iv(32 hex) + tag(32 hex) + ciphertext(hex) — all lowercase hex,
-// which never starts with 'U' (CryptoJS legacy format starts with 'U2FsdGVkX1').
+// Format: iv(32 hex) + tag(32 hex) + ciphertext(hex).
 function encrypt(data) {
   const iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv('aes-256-gcm', KEY, iv);
@@ -28,13 +26,7 @@ function encrypt(data) {
 function decrypt(encryptedData) {
   if (typeof encryptedData !== 'string') throw new Error('Invalid encrypted data');
 
-  // Legacy CryptoJS format starts with 'U2FsdGVkX1' (base64 for 'Salted__')
-  if (encryptedData.startsWith('U2FsdGVkX1')) {
-    const bytes = CryptoJS.AES.decrypt(encryptedData, RAW_KEY);
-    return JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
-  }
-
-  // New AES-256-GCM format
+  // AES-256-GCM format
   const iv = Buffer.from(encryptedData.slice(0, 32), 'hex');
   const tag = Buffer.from(encryptedData.slice(32, 64), 'hex');
   const ciphertext = Buffer.from(encryptedData.slice(64), 'hex');

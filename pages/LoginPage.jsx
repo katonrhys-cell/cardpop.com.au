@@ -93,7 +93,7 @@ const LoginPage = () => {
         setTimeout(() => {
           setLockState('unlocked');
           setMfaStep(true);
-          toast.info('Please check your email for the verification code.');
+          toast.info('Enter the 6-digit code from your authenticator app.');
         }, 650);
       } else {
         // Play animation and navigate — don't gate navigate on animation timer

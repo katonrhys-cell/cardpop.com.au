@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/ProductCard.jsx';
 import { useCart } from '@/hooks/useCart.jsx';
-import useShopProductRealtimeSync from '@/hooks/useShopProductRealtimeSync.js';
 import { toast } from 'sonner';
 
 const ShopPage = () => {
@@ -64,9 +63,12 @@ const ShopPage = () => {
   }, [sort, searchTerm]);
 
   useEffect(() => {
+    // Scoped to active products — this page already only ever queries
+    // status='active', so a change to a draft/archived product shouldn't
+    // trigger every open shop page to refetch.
     const channel = supabase
       .channel('shop-products')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products' },
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products', filter: 'status=eq.active' },
         () => { if (fetchRef.current) fetchRef.current(); }
       )
       .subscribe();

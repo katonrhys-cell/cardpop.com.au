@@ -4,7 +4,6 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { escapeLike } from '@/src/utils/escapeLike.js';
 import { useCategories } from '@/hooks/useCategories.js';
-import useVaultItemRealtimeSync from '@/hooks/useVaultItemRealtimeSync.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search, RefreshCw, AlertCircle, Users, X, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';

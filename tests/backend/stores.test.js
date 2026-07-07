@@ -101,6 +101,20 @@ describe('POST /stores/submit', () => {
     expect(res.body).toEqual({ ok: true, duplicate: true });
   });
 
+  it('escapes LIKE wildcards in the submitted name for the duplicate check', async () => {
+    // An unescaped ilike('name', name) treats a submitted '%' or '_' as a
+    // wildcard, so a name containing one could match (and get silently
+    // dropped as a "duplicate" of) an unrelated existing store.
+    const dupCheck = makeBuilder({ data: null, error: null });
+    const slugCheck = makeBuilder({ data: [], error: null });
+    const insert = makeBuilder({ data: null, error: null });
+    builders.push(dupCheck, slugCheck, insert);
+
+    await request(app).post('/submit').send({ ...validBody, name: '100% Cards_Store' });
+
+    expect(dupCheck.ilike).toHaveBeenCalledWith('name', '100\\% Cards\\_Store');
+  });
+
   it('suffixes the slug when it is already taken', async () => {
     const dupCheck = makeBuilder({ data: null, error: null });
     const slugCheck = makeBuilder({ data: [{ slug: 'test-card-emporium-parramatta' }], error: null });

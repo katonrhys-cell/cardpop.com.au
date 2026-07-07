@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useCart } from '@/hooks/useCart.jsx';
@@ -20,11 +20,13 @@ import ShippingAddressForm from '@/components/checkout/ShippingAddressForm.jsx';
 import BillingAddressForm from '@/components/checkout/BillingAddressForm.jsx';
 import PaymentMethodSelector from '@/components/checkout/PaymentMethodSelector.jsx';
 import OrderReviewSection from '@/components/checkout/OrderReviewSection.jsx';
+import EmbeddedStripeCheckout from '@/components/checkout/EmbeddedStripeCheckout.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import { getReferralCode } from '@/lib/referral.js';
+import { GOOGLE_PLACES_ENABLED } from '@/lib/googlePlaces.js';
 
-const STEPS = { SUMMARY: 1, SHIPPING: 2, BILLING: 3, PAYMENT: 4, REVIEW: 5 };
-const STEP_LABELS = ['Cart', 'Ship', 'Bill', 'Pay', 'Review'];
+const STEPS = { SUMMARY: 1, SHIPPING: 2, BILLING: 3, PAY: 4 };
+const STEP_LABELS = ['Cart', 'Ship', 'Bill', 'Pay'];
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -35,7 +37,6 @@ const CheckoutPage = () => {
   const { cartItems } = useCart();
   const { currentUser } = useAuth();
   const [step, setStep] = useState(STEPS.SUMMARY);
-  const [processing, setProcessing] = useState(false);
   const [initializing, setInitializing] = useState(true);
 
   const [directItem, setDirectItem] = useState(null);
@@ -43,7 +44,6 @@ const CheckoutPage = () => {
   const [shippingData, setShippingData] = useState({ email: currentUser?.email || '' });
   const [billingData, setBillingData] = useState({});
   const [sameAsShipping, setSameAsShipping] = useState(true);
-  const [paymentMethod, setPaymentMethod] = useState('card');
 
   useEffect(() => {
     let cancelled = false;
@@ -189,48 +189,50 @@ const CheckoutPage = () => {
   const appliedPromoCode = discount > 0 ? promoCode : '';
 
   const validateShipping = () => {
-    const { firstName, lastName, address, suburb, state, postcode } = shippingData;
+    const { firstName, lastName, address, suburb, state, postcode, verified, placesUnavailable } = shippingData;
     if (!firstName || !lastName || !address || !suburb || !state || !postcode) {
       toast.error('Please fill in all shipping address fields.');
+      return false;
+    }
+    // When Google Places is active, the address must be one the user picked from
+    // the suggestions (verified) — not free-typed. Skipped if Places couldn't
+    // load; the server still validates the address before charging.
+    if (GOOGLE_PLACES_ENABLED && !placesUnavailable && !verified) {
+      toast.error('Please select your address from the suggestions so we can verify it.');
       return false;
     }
     return true;
   };
 
-  const handleCheckoutConfirm = async () => {
-    if (serverItems.length === 0) { toast.error('Your cart is empty!'); return; }
-    setProcessing(true);
-
-    const name = [shippingData.firstName, shippingData.lastName].filter(Boolean).join(' ');
-
-    try {
-      const res = await apiServerClient.fetch('/stripe/create-cart-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          items: serverItems,
-          successUrl: `${window.location.origin}/checkout-success?session_id={CHECKOUT_SESSION_ID}`,
-          cancelUrl: window.location.href,
-          ...(useWallet ? { useWalletBalance: true } : (appliedPromoCode ? { promoCode: appliedPromoCode } : {})),
-          shippingAddress: {
-            name,
-            address: shippingData.address || '',
-            suburb: shippingData.suburb || '',
-            state: shippingData.state || '',
-            postcode: shippingData.postcode || '',
-          },
-        }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Payment service unavailable. Please try again later.');
-      if (!data?.url) throw new Error('No checkout URL returned from payment service.');
-      window.location.href = data.url;
-    } catch (err) {
-      toast.error(err.message || 'Payment initiation failed.');
-      setProcessing(false);
-    }
-  };
+  // Stable request body for the inline Stripe form. It must not change identity
+  // on every render — Stripe's EmbeddedCheckoutProvider fetches the client
+  // secret once, and a new object would recreate the session. Serialising the
+  // dependencies keeps it stable until the order actually changes.
+  const shippingName = [shippingData.firstName, shippingData.lastName].filter(Boolean).join(' ');
+  // serverItems is a fresh array each render; track it by its serialised key so
+  // the memo (and the Stripe session it seeds) only changes when the order does.
+  const serverItemsKey = JSON.stringify(serverItems);
+  const checkoutRequestBody = useMemo(() => ({
+    items: serverItems,
+    ...(useWallet ? { useWalletBalance: true } : (appliedPromoCode ? { promoCode: appliedPromoCode } : {})),
+    shippingAddress: {
+      name: shippingName,
+      address: shippingData.address || '',
+      suburb: shippingData.suburb || '',
+      state: shippingData.state || '',
+      postcode: shippingData.postcode || '',
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [
+    serverItemsKey,
+    useWallet,
+    appliedPromoCode,
+    shippingName,
+    shippingData.address,
+    shippingData.suburb,
+    shippingData.state,
+    shippingData.postcode,
+  ]);
 
   if (initializing) {
     return (
@@ -296,7 +298,7 @@ const CheckoutPage = () => {
               />
               <div className="flex justify-between pt-2">
                 <Button variant="outline" onClick={() => setStep(STEPS.SHIPPING)}>Back</Button>
-                <Button onClick={() => setStep(STEPS.PAYMENT)}>
+                <Button onClick={() => setStep(STEPS.PAY)}>
                   Continue <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
               </div>
@@ -304,40 +306,34 @@ const CheckoutPage = () => {
           </Card>
         );
 
-      case STEPS.PAYMENT:
+      case STEPS.PAY:
         return (
-          <Card className="border-border shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Payment Method</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <PaymentMethodSelector value={paymentMethod} onChange={setPaymentMethod} />
-              <div className="flex justify-between pt-2">
-                <Button variant="outline" onClick={() => setStep(STEPS.BILLING)}>Back</Button>
-                <Button onClick={() => setStep(STEPS.REVIEW)}>
-                  Review Order <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        );
+          <div className="space-y-4">
+            <OrderReviewSection
+              shippingData={shippingData}
+              billingData={billingData}
+              sameAsShipping={sameAsShipping}
+              items={flatItems}
+              subtotal={subtotal}
+              tax={tax}
+              discount={discount}
+              total={total}
+            />
 
-      case STEPS.REVIEW:
-        return (
-          <OrderReviewSection
-            shippingData={shippingData}
-            billingData={billingData}
-            sameAsShipping={sameAsShipping}
-            paymentMethod={paymentMethod}
-            items={flatItems}
-            subtotal={subtotal}
-            tax={tax}
-            discount={discount}
-            total={total}
-            processing={processing}
-            onConfirm={handleCheckoutConfirm}
-            onBack={() => setStep(STEPS.PAYMENT)}
-          />
+            <Card className="border-border shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Payment</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <PaymentMethodSelector />
+                <EmbeddedStripeCheckout requestBody={checkoutRequestBody} />
+              </CardContent>
+            </Card>
+
+            <div className="pt-1">
+              <Button variant="outline" onClick={() => setStep(STEPS.BILLING)}>Back</Button>
+            </div>
+          </div>
         );
 
       default:
@@ -355,9 +351,9 @@ const CheckoutPage = () => {
             <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-border -z-10 rounded-full" />
             <div
               className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary -z-10 rounded-full transition-all duration-500"
-              style={{ width: `${((step - 1) / 4) * 100}%` }}
+              style={{ width: `${((step - 1) / (STEP_LABELS.length - 1)) * 100}%` }}
             />
-            {[1, 2, 3, 4, 5].map((idx) => (
+            {STEP_LABELS.map((_, i) => i + 1).map((idx) => (
               <div
                 key={idx}
                 className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-colors duration-300 ${step >= idx ? 'bg-primary text-white shadow-md' : 'bg-card text-muted-foreground border-2 border-border'}`}

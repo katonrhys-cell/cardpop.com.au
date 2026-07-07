@@ -176,7 +176,12 @@ export async function createSingleItemCheckout(req, res) {
     }
 
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      // Let Stripe present every method enabled on the account (Card, Link /
+      // Apple Pay / Google Pay, PayPal, Afterpay/Clearpay) and show each only
+      // when the order is eligible — enable the individual methods in the
+      // Stripe Dashboard → Settings → Payment methods.
+      automatic_payment_methods: { enabled: true },
+      billing_address_collection: 'auto',
       line_items: lineItems,
       mode: 'payment',
       success_url: successUrl,

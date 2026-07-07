@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import { supabase } from '@/lib/supabaseClient.js';
 import apiServerClient from '@/lib/apiServerClient.js';
 import AuditLog from '@/components/AuditLog.jsx';
 import { Button } from '@/components/ui/button';
@@ -13,15 +14,10 @@ import { toast } from 'sonner';
 const SecuritySettingsPage = () => {
   const { listMFAFactors, unenrollTOTP } = useAuth();
   const navigate = useNavigate();
-  const [sessions, setSessions] = useState([]);
-  const [loadingSessions, setLoadingSessions] = useState(true);
   const [backupCodes, setBackupCodes] = useState([]);
   const [generatingCodes, setGeneratingCodes] = useState(false);
   const [mfaFactor, setMfaFactor] = useState(null);
-
-  useEffect(() => {
-    fetchSessions();
-  }, []);
+  const [loggingOutOthers, setLoggingOutOthers] = useState(false);
 
   // Reflect the real MFA state from Supabase rather than a non-existent field.
   useEffect(() => {
@@ -36,19 +32,6 @@ const SecuritySettingsPage = () => {
   }, [listMFAFactors]);
 
   const mfaEnabled = !!mfaFactor;
-
-  const fetchSessions = async () => {
-    try {
-      const res = await apiServerClient.fetch('/auth/sessions');
-      const data = await res.json();
-      if (data.sessions) {
-        setSessions(data.sessions);
-      }
-    } catch (err) {
-    } finally {
-      setLoadingSessions(false);
-    }
-  };
 
   const handleMfaToggle = async (checked) => {
     // Enabling MFA requires the authenticator-app QR/enrollment flow, which
@@ -69,17 +52,20 @@ const SecuritySettingsPage = () => {
     }
   };
 
-  const handleLogoutSession = async (sessionId) => {
+  // Signs out every other session for this account via Supabase's own
+  // 'others' scope — the only revocation Supabase actually supports without
+  // storing raw access tokens or reaching into its internal auth schema.
+  const handleLogoutOthers = async () => {
+    if (!window.confirm('Log out of all other devices? Any other browser or app currently signed in will be signed out.')) return;
+    setLoggingOutOthers(true);
     try {
-      await apiServerClient.fetch('/auth/sessions/revoke', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId })
-      });
-      toast.success('Session terminated successfully.');
-      fetchSessions();
+      const { error } = await supabase.auth.signOut({ scope: 'others' });
+      if (error) throw error;
+      toast.success('Logged out of all other devices.');
     } catch (err) {
-      toast.error('Failed to terminate session.');
+      toast.error(err.message || 'Failed to log out other devices.');
+    } finally {
+      setLoggingOutOthers(false);
     }
   };
 
@@ -200,36 +186,20 @@ const SecuritySettingsPage = () => {
                   <CardTitle className="text-xl flex items-center gap-2">
                     <Smartphone className="w-5 h-5 text-primary" /> Active Sessions
                   </CardTitle>
-                  <CardDescription>Devices currently logged into your account</CardDescription>
+                  <CardDescription>You're currently signed in on this device.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {loadingSessions ? (
-                    <p className="text-sm text-muted-foreground">Loading sessions...</p>
-                  ) : sessions.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No external sessions found.</p>
-                  ) : (
-                    <div className="space-y-4">
-                      {sessions.map((session) => (
-                        <div key={session.sessionId} className="flex items-center justify-between p-4 bg-muted/40 rounded-xl border border-border">
-                          <div className="flex items-start gap-3">
-                            <div className="p-2 bg-background rounded-lg shadow-sm shrink-0">
-                              <Smartphone className="w-5 h-5 text-secondary" />
-                            </div>
-                            <div>
-                              <p className="font-semibold text-foreground tracking-wide text-sm">{session.deviceName || 'Unknown Device'}</p>
-                              <p className="text-xs text-muted-foreground">{session.ipAddress}</p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Started: {new Date(session.createdAt).toLocaleDateString()}
-                              </p>
-                            </div>
-                          </div>
-                          <Button variant="ghost" size="sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => handleLogoutSession(session.sessionId)}>
-                            <LogOut className="w-4 h-4 mr-2" /> Revoke
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <p className="text-sm text-muted-foreground mb-4">
+                    If you've signed in on another browser or device and want to make sure it's signed out, you can end every other session at once.
+                  </p>
+                  <Button
+                    variant="outline"
+                    className="font-bold text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
+                    onClick={handleLogoutOthers}
+                    disabled={loggingOutOthers}
+                  >
+                    <LogOut className="w-4 h-4 mr-2" /> {loggingOutOthers ? 'Logging out...' : 'Log out of all other devices'}
+                  </Button>
                 </CardContent>
               </Card>
 
