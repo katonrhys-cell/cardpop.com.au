@@ -208,3 +208,73 @@ describe('webhook cart idempotency', () => {
     expect(decrements[0].args).toMatchObject({ p_id: 'p1', p_qty: 1 });
   });
 });
+
+// ─── checkout.session.expired: clean up stale pending orders ───────────────────
+
+describe('webhook checkout.session.expired', () => {
+  beforeEach(() => {
+    mockStripe.webhooks.constructEvent.mockReturnValue({
+      type: 'checkout.session.expired',
+      data: { object: { id: 'cs_expired' } },
+    });
+  });
+
+  it('cancels the pending order for the expired session (pending → cancelled, guarded)', async () => {
+    state.respond = (ctx) => {
+      if (ctx.table === 'orders' && ctx.op === 'update') return { data: [{ id: 'order-x' }], error: null };
+      return { data: null, error: null };
+    };
+
+    const res = await postWebhook();
+
+    expect(res.status).toBe(200);
+    expect(res.body.received).toBe(true);
+    const upd = dbCalls.find(c => c.table === 'orders' && c.op === 'update');
+    expect(upd).toBeDefined();
+    expect(upd.payload).toMatchObject({ status: 'cancelled' });
+    // Guarded so it can only ever touch a still-pending row for THIS session.
+    expect(upd.filters).toMatchObject({ stripe_session_id: 'cs_expired', status: 'pending' });
+  });
+});
+
+// ─── Event-level idempotency (stripe_webhook_events dedup) ──────────────────────
+
+describe('webhook event-id dedup', () => {
+  it('skips an event whose id was already recorded — no handler runs', async () => {
+    mockStripe.webhooks.constructEvent.mockReturnValue({
+      id: 'evt_dup',
+      type: 'checkout.session.completed',
+      data: { object: { id: 'cs_whatever', amount_total: 10000, metadata: {} } },
+    });
+    state.respond = (ctx) => {
+      // The dedup lookup finds a prior record for this event id.
+      if (ctx.table === 'stripe_webhook_events' && ctx.single) return { data: { event_id: 'evt_dup' }, error: null };
+      return { data: null, error: null };
+    };
+
+    const res = await postWebhook();
+
+    expect(res.status).toBe(200);
+    expect(res.body.deduped).toBe(true);
+    // No order work happened — the switch was never entered.
+    expect(dbCalls.some(c => c.table === 'orders')).toBe(false);
+    expect(mockStripe.transfers.create).not.toHaveBeenCalled();
+  });
+
+  it('records the event id after a successful first delivery', async () => {
+    mockStripe.webhooks.constructEvent.mockReturnValue({
+      id: 'evt_new',
+      type: 'checkout.session.expired',
+      data: { object: { id: 'cs_new' } },
+    });
+    state.respond = () => ({ data: null, error: null });
+
+    const res = await postWebhook();
+
+    expect(res.status).toBe(200);
+    expect(res.body.received).toBe(true);
+    const rec = dbCalls.find(c => c.table === 'stripe_webhook_events' && c.op === 'insert');
+    expect(rec).toBeDefined();
+    expect(rec.payload).toMatchObject({ event_id: 'evt_new', type: 'checkout.session.expired' });
+  });
+});
