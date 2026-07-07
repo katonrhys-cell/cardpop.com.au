@@ -9,7 +9,6 @@ import { compressImage } from '@/utils/compressImage.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -33,7 +32,6 @@ const VaultProfilePage = () => {
     name: '',
     bio: '',
     location: '',
-    emailVisibility: false
   });
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
@@ -57,11 +55,10 @@ const VaultProfilePage = () => {
         setFormData({
           name: record.name || '',
           bio: record.bio || '',
-          location: record.location || '',
-          emailVisibility: record.email_visibility || false
+          location: record.location_suburb || '',
         });
-        if (record.avatar) {
-          const avatarUrl = publicImageUrl(record.avatar);
+        if (record.avatar_url) {
+          const avatarUrl = publicImageUrl(record.avatar_url);
           setAvatarPreview(avatarUrl);
         }
 
@@ -92,10 +89,6 @@ const VaultProfilePage = () => {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSwitchChange = (checked) => {
-    setFormData(prev => ({ ...prev, emailVisibility: checked }));
-  };
-
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -114,8 +107,7 @@ const VaultProfilePage = () => {
       const updatePayload = {
         name: formData.name,
         bio: formData.bio,
-        location: formData.location,
-        email_visibility: formData.emailVisibility,
+        location_suburb: formData.location,
         updated_at: new Date().toISOString()
       };
 
@@ -129,7 +121,7 @@ const VaultProfilePage = () => {
           .from('vault-images')
           .upload(filePath, compressed, { upsert: true, cacheControl: '31536000' });
         if (uploadError) throw uploadError;
-        updatePayload.avatar = filePath;
+        updatePayload.avatar_url = filePath;
       }
 
       const { data: updatedRecord, error: updateError } = await supabase
@@ -156,12 +148,11 @@ const VaultProfilePage = () => {
     setFormData({
       name: profile?.name || '',
       bio: profile?.bio || '',
-      location: profile?.location || '',
-      emailVisibility: profile?.emailVisibility || false
+      location: profile?.location_suburb || '',
     });
     setAvatarFile(null);
-    if (profile?.avatar) {
-      const avatarUrl = publicImageUrl(profile.avatar);
+    if (profile?.avatar_url) {
+      const avatarUrl = publicImageUrl(profile.avatar_url);
       setAvatarPreview(avatarUrl);
     } else {
       setAvatarPreview(null);
@@ -190,9 +181,9 @@ const VaultProfilePage = () => {
     : 'Unknown';
 
   const rating = profile?.rating || 0;
-  const reviewsCount = profile?.reviewsCount || 0;
-  const inventoryCount = profile?.inventoryCount || vaultCards.length;
-  const itemsSold = profile?.reviewsCount ? Math.floor(profile.reviewsCount * 1.5) : 0;
+  const reviewsCount = profile?.reviews_count || 0;
+  const inventoryCount = vaultCards.length;
+  const itemsSold = profile?.reviews_count ? Math.floor(profile.reviews_count * 1.5) : 0;
   const positivePercentage = rating ? Math.round((rating / 5) * 100) : 100;
 
   return (
@@ -320,17 +311,6 @@ const VaultProfilePage = () => {
                       className="min-h-[120px] bg-background resize-none"
                     />
                   </div>
-
-                  <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-muted/30">
-                    <div className="space-y-0.5">
-                      <Label className="text-base">Public Profile</Label>
-                      <p className="text-sm text-muted-foreground">Allow other users to see your email address and contact you directly.</p>
-                    </div>
-                    <Switch 
-                      checked={formData.emailVisibility} 
-                      onCheckedChange={handleSwitchChange} 
-                    />
-                  </div>
                 </div>
               ) : (
                 <div className="space-y-6 animate-in fade-in duration-300">
@@ -339,11 +319,11 @@ const VaultProfilePage = () => {
                   ) : (
                     <p className="text-muted-foreground italic">No bio provided yet.</p>
                   )}
-                  
-                  {profile?.location && (
+
+                  {profile?.location_suburb && (
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <MapPin className="w-5 h-5 text-primary" />
-                      <span className="font-medium">{profile.location}</span>
+                      <span className="font-medium">{profile.location_suburb}</span>
                     </div>
                   )}
                 </div>
@@ -468,13 +448,9 @@ const VaultProfilePage = () => {
                       <p className="font-medium">{selectedCard.condition}</p>
                     </div>
                     <div className="bg-muted/50 p-3 rounded-xl">
-                      <p className="text-xs text-muted-foreground font-bold uppercase mb-1">
-                        {['For Sale', 'For Sale & Trade'].includes(selectedCard.listing_type) ? 'Asking Price' : 'Est. Value'}
-                      </p>
+                      <p className="text-xs text-muted-foreground font-bold uppercase mb-1">Est. Value</p>
                       <p className="font-medium tabular-nums">
-                        ${(['For Sale', 'For Sale & Trade'].includes(selectedCard.listing_type) && selectedCard.price_aud)
-                          ? Number(selectedCard.price_aud).toFixed(2)
-                          : (Number(selectedCard.estimated_value_aud ?? 0).toFixed(2))}
+                        ${Number(selectedCard.estimated_value_aud ?? 0).toFixed(2)}
                       </p>
                     </div>
                     <div className="bg-muted/50 p-3 rounded-xl">
@@ -482,11 +458,11 @@ const VaultProfilePage = () => {
                       <p className="font-medium">{selectedCard.listing_type}</p>
                     </div>
                   </div>
-                  
-                  {selectedCard.description && (
+
+                  {selectedCard.notes && (
                     <div className="mt-6">
-                      <p className="text-sm font-bold text-foreground mb-2">Description</p>
-                      <p className="text-sm text-muted-foreground leading-relaxed">{selectedCard.description}</p>
+                      <p className="text-sm font-bold text-foreground mb-2">Notes</p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">{selectedCard.notes}</p>
                     </div>
                   )}
                 </div>

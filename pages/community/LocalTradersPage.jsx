@@ -106,18 +106,19 @@ const LocalTradersPage = () => {
       .order('is_featured_seller', { ascending: false })
       .order('rating', { ascending: false, nullsFirst: false })
       .limit(24)
-      .then(({ data }) => {
-        if (!cancelled) {
-          // Deduplicate by user id to prevent duplicates
-          const seen = new Set();
-          const uniqueStores = (data || []).filter(store => {
-            if (seen.has(store.id)) return false;
-            seen.add(store.id);
-            return true;
-          });
-          setStores(uniqueStores);
-        }
-      });
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) { console.error('Failed to load featured trader stores:', error); return; }
+        // Deduplicate by user id to prevent duplicates
+        const seen = new Set();
+        const uniqueStores = (data || []).filter(store => {
+          if (seen.has(store.id)) return false;
+          seen.add(store.id);
+          return true;
+        });
+        setStores(uniqueStores);
+      })
+      .catch((error) => { if (!cancelled) console.error('Failed to load featured trader stores:', error); });
     return () => { cancelled = true; };
   }, []);
 

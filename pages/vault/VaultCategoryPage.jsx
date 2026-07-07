@@ -113,10 +113,11 @@ const VaultCategoryPage = () => {
           setTotalPages(Math.ceil((count || 0) / perPage));
         } else {
           // Fetch all listings to get vault_item mappings
-          const { data: allListings } = await supabase
+          const { data: allListings, error: allListingsErr } = await supabase
             .from('listings')
             .select('vault_item_id, id, price_aud')
             .eq('status', 'active');
+          if (allListingsErr) throw allListingsErr;
 
           const listingMap = {};
           (allListings || []).forEach(r => {

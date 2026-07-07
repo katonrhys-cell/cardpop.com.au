@@ -59,6 +59,15 @@ const GRADERS = [
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+// AI model JSON isn't guaranteed to return a number (a string like "9.5", or a
+// missing/null field, is possible) — .toFixed() throws on either (strings have
+// no toFixed, null/undefined can't be called at all), white-screening the page.
+function formatGrade(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
+  return n % 1 === 0 ? n.toFixed(0) : n.toFixed(1);
+}
+
 function gradeColor(estimate) {
   if (estimate >= 9.5) return 'text-emerald-500';
   if (estimate >= 8) return 'text-blue-500';
@@ -229,7 +238,7 @@ function GraderCard({ grader, gradeData }) {
       <div className="p-4 space-y-3">
         <div className={`rounded-xl p-4 text-center ${gradeBg(estimate)}`}>
           <div className={`text-5xl font-black ${gradeColor(estimate)}`}>
-            {estimate % 1 === 0 ? estimate.toFixed(0) : estimate.toFixed(1)}
+            {formatGrade(estimate)}
           </div>
           <div className="text-sm font-semibold mt-1 text-foreground">{label}</div>
           <div className="text-xs text-muted-foreground mt-0.5">Range: {range}</div>
@@ -248,7 +257,7 @@ function GraderCard({ grader, gradeData }) {
               <div key={k} className="bg-muted/50 rounded-lg px-2.5 py-1.5">
                 <div className="text-xs text-muted-foreground capitalize">{k}</div>
                 <div className={`text-sm font-bold ${gradeColor(v)}`}>
-                  {v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)}
+                  {formatGrade(v)}
                 </div>
               </div>
             ))}
