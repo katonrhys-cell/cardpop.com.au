@@ -102,6 +102,17 @@ router.post('/generate', integratedAiRateLimit, requireAuth, async (req, res) =>
 		if (!apiRes.ok) {
 			const errBody = await apiRes.text().catch(() => '');
 			logger.error(`[CARD_DESCRIPTION] Anthropic API error ${apiRes.status}: ${errBody}`);
+
+			// A billing/credit/auth failure on the Anthropic account is a service
+			// outage, not something the user can fix by retrying — surface it as
+			// "temporarily unavailable" (503) with a distinct message so it isn't
+			// mistaken for a broken button. Everything else stays a retryable 502.
+			const isServiceOutage = apiRes.status === 401
+				|| apiRes.status === 402
+				|| /credit balance is too low|billing|Plans & Billing/i.test(errBody);
+			if (isServiceOutage) {
+				return res.status(503).json({ error: 'AI description generation is temporarily unavailable. Please try again later.' });
+			}
 			return res.status(502).json({ error: 'Could not generate a description right now. Please try again.' });
 		}
 
