@@ -48,7 +48,10 @@ async function calculateBreakdown(listing, transactionType = 'fixed') {
   const commEnabled = await getPlatformSetting('commissions_enabled', true);
   const gstEnabled  = await getPlatformSetting('gst_enabled', true);
   const gstRate     = Number(await getPlatformSetting('gst_rate_pct', 10));
-  const gstOnCommOnly = await getPlatformSetting('gst_on_commission_only', true);
+  // GST applies to the full sale price (item + commission), not just the
+  // commission — confirmed business decision; matches the live platform_settings
+  // value (see migration 20260707120240_gst_on_full_sale_price.sql).
+  const gstOnCommOnly = await getPlatformSetting('gst_on_commission_only', false);
 
   const itemPrice = Number(listing.price_aud) || 0;
   let commissionPct = 0;
