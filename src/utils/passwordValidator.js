@@ -15,7 +15,10 @@ function validatePassword(password) {
   if (!requirements.length) missing.push('length');
 
   const strengthScore = Object.values(requirements).filter(Boolean).length;
-  const isStrong = strengthScore >= 4;
+  // Require every category, not just 4 of 5 — a >=4 threshold let a
+  // password missing only special characters (e.g. "Password1") pass as
+  // "strong" despite being a well-known weak/common password.
+  const isStrong = strengthScore === 5;
 
   return {
     isStrong,

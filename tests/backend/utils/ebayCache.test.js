@@ -104,6 +104,32 @@ describe('get (TTL expiry)', () => {
   });
 });
 
+// ─── bounded size (FIFO eviction) ───────────────────────────────────────────────
+
+describe('set (bounded size)', () => {
+  it('evicts the oldest entry once the cache is at capacity, keeping recent ones', () => {
+    const MAX_ENTRIES = 500; // keep in sync with the module's cap
+    for (let i = 0; i < MAX_ENTRIES; i++) set(`key-${i}`, i);
+    expect(get('key-0')).toBe(0);
+
+    // One more insert past capacity should evict the oldest (key-0), not
+    // grow the cache unbounded.
+    set('key-overflow', 'new');
+    expect(get('key-0')).toBeNull();
+    expect(get('key-overflow')).toBe('new');
+    expect(get(`key-${MAX_ENTRIES - 1}`)).toBe(MAX_ENTRIES - 1);
+  });
+
+  it('overwriting an existing key does not count as growth toward the cap', () => {
+    const MAX_ENTRIES = 500;
+    for (let i = 0; i < MAX_ENTRIES; i++) set(`key-${i}`, i);
+    set('key-0', 'updated'); // re-set an existing key at capacity
+    expect(get('key-0')).toBe('updated');
+    // Nothing should have been evicted since size didn't grow past the cap.
+    expect(get(`key-${MAX_ENTRIES - 1}`)).toBe(MAX_ENTRIES - 1);
+  });
+});
+
 // ─── clear ────────────────────────────────────────────────────────────────────
 
 describe('clear', () => {

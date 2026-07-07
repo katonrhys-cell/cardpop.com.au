@@ -1,4 +1,4 @@
-import supabase from '../utils/supabaseClient.js';
+import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 
 // Pay a seller their proceeds for an order. Used both when an order is first

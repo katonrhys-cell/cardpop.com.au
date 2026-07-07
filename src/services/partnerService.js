@@ -1,5 +1,6 @@
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
+import { escapeLike } from '../utils/escapeLike.js';
 
 /**
  * Partner program: approved partners (local game stores, content creators)
@@ -182,7 +183,7 @@ export async function validatePartnerCode(userId, rawCode) {
   const { data: partner } = await supabase
     .from('partners')
     .select('id, user_id, code, discount_pct, commission_pct, free_shipping, status')
-    .ilike('code', code)
+    .ilike('code', escapeLike(code))
     .maybeSingle();
 
   if (!partner || partner.status !== 'approved') {

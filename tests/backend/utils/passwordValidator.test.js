@@ -49,11 +49,14 @@ describe('validatePassword', () => {
     expect(result.isStrong).toBe(false);
   });
 
-  it('isStrong is true when score is exactly 4', () => {
-    // uppercase + lowercase + numbers + length = 4 (no special chars)
+  it('isStrong is false when score is exactly 4 (missing only special chars)', () => {
+    // A >=4 threshold let a password like "Password1" — uppercase + lowercase
+    // + numbers + length, no special chars — pass as "strong" despite being a
+    // well-known weak/common password. Every category is now required.
     const result = validatePassword('Abcdefg1');
     expect(result.strengthScore).toBe(4);
-    expect(result.isStrong).toBe(true);
+    expect(result.isStrong).toBe(false);
+    expect(result.missing).toEqual(['specialChars']);
   });
 
   it('isStrong is true and score is 5 for a fully compliant password', () => {
