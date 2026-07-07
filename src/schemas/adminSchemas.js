@@ -47,3 +47,11 @@ export const resolveDisputeBodySchema = z.object({
   action: z.enum(['release', 'keep_frozen']),
   resolution_notes: z.string().max(1000, 'Resolution notes must be 1000 characters or less').optional(),
 });
+
+export const setUserStatusSchema = z.object({
+  userId: z.string().min(1, 'User ID is required'),
+});
+
+export const setUserStatusBodySchema = z.object({
+  status: z.enum(['active', 'suspended', 'deleted']),
+});

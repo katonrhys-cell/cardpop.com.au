@@ -4,9 +4,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '@/components/ui/button';
 
 const ACTION_LABELS = {
-  suspend: { title: 'Suspend Account', description: 'This deactivates the account (hides their public store and listings) until reactivated.', variant: 'destructive' },
-  unsuspend: { title: 'Reactivate Account', description: 'This restores the account to active.', variant: 'default' },
+  suspend: { title: 'Suspend Account', description: 'This blocks the account from signing in and hides their public store and listings, until reactivated.', variant: 'destructive' },
+  unsuspend: { title: 'Reactivate Account', description: 'This restores the account to active and allows sign-in again.', variant: 'default' },
   reset_password: { title: 'Reset Password', description: 'Send a password reset email to the user.', variant: 'default' },
+  delete: { title: 'Delete Account', description: 'This permanently blocks sign-in and hides the account everywhere. Historical orders, listings and reviews are kept — this cannot be undone from here.', variant: 'destructive' },
 };
 
 const UserActionsModal = ({ isOpen, onClose, actionType, user, onConfirm, extraContent = null, confirmDisabled = false }) => {

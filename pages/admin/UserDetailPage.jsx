@@ -11,10 +11,12 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
 import { useUserDetails } from '@/hooks/useUserDetails.js';
 import UserStatsCard from '@/components/admin/UserStatsCard.jsx';
 import UserActionsModal from '@/components/admin/UserActionsModal.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import apiServerClient from '@/lib/apiServerClient.js';
 import { isVerified } from '@/utils/verification.js';
 import Turnstile from '@/components/Turnstile.jsx';
 import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
@@ -40,9 +42,11 @@ const UserDetailPage = () => {
   // recover endpoint even for admin-triggered resets).
   const [resetCaptchaToken, setResetCaptchaToken] = useState('');
   const resetTurnstileRef = useRef(null);
+  // Type-to-confirm safety net for the irreversible-from-here delete action.
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   const openAction = (type) => setActionModal({ isOpen: true, type });
-  const closeAction = () => { setActionModal({ isOpen: false, type: null }); setResetCaptchaToken(''); };
+  const closeAction = () => { setActionModal({ isOpen: false, type: null }); setResetCaptchaToken(''); setDeleteConfirmText(''); };
 
   // Toggle a sole-trader store flag (verification / promotion). These appear on
   // the public Local Traders directory and will later gate behind subscription tiers.
@@ -61,20 +65,31 @@ const UserDetailPage = () => {
     }
   };
 
-  // Performs the action chosen in the confirmation modal. Previously the modal's
-  // Confirm button was wired to a non-existent `onComplete` prop and there was no
-  // mutation, so Suspend/Reactivate/Reset-password did nothing.
+  // Performs the action chosen in the confirmation modal. Suspend/reactivate/
+  // delete go through the service-role /admin/users/:id/status endpoint, which
+  // both flips profiles.is_active(/is_deleted) and actually bans the Supabase
+  // auth user — a client-side profiles write alone (the old behaviour) never
+  // blocked sign-in, it only hid the account from public listings.
   const handleConfirmAction = async () => {
     const type = actionModal.type;
     if (!type || !userId) return;
     try {
-      if (type === 'suspend' || type === 'unsuspend') {
-        const { error: updErr } = await supabase
-          .from('profiles')
-          .update({ is_active: type === 'unsuspend' })
-          .eq('id', userId);
-        if (updErr) throw updErr;
-        toast.success(type === 'suspend' ? 'Account suspended.' : 'Account reactivated.');
+      if (type === 'suspend' || type === 'unsuspend' || type === 'delete') {
+        const status = type === 'unsuspend' ? 'active' : type === 'suspend' ? 'suspended' : 'deleted';
+        const res = await apiServerClient.fetch(`/admin/users/${userId}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || 'Failed to update account status.');
+        }
+        toast.success(
+          type === 'suspend' ? 'Account suspended.'
+            : type === 'unsuspend' ? 'Account reactivated.'
+              : 'Account deleted.'
+        );
         refetch?.();
       } else if (type === 'reset_password') {
         if (!user?.email) { toast.error('No email on file for this user.'); return; }
@@ -143,7 +158,8 @@ const UserDetailPage = () => {
             <div className="flex flex-wrap justify-center gap-2 mb-6">
               <Badge variant="secondary" className="bg-secondary text-secondary-foreground">{user.community_type || user.user_type || 'collector'}</Badge>
               {isVerified(user.is_verified) && <Badge variant="outline" className="bg-blue-500/10 text-blue-600 border-blue-200">Verified</Badge>}
-              {user.is_active === false && <Badge variant="destructive">Suspended</Badge>}
+              {user.is_deleted && <Badge variant="destructive">Deleted</Badge>}
+              {!user.is_deleted && user.is_active === false && <Badge variant="destructive">Suspended</Badge>}
             </div>
 
             <div className="w-full space-y-3 text-sm text-left">
@@ -194,8 +210,9 @@ const UserDetailPage = () => {
                 </>
               )}
               <Button
-                variant={user.is_active !== false ? "outline" : "default"} 
+                variant={user.is_active !== false ? "outline" : "default"}
                 className="w-full justify-start"
+                disabled={user.is_deleted}
                 onClick={() => openAction(user.is_active !== false ? 'suspend' : 'unsuspend')}
               >
                 {user.is_active !== false ? (
@@ -204,16 +221,16 @@ const UserDetailPage = () => {
                   <><CheckCircle2 className="w-4 h-4 mr-2" /> Reactivate Account</>
                 )}
               </Button>
-              <Button variant="outline" className="w-full justify-start" onClick={() => openAction('reset_password')}>
+              <Button variant="outline" className="w-full justify-start" disabled={user.is_deleted} onClick={() => openAction('reset_password')}>
                 <KeyRound className="w-4 h-4 mr-2" /> Send Password Reset
               </Button>
               <Button
                 variant="outline"
-                className="w-full justify-start text-muted-foreground border-border"
-                disabled
-                title="Account deletion requires a service-role backend endpoint (auth user removal). Not yet available."
+                className="w-full justify-start text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+                disabled={user.is_deleted}
+                onClick={() => openAction('delete')}
               >
-                <Trash2 className="w-4 h-4 mr-2" /> Delete Account (unavailable)
+                <Trash2 className="w-4 h-4 mr-2" /> {user.is_deleted ? 'Account Deleted' : 'Delete Account'}
               </Button>
             </div>
           </CardContent>
@@ -325,14 +342,32 @@ const UserDetailPage = () => {
         actionType={actionModal.type}
         user={user}
         onConfirm={handleConfirmAction}
-        confirmDisabled={actionModal.type === 'reset_password' && TURNSTILE_ENABLED && !resetCaptchaToken}
-        extraContent={actionModal.type === 'reset_password' && TURNSTILE_ENABLED ? (
-          <Turnstile
-            ref={resetTurnstileRef}
-            onVerify={setResetCaptchaToken}
-            onExpire={() => setResetCaptchaToken('')}
-          />
-        ) : null}
+        confirmDisabled={
+          (actionModal.type === 'reset_password' && TURNSTILE_ENABLED && !resetCaptchaToken)
+          || (actionModal.type === 'delete' && deleteConfirmText.trim().toUpperCase() !== 'DELETE')
+        }
+        extraContent={
+          actionModal.type === 'reset_password' && TURNSTILE_ENABLED ? (
+            <Turnstile
+              ref={resetTurnstileRef}
+              onVerify={setResetCaptchaToken}
+              onExpire={() => setResetCaptchaToken('')}
+            />
+          ) : actionModal.type === 'delete' ? (
+            <div className="space-y-1.5">
+              <label htmlFor="deleteConfirmText" className="text-xs font-semibold text-muted-foreground">
+                Type DELETE to confirm
+              </label>
+              <Input
+                id="deleteConfirmText"
+                value={deleteConfirmText}
+                onChange={e => setDeleteConfirmText(e.target.value)}
+                placeholder="DELETE"
+                autoComplete="off"
+              />
+            </div>
+          ) : null
+        }
       />
     </div>
   );
