@@ -1,9 +1,7 @@
 import React from 'react';
-import { MapPin, CreditCard, Package, Loader2 } from 'lucide-react';
+import { MapPin, Package } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 
 const AddressBlock = ({ data = {} }) => (
   <div className="text-sm space-y-0.5 text-muted-foreground">
@@ -13,60 +11,48 @@ const AddressBlock = ({ data = {} }) => (
   </div>
 );
 
+// Read-only recap shown above the inline Stripe payment form on the final step.
+// Payment details themselves are collected by Stripe's embedded form, so this
+// component intentionally has no pay button of its own.
 const OrderReviewSection = ({
   shippingData,
   billingData,
   sameAsShipping,
-  paymentMethod,
   items = [],
   subtotal = 0,
   tax = 0,
   discount = 0,
   total = 0,
-  processing = false,
-  onConfirm,
-  onBack,
 }) => {
   return (
     <div className="space-y-4">
-      <Card className="border-border shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <MapPin className="h-4 w-4" /> Shipping Address
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <AddressBlock data={shippingData} />
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card className="border-border shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <MapPin className="h-4 w-4" /> Shipping
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AddressBlock data={shippingData} />
+          </CardContent>
+        </Card>
 
-      <Card className="border-border shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <MapPin className="h-4 w-4" /> Billing Address
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {sameAsShipping ? (
-            <p className="text-sm text-muted-foreground">Same as shipping address</p>
-          ) : (
-            <AddressBlock data={billingData} />
-          )}
-        </CardContent>
-      </Card>
-
-      <Card className="border-border shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <CreditCard className="h-4 w-4" /> Payment
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Badge variant="outline" className="capitalize">
-            {paymentMethod === 'card' ? 'Credit / Debit Card' : (paymentMethod ?? '—')}
-          </Badge>
-        </CardContent>
-      </Card>
+        <Card className="border-border shadow-sm">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <MapPin className="h-4 w-4" /> Billing
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {sameAsShipping ? (
+              <p className="text-sm text-muted-foreground">Same as shipping address</p>
+            ) : (
+              <AddressBlock data={billingData} />
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <Card className="border-border shadow-sm">
         <CardHeader className="pb-2">
@@ -97,28 +83,11 @@ const OrderReviewSection = ({
             <span>Tax (GST 10%)</span><span>${Number(tax).toFixed(2)}</span>
           </div>
           <Separator />
-          <div className="flex justify-between font-semibold">
+          <div className="flex justify-between font-semibold text-base">
             <span>Total (AUD)</span><span>${Number(total).toFixed(2)}</span>
           </div>
         </CardContent>
       </Card>
-
-      <div className="flex justify-between pt-2">
-        {onBack && (
-          <Button variant="outline" onClick={onBack} disabled={processing}>
-            Back
-          </Button>
-        )}
-        {onConfirm && (
-          <Button onClick={onConfirm} disabled={processing} className="ml-auto">
-            {processing ? (
-              <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Processing…</>
-            ) : (
-              'Confirm & Pay'
-            )}
-          </Button>
-        )}
-      </div>
     </div>
   );
 };
