@@ -201,6 +201,15 @@ const ProfilesPage = () => {
                     </div>
                   </div>
 
+                  {profile.personal_collection && (
+                    <div className="flex items-start gap-1.5 text-xs">
+                      <Package className="w-3.5 h-3.5 mt-0.5 text-primary flex-shrink-0" />
+                      <span className="font-medium text-foreground/90 line-clamp-2 leading-relaxed">
+                        <span className="font-bold text-primary">PC:</span> {profile.personal_collection}
+                      </span>
+                    </div>
+                  )}
+
                   {profile.bio && (
                     <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                       {profile.bio}

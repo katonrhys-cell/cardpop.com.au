@@ -26,7 +26,8 @@ const UserProfilePage = () => {
   // Form State
   const [formData, setFormData] = useState({
     display_name: '',
-    bio: ''
+    bio: '',
+    personal_collection: ''
   });
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
@@ -49,7 +50,8 @@ const UserProfilePage = () => {
           if (p) {
             setFormData({
               display_name: p.display_name || '',
-              bio: p.bio || ''
+              bio: p.bio || '',
+              personal_collection: p.personal_collection || ''
             });
           }
         }
@@ -109,6 +111,7 @@ const UserProfilePage = () => {
         id: currentUser.id,
         display_name: formData.display_name.trim(),
         bio: formData.bio.trim(),
+        personal_collection: formData.personal_collection.trim(),
         updated_at: new Date().toISOString()
       };
 
@@ -282,6 +285,25 @@ const UserProfilePage = () => {
               <div className="grid md:grid-cols-3 gap-8">
                 <div className="md:col-span-2 space-y-6">
                   <div className="space-y-3">
+                    <Label className="text-muted-foreground font-bold uppercase tracking-wider text-xs">Personal Collection (PC)</Label>
+                    {isEditing ? (
+                      <Input
+                        name="personal_collection"
+                        value={formData.personal_collection}
+                        onChange={handleChange}
+                        placeholder="e.g. Pokémon WOTC Charizards, vintage Yu-Gi-Oh"
+                        className="bg-background rounded-xl focus-visible:ring-primary shadow-sm"
+                      />
+                    ) : (
+                      profile.personal_collection ? (
+                        <p className="text-foreground leading-relaxed font-medium">{profile.personal_collection}</p>
+                      ) : (
+                        <p className="text-muted-foreground italic font-normal">Not set — tell others what you collect.</p>
+                      )
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
                     <Label className="text-muted-foreground font-bold uppercase tracking-wider text-xs">About Me</Label>
                     {isEditing ? (
                       <Textarea 
@@ -337,7 +359,7 @@ const UserProfilePage = () => {
                       setAvatarPreview(null);
                       setRemoveAvatar(false);
                       if (profile) {
-                        setFormData({ display_name: profile.display_name||'', bio: profile.bio||'' });
+                        setFormData({ display_name: profile.display_name||'', bio: profile.bio||'', personal_collection: profile.personal_collection||'' });
                       }
                     }}
                     disabled={saving}
