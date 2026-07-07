@@ -108,7 +108,7 @@ Tests are split into two Vitest projects configured in `vitest.config.js`:
 - **eBay** (`src/routes/ebay.js`, `src/utils/ebayClient.js`): Market price lookups with caching (`src/utils/ebayCache.js`).
 - **Stripe** (`src/routes/stripe.js`): Payment processing and checkout.
 - **Kit.com** (`src/routes/newsletter.js`): Newsletter subscriptions via the Kit v4 API. Requires `KIT_API_KEY` and `KIT_FORM_ID` env vars. The `/launch` pre-launch landing page subscribes with `list: 'launch'`, which targets `KIT_LAUNCH_FORM_ID` (optional — falls back to `KIT_FORM_ID` until set). Setting `VITE_COMING_SOON=true` at build time redirects the homepage to `/launch`.
-- **Shop catalogue**: Product data, pricing, stock and checkout run entirely on Supabase (`shop_products` table) and the Stripe endpoints (`src/routes/stripe.js`). The former Hostinger/Online-Store product API has been removed; `api/EcommerceApi.js` now only exports a `formatCurrency` helper and makes no external calls.
+- **Shop catalogue**: Product data, pricing, stock and checkout run entirely on Supabase (`shop_products` table) and the Stripe endpoints (`src/routes/stripe.js`). The former Hostinger/Online-Store product API (`api/EcommerceApi.js`) has been removed entirely; the `formatCurrency` helper it used to export now lives at `utils/formatCurrency.js`.
 
 ### Image serving & Supabase egress
 
@@ -148,6 +148,8 @@ git push main
 | `KIT_LAUNCH_FORM_ID` | Kit.com pre-launch notify list (`/launch` page) — optional, falls back to `KIT_FORM_ID` |
 | `VITE_COMING_SOON` | Pre-launch mode (build-time): `true` redirects the homepage to `/launch` |
 | `ENCRYPTION_KEY` | MFA OTP / backup code encryption |
+| `VITE_GOOGLE_MAPS_API_KEY` | *(optional)* Google Places autocomplete on the checkout shipping form (build-time, public) — blank = free-text fallback |
+| `GOOGLE_MAPS_API_KEY` | *(optional)* Google Address Validation API — server-side check of the chosen shipping address before creating the Stripe session; blank = skipped (fail-open) |
 | `CORS_ORIGIN` | Express CORS (set to `https://cardpop.com.au`) |
 | `APP_URL` | App base URL |
 | `VITE_IMAGE_CDN_HOST` | *(optional)* Image CDN host (e.g. CloudFront) — frontend image URLs |

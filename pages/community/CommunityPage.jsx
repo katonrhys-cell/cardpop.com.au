@@ -33,6 +33,9 @@ const CommunityPage = () => {
   const [loadingDiscussions, setLoadingDiscussions] = useState(true);
   const [loadingProfiles, setLoadingProfiles] = useState(true);
   const [loadingRetailers, setLoadingRetailers] = useState(true);
+  const [discussionsError, setDiscussionsError] = useState(null);
+  const [profilesError, setProfilesError] = useState(null);
+  const [retailersError, setRetailersError] = useState(null);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [slideKey, setSlideKey] = useState(0);
@@ -61,8 +64,12 @@ const CommunityPage = () => {
       .eq('post_type', 'text')
       .order('created_at', { ascending: false })
       .limit(20)
-      .then(({ data }) => { if (!cancelled) setDiscussions(data || []); })
-      .catch(() => {})
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) { setDiscussionsError('Unable to load discussions right now.'); return; }
+        setDiscussions(data || []);
+      })
+      .catch(() => { if (!cancelled) setDiscussionsError('Unable to load discussions right now.'); })
       .finally(() => { if (!cancelled) setLoadingDiscussions(false); });
 
     supabase
@@ -70,19 +77,19 @@ const CommunityPage = () => {
       .select('*')
       .order('created_at', { ascending: false })
       .limit(50)
-      .then(({ data }) => {
-        if (!cancelled) {
-          // Deduplicate by user id to prevent duplicates
-          const seen = new Set();
-          const uniqueProfiles = (data || []).filter(profile => {
-            if (seen.has(profile.id)) return false;
-            seen.add(profile.id);
-            return true;
-          });
-          setProfiles(uniqueProfiles);
-        }
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) { setProfilesError('Unable to load profiles right now.'); return; }
+        // Deduplicate by user id to prevent duplicates
+        const seen = new Set();
+        const uniqueProfiles = (data || []).filter(profile => {
+          if (seen.has(profile.id)) return false;
+          seen.add(profile.id);
+          return true;
+        });
+        setProfiles(uniqueProfiles);
       })
-      .catch(() => {})
+      .catch(() => { if (!cancelled) setProfilesError('Unable to load profiles right now.'); })
       .finally(() => { if (!cancelled) setLoadingProfiles(false); });
 
     supabase
@@ -90,8 +97,12 @@ const CommunityPage = () => {
       .select('*')
       .eq('is_active', true)
       .order('brand_name', { ascending: true })
-      .then(({ data }) => { if (!cancelled) setRetailers(data || []); })
-      .catch(() => {})
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) { setRetailersError('Unable to load retailers right now.'); return; }
+        setRetailers(data || []);
+      })
+      .catch(() => { if (!cancelled) setRetailersError('Unable to load retailers right now.'); })
       .finally(() => { if (!cancelled) setLoadingRetailers(false); });
 
     return () => { cancelled = true; };
@@ -275,6 +286,12 @@ const CommunityPage = () => {
             <div className="space-y-4">
               {loadingDiscussions ? (
                 Array(5).fill(0).map((_, i) => <Skeleton key={i} className="h-24 w-full rounded-xl" />)
+              ) : discussionsError ? (
+                <div className="flex flex-col items-center justify-center py-16 bg-muted/30 rounded-3xl border border-destructive/20 border-dashed">
+                  <MessageSquare className="w-12 h-12 text-destructive mb-4 opacity-40" />
+                  <p className="text-foreground text-xl font-bold mb-2">Couldn't load discussions</p>
+                  <p className="text-sm text-muted-foreground">{discussionsError}</p>
+                </div>
               ) : discussions.length > 0 ? (
                 discussions.map(post => (
                   <Link
@@ -313,6 +330,12 @@ const CommunityPage = () => {
             {loadingProfiles ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {Array(6).fill(0).map((_, i) => <Skeleton key={i} className="h-36 rounded-2xl" />)}
+              </div>
+            ) : profilesError ? (
+              <div className="flex flex-col items-center justify-center py-16 bg-muted/30 rounded-3xl border border-destructive/20 border-dashed">
+                <Users className="w-12 h-12 text-destructive mb-4 opacity-40" />
+                <p className="text-foreground text-xl font-bold mb-2">Couldn't load profiles</p>
+                <p className="text-sm text-muted-foreground">{profilesError}</p>
               </div>
             ) : profiles.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -368,6 +391,12 @@ const CommunityPage = () => {
             {loadingRetailers ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {Array(6).fill(0).map((_, i) => <Skeleton key={i} className="h-44 rounded-2xl" />)}
+              </div>
+            ) : retailersError ? (
+              <div className="flex flex-col items-center justify-center py-16 bg-muted/30 rounded-3xl border border-destructive/20 border-dashed">
+                <Store className="w-12 h-12 text-destructive mb-4 opacity-40" />
+                <p className="text-foreground text-xl font-bold mb-2">Couldn't load retailers</p>
+                <p className="text-sm text-muted-foreground">{retailersError}</p>
               </div>
             ) : retailers.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

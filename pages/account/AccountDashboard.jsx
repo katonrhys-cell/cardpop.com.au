@@ -70,9 +70,17 @@ const AccountDashboard = () => {
 
         if (cancelled) return;
 
-        // Log individual errors without crashing the whole dashboard
-        [salesRes, revenueRes, listingsRes, vaultRes, tradesRes].forEach((r, i) => {
-        });
+        // Log individual errors without crashing the whole dashboard. Supabase
+        // resolves (never rejects) a failed query, so a per-query error here
+        // previously went unchecked — count/data falls back to 0/[] below,
+        // silently rendering a real failure as "0 sales" / "$0 revenue"
+        // instead of surfacing it.
+        const namedResults = { sales: salesRes, revenue: revenueRes, listings: listingsRes, vault: vaultRes, trades: tradesRes };
+        const failed = Object.entries(namedResults).filter(([, r]) => r.error);
+        if (failed.length > 0) {
+          failed.forEach(([name, r]) => console.error(`Failed to load ${name} stats:`, r.error));
+          setStatsError('Some statistics failed to load — the numbers below may be incomplete. Try refreshing.');
+        }
 
         const revenue = (revenueRes.data || []).reduce((s, t) => s + (t.total_aud || 0), 0);
         setStats({
@@ -106,11 +114,12 @@ const AccountDashboard = () => {
       setVaultError(null);
       try {
         const from = (page - 1) * 10;
-        const { data: items, count } = await supabase
+        const { data: items, count, error: vaultFetchError } = await supabase
           .from('vault_items').select('*', { count: 'exact' })
           .eq('owner_id', uid)
           .order('created_at', { ascending: false })
           .range(from, from + 9);
+        if (vaultFetchError) throw vaultFetchError;
         if (cancelled) return;
         setVaultItems(items ?? []);
         setVaultPage(page);

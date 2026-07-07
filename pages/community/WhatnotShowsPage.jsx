@@ -54,6 +54,7 @@ const WhatnotShowsPage = () => {
 
   const [shows, setShows] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showsError, setShowsError] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -84,6 +85,7 @@ const WhatnotShowsPage = () => {
 
   const fetchShows = useCallback(async () => {
     setLoading(true);
+    setShowsError(null);
     try {
       const { data, error } = await supabase
         .from('whatnot_shows')
@@ -94,6 +96,9 @@ const WhatnotShowsPage = () => {
       if (error) throw error;
       setShows(data || []);
     } catch (err) {
+      console.error('Failed to load Whatnot shows:', err);
+      setShowsError('Unable to load shows right now. Please try again shortly.');
+      setShows([]);
     } finally {
       setLoading(false);
     }
@@ -410,6 +415,15 @@ const WhatnotShowsPage = () => {
         {loading ? (
           <div className="space-y-4">
             {Array(3).fill(0).map((_, i) => <Skeleton key={i} className="h-64 w-full rounded-2xl" />)}
+          </div>
+        ) : showsError ? (
+          <div className="flex flex-col items-center justify-center py-16 bg-muted/30 rounded-3xl border border-destructive/20 border-dashed">
+            <Tv2 className="w-12 h-12 text-destructive mb-4 opacity-40" />
+            <p className="text-foreground text-xl font-bold mb-2">Couldn't load shows</p>
+            <p className="text-sm text-muted-foreground mb-6">{showsError}</p>
+            <Button onClick={fetchShows} variant="outline" className="rounded-xl font-bold">
+              Try again
+            </Button>
           </div>
         ) : shows.length > 0 ? (
           <div className="space-y-4">

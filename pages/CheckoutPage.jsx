@@ -23,6 +23,7 @@ import OrderReviewSection from '@/components/checkout/OrderReviewSection.jsx';
 import EmbeddedStripeCheckout from '@/components/checkout/EmbeddedStripeCheckout.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import { getReferralCode } from '@/lib/referral.js';
+import { GOOGLE_PLACES_ENABLED } from '@/lib/googlePlaces.js';
 
 const STEPS = { SUMMARY: 1, SHIPPING: 2, BILLING: 3, PAY: 4 };
 const STEP_LABELS = ['Cart', 'Ship', 'Bill', 'Pay'];
@@ -188,9 +189,16 @@ const CheckoutPage = () => {
   const appliedPromoCode = discount > 0 ? promoCode : '';
 
   const validateShipping = () => {
-    const { firstName, lastName, address, suburb, state, postcode } = shippingData;
+    const { firstName, lastName, address, suburb, state, postcode, verified, placesUnavailable } = shippingData;
     if (!firstName || !lastName || !address || !suburb || !state || !postcode) {
       toast.error('Please fill in all shipping address fields.');
+      return false;
+    }
+    // When Google Places is active, the address must be one the user picked from
+    // the suggestions (verified) — not free-typed. Skipped if Places couldn't
+    // load; the server still validates the address before charging.
+    if (GOOGLE_PLACES_ENABLED && !placesUnavailable && !verified) {
+      toast.error('Please select your address from the suggestions so we can verify it.');
       return false;
     }
     return true;

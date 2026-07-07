@@ -12,6 +12,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getCollectionImage } from '@/data/collectionImages.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 
+// Deterministic pseudo-random index derived from an id string, used to spread
+// items across brand/series buckets. A single charCodeAt(N) is out of bounds
+// (NaN) for any id shorter than N+1 characters (e.g. a single-digit numeric
+// id) — summing all char codes is always defined for any non-empty string.
+const idHash = (id) => {
+  const str = String(id);
+  let sum = 0;
+  for (let i = 0; i < str.length; i++) sum += str.charCodeAt(i);
+  return sum;
+};
+
 const TCG_BRANDS = ['PSA', 'BGS', 'Beckett', 'CGC', 'Raw'];
 const SPORTS_BRANDS = ['Panini', 'Topps', 'Upper Deck', 'Bowman', 'Fleer'];
 const TCG_SERIES = ['Base Set', 'Scarlet & Violet', 'Sword & Shield', 'Sun & Moon', 'Alpha', 'Beta'];
@@ -51,12 +62,12 @@ const PublicCollectionsPage = () => {
       const processVaultItem = (item) => {
         const isSportsItem = SPORTS_COLLECTIONS.includes(item.collectionType);
         const brand = isSportsItem
-          ? (SPORTS_BRANDS.find(b => item.card_name?.includes(b)) || SPORTS_BRANDS[String(item.id).charCodeAt(0) % SPORTS_BRANDS.length])
-          : (TCG_BRANDS.find(b => item.grading_company?.includes(b)) || TCG_BRANDS[String(item.id).charCodeAt(0) % TCG_BRANDS.length]);
+          ? (SPORTS_BRANDS.find(b => item.card_name?.includes(b)) || SPORTS_BRANDS[idHash(item.id) % SPORTS_BRANDS.length])
+          : (TCG_BRANDS.find(b => item.grading_company?.includes(b)) || TCG_BRANDS[idHash(item.id) % TCG_BRANDS.length]);
 
         const series = isSportsItem
-          ? SPORTS_SERIES[String(item.id).charCodeAt(1) % SPORTS_SERIES.length]
-          : TCG_SERIES[String(item.id).charCodeAt(1) % TCG_SERIES.length];
+          ? SPORTS_SERIES[idHash(item.id) % SPORTS_SERIES.length]
+          : TCG_SERIES[idHash(item.id) % TCG_SERIES.length];
 
         return {
           id: item.id,
@@ -85,8 +96,8 @@ const PublicCollectionsPage = () => {
           : (TCG_BRANDS.find(b => item.name?.includes(b) || item.grading_company?.includes(b)) || 'Official');
 
         const series = isSportsItem
-          ? SPORTS_SERIES[String(item.id).charCodeAt(1) % SPORTS_SERIES.length]
-          : TCG_SERIES[String(item.id).charCodeAt(1) % TCG_SERIES.length];
+          ? SPORTS_SERIES[idHash(item.id) % SPORTS_SERIES.length]
+          : TCG_SERIES[idHash(item.id) % TCG_SERIES.length];
 
         return {
           id: item.id,

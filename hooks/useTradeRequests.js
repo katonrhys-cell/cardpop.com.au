@@ -82,37 +82,17 @@ export function useTradeRequests() {
 
   const acceptTrade = async (trade) => {
     try {
-      const { error } = await supabase
-        .from('trades')
-        .update({ status: 'accepted' })
-        .eq('id', trade.id)
-        .eq('responder_id', currentUser?.id);
+      // Accepting the trade and cancelling any other still-proposed trade on
+      // either listing happen inside one DB transaction (accept_trade RPC) —
+      // doing it as two separate client calls left a window where two
+      // concurrent acceptances on the same listing could both reach
+      // 'accepted' before either's cancellation sweep ran.
+      const { data: accepted, error } = await supabase
+        .rpc('accept_trade', { p_trade_id: trade.id, p_responder_id: currentUser?.id });
       if (error) throw error;
-
-      // Cancel any other still-proposed trade that involves either of the two
-      // listings, in either column — otherwise a card could be committed twice.
-      const a = trade.initiator_listing_id;
-      const b = trade.responder_listing_id;
-      const { error: cancelErr } = await supabase
-        .from('trades')
-        .update({ status: 'cancelled' })
-        .or(
-          `initiator_listing_id.eq.${a},responder_listing_id.eq.${a},` +
-          `initiator_listing_id.eq.${b},responder_listing_id.eq.${b}`,
-        )
-        .eq('status', 'proposed')
-        .neq('id', trade.id);
-
-      if (cancelErr) {
-        // Roll the acceptance back to 'proposed' so we never leave a listing
-        // committed to this trade while competing proposals are still live.
-        // (Fully race-proof acceptance needs a DB transaction / constraint.)
-        await supabase
-          .from('trades')
-          .update({ status: 'proposed' })
-          .eq('id', trade.id)
-          .eq('responder_id', currentUser?.id);
-        throw cancelErr;
+      if (!accepted) {
+        toast.error('This trade is no longer available to accept.');
+        return false;
       }
 
       toast.success('Trade accepted! The fee will be calculated and contact details shared.');

@@ -45,13 +45,16 @@ const AccountWallet = () => {
     if (!currentUser?.id) return;
     setLoadingSales(true);
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('orders')
         .select('id, created_at, item_price_aud, commission_pct, platform_fee_aud, seller_proceeds_aud, payout_status, stripe_transfer_id, listing_id')
         .eq('seller_id', currentUser.id)
         .order('created_at', { ascending: false })
         .limit(20);
+      if (error) throw error;
       setSales(data || []);
+    } catch {
+      toast.error('Could not load your sale payouts.');
     } finally {
       setLoadingSales(false);
     }
