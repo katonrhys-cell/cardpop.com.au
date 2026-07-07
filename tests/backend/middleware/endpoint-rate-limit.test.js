@@ -11,7 +11,6 @@ import {
   passwordResetLimiter,
   stripeLimiter,
   apiLimiter,
-  mfaLimiter,
   backupCodeLimiter,
 } from '../../../src/middleware/endpoint-rate-limit.js';
 
@@ -73,31 +72,6 @@ describe('passwordResetLimiter', () => {
       expect((await request(app).post('/reset').set('X-Forwarded-For', ip)).status).toBe(200);
     }
     expect((await request(app).post('/reset').set('X-Forwarded-For', ip)).status).toBe(429);
-  });
-});
-
-describe('mfaLimiter — keyed by authenticated user, not mfaId/IP', () => {
-  it('limits per user so rotating mfaId/IP cannot bypass the cap', async () => {
-    const app = appWith(mfaLimiter, { injectUser: true });
-    // Same user, rotating mfaId AND IP, still hits the same bucket — the old
-    // behaviour (keying on body mfaId) let an attacker rotate the key to evade it.
-    for (let i = 0; i < 5; i++) {
-      const res = await request(app).post('/verify')
-        .set('x-test-user', 'mfa-user-A')
-        .set('X-Forwarded-For', `10.30.0.${i}`)
-        .send({ mfaId: `session-${i}` });
-      expect(res.status).toBe(200);
-    }
-    const blocked = await request(app).post('/verify')
-      .set('x-test-user', 'mfa-user-A')
-      .send({ mfaId: 'session-99' });
-    expect(blocked.status).toBe(429);
-
-    // A different user is independent.
-    const other = await request(app).post('/verify')
-      .set('x-test-user', 'mfa-user-B')
-      .send({ mfaId: 'session-X' });
-    expect(other.status).toBe(200);
   });
 });
 

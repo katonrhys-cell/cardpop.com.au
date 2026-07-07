@@ -62,6 +62,14 @@ vi.mock('@/lib/supabaseClient.js', () => {
   return { supabase, default: supabase };
 });
 
+// Backend lockout-gate calls made by login() — default to "allowed" so
+// existing login tests exercise the same signInWithPassword path as before.
+const apiClient = vi.hoisted(() => ({ fetchMock: vi.fn() }));
+vi.mock('@/lib/apiServerClient.js', () => {
+  const client = { fetch: (...args) => apiClient.fetchMock(...args) };
+  return { default: client, apiServerClient: client };
+});
+
 import { supabase } from '@/lib/supabaseClient.js';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext.jsx';
 
@@ -114,6 +122,8 @@ const SESSION = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  apiClient.fetchMock.mockReset();
+  apiClient.fetchMock.mockResolvedValue({ ok: true, status: 200, json: async () => ({ allowed: true }) });
   h.authCallback = null;
   h.profileResult = { data: null, error: null };
   h.aalResult = { data: { currentLevel: 'aal1', nextLevel: 'aal1' }, error: null };
@@ -203,6 +213,62 @@ describe('login', () => {
     await act(async () => {
       await expect(captured.login('a@b.com', 'bad')).rejects.toThrow('Invalid login credentials');
     });
+  });
+
+  it('checks the (email, IP) lockout before signing in, and records a failure on bad credentials', async () => {
+    h.signInResult = { data: {}, error: { message: 'Invalid login credentials' } };
+    renderAuth();
+    await emitAuth('INITIAL_SESSION', null);
+
+    await act(async () => {
+      await expect(captured.login('a@b.com', 'bad')).rejects.toThrow('Invalid login credentials');
+    });
+
+    expect(apiClient.fetchMock).toHaveBeenCalledWith('/auth/login/attempt', expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ email: 'a@b.com' }),
+    }));
+    expect(apiClient.fetchMock).toHaveBeenCalledWith('/auth/login/record-failure', expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ email: 'a@b.com' }),
+    }));
+  });
+
+  it('records success after a valid sign-in', async () => {
+    h.signInResult = {
+      data: { session: { access_token: 't', user: { id: 'user-1' } }, user: { id: 'user-1' } },
+      error: null,
+    };
+    renderAuth();
+    await emitAuth('INITIAL_SESSION', null);
+
+    await act(async () => { await captured.login('a@b.com', 'pw'); });
+
+    expect(apiClient.fetchMock).toHaveBeenCalledWith('/auth/login/record-success', expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ email: 'a@b.com' }),
+    }));
+  });
+
+  it('blocks sign-in without calling Supabase when the account is locked out', async () => {
+    apiClient.fetchMock.mockResolvedValueOnce({ ok: false, status: 429, json: async () => ({ error: 'Account temporarily locked due to too many failed login attempts' }) });
+    renderAuth();
+    await emitAuth('INITIAL_SESSION', null);
+
+    await act(async () => {
+      await expect(captured.login('a@b.com', 'pw')).rejects.toThrow('Account temporarily locked due to too many failed login attempts');
+    });
+    expect(supabase.auth.signInWithPassword).not.toHaveBeenCalled();
+  });
+
+  it('fails open and still signs in when the lockout check itself is unreachable', async () => {
+    apiClient.fetchMock.mockRejectedValueOnce(new Error('network down'));
+    h.signInResult = {
+      data: { session: { access_token: 't', user: { id: 'user-1' } }, user: { id: 'user-1' } },
+      error: null,
+    };
+    renderAuth();
+    await emitAuth('INITIAL_SESSION', null);
+
+    await act(async () => { await captured.login('a@b.com', 'pw'); });
+    expect(supabase.auth.signInWithPassword).toHaveBeenCalled();
   });
 
   it('returns requiresMfa and gates auth when a verified TOTP factor exists', async () => {
