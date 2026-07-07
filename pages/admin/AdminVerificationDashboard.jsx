@@ -82,7 +82,7 @@ const AdminVerificationDashboard = () => {
       try {
         let query = supabase
           .from('user_verifications')
-          .select(`*, profile:profiles!user_id(display_name, username, email:id, is_verified, verification_status, created_at, total_sales, reviews_count, rating)`)
+          .select(`*, profile:profiles!user_id(display_name, username, is_verified, verification_status, created_at, total_sales, reviews_count, rating)`)
           .order('submitted_at', { ascending: false });
         if (statusFilter !== 'all') query = query.eq('status', statusFilter);
         const { data, error } = await query;
