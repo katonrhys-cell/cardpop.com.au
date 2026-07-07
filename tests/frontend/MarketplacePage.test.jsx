@@ -127,7 +127,7 @@ describe('MarketplacePage — search and refresh', () => {
 
     // Debounced (~400ms) before the effect re-runs the query with the filter.
     await waitFor(
-      () => expect(h.lastCalls).toContainEqual(['ilike', 'vault_items.card_name', '%charizard%']),
+      () => expect(h.lastCalls).toContainEqual(['ilike', 'vault_item.card_name', '%charizard%']),
       { timeout: 1500 },
     );
   });

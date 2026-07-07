@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { escapeLike } from '@/src/utils/escapeLike.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search, RefreshCw, AlertCircle, Users, X, ChevronDown } from 'lucide-react';
@@ -211,18 +212,22 @@ const MarketplacePage = () => {
           .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
 
         // Apply hierarchy filters — most specific wins for the hierarchy levels,
-        // but parallel and subset stack on top independently
-        if (filterSet)            query = query.eq('vault_items.set_id', filterSet);
-        else if (filterMfr)       query = query.eq('vault_items.manufacturer_id', filterMfr);
-        else if (filterFranchise) query = query.eq('vault_items.franchise_id', filterFranchise);
-        else if (filterCat)       query = query.eq('vault_items.category_id', filterCat);
+        // but parallel and subset stack on top independently.
+        // Embedded filters must reference the select alias ("vault_item"), not
+        // the underlying table name ("vault_items") — PostgREST resolves
+        // dot-notation filters against the resource's embedding label, so a
+        // renamed embed silently fails to filter if you use the table name.
+        if (filterSet)            query = query.eq('vault_item.set_id', filterSet);
+        else if (filterMfr)       query = query.eq('vault_item.manufacturer_id', filterMfr);
+        else if (filterFranchise) query = query.eq('vault_item.franchise_id', filterFranchise);
+        else if (filterCat)       query = query.eq('vault_item.category_id', filterCat);
 
-        if (filterTeam)     query = query.eq('vault_items.team_id', filterTeam);
-        if (filterParallel) query = query.eq('vault_items.parallel_id', filterParallel);
-        if (filterSubset)   query = query.eq('vault_items.subset_id', filterSubset);
+        if (filterTeam)     query = query.eq('vault_item.team_id', filterTeam);
+        if (filterParallel) query = query.eq('vault_item.parallel_id', filterParallel);
+        if (filterSubset)   query = query.eq('vault_item.subset_id', filterSubset);
 
-        if (filterPlayer) query = query.ilike('vault_items.card_name', `%${filterPlayer}%`);
-        if (debouncedSearch.trim()) query = query.ilike('vault_items.card_name', `%${debouncedSearch.trim()}%`);
+        if (filterPlayer) query = query.ilike('vault_item.card_name', `%${escapeLike(filterPlayer)}%`);
+        if (debouncedSearch.trim()) query = query.ilike('vault_item.card_name', `%${escapeLike(debouncedSearch.trim())}%`);
         if (debouncedMin && !isNaN(debouncedMin)) query = query.gte('price_aud', Number(debouncedMin));
         if (debouncedMax && !isNaN(debouncedMax)) query = query.lte('price_aud', Number(debouncedMax));
 
@@ -232,7 +237,7 @@ const MarketplacePage = () => {
         else if (filterMode === 'MakeOffer') query = query.eq('accepts_offers', true);
 
         // is_rookie is set by the add-card form (attribute tick or RC variant)
-        if (filterRookie) query = query.eq('vault_items.is_rookie', true);
+        if (filterRookie) query = query.eq('vault_item.is_rookie', true);
 
         if (sort === 'price_asc')  query = query.order('price_aud', { ascending: true });
         else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
