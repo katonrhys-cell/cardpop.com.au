@@ -1,22 +1,27 @@
 import express from 'express';
-import multer from 'multer';
 import { authMiddleware } from '../middleware/auth.js';
+import { uploadFiles } from '../middleware/file-upload.js';
 import { createSlabImage, compressImage } from '../utils/imageProcessor.js';
 import supabase from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
 
-// Multer for file upload
-const upload = multer({
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
-  storage: multer.memoryStorage()
+// Use the shared hardened upload middleware: 10MB cap + Content-Type gate +
+// magic-byte validation (rejects files whose actual bytes aren't a real image),
+// consistent with card-ocr/integrated-ai. Single-file field 'image'.
+const uploadImage = uploadFiles({
+  fieldName: 'image',
+  maxCount: 1,
+  maxSizeMB: 10,
+  allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
 });
 
 // POST /photo-template/slab-image — create slab template image
-router.post('/slab-image', authMiddleware, upload.single('image'), async (req, res) => {
+router.post('/slab-image', authMiddleware, uploadImage, async (req, res) => {
   try {
-    if (!req.file) {
+    const file = req.files?.[0];
+    if (!file) {
       return res.status(400).json({ error: 'No image provided' });
     }
 
@@ -41,7 +46,7 @@ router.post('/slab-image', authMiddleware, upload.single('image'), async (req, r
     }
 
     // Create slab template
-    const slabImageBuffer = await createSlabImage(req.file.buffer);
+    const slabImageBuffer = await createSlabImage(file.buffer);
 
     // Compress before upload
     const compressedBuffer = await compressImage(slabImageBuffer, 85);
@@ -95,17 +100,18 @@ router.post('/slab-image', authMiddleware, upload.single('image'), async (req, r
 });
 
 // POST /photo-template/validate-image — validate image for browser processing
-router.post('/validate-image', authMiddleware, upload.single('image'), async (req, res) => {
+router.post('/validate-image', authMiddleware, uploadImage, async (req, res) => {
   try {
-    if (!req.file) {
+    const file = req.files?.[0];
+    if (!file) {
       return res.status(400).json({ error: 'No image provided' });
     }
 
-    // Simply return success if file exists and is valid
+    // Magic-byte validation already ran in uploadImage; echo back the verified type
     res.json({
       success: true,
-      size: req.file.size,
-      mimetype: req.file.mimetype
+      size: file.size,
+      mimetype: file.mimetype
     });
   } catch (error) {
     logger.error('[PHOTO-TEMPLATE] Validation error:', error);
