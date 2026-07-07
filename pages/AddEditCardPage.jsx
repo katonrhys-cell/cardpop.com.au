@@ -185,6 +185,7 @@ const AddEditCardPage = () => {
     notes:          '',
     // Listing
     tradeValue:     '',
+    askingPrice:    '',
     listingType:    'private',
     offerMin:       '',
     offerMax:       '',
@@ -347,10 +348,12 @@ const AddEditCardPage = () => {
           listingType:    (!card.listing_type || card.listing_type === 'Private') ? 'private' : card.listing_type,
           displayStyle:   card.display_style || 'classic',
         });
-        // The EOI price range lives on the listings row, not vault_items.
+        // The EOI price range and the asking price live on the listings row,
+        // not vault_items — asking price is the seller's independent choice,
+        // separate from estimated_value_aud (a reference comp, not a floor).
         supabase
           .from('listings')
-          .select('price_min_aud, price_max_aud')
+          .select('price_min_aud, price_max_aud, price_aud')
           .eq('vault_item_id', id)
           .neq('status', 'archived')
           .maybeSingle()
@@ -360,6 +363,7 @@ const AddEditCardPage = () => {
               ...f,
               offerMin: data.price_min_aud != null ? String(data.price_min_aud) : f.offerMin,
               offerMax: data.price_max_aud != null ? String(data.price_max_aud) : f.offerMax,
+              askingPrice: data.price_aud != null ? String(data.price_aud) : f.askingPrice,
             }));
           });
         if (card.card_image) {
@@ -657,6 +661,10 @@ const AddEditCardPage = () => {
       if (!max || max <= 0) newErrors.offerMax = 'Enter the maximum of the price range you want offers in';
       else if (min > 0 && max < min) newErrors.offerMax = 'Must be at least the minimum of the range';
     }
+    if (formData.listingType === 'For Sale' || formData.listingType === 'For Sale & Trade') {
+      const ap = parseFloat(formData.askingPrice);
+      if (!ap || ap <= 0) newErrors.askingPrice = 'Enter a valid asking price';
+    }
     if (isEdit && lockedBaseValue !== null) {
       const ev = parseFloat(formData.estimatedValue) || 0;
       if (ev < lockedBaseValue)
@@ -697,7 +705,7 @@ const AddEditCardPage = () => {
         listing_type:  isEOI ? 'expression_of_interest' : (isSale ? 'fixed' : 'trade'),
         status:        'active',
         accepts_trade: acceptsTrade,
-        price_aud:     isSale ? (parseFloat(formData.estimatedValue) || null) : null,
+        price_aud:     isSale ? (parseFloat(formData.askingPrice) || null) : null,
         // Expression of Interest: no fixed price — publish the seller's target
         // range and open the listing to offers.
         price_min_aud: isEOI ? (parseFloat(formData.offerMin) || null) : null,
@@ -2920,7 +2928,15 @@ const AddEditCardPage = () => {
                       <button
                         key={value}
                         type="button"
-                        onClick={() => set('listingType', value)}
+                        onClick={() => {
+                          set('listingType', value);
+                          // Seed the asking price from the estimated value the first
+                          // time a sale-enabled type is picked — a starting point the
+                          // seller can freely raise or lower, not a locked mirror of it.
+                          if ((value === 'For Sale' || value === 'For Sale & Trade') && !formData.askingPrice && formData.estimatedValue) {
+                            set('askingPrice', formData.estimatedValue);
+                          }
+                        }}
                         className={`flex items-start gap-3 p-4 rounded-xl border-2 text-left transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
                           isActive
                             ? `${activeClass} shadow-sm`
@@ -2949,12 +2965,18 @@ const AddEditCardPage = () => {
                         type="number"
                         min="0"
                         step="0.01"
-                        value={formData.estimatedValue}
-                        onChange={e => set('estimatedValue', e.target.value)}
+                        value={formData.askingPrice}
+                        onChange={e => set('askingPrice', e.target.value)}
                         placeholder="0.00"
-                        className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm pl-8 tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        className={`flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm pl-8 tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${errors.askingPrice ? 'border-destructive' : ''}`}
                       />
                     </div>
+                    {errors.askingPrice && <p className="text-destructive text-xs">{errors.askingPrice}</p>}
+                    {formData.estimatedValue && (
+                      <p className="text-xs text-muted-foreground">
+                        Estimated value: ${Number(formData.estimatedValue).toFixed(2)} — list above or below it, it's your call.
+                      </p>
+                    )}
                   </div>
                 )}
 
