@@ -224,7 +224,7 @@ const OrderManagementPage = () => {
     try {
       const { data, error } = await supabase
         .from('orders')
-        .select('*, buyer:profiles!buyer_id(id, display_name, username, email), seller:profiles!seller_id(id, display_name, username)')
+        .select('*, buyer:profiles!buyer_id(id, display_name, username), seller:profiles!seller_id(id, display_name, username)')
         .order('created_at', { ascending: false })
         .limit(200);
       if (error) throw error;
@@ -268,7 +268,7 @@ const OrderManagementPage = () => {
 
   const filtered = orders.filter(o => {
     const matchSearch = o.order_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        o.buyer?.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        o.buyer?.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                         o.buyer?.display_name?.toLowerCase().includes(searchTerm.toLowerCase());
     if (!matchSearch) return false;
     if (statusFilter === 'all')              return true;
@@ -347,6 +347,7 @@ const OrderManagementPage = () => {
                   <TableCell colSpan={8} className="h-48 text-center text-muted-foreground">
                     <AlertCircle className="w-10 h-10 text-destructive mb-3 mx-auto" />
                     <p>Failed to load orders</p>
+                    {error && <p className="text-xs mt-1 opacity-70">{error}</p>}
                   </TableCell>
                 </TableRow>
               ) : filtered.length === 0 ? (
@@ -360,7 +361,7 @@ const OrderManagementPage = () => {
                 <TableRow key={order.id} className={order.refund_status === 'requested' ? 'bg-amber-500/5' : ''}>
                   <TableCell className="font-mono text-xs text-muted-foreground">{order.order_number || order.id.slice(0,8).toUpperCase()}</TableCell>
                   <TableCell className="text-muted-foreground text-sm whitespace-nowrap">{format(new Date(order.created_at), 'dd MMM yyyy')}</TableCell>
-                  <TableCell className="font-medium">{order.buyer?.display_name || order.buyer?.email || 'Unknown'}</TableCell>
+                  <TableCell className="font-medium">{order.buyer?.display_name || order.buyer?.username || 'Unknown'}</TableCell>
                   <TableCell className="tabular-nums font-medium">{fmt(order.total_aud)}</TableCell>
                   <TableCell className="tabular-nums text-sm text-muted-foreground">{fmt(order.platform_fee_aud)}</TableCell>
                   <TableCell>
