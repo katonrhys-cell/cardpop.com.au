@@ -24,6 +24,7 @@ import { connectOnboard, getConnectStatus, getDashboardLink } from '../services/
 import { createIdentitySession, getIdentityStatus, applyIdentitySession } from '../services/identityService.js';
 import { applyStripeSubscription } from '../services/subscriptionService.js';
 import { ensureWalletCustomer, getWalletBalanceCents, handleWalletTopup } from '../services/walletService.js';
+import { validateShippingAddress } from '../utils/addressValidation.js';
 
 const router = express.Router();
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
@@ -143,6 +144,18 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Apply either a promo code or your wallet balance, not both.' });
     }
 
+    // Authoritative "real, deliverable address" gate. The client autocompletes
+    // via Google Places, but a bypassed frontend can't slip a fake address past
+    // this server-side check (fails open only when no API key is configured).
+    const addressCheck = await validateShippingAddress(shippingAddress || {});
+    if (!addressCheck.valid) {
+      const message = addressCheck.reason === 'request-failed'
+        ? 'We could not verify that shipping address right now. Please try again.'
+        : 'That shipping address could not be verified. Please select a valid address from the suggestions.';
+      logger.warn(`[STRIPE] cart checkout blocked — address ${addressCheck.reason || 'invalid'}`);
+      return res.status(400).json({ error: message, code: 'address_unverified' });
+    }
+
     const userId = req.user.id;
     const email  = req.user.email;
 
@@ -228,6 +241,7 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
     if (!session?.url) throw new Error('Stripe returned a session without a URL');
 
     const s = shippingAddress || {};
+    const streetLine = s.address2 ? `${s.address2}, ${s.address || ''}`.trim() : (s.address || '');
     const { error: orderErr } = await supabase.from('orders').insert({
       buyer_id:          userId,
       seller_id:         null,
@@ -244,7 +258,7 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
       buyer_protection:  true,
       order_items:       orderLines,
       shipping_name:     s.name     ? String(s.name).slice(0, 100)     : null,
-      shipping_address:  s.address  ? String(s.address).slice(0, 200)  : null,
+      shipping_address:  streetLine ? String(streetLine).slice(0, 200)  : null,
       shipping_suburb:   s.suburb   ? String(s.suburb).slice(0, 100)   : null,
       shipping_state:    s.state    ? String(s.state).slice(0, 50)     : null,
       shipping_postcode: s.postcode ? String(s.postcode).slice(0, 10)  : null,
