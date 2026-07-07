@@ -108,6 +108,7 @@ Tests are split into two Vitest projects configured in `vitest.config.js`:
 - **eBay** (`src/routes/ebay.js`, `src/utils/ebayClient.js`): Market price lookups with caching (`src/utils/ebayCache.js`).
 - **Stripe** (`src/routes/stripe.js`): Payment processing and checkout.
 - **Kit.com** (`src/routes/newsletter.js`): Newsletter subscriptions via the Kit v4 API. Requires `KIT_API_KEY` and `KIT_FORM_ID` env vars. The `/launch` pre-launch landing page subscribes with `list: 'launch'`, which targets `KIT_LAUNCH_FORM_ID` (optional — falls back to `KIT_FORM_ID` until set). Setting `VITE_COMING_SOON=true` at build time redirects the homepage to `/launch`.
+- **Resend** (`src/utils/emailService.js`): **Transactional** email — the automated, server-triggered messages sent to one recipient in response to an event: order confirmed (buyer), item sold (seller), refund processed/issued, and the registration welcome offer (fired from `stripeWebhookService.js`, `refundService.js`, `welcomeOfferService.js`). Requires `RESEND_API_KEY`; sends from `noreply@cardpop.com.au`. This is a distinct role from the other two mail systems and does not overlap: **Google Workspace** is the human inbox (person-to-person mail) and **Kit.com** is bulk marketing (newsletters/campaigns). Sending requires the domain to be **verified in Resend** — its SPF/DKIM DNS records live in Cloudflare and coexist with Google's (Resend uses the `send.` subdomain + `resend._domainkey`, Google uses the root domain + `google._domainkey`). Supabase Auth emails (signup confirmation, password reset, magic links) are a separate pipeline sent by Supabase itself, not Resend. Full setup and DNS records: `docs/email.md`. If `RESEND_API_KEY` is unset the service logs a warning and silently skips sending (fail-safe).
 - **Shop catalogue**: Product data, pricing, stock and checkout run entirely on Supabase (`shop_products` table) and the Stripe endpoints (`src/routes/stripe.js`). The former Hostinger/Online-Store product API (`api/EcommerceApi.js`) has been removed entirely; the `formatCurrency` helper it used to export now lives at `utils/formatCurrency.js`.
 
 ### Image serving & Supabase egress
@@ -145,6 +146,7 @@ git push main
 | `EBAY_CLIENT_SECRET` | eBay API client |
 | `KIT_API_KEY` | Kit.com newsletter |
 | `KIT_FORM_ID` | Kit.com newsletter |
+| `RESEND_API_KEY` | Resend transactional email (order/refund/welcome). Unset = emails silently skipped. Domain must be verified in Resend — see `docs/email.md` |
 | `KIT_LAUNCH_FORM_ID` | Kit.com pre-launch notify list (`/launch` page) — optional, falls back to `KIT_FORM_ID` |
 | `VITE_COMING_SOON` | Pre-launch mode (build-time): `true` redirects the homepage to `/launch` |
 | `ENCRYPTION_KEY` | MFA OTP / backup code encryption |
