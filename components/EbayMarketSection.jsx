@@ -67,7 +67,7 @@ const EbayMarketSection = ({ cardName, cardSet, gradingService, gradeScore }) =>
       <div className="mt-8 p-6 bg-card rounded-2xl border border-border shadow-sm">
         <div className="space-y-4">
           <Skeleton className="h-6 w-48 rounded" />
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Skeleton className="h-16 rounded-lg" />
             <Skeleton className="h-16 rounded-lg" />
             <Skeleton className="h-16 rounded-lg" />
@@ -80,7 +80,7 @@ const EbayMarketSection = ({ cardName, cardSet, gradingService, gradeScore }) =>
 
   return (
     <div className="mt-8 p-6 bg-card rounded-2xl border border-border shadow-sm">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-y-3 mb-6">
         <div className="flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-primary" />
           <h3 className="font-bold text-lg text-foreground">eBay Market Data</h3>
@@ -89,7 +89,7 @@ const EbayMarketSection = ({ cardName, cardSet, gradingService, gradeScore }) =>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setDisplayCurrency('AUD')}
-              className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors ${
+              className={`px-3 py-1 text-xs font-bold rounded-lg whitespace-nowrap transition-colors ${
                 displayCurrency === 'AUD'
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-muted text-muted-foreground hover:bg-muted/80'
@@ -99,7 +99,7 @@ const EbayMarketSection = ({ cardName, cardSet, gradingService, gradeScore }) =>
             </button>
             <button
               onClick={() => setDisplayCurrency('USD')}
-              className={`px-3 py-1 text-xs font-bold rounded-lg transition-colors ${
+              className={`px-3 py-1 text-xs font-bold rounded-lg whitespace-nowrap transition-colors ${
                 displayCurrency === 'USD'
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-muted text-muted-foreground hover:bg-muted/80'
@@ -107,7 +107,7 @@ const EbayMarketSection = ({ cardName, cardSet, gradingService, gradeScore }) =>
             >
               USD
             </button>
-            <span className="text-[10px] text-muted-foreground ml-1">
+            <span className="text-[10px] text-muted-foreground ml-1 whitespace-nowrap">
               1 USD = ${data.exchangeRate.toFixed(2)} AUD
             </span>
           </div>
@@ -122,7 +122,7 @@ const EbayMarketSection = ({ cardName, cardSet, gradingService, gradeScore }) =>
       ) : data && data.count > 0 ? (
         <>
           {/* Price Summary */}
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <div className="p-4 bg-muted/30 rounded-lg border border-border/50">
               <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">
                 {displayCurrency === 'AUD' ? 'Avg Price (AUD)' : 'Avg Price (USD)'}
