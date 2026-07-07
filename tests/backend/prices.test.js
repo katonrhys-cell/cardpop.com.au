@@ -71,6 +71,12 @@ describe('GET /refresh', () => {
     expect(res.status).toBe(401);
   });
 
+  it('rejects calls when no cron secret is configured (fail-closed)', async () => {
+    delete process.env.CRON_SECRET;
+    const res = await request(app).get('/refresh');
+    expect(res.status).toBe(401);
+  });
+
   it('accepts the cron call with the right bearer token and refreshes pending cards', async () => {
     process.env.CRON_SECRET = 'supersecret';
     mockCallEbayApi.mockResolvedValue(ebayResult);
@@ -100,21 +106,23 @@ describe('GET /refresh', () => {
   });
 
   it('skips cards that already have a snapshot today', async () => {
+    process.env.CRON_SECRET = 'supersecret';
     queues.tracked_cards.push(makeBuilder({ data: [{ id: 'c1', slug: 'test-card', search_query: 'q' }], error: null }));
     queues.card_price_snapshots.push(makeBuilder({ data: [{ card_id: 'c1' }], error: null }));
 
-    const res = await request(app).get('/refresh');
+    const res = await request(app).get('/refresh').set('Authorization', 'Bearer supersecret');
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ total: 1, alreadyFresh: 1, refreshed: 0 });
     expect(mockCallEbayApi).not.toHaveBeenCalled();
   });
 
   it('counts a card as failed when both eBay marketplaces are down', async () => {
+    process.env.CRON_SECRET = 'supersecret';
     mockCallEbayApi.mockRejectedValue(new Error('eBay down'));
     queues.tracked_cards.push(makeBuilder({ data: [{ id: 'c1', slug: 'test-card', search_query: 'q' }], error: null }));
     queues.card_price_snapshots.push(makeBuilder({ data: [], error: null }));
 
-    const res = await request(app).get('/refresh');
+    const res = await request(app).get('/refresh').set('Authorization', 'Bearer supersecret');
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ refreshed: 0, failed: 1 });
   });
