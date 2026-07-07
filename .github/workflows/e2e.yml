@@ -43,6 +43,15 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
 
+      # The hosted runner image periodically ships broken Microsoft apt repos
+      # (azure-cli / prod) whose InRelease signatures fail to verify. The
+      # `apt-get update` that `playwright install --with-deps` runs then aborts
+      # with exit 100 ("repository is no longer signed" / "Clearsigned file
+      # isn't valid, got 'NOSPLIT'"), failing the browser install. Those repos
+      # aren't needed for Chromium's system libraries, so drop them first.
+      - name: Remove broken Microsoft apt repos
+        run: sudo rm -f /etc/apt/sources.list.d/*microsoft* /etc/apt/sources.list.d/*azure*
+
       # GitHub runners don't have the browser pre-installed (this repo's dev
       # sandbox does), so fetch it here.
       - name: Install Playwright Chromium
