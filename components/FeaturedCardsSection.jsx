@@ -28,23 +28,12 @@ const FeaturedCardsSection = () => {
           .order('estimated_value_aud', { ascending: false })
           .limit(50);
 
-        console.log('[FeaturedCardsSection] Featured records fetched:', featuredItems);
-
         if (featuredError || !featuredItems || featuredItems.length === 0) {
           if (isMounted) setCards([]);
           return;
         }
 
-        // 2. Also check set_cards (officialCatalog equivalent)
-        const { data: catalogItems } = await supabase
-          .from('set_cards')
-          .select('*')
-          .limit(50);
-
-        const allFetchedProducts = [...(featuredItems || []), ...(catalogItems || [])];
-        console.log('[FeaturedCardsSection] Retrieved product data:', allFetchedProducts);
-
-        // 3. Use the ordered products directly
+        // Use the ordered products directly
         const orderedProducts = featuredItems.map((item, idx) => ({
           ...item,
           _featuredOrder: idx
