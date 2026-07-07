@@ -10,11 +10,14 @@ import CategoryFilter from '@/components/CategoryFilter.jsx';
 import ProductGrid from '@/components/ProductGrid.jsx';
 import PaginationControls from '@/components/PaginationControls.jsx';
 import useShopProductRealtimeSync from '@/hooks/useShopProductRealtimeSync.js';
+import { useCart } from '@/hooks/useCart.jsx';
+import { toast } from 'sonner';
 
 const ShopCategoryPage = () => {
   const { categorySlug, subcategorySlug, productTypeSlug } = useParams();
   const { hierarchy, loading: contextLoading } = useCategory();
-  
+  const { addToCart } = useCart();
+
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -63,6 +66,8 @@ const ShopCategoryPage = () => {
         setTotalItems(count || 0);
         setTotalPages(Math.ceil((count || 0) / perPage));
       } catch (error) {
+        console.error('Failed to load shop category products:', error);
+        toast.error('Failed to load products. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -86,6 +91,31 @@ const ShopCategoryPage = () => {
 
     return () => { supabase.removeChannel(channel); };
   }, []);
+
+  const handleAddToCart = (product) => {
+    // Build the cart product/variant from the real shop_products columns
+    // (title / price_aud / stock_quantity), mirroring the other shop pages.
+    const priceInCents = Math.round((Number(product.price_aud) || 0) * 100);
+    const cartProduct = {
+      id: product.id,
+      source: 'shop',
+      type: 'shop',
+      title: product.title,
+      price: priceInCents / 100,
+      image: product.images?.[0] || product.image_url || product.card_image || null,
+      grading_company: product.grading_company || null,
+      grade: product.grade || null,
+    };
+    const cartVariant = {
+      id: product.id,
+      price_in_cents: priceInCents,
+      manage_inventory: product.stock_quantity != null,
+      inventory_quantity: product.stock_quantity,
+    };
+    addToCart(cartProduct, cartVariant, 1, product.stock_quantity ?? 999)
+      .then(() => toast.success(`${product.title || 'Item'} added to cart`))
+      .catch(e => toast.error(e.message));
+  };
 
   const breadcrumbs = getBreadcrumbs(category, subcategory, productType, '/shop');
   const metaTitle = generateMetaTitle(category, subcategory, productType) + " - Official Store";
@@ -119,7 +149,7 @@ const ShopCategoryPage = () => {
             </p>
           </div>
           
-          <ProductGrid items={products} loading={loading || contextLoading} isVault={false} />
+          <ProductGrid items={products} loading={loading || contextLoading} isVault={false} onAddToCart={handleAddToCart} />
           
           <PaginationControls 
             currentPage={page} 

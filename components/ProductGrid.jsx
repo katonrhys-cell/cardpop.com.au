@@ -2,7 +2,7 @@ import React from 'react';
 import ProductCard from './ProductCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 
-const ProductGrid = ({ items, loading, isVault = true }) => {
+const ProductGrid = ({ items, loading, isVault = true, onAddToCart }) => {
   if (loading) {
     return (
       <div className="seo-product-grid">
@@ -30,7 +30,11 @@ const ProductGrid = ({ items, loading, isVault = true }) => {
   return (
     <div className="seo-product-grid">
       {items.map((item) => (
-        <ProductCard key={item.id} product={{ ...item, source: item.source || (isVault ? 'vault' : 'shop') }} />
+        <ProductCard
+          key={item.id}
+          product={{ ...item, source: item.source || (isVault ? 'vault' : 'shop') }}
+          onAddToCart={onAddToCart}
+        />
       ))}
     </div>
   );

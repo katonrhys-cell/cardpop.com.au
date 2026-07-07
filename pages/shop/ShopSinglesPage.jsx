@@ -94,7 +94,7 @@ const ShopSinglesPage = () => {
       id: product.id,
       source: 'shop',
       type: 'shop',
-      title: product.name,
+      title: product.title,
       price: priceInCents / 100,
       image: product.images?.[0] || product.image_url || product.card_image || null,
       grading_company: product.grading_company || null,
@@ -107,7 +107,7 @@ const ShopSinglesPage = () => {
       inventory_quantity: product.stock_quantity,
     };
     addToCart(cartProduct, cartVariant, 1, product.stock_quantity ?? 999);
-    toast.success(`${product.name || 'Item'} added to cart`);
+    toast.success(`${product.title || 'Item'} added to cart`);
   };
 
   const handleClearFilters = () => {

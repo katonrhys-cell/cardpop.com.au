@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { escapeLike } from '@/src/utils/escapeLike.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PackageX, SlidersHorizontal, Search, ShoppingBag } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -35,7 +36,7 @@ const ShopPage = () => {
           .limit(50);
 
         if (searchTerm) {
-          query = query.ilike('title', `%${searchTerm.replace(/'/g, '')}%`);
+          query = query.ilike('title', `%${escapeLike(searchTerm)}%`);
         }
 
         if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
@@ -83,7 +84,7 @@ const ShopPage = () => {
       id: product.id,
       source: 'shop',
       type: 'shop',
-      title: product.name,
+      title: product.title,
       price: priceInCents / 100,
       image: product.images?.[0] || product.image_url || product.card_image || null,
       grading_company: product.grading_company || null,
