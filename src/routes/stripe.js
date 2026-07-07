@@ -7,7 +7,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
 import { handleDisputeCreated, handleDisputeClosed } from '../services/disputeService.js';
 import { calculateBreakdown } from '../services/commissionService.js';
-import { handleCheckoutSessionCompleted, handlePaymentFailed, getPlatformSetting } from '../services/stripeWebhookService.js';
+import { handleCheckoutSessionCompleted, handlePaymentFailed, handleCheckoutSessionExpired, getPlatformSetting } from '../services/stripeWebhookService.js';
 import { validateRequestBody, validateRequestQuery } from '../middleware/validateRequest.js';
 import { createCheckoutSchema, calculateBreakdownSchema, processRefundSchema } from '../schemas/stripeSchemas.js';
 import { createSingleItemCheckout } from '../services/checkoutService.js';
@@ -360,6 +360,22 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
     return res.status(400).json({ error: 'Webhook signature verification failed' });
   }
 
+  // Event-level idempotency: skip an event we've already fully processed, so a
+  // Stripe redelivery doesn't re-run handlers. Fail-open — if the dedup table is
+  // unreachable (or not yet migrated), fall through and let the per-handler
+  // guards (unique stripe_session_id, compare-and-swap on status) do their job.
+  try {
+    const { data: seen } = await supabase
+      .from('stripe_webhook_events')
+      .select('event_id')
+      .eq('event_id', event.id)
+      .maybeSingle();
+    if (seen) {
+      logger.info(`[STRIPE] Event ${event.id} (${event.type}) already processed, skipping`);
+      return res.json({ received: true, deduped: true });
+    }
+  } catch { /* dedup unavailable — process anyway */ }
+
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -371,6 +387,10 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         }
         break;
       }
+
+      case 'checkout.session.expired':
+        await handleCheckoutSessionExpired(event.data.object);
+        break;
 
       case 'payment_intent.payment_failed':
         await handlePaymentFailed(event.data.object);
@@ -409,6 +429,17 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       default:
         logger.debug(`[STRIPE] Unhandled event type: ${event.type}`);
     }
+
+    // Record the event as processed only after the handler succeeded, so a
+    // handler that throws (→ 500) isn't marked done and Stripe's retry will
+    // reprocess it. Best-effort: a dedup-table write failure must not fail an
+    // otherwise-successful webhook (Stripe would retry and reprocess, which the
+    // per-handler guards already tolerate).
+    await supabase
+      .from('stripe_webhook_events')
+      .insert({ event_id: event.id, type: event.type })
+      .then(({ error }) => { if (error && error.code !== '23505') logger.warn(`[STRIPE] dedup record failed for ${event.id}: ${error.message}`); })
+      .catch(() => {});
 
     res.json({ received: true });
   } catch (err) {

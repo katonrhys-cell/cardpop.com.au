@@ -417,8 +417,35 @@ async function handlePaymentFailed(paymentIntent) {
     .eq('stripe_payment_intent_id', paymentIntent.id);
 }
 
+/**
+ * Handle checkout.session.expired.
+ *
+ * Cart checkouts pre-create a 'pending' order row keyed on stripe_session_id
+ * (the snapshot the completed webhook confirms). If the buyer abandons the
+ * hosted Checkout page, Stripe expires the session (~24h) but nothing ever
+ * cleared that pending row — so abandoned carts accumulated as stale 'pending'
+ * orders forever. (payment_intent.payment_failed can't clean these up: the
+ * pending row has no payment_intent_id until the payment succeeds, so its
+ * update matched zero rows.) This transitions pending → cancelled, guarded so
+ * it can never touch an already-confirmed/shipped order. Single-item orders
+ * don't exist until completion, so there's nothing to expire for them.
+ */
+async function handleCheckoutSessionExpired(session) {
+  logger.info(`[STRIPE] checkout.session.expired: ${session.id}`);
+  const { data: cancelled } = await supabase
+    .from('orders')
+    .update({ status: 'cancelled' })
+    .eq('stripe_session_id', session.id)
+    .eq('status', 'pending')
+    .select('id');
+  if (cancelled?.length) {
+    logger.info(`[STRIPE] Cancelled ${cancelled.length} stale pending order(s) for expired session ${session.id}`);
+  }
+}
+
 export {
   handleCheckoutSessionCompleted,
   handlePaymentFailed,
+  handleCheckoutSessionExpired,
   getPlatformSetting,
 };

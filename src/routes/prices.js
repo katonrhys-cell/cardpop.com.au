@@ -1,18 +1,32 @@
 import express from 'express';
+import crypto from 'node:crypto';
 import supabase from '../utils/supabaseClient.js';
 import { buildSnapshotForCard, refreshTrackedCards } from '../utils/cardPriceSnapshots.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
 
+// Constant-time string compare so the bearer check doesn't leak the secret via
+// response timing.
+const timingSafeEqualStr = (a, b) => {
+  const ab = Buffer.from(String(a));
+  const bb = Buffer.from(String(b));
+  if (ab.length !== bb.length) return false;
+  return crypto.timingSafeEqual(ab, bb);
+};
+
 // Vercel Cron includes "Authorization: Bearer <CRON_SECRET>" automatically when
-// the CRON_SECRET env var is set on the project. When the secret is configured,
-// only the cron may trigger a full refresh; without it the endpoint still works
-// (each card refreshes at most once per UTC day, which bounds abuse to a no-op).
+// the CRON_SECRET env var is set on the project. This is fail-CLOSED: if the
+// secret isn't configured, the full-refresh endpoint refuses rather than letting
+// anyone trigger the eBay-hitting job anonymously. CRON_SECRET must be set in the
+// production environment for the daily cron to run.
 const isAuthorisedCronCall = (req) => {
   const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
-  return req.headers.authorization === `Bearer ${secret}`;
+  if (!secret) {
+    logger.warn('[PRICES] CRON_SECRET is not set — refusing /refresh (fail-closed). Set CRON_SECRET to enable the daily cron.');
+    return false;
+  }
+  return timingSafeEqualStr(req.headers.authorization || '', `Bearer ${secret}`);
 };
 
 /**

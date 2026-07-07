@@ -34,7 +34,6 @@ export const useApiHealth = () => {
           setIsHealthy(true);
           setError(null);
           setLastChecked(new Date());
-          console.log('[useApiHealth] Express API connection verified successfully.');
         }
       } else {
         throw new Error(`Server responded with HTTP ${response.status}`);
