@@ -148,6 +148,8 @@ git push main
 | `KIT_LAUNCH_FORM_ID` | Kit.com pre-launch notify list (`/launch` page) — optional, falls back to `KIT_FORM_ID` |
 | `VITE_COMING_SOON` | Pre-launch mode (build-time): `true` redirects the homepage to `/launch` |
 | `ENCRYPTION_KEY` | MFA OTP / backup code encryption |
+| `VITE_GOOGLE_MAPS_API_KEY` | *(optional)* Google Places autocomplete on the checkout shipping form (build-time, public) — blank = free-text fallback |
+| `GOOGLE_MAPS_API_KEY` | *(optional)* Google Address Validation API — server-side check of the chosen shipping address before creating the Stripe session; blank = skipped (fail-open) |
 | `CORS_ORIGIN` | Express CORS (set to `https://cardpop.com.au`) |
 | `APP_URL` | App base URL |
 | `VITE_IMAGE_CDN_HOST` | *(optional)* Image CDN host (e.g. CloudFront) — frontend image URLs |
