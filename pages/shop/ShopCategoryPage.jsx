@@ -9,7 +9,6 @@ import Breadcrumb from '@/components/Breadcrumb.jsx';
 import CategoryFilter from '@/components/CategoryFilter.jsx';
 import ProductGrid from '@/components/ProductGrid.jsx';
 import PaginationControls from '@/components/PaginationControls.jsx';
-import useShopProductRealtimeSync from '@/hooks/useShopProductRealtimeSync.js';
 import { useCart } from '@/hooks/useCart.jsx';
 import { toast } from 'sonner';
 
