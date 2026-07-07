@@ -2,22 +2,25 @@ import logger from '../utils/logger.js';
 import express from 'express';
 import { subscribeToNewsletter } from '../utils/newsletter.js';
 import { verifyRecaptchaToken } from '../utils/recaptcha.js';
+import { optionalAuthMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
 
-router.post('/subscribe', async (req, res) => {
+router.post('/subscribe', optionalAuthMiddleware, async (req, res) => {
   const { email, firstName, recaptchaToken, list } = req.body;
 
   if (!email || typeof email !== 'string' || !email.includes('@')) {
     return res.status(400).json({ error: 'A valid email address is required.' });
   }
 
-  // Bot protection for the public newsletter form, which always sends a token.
-  // Verified only when a token is supplied (and skipped automatically when
-  // RECAPTCHA_SECRET_KEY is unset); trusted internal callers — e.g. the
-  // signup opt-in behind its own captcha — may omit it and rely on the rate
-  // limiter applied to this route.
-  if (recaptchaToken) {
+  // Bot protection for the public newsletter form. A signed-in caller (e.g. the
+  // opt-in checkbox on signup, immediately after a Turnstile-gated account
+  // creation) is proof enough of not being an anonymous script; anyone else
+  // must supply a token that actually passes verification — a missing or
+  // failing token is rejected, it no longer just falls through to the rate
+  // limiter (verifyRecaptchaToken itself fails open only when
+  // RECAPTCHA_SECRET_KEY is unset, e.g. in dev).
+  if (!req.user) {
     const captcha = await verifyRecaptchaToken(recaptchaToken, req.ip);
     if (!captcha.success) {
       return res.status(400).json({ error: 'reCAPTCHA verification failed. Please try again.' });

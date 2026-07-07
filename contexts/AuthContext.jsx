@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
+import apiServerClient from '@/lib/apiServerClient.js';
 import { isEntitled } from '@/config/subscription.js';
 
 const AuthContext = createContext();
@@ -161,12 +162,45 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = async (email, password, captchaToken) => {
+    // (email, IP) brute-force gate — ask the backend's lockout tracker whether
+    // this attempt is even allowed before touching Supabase. A network error
+    // reaching the check fails open (mirrors the backend's own catch-and-allow
+    // behavior); only an explicit 429 lockout blocks sign-in.
+    let attemptRes = null;
+    try {
+      attemptRes = await apiServerClient.fetch('/auth/login/attempt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+    } catch (_networkErr) {
+      attemptRes = null;
+    }
+    if (attemptRes?.status === 429) {
+      const body = await attemptRes.json().catch(() => ({}));
+      throw new Error(body.error || 'Account temporarily locked due to too many failed login attempts.');
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
       options: { captchaToken },
     });
-    if (error) throw new Error(error.message);
+
+    if (error) {
+      apiServerClient.fetch('/auth/login/record-failure', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      }).catch(() => {});
+      throw new Error(error.message);
+    }
+
+    apiServerClient.fetch('/auth/login/record-success', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    }).catch(() => {});
 
     // Check if the user has a verified TOTP factor enrolled via Supabase native MFA.
     const { data: factors } = await supabase.auth.mfa.listFactors();
