@@ -132,12 +132,19 @@ router.post('/calculate-cart', authMiddleware, async (req, res) => {
 
 router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
   try {
-    const { items, successUrl, cancelUrl, shippingAddress, promoCode, useWalletBalance } = req.body;
+    const { items, successUrl, cancelUrl, returnUrl, uiMode, shippingAddress, promoCode, useWalletBalance } = req.body;
+
+    // 'embedded' renders Stripe's payment form inline on our own page (no
+    // redirect away); 'hosted' redirects to Stripe's own checkout page. Both
+    // create an identical Checkout Session — only how the buyer sees it differs.
+    const embedded = uiMode === 'embedded';
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'items is required' });
     }
-    if (!successUrl || !cancelUrl) {
+    if (embedded) {
+      if (!returnUrl) return res.status(400).json({ error: 'returnUrl is required' });
+    } else if (!successUrl || !cancelUrl) {
       return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
     }
     if (promoCode && useWalletBalance) {
@@ -223,11 +230,19 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
     }
 
     const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
+      // Let Stripe present every method enabled on the account (Card, Link /
+      // Apple Pay / Google Pay, PayPal, Afterpay/Clearpay) and show each only
+      // when the order is eligible — enable the individual methods in the
+      // Stripe Dashboard → Settings → Payment methods.
+      automatic_payment_methods: { enabled: true },
+      billing_address_collection: 'auto',
       line_items:           lineItems,
       mode:                 'payment',
-      success_url:          successUrl,
-      cancel_url:           cancelUrl,
+      // Embedded checkout keeps the buyer on our page and returns to return_url
+      // once payment completes; hosted checkout redirects out and back.
+      ...(embedded
+        ? { ui_mode: 'embedded', return_url: returnUrl }
+        : { success_url: successUrl, cancel_url: cancelUrl }),
       ...(walletCustomerId ? { customer: walletCustomerId } : { customer_email: email }),
       metadata:             {
         userId, cartCheckout: 'true',
@@ -238,7 +253,9 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
       ...(discounts ? { discounts } : {}),
     });
 
-    if (!session?.url) throw new Error('Stripe returned a session without a URL');
+    if (embedded ? !session?.client_secret : !session?.url) {
+      throw new Error('Stripe returned an incomplete checkout session');
+    }
 
     const s = shippingAddress || {};
     const streetLine = s.address2 ? `${s.address2}, ${s.address || ''}`.trim() : (s.address || '');
@@ -269,8 +286,12 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
       throw new Error('Could not record the order');
     }
 
-    logger.info(`[STRIPE] Cart session created: ${session.id} (${orderLines.length} items, $${grandCents / 100})`);
-    res.json({ url: session.url, sessionId: session.id, total: grandCents / 100 });
+    logger.info(`[STRIPE] Cart session created: ${session.id} (${orderLines.length} items, $${grandCents / 100}, ${embedded ? 'embedded' : 'hosted'})`);
+    res.json({
+      ...(embedded ? { clientSecret: session.client_secret } : { url: session.url }),
+      sessionId: session.id,
+      total: grandCents / 100,
+    });
   } catch (err) {
     const code = err.statusCode || 500;
     if (code === 500) logger.error(`[STRIPE] create-cart-checkout error: ${err.message}`);

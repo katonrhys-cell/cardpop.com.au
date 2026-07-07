@@ -49,9 +49,12 @@ vi.mock('@/components/checkout/ShippingAddressForm.jsx', () => ({
 vi.mock('@/components/checkout/BillingAddressForm.jsx', () => ({ default: () => <div>billing-form</div> }));
 vi.mock('@/components/checkout/PaymentMethodSelector.jsx', () => ({ default: () => <div>payment-selector</div> }));
 vi.mock('@/components/checkout/OrderReviewSection.jsx', () => ({
-  default: ({ onConfirm, processing }) => (
-    <button onClick={onConfirm} disabled={processing}>confirm-order</button>
-  ),
+  default: ({ total }) => <div data-testid="review-total">{total}</div>,
+}));
+// The inline Stripe form loads @stripe/js at runtime; stub it and surface the
+// request body it would send so we can assert the order is built correctly.
+vi.mock('@/components/checkout/EmbeddedStripeCheckout.jsx', () => ({
+  default: ({ requestBody }) => <div data-testid="embedded-checkout">{JSON.stringify(requestBody)}</div>,
 }));
 
 import CheckoutPage from '@/pages/CheckoutPage.jsx';
@@ -66,7 +69,7 @@ function setFetch({ pricing = PRICING, checkout = { ok: true, url: 'https://stri
     if (url === '/stripe/create-cart-checkout') {
       return Promise.resolve({
         ok: checkout.ok,
-        json: async () => (checkout.ok ? { url: checkout.url } : { error: checkout.error }),
+        json: async () => (checkout.ok ? { clientSecret: 'cs_test_123' } : { error: checkout.error }),
       });
     }
     return Promise.resolve({ ok: true, json: async () => ({}) });
@@ -154,44 +157,26 @@ describe('CheckoutPage — guards & validation', () => {
 // ─── full checkout flow ──────────────────────────────────────────────────────
 
 describe('CheckoutPage — checkout flow', () => {
-  async function advanceToReview(user) {
+  async function advanceToPay() {
     await userEvent.click(screen.getByText('summary-next'));         // → SHIPPING
     await screen.findByText('fill-shipping');
     await userEvent.click(screen.getByText('fill-shipping'));        // populate address
     await userEvent.click(screen.getByRole('button', { name: /continue/i })); // → BILLING
     await screen.findByText('billing-form');
-    await userEvent.click(screen.getByRole('button', { name: /continue/i })); // → PAYMENT
-    await screen.findByText('payment-selector');
-    await userEvent.click(screen.getByRole('button', { name: /review order/i })); // → REVIEW
-    await screen.findByText('confirm-order');
+    await userEvent.click(screen.getByRole('button', { name: /continue/i })); // → PAY
+    await screen.findByTestId('embedded-checkout');
   }
 
-  it('creates a Stripe checkout session with items and shipping, then redirects', async () => {
-    const user = userEvent.setup();
+  it('reaches the inline payment step and passes items + shipping to the Stripe form', async () => {
     renderCheckout();
     await waitFor(() => expect(screen.getByText('summary-next')).toBeInTheDocument());
-    await advanceToReview(user);
+    await advanceToPay();
 
-    await userEvent.click(screen.getByText('confirm-order'));
-
-    await waitFor(() => expect(mockFetch).toHaveBeenCalledWith(
-      '/stripe/create-cart-checkout', expect.objectContaining({ method: 'POST' }),
-    ));
-    const call = mockFetch.mock.calls.find(([u]) => u === '/stripe/create-cart-checkout');
-    const body = JSON.parse(call[1].body);
+    // The inline Stripe form is mounted with the authoritative order body — no
+    // redirect off the page.
+    const body = JSON.parse(screen.getByTestId('embedded-checkout').textContent);
     expect(body.items).toEqual([{ type: 'listing', id: 'l1', quantity: 1 }]);
     expect(body.shippingAddress).toMatchObject({ name: 'Ada L', postcode: '2000', state: 'NSW' });
-    await waitFor(() => expect(window.location.href).toBe('https://stripe.test/session'));
-  });
-
-  it('shows an error toast when the checkout session cannot be created', async () => {
-    setFetch({ checkout: { ok: false, error: 'Payment service down' } });
-    const user = userEvent.setup();
-    renderCheckout();
-    await waitFor(() => expect(screen.getByText('summary-next')).toBeInTheDocument());
-    await advanceToReview(user);
-
-    await userEvent.click(screen.getByText('confirm-order'));
-    await waitFor(() => expect(mockToast.error).toHaveBeenCalledWith('Payment service down'));
+    expect(window.location.href).toBe('http://localhost/checkout'); // stayed on-page
   });
 });
