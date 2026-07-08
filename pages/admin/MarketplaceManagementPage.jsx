@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Store, CheckCircle2, Archive, MoreHorizontal, Loader2 } from 'lucide-react';
+import { Store, CheckCircle2, Archive, MoreHorizontal, Loader2, ExternalLink } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
+import { slugify } from '@/lib/slugify.js';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +14,14 @@ import { toast } from 'sonner';
 // card, "Archive" pulls it from the marketplace (the effective "disable"), and
 // "Mark as Sold" closes it out.
 const STATUS_LABELS = { active: 'Active', sold: 'Sold', archived: 'Archived' };
+
+// Listings created from the vault only store a vault_item_id reference — the
+// card's name lives on the joined vault_items row, so read the listing's own
+// columns first and fall back to the vault item.
+const listingName = (l) => l.card_name || l.title || l.vault_item?.card_name || null;
+
+// Canonical public listing URL: /marketplace/:id/:slug
+const listingUrl = (l) => `/marketplace/${l.id}/${slugify(listingName(l) || 'listing')}`;
 
 const StatusBadge = ({ status }) => {
   if (status === 'active') return <Badge className="bg-emerald-500/10 text-emerald-600 border-none">Active</Badge>;
@@ -32,7 +41,7 @@ const MarketplaceManagementPage = () => {
       const [listRes, activeRes, soldRes, archivedRes] = await Promise.all([
         supabase
           .from('listings')
-          .select('*, seller:profiles!seller_id(id, display_name, username)')
+          .select('*, seller:profiles!seller_id(id, display_name, username), vault_item:vault_items(card_name, set_name)')
           .order('created_at', { ascending: false })
           .limit(50),
         supabase.from('listings').select('*', { count: 'exact', head: true }).eq('status', 'active'),
@@ -61,7 +70,7 @@ const MarketplaceManagementPage = () => {
   // update to 0 rows (e.g. the admin write policy is missing), we surface that
   // as an error instead of a misleading "success" toast.
   const changeStatus = async (listing, newStatus) => {
-    const name = listing.card_name || listing.title || 'listing';
+    const name = listingName(listing) || 'listing';
     if (newStatus === 'archived' && !window.confirm(`Archive "${name}"? It will be removed from the marketplace.`)) return;
     setActioningId(listing.id);
     try {
@@ -140,7 +149,7 @@ const MarketplaceManagementPage = () => {
                 <TableHead>Price</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
-                <TableHead className="w-[60px] text-right">Actions</TableHead>
+                <TableHead className="w-[80px] text-right whitespace-nowrap">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -151,7 +160,22 @@ const MarketplaceManagementPage = () => {
               ) : (
                 listings.map(l => (
                   <TableRow key={l.id}>
-                    <TableCell className="font-medium">{l.card_name || l.title || '—'}</TableCell>
+                    <TableCell className="font-medium">
+                      {listingName(l) ? (
+                        <a
+                          href={listingUrl(l)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 text-brand-blue hover:underline"
+                          title="Open listing in a new tab"
+                        >
+                          <span>{listingName(l)}</span>
+                          <ExternalLink className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
+                        </a>
+                      ) : (
+                        '—'
+                      )}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{l.seller?.display_name || l.seller?.username || '—'}</TableCell>
                     <TableCell>{l.price_aud != null ? `$${Number(l.price_aud).toFixed(2)}` : '—'}</TableCell>
                     <TableCell><StatusBadge status={l.status} /></TableCell>
