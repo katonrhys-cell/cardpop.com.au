@@ -279,12 +279,54 @@ const CertificationVerificationSection = ({ certNumber, gradingCompany = 'psa', 
             </div>
           )}
 
-          {/* Grade Category */}
-          {psaData.gradeCategory && (
-            <div className="mb-6">
-              <Badge variant="outline" className="text-sm font-bold border-purple-400/50 text-purple-700 bg-purple-400/10 dark:text-purple-300">
-                {psaData.gradeCategory}
-              </Badge>
+          {/* Additional PSA record details */}
+          {(psaData.subject || psaData.category || psaData.variety || psaData.labelType) && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              {psaData.subject && (
+                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Subject</p>
+                  <p className="font-bold text-foreground text-sm">{psaData.subject}</p>
+                </div>
+              )}
+              {psaData.category && (
+                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Category</p>
+                  <p className="font-bold text-foreground text-sm">{psaData.category}</p>
+                </div>
+              )}
+              {psaData.variety && (
+                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Variety</p>
+                  <p className="font-bold text-foreground text-sm">{psaData.variety}</p>
+                </div>
+              )}
+              {psaData.labelType && (
+                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Label Type</p>
+                  <p className="font-bold text-foreground text-sm">{psaData.labelType}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Grade Category / cert flags */}
+          {(psaData.gradeCategory || psaData.isDualCert || psaData.isPsaDna) && (
+            <div className="flex flex-wrap gap-2 mb-6">
+              {psaData.gradeCategory && (
+                <Badge variant="outline" className="text-sm font-bold border-purple-400/50 text-purple-700 bg-purple-400/10 dark:text-purple-300">
+                  {psaData.gradeCategory}
+                </Badge>
+              )}
+              {psaData.isDualCert && (
+                <Badge variant="outline" className="text-sm font-bold border-blue-400/50 text-blue-700 bg-blue-400/10 dark:text-blue-300">
+                  Dual Cert
+                </Badge>
+              )}
+              {psaData.isPsaDna && (
+                <Badge variant="outline" className="text-sm font-bold border-emerald-400/50 text-emerald-700 bg-emerald-400/10 dark:text-emerald-300">
+                  PSA/DNA Authenticated
+                </Badge>
+              )}
             </div>
           )}
 
@@ -301,6 +343,13 @@ const CertificationVerificationSection = ({ certNumber, gradingCompany = 'psa', 
                 <div className="p-4 bg-amber-500/10 rounded-lg border border-amber-500/20">
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Pop Higher</p>
                   <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{psaData.popHigher.toLocaleString()}</p>
+                </div>
+              )}
+              {psaData.populationWithQualifier != null
+                && psaData.populationWithQualifier !== psaData.population && (
+                <div className="p-4 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Pop (with qualifier)</p>
+                  <p className="text-2xl font-bold text-purple-700 dark:text-purple-400">{psaData.populationWithQualifier.toLocaleString()}</p>
                 </div>
               )}
             </div>
