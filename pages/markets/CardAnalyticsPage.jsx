@@ -9,6 +9,7 @@ import {
   RefreshCw, Star, Info, ChevronRight, ShieldCheck,
 } from 'lucide-react';
 import PriceRangeIndicator from '@/components/PriceRangeIndicator.jsx';
+import { fetchPokemonCardImage } from '@/utils/pokemonCardImage.js';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -171,6 +172,7 @@ const CardAnalyticsPage = () => {
   const rawPrice      = parseFloat(searchParams.get('price')  || '75');
   const rawChange     = parseFloat(searchParams.get('change') || '0');
   const cardsightId   = searchParams.get('cardsight_id')  || null;
+  const passedImage   = searchParams.get('image')         || null;
 
   const [listings, setListings]     = useState([]);
   const [vaultItems, setVaultItems] = useState([]);
@@ -188,6 +190,13 @@ const CardAnalyticsPage = () => {
   // Stored market valuations from DB (CardSight, eBay, PSA)
   const [storedVal, setStoredVal]       = useState(null);
   const [priceRange, setPriceRange]     = useState(null);
+
+  // Official card art from the Pokémon TCG API (falls back to a passed-through
+  // thumbnail, then to the text placeholder). Pokémon-only; skip other games.
+  const [cardImage, setCardImage] = useState(null);
+  const [heroBroken, setHeroBroken] = useState(false);
+  const isPokemon = !cardColl || /pok[eé]mon/i.test(cardColl);
+  const heroImage = heroBroken ? null : (cardImage?.large || passedImage);
 
   const rng = useMemo(() => makePrng(cardName + cardSet), [cardName, cardSet]);
 
@@ -216,6 +225,19 @@ const CardAnalyticsPage = () => {
     });
     return () => { cancelled = true; };
   }, [cardName]);
+
+  // Fetch official Pokémon card art (images served from the API's own CDN — no
+  // Supabase egress cost). Resets on card change so we don't show stale art.
+  useEffect(() => {
+    let cancelled = false;
+    setCardImage(null);
+    setHeroBroken(false);
+    if (!isPokemon || !cardName || cardName === 'Unknown Card') return;
+    fetchPokemonCardImage(cardName, cardSet).then(img => {
+      if (!cancelled && img) setCardImage(img);
+    });
+    return () => { cancelled = true; };
+  }, [cardName, cardSet, isPokemon]);
 
   // Fetch CardSight AI real pricing + marketplace data + stored valuations
   useEffect(() => {
@@ -300,18 +322,31 @@ const CardAnalyticsPage = () => {
           </Link>
 
           <div className="flex flex-col lg:flex-row gap-8">
-            {/* Card art placeholder */}
+            {/* Card art — official image from the Pokémon TCG API, with a
+                passed-through thumbnail then a text placeholder as fallbacks */}
             <div className="w-full lg:w-56 flex-shrink-0">
-              <div
-                className="aspect-[2.5/3.5] rounded-2xl flex flex-col items-center justify-center text-center p-4 shadow-lg border border-primary/20 overflow-hidden relative"
-                style={{ background: `linear-gradient(135deg, hsl(var(--primary) / 0.15), hsl(var(--primary) / 0.05))` }}
-              >
-                <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, hsl(var(--primary)), transparent 70%)' }} />
-                <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3 relative z-10">{cardColl}</p>
-                <p className="font-black text-lg leading-tight text-foreground relative z-10">{cardName}</p>
-                {cardSet && <p className="text-xs text-muted-foreground mt-2 relative z-10">{cardSet}</p>}
-                <div className="mt-4 px-3 py-1 rounded-full bg-primary/20 text-primary text-xs font-bold relative z-10">CardPop</div>
-              </div>
+              {heroImage ? (
+                <div className="aspect-[2.5/3.5] rounded-2xl overflow-hidden shadow-lg border border-primary/20 bg-muted/40">
+                  <img
+                    src={heroImage}
+                    alt={`${cardName}${cardSet ? ` — ${cardSet}` : ''}`}
+                    className="w-full h-full object-contain"
+                    loading="eager"
+                    onError={() => setHeroBroken(true)}
+                  />
+                </div>
+              ) : (
+                <div
+                  className="aspect-[2.5/3.5] rounded-2xl flex flex-col items-center justify-center text-center p-4 shadow-lg border border-primary/20 overflow-hidden relative"
+                  style={{ background: `linear-gradient(135deg, hsl(var(--primary) / 0.15), hsl(var(--primary) / 0.05))` }}
+                >
+                  <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, hsl(var(--primary)), transparent 70%)' }} />
+                  <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3 relative z-10">{cardColl}</p>
+                  <p className="font-black text-lg leading-tight text-foreground relative z-10">{cardName}</p>
+                  {cardSet && <p className="text-xs text-muted-foreground mt-2 relative z-10">{cardSet}</p>}
+                  <div className="mt-4 px-3 py-1 rounded-full bg-primary/20 text-primary text-xs font-bold relative z-10">CardPop</div>
+                </div>
+              )}
             </div>
 
             {/* Card info */}
