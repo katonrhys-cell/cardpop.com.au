@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe-js';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
 import { stripePromise, hasStripeKey } from '@/lib/stripeClient.js';
 import apiServerClient from '@/lib/apiServerClient.js';
 
@@ -51,10 +51,18 @@ const EmbeddedStripeCheckout = ({ requestBody }) => {
   }
 
   return (
-    <div className="min-h-[420px]">
-      <EmbeddedCheckoutProvider stripe={stripePromise} options={{ fetchClientSecret }}>
-        <EmbeddedCheckout />
-      </EmbeddedCheckoutProvider>
+    <div className="relative min-h-[420px] rounded-xl border border-border bg-background p-1">
+      {/* Placeholder sits behind the Stripe iframe and is painted over once the
+          secure form finishes loading — so the panel never shows an empty gap. */}
+      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 text-muted-foreground">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <p className="text-sm">Loading secure payment form…</p>
+      </div>
+      <div className="relative">
+        <EmbeddedCheckoutProvider stripe={stripePromise} options={{ fetchClientSecret }}>
+          <EmbeddedCheckout className="rounded-lg" />
+        </EmbeddedCheckoutProvider>
+      </div>
     </div>
   );
 };

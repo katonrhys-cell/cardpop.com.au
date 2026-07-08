@@ -97,18 +97,78 @@ ${codeBlock}
 
 // ─── Order confirmed (buyer) ──────────────────────────────────────────────────
 
-export function orderConfirmedEmail({ buyerName, cardName, itemPrice, total, orderId }) {
-  const body = `<p>Your purchase has been confirmed. Here's a summary of what you've secured:</p>
+const money = (n) => `$${Number(n || 0).toFixed(2)}`;
+
+// Itemised invoice block. GST is already included in the total (Australian
+// prices are GST-inclusive), so it's shown as an "includes GST" line rather
+// than added on top.
+function invoiceBlock(invoice, orderId) {
+  const rows = (invoice.items || [])
+    .map(it => `<tr>
+<td style="padding:8px 0;font-size:14px;color:#374151;border-bottom:1px solid #F3F4F6;">${it.name}${it.quantity > 1 ? ` <span style="color:#9CA3AF;">× ${it.quantity}</span>` : ''}</td>
+<td style="padding:8px 0;font-size:14px;color:#374151;border-bottom:1px solid #F3F4F6;text-align:right;white-space:nowrap;">${money(it.total)} AUD</td>
+</tr>`)
+    .join('');
+
+  const totalsRow = (label, value, bold) => `<tr>
+<td style="padding:6px 0;font-size:${bold ? '15px' : '14px'};color:${bold ? '#111827' : '#6B7280'};${bold ? 'font-weight:700;border-top:2px solid #E5E7EB;padding-top:12px;' : ''}">${label}</td>
+<td style="padding:6px 0;font-size:${bold ? '15px' : '14px'};color:${bold ? '#111827' : '#6B7280'};text-align:right;white-space:nowrap;${bold ? 'font-weight:700;border-top:2px solid #E5E7EB;padding-top:12px;' : ''}">${value}</td>
+</tr>`;
+
+  // Mirrors the on-page checkout summary: Subtotal → Discount → Tax (GST 10%) → Total.
+  const discountRow = invoice.discount > 0 ? totalsRow('Discount', `−${money(invoice.discount)} AUD`) : '';
+  const taxRow = invoice.tax > 0 ? totalsRow('Tax (GST 10%)', `${money(invoice.tax)} AUD`) : '';
+
+  return `<div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:20px 24px;margin:24px 0;">
+<table cellpadding="0" cellspacing="0" border="0" width="100%">
+${rows}
+${totalsRow('Subtotal', `${money(invoice.subtotal)} AUD`)}
+${discountRow}
+${taxRow}
+${totalsRow('Total (AUD)', `${money(invoice.total)} AUD`, true)}
+</table>
+</div>`;
+}
+
+function businessBlock(invoice) {
+  if (!invoice?.abn) return '';
+  return `<div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:16px 20px;margin:0 0 24px;">
+<p style="margin:0 0 6px;font-size:11px;color:#9CA3AF;letter-spacing:1.5px;text-transform:uppercase;">Billed to</p>
+${invoice.businessName ? `<p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#111827;">${invoice.businessName}</p>` : ''}
+<p style="margin:0;font-size:14px;color:#374151;">ABN: ${invoice.abn}</p>
+</div>`;
+}
+
+export function orderConfirmedEmail({ buyerName, cardName, itemPrice, total, orderId, invoice }) {
+  const isTaxInvoice = Boolean(invoice?.abn);
+
+  // Rich itemised invoice when the checkout captured full pricing; otherwise
+  // fall back to the original single-line summary (single-item purchases).
+  let body;
+  if (invoice?.items?.length) {
+    const orderDate = invoice.orderDate
+      ? new Date(invoice.orderDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney' })
+      : null;
+    const meta = `<p style="margin:0 0 20px;font-size:13px;color:#6B7280;">Invoice <strong style="color:#111827;">#${String(orderId).slice(0, 8).toUpperCase()}</strong>${orderDate ? ` &middot; ${orderDate}` : ''}</p>`;
+    body = `<p>Your purchase has been confirmed. Here's your ${isTaxInvoice ? 'tax invoice' : 'receipt'}:</p>
+${meta}
+${businessBlock(invoice)}
+${invoiceBlock(invoice, orderId)}
+${isTaxInvoice ? `<p style="font-size:13px;color:#6B7280;">This is a tax invoice.${invoice.gst > 0 ? ` Total includes GST of ${money(invoice.gst)} AUD.` : ''} Issued to ABN ${invoice.abn}.</p>` : ''}
+<p>Check your order details to coordinate delivery with the seller. Enjoy the new addition to your collection!</p>`;
+  } else {
+    body = `<p>Your purchase has been confirmed. Here's a summary of what you've secured:</p>
 ${summaryTable([
   ['Item', cardName],
   ['Item price', `$${Number(itemPrice).toFixed(2)} AUD`],
   ['Total charged', `$${Number(total).toFixed(2)} AUD`, true],
 ])}
 <p>Check your order details to coordinate delivery with the seller. Enjoy the new addition to your collection!</p>`;
+  }
 
   return cpEmail(
-    'Your CardPop purchase is confirmed — check the details inside.',
-    'Purchase Confirmed!',
+    isTaxInvoice ? 'Your CardPop tax invoice — check the details inside.' : 'Your CardPop purchase is confirmed — check the details inside.',
+    isTaxInvoice ? 'Tax Invoice' : 'Purchase Confirmed!',
     `You did it, ${buyerName}!`,
     body,
     `https://cardpop.com.au/orders/${orderId}`,

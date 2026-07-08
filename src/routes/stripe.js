@@ -25,6 +25,7 @@ import { createIdentitySession, getIdentityStatus, applyIdentitySession } from '
 import { applyStripeSubscription } from '../services/subscriptionService.js';
 import { ensureWalletCustomer, getWalletBalanceCents, handleWalletTopup } from '../services/walletService.js';
 import { validateShippingAddress } from '../utils/addressValidation.js';
+import { isValidAbn, normalizeAbn } from '../../utils/abn.js';
 
 const router = express.Router();
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
@@ -132,7 +133,14 @@ router.post('/calculate-cart', authMiddleware, async (req, res) => {
 
 router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
   try {
-    const { items, successUrl, cancelUrl, returnUrl, uiMode, shippingAddress, promoCode, useWalletBalance } = req.body;
+    const { items, successUrl, cancelUrl, returnUrl, uiMode, shippingAddress, promoCode, useWalletBalance, billingDetails } = req.body;
+
+    // Business / ABN buyers get a proper tax invoice. Re-validate the ABN
+    // server-side — never trust the client's checksum. Anything invalid is
+    // simply dropped so a bad value can't block an otherwise-fine order.
+    const business = billingDetails && isValidAbn(billingDetails.abn)
+      ? { abn: normalizeAbn(billingDetails.abn), name: String(billingDetails.businessName || '').trim().slice(0, 120) }
+      : null;
 
     // 'embedded' renders Stripe's payment form inline on our own page (no
     // redirect away); 'hosted' redirects to Stripe's own checkout page. Both
@@ -229,6 +237,28 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
       }
     }
 
+    // For business buyers, attach the ABN to a Stripe Customer as an `au_abn`
+    // tax id and generate an invoice, so the buyer receives a valid Australian
+    // tax invoice. Reuses the wallet customer if one was already resolved. Any
+    // failure here is logged but never blocks the payment.
+    let billingCustomerId = walletCustomerId;
+    if (business) {
+      try {
+        billingCustomerId = billingCustomerId
+          || await ensureWalletCustomer(stripe, userId, { email, displayName: business.name });
+        if (business.name) {
+          await stripe.customers.update(billingCustomerId, { name: business.name });
+        }
+        const existing = await stripe.customers.listTaxIds(billingCustomerId, { limit: 100 });
+        const alreadyAttached = existing.data.some(t => t.type === 'au_abn' && t.value === business.abn);
+        if (!alreadyAttached) {
+          await stripe.customers.createTaxId(billingCustomerId, { type: 'au_abn', value: business.abn });
+        }
+      } catch (taxErr) {
+        logger.warn(`[STRIPE] Could not attach ABN for user ${userId}: ${taxErr.message}`);
+      }
+    }
+
     const session = await stripe.checkout.sessions.create({
       // Let Stripe present every method enabled on the account (Card, Link /
       // Apple Pay / Google Pay, PayPal, Afterpay/Clearpay) and show each only
@@ -243,12 +273,15 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
       ...(embedded
         ? { ui_mode: 'embedded', return_url: returnUrl }
         : { success_url: successUrl, cancel_url: cancelUrl }),
-      ...(walletCustomerId ? { customer: walletCustomerId } : { customer_email: email }),
+      ...(billingCustomerId ? { customer: billingCustomerId } : { customer_email: email }),
+      // Business buyers get an itemised tax invoice carrying their ABN.
+      ...(business ? { invoice_creation: { enabled: true } } : {}),
       metadata:             {
         userId, cartCheckout: 'true',
         ...(welcomeOfferId ? { welcomeOfferId } : {}),
         ...partnerMeta,
         ...(walletCents > 0 ? { walletCents: String(walletCents) } : {}),
+        ...(business ? { billingAbn: business.abn, billingBusinessName: business.name } : {}),
       },
       ...(discounts ? { discounts } : {}),
     });
@@ -279,6 +312,11 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
       shipping_suburb:   s.suburb   ? String(s.suburb).slice(0, 100)   : null,
       shipping_state:    s.state    ? String(s.state).slice(0, 50)     : null,
       shipping_postcode: s.postcode ? String(s.postcode).slice(0, 10)  : null,
+      // Only present for business purchases — keeps the common checkout insert
+      // byte-identical to before, so it can't break in the window before the
+      // billing_* migration lands. The ABN is also on the session metadata as a
+      // fallback record either way.
+      ...(business ? { billing_business_name: business.name || null, billing_abn: business.abn } : {}),
     });
 
     if (orderErr) {
