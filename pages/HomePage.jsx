@@ -232,8 +232,26 @@ const HomePage = () => {
       try {
         // Use 5-minute cache for homepage data (user sees fresh content on repeat visits)
         const [listingsRes, sellersRes] = await Promise.all([
-          cachedQuery('homepage_featured_cards', () =>
-            supabase.from('vault_items').select('*, owner:profiles!owner_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count), vault_images(*)').eq('is_public', true).neq('listing_type', 'Private').order('created_at', { ascending: false }).limit(4),
+          cachedQuery('homepage_featured_cards', async () => {
+            const SELECT = '*, owner:profiles!owner_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count), vault_images(*)';
+            const LIMIT = 4;
+            // Fresh builder per call — a Supabase query builder is single-use.
+            const base = () => supabase.from('vault_items').select(SELECT).eq('is_public', true).neq('listing_type', 'Private');
+
+            // Admin-curated picks (Marketplace Management → Featured) come first.
+            const featuredRes = await base().eq('is_featured', true).order('created_at', { ascending: false }).limit(LIMIT);
+            if (featuredRes.error) return featuredRes;
+            const featured = featuredRes.data ?? [];
+            if (featured.length >= LIMIT) return { data: featured.slice(0, LIMIT), error: null };
+
+            // Backfill with the most recent cards so the grid is never emptier
+            // than before curation existed (empty selection = previous behaviour).
+            const fillRes = await base().order('created_at', { ascending: false }).limit(LIMIT + featured.length);
+            if (fillRes.error) return { data: featured, error: null };
+            const seen = new Set(featured.map(c => c.id));
+            const backfill = (fillRes.data ?? []).filter(c => !seen.has(c.id));
+            return { data: [...featured, ...backfill].slice(0, LIMIT), error: null };
+          },
             5 * 60 * 1000
           ),
           cachedQuery('homepage_featured_sellers', () =>
