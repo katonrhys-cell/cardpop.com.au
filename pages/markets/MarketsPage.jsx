@@ -271,7 +271,7 @@ const MarketsPage = () => {
     setSearchResult(null);
   };
 
-  const cardUrl = (card) => `/analytics/card?name=${encodeURIComponent(card.name)}&set=${encodeURIComponent(card.set ?? '')}&collection=${encodeURIComponent(card.collection ?? '')}&price=${card.price ?? 0}&change=${card.change ?? 0}`;
+  const cardUrl = (card) => `/analytics/card?name=${encodeURIComponent(card.name)}&set=${encodeURIComponent(card.set ?? '')}&collection=${encodeURIComponent(card.collection ?? '')}&price=${card.price ?? 0}&change=${card.change ?? 0}${card.thumbnailUrl ? `&image=${encodeURIComponent(card.thumbnailUrl)}` : ''}`;
 
   const MoverRow = ({ card }) => (
     <Link

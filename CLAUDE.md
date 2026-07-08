@@ -154,6 +154,7 @@ git push main
 | `GOOGLE_MAPS_API_KEY` | *(optional)* Google Address Validation API — server-side check of the chosen shipping address before creating the Stripe session; blank = skipped (fail-open) |
 | `CORS_ORIGIN` | Express CORS (set to `https://cardpop.com.au`) |
 | `APP_URL` | App base URL |
+| `VITE_POKEMONTCG_API_KEY` | *(optional)* Pokémon TCG API key ([dev.pokemontcg.io](https://dev.pokemontcg.io)) for analytics card art (`utils/pokemonCardImage.js`) — blank works keyless (~1,000 req/day); a free key raises the limit to 20,000/day. Images are served from the API's own CDN, so they cost nothing against Supabase egress |
 | `VITE_IMAGE_CDN_HOST` | *(optional)* Image CDN host (e.g. CloudFront) — frontend image URLs |
 | `IMAGE_CDN_HOST` | *(optional)* Same host, for `api/prerender.js` og:image URLs |
 
