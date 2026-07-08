@@ -55,3 +55,41 @@ export const setUserStatusSchema = z.object({
 export const setUserStatusBodySchema = z.object({
   status: z.enum(['active', 'suspended', 'deleted']),
 });
+
+// business_profiles: an admin-curated directory of physical retail locations
+// (distinct from the self-service profiles.is_sole_trader /dealer storefront).
+const businessProfileFields = {
+  business_name: z.string().min(1, 'Business name is required').max(200),
+  tagline: z.string().max(160).optional().nullable(),
+  about: z.string().max(2000).optional().nullable(),
+  business_type: z.string().max(100).optional().nullable(),
+  website_url: z.string().url('Must be a valid URL').max(500).optional().nullable().or(z.literal('')),
+  phone: z.string().max(30).optional().nullable(),
+  email: z.string().email('Must be a valid email').max(320).optional().nullable().or(z.literal('')),
+  logo_url: z.string().url('Must be a valid URL').max(1000).optional().nullable().or(z.literal('')),
+  has_physical_store: z.boolean().optional(),
+  store_address: z.string().max(300).optional().nullable(),
+  store_suburb: z.string().max(120).optional().nullable(),
+  store_state: z.string().max(10).optional().nullable(),
+  store_postcode: z.string().max(10).optional().nullable(),
+};
+
+export const createBusinessProfileBodySchema = z.object({
+  ...businessProfileFields,
+  business_name: businessProfileFields.business_name, // required on create
+  user_email: z.string().email('A valid user email is required to link the storefront to an account'),
+  storefront_status: z.enum(['pending_review', 'approved', 'suspended']).optional(),
+});
+
+export const businessProfileIdSchema = z.object({
+  id: z.string().min(1, 'Business profile ID is required'),
+});
+
+export const updateBusinessProfileBodySchema = z.object({
+  ...Object.fromEntries(Object.entries(businessProfileFields).map(([k, v]) => [k, v.optional()])),
+  storefront_status: z.enum(['pending_review', 'approved', 'suspended']).optional(),
+  rejection_reason: z.string().max(1000).optional().nullable(),
+}).refine(
+  (data) => Object.keys(data).length > 0,
+  { message: 'At least one field is required' }
+);

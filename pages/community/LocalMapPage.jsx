@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { geocodeLocation, STATE_CENTROIDS } from '@/lib/geocode.js';
+import { fetchStores, DIRECTORY_CITIES } from '@/lib/storeDirectory.js';
 import logger from '@/src/utils/logger.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -178,11 +179,34 @@ const LocalMapPage = () => {
       setLoading(true);
       const results = [];
 
-      // NOTE: retailer/storefront markers are intentionally not fetched yet.
-      // business_profiles has no location/geo columns (the previous query hit
-      // non-existent columns like store_address/has_physical_store and silently
-      // errored). Re-add this layer once a store-location data source exists; the
-      // 'retailer' marker type and the "List Your Store" CTA are kept for then.
+      // Approved local game stores (self-service submission + admin review at
+      // /card-shops/add and /admin/store-directory) — the only store-location
+      // data source in the app with real address data. business_profiles (a
+      // separate, admin-curated retailer directory) intentionally isn't a
+      // second marker source here to avoid duplicate/conflicting pins for the
+      // same physical shop.
+      try {
+        const stores = await fetchStores();
+        stores.forEach(store => {
+          const cityInfo = DIRECTORY_CITIES[store.city];
+          const state = store.state || cityInfo?.state;
+          const locParts = [store.suburb, cityInfo?.label, state].filter(Boolean);
+          results.push({
+            id: 'store-' + store.slug,
+            type: 'retailer',
+            name: store.name,
+            geocodeParams: {
+              suburb: store.suburb || cityInfo?.label,
+              state,
+            },
+            location: locParts.join(', '),
+            description: store.description,
+            url: store.website,
+          });
+        });
+      } catch (err) {
+        logger.error(`Failed to fetch stores: ${err.message}`);
+      }
 
       // Upcoming events — only those with at least a suburb/state so they can be placed
       try {
@@ -553,12 +577,11 @@ const LocalMapPage = () => {
           <div>
             <h3 className="font-bold mb-1">Are you a retailer or event organiser?</h3>
             <p className="text-sm text-muted-foreground mb-3 leading-relaxed">
-              Get your store or event pinned on this map. Retailers apply via the Retailers page.
-              Events with a confirmed venue address appear automatically once approved.
+              Get your store or event pinned on this map. Both appear automatically once approved.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button asChild size="sm" variant="outline" className="rounded-xl text-xs font-bold gap-1.5">
-                <Link to="/community/retailers"><Store className="w-3.5 h-3.5" /> List Your Store</Link>
+                <Link to="/card-shops/add"><Store className="w-3.5 h-3.5" /> List Your Store</Link>
               </Button>
               <Button asChild size="sm" variant="outline" className="rounded-xl text-xs font-bold gap-1.5">
                 <Link to="/account/events"><Calendar className="w-3.5 h-3.5" /> Submit an Event</Link>

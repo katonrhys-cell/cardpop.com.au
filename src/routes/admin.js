@@ -4,7 +4,7 @@ import stripe from '../utils/stripeClient.js';
 import { payoutSeller } from '../services/payoutService.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import { validateRequestBody, validateRequestParams, validateRequestQuery } from '../middleware/validateRequest.js';
-import { setUserRoleSchema, setUserRoleBodySchema, reviewVerificationSchema, reviewVerificationBodySchema, processRefundSchema, processRefundBodySchema, getDisputesSchema, resolveDisputeSchema, resolveDisputeBodySchema, setUserStatusSchema, setUserStatusBodySchema } from '../schemas/adminSchemas.js';
+import { setUserRoleSchema, setUserRoleBodySchema, reviewVerificationSchema, reviewVerificationBodySchema, processRefundSchema, processRefundBodySchema, getDisputesSchema, resolveDisputeSchema, resolveDisputeBodySchema, setUserStatusSchema, setUserStatusBodySchema, createBusinessProfileBodySchema, businessProfileIdSchema, updateBusinessProfileBodySchema } from '../schemas/adminSchemas.js';
 import logger from '../utils/logger.js';
 
 const router = Router();
@@ -305,6 +305,103 @@ router.patch('/disputes/:id', validateRequestParams(resolveDisputeSchema), valid
   } catch (err) {
     logger.error(`[ADMIN] Failed to resolve dispute: ${err.message}`);
     res.status(500).json({ error: 'Failed to resolve dispute' });
+  }
+});
+
+// ─── Business profiles: admin-curated directory of physical retail locations ──
+// Deliberately separate from profiles.is_sole_trader (the self-service /dealer
+// storefront any seller can enable themselves) — business_profiles is a
+// curated set of real-world stores for the Retailers directory and community
+// map, and only an admin creates/approves/edits them (its RLS only grants a
+// row's own user self-view/self-update; there's no public write path and no
+// admin bypass policy, so every privileged read/write goes through here).
+router.get('/business-profiles', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('business_profiles')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json({ businessProfiles: data || [] });
+  } catch (err) {
+    logger.error(`[ADMIN] Failed to list business profiles: ${err.message}`);
+    res.status(500).json({ error: 'Failed to load business profiles' });
+  }
+});
+
+router.post('/business-profiles', validateRequestBody(createBusinessProfileBodySchema), async (req, res) => {
+  const { user_email, storefront_status, ...fields } = req.body;
+
+  try {
+    const { data: owner, error: ownerErr } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', user_email.trim().toLowerCase())
+      .maybeSingle();
+    if (ownerErr) throw ownerErr;
+    if (!owner) return res.status(404).json({ error: 'No account found with that email' });
+
+    const { data, error } = await supabase
+      .from('business_profiles')
+      .insert({
+        ...fields,
+        user_id: owner.id,
+        storefront_status: storefront_status || 'pending_review',
+        reviewed_by: req.user.id,
+        reviewed_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+    if (error) throw error;
+
+    await supabase.from('audit_logs').insert({
+      user_id: req.user.id,
+      event_type: 'create_business_profile',
+      description: `Created business profile "${data.business_name}" (${data.id}) for user ${owner.id}`,
+      status: 'success',
+    }).catch(() => {});
+
+    logger.info(`[ADMIN] ${req.user.id} created business profile ${data.id}`);
+    res.json({ success: true, businessProfile: data });
+  } catch (err) {
+    logger.error(`[ADMIN] Failed to create business profile: ${err.message}`);
+    res.status(500).json({ error: 'Failed to create business profile' });
+  }
+});
+
+router.patch('/business-profiles/:id', validateRequestParams(businessProfileIdSchema), validateRequestBody(updateBusinessProfileBodySchema), async (req, res) => {
+  const { id } = req.params;
+  const updates = { ...req.body };
+
+  // Any status transition (approve/reject/suspend) counts as a review.
+  if (updates.storefront_status) {
+    updates.reviewed_by = req.user.id;
+    updates.reviewed_at = new Date().toISOString();
+    if (updates.storefront_status !== 'suspended') updates.rejection_reason = null;
+  }
+  updates.updated_at = new Date().toISOString();
+
+  try {
+    const { data, error } = await supabase
+      .from('business_profiles')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+
+    await supabase.from('audit_logs').insert({
+      user_id: req.user.id,
+      event_type: 'update_business_profile',
+      description: `Updated business profile ${id}${updates.storefront_status ? ` → ${updates.storefront_status}` : ''}`,
+      status: 'success',
+    }).catch(() => {});
+
+    logger.info(`[ADMIN] ${req.user.id} updated business profile ${id}`);
+    res.json({ success: true, businessProfile: data });
+  } catch (err) {
+    logger.error(`[ADMIN] Failed to update business profile: ${err.message}`);
+    res.status(500).json({ error: 'Failed to update business profile' });
   }
 });
 

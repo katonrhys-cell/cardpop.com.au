@@ -9,6 +9,7 @@
 - [Admin - Hero Showcase | CardPop](https://cardpop.com.au/heroshowcaseadmin): No description available
 - [Admin - Manage Featured Cards | CardPop](https://cardpop.com.au/featuredcardsadmin): No description available
 - [Brand Management | Admin Portal](https://cardpop.com.au/brandsmanagement): No description available
+- [Business Profiles | Admin](https://cardpop.com.au/businessprofilesmanagement): No description available
 - [Card Pop](https://cardpop.com.au/addeditcard): No description available
 - [Category Mapping Tools | Admin](https://cardpop.com.au/categorymapping): No description available
 - [Chargebacks | Admin](https://cardpop.com.au/disputesadmin): No description available
