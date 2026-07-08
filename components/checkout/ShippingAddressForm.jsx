@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 import {
   AMAZON_LOCATION_ENABLED,
   autocompleteAddress,
-  getPlaceDetails,
+  resolveSuggestion,
 } from '@/lib/amazonLocation.js';
 
 const AU_STATES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'];
@@ -38,6 +38,15 @@ const ShippingAddressForm = ({ values = {}, onChange, showEmail = false }) => {
 
   const placesActive = AMAZON_LOCATION_ENABLED && !unavailable;
   const verified = Boolean(values.verified);
+
+  // Log the real failure to the console (status + AWS message) and degrade to
+  // manual entry. The visible fallback below tells the shopper why the search
+  // box went away, so a misconfigured key never looks like a broken form.
+  const degradeToManual = useCallback((context, err) => {
+    console.warn(`[address] Amazon Location ${context} failed — falling back to manual entry.`, err);
+    setUnavailable(true);
+    onChangeRef.current?.({ ...valuesRef.current, placesUnavailable: true });
+  }, []);
 
   const closeSuggestions = useCallback(() => {
     setOpen(false);
@@ -77,15 +86,14 @@ const ShippingAddressForm = ({ values = {}, onChange, showEmail = false }) => {
       })
       .catch((err) => {
         if (controller.signal.aborted || err?.name === 'AbortError') return;
-        // AWS unreachable — degrade to plain free-text entry and tell the page
-        // to drop its "verified pick" requirement.
-        setUnavailable(true);
-        onChangeRef.current?.({ ...valuesRef.current, placesUnavailable: true });
+        // AWS unreachable / key misconfigured — degrade to plain free-text entry
+        // and tell the page to drop its "verified pick" requirement.
+        degradeToManual('autocomplete', err);
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
       });
-  }, []);
+  }, [degradeToManual]);
 
   // Editing the street field (re)invalidates the verified flag and kicks off a
   // debounced search.
@@ -104,17 +112,17 @@ const ShippingAddressForm = ({ values = {}, onChange, showEmail = false }) => {
   const selectSuggestion = async (suggestion) => {
     if (!suggestion) return;
     closeSuggestions();
-    // Optimistically show the chosen label while we fetch structured details.
+    // Optimistically show the chosen label while we resolve structured details
+    // (usually already inline in the suggestion — no extra request).
     onChangeRef.current?.({ ...valuesRef.current, address: suggestion.label, verified: false });
     setLoading(true);
     try {
-      const parsed = await getPlaceDetails(suggestion.placeId);
+      const parsed = await resolveSuggestion(suggestion);
       if (parsed) {
         onChangeRef.current?.({ ...valuesRef.current, ...parsed });
       }
-    } catch {
-      setUnavailable(true);
-      onChangeRef.current?.({ ...valuesRef.current, placesUnavailable: true });
+    } catch (err) {
+      degradeToManual('get-place', err);
     } finally {
       setLoading(false);
     }
@@ -223,6 +231,13 @@ const ShippingAddressForm = ({ values = {}, onChange, showEmail = false }) => {
               Select your address from the suggestions so we can verify it.
             </p>
           )
+        )}
+        {/* Autocomplete was enabled but a request failed — tell the shopper the
+            search fell back to manual entry rather than leaving them puzzled. */}
+        {AMAZON_LOCATION_ENABLED && unavailable && (
+          <p className="text-xs text-muted-foreground">
+            Address search is unavailable right now — please enter your address manually.
+          </p>
         )}
       </div>
 
