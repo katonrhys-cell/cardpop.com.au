@@ -21,18 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { SheetClose } from '@/components/ui/sheet';
 import SearchBar from '@/components/SearchBar.jsx';
-
-const WhatnotIcon = ({ className = 'w-4 h-4' }) => (
-  <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className}>
-    <path
-      d="M2 5l4.1 14 3.6-9.5L12 15l2.3-5.5L17.9 19 22 5"
-      stroke="#FFDF00"
-      strokeWidth="2.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
+import WhatnotIcon from '@/components/WhatnotIcon.jsx';
 
 export const NAV_LINKS = [
   { label: 'Shop', href: '/shop' },
