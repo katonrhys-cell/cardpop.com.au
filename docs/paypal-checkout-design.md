@@ -76,10 +76,27 @@ fulfillConfirmedOrder(order, { provider, stripe? })
 ```
 
 - Stripe path calls it after its compare-and-swap; PayPal path calls it after capture.
-- `payoutSeller` is called with `provider:'paypal'` → **force the wallet-credit branch** (skip the Stripe Connect transfer, since the funds are in PayPal). Small change: pass a `forceWallet` flag, or branch on `provider`.
+- Payout branches on **provider + the seller's payout preference** (§5.5), not just provider.
 - Everything else (double-sale guard, oversell notify, buyer/seller notifications, emails) is provider-agnostic and shared verbatim.
 
 This refactor also *reduces* duplication in the current code and is independently valuable.
+
+### 5.5 Seller payout — per-seller preference (DECIDED)
+Shop items are platform-owned, so a PayPal payment for them simply lands in the **platform (admin) PayPal balance** — no payout step. For **seller listings** paid via PayPal, each seller chooses how they're paid:
+
+- **Seller has a PayPal payout method** (email on file, verified) → pay their proceeds via the **PayPal Payouts API** (`POST /v1/payments/payouts`) to that email, after the platform captures the buyer's payment.
+- **No PayPal on file** → **credit their CardPop wallet** (existing `payoutSeller` wallet branch); they withdraw later.
+
+`payoutSeller` gains a `provider` arg and consults a new seller payout-preference:
+```
+payoutSeller(stripe, { sellerId, sellerProceeds, listingId, orderId, provider })
+  provider==='stripe' → existing behaviour (Connect transfer, else wallet)
+  provider==='paypal' → if seller.payout_paypal_email → PayPal Payouts
+                        else → wallet credit
+```
+New `paypalClient.createPayout({ email, amountCents, note })`. Payout failures fall back to wallet-credit (never lose the seller's money), mirroring the Stripe fallback. Refund clawback reuses the wallet-clawback branch; a PayPal Payout that already went out is clawed back to wallet (negative) or flagged for admin if the payout is unreversible.
+
+**Seller onboarding:** add a `payout_paypal_email` (+ `payout_method` enum: `wallet` | `paypal`) to the seller's profile/settings, entered in account settings. Sellers with neither Stripe Connect nor PayPal default to wallet.
 
 ### 5.4 `src/app.js`
 The PayPal webhook does **not** need the raw-body exemption Stripe needs — `verifyPaypalWebhook` posts the parsed event to PayPal's verify API (same as the existing subscription webhook). No `express.raw` change.
@@ -128,9 +145,15 @@ PayPal **Sandbox** (`PAYPAL_ENV=sandbox`) allows full end-to-end testing with fa
 5. **Sandbox** end-to-end verification.
 6. Flip to live.
 
-## 13. Open decisions (need your input)
+## 13. Decisions (LOCKED — 2026-07)
 
-1. **Seller payout model for PayPal orders** — v1 recommendation: credit the seller's **CardPop wallet** (reuses existing infra, sellers withdraw later). Alternatives: PayPal **Payouts API** (sellers need PayPal accounts, more setup) or PayPal **Commerce Platform** multiparty (most complex, real marketplace split). Wallet-credit is the pragmatic start.
-2. **Scope of items** — support both **shop items and seller listings** at launch, or **shop-only first** (platform-owned, no seller-payout question) then add listings?
-3. **Wallet-balance-as-payment with PayPal** — OK to keep that **card-only for v1** (recommended), or is it a must-have day one?
-4. **Buyer wallet vs seller wallet** — worth a small follow-up to consolidate the two "wallet" concepts, but not blocking.
+1. **Seller payout:** per-seller preference. Shop items → **platform/admin PayPal** (no payout). Seller listings → **PayPal Payouts** to the seller's PayPal email if they have one on file, else **CardPop wallet** credit. Payout failure always falls back to wallet (never lose seller funds). See §5.5.
+2. **Item scope:** **both** shop items and seller listings accept PayPal at launch (so the seller-payout mechanism in §5.5 must be built + sandbox-tested before go-live).
+3. **Wallet-as-payment with PayPal:** **card-only for v1** — the "use wallet balance" toggle is hidden when PayPal is selected. Promo/welcome/partner codes still work (applied as an amount discount). Revisit after wallet consolidation.
+4. **Follow-up (non-blocking):** consolidate the two "wallet" concepts (buyer Stripe Customer Balance vs seller `wallet_balance_aud`).
+
+## 14. Extra build items from the locked decisions
+
+- **Seller payout settings UI + schema:** `profiles.payout_paypal_email`, `profiles.payout_method` (`wallet` | `paypal`), edited in account settings; validated (basic email + optionally a PayPal-side check).
+- **`paypalClient.createPayout()`** (PayPal Payouts API) + payout-failure → wallet fallback + refund/clawback handling for PayPal payouts.
+- **Admin visibility:** show `payment_provider` + payout method/status on the order in the admin orders view, so you can see at a glance how each order was paid and how the seller was paid.
