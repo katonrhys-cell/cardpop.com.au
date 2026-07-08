@@ -1,71 +1,147 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Search } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { CheckCircle2, Loader2, MapPin, Search } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { GOOGLE_PLACES_ENABLED, loadGoogleMaps, parsePlace } from '@/lib/googlePlaces.js';
+import { cn } from '@/lib/utils';
+import {
+  AMAZON_LOCATION_ENABLED,
+  autocompleteAddress,
+  getPlaceDetails,
+} from '@/lib/amazonLocation.js';
 
 const AU_STATES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'];
+const DEBOUNCE_MS = 250;
 
 const ShippingAddressForm = ({ values = {}, onChange, showEmail = false }) => {
   const update = (key, value) => onChange?.({ ...values, [key]: value });
 
-  // Keep the latest values/onChange reachable from the Places callback without
-  // re-binding the autocomplete on every keystroke.
+  // Keep the latest values/onChange reachable from async callbacks without
+  // re-binding effects on every keystroke.
   const valuesRef = useRef(values);
   valuesRef.current = values;
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
-  const addressInputRef = useRef(null);
-  // Whether the Places widget is actually available in this session. Starts off
-  // matching the build-time flag and flips to false if the script fails to load
-  // (fail-open to free text — the server still validates the address).
-  const [placesReady, setPlacesReady] = useState(false);
-  const [placesUnavailable, setPlacesUnavailable] = useState(!GOOGLE_PLACES_ENABLED);
+  // Autocomplete state.
+  const [suggestions, setSuggestions] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const [loading, setLoading] = useState(false);
+  // Flips to true if a request errors — we then degrade to plain free-text and
+  // drop the "verified pick" gate (the server still validates the address).
+  const [unavailable, setUnavailable] = useState(!AMAZON_LOCATION_ENABLED);
 
-  useEffect(() => {
-    if (!GOOGLE_PLACES_ENABLED) return;
-    let cancelled = false;
-    let listener = null;
+  const containerRef = useRef(null);
+  const debounceRef = useRef(null);
+  const abortRef = useRef(null);
 
-    loadGoogleMaps()
-      .then((google) => {
-        if (cancelled || !addressInputRef.current) return;
-        const autocomplete = new google.maps.places.Autocomplete(addressInputRef.current, {
-          componentRestrictions: { country: 'au' },
-          fields: ['address_components', 'formatted_address', 'place_id'],
-          types: ['address'],
-        });
-        listener = autocomplete.addListener('place_changed', () => {
-          const parsed = parsePlace(autocomplete.getPlace());
-          if (!parsed) return; // ignore incomplete / out-of-AU selections
-          onChangeRef.current?.({ ...valuesRef.current, ...parsed });
-        });
-        setPlacesReady(true);
-      })
-      .catch(() => {
-        // Google unreachable — degrade to plain free-text entry, and tell the
-        // page to drop its "verified pick" requirement. The server-side Address
-        // Validation check remains the real guarantee.
-        if (cancelled) return;
-        setPlacesUnavailable(true);
-        onChangeRef.current?.({ ...valuesRef.current, placesUnavailable: true });
-      });
+  const placesActive = AMAZON_LOCATION_ENABLED && !unavailable;
+  const verified = Boolean(values.verified);
 
-    return () => {
-      cancelled = true;
-      if (listener?.remove) listener.remove();
-    };
+  const closeSuggestions = useCallback(() => {
+    setOpen(false);
+    setActiveIndex(-1);
   }, []);
+
+  // Close the dropdown on an outside click.
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        closeSuggestions();
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [open, closeSuggestions]);
+
+  // Tear down any pending timer / request on unmount.
+  useEffect(() => () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (abortRef.current) abortRef.current.abort();
+  }, []);
+
+  const runSearch = useCallback((query) => {
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setLoading(true);
+
+    autocompleteAddress(query, { signal: controller.signal })
+      .then((results) => {
+        if (controller.signal.aborted) return;
+        setSuggestions(results);
+        setActiveIndex(-1);
+        setOpen(results.length > 0);
+      })
+      .catch((err) => {
+        if (controller.signal.aborted || err?.name === 'AbortError') return;
+        // AWS unreachable — degrade to plain free-text entry and tell the page
+        // to drop its "verified pick" requirement.
+        setUnavailable(true);
+        onChangeRef.current?.({ ...valuesRef.current, placesUnavailable: true });
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+  }, []);
+
+  // Editing the street field (re)invalidates the verified flag and kicks off a
+  // debounced search.
+  const onAddressInput = (value) => {
+    onChange?.({ ...values, address: value, verified: false });
+    if (!placesActive) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (value.trim().length < 3) {
+      closeSuggestions();
+      setSuggestions([]);
+      return;
+    }
+    debounceRef.current = setTimeout(() => runSearch(value), DEBOUNCE_MS);
+  };
+
+  const selectSuggestion = async (suggestion) => {
+    if (!suggestion) return;
+    closeSuggestions();
+    // Optimistically show the chosen label while we fetch structured details.
+    onChangeRef.current?.({ ...valuesRef.current, address: suggestion.label, verified: false });
+    setLoading(true);
+    try {
+      const parsed = await getPlaceDetails(suggestion.placeId);
+      if (parsed) {
+        onChangeRef.current?.({ ...valuesRef.current, ...parsed });
+      }
+    } catch {
+      setUnavailable(true);
+      onChangeRef.current?.({ ...valuesRef.current, placesUnavailable: true });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onKeyDown = (e) => {
+    if (!open || suggestions.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex((i) => (i + 1) % suggestions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex((i) => (i <= 0 ? suggestions.length - 1 : i - 1));
+    } else if (e.key === 'Enter') {
+      if (activeIndex >= 0) {
+        e.preventDefault();
+        selectSuggestion(suggestions[activeIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      closeSuggestions();
+    }
+  };
 
   // When Places is active, editing an autocompleted field manually invalidates
   // the "verified" flag — the user must re-pick a suggestion to continue.
   const updateAndInvalidate = (key, value) =>
     onChange?.({ ...values, [key]: value, verified: false });
-
-  const placesActive = placesReady && !placesUnavailable;
-  const verified = Boolean(values.verified);
 
   return (
     <div className="space-y-4">
@@ -85,20 +161,57 @@ const ShippingAddressForm = ({ values = {}, onChange, showEmail = false }) => {
           <Input value={values.lastName ?? ''} onChange={e => update('lastName', e.target.value)} />
         </div>
       </div>
-      <div className="space-y-1">
+
+      <div className="space-y-1" ref={containerRef}>
         <Label>{placesActive ? 'Search Address' : 'Street Address'}</Label>
         <div className="relative">
           {placesActive && (
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           )}
           <Input
-            ref={addressInputRef}
             value={values.address ?? ''}
-            onChange={e => updateAndInvalidate('address', e.target.value)}
+            onChange={e => onAddressInput(e.target.value)}
+            onKeyDown={onKeyDown}
+            onFocus={() => { if (suggestions.length > 0 && !verified) setOpen(true); }}
             placeholder={placesActive ? 'Start typing your address…' : undefined}
-            className={placesActive ? 'pl-9' : undefined}
+            className={cn(placesActive && 'pl-9', placesActive && 'pr-9')}
             autoComplete={placesActive ? 'off' : 'street-address'}
+            role={placesActive ? 'combobox' : undefined}
+            aria-expanded={placesActive ? open : undefined}
+            aria-autocomplete={placesActive ? 'list' : undefined}
           />
+          {placesActive && loading && (
+            <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+          )}
+          {placesActive && !loading && verified && (
+            <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-600" />
+          )}
+
+          {placesActive && open && suggestions.length > 0 && (
+            <ul
+              className="absolute z-50 mt-1 w-full overflow-hidden rounded-md border border-border bg-popover shadow-lg"
+              role="listbox"
+            >
+              {suggestions.map((s, i) => (
+                <li
+                  key={s.placeId}
+                  role="option"
+                  aria-selected={i === activeIndex}
+                  // onMouseDown (not onClick) so the field's blur doesn't close
+                  // the list before the selection registers.
+                  onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s); }}
+                  onMouseEnter={() => setActiveIndex(i)}
+                  className={cn(
+                    'flex cursor-pointer items-start gap-2 px-3 py-2 text-sm',
+                    i === activeIndex ? 'bg-accent text-accent-foreground' : 'text-foreground',
+                  )}
+                >
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                  <span className="leading-snug">{s.label}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
         {placesActive && (
           verified ? (
@@ -112,6 +225,7 @@ const ShippingAddressForm = ({ values = {}, onChange, showEmail = false }) => {
           )
         )}
       </div>
+
       {/* Optional unit / apartment line — free text, does not affect verification. */}
       {placesActive && (
         <div className="space-y-1">
