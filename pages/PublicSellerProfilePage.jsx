@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import VaultListingCard from '@/components/VaultListingCard.jsx';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import WhatnotIcon from '@/components/WhatnotIcon.jsx';
 
 const PublicSellerProfilePage = () => {
   const { userId } = useParams();
@@ -253,7 +254,7 @@ const PublicSellerProfilePage = () => {
                           title="Whatnot"
                           className="flex items-center gap-1.5 px-3 py-1.5 text-orange-500 hover:text-orange-600 transition-colors bg-orange-500/10 hover:bg-orange-500/20 rounded-lg text-sm font-bold"
                         >
-                          <ExternalLink className="w-3.5 h-3.5" />
+                          <WhatnotIcon className="w-4 h-4" />
                           Whatnot
                         </a>
                       ) : (
