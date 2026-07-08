@@ -160,8 +160,8 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
     }
 
     // Authoritative "real, deliverable address" gate. The client autocompletes
-    // via Google Places, but a bypassed frontend can't slip a fake address past
-    // this server-side check (fails open only when no API key is configured).
+    // via Amazon Location Service, but a bypassed frontend can't slip a fake
+    // address past this server-side check (fails open only when no key is set).
     const addressCheck = await validateShippingAddress(shippingAddress || {});
     if (!addressCheck.valid) {
       const message = addressCheck.reason === 'request-failed'

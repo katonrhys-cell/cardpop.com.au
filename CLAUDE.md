@@ -151,8 +151,10 @@ git push main
 | `KIT_LAUNCH_FORM_ID` | Kit.com pre-launch notify list (`/launch` page) — optional, falls back to `KIT_FORM_ID` |
 | `VITE_COMING_SOON` | Pre-launch mode (build-time): `true` redirects the homepage to `/launch` |
 | `ENCRYPTION_KEY` | MFA OTP / backup code encryption |
-| `VITE_GOOGLE_MAPS_API_KEY` | *(optional)* Google Places autocomplete on the checkout shipping form (build-time, public) — blank = free-text fallback |
-| `GOOGLE_MAPS_API_KEY` | *(optional)* Google Address Validation API — server-side check of the chosen shipping address before creating the Stripe session; blank = skipped (fail-open) |
+| `VITE_AWS_LOCATION_API_KEY` | *(optional)* Amazon Location Service Places API key — address autocomplete on the checkout shipping form (build-time, public) — blank = free-text fallback |
+| `VITE_AWS_LOCATION_REGION` | *(optional)* Region for the browser Amazon Location endpoint (`places.geo.<region>.amazonaws.com`) — defaults to `ap-southeast-2` |
+| `AWS_LOCATION_API_KEY` | *(optional)* Amazon Location Service Places API key — server-side geocode check of the chosen shipping address before creating the Stripe session; blank = skipped (fail-open) |
+| `AWS_LOCATION_REGION` | *(optional)* Region for the server-side Amazon Location endpoint — defaults to `ap-southeast-2` |
 | `CORS_ORIGIN` | Express CORS (set to `https://cardpop.com.au`) |
 | `APP_URL` | App base URL |
 | `VITE_POKEMONTCG_API_KEY` | *(optional)* Pokémon TCG API key ([dev.pokemontcg.io](https://dev.pokemontcg.io)) for analytics card art (`utils/pokemonCardImage.js`) — blank works keyless (~1,000 req/day); a free key raises the limit to 20,000/day. Images are served from the API's own CDN, so they cost nothing against Supabase egress |
