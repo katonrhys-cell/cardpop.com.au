@@ -30,6 +30,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import VaultListingCard from '@/components/VaultListingCard.jsx';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import { WhatnotIcon } from '@/components/HeaderMenus.jsx';
 
 const BADGE_META = {
   authentic:          { label: '100% Authentic',     desc: 'All cards verified before listing',                   Icon: CheckCircle2 },
@@ -343,7 +344,7 @@ const SoleTraderStorePage = () => {
                       title={i.label}
                       className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-bold border transition-all ${i.className}`}>
                       {i.icon === 'instagram' && <Instagram className="w-4 h-4" />}
-                      {i.icon === 'whatnot' && <span className="font-extrabold text-base leading-none">W</span>}
+                      {i.icon === 'whatnot' && <WhatnotIcon className="w-4 h-4" color="currentColor" />}
                       {i.icon === 'link' && <ExternalLink className="w-4 h-4" />}
                       {i.label}
                     </a>
