@@ -79,7 +79,7 @@ async function handleCheckoutSessionCompleted(session, stripe) {
 
   const { data: existing } = await supabase
     .from('orders')
-    .select('id, status, total_aud, order_items, buyer_id')
+    .select('id, status, total_aud, order_items, buyer_id, item_price_aud, gst_aud, platform_fee_aud, discount_aud, created_at, shipping_name, shipping_address, shipping_suburb, shipping_state, shipping_postcode')
     .eq('stripe_session_id', session.id)
     .maybeSingle();
 
@@ -212,13 +212,43 @@ async function handleCartOrder(existing, session, stripe) {
       .select('email, display_name').eq('id', existing.buyer_id).maybeSingle();
     if (buyerProfile?.email) {
       const itemCount = lines.reduce((n, l) => n + (l.quantity || 1), 0);
+      // Build an itemised tax invoice from the persisted order so the emailed
+      // receipt carries every figure the buyer saw at checkout — line items,
+      // GST, discount, total — plus their business name and ABN when supplied.
+      const invoiceItems = lines.map(l => ({
+        name: l.title || l.name || l.card_name || 'Item',
+        quantity: l.quantity || 1,
+        total: Number(l.line_total_aud ?? l.price_aud ?? l.price ?? 0),
+      }));
       await sendOrderConfirmed({
         buyerEmail: buyerProfile.email,
         buyerName: buyerProfile.display_name || 'Collector',
         cardName: `${itemCount} item${itemCount === 1 ? '' : 's'}`,
-        itemPrice: amountCents2 / 100,
+        itemPrice: Number(existing.item_price_aud ?? amountCents2 / 100),
         total: amountCents2 / 100,
         orderId: existing.id,
+        invoice: {
+          items: invoiceItems,
+          subtotal: Number(existing.item_price_aud ?? 0),
+          // platform_fee_aud bundles commission + GST; the service fee is the
+          // commission portion, shown separately from GST to mirror checkout.
+          serviceFee: Math.max(0, Number(existing.platform_fee_aud ?? 0) - Number(existing.gst_aud ?? 0)),
+          gst: Number(existing.gst_aud ?? 0),
+          discount: Number(existing.discount_aud ?? 0),
+          total: amountCents2 / 100,
+          // Read from the session metadata (set at checkout) so the invoice
+          // doesn't depend on the billing_* columns having been migrated yet.
+          businessName: session.metadata?.billingBusinessName || null,
+          abn: session.metadata?.billingAbn || null,
+          orderDate: existing.created_at || null,
+          shipping: {
+            name: existing.shipping_name || null,
+            address: existing.shipping_address || null,
+            suburb: existing.shipping_suburb || null,
+            state: existing.shipping_state || null,
+            postcode: existing.shipping_postcode || null,
+          },
+        },
       }).catch(e => logger.warn(`[STRIPE] cart confirm email failed: ${e.message}`));
     }
   }
@@ -381,6 +411,19 @@ async function handleSingleItemOrder(session, stripe) {
       itemPrice,
       total: amountCents / 100,
       orderId,
+      // Itemised breakdown so the receipt shows the same service-fee + GST
+      // commission structure the buyer saw at checkout.
+      invoice: {
+        items: [{ name: cardName || 'Trading Card', quantity: 1, total: itemPrice }],
+        subtotal: itemPrice,
+        serviceFee: commissionAud,
+        gst: gstAud,
+        discount: discountAud,
+        total: amountCents / 100,
+        businessName: null,
+        abn: null,
+        orderDate: null,
+      },
     });
   }
 

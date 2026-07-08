@@ -29,10 +29,11 @@ vi.mock('sonner', () => ({ toast: mockToast }));
 
 // Minimal stubs that expose each step's callbacks as plain buttons / values.
 vi.mock('@/components/checkout/OrderSummary.jsx', () => ({
-  default: ({ subtotal, total, tax, onNext }) => (
+  default: ({ subtotal, total, serviceFee, gst, onNext }) => (
     <div>
       <span data-testid="subtotal">{subtotal}</span>
-      <span data-testid="tax">{tax}</span>
+      <span data-testid="service-fee">{serviceFee}</span>
+      <span data-testid="gst">{gst}</span>
       <span data-testid="total">{total}</span>
       <button onClick={onNext}>summary-next</button>
     </div>
@@ -113,7 +114,8 @@ describe('CheckoutPage — server pricing', () => {
 
     await waitFor(() => expect(screen.getByTestId('total')).toHaveTextContent('110'));
     expect(screen.getByTestId('subtotal')).toHaveTextContent('100');
-    expect(screen.getByTestId('tax')).toHaveTextContent('10'); // commission + gst
+    expect(screen.getByTestId('service-fee')).toHaveTextContent('8'); // commission, shown separately
+    expect(screen.getByTestId('gst')).toHaveTextContent('2'); // GST, shown separately
   });
 
   it('falls back to the client subtotal when pricing is unavailable', async () => {

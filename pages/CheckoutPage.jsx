@@ -24,6 +24,7 @@ import EmbeddedStripeCheckout from '@/components/checkout/EmbeddedStripeCheckout
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import { getReferralCode } from '@/lib/referral.js';
 import { GOOGLE_PLACES_ENABLED } from '@/lib/googlePlaces.js';
+import { isValidAbn, normalizeAbn } from '@/utils/abn.js';
 
 const STEPS = { SUMMARY: 1, SHIPPING: 2, BILLING: 3, PAY: 4 };
 const STEP_LABELS = ['Cart', 'Ship', 'Bill', 'Pay'];
@@ -183,7 +184,10 @@ const CheckoutPage = () => {
 
   const clientSubtotal = flatItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
   const subtotal = pricing?.subtotalAud ?? clientSubtotal;
-  const tax = pricing ? (Number(pricing.commissionAud || 0) + Number(pricing.gstAud || 0)) : 0;
+  // Platform commission and GST are distinct charges (and distinct Stripe line
+  // items) — shown as separate "Service fee" and "GST" lines, never merged.
+  const serviceFee = pricing ? Number(pricing.commissionAud || 0) : 0;
+  const gst = pricing ? Number(pricing.gstAud || 0) : 0;
   const discount = pricing && !pricing.promoError ? Number(pricing.discountAud || 0) : 0;
   const total = pricing?.totalAud ?? clientSubtotal;
   const appliedPromoCode = discount > 0 ? promoCode : '';
@@ -204,6 +208,20 @@ const CheckoutPage = () => {
     return true;
   };
 
+  const validateBilling = () => {
+    if (billingData.isBusiness) {
+      if (!billingData.businessName?.trim()) {
+        toast.error('Please enter your business name.');
+        return false;
+      }
+      if (!isValidAbn(billingData.abn)) {
+        toast.error('Please enter a valid 11-digit ABN.');
+        return false;
+      }
+    }
+    return true;
+  };
+
   // Stable request body for the inline Stripe form. It must not change identity
   // on every render — Stripe's EmbeddedCheckoutProvider fetches the client
   // secret once, and a new object would recreate the session. Serialising the
@@ -212,6 +230,10 @@ const CheckoutPage = () => {
   // serverItems is a fresh array each render; track it by its serialised key so
   // the memo (and the Stripe session it seeds) only changes when the order does.
   const serverItemsKey = JSON.stringify(serverItems);
+  // Only forward business details when a valid ABN was supplied — this is what
+  // switches the server onto the tax-invoice path.
+  const billingAbn = billingData.isBusiness && isValidAbn(billingData.abn) ? normalizeAbn(billingData.abn) : '';
+  const billingBusinessName = billingAbn ? (billingData.businessName || '').trim() : '';
   const checkoutRequestBody = useMemo(() => ({
     items: serverItems,
     ...(useWallet ? { useWalletBalance: true } : (appliedPromoCode ? { promoCode: appliedPromoCode } : {})),
@@ -222,6 +244,7 @@ const CheckoutPage = () => {
       state: shippingData.state || '',
       postcode: shippingData.postcode || '',
     },
+    ...(billingAbn ? { billingDetails: { businessName: billingBusinessName, abn: billingAbn } } : {}),
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [
     serverItemsKey,
@@ -232,6 +255,8 @@ const CheckoutPage = () => {
     shippingData.suburb,
     shippingData.state,
     shippingData.postcode,
+    billingAbn,
+    billingBusinessName,
   ]);
 
   if (initializing) {
@@ -249,7 +274,8 @@ const CheckoutPage = () => {
           <OrderSummary
             cartItems={flatItems}
             subtotal={subtotal}
-            tax={tax}
+            serviceFee={serviceFee}
+            gst={gst}
             discount={discount}
             total={total}
             onEditCart={() => navigate('/browse')}
@@ -298,7 +324,7 @@ const CheckoutPage = () => {
               />
               <div className="flex justify-between pt-2">
                 <Button variant="outline" onClick={() => setStep(STEPS.SHIPPING)}>Back</Button>
-                <Button onClick={() => setStep(STEPS.PAY)}>
+                <Button onClick={() => { if (validateBilling()) setStep(STEPS.PAY); }}>
                   Continue <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
               </div>
@@ -315,7 +341,8 @@ const CheckoutPage = () => {
               sameAsShipping={sameAsShipping}
               items={flatItems}
               subtotal={subtotal}
-              tax={tax}
+              serviceFee={serviceFee}
+              gst={gst}
               discount={discount}
               total={total}
             />

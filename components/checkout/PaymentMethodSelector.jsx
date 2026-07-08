@@ -13,7 +13,7 @@ import { ShieldCheck, Lock } from 'lucide-react';
 
 const Badge = ({ label, children }) => (
   <div
-    className="flex h-11 min-w-[3.75rem] items-center justify-center rounded-lg border border-border bg-white px-3 shadow-sm"
+    className="flex h-8 min-w-[2.75rem] items-center justify-center rounded-md border border-border bg-white px-2 shadow-sm"
     title={label}
     aria-label={label}
   >
@@ -85,43 +85,29 @@ const METHODS = [
 
 const PaymentMethodSelector = () => {
   return (
-    <div className="space-y-5">
-      <div className="rounded-xl border border-border bg-muted/30 p-4">
-        <div className="flex items-start gap-3">
-          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <ShieldCheck className="h-5 w-5" />
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <ShieldCheck className="h-[18px] w-[18px]" />
           </span>
-          <div className="space-y-1">
-            <p className="text-sm font-semibold text-foreground">Secure payment powered by Stripe</p>
-            <p className="text-sm text-muted-foreground">
-              Pay right here with Card, PayPal, Afterpay or a mobile wallet — you won't leave this
-              page. Card details are entered inside Stripe's encrypted form and never touch
-              CardPop's servers.
-            </p>
+          <div className="leading-tight">
+            <p className="text-sm font-semibold text-foreground">Secure payment</p>
+            <p className="text-xs text-muted-foreground">Powered by Stripe · you never leave this page</p>
           </div>
         </div>
-      </div>
-
-      <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Accepted payment methods
-        </p>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           {METHODS.map(({ label, mark: Mark }) => (
             <Badge key={label} label={label}>
               <Mark />
             </Badge>
           ))}
         </div>
-        <p className="mt-3 text-xs text-muted-foreground">
-          Afterpay lets you pay in 4 interest-free instalments, and appears at checkout for eligible
-          order totals. Availability of each method depends on your device and region.
-        </p>
       </div>
 
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Lock className="h-3.5 w-3.5" />
-        <span>256-bit SSL encrypted · PCI-DSS compliant · You are only charged when you press Pay below.</span>
+      <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+        <Lock className="h-3.5 w-3.5 shrink-0" />
+        <span>256-bit SSL · PCI-DSS compliant. Card details are entered inside Stripe's encrypted form and never touch our servers.</span>
       </div>
     </div>
   );

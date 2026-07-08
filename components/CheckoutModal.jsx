@@ -118,7 +118,7 @@ const CheckoutModal = ({ isOpen, onClose, listingId, transactionType = 'fixed', 
               <LineRow label="Item Price" value={`$${breakdown.itemPrice.toFixed(2)} AUD`} />
               {breakdown.commissionAud > 0 && (
                 <LineRow
-                  label={`Platform Fee (${breakdown.commissionPct}%)`}
+                  label={`Service fee (${breakdown.commissionPct}%)`}
                   value={`$${breakdown.commissionAud.toFixed(2)} AUD`}
                 />
               )}

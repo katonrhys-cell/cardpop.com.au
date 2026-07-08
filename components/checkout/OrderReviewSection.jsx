@@ -20,7 +20,8 @@ const OrderReviewSection = ({
   sameAsShipping,
   items = [],
   subtotal = 0,
-  tax = 0,
+  serviceFee = 0,
+  gst = 0,
   discount = 0,
   total = 0,
 }) => {
@@ -49,6 +50,12 @@ const OrderReviewSection = ({
               <p className="text-sm text-muted-foreground">Same as shipping address</p>
             ) : (
               <AddressBlock data={billingData} />
+            )}
+            {billingData?.isBusiness && billingData?.abn && (
+              <div className="mt-2 border-t border-border pt-2 text-sm">
+                {billingData.businessName && <p className="font-medium text-foreground">{billingData.businessName}</p>}
+                <p className="text-muted-foreground">ABN: {billingData.abn}</p>
+              </div>
             )}
           </CardContent>
         </Card>
@@ -79,8 +86,13 @@ const OrderReviewSection = ({
               <span>Discount</span><span>-${Number(discount).toFixed(2)}</span>
             </div>
           )}
+          {serviceFee > 0 && (
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>Service fee</span><span>${Number(serviceFee).toFixed(2)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-sm text-muted-foreground">
-            <span>Tax (GST 10%)</span><span>${Number(tax).toFixed(2)}</span>
+            <span>GST (10%)</span><span>${Number(gst).toFixed(2)}</span>
           </div>
           <Separator />
           <div className="flex justify-between font-semibold text-base">
