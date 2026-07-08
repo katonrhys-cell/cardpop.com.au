@@ -21,6 +21,55 @@ revoke execute on function public.increment_partner_clicks(text) from authentica
 --    is by design: this function must stay SECURITY DEFINER so its cross-user
 --    "cancel competing proposed trades" sweep can update rows the caller does
 --    not own — SECURITY INVOKER would break that under RLS.
+--
+--    Also harden it: derive the responder from the verified JWT (auth.uid())
+--    instead of the client-supplied p_responder_id. Because the function is
+--    SECURITY DEFINER and callable by any signed-in user, trusting the argument
+--    would let a caller accept a trade on another user's behalf. p_responder_id
+--    is kept in the signature for wire compatibility with the existing client
+--    (which passes currentUser.id, i.e. auth.uid()) but is no longer used for
+--    authorization. CREATE OR REPLACE preserves the existing grants, so the
+--    anon revoke below still stands.
+create or replace function public.accept_trade(p_trade_id uuid, p_responder_id uuid)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_initiator_listing_id uuid;
+  v_responder_listing_id uuid;
+begin
+  -- Atomically claim the trade: only succeeds if it's still proposed and the
+  -- caller is genuinely its responder (verified via auth.uid(), not a trusted
+  -- argument).
+  update trades
+  set status = 'accepted'
+  where id = p_trade_id
+    and responder_id = auth.uid()
+    and status = 'proposed'
+  returning initiator_listing_id, responder_listing_id
+  into v_initiator_listing_id, v_responder_listing_id;
+
+  if not found then
+    return false;
+  end if;
+
+  -- Cancel any other still-proposed trade touching either listing, in the same
+  -- transaction so a card can never end up committed to two accepted trades.
+  update trades
+  set status = 'cancelled'
+  where status = 'proposed'
+    and id <> p_trade_id
+    and (
+      initiator_listing_id in (v_initiator_listing_id, v_responder_listing_id)
+      or responder_listing_id in (v_initiator_listing_id, v_responder_listing_id)
+    );
+
+  return true;
+end;
+$$;
+
 revoke execute on function public.accept_trade(uuid, uuid) from anon;
 
 -- 3. can_sell — never called through the API. It exists only to be referenced
