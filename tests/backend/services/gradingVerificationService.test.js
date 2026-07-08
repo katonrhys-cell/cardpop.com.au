@@ -75,6 +75,7 @@ describe('verifyGradingNumber — cache', () => {
       verifiedGrade: 10,
       gradeMatch: null,
       cached: true,
+      stale: false,
       cachedAt: '2026-01-01T00:00:00Z',
     });
     expect(mockLookupCard).not.toHaveBeenCalled();
@@ -115,6 +116,7 @@ describe('verifyGradingNumber — live lookup', () => {
       verifiedGrade: 10,
       gradeMatch: null,
       cached: false,
+      stale: false,
     });
 
     // Saved to cache with the right key/conflict target.
@@ -137,9 +139,59 @@ describe('verifyGradingNumber — live lookup', () => {
       .rejects.toThrow(/Beckett verification not yet implemented/);
   });
 
-  it('propagates a PSA API error', async () => {
+  it('propagates a PSA API error when there is no cache to fall back on', async () => {
     mockLookupCard.mockRejectedValue(new Error('PSA API timeout'));
     await expect(verifyGradingNumber({ gradingNumber: '123' })).rejects.toThrow('PSA API timeout');
+  });
+
+  it('serves a STALE cached result when the live lookup fails (PSA outage)', async () => {
+    // Expired positive cache + a failing live lookup: the cert is immutable, so
+    // the prior verification is still trustworthy — surface it as stale rather
+    // than throwing a "verification error" at the buyer.
+    h.cacheResult = {
+      data: {
+        verified: true,
+        details: { grade: 9 },
+        verified_at: '2026-01-01T00:00:00Z',
+        expires_at: past(),
+      },
+      error: null,
+    };
+    mockLookupCard.mockRejectedValue(new Error('PSA API timeout'));
+
+    const result = await verifyGradingNumber({ gradingNumber: '123', expectedGrade: '9' });
+    expect(mockLookupCard).toHaveBeenCalled();
+    expect(result).toEqual({
+      verified: true,
+      company: 'psa',
+      details: { grade: 9 },
+      verifiedGrade: 9,
+      gradeMatch: true,
+      cached: true,
+      stale: true,
+      cachedAt: '2026-01-01T00:00:00Z',
+    });
+  });
+
+  it('does NOT mask Beckett-not-implemented behind a stale cache row', async () => {
+    h.cacheResult = {
+      data: { verified: true, details: {}, verified_at: 'x', expires_at: past() },
+      error: null,
+    };
+    await expect(verifyGradingNumber({ gradingNumber: '123', company: 'beckett' }))
+      .rejects.toThrow(/Beckett verification not yet implemented/);
+  });
+
+  it('caches a "not found" for a shorter window than a verified hit', async () => {
+    mockLookupCard.mockResolvedValue(null); // not found
+    await verifyGradingNumber({ gradingNumber: '00000' });
+
+    const upsertBuilder = supabase.from.mock.results.at(-1).value;
+    const payload = upsertBuilder.upsert.mock.calls[0][0];
+    expect(payload.verified).toBe(false);
+    // Negative results expire in ~1 day, not the 90-day positive window.
+    const ttlMs = new Date(payload.expires_at).getTime() - Date.now();
+    expect(ttlMs).toBeLessThan(2 * 24 * 60 * 60 * 1000);
   });
 
   it('still succeeds when caching the result fails', async () => {

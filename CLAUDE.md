@@ -144,6 +144,7 @@ git push main
 | `STRIPE_IDENTITY_FLOW_ID` | *(optional)* Stripe Identity Verification Flow (`vf_...`) for signup ID checks — falls back to an inline document+selfie config |
 | `EBAY_APP_ID` | eBay API client |
 | `EBAY_CLIENT_SECRET` | eBay API client |
+| `PSA_API_TOKEN` | PSA certificate verification (`src/utils/psaApiClient.js`). **Unset = certs show "Verification error"** — the `/grading-verification/verify` endpoint has no non-API fallback, and the `/psa/cert` detail route only falls back to a bot-blocked, unreliable web scraper. Effectively required in production; obtain from the PSA Public API dashboard. |
 | `KIT_API_KEY` | Kit.com newsletter |
 | `KIT_FORM_ID` | Kit.com newsletter |
 | `RESEND_API_KEY` | Resend transactional email (order/refund/welcome). Unset = emails silently skipped. Domain must be verified in Resend — see `docs/email.md` |

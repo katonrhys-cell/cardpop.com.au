@@ -2,8 +2,13 @@ import { supabase } from '../utils/supabaseClient.js';
 import { psaApiClient } from '../utils/psaApiClient.js';
 import logger from '../utils/logger.js';
 
-const CACHE_VALIDITY_DAYS = 90;
-const CACHE_EXPIRY_MS = CACHE_VALIDITY_DAYS * 24 * 60 * 60 * 1000;
+// A verified cert is immutable — its grade never changes — so a positive result
+// is cached for a long time. A "not found" is provisional (the cert may be newly
+// issued, or the miss may have been a transient upstream hiccup), so it expires
+// quickly and gets re-checked sooner.
+const POSITIVE_CACHE_DAYS = 90;
+const NEGATIVE_CACHE_DAYS = 1;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Pull the graded value out of a grading-company cert payload, tolerant of the
 // various shapes PSA returns it in.
@@ -47,24 +52,27 @@ export async function verifyGradingNumber({ gradingNumber, company = 'psa', expe
 
   const normalizedNumber = gradingNumber.trim();
 
+  // Read the cache once up front. A fresh entry is the fast path; a stale entry
+  // becomes a fallback if the live lookup fails below.
+  const cached = await getFromCache(normalizedNumber, company);
+
+  if (cached && isCacheValid(cached)) {
+    logger.info(`[GRADING_VERIFICATION] Cache hit for ${normalizedNumber}`);
+    return {
+      verified: cached.verified,
+      company,
+      details: cached.details,
+      verifiedGrade: extractVerifiedGrade(cached.details),
+      gradeMatch: computeGradeMatch(cached.details, expectedGrade),
+      cached: true,
+      stale: false,
+      cachedAt: cached.verified_at
+    };
+  }
+
+  logger.info(`[GRADING_VERIFICATION] No valid cache, querying ${company.toUpperCase()} API for ${normalizedNumber}`);
+
   try {
-    // Check cache first
-    const cached = await getFromCache(normalizedNumber, company);
-    if (cached && isCacheValid(cached)) {
-      logger.info(`[GRADING_VERIFICATION] Cache hit for ${normalizedNumber}`);
-      return {
-        verified: cached.verified,
-        company,
-        details: cached.details,
-        verifiedGrade: extractVerifiedGrade(cached.details),
-        gradeMatch: computeGradeMatch(cached.details, expectedGrade),
-        cached: true,
-        cachedAt: cached.verified_at
-      };
-    }
-
-    logger.info(`[GRADING_VERIFICATION] No valid cache, querying ${company.toUpperCase()} API for ${normalizedNumber}`);
-
     // Query external API
     let details;
     if (company === 'psa') {
@@ -85,9 +93,28 @@ export async function verifyGradingNumber({ gradingNumber, company = 'psa', expe
       details: details || null,
       verifiedGrade: extractVerifiedGrade(details),
       gradeMatch: computeGradeMatch(details, expectedGrade),
-      cached: false
+      cached: false,
+      stale: false
     };
   } catch (error) {
+    // The live lookup failed. If we have ANY prior cached result — even an
+    // expired one — serve it rather than surfacing a verification error to the
+    // buyer: a PSA cert is immutable, so a past successful verification is still
+    // trustworthy during a transient PSA outage. (Beckett-not-implemented is a
+    // config gap, not an outage, so it must not be masked by a stale row.)
+    if (cached && !/not yet implemented/i.test(error.message)) {
+      logger.warn(`[GRADING_VERIFICATION] Live lookup failed for ${normalizedNumber} (${error.message}); serving stale cache from ${cached.verified_at}`);
+      return {
+        verified: cached.verified,
+        company,
+        details: cached.details,
+        verifiedGrade: extractVerifiedGrade(cached.details),
+        gradeMatch: computeGradeMatch(cached.details, expectedGrade),
+        cached: true,
+        stale: true,
+        cachedAt: cached.verified_at
+      };
+    }
     logger.error(`[GRADING_VERIFICATION] Error verifying ${normalizedNumber}: ${error.message}`);
     throw error;
   }
@@ -150,7 +177,8 @@ function isCacheValid(cacheEntry) {
 
 async function saveToCache(gradingNumber, company, verified, details) {
   try {
-    const expiresAt = new Date(Date.now() + CACHE_EXPIRY_MS).toISOString();
+    const cacheDays = verified ? POSITIVE_CACHE_DAYS : NEGATIVE_CACHE_DAYS;
+    const expiresAt = new Date(Date.now() + cacheDays * DAY_MS).toISOString();
 
     const { error } = await supabase
       .from('grading_verifications')

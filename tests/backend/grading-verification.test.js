@@ -87,11 +87,19 @@ describe('POST /verify', () => {
     expect(mockVerify).not.toHaveBeenCalled();
   });
 
-  it('returns 400 with the service error message when verification throws', async () => {
+  it('returns 503 (not 400) when the live lookup fails with no cache to fall back on', async () => {
     mockVerify.mockRejectedValue(new Error('PSA API unavailable'));
     const res = await request(app).post('/verify').send({ gradingNumber: '123' });
-    expect(res.status).toBe(400);
-    expect(res.body.error).toBe('PSA API unavailable');
+    expect(res.status).toBe(503);
+    // Generic client-facing message; the real error stays in the server logs.
+    expect(res.body.error).toMatch(/try again shortly/i);
+  });
+
+  it('returns 501 for a not-yet-implemented company', async () => {
+    mockVerify.mockRejectedValue(new Error('Beckett verification not yet implemented'));
+    const res = await request(app).post('/verify').send({ gradingNumber: '123' });
+    expect(res.status).toBe(501);
+    expect(res.body.error).toMatch(/not yet implemented/i);
   });
 });
 
