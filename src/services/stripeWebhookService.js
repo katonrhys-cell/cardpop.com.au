@@ -230,8 +230,9 @@ async function handleCartOrder(existing, session, stripe) {
         invoice: {
           items: invoiceItems,
           subtotal: Number(existing.item_price_aud ?? 0),
-          // Mirrors the checkout summary's "Tax (GST 10%)" line exactly.
-          tax: Number(existing.platform_fee_aud ?? 0),
+          // platform_fee_aud bundles commission + GST; the service fee is the
+          // commission portion, shown separately from GST to mirror checkout.
+          serviceFee: Math.max(0, Number(existing.platform_fee_aud ?? 0) - Number(existing.gst_aud ?? 0)),
           gst: Number(existing.gst_aud ?? 0),
           discount: Number(existing.discount_aud ?? 0),
           total: amountCents2 / 100,
@@ -410,6 +411,19 @@ async function handleSingleItemOrder(session, stripe) {
       itemPrice,
       total: amountCents / 100,
       orderId,
+      // Itemised breakdown so the receipt shows the same service-fee + GST
+      // commission structure the buyer saw at checkout.
+      invoice: {
+        items: [{ name: cardName || 'Trading Card', quantity: 1, total: itemPrice }],
+        subtotal: itemPrice,
+        serviceFee: commissionAud,
+        gst: gstAud,
+        discount: discountAud,
+        total: amountCents / 100,
+        businessName: null,
+        abn: null,
+        orderDate: null,
+      },
     });
   }
 

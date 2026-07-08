@@ -184,7 +184,10 @@ const CheckoutPage = () => {
 
   const clientSubtotal = flatItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
   const subtotal = pricing?.subtotalAud ?? clientSubtotal;
-  const tax = pricing ? (Number(pricing.commissionAud || 0) + Number(pricing.gstAud || 0)) : 0;
+  // Platform commission and GST are distinct charges (and distinct Stripe line
+  // items) — shown as separate "Service fee" and "GST" lines, never merged.
+  const serviceFee = pricing ? Number(pricing.commissionAud || 0) : 0;
+  const gst = pricing ? Number(pricing.gstAud || 0) : 0;
   const discount = pricing && !pricing.promoError ? Number(pricing.discountAud || 0) : 0;
   const total = pricing?.totalAud ?? clientSubtotal;
   const appliedPromoCode = discount > 0 ? promoCode : '';
@@ -271,7 +274,8 @@ const CheckoutPage = () => {
           <OrderSummary
             cartItems={flatItems}
             subtotal={subtotal}
-            tax={tax}
+            serviceFee={serviceFee}
+            gst={gst}
             discount={discount}
             total={total}
             onEditCart={() => navigate('/browse')}
@@ -337,7 +341,8 @@ const CheckoutPage = () => {
               sameAsShipping={sameAsShipping}
               items={flatItems}
               subtotal={subtotal}
-              tax={tax}
+              serviceFee={serviceFee}
+              gst={gst}
               discount={discount}
               total={total}
             />
