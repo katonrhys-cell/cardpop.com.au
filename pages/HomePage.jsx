@@ -233,7 +233,7 @@ const HomePage = () => {
         // Use 5-minute cache for homepage data (user sees fresh content on repeat visits)
         const [listingsRes, sellersRes] = await Promise.all([
           cachedQuery('homepage_featured_cards', () =>
-            supabase.from('vault_items').select('*, owner:profiles!owner_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count), vault_images(*)').eq('is_public', true).neq('listing_type', 'Private').order('created_at', { ascending: false }).limit(4),
+            supabase.from('vault_items').select('*, owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count), vault_images(*)').eq('is_public', true).neq('listing_type', 'Private').order('created_at', { ascending: false }).limit(4),
             5 * 60 * 1000
           ),
           cachedQuery('homepage_featured_sellers', () =>

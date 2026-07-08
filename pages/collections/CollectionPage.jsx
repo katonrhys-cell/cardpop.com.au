@@ -445,14 +445,14 @@ const CollectionPage = () => {
     const loadHolyGrail = async () => {
       try {
         let query = supabase.from('vault_items')
-          .select('*, vault_images(*), owner:profiles!owner_id(*)')
+          .select('*, vault_images(*), owner:profiles!vault_items_owner_id_fkey(*)')
           .eq('is_public', true)
           .gt('estimated_value_aud', 0)
           .order('estimated_value_aud', { ascending: false })
           .limit(6);
         if (categoryId) query = query.or(`category_id.eq.${categoryId},franchise_id.eq.${categoryId}`);
         const [pinned, { data: featured }] = await Promise.all([
-          fetchPinnedSectionItems(slug, 'holy_grail', '*, vault_images(*), owner:profiles!owner_id(*)'),
+          fetchPinnedSectionItems(slug, 'holy_grail', '*, vault_images(*), owner:profiles!vault_items_owner_id_fkey(*)'),
           query,
         ]);
         if (cancelled) return;
