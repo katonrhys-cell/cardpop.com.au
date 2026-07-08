@@ -64,7 +64,7 @@ describe('resolveSuggestion', () => {
   afterEach(() => vi.restoreAllMocks());
 
   it('resolves from the inline place with no network request', async () => {
-    const fetchSpy = vi.spyOn(global, 'fetch');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const result = await resolveSuggestion({ placeId: 'abc123', place: AWS_PLACE });
     expect(result).toMatchObject({ address: '1 Martin Place', suburb: 'Sydney', state: 'NSW', postcode: '2000' });
     expect(fetchSpy).not.toHaveBeenCalled();
