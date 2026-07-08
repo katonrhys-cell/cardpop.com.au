@@ -3,6 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import { Star, ShieldCheck, RefreshCw } from 'lucide-react';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import { isVerified } from '@/utils/verification.js';
+import { toCdnUrl } from '@/utils/imageUrl.js';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -36,7 +37,7 @@ const ReviewCard = ({ review }) => {
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary shrink-0 overflow-hidden">
             {author?.avatar_url
-              ? <img src={author.avatar_url} alt={author.display_name} className="w-full h-full object-cover" />
+              ? <img src={toCdnUrl(author.avatar_url)} alt={author.display_name} className="w-full h-full object-cover" />
               : (author?.display_name || author?.username || '?')[0].toUpperCase()}
           </div>
           <div>

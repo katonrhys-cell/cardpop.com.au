@@ -5,7 +5,7 @@ import { Heart, ZoomIn } from 'lucide-react';
 // Lazy: the zoom modal drags framer-motion with it — load it only on demand.
 const ImageZoomModal = lazy(() => import('@/components/ImageZoomModal.jsx'));
 import CardImage from '@/components/CardImage.jsx';
-import { getCardImage, CARD_GRID_SIZES } from '@/utils/imageUrl.js';
+import { getCardImage, CARD_GRID_SIZES, toCdnUrl } from '@/utils/imageUrl.js';
 import { isVerified } from '@/utils/verification.js';
 import { toast } from 'sonner';
 import VerifiedBadge from '@/components/VerifiedBadge.jsx';
@@ -215,7 +215,7 @@ const MarketplaceListingCard = ({ listing }) => {
             >
               <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
                 {sellerObj?.avatar_url ? (
-                  <img src={sellerObj.avatar_url} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" width="32" height="32" decoding="async" />
+                  <img src={toCdnUrl(sellerObj.avatar_url)} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" width="32" height="32" decoding="async" />
                 ) : (
                   (sellerObj?.display_name || sellerObj?.username || 'S')[0].toUpperCase()
                 )}
