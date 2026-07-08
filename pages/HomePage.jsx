@@ -676,13 +676,13 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* ── Recent vault additions ────────────────────────────────────────── */}
+      {/* ── Featured cards ────────────────────────────────────────────────── */}
       <section className="py-24 bg-muted/30 border-t border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-end justify-between mb-12">
             <div>
-              <h2 className="text-3xl font-bold font-serif mb-2">Recent Vault Additions</h2>
-              <p className="text-muted-foreground">Fresh listings from Australian collectors.</p>
+              <h2 className="text-3xl font-bold font-serif mb-2">Featured Cards</h2>
+              <p className="text-muted-foreground">Handpicked listings from Australian collectors.</p>
             </div>
             <Button asChild variant="ghost" className="hidden sm:flex font-bold hover:bg-muted">
               <Link to="/marketplace">View All <ArrowRight className="ml-2 w-4 h-4" /></Link>
