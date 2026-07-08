@@ -40,10 +40,30 @@ describe('psaApiClient.lookupCard', () => {
     expect(result).toBeNull();
   });
 
-  it('throws on a non-404 error response', async () => {
+  it('throws on a persistent 5xx after exhausting retries', async () => {
     global.fetch.mockResolvedValue(fetchResponse({ ok: false, status: 500, statusText: 'Server Error' }));
     await expect(psaApiClient.lookupCard({ gradingNumber: '123' }))
       .rejects.toThrow(/PSA API error: 500 Server Error/);
+    // Retried up to the attempt cap rather than giving up on the first blip.
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('retries a transient 5xx and returns the cert once it recovers', async () => {
+    const cert = { PSACert: { CertNumber: '123', Grade: '9' } };
+    global.fetch
+      .mockResolvedValueOnce(fetchResponse({ ok: false, status: 503, statusText: 'Unavailable' }))
+      .mockResolvedValueOnce(fetchResponse({ body: cert }));
+
+    const result = await psaApiClient.lookupCard({ gradingNumber: '123' });
+    expect(result).toEqual(cert);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry a definitive auth error (403)', async () => {
+    global.fetch.mockResolvedValue(fetchResponse({ ok: false, status: 403, statusText: 'Forbidden' }));
+    await expect(psaApiClient.lookupCard({ gradingNumber: '123' }))
+      .rejects.toThrow(/PSA API error: 403 Forbidden/);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   it('propagates a network/fetch failure', async () => {

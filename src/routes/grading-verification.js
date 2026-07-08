@@ -50,7 +50,16 @@ router.post('/verify', async (req, res) => {
     res.json(result);
   } catch (error) {
     logger.error(`[GRADING_VERIFICATION] Verification error: ${error.message}`);
-    res.status(400).json({ error: error.message });
+    // A company we don't support yet is a capability gap, not an outage.
+    if (/not yet implemented/i.test(error.message)) {
+      return res.status(501).json({ error: error.message });
+    }
+    // Any other throw means the live lookup failed and we had no cached result
+    // to fall back on — an upstream-availability problem, not a bad request.
+    // Return 503 (and a generic message; the real error is logged server-side).
+    res.status(503).json({
+      error: 'Unable to reach the verification service right now. Please try again shortly.'
+    });
   }
 });
 
