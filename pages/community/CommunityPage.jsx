@@ -95,8 +95,8 @@ const CommunityPage = () => {
     supabase
       .from('business_profiles')
       .select('*')
-      .eq('is_active', true)
-      .order('brand_name', { ascending: true })
+      .eq('storefront_status', 'approved')
+      .order('business_name', { ascending: true })
       .then(({ data, error }) => {
         if (cancelled) return;
         if (error) { setRetailersError('Unable to load retailers right now.'); return; }
@@ -406,7 +406,7 @@ const CommunityPage = () => {
                       {retailer.logo_url ? (
                         <img
                           src={retailer.logo_url}
-                          alt={retailer.brand_name}
+                          alt={retailer.business_name}
                           className="h-12 w-12 rounded-xl object-cover border border-border flex-shrink-0"
                         />
                       ) : (
@@ -415,21 +415,21 @@ const CommunityPage = () => {
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold truncate">{retailer.brand_name}</p>
-                        {retailer.category && (
-                          <Badge variant="outline" className="text-xs mt-0.5">{retailer.category}</Badge>
+                        <p className="font-semibold truncate">{retailer.business_name}</p>
+                        {retailer.business_type && (
+                          <Badge variant="outline" className="text-xs mt-0.5">{retailer.business_type}</Badge>
                         )}
                       </div>
                     </div>
                     <p className="text-sm text-muted-foreground line-clamp-2">
-                      {retailer.description || 'Authorized CardPop partner.'}
+                      {retailer.tagline || retailer.about || 'Authorized CardPop partner.'}
                     </p>
-                    {retailer.affiliate_link && (
+                    {retailer.website_url && (
                       <Button
                         variant="outline"
                         size="sm"
                         className="mt-auto gap-1.5"
-                        onClick={() => window.open(retailer.affiliate_link, '_blank')}
+                        onClick={() => window.open(retailer.website_url, '_blank')}
                       >
                         <ExternalLink className="w-3.5 h-3.5" /> Visit Store
                       </Button>

@@ -262,6 +262,7 @@ const AdminDashboard = () => {
         <h2 className="text-2xl font-serif font-bold text-foreground">Content &amp; Platform</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <ManagementBox title="Marketplace" description="Manage marketplace listings." icon={Store} link="/admin/marketplace" />
+          <ManagementBox title="Business Profiles" description="Curate retail storefronts shown on the Retailers directory and map." icon={Building2} link="/admin/business-profiles" />
           <ManagementBox title="Category Mapping" description="Map categories to collections." icon={Map} link="/admin/category-mapping" />
           <ManagementBox title="Events Management" description="Create and manage events." icon={Calendar} link="/admin/events" />
           <ManagementBox title="Content Management" description="Edit blog, pages and articles." icon={FileText} link="/admin/content" />

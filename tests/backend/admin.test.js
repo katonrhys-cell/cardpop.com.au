@@ -277,3 +277,85 @@ describe('PATCH /disputes/:id', () => {
     expect(res.status).toBe(404);
   });
 });
+
+// ─── business-profiles ───────────────────────────────────────────────────────
+
+describe('GET /business-profiles', () => {
+  it('lists every business profile regardless of status', async () => {
+    queueFrom(makeBuilder({ data: [{ id: 'b1' }, { id: 'b2' }], error: null }));
+    const res = await request(app).get('/admin/business-profiles');
+    expect(res.status).toBe(200);
+    expect(res.body.businessProfiles).toHaveLength(2);
+  });
+
+  it('rejects non-admins', async () => {
+    mockIsAdminUser.mockResolvedValue(false);
+    const res = await request(app).get('/admin/business-profiles');
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('POST /business-profiles', () => {
+  it('creates a profile linked to the user resolved by email', async () => {
+    queueFrom(
+      makeBuilder({ data: { id: 'u9' }, error: null }), // profiles lookup by email
+      makeBuilder({ data: { id: 'b1', business_name: 'Card Corner', user_id: 'u9' }, error: null }), // insert
+      makeBuilder(), // audit insert
+    );
+    const res = await request(app).post('/admin/business-profiles').send({
+      business_name: 'Card Corner',
+      user_email: 'Owner@Example.com',
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.businessProfile).toMatchObject({ id: 'b1', user_id: 'u9' });
+  });
+
+  it('404s when no account matches the given email', async () => {
+    queueFrom(makeBuilder({ data: null, error: null }));
+    const res = await request(app).post('/admin/business-profiles').send({
+      business_name: 'Card Corner',
+      user_email: 'nobody@example.com',
+    });
+    expect(res.status).toBe(404);
+  });
+
+  it('requires a business name', async () => {
+    const res = await request(app).post('/admin/business-profiles').send({ user_email: 'a@b.com' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects an invalid user_email', async () => {
+    const res = await request(app).post('/admin/business-profiles').send({ business_name: 'X', user_email: 'not-an-email' });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('PATCH /business-profiles/:id', () => {
+  it('approves a pending profile and stamps the reviewer', async () => {
+    const updateBuilder = makeBuilder({ data: { id: 'b1', storefront_status: 'approved' }, error: null });
+    queueFrom(updateBuilder, makeBuilder());
+    const res = await request(app).patch('/admin/business-profiles/b1').send({ storefront_status: 'approved' });
+    expect(res.status).toBe(200);
+    expect(updateBuilder.update).toHaveBeenCalledWith(expect.objectContaining({
+      storefront_status: 'approved', reviewed_by: 'admin-1', rejection_reason: null,
+    }));
+  });
+
+  it('edits store details without touching status', async () => {
+    const updateBuilder = makeBuilder({ data: { id: 'b1', store_suburb: 'Parramatta' }, error: null });
+    queueFrom(updateBuilder, makeBuilder());
+    const res = await request(app).patch('/admin/business-profiles/b1').send({ store_suburb: 'Parramatta' });
+    expect(res.status).toBe(200);
+    expect(updateBuilder.update).toHaveBeenCalledWith(expect.not.objectContaining({ reviewed_by: expect.anything() }));
+  });
+
+  it('rejects an empty body', async () => {
+    const res = await request(app).patch('/admin/business-profiles/b1').send({});
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects an invalid storefront_status', async () => {
+    const res = await request(app).patch('/admin/business-profiles/b1').send({ storefront_status: 'live' });
+    expect(res.status).toBe(400);
+  });
+});

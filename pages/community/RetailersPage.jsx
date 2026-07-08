@@ -22,15 +22,15 @@ const RetailersPage = () => {
       const { data, error: fetchError } = await supabase
         .from('business_profiles')
         .select('*')
-        .eq('is_active', true)
-        .order('brand_name', { ascending: true });
+        .eq('storefront_status', 'approved')
+        .order('business_name', { ascending: true });
 
       if (fetchError) throw fetchError;
 
       const list = data || [];
       setRetailers(list);
 
-      const cats = ['All', ...new Set(list.map(r => r.category).filter(Boolean))].sort((a, b) =>
+      const cats = ['All', ...new Set(list.map(r => r.business_type).filter(Boolean))].sort((a, b) =>
         a === 'All' ? -1 : b === 'All' ? 1 : a.localeCompare(b)
       );
       setCategories(cats);
@@ -47,9 +47,10 @@ const RetailersPage = () => {
 
   const filtered = retailers.filter(r => {
     const matchesSearch = !search.trim() ||
-      (r.brand_name || '').toLowerCase().includes(search.toLowerCase()) ||
-      (r.description || '').toLowerCase().includes(search.toLowerCase());
-    const matchesCat = activeCategory === 'All' || r.category === activeCategory;
+      (r.business_name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (r.tagline || '').toLowerCase().includes(search.toLowerCase()) ||
+      (r.about || '').toLowerCase().includes(search.toLowerCase());
+    const matchesCat = activeCategory === 'All' || r.business_type === activeCategory;
     return matchesSearch && matchesCat;
   });
 
@@ -139,7 +140,7 @@ const RetailersPage = () => {
                   {retailer.logo_url ? (
                     <img
                       src={retailer.logo_url}
-                      alt={retailer.brand_name}
+                      alt={retailer.business_name}
                       className="h-12 w-12 rounded-xl object-cover border border-border flex-shrink-0"
                     />
                   ) : (
@@ -149,14 +150,12 @@ const RetailersPage = () => {
                   )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                      <p className="font-bold truncate text-sm">{retailer.brand_name}</p>
-                      {retailer.is_verified && (
-                        <ShieldCheck className="w-4 h-4 text-primary flex-shrink-0" />
-                      )}
+                      <p className="font-bold truncate text-sm">{retailer.business_name}</p>
+                      <ShieldCheck className="w-4 h-4 text-primary flex-shrink-0" />
                     </div>
-                    {retailer.category && (
+                    {retailer.business_type && (
                       <Badge variant="outline" className="text-[10px] font-semibold mt-0.5">
-                        {retailer.category}
+                        {retailer.business_type}
                       </Badge>
                     )}
                   </div>
@@ -164,39 +163,39 @@ const RetailersPage = () => {
 
                 {/* Description */}
                 <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed flex-1">
-                  {retailer.description || 'Authorized CardPop partner.'}
+                  {retailer.tagline || retailer.about || 'Authorized CardPop partner.'}
                 </p>
 
                 {/* Meta */}
                 <div className="flex flex-col gap-1.5">
-                  {retailer.location && (
+                  {retailer.has_physical_store && (retailer.store_suburb || retailer.store_state) && (
                     <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <MapPin className="w-3.5 h-3.5 shrink-0" />
-                      {retailer.location}
+                      {[retailer.store_suburb, retailer.store_state].filter(Boolean).join(', ')}
                     </span>
                   )}
-                  {retailer.website && (
+                  {retailer.website_url && (
                     <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Globe className="w-3.5 h-3.5 shrink-0" />
                       <a
-                        href={retailer.website}
+                        href={retailer.website_url}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="hover:text-primary transition-colors truncate"
                       >
-                        {retailer.website.replace(/^https?:\/\//, '')}
+                        {retailer.website_url.replace(/^https?:\/\//, '')}
                       </a>
                     </span>
                   )}
                 </div>
 
                 {/* CTA */}
-                {retailer.affiliate_link && (
+                {retailer.website_url && (
                   <Button
                     variant="outline"
                     size="sm"
                     className="mt-auto gap-1.5 rounded-xl font-bold text-xs"
-                    onClick={() => window.open(retailer.affiliate_link, '_blank')}
+                    onClick={() => window.open(retailer.website_url, '_blank')}
                   >
                     <ExternalLink className="w-3.5 h-3.5" /> Visit Store
                   </Button>
