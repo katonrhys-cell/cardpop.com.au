@@ -78,6 +78,42 @@ export const psaApiClient = {
 
     logger.error(`[PSA_API] Lookup failed for ${cert}: ${lastError.message}`);
     throw lastError;
+  },
+
+  // Card images live on a separate PSA endpoint from the cert record. Images are
+  // purely decorative here, so this is best-effort: any failure resolves to an
+  // empty list rather than throwing, so it can never downgrade a cert lookup
+  // that otherwise succeeded.
+  async lookupImages({ gradingNumber }) {
+    if (!PSA_API_TOKEN) return [];
+    if (!gradingNumber || typeof gradingNumber !== 'string') return [];
+
+    const cert = gradingNumber.trim();
+    if (!/^[A-Za-z0-9-]+$/.test(cert)) return [];
+
+    try {
+      const response = await fetch(
+        `${PSA_API_BASE}/cert/GetImagesByCertNumber/${encodeURIComponent(cert)}`,
+        {
+          method: 'GET',
+          headers: {
+            'authorization': `bearer ${PSA_API_TOKEN}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        logger.warn(`[PSA_API] Image lookup for ${cert} returned ${response.status}`);
+        return [];
+      }
+
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
+    } catch (error) {
+      logger.warn(`[PSA_API] Image lookup failed for ${cert}: ${error.message}`);
+      return [];
+    }
   }
 };
 
