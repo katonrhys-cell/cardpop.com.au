@@ -23,6 +23,7 @@ const AccountProfile = () => {
   const [formData, setFormData] = useState({
     display_name: '',
     bio: '',
+    personal_collection: '',
     location_state: '',
     location_suburb: '',
     social_twitter: '',
@@ -40,6 +41,7 @@ const AccountProfile = () => {
       setFormData({
         display_name: currentUser.display_name || currentUser.name || '',
         bio: currentUser.bio || '',
+        personal_collection: currentUser.personal_collection || '',
         location_state: currentUser.location_state || '',
         location_suburb: currentUser.location_suburb || '',
         social_twitter: socials.twitter || '',
@@ -105,6 +107,7 @@ const AccountProfile = () => {
       const { error: updateErr } = await supabase.from('profiles').update({
         display_name: formData.display_name,
         bio: formData.bio,
+        personal_collection: formData.personal_collection,
         location_state: formData.location_state,
         location_suburb: formData.location_suburb,
         avatar_url,
@@ -179,6 +182,12 @@ const AccountProfile = () => {
               </div>
             </div>
             <div className="p-8 space-y-6">
+              {formData.personal_collection && (
+                <div>
+                  <h3 className="font-bold text-xs uppercase tracking-wider text-muted-foreground mb-2">Personal Collection (PC)</h3>
+                  <p className="text-foreground text-sm leading-relaxed">{formData.personal_collection}</p>
+                </div>
+              )}
               <div>
                 <h3 className="font-bold text-xs uppercase tracking-wider text-muted-foreground mb-2">About</h3>
                 <p className="text-foreground text-sm leading-relaxed">{formData.bio || 'No bio provided.'}</p>
@@ -255,6 +264,19 @@ const AccountProfile = () => {
                     className="h-12 rounded-xl font-medium shadow-sm"
                     placeholder="e.g. RareCardHunter"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="personal_collection" className="font-bold text-foreground">Personal Collection (PC)</Label>
+                  <Input
+                    id="personal_collection"
+                    name="personal_collection"
+                    value={formData.personal_collection}
+                    onChange={handleChange}
+                    className="h-12 rounded-xl font-medium shadow-sm"
+                    placeholder="e.g. Pokémon WOTC Charizards, vintage Yu-Gi-Oh"
+                  />
+                  <p className="text-xs text-muted-foreground font-medium">What you personally collect. Shown on your public profile so others know what you chase.</p>
                 </div>
 
                 <div className="space-y-2">

@@ -208,6 +208,17 @@ const PublicSellerProfilePage = () => {
                 </div>
               </div>
 
+              {/* Personal Collection (PC) */}
+              {seller.personal_collection && (
+                <div className="max-w-3xl mb-6 flex flex-wrap items-start gap-2 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+                  <Package className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-primary">Personal Collection (PC)</span>
+                    <p className="text-sm font-medium text-foreground/90 leading-relaxed">{seller.personal_collection}</p>
+                  </div>
+                </div>
+              )}
+
               {/* Bio */}
               <p className="text-foreground/80 leading-relaxed max-w-3xl mb-6">
                 {seller.bio || "This collector hasn't added a bio yet."}
