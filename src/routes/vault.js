@@ -61,7 +61,7 @@ router.get('/public', async (req, res) => {
 
   let query = supabase
     .from('vault_items')
-    .select('*, profiles!owner_id(username, business_name)', { count: 'exact' })
+    .select('*, profiles!vault_items_owner_id_fkey(username, business_name)', { count: 'exact' })
     .eq('is_public', true);
 
   if (userId?.trim()) query = query.eq('owner_id', userId.trim());
@@ -97,7 +97,7 @@ router.get('/:id', optionalAuthMiddleware, async (req, res) => {
 
   const { data: product, error } = await supabase
     .from('vault_items')
-    .select('*, profiles!owner_id(username, business_name)')
+    .select('*, profiles!vault_items_owner_id_fkey(username, business_name)')
     .eq('id', id.trim())
     .single();
 

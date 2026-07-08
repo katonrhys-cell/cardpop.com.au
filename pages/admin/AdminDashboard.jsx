@@ -110,7 +110,7 @@ const AdminDashboard = () => {
       try {
         let vaultQuery = supabase
           .from('vault_items')
-          .select('*, profiles(display_name, full_name)', { count: 'exact' })
+          .select('*, profiles!vault_items_owner_id_fkey(display_name, full_name)', { count: 'exact' })
           .order('created_at', { ascending: false })
           .range(0, 19);
 
