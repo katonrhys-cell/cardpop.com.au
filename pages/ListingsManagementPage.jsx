@@ -62,7 +62,7 @@ const ListingsManagementPage = () => {
         .order(sortColumn, { ascending });
 
       if (searchQuery) query = query.ilike('vault_items.card_name', `%${searchQuery}%`);
-      if (['active', 'sold', 'archived'].includes(statusFilter)) query = query.eq('status', statusFilter);
+      if (['active', 'sold', 'archived', 'pending'].includes(statusFilter)) query = query.eq('status', statusFilter);
 
       const { data: items, count, error } = await query;
       if (error) throw error;
@@ -130,6 +130,20 @@ const ListingsManagementPage = () => {
       fetchListings();
     } catch (err) {
       toast.error('Bulk delete encountered errors');
+    }
+  };
+
+  // Approve a listing that's awaiting review (listing_approval_required). Moving
+  // it to 'active' publishes it to the marketplace.
+  const handleApprove = async (listing) => {
+    try {
+      const { error } = await supabase.from('listings').update({ status: 'active' }).eq('id', listing.id);
+      if (error) throw error;
+      toast.success('Listing approved & published');
+      fetchListings();
+      if (selectedListing?.id === listing.id) setIsDetailModalOpen(false);
+    } catch (err) {
+      toast.error('Failed to approve listing');
     }
   };
 
@@ -210,6 +224,7 @@ const ListingsManagementPage = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="pending">Pending Approval</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="sold">Sold</SelectItem>
                   <SelectItem value="archived">Archived</SelectItem>
@@ -305,6 +320,8 @@ const ListingsManagementPage = () => {
                           <Badge className="bg-emerald-500/10 text-emerald-600 border-none">Active</Badge>
                         ) : listing.status === 'sold' ? (
                           <Badge className="bg-brand-red/10 text-brand-red border-none">Sold</Badge>
+                        ) : listing.status === 'pending' ? (
+                          <Badge className="bg-amber-500/10 text-amber-600 border-none">Pending Approval</Badge>
                         ) : (
                           <Badge variant="secondary" className="bg-muted text-muted-foreground border-none capitalize">{listing.status || 'archived'}</Badge>
                         )}
@@ -323,6 +340,9 @@ const ListingsManagementPage = () => {
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => openDetailModal(listing)}>View Details</DropdownMenuItem>
+                            {listing.status === 'pending' && (
+                              <DropdownMenuItem className="text-emerald-600 focus:text-emerald-600" onClick={() => handleApprove(listing)}>Approve &amp; publish</DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onClick={() => openStatusModal(listing)}>Change Status</DropdownMenuItem>
                             {listing.status !== 'archived' && (
                               <DropdownMenuItem onClick={() => handleArchive(listing)}>Archive (remove from marketplace)</DropdownMenuItem>
