@@ -85,12 +85,15 @@ const SellersManagementPage = () => {
     setUpdating(sellerId);
     try {
       const newStatus = !currentStatus;
-      const { error } = await supabase
-        .from('profiles')
-        .update({ is_featured_seller: newStatus })
-        .eq('id', sellerId);
+      // Toggling another seller's row can't go through the anon client directly:
+      // the profiles UPDATE policy only permits auth.uid() = id, so an admin's
+      // write silently matches 0 rows. Route it through the admin-only
+      // SECURITY DEFINER RPC instead, which also tells us whether the row existed.
+      const { data: updated, error } = await supabase
+        .rpc('admin_set_featured_seller', { target_id: sellerId, featured: newStatus });
 
       if (error) throw error;
+      if (updated !== true) throw new Error('Seller not found or update was not applied.');
 
       toast.success(newStatus ? 'Seller promoted to featured.' : 'Seller removed from featured.');
       logAdminAction('update_featured_seller', { sellerId, is_featured_seller: newStatus });
