@@ -13,6 +13,10 @@ export async function priceCart(items, userId) {
   let itemsCents = 0;
   let commissionCents = 0;
   let gstCents = 0;
+  // Only CardPop Shop items (platform-owned stock) attract the flat shipping
+  // fee — marketplace listings ship seller-arranged. Tracked separately so both
+  // the fee and the free-shipping threshold key off the shop-item subtotal.
+  let shopItemsCents = 0;
 
   for (const raw of items) {
     const type = raw?.type;
@@ -34,6 +38,7 @@ export async function priceCart(items, userId) {
       const lineGstCents = gstEnabled ? Math.round(lineCents * (gstRate / 100)) : 0;
 
       itemsCents += lineCents;
+      shopItemsCents += lineCents;
       gstCents += lineGstCents;
 
       lineItems.push({
@@ -80,12 +85,29 @@ export async function priceCart(items, userId) {
     }
   }
 
+  // Flat-rate shipping on the CardPop Shop portion of the cart. Both values are
+  // set in Platform Settings (Admin → Listings). The rate is charged once per
+  // order unless the shop-item subtotal reaches the free-shipping threshold; a
+  // rate of 0 (or no shop items) means nothing is charged, and a threshold of 0
+  // means there's no free tier. The rate is treated as GST-inclusive (AUD
+  // consumer prices are), so no extra GST line is added on top of it.
+  const shipRateCents = Math.round(Number(await getPlatformSetting('default_shipping_rate_aud', 0)) * 100);
+  const freeThresholdCents = Math.round(Number(await getPlatformSetting('free_shipping_threshold_aud', 0)) * 100);
+  let shippingCents = 0;
+  if (shopItemsCents > 0 && shipRateCents > 0) {
+    const qualifiesForFree = freeThresholdCents > 0 && shopItemsCents >= freeThresholdCents;
+    shippingCents = qualifiesForFree ? 0 : shipRateCents;
+  }
+
   if (commissionCents > 0) {
     lineItems.push({ price_data: { currency: 'aud', product_data: { name: 'Platform Fee' }, unit_amount: commissionCents }, quantity: 1 });
   }
   if (gstCents > 0) {
     lineItems.push({ price_data: { currency: 'aud', product_data: { name: 'GST' }, unit_amount: gstCents }, quantity: 1 });
   }
+  if (shippingCents > 0) {
+    lineItems.push({ price_data: { currency: 'aud', product_data: { name: 'Shipping' }, unit_amount: shippingCents }, quantity: 1 });
+  }
 
-  return { lineItems, orderLines, itemsCents, commissionCents, gstCents, grandCents: itemsCents + commissionCents + gstCents };
+  return { lineItems, orderLines, itemsCents, commissionCents, gstCents, shippingCents, grandCents: itemsCents + commissionCents + gstCents + shippingCents };
 }

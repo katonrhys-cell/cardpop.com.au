@@ -115,6 +115,7 @@ describe('POST /create-checkout', () => {
 
   it("charges the seller's counter amount, not the buyer's original offer, when checking out on a countered offer", async () => {
     mockMaybeSingle
+      .mockResolvedValueOnce({ data: { value: false }, error: null }) // email_verification_required (gate off)
       .mockResolvedValueOnce({ data: MOCK_LISTING, error: null }) // listing lookup
       .mockResolvedValueOnce({
         data: {
@@ -239,6 +240,11 @@ const gstSettings = () => {
     .mockResolvedValueOnce({ data: { value: 10 }, error: null });    // gst_rate_pct
 };
 
+// The checkout routes now run requireEmailVerified first, which reads the
+// email_verification_required flag via one maybeSingle. Queue it OFF so the
+// gate passes and the following mocks line up with the handler's own reads.
+const emailVerifyOff = () => mockMaybeSingle.mockResolvedValueOnce({ data: { value: false }, error: null });
+
 describe('POST /calculate-cart', () => {
   it('returns 400 when items is empty', async () => {
     const res = await request(app).post('/calculate-cart').send({ items: [] });
@@ -256,6 +262,44 @@ describe('POST /calculate-cart', () => {
     expect(res.body.subtotalAud).toBe(200);
     expect(res.body.commissionAud).toBe(0);
     expect(res.body.gstAud).toBe(20);
+    expect(res.body.shippingAud).toBe(0);
+    expect(res.body.totalAud).toBe(220);
+  });
+
+  // priceCart reads the two shipping settings AFTER the item loop, so queue them
+  // last (rate then threshold). Both come from Platform Settings (Admin → Listings).
+  const shippingSettings = (rate, threshold) => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: { value: rate }, error: null })       // default_shipping_rate_aud
+      .mockResolvedValueOnce({ data: { value: threshold }, error: null }); // free_shipping_threshold_aud
+  };
+
+  it('charges the flat shipping rate on a shop order below the free-shipping threshold', async () => {
+    gstSettings();
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: { id: 'p1', title: 'Single Card', price_aud: 50, stock_quantity: 5, status: 'active' },
+      error: null,
+    });
+    shippingSettings(9.95, 100);
+    const res = await request(app).post('/calculate-cart').send({ items: [{ type: 'shop', id: 'p1', quantity: 1 }] });
+    expect(res.status).toBe(200);
+    expect(res.body.subtotalAud).toBe(50);
+    expect(res.body.gstAud).toBe(5);
+    expect(res.body.shippingAud).toBe(9.95);
+    expect(res.body.totalAud).toBe(64.95);
+  });
+
+  it('gives free shipping once the shop subtotal reaches the threshold', async () => {
+    gstSettings();
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: { id: 'p1', title: 'Booster Box', price_aud: 100, stock_quantity: 5, status: 'active' },
+      error: null,
+    });
+    shippingSettings(9.95, 100);
+    const res = await request(app).post('/calculate-cart').send({ items: [{ type: 'shop', id: 'p1', quantity: 2 }] });
+    expect(res.status).toBe(200);
+    expect(res.body.subtotalAud).toBe(200);
+    expect(res.body.shippingAud).toBe(0);
     expect(res.body.totalAud).toBe(220);
   });
 });
@@ -272,6 +316,7 @@ describe('POST /create-cart-checkout', () => {
   });
 
   it('returns 409 when a shop item is out of stock', async () => {
+    emailVerifyOff();
     gstSettings();
     mockMaybeSingle.mockResolvedValueOnce({
       data: { id: 'p1', title: 'Booster Box', price_aud: 100, stock_quantity: 0, status: 'active' },
@@ -284,6 +329,7 @@ describe('POST /create-cart-checkout', () => {
   });
 
   it('returns 403 when buying your own listing', async () => {
+    emailVerifyOff();
     gstSettings();
     mockMaybeSingle.mockResolvedValueOnce({
       data: { id: 'l1', price_aud: 50, seller_id: 'user-123', status: 'active', vault_item: { card_name: 'X' }, seller: { seller_tier: 'none' } },
@@ -296,6 +342,7 @@ describe('POST /create-cart-checkout', () => {
   });
 
   it('returns 400 for an unknown item type', async () => {
+    emailVerifyOff();
     gstSettings();
     const res = await request(app).post('/create-cart-checkout').send({
       items: [{ type: 'mystery', id: 'x' }], successUrl: 'a', cancelUrl: 'b',
@@ -304,6 +351,7 @@ describe('POST /create-cart-checkout', () => {
   });
 
   it('creates a Stripe session and returns the URL for a valid shop cart', async () => {
+    emailVerifyOff();
     gstSettings();
     mockMaybeSingle.mockResolvedValueOnce({
       data: { id: 'p1', title: 'Booster Box', price_aud: 100, stock_quantity: 5, status: 'active' },
@@ -319,5 +367,17 @@ describe('POST /create-cart-checkout', () => {
     expect(res.body.url).toBe('https://stripe.com/pay/cs_cart');
     expect(res.body.total).toBe(110);
     expect(mockStripe.checkout.sessions.create).toHaveBeenCalled();
+  });
+
+  it('blocks checkout with 403 when email verification is required and the buyer is unverified', async () => {
+    // requireEmailVerified reads the flag first; ON + a user with no
+    // email_confirmed_at (the auth mock) must be rejected before any pricing.
+    mockMaybeSingle.mockResolvedValueOnce({ data: { value: true }, error: null });
+    const res = await request(app).post('/create-cart-checkout').send({
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b',
+    });
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('EMAIL_NOT_VERIFIED');
+    expect(mockStripe.checkout.sessions.create).not.toHaveBeenCalled();
   });
 });

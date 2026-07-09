@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useDarkMode } from '@/hooks/useDarkMode.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { useIsDesktop } from '@/hooks/useIsDesktop.js';
 import CardPopLogo from '@/components/CardPopLogo.jsx';
 import { useCart } from '@/hooks/useCart.jsx';
@@ -48,6 +49,7 @@ export const COLLECTIONS_LIST = [...TCG_COLLECTIONS, ...SPORTS_COLLECTIONS].sort
 
 const Header = () => {
   const { isAuthenticated, currentUser, isAdmin, logout, isVerified, loading: authLoading } = useAuth();
+  const { settings } = usePlatformSettings();
   const { cartItems, setIsCartOpen } = useCart();
   const location = useLocation();
   const navigate = useNavigate();
@@ -264,7 +266,7 @@ const Header = () => {
               </Button>
             )}
 
-            {!authLoading && isAuthenticated && (
+            {!authLoading && isAuthenticated && settings.enable_trading !== false && (
               <Button asChild variant="ghost" size="icon" className="hidden sm:flex relative rounded-xl hover:bg-muted">
                 <Link to="/trade-requests" aria-label={tradeCount > 0 ? `Trade requests, ${tradeCount > 99 ? '99+' : tradeCount} pending` : 'Trade requests'}>
                   <ArrowRightLeft className="h-5 w-5" aria-hidden="true" />

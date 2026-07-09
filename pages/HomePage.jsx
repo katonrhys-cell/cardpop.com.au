@@ -233,7 +233,10 @@ const HomePage = () => {
         // Use 5-minute cache for homepage data (user sees fresh content on repeat visits)
         const [listingsRes, sellersRes] = await Promise.all([
           cachedQuery('homepage_featured_cards', async () => {
-            const SELECT = '*, owner:profiles!owner_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count), vault_images(*)';
+            // vault_items has more than one FK to profiles, so the embed must use
+            // the explicit constraint-name hint (!vault_items_owner_id_fkey) —
+            // the bare !owner_id hint returns a PostgREST 400.
+            const SELECT = '*, owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count), vault_images(*)';
             const LIMIT = 4;
             // Fresh builder per call — a Supabase query builder is single-use.
             const base = () => supabase.from('vault_items').select(SELECT).eq('is_public', true).neq('listing_type', 'Private');

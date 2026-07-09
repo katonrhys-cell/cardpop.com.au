@@ -158,4 +158,23 @@ const welcomeOfferIssueLimiter = rateLimit({
 	},
 });
 
-export { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, backupCodeLimiter, reportLimiter, resendVerificationLimiter, welcomeOfferIssueLimiter };
+// Pwned-password check limiter: 30 per 15 minutes per IP. The endpoint is a
+// thin k-anonymity proxy to HaveIBeenPwned (one outbound request per call), hit
+// on signup / password change, so cap it tightly enough that it can't be abused
+// as a general-purpose HIBP proxy while leaving room for genuine retries.
+const pwnedCheckLimiter = rateLimit({
+	windowMs: 15 * 60 * 1000,
+	max: 30,
+	standardHeaders: true,
+	legacyHeaders: false,
+	keyGenerator: (req) => ipKeyGenerator(req),
+	handler: (req, res) => {
+		logger.warn(`[RATE_LIMIT] Pwned-password check limit exceeded for IP: ${ipKeyGenerator(req)}`);
+		res.status(429).json({
+			error: 'Too many password checks, please try again later',
+			retryAfter: req.rateLimit.resetTime,
+		});
+	},
+});
+
+export { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, backupCodeLimiter, reportLimiter, resendVerificationLimiter, welcomeOfferIssueLimiter, pwnedCheckLimiter };

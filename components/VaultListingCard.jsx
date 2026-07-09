@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { VARIANT_BADGES } from '@/lib/cardVariants.js';
 import { formatAutograph, getRefractorLabel, getRefractorBadgeClass } from '@/lib/cardAttributeLabels.js';
-import { getCardImage, CARD_GRID_SIZES } from '@/utils/imageUrl.js';
+import { getCardImage, CARD_GRID_SIZES, toCdnUrl } from '@/utils/imageUrl.js';
 import { isVerified } from '@/utils/verification.js';
 import GradeBadge, { GRADE_BADGE } from '@/components/GradeBadge.jsx';
 
@@ -158,7 +158,7 @@ const VaultListingCard = ({ vaultItem, listing }) => {
             >
               <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
                 {sellerObj?.avatar_url ? (
-                  <img src={sellerObj.avatar_url} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" width="32" height="32" decoding="async" />
+                  <img src={toCdnUrl(sellerObj.avatar_url)} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" width="32" height="32" decoding="async" />
                 ) : (
                   (sellerObj?.display_name || sellerObj?.name || 'U')[0].toUpperCase()
                 )}

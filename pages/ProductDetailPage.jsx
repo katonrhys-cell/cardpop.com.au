@@ -147,7 +147,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
         // Only the 'vault' source reaches here.
         const { data, error: fetchError } = await supabase
           .from('vault_items')
-          .select('*, owner:profiles!owner_id(*)')
+          .select('*, owner:profiles!vault_items_owner_id_fkey(*)')
           .eq('id', id)
           .single();
 

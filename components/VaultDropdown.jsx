@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, LogOut, Settings, Package, ArrowRightLeft, ShieldAlert, LayoutDashboard, CheckCircle2, CalendarDays } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -16,6 +17,7 @@ import { VerificationBadge } from '@/components/VerificationBadge.jsx';
 
 const VaultDropdown = ({ isMobile = false }) => {
   const { currentUser, logout, isVerified, isAdmin } = useAuth();
+  const { settings } = usePlatformSettings();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -132,12 +134,14 @@ const VaultDropdown = ({ isMobile = false }) => {
             <span>My Vault</span>
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild className="cursor-pointer py-2.5">
-          <Link to="/trade-requests" className="flex items-center w-full">
-            <ArrowRightLeft className="mr-2 h-4 w-4" />
-            <span>Trade Requests</span>
-          </Link>
-        </DropdownMenuItem>
+        {settings.enable_trading !== false && (
+          <DropdownMenuItem asChild className="cursor-pointer py-2.5">
+            <Link to="/trade-requests" className="flex items-center w-full">
+              <ArrowRightLeft className="mr-2 h-4 w-4" />
+              <span>Trade Requests</span>
+            </Link>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem asChild className="cursor-pointer py-2.5">
           <Link to="/account/events" className="flex items-center w-full">
             <CalendarDays className="mr-2 h-4 w-4" />

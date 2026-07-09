@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Twitter, Instagram, Facebook, Youtube } from 'lucide-react';
 import CardPopLogo from '@/components/CardPopLogo.jsx';
 import NewsletterSignup from '@/components/NewsletterSignup.jsx';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 
 const DiscordIcon = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -19,6 +20,7 @@ const SOCIAL_LINKS = [
 ];
 
 const Footer = () => {
+  const { settings } = usePlatformSettings();
   return (
     <footer className="bg-secondary/30 text-foreground pt-12 pb-8 sm:pt-20 sm:pb-10 mt-auto border-t border-border">
       <div className="container-default">
@@ -58,7 +60,9 @@ const Footer = () => {
             <h4 className="font-bold mb-6 uppercase tracking-wider text-sm">Explore</h4>
             <ul className="space-y-4 text-sm text-muted-foreground font-medium">
               <li><Link to="/shop" className="hover:text-primary transition-colors">Shop</Link></li>
-              <li><Link to="/marketplace" className="hover:text-primary transition-colors">Marketplace</Link></li>
+              {settings.enable_marketplace !== false && (
+                <li><Link to="/marketplace" className="hover:text-primary transition-colors">Marketplace</Link></li>
+              )}
               <li><Link to="/analytics" className="hover:text-primary transition-colors">Analytics</Link></li>
               <li><Link to="/prices" className="hover:text-primary transition-colors">Card Prices (AUD)</Link></li>
               <li><Link to="/card-shops" className="hover:text-primary transition-colors">Card Shop Directory</Link></li>
@@ -70,7 +74,9 @@ const Footer = () => {
           <div>
             <h4 className="font-bold mb-6 uppercase tracking-wider text-sm">Connect</h4>
             <ul className="space-y-4 text-sm text-muted-foreground font-medium">
-              <li><Link to="/blog" className="hover:text-primary transition-colors">Blog</Link></li>
+              {settings.enable_blog !== false && (
+                <li><Link to="/blog" className="hover:text-primary transition-colors">Blog</Link></li>
+              )}
               <li><Link to="/community" className="hover:text-primary transition-colors">Community</Link></li>
               <li><Link to="/about" className="hover:text-primary transition-colors">About Us</Link></li>
               <li><Link to="/contact" className="hover:text-primary transition-colors">Contact</Link></li>

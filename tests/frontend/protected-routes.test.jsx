@@ -9,6 +9,14 @@ vi.mock('@/pages/VerificationPendingPage.jsx', () => ({
 }));
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
 
+// ProtectedAdminRoute reads require_mfa_admins from platform_settings; mock the
+// client so the MFA check resolves deterministically. Defaults to "off".
+const mockMaybeSingle = vi.hoisted(() => vi.fn(() => Promise.resolve({ data: null, error: null })));
+vi.mock('@/lib/supabaseClient.js', () => {
+  const chain = { select: () => chain, eq: () => chain, maybeSingle: () => mockMaybeSingle() };
+  return { supabase: { from: () => chain } };
+});
+
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import ProtectedRoute from '@/components/ProtectedRoute.jsx';
 import ProtectedAdminRoute from '@/components/ProtectedAdminRoute.jsx';
@@ -35,7 +43,9 @@ function renderProtected(authValues, { requireVerification = false } = {}) {
 }
 
 function renderAdmin(authValues) {
-  useAuth.mockReturnValue(authValues);
+  // Default listMFAFactors so the MFA check has a callable stub; individual
+  // tests override it to simulate enrolled / not-enrolled admins.
+  useAuth.mockReturnValue({ listMFAFactors: async () => ({ totp: [] }), ...authValues });
   return render(
     <MemoryRouter initialEntries={['/admin']}>
       <Routes>
@@ -48,13 +58,17 @@ function renderAdmin(authValues) {
           }
         />
         <Route path="/login" element={<div>Login Page</div>} />
+        <Route path="/account/security" element={<div>Security Page</div>} />
         <Route path="/" element={<div>Home Page</div>} />
       </Routes>
     </MemoryRouter>,
   );
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockMaybeSingle.mockResolvedValue({ data: null, error: null }); // MFA off by default
+});
 
 // ─── ProtectedRoute ───────────────────────────────────────────────────────────
 
@@ -129,8 +143,27 @@ describe('ProtectedAdminRoute', () => {
     expect(screen.queryByText('Admin Content')).not.toBeInTheDocument();
   });
 
-  it('renders children when authenticated and admin', () => {
+  it('renders children when authenticated and admin (MFA not required)', async () => {
     renderAdmin({ loading: false, isAuthenticated: true, isAdmin: true });
-    expect(screen.getByText('Admin Content')).toBeInTheDocument();
+    expect(await screen.findByText('Admin Content')).toBeInTheDocument();
+  });
+
+  it('renders children when admin, MFA required, and a verified factor exists', async () => {
+    mockMaybeSingle.mockResolvedValue({ data: { value: true }, error: null });
+    renderAdmin({
+      loading: false, isAuthenticated: true, isAdmin: true,
+      listMFAFactors: async () => ({ totp: [{ status: 'verified' }] }),
+    });
+    expect(await screen.findByText('Admin Content')).toBeInTheDocument();
+  });
+
+  it('redirects an un-enrolled admin to /account/security when MFA is required', async () => {
+    mockMaybeSingle.mockResolvedValue({ data: { value: true }, error: null });
+    renderAdmin({
+      loading: false, isAuthenticated: true, isAdmin: true,
+      listMFAFactors: async () => ({ totp: [] }),
+    });
+    expect(await screen.findByText('Security Page')).toBeInTheDocument();
+    expect(screen.queryByText('Admin Content')).not.toBeInTheDocument();
   });
 });

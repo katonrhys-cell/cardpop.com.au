@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter } from '../middleware/endpoint-rate-limit.js';
+import { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, pwnedCheckLimiter } from '../middleware/endpoint-rate-limit.js';
 import { verifyTradeAccess } from '../middleware/verifyTradeAccess.js';
 import { authMiddleware } from '../middleware/auth.js';
 import healthCheck from './health-check.js';
@@ -35,6 +35,7 @@ import welcomeOfferRouter from './welcome-offer.js';
 import partnersRouter from './partners.js';
 import walletRouter from './wallet.js';
 import adminRouter from './admin.js';
+import settingsRouter from './settings.js';
 
 const router = Router();
 
@@ -67,6 +68,7 @@ export default () => {
     // Auth routes with endpoint-specific rate limiting
     router.use('/auth/login', loginLimiter);
     router.use('/auth/password/reset/request', passwordResetLimiter);
+    router.use('/auth/password/pwned-check', pwnedCheckLimiter);
     router.use('/auth', authRouter);
     
     // eBay routes with API rate limiting
@@ -167,6 +169,11 @@ export default () => {
     // actually mounted, so every one of these endpoints 404'd in production.
     router.use('/admin', apiLimiter);
     router.use('/admin', adminRouter);
+
+    // Public platform settings (feature flags, maintenance switch, listing-form
+    // limits). No auth — read by every client, including logged-out visitors.
+    router.use('/settings', apiLimiter);
+    router.use('/settings', settingsRouter);
 
     // Trade routes with email verification middleware
     // Apply auth middleware first, then trade access verification
