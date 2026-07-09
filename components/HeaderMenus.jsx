@@ -15,6 +15,7 @@ import {
   Settings, FolderTree, ListOrdered, BarChart3, Store, Shield,
   BookOpen, Globe, Star, Award, TrendingUp, Newspaper, BadgeCheck, Ticket, Handshake,
   Calculator, MapPin, ClipboardList, HelpCircle, MessageSquare,
+  ShoppingBag, LineChart, Info,
 } from 'lucide-react';
 import { TCG_CATEGORY_DATA, SPORTS_CATEGORY_DATA } from '@/components/CategoryIcons.jsx';
 import { toCdnUrl } from '@/utils/imageUrl.js';
@@ -25,14 +26,16 @@ import SearchBar from '@/components/SearchBar.jsx';
 import WhatnotIcon from '@/components/WhatnotIcon.jsx';
 
 export const NAV_LINKS = [
-  { label: 'Shop', href: '/shop' },
-  { label: 'Marketplace', href: '/marketplace' },
-  { label: 'Analytics', href: '/analytics' },
+  // `icon` (where present) matches the lucide icon in that page's own hero/heading,
+  // so the mobile menu's flat links carry the same visual cue as the page they open.
+  { label: 'Shop', href: '/shop', icon: ShoppingBag },
+  { label: 'Marketplace', href: '/marketplace', icon: Users },
+  { label: 'Analytics', href: '/analytics', icon: LineChart },
   { label: 'Blog', href: '/blog' },
   { label: 'Community', href: '/community' },
   { label: 'Events', href: '/events' },
   { label: 'Grading', href: '/grading' },
-  { label: 'About', href: '/about' },
+  { label: 'About', href: '/about', icon: Info },
 ];
 
 const ADMIN_LINKS = [
@@ -892,17 +895,19 @@ export const MobileNavMenus = ({
         <nav className="flex flex-col gap-1.5 mb-6">
           {NAV_LINKS.filter(l => l.label !== 'Blog' && l.label !== 'Community' && l.label !== 'Events' && l.label !== 'Grading').map((link) => {
             const isActive = isNavLinkActive(link, location.pathname);
+            const Icon = link.icon;
             return (
               <SheetClose key={link.label} asChild>
                 <Link
                   to={link.href}
                   onClick={onNavigate}
-                  className={`px-4 py-3.5 rounded-xl text-base font-bold transition-colors ${
+                  className={`flex items-center gap-3 px-4 py-3.5 rounded-xl text-base font-bold transition-colors ${
                     isActive
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'text-foreground hover:bg-muted'
                   }`}
                 >
+                  {Icon && <Icon className={`w-5 h-5 shrink-0 ${isActive ? '' : 'text-primary'}`} />}
                   {link.label}
                 </Link>
               </SheetClose>
