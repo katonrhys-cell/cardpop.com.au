@@ -5,8 +5,14 @@ import '@/lib/trustedTypesPolicy.js';
 import React, { Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from '@/App.jsx';
+import { installChunkReloadGuard } from '@/lib/chunkReload.js';
 import '@/index.css';
 import '@/global.css';
+
+// Auto-recover if an out-of-date app shell requests a lazy-chunk hash that no
+// longer exists after a deploy (see lib/chunkReload.js). Installed first so the
+// listeners are in place before any route chunk is imported.
+installChunkReloadGuard();
 
 // The homepage ships its full stylesheet as media="print" (non-render-blocking,
 // with critical above-the-fold CSS inlined in the HTML head) so it never delays
