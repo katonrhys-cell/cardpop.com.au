@@ -26,6 +26,7 @@ import {
   _resetTransformState,
   toCdnUrl,
   publicImageUrl,
+  canonicalStorageUrl,
   _setCdnHostForTests,
 } from '@/utils/imageUrl.js';
 
@@ -36,9 +37,19 @@ beforeEach(() => {
 
 describe('getCardImage', () => {
   it('returns all-null for missing input', () => {
-    expect(getCardImage(null)).toEqual({ src: null, srcSet: null, fallbackSrc: null });
-    expect(getCardImage('')).toEqual({ src: null, srcSet: null, fallbackSrc: null });
-    expect(getCardImage(undefined)).toEqual({ src: null, srcSet: null, fallbackSrc: null });
+    const empty = { src: null, srcSet: null, fallbackSrc: null, canonicalSrc: null };
+    expect(getCardImage(null)).toEqual(empty);
+    expect(getCardImage('')).toEqual(empty);
+    expect(getCardImage(undefined)).toEqual(empty);
+  });
+
+  it('exposes a canonical (non-CDN) source for a storage path even when a CDN is set', () => {
+    _setCdnHostForTests('dxxxx.cloudfront.net');
+    const r = getCardImage('user/card.jpg');
+    // canonicalSrc is the plain Supabase public URL, never rewritten to the CDN,
+    // so a CDN outage falls back to the origin. (The mock's URL doesn't match the
+    // Supabase shape, so toCdnUrl leaves fallbackSrc unchanged here too.)
+    expect(r.canonicalSrc).toBe('https://cdn/object/vault-images/user/card.jpg');
   });
 
   it('passes absolute URLs through untouched (no transform)', () => {
@@ -120,6 +131,32 @@ describe('toCdnUrl', () => {
     expect(toCdnUrl('https://example.com/pic.png')).toBe('https://example.com/pic.png');
     expect(toCdnUrl(null)).toBeNull();
     expect(toCdnUrl(undefined)).toBeNull();
+  });
+});
+
+describe('canonicalStorageUrl', () => {
+  // In this suite the mocked getPublicUrl origin is `https://cdn`, so a CDN URL
+  // maps back onto that host.
+  it('is a no-op when no CDN host is configured', () => {
+    const url = 'https://dxxxx.cloudfront.net/storage/v1/object/public/vault-images/u/c.jpg';
+    expect(canonicalStorageUrl(url)).toBe(url);
+  });
+
+  it('maps a CDN storage URL back to the Supabase origin', () => {
+    _setCdnHostForTests('dxxxx.cloudfront.net');
+    expect(
+      canonicalStorageUrl(
+        'https://dxxxx.cloudfront.net/storage/v1/object/public/vault-images/u/c.jpg'
+      )
+    ).toBe('https://cdn/storage/v1/object/public/vault-images/u/c.jpg');
+  });
+
+  it('leaves URLs not on the CDN host, and non-strings, unchanged', () => {
+    _setCdnHostForTests('dxxxx.cloudfront.net');
+    const other = 'https://example.com/pic.png';
+    expect(canonicalStorageUrl(other)).toBe(other);
+    expect(canonicalStorageUrl(null)).toBeNull();
+    expect(canonicalStorageUrl(undefined)).toBeUndefined();
   });
 });
 

@@ -6,6 +6,7 @@ import React, { Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from '@/App.jsx';
 import { installChunkReloadGuard } from '@/lib/chunkReload.js';
+import { installImageCdnFallback } from '@/utils/imageCdnFallback.js';
 import '@/index.css';
 import '@/global.css';
 
@@ -13,6 +14,12 @@ import '@/global.css';
 // longer exists after a deploy (see lib/chunkReload.js). Installed first so the
 // listeners are in place before any route chunk is imported.
 installChunkReloadGuard();
+
+// If the image CDN (img.cardpop.com.au) fails to serve an object, fall images
+// back to the Supabase origin so a CDN incident doesn't leave broken thumbnails
+// across the site (see utils/imageCdnFallback.js). Installed before first paint
+// so the listener catches the earliest image loads.
+installImageCdnFallback();
 
 // The homepage ships its full stylesheet as media="print" (non-render-blocking,
 // with critical above-the-fold CSS inlined in the HTML head) so it never delays

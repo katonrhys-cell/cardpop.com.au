@@ -94,10 +94,35 @@ not expire. No Worker code — pure console configuration:
   become a significant egress source, route them through `publicImageUrl()`
   at render time too.
 
+## Outage fallback (self-healing)
+
+The CDN host is a single point of failure: if `img.cardpop.com.au` stops
+serving objects (Worker/route misconfig, an edge incident, a bad
+`VITE_IMAGE_CDN_HOST`), every image built through it would 404/error at once —
+even though the objects are still readable straight from Supabase Storage. Two
+layers recover from this automatically, so a CDN problem degrades to "images
+load from Supabase directly" instead of "site full of broken thumbnails":
+
+- **`CardImage`** (grids/listings) tries `src` → `fallbackSrc` (both CDN) →
+  `canonicalSrc` (the non-CDN Supabase origin from `getCardImage`) before
+  showing "No Image".
+- **`utils/imageCdnFallback.js`** installs one global capture-phase `error`
+  listener (`installImageCdnFallback()` in `main.jsx`). The first time any raw
+  `<img>` served from the CDN host fails, it rewrites the src back to the
+  Supabase origin via `canonicalStorageUrl()` and retries once — covering every
+  raw `<img>` on the site without a per-call-site handler. `CardImage` opts out
+  (`data-managed-image`) since it runs its own richer fallback.
+
+The trade-off is deliberate: a working image (served from Supabase, metered
+egress) beats a broken one. Fix the CDN (or clear `VITE_IMAGE_CDN_HOST`) to
+return traffic to the edge.
+
 ## Related pieces in this repo
 
 - `cloudflare/image-proxy-worker.js` — the Worker source (Option A).
-- `utils/imageUrl.js` — `toCdnUrl()` / `publicImageUrl()`, the host swap.
+- `utils/imageUrl.js` — `toCdnUrl()` / `publicImageUrl()`, the host swap;
+  `canonicalStorageUrl()` / `getCardImage().canonicalSrc`, the outage fallback.
+- `utils/imageCdnFallback.js` — global CDN→origin `<img>` recovery listener.
 - `public/sw.js` — service worker caches storage images cache-first on the
   client, so returning visitors generate almost no image egress even
   without the CDN.
