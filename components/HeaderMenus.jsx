@@ -877,23 +877,19 @@ export const MobileNavMenus = ({
           />
         </div>
 
-        {/* Mobile Browse Collections — key resets accordion state each time menu opens */}
-        <MobileBrowseSection key={openKey} onNavigate={onNavigate} />
+        {/* Order mirrors the desktop Row-2 nav top-to-bottom: Browse Collections
+            leads, then NAV_LINKS in sequence — expandable sections (Blog,
+            Community, Events, Grading) and flat links interleaved so the mobile
+            menu reads in the same order as the desktop bar reads left-to-right.
+            key={openKey} resets accordion state each time the menu opens. */}
+        <nav className="flex flex-col mb-6">
+          <MobileBrowseSection key={openKey} onNavigate={onNavigate} />
 
-        {/* Mobile Blog categories */}
-        <MobileBlogSection key={`blog-${openKey}`} onNavigate={onNavigate} />
-
-        {/* Mobile Community */}
-        <MobileCommunitySection key={`community-${openKey}`} onNavigate={onNavigate} />
-
-        {/* Mobile Events */}
-        <MobileEventsSection key={`events-${openKey}`} onNavigate={onNavigate} />
-
-        {/* Mobile Grading */}
-        <MobileGradingSection key={`grading-${openKey}`} onNavigate={onNavigate} />
-
-        <nav className="flex flex-col gap-1.5 mb-6">
-          {NAV_LINKS.filter(l => l.label !== 'Blog' && l.label !== 'Community' && l.label !== 'Events' && l.label !== 'Grading').map((link) => {
+          {NAV_LINKS.map((link) => {
+            if (link.label === 'Blog') return <MobileBlogSection key={`blog-${openKey}`} onNavigate={onNavigate} />;
+            if (link.label === 'Community') return <MobileCommunitySection key={`community-${openKey}`} onNavigate={onNavigate} />;
+            if (link.label === 'Events') return <MobileEventsSection key={`events-${openKey}`} onNavigate={onNavigate} />;
+            if (link.label === 'Grading') return <MobileGradingSection key={`grading-${openKey}`} onNavigate={onNavigate} />;
             const isActive = isNavLinkActive(link, location.pathname);
             const Icon = link.icon;
             return (
@@ -901,13 +897,13 @@ export const MobileNavMenus = ({
                 <Link
                   to={link.href}
                   onClick={onNavigate}
-                  className={`flex items-center gap-3 px-4 py-3.5 rounded-xl text-base font-bold transition-colors ${
+                  className={`flex items-center gap-3 px-4 py-3.5 mb-4 rounded-xl text-base font-bold transition-colors ${
                     isActive
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'text-foreground hover:bg-muted'
                   }`}
                 >
-                  {Icon && <Icon className={`w-5 h-5 shrink-0 ${isActive ? '' : 'text-primary'}`} />}
+                  {Icon && <Icon className={`w-4 h-4 shrink-0 ${isActive ? '' : 'text-primary'}`} />}
                   {link.label}
                 </Link>
               </SheetClose>
