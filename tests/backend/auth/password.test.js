@@ -135,3 +135,42 @@ describe('POST /change', () => {
     expect(mockSupabase.auth.admin.updateUserById).toHaveBeenCalledWith('user-1', { password: 'NewPass1!' });
   });
 });
+
+// ─── GET /pwned-check ─────────────────────────────────────────────────────────
+
+describe('GET /pwned-check', () => {
+  it('returns 400 when the prefix is missing', async () => {
+    const res = await request(app).get('/pwned-check');
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 400 for a malformed (non-hex / wrong-length) prefix', async () => {
+    expect((await request(app).get('/pwned-check?prefix=ZZZZZ')).status).toBe(400);
+    expect((await request(app).get('/pwned-check?prefix=ABC')).status).toBe(400);
+  });
+
+  it('proxies the range list from HIBP for a valid prefix', async () => {
+    const body = '0018A45C4D1DEF81644B54AB7F969B88D65:1\r\n00D4F6E8FA6EECAD2A3AA415EEC418D38EC:2';
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, text: () => Promise.resolve(body) });
+    const res = await request(app).get('/pwned-check?prefix=5BAA6');
+    expect(res.status).toBe(200);
+    expect(res.text).toBe(body);
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://api.pwnedpasswords.com/range/5BAA6',
+      expect.objectContaining({ headers: expect.objectContaining({ 'Add-Padding': 'true' }) }),
+    );
+  });
+
+  it('lower-cases prefixes are accepted and upper-cased before lookup', async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, text: () => Promise.resolve('') });
+    const res = await request(app).get('/pwned-check?prefix=5baa6');
+    expect(res.status).toBe(200);
+    expect(global.fetch).toHaveBeenCalledWith('https://api.pwnedpasswords.com/range/5BAA6', expect.anything());
+  });
+
+  it('returns 502 when the upstream call fails', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new Error('network down'));
+    const res = await request(app).get('/pwned-check?prefix=5BAA6');
+    expect(res.status).toBe(502);
+  });
+});

@@ -26,6 +26,36 @@ router.post('/validate', async (req, res) => {
   res.json({ isStrong: validation.isStrong, strengthScore: validation.strengthScore, missing: validation.missing });
 });
 
+// Pwned-password check (k-anonymity proxy to HaveIBeenPwned's Pwned Passwords
+// range API). Backfills Supabase's "leaked password protection" — a Pro-plan
+// Auth feature — on the free plan. The client SHA-1s the candidate password
+// locally and sends ONLY the first 5 hex chars of the hash; we forward that
+// prefix to HIBP and return the raw suffix list for the client to match
+// locally. The password and its full hash never reach this server. No auth:
+// this runs during signup and password recovery, before a session exists.
+router.get('/pwned-check', async (req, res) => {
+  const prefix = String(req.query.prefix || '').toUpperCase();
+  if (!/^[0-9A-F]{5}$/.test(prefix)) {
+    return res.status(400).json({ error: 'A 5-character hex hash prefix is required' });
+  }
+  try {
+    // Add-Padding makes HIBP pad the response with bogus entries so the
+    // response size can't hint at how many real matches the prefix has.
+    const hibp = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
+      headers: { 'Add-Padding': 'true', 'User-Agent': 'CardPop-PasswordCheck' },
+    });
+    if (!hibp.ok) {
+      logger.warn(`[PWNED] range lookup returned ${hibp.status}`);
+      return res.status(502).json({ error: 'Password check is temporarily unavailable' });
+    }
+    const text = await hibp.text();
+    res.type('text/plain').send(text);
+  } catch (err) {
+    logger.warn(`[PWNED] range lookup failed: ${err.message}`);
+    return res.status(502).json({ error: 'Password check is temporarily unavailable' });
+  }
+});
+
 // Request a password reset link
 router.post('/reset/request', async (req, res) => {
   const { email } = req.body;

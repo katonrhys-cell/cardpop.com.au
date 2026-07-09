@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import Turnstile from '@/components/Turnstile.jsx';
 import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
+import { isPasswordPwned } from '@/utils/pwnedPassword.js';
 
 const PasswordResetPage = () => {
   // 'request' = ask for the recovery email; 'update' = arrived via the email
@@ -69,6 +70,12 @@ const PasswordResetPage = () => {
     }
     setLoading(true);
     try {
+      // Reject breached passwords (HaveIBeenPwned via k-anonymity; the password
+      // never leaves the browser). Fails open on any error.
+      if (await isPasswordPwned(newPassword)) {
+        toast.error('This password has appeared in a known data breach. Please choose a different one.');
+        return;
+      }
       await updatePassword(newPassword);
       toast.success('Password updated successfully.');
       navigate('/account');

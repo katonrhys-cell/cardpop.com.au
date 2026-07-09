@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter } from '../middleware/endpoint-rate-limit.js';
+import { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, pwnedCheckLimiter } from '../middleware/endpoint-rate-limit.js';
 import { verifyTradeAccess } from '../middleware/verifyTradeAccess.js';
 import { authMiddleware } from '../middleware/auth.js';
 import healthCheck from './health-check.js';
@@ -67,6 +67,7 @@ export default () => {
     // Auth routes with endpoint-specific rate limiting
     router.use('/auth/login', loginLimiter);
     router.use('/auth/password/reset/request', passwordResetLimiter);
+    router.use('/auth/password/pwned-check', pwnedCheckLimiter);
     router.use('/auth', authRouter);
     
     // eBay routes with API rate limiting
