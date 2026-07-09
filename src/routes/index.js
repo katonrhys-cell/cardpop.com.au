@@ -35,6 +35,7 @@ import welcomeOfferRouter from './welcome-offer.js';
 import partnersRouter from './partners.js';
 import walletRouter from './wallet.js';
 import adminRouter from './admin.js';
+import settingsRouter from './settings.js';
 
 const router = Router();
 
@@ -168,6 +169,11 @@ export default () => {
     // actually mounted, so every one of these endpoints 404'd in production.
     router.use('/admin', apiLimiter);
     router.use('/admin', adminRouter);
+
+    // Public platform settings (feature flags, maintenance switch, listing-form
+    // limits). No auth — read by every client, including logged-out visitors.
+    router.use('/settings', apiLimiter);
+    router.use('/settings', settingsRouter);
 
     // Trade routes with email verification middleware
     // Apply auth middleware first, then trade access verification

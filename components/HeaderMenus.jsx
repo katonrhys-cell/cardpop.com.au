@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { SheetClose } from '@/components/ui/sheet';
 import SearchBar from '@/components/SearchBar.jsx';
 import WhatnotIcon from '@/components/WhatnotIcon.jsx';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 
 export const NAV_LINKS = [
   { label: 'Shop', href: '/shop' },
@@ -820,14 +821,16 @@ const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout })
 // Row-2 desktop navigation (Browse mega-dropdown + top-level links/dropdowns).
 export const DesktopNavMenus = ({ onNavigate }) => {
   const location = useLocation();
+  const { settings } = usePlatformSettings();
   return (
     <>
       <BrowseDropdown onNavigate={onNavigate} />
       {NAV_LINKS.map((link) => {
-        if (link.label === 'Blog') return <BlogDropdown key="blog" onNavigate={onNavigate} />;
+        if (link.label === 'Blog') return settings.enable_blog === false ? null : <BlogDropdown key="blog" onNavigate={onNavigate} />;
         if (link.label === 'Community') return <CommunityDropdown key="community" onNavigate={onNavigate} />;
         if (link.label === 'Events') return <EventsDropdown key="events" onNavigate={onNavigate} />;
         if (link.label === 'Grading') return <GradingDropdown key="grading" onNavigate={onNavigate} />;
+        if (link.label === 'Marketplace' && settings.enable_marketplace === false) return null;
         const isActive = isNavLinkActive(link, location.pathname);
         return (
           <Link
@@ -862,6 +865,7 @@ export const MobileNavMenus = ({
   onLogout,
 }) => {
   const location = useLocation();
+  const { settings } = usePlatformSettings();
   return (
     <>
       <div className="flex-1 overflow-y-auto py-6 px-4">
@@ -878,7 +882,9 @@ export const MobileNavMenus = ({
         <MobileBrowseSection key={openKey} onNavigate={onNavigate} />
 
         {/* Mobile Blog categories */}
-        <MobileBlogSection key={`blog-${openKey}`} onNavigate={onNavigate} />
+        {settings.enable_blog !== false && (
+          <MobileBlogSection key={`blog-${openKey}`} onNavigate={onNavigate} />
+        )}
 
         {/* Mobile Community */}
         <MobileCommunitySection key={`community-${openKey}`} onNavigate={onNavigate} />
@@ -890,7 +896,7 @@ export const MobileNavMenus = ({
         <MobileGradingSection key={`grading-${openKey}`} onNavigate={onNavigate} />
 
         <nav className="flex flex-col gap-1.5 mb-6">
-          {NAV_LINKS.filter(l => l.label !== 'Blog' && l.label !== 'Community' && l.label !== 'Events' && l.label !== 'Grading').map((link) => {
+          {NAV_LINKS.filter(l => l.label !== 'Blog' && l.label !== 'Community' && l.label !== 'Events' && l.label !== 'Grading' && !(l.label === 'Marketplace' && settings.enable_marketplace === false)).map((link) => {
             const isActive = isNavLinkActive(link, location.pathname);
             return (
               <SheetClose key={link.label} asChild>
