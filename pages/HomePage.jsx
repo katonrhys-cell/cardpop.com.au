@@ -232,8 +232,29 @@ const HomePage = () => {
       try {
         // Use 5-minute cache for homepage data (user sees fresh content on repeat visits)
         const [listingsRes, sellersRes] = await Promise.all([
-          cachedQuery('homepage_featured_cards', () =>
-            supabase.from('vault_items').select('*, owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count), vault_images(*)').eq('is_public', true).neq('listing_type', 'Private').order('created_at', { ascending: false }).limit(4),
+          cachedQuery('homepage_featured_cards', async () => {
+            // vault_items has more than one FK to profiles, so the embed must use
+            // the explicit constraint-name hint (!vault_items_owner_id_fkey) —
+            // the bare !owner_id hint returns a PostgREST 400.
+            const SELECT = '*, owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count), vault_images(*)';
+            const LIMIT = 4;
+            // Fresh builder per call — a Supabase query builder is single-use.
+            const base = () => supabase.from('vault_items').select(SELECT).eq('is_public', true).neq('listing_type', 'Private');
+
+            // Admin-curated picks (Marketplace Management → Featured) come first.
+            const featuredRes = await base().eq('is_featured', true).order('created_at', { ascending: false }).limit(LIMIT);
+            if (featuredRes.error) return featuredRes;
+            const featured = featuredRes.data ?? [];
+            if (featured.length >= LIMIT) return { data: featured.slice(0, LIMIT), error: null };
+
+            // Backfill with the most recent cards so the grid is never emptier
+            // than before curation existed (empty selection = previous behaviour).
+            const fillRes = await base().order('created_at', { ascending: false }).limit(LIMIT + featured.length);
+            if (fillRes.error) return { data: featured, error: null };
+            const seen = new Set(featured.map(c => c.id));
+            const backfill = (fillRes.data ?? []).filter(c => !seen.has(c.id));
+            return { data: [...featured, ...backfill].slice(0, LIMIT), error: null };
+          },
             5 * 60 * 1000
           ),
           cachedQuery('homepage_featured_sellers', () =>
@@ -658,13 +679,13 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* ── Recent vault additions ────────────────────────────────────────── */}
+      {/* ── Featured cards ────────────────────────────────────────────────── */}
       <section className="py-24 bg-muted/30 border-t border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-end justify-between mb-12">
             <div>
-              <h2 className="text-3xl font-bold font-serif mb-2">Recent Vault Additions</h2>
-              <p className="text-muted-foreground">Fresh listings from Australian collectors.</p>
+              <h2 className="text-3xl font-bold font-serif mb-2">Featured Cards</h2>
+              <p className="text-muted-foreground">Handpicked listings from Australian collectors.</p>
             </div>
             <Button asChild variant="ghost" className="hidden sm:flex font-bold hover:bg-muted">
               <Link to="/marketplace">View All <ArrowRight className="ml-2 w-4 h-4" /></Link>
