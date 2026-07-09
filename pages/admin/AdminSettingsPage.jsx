@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { ChevronLeft, Save, Settings, Shield, Mail, CreditCard, MessageSquare, LayoutGrid, RefreshCcw, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Save, Settings, Shield, Mail, MessageSquare, LayoutGrid, RefreshCcw, AlertCircle } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,9 +18,6 @@ const DEFAULT_SETTINGS = {
   site_name: 'CardPop',
   contact_email: 'support@cardpop.com.au',
   maintenance_mode: false,
-  platform_fee_percent: '5',
-  stripe_enabled: true,
-  paypal_enabled: false,
   listing_approval_required: false,
   max_images_per_listing: '10',
   free_shipping_threshold_aud: '100',
@@ -115,9 +112,8 @@ const AdminSettingsPage = () => {
       </AdminPageHeader>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid grid-cols-3 md:grid-cols-6 mb-6 bg-muted/50 p-1 rounded-xl h-auto">
+        <TabsList className="grid grid-cols-3 md:grid-cols-5 mb-6 bg-muted/50 p-1 rounded-xl h-auto">
           <TabsTrigger value="general" className="rounded-lg py-2.5"><Settings className="w-4 h-4 mr-1.5 hidden sm:block" />General</TabsTrigger>
-          <TabsTrigger value="payment" className="rounded-lg py-2.5"><CreditCard className="w-4 h-4 mr-1.5 hidden sm:block" />Payment</TabsTrigger>
           <TabsTrigger value="listings" className="rounded-lg py-2.5"><LayoutGrid className="w-4 h-4 mr-1.5 hidden sm:block" />Listings</TabsTrigger>
           <TabsTrigger value="moderation" className="rounded-lg py-2.5"><MessageSquare className="w-4 h-4 mr-1.5 hidden sm:block" />Moderation</TabsTrigger>
           <TabsTrigger value="security" className="rounded-lg py-2.5"><Shield className="w-4 h-4 mr-1.5 hidden sm:block" />Security</TabsTrigger>
@@ -151,44 +147,6 @@ const AdminSettingsPage = () => {
           </Card>
         </TabsContent>
 
-        {/* Payment */}
-        <TabsContent value="payment">
-          <Card className="border-border shadow-sm rounded-xl">
-            <CardHeader>
-              <CardTitle>Payment & Fees</CardTitle>
-              <CardDescription>Marketplace commission rates and payment gateway toggles.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="space-y-2">
-                <Label>Platform Commission Rate (%)</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  value={settings.platform_fee_percent}
-                  onChange={e => set('platform_fee_percent', e.target.value)}
-                  className="max-w-xs bg-background"
-                />
-                <p className="text-xs text-muted-foreground">Applied to all marketplace transactions. Individual seller tiers in the Fee Config table override this.</p>
-              </div>
-              <div className="flex items-center justify-between max-w-md rounded-lg border border-border p-3 bg-muted/30">
-                <div className="space-y-0.5">
-                  <Label>Stripe Payments</Label>
-                  <p className="text-sm text-muted-foreground">Enable card payments via Stripe.</p>
-                </div>
-                <Switch checked={!!settings.stripe_enabled} onCheckedChange={v => set('stripe_enabled', v)} />
-              </div>
-              <div className="flex items-center justify-between max-w-md rounded-lg border border-border p-3 bg-muted/30">
-                <div className="space-y-0.5">
-                  <Label>PayPal Payments</Label>
-                  <p className="text-sm text-muted-foreground">Enable PayPal as a checkout option.</p>
-                </div>
-                <Switch checked={!!settings.paypal_enabled} onCheckedChange={v => set('paypal_enabled', v)} />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         {/* Listings */}
         <TabsContent value="listings">

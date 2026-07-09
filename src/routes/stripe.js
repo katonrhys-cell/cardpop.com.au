@@ -25,6 +25,7 @@ import { createIdentitySession, getIdentityStatus, applyIdentitySession } from '
 import { applyStripeSubscription } from '../services/subscriptionService.js';
 import { ensureWalletCustomer, getWalletBalanceCents, handleWalletTopup } from '../services/walletService.js';
 import { validateShippingAddress } from '../utils/addressValidation.js';
+import { requireEmailVerified } from '../middleware/requireEmailVerified.js';
 import { isValidAbn, normalizeAbn } from '../../utils/abn.js';
 
 const router = express.Router();
@@ -64,7 +65,7 @@ router.get('/calculate', authMiddleware, validateRequestQuery(calculateBreakdown
 
 // ─── POST /create-checkout ───────────────────────────────────────────────────
 
-router.post('/create-checkout', authMiddleware, validateRequestBody(createCheckoutSchema), createSingleItemCheckout);
+router.post('/create-checkout', authMiddleware, requireEmailVerified, validateRequestBody(createCheckoutSchema), createSingleItemCheckout);
 
 // ─── POST /create-cart-checkout ──────────────────────────────────────────────
 // Multi-item cart checkout. Each item is priced server-side from its source of
@@ -132,7 +133,7 @@ router.post('/calculate-cart', authMiddleware, async (req, res) => {
   }
 });
 
-router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
+router.post('/create-cart-checkout', authMiddleware, requireEmailVerified, async (req, res) => {
   try {
     const { items, successUrl, cancelUrl, returnUrl, uiMode, shippingAddress, promoCode, useWalletBalance, billingDetails } = req.body;
 
