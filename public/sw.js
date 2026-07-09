@@ -12,9 +12,16 @@ const CACHE_NAMES = {
   // response and the homepage stayed empty on every subsequent visit,
   // regardless of what the database returned. The activate handler deletes
   // anything not named below, so bumping the suffix evicts the bad entries.
-  STATIC: 'cardpop-static-v4',
-  DYNAMIC: 'cardpop-dynamic-v4',
-  PAGES: 'cardpop-pages-v4',
+  // v5: HTML/navigations moved from stale-while-revalidate to network-first
+  // (see the fetch handler). The old behaviour served a cached index.html that
+  // referenced content-hashed chunk files a newer deploy had already purged,
+  // producing "Importing a module script failed" on lazy routes. Bumping the
+  // suffix evicts any stale shells cached under v4. IMAGES is deliberately left
+  // at v1 — those entries are immutable (timestamped filenames) and expensive
+  // to refetch against the Supabase egress quota, so they must survive the bump.
+  STATIC: 'cardpop-static-v5',
+  DYNAMIC: 'cardpop-dynamic-v5',
+  PAGES: 'cardpop-pages-v5',
   IMAGES: 'cardpop-images-v1',
 };
 
@@ -151,23 +158,30 @@ const imageCacheFirst = async (request) => {
   }
 };
 
-// Helper: Stale While Revalidate strategy
-const staleWhileRevalidate = async (request) => {
-  const cached = await caches.match(request);
-
-  const fetchPromise = fetch(request).then((response) => {
+// Helper: Network First for navigations / HTML documents. The app shell
+// (index.html) is the one resource that MUST be current: it carries the
+// <script> references to this deploy's content-hashed JS chunks. Serving a
+// stale shell (the previous stale-while-revalidate behaviour) pinned returning
+// visitors to chunk filenames a newer deploy had already purged, so lazy routes
+// failed with "Importing a module script failed". Going to the network first
+// guarantees an online visitor always gets the current shell; the PAGES cache
+// is kept only as an offline fallback.
+const networkFirstPage = async (request) => {
+  try {
+    const response = await fetch(request);
     if (response.ok) {
-      const cache = caches.open(CACHE_NAMES.PAGES);
-      cache.then((c) => c.put(request, response.clone()));
+      const cache = await caches.open(CACHE_NAMES.PAGES);
+      cache.put(request, response.clone());
     }
     return response;
-  }).catch(() => {
-    // Network failed, return cached if available
-    if (cached) return cached;
+  } catch (error) {
+    const cached = await caches.match(request);
+    if (cached) {
+      console.log('[SW] Network failed, serving cached shell:', request.url);
+      return cached;
+    }
     return new Response('Offline', { status: 503 });
-  });
-
-  return cached || fetchPromise;
+  }
 };
 
 // Fetch: route requests to appropriate strategy
@@ -214,9 +228,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Stale While Revalidate for HTML pages
+  // Network First for navigations / HTML pages — always fetch a fresh app
+  // shell so its chunk references match the live deploy (offline falls back to
+  // the cached shell).
   if (request.mode === 'navigate' || pathname.endsWith('.html') || !pathname.includes('.')) {
-    event.respondWith(staleWhileRevalidate(request));
+    event.respondWith(networkFirstPage(request));
     return;
   }
 
