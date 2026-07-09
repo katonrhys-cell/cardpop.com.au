@@ -256,6 +256,44 @@ describe('POST /calculate-cart', () => {
     expect(res.body.subtotalAud).toBe(200);
     expect(res.body.commissionAud).toBe(0);
     expect(res.body.gstAud).toBe(20);
+    expect(res.body.shippingAud).toBe(0);
+    expect(res.body.totalAud).toBe(220);
+  });
+
+  // priceCart reads the two shipping settings AFTER the item loop, so queue them
+  // last (rate then threshold). Both come from Platform Settings (Admin → Listings).
+  const shippingSettings = (rate, threshold) => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: { value: rate }, error: null })       // default_shipping_rate_aud
+      .mockResolvedValueOnce({ data: { value: threshold }, error: null }); // free_shipping_threshold_aud
+  };
+
+  it('charges the flat shipping rate on a shop order below the free-shipping threshold', async () => {
+    gstSettings();
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: { id: 'p1', title: 'Single Card', price_aud: 50, stock_quantity: 5, status: 'active' },
+      error: null,
+    });
+    shippingSettings(9.95, 100);
+    const res = await request(app).post('/calculate-cart').send({ items: [{ type: 'shop', id: 'p1', quantity: 1 }] });
+    expect(res.status).toBe(200);
+    expect(res.body.subtotalAud).toBe(50);
+    expect(res.body.gstAud).toBe(5);
+    expect(res.body.shippingAud).toBe(9.95);
+    expect(res.body.totalAud).toBe(64.95);
+  });
+
+  it('gives free shipping once the shop subtotal reaches the threshold', async () => {
+    gstSettings();
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: { id: 'p1', title: 'Booster Box', price_aud: 100, stock_quantity: 5, status: 'active' },
+      error: null,
+    });
+    shippingSettings(9.95, 100);
+    const res = await request(app).post('/calculate-cart').send({ items: [{ type: 'shop', id: 'p1', quantity: 2 }] });
+    expect(res.status).toBe(200);
+    expect(res.body.subtotalAud).toBe(200);
+    expect(res.body.shippingAud).toBe(0);
     expect(res.body.totalAud).toBe(220);
   });
 });

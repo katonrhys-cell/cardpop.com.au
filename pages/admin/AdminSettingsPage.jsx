@@ -216,29 +216,34 @@ const AdminSettingsPage = () => {
                   className="max-w-xs bg-background"
                 />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
-                <div className="space-y-2">
-                  <Label>Free Shipping Threshold (AUD)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={settings.free_shipping_threshold_aud}
-                    onChange={e => set('free_shipping_threshold_aud', e.target.value)}
-                    className="bg-background"
-                  />
+              <div className="space-y-2 max-w-md">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Free Shipping Threshold (AUD)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={settings.free_shipping_threshold_aud}
+                      onChange={e => set('free_shipping_threshold_aud', e.target.value)}
+                      className="bg-background"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Default Shipping Rate (AUD)</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={settings.default_shipping_rate_aud}
+                      onChange={e => set('default_shipping_rate_aud', e.target.value)}
+                      className="bg-background"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Default Shipping Rate (AUD)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={settings.default_shipping_rate_aud}
-                    onChange={e => set('default_shipping_rate_aud', e.target.value)}
-                    className="bg-background"
-                  />
-                </div>
+                <p className="text-xs text-muted-foreground">
+                  Applied to CardPop Shop items at checkout — a flat rate charged once per order, waived when the shop-item subtotal reaches the threshold. A rate of 0 disables shipping charges; a threshold of 0 means no free-shipping tier. Marketplace listings ship seller-arranged and are unaffected.
+                </p>
               </div>
             </CardContent>
           </Card>

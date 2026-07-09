@@ -23,6 +23,7 @@ const OrderReviewSection = ({
   subtotal = 0,
   serviceFee = 0,
   gst = 0,
+  shipping = 0,
   discount = 0,
   total = 0,
 }) => {
@@ -95,6 +96,11 @@ const OrderReviewSection = ({
           <div className="flex justify-between text-sm text-muted-foreground">
             <span>GST (10%)</span><span>${Number(gst).toFixed(2)}</span>
           </div>
+          {shipping > 0 && (
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>Shipping</span><span>${Number(shipping).toFixed(2)}</span>
+            </div>
+          )}
           <Separator />
           <div className="flex justify-between font-semibold text-base">
             <span>Total (AUD)</span><span>${Number(total).toFixed(2)}</span>

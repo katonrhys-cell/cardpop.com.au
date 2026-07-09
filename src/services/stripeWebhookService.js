@@ -79,7 +79,7 @@ async function handleCheckoutSessionCompleted(session, stripe) {
 
   const { data: existing } = await supabase
     .from('orders')
-    .select('id, status, total_aud, order_items, buyer_id, item_price_aud, gst_aud, platform_fee_aud, discount_aud, created_at, shipping_name, shipping_address, shipping_suburb, shipping_state, shipping_postcode')
+    .select('id, status, total_aud, order_items, buyer_id, item_price_aud, gst_aud, platform_fee_aud, discount_aud, shipping_aud, created_at, shipping_name, shipping_address, shipping_suburb, shipping_state, shipping_postcode')
     .eq('stripe_session_id', session.id)
     .maybeSingle();
 
@@ -234,6 +234,7 @@ async function handleCartOrder(existing, session, stripe) {
           // commission portion, shown separately from GST to mirror checkout.
           serviceFee: Math.max(0, Number(existing.platform_fee_aud ?? 0) - Number(existing.gst_aud ?? 0)),
           gst: Number(existing.gst_aud ?? 0),
+          shipping: Number(existing.shipping_aud ?? 0),
           discount: Number(existing.discount_aud ?? 0),
           total: amountCents2 / 100,
           // Read from the session metadata (set at checkout) so the invoice

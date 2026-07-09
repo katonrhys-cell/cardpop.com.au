@@ -188,6 +188,9 @@ const CheckoutPage = () => {
   // items) — shown as separate "Service fee" and "GST" lines, never merged.
   const serviceFee = pricing ? Number(pricing.commissionAud || 0) : 0;
   const gst = pricing ? Number(pricing.gstAud || 0) : 0;
+  // Flat shipping fee on CardPop Shop items (server-calculated from Platform
+  // Settings); 0 when the cart has no shop items or the order ships free.
+  const shipping = pricing ? Number(pricing.shippingAud || 0) : 0;
   const discount = pricing && !pricing.promoError ? Number(pricing.discountAud || 0) : 0;
   const total = pricing?.totalAud ?? clientSubtotal;
   const appliedPromoCode = discount > 0 ? promoCode : '';
@@ -276,6 +279,7 @@ const CheckoutPage = () => {
             subtotal={subtotal}
             serviceFee={serviceFee}
             gst={gst}
+            shipping={shipping}
             discount={discount}
             total={total}
             onEditCart={() => navigate('/browse')}
@@ -343,6 +347,7 @@ const CheckoutPage = () => {
               subtotal={subtotal}
               serviceFee={serviceFee}
               gst={gst}
+              shipping={shipping}
               discount={discount}
               total={total}
             />
