@@ -901,7 +901,7 @@ export const MobileNavMenus = ({
                 <Link
                   to={link.href}
                   onClick={onNavigate}
-                  className={`flex items-center gap-3 px-4 py-3.5 mb-4 rounded-xl text-base font-bold transition-colors ${
+                  className={`flex items-center gap-2 px-4 py-3 mb-4 rounded-xl text-sm font-bold transition-colors ${
                     isActive
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'text-foreground hover:bg-muted'
