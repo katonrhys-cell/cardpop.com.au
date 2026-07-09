@@ -62,7 +62,8 @@ const ListingsManagementPage = () => {
         .order(sortColumn, { ascending });
 
       if (searchQuery) query = query.ilike('vault_items.card_name', `%${searchQuery}%`);
-      if (['active', 'sold', 'archived', 'pending'].includes(statusFilter)) query = query.eq('status', statusFilter);
+      if (statusFilter === 'flagged') query = query.eq('flagged', true);
+      else if (['active', 'sold', 'archived', 'pending'].includes(statusFilter)) query = query.eq('status', statusFilter);
 
       const { data: items, count, error } = await query;
       if (error) throw error;
@@ -130,6 +131,18 @@ const ListingsManagementPage = () => {
       fetchListings();
     } catch (err) {
       toast.error('Bulk delete encountered errors');
+    }
+  };
+
+  // Dismiss a banned-words auto-flag once an admin has reviewed the content.
+  const handleClearFlag = async (listing) => {
+    try {
+      const { error } = await supabase.from('listings').update({ flagged: false, flag_reason: null }).eq('id', listing.id);
+      if (error) throw error;
+      toast.success('Flag cleared');
+      fetchListings();
+    } catch (err) {
+      toast.error('Failed to clear flag');
     }
   };
 
@@ -225,6 +238,7 @@ const ListingsManagementPage = () => {
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="pending">Pending Approval</SelectItem>
+                  <SelectItem value="flagged">Flagged</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="sold">Sold</SelectItem>
                   <SelectItem value="archived">Archived</SelectItem>
@@ -325,6 +339,9 @@ const ListingsManagementPage = () => {
                         ) : (
                           <Badge variant="secondary" className="bg-muted text-muted-foreground border-none capitalize">{listing.status || 'archived'}</Badge>
                         )}
+                        {listing.flagged && (
+                          <Badge className="ml-1 bg-red-500/10 text-red-600 border-none" title={listing.flag_reason || 'Flagged'}>Flagged</Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-right font-medium">
                         {formatCurrency((listing.price_aud || 0) * 100)}
@@ -342,6 +359,9 @@ const ListingsManagementPage = () => {
                             <DropdownMenuItem onClick={() => openDetailModal(listing)}>View Details</DropdownMenuItem>
                             {listing.status === 'pending' && (
                               <DropdownMenuItem className="text-emerald-600 focus:text-emerald-600" onClick={() => handleApprove(listing)}>Approve &amp; publish</DropdownMenuItem>
+                            )}
+                            {listing.flagged && (
+                              <DropdownMenuItem onClick={() => handleClearFlag(listing)}>Clear flag</DropdownMenuItem>
                             )}
                             <DropdownMenuItem onClick={() => openStatusModal(listing)}>Change Status</DropdownMenuItem>
                             {listing.status !== 'archived' && (
