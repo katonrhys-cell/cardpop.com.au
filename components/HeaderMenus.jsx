@@ -907,7 +907,7 @@ export const MobileNavMenus = ({
                       : 'text-foreground hover:bg-muted'
                   }`}
                 >
-                  {Icon && <Icon className={`w-5 h-5 shrink-0 ${isActive ? '' : 'text-primary'}`} />}
+                  {Icon && <Icon className={`w-4 h-4 shrink-0 ${isActive ? '' : 'text-primary'}`} />}
                   {link.label}
                 </Link>
               </SheetClose>
