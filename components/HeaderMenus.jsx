@@ -17,6 +17,7 @@ import {
   Calculator, MapPin, ClipboardList, HelpCircle, MessageSquare,
 } from 'lucide-react';
 import { TCG_CATEGORY_DATA, SPORTS_CATEGORY_DATA } from '@/components/CategoryIcons.jsx';
+import { toCdnUrl } from '@/utils/imageUrl.js';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { SheetClose } from '@/components/ui/sheet';
@@ -765,7 +766,7 @@ const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout })
       >
         <div className="relative h-8 w-8 rounded-full overflow-hidden shrink-0 bg-primary/10 flex items-center justify-center">
           {currentUser.avatar_url ? (
-            <img src={currentUser.avatar_url} alt={currentUser.name} className="h-full w-full object-cover" width="32" height="32" />
+            <img src={toCdnUrl(currentUser.avatar_url)} alt={currentUser.name} className="h-full w-full object-cover" width="32" height="32" />
           ) : (
             <User className="h-4 w-4 text-primary" />
           )}
