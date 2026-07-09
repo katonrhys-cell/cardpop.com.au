@@ -40,6 +40,33 @@ export function _setCdnHostForTests(host) {
   cdnOrigin = normalizeCdnHost(host);
 }
 
+// Origin of the Supabase project (e.g. https://xxxx.supabase.co), derived once
+// from a throwaway public URL. Used to map a CDN storage URL back to its source
+// of truth when the CDN itself is failing to serve — see canonicalStorageUrl.
+const SUPABASE_ORIGIN = (() => {
+  try {
+    return new URL(
+      supabase.storage.from(DEFAULT_BUCKET).getPublicUrl('_').data.publicUrl
+    ).origin;
+  } catch {
+    return null;
+  }
+})();
+
+/**
+ * Reverse of {@link toCdnUrl}: map a storage URL served from the image CDN back
+ * to the canonical Supabase origin. Any URL not on the CDN host (or when no CDN
+ * is configured) is returned unchanged. This is the recovery path when the CDN
+ * has an outage — the object is still readable straight from Supabase Storage.
+ */
+export function canonicalStorageUrl(url) {
+  if (typeof url !== 'string' || !cdnOrigin || !SUPABASE_ORIGIN) return url;
+  if (url === cdnOrigin || url.startsWith(`${cdnOrigin}/`)) {
+    return `${SUPABASE_ORIGIN}${url.slice(cdnOrigin.length)}`;
+  }
+  return url;
+}
+
 // Matches the origin of a Supabase storage public URL, keeping the
 // `/storage/v1/...` path intact so the CDN can proxy it verbatim.
 const SUPABASE_STORAGE_URL_RE =
@@ -94,28 +121,33 @@ const isHttp = (s) => typeof s === 'string' && /^https?:\/\//.test(s);
  * @param {number[]} [opts.widths]  Candidate widths for the srcset.
  * @param {string}   [opts.bucket]  Storage bucket (default `vault-images`).
  * @param {number}   [opts.quality] Transform quality (default 75).
- * @returns {{ src: string|null, srcSet: string|null, fallbackSrc: string|null }}
+ * @returns {{ src: string|null, srcSet: string|null, fallbackSrc: string|null, canonicalSrc: string|null }}
  */
 export function getCardImage(pathOrUrl, opts = {}) {
   const { widths = DEFAULT_WIDTHS, bucket = DEFAULT_BUCKET, quality = 75 } = opts;
 
   if (!pathOrUrl || typeof pathOrUrl !== 'string') {
-    return { src: null, srcSet: null, fallbackSrc: null };
+    return { src: null, srcSet: null, fallbackSrc: null, canonicalSrc: null };
   }
 
   // Already an absolute URL (legacy/external image) — nothing to transform.
+  // `canonicalSrc` is the un-rewritten original, so a CDN outage falls back to
+  // the source URL (DB-stored URLs are canonical Supabase URLs by design).
   if (isHttp(pathOrUrl)) {
     const direct = toCdnUrl(pathOrUrl);
-    return { src: direct, srcSet: null, fallbackSrc: direct };
+    return { src: direct, srcSet: null, fallbackSrc: direct, canonicalSrc: pathOrUrl };
   }
 
-  const fallbackSrc = toCdnUrl(
-    supabase.storage.from(bucket).getPublicUrl(pathOrUrl).data.publicUrl
-  );
+  // Canonical (non-CDN) public URL — the last-resort fallback that always hits
+  // Supabase directly, so a CDN failure self-heals instead of showing a broken
+  // image. `fallbackSrc` stays CDN-routed (untransformed) to keep egress off
+  // the metered quota in the normal case where only transforms are the problem.
+  const canonicalSrc = supabase.storage.from(bucket).getPublicUrl(pathOrUrl).data.publicUrl;
+  const fallbackSrc = toCdnUrl(canonicalSrc);
 
   // Feature known-off this session → just serve the original.
   if (transformsUnavailable) {
-    return { src: fallbackSrc, srcSet: null, fallbackSrc };
+    return { src: fallbackSrc, srcSet: null, fallbackSrc, canonicalSrc };
   }
 
   const at = (width) =>
@@ -130,7 +162,7 @@ export function getCardImage(pathOrUrl, opts = {}) {
   // Default src = middle width (a sensible pick for no-srcset browsers).
   const src = at(sorted[Math.floor(sorted.length / 2)] ?? sorted[0]);
 
-  return { src, srcSet, fallbackSrc };
+  return { src, srcSet, fallbackSrc, canonicalSrc };
 }
 
 // Sensible default `sizes` for the 1→2→3→4 column card grids used across the

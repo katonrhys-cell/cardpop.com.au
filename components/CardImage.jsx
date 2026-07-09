@@ -10,16 +10,22 @@ import { markTransformsUnavailable } from '@/utils/imageUrl.js';
  * a graceful "No Image" fallback for missing or broken photos.
  *
  * Responsive: pass `srcSet` + `sizes` (built via `getCardImage`) to let the
- * browser fetch a right-sized, auto-WebP image from Supabase. If a transformed
- * URL fails (e.g. image transformations aren't enabled on the plan), it falls
- * back to `fallbackSrc` (the untransformed original) and flags transforms as
- * unavailable for the rest of the session, so we don't keep retrying them.
+ * browser fetch a right-sized, auto-WebP image from Supabase. Sources are tried
+ * in order and it steps to the next one on load failure:
+ *   1. `src` (+ `srcSet`) — the transformed, CDN-routed image.
+ *   2. `fallbackSrc` — the untransformed original (still CDN-routed). Reaching
+ *      it flags transforms as unavailable for the session, so we stop retrying
+ *      them (e.g. when image transformations aren't enabled on the plan).
+ *   3. `canonicalSrc` — the object straight from the Supabase origin, so an
+ *      image-CDN outage self-heals instead of showing a broken thumbnail.
+ * Only then does it show "No Image".
  */
 const CardImage = ({
   src,
   srcSet,
   sizes,
   fallbackSrc,
+  canonicalSrc,
   alt = '',
   imgClassName = 'w-full h-full object-cover',
   width,
@@ -28,8 +34,19 @@ const CardImage = ({
   ...props
 }) => {
   const [status, setStatus] = useState('loading'); // 'loading' | 'loaded' | 'error'
-  const [useFallback, setUseFallback] = useState(false);
+  const [tier, setTier] = useState(0); // index into `candidates` below
   const imgRef = useRef(null);
+
+  // Ordered, de-duplicated list of sources to try. The primary carries the
+  // srcSet; every fallback is a single untransformed URL. Filtering out
+  // duplicates keeps the error handler from "advancing" to the same URL (which
+  // would loop) when, say, fallbackSrc === src (no CDN configured).
+  const candidates = [];
+  if (src) candidates.push({ url: src, srcSet: srcSet || undefined });
+  if (fallbackSrc && fallbackSrc !== src) candidates.push({ url: fallbackSrc });
+  if (canonicalSrc && canonicalSrc !== src && canonicalSrc !== fallbackSrc) {
+    candidates.push({ url: canonicalSrc });
+  }
 
   // Reset when the source changes (e.g. a card re-used in a virtualised list,
   // or the session flipping to untransformed URLs after a transformed one
@@ -39,13 +56,13 @@ const CardImage = ({
   // source in place. Forcing opacity-0 here made loaded homepage photos
   // visibly flicker/disappear on every such re-render (e.g. while scrolling).
   useEffect(() => {
-    setUseFallback(false);
+    setTier(0);
     setStatus((prev) => (prev === 'loaded' ? 'loaded' : 'loading'));
   }, [src]);
 
-  const canFallback = !useFallback && fallbackSrc && fallbackSrc !== src;
-  const effectiveSrc = useFallback ? fallbackSrc : src;
-  const effectiveSrcSet = useFallback ? undefined : srcSet;
+  const active = candidates[tier];
+  const effectiveSrc = active?.url ?? null;
+  const effectiveSrcSet = active?.srcSet;
 
   // A cached image can finish loading before React attaches `onLoad` — most
   // often when the component remounts (e.g. scrolling back to a card or
@@ -69,10 +86,11 @@ const CardImage = ({
   }
 
   const handleError = () => {
-    if (canFallback) {
-      // Transformed URL failed → drop to the original and stop using transforms.
-      markTransformsUnavailable();
-      setUseFallback(true);
+    // Leaving the transformed primary means transforms may be unavailable —
+    // flag it so getCardImage stops emitting transform URLs this session.
+    if (tier === 0) markTransformsUnavailable();
+    if (tier < candidates.length - 1) {
+      setTier(tier + 1);
       setStatus('loading');
     } else {
       setStatus('error');
@@ -94,6 +112,10 @@ const CardImage = ({
         height={height}
         loading={loading}
         decoding="async"
+        // This component runs its own multi-tier fallback (above), so the
+        // global CDN→origin safety net in utils/imageCdnFallback.js must not
+        // also mutate its src — opt out.
+        data-managed-image=""
         onLoad={() => setStatus('loaded')}
         onError={handleError}
         className={`${imgClassName} transition-opacity duration-500 ${
