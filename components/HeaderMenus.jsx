@@ -126,7 +126,7 @@ const MobileBrowseSection = ({ onNavigate }) => {
   };
 
   return (
-    <div className="mb-6">
+    <div className="mb-4">
       <p className="px-1 text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground mb-2">
         Browse Collections
       </p>
@@ -871,9 +871,9 @@ export const MobileNavMenus = ({
   const { settings } = usePlatformSettings();
   return (
     <>
-      <div className="flex-1 overflow-y-auto py-6 px-4">
+      <div className="flex-1 overflow-y-auto pt-4 pb-6 px-4">
         {/* Mobile search */}
-        <div className="mb-5">
+        <div className="mb-4">
           <SearchBar
             onSearchChange={onSearch}
             placeholder="Search cards, sets, sellers..."
