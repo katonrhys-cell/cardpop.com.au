@@ -95,8 +95,19 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
+      # Always deploy the current tip of main, NOT the commit that triggered this
+      # run (github.sha). When several PRs merge within minutes, their deploy jobs
+      # race — and because each used to check out its own commit, whichever job
+      # finished last re-aliased production to *its* (possibly older) commit,
+      # silently rolling production back. (This is exactly how production once got
+      # stuck on an ancestor commit: a later-finishing older run won the alias.)
+      # Pinning the checkout to `main` means every deploy — original, re-run, or
+      # manual redeploy of an old run — publishes the latest main, so a lagging
+      # run can only ever re-publish HEAD, never regress it.
       - name: Checkout code
         uses: actions/checkout@v5
+        with:
+          ref: main
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
