@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCategory } from '@/contexts/CategoryContext.jsx';
 import { getCategoryBySlug, getBreadcrumbs } from '@/utils/categoryUtils.js';
+import { findShopCategory } from '@/utils/shopCategories.js';
 import { generateMetaTitle, generateMetaDescription } from '@/utils/seoUtils.js';
 import SEOHead from '@/components/SEOHead.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
@@ -25,9 +26,14 @@ const ShopCategoryPage = () => {
   const [totalItems, setTotalItems] = useState(0);
   const fetchRef = useRef(null);
 
+  // Accessory categories (Card Sleeves, Top Loaders, …) are defined in the shop
+  // config, not the marketplace `categories` hierarchy — resolve those first so
+  // each dropdown item renders a real page. Fall back to the TCG hierarchy for
+  // legacy slugs (pokemon, etc.).
+  const shopCategory = findShopCategory(categorySlug);
   const pathInfo = getCategoryBySlug(hierarchy, categorySlug, subcategorySlug, productTypeSlug);
   const { category, subcategory, productType } = pathInfo || {};
-  const categoryName = subcategory?.name || category?.name;
+  const categoryName = shopCategory?.name || subcategory?.name || category?.name;
 
   // Reset to the first page whenever the category path or sort changes, so we
   // never land on an out-of-range page showing zero products.
@@ -116,9 +122,19 @@ const ShopCategoryPage = () => {
       .catch(e => toast.error(e.message));
   };
 
-  const breadcrumbs = getBreadcrumbs(category, subcategory, productType, '/shop');
-  const metaTitle = generateMetaTitle(category, subcategory, productType) + " - Official Store";
-  const metaDesc = generateMetaDescription(category, totalItems);
+  const breadcrumbs = shopCategory
+    ? [
+        { label: 'Home', path: '/' },
+        { label: 'Shop', path: '/shop' },
+        { label: shopCategory.name },
+      ]
+    : getBreadcrumbs(category, subcategory, productType, '/shop');
+  const metaTitle = shopCategory
+    ? `${shopCategory.name} - CardPop Shop`
+    : generateMetaTitle(category, subcategory, productType) + " - Official Store";
+  const metaDesc = shopCategory
+    ? `Shop ${shopCategory.name.toLowerCase()} and more ${shopCategory.group.toLowerCase()} supplies at CardPop. Fast, tracked shipping across Australia.`
+    : generateMetaDescription(category, totalItems);
 
   return (
     <div className="container-default section-padding">
@@ -140,11 +156,19 @@ const ShopCategoryPage = () => {
         
         <div className="flex-1 min-w-0">
           <div className="mb-8">
+            {shopCategory && (
+              <p className="text-xs font-bold uppercase tracking-widest text-primary mb-1.5">
+                {shopCategory.group}
+              </p>
+            )}
             <h1 className="text-3xl md:text-4xl font-bold font-heading text-foreground mb-2">
-              {productType?.name || subcategory?.name || category?.name || 'Shop Products'}
+              {shopCategory?.name || productType?.name || subcategory?.name || category?.name || 'Shop Products'}
             </h1>
-            <p className="text-muted-foreground text-lg">
-              {totalItems} products available
+            {shopCategory?.desc && (
+              <p className="text-muted-foreground text-lg mb-1">{shopCategory.desc}</p>
+            )}
+            <p className="text-muted-foreground text-sm">
+              {totalItems} {totalItems === 1 ? 'product' : 'products'} available
             </p>
           </div>
           
