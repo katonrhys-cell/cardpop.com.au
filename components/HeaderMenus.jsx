@@ -80,6 +80,11 @@ const EVENT_ITEMS = [
   { href: '/events/store-events',     label: 'Store Events',     desc: 'Local game store tournaments',        Icon: Store,     gradient: 'from-amber-500 to-orange-500'  },
 ];
 
+const ANALYTICS_ITEMS = [
+  { href: '/analytics', label: 'Market Analytics', desc: 'Live prices, movers and trends',   Icon: LineChart,  gradient: 'from-blue-500 to-indigo-600'   },
+  { href: '/prices',    label: 'Card Prices',      desc: 'What cards are worth in AUD',       Icon: TrendingUp, gradient: 'from-green-500 to-emerald-600' },
+];
+
 const GRADING_ITEMS = [
   { href: '/grading/estimator',          label: 'CardPop Grade Estimator',  desc: 'Estimate your card grade instantly',      Icon: Calculator,    gradient: 'from-blue-500 to-indigo-600'   },
   { href: '/grading/roi-calculator',     label: 'Grading ROI Calculator',   desc: 'See if grading a card is worth it',       Icon: TrendingUp,    gradient: 'from-green-500 to-emerald-600' },
@@ -574,6 +579,64 @@ const GradingDropdown = ({ onNavigate }) => {
   );
 };
 
+// ─── Analytics dropdown ───────────────────────────────────────────────────────
+const AnalyticsDropdown = ({ onNavigate }) => {
+  const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
+  const location = useLocation();
+  const isAnalyticsActive = location.pathname.startsWith('/analytics') || location.pathname.startsWith('/prices');
+
+  return (
+    <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
+      <button
+        onClick={handleTriggerClick}
+        aria-expanded={open}
+        className={`flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+          open || isAnalyticsActive
+            ? 'bg-primary text-primary-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+        }`}
+      >
+        Analytics
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-72 bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+          <Link
+            to="/analytics"
+            onClick={() => { setOpen(false); onNavigate?.(); }}
+            className="flex items-center justify-between px-5 py-3.5 border-b border-border hover:bg-muted/60 transition-colors group"
+          >
+            <div>
+              <span className="text-sm font-bold text-foreground">Analytics Hub</span>
+              <p className="text-xs text-muted-foreground mt-0.5">Track the trading card market</p>
+            </div>
+            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
+          </Link>
+          <div className="p-3 grid gap-0.5">
+            {ANALYTICS_ITEMS.map(item => (
+              <Link
+                key={item.href}
+                to={item.href}
+                onClick={() => { setOpen(false); onNavigate?.(); }}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
+              >
+                <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${item.gradient} shrink-0 shadow-sm`}>
+                  <item.Icon className="w-4 h-4 text-white" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{item.label}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{item.desc}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Mobile blog section (expandable) ────────────────────────────────────────
 const MobileBlogSection = ({ onNavigate }) => {
   const [open, setOpen] = useState(false);
@@ -758,6 +821,43 @@ const MobileGradingSection = ({ onNavigate }) => {
   );
 };
 
+// ─── Mobile analytics section (expandable) ───────────────────────────────────
+const MobileAnalyticsSection = ({ onNavigate }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-4">
+      <button
+        onClick={() => startTransition(() => setOpen(o => !o))}
+        className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-muted transition-colors mb-0.5"
+      >
+        <span className="text-sm font-bold text-foreground flex items-center gap-2">
+          <LineChart className="w-4 h-4 text-primary" />
+          Analytics
+        </span>
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="flex flex-col gap-0.5 mb-1 pl-2">
+          {ANALYTICS_ITEMS.map(item => (
+            <SheetClose key={item.href} asChild>
+              <Link
+                to={item.href}
+                onClick={onNavigate}
+                className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
+              >
+                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${item.gradient} shrink-0`}>
+                  <item.Icon className="w-3.5 h-3.5 text-white" />
+                </span>
+                <span className="text-xs font-semibold text-foreground truncate">{item.label}</span>
+              </Link>
+            </SheetClose>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Plain inline account section — no nested Radix portals inside the Sheet Dialog
 const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout }) => {
   const [expanded, setExpanded] = useState(false);
@@ -829,6 +929,7 @@ export const DesktopNavMenus = ({ onNavigate }) => {
     <>
       <BrowseDropdown onNavigate={onNavigate} />
       {NAV_LINKS.map((link) => {
+        if (link.label === 'Analytics') return <AnalyticsDropdown key="analytics" onNavigate={onNavigate} />;
         if (link.label === 'Blog') return settings.enable_blog === false ? null : <BlogDropdown key="blog" onNavigate={onNavigate} />;
         if (link.label === 'Community') return <CommunityDropdown key="community" onNavigate={onNavigate} />;
         if (link.label === 'Events') return <EventsDropdown key="events" onNavigate={onNavigate} />;
@@ -890,6 +991,7 @@ export const MobileNavMenus = ({
           <MobileBrowseSection key={openKey} onNavigate={onNavigate} />
 
           {NAV_LINKS.map((link) => {
+            if (link.label === 'Analytics') return <MobileAnalyticsSection key={`analytics-${openKey}`} onNavigate={onNavigate} />;
             if (link.label === 'Blog') return <MobileBlogSection key={`blog-${openKey}`} onNavigate={onNavigate} />;
             if (link.label === 'Community') return <MobileCommunitySection key={`community-${openKey}`} onNavigate={onNavigate} />;
             if (link.label === 'Events') return <MobileEventsSection key={`events-${openKey}`} onNavigate={onNavigate} />;
