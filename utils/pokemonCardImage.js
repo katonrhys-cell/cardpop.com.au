@@ -38,12 +38,23 @@ const writeSession = (key, value) => {
   }
 };
 
-// "Charizard VSTAR 018/172" → { name: 'Charizard VSTAR', number: '18' }
-// "Mew ex 151/165"          → { name: 'Mew ex', number: '151' }
-// "Pikachu"                 → { name: 'Pikachu', number: null }
+// "Charizard VSTAR 018/172"                  → { name: 'Charizard VSTAR', number: '18' }
+// "Mew ex 151/165"                           → { name: 'Mew ex', number: '151' }
+// "Charizard ex (Special Illustration Rare)" → { name: 'Charizard ex', number: null }
+// "Charizard Holo (Base Set)"                → { name: 'Charizard', number: null }
+// "Pikachu"                                  → { name: 'Pikachu', number: null }
 const parseCard = (raw) => {
   let name = (raw || '').trim();
   let number = null;
+
+  // Curated display names embed rarity/variant/print labels that aren't part of
+  // the card's actual name in the TCG API. Drop them before querying, or the
+  // (exact-phrase) name filter matches nothing and the lookup returns null:
+  //   parenthetical labels — "(Special Illustration Rare)", "(Rainbow Rare)",
+  //     "(Alt Art)", "(Base Set)"
+  //   bare print qualifiers — a trailing/standalone "Holo"
+  name = name.replace(/\s*\([^)]*\)/g, ' ');
+  name = name.replace(/\bholo(?:foil)?\b/gi, ' ');
 
   const slash = name.match(/\b(\d+)\s*\/\s*\d+\b/); // 018/172 collector number
   if (slash) {
