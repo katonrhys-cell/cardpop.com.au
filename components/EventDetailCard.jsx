@@ -50,7 +50,7 @@ const EventDetailCard = ({ event }) => {
       </nav>
 
       <div className="bg-card rounded-3xl overflow-hidden border border-border shadow-lg">
-        {/* Hero Image */}
+        {/* Hero Image — shown in full, unobstructed by any text overlay */}
         <div className="w-full h-64 md:h-96 lg:h-[450px] relative bg-muted overflow-hidden">
           {/* Blurred backdrop fills the frame so tall portrait posters don't leave bare side bars */}
           <img
@@ -65,38 +65,30 @@ const EventDetailCard = ({ event }) => {
             alt={event.name}
             className="absolute inset-0 w-full h-full object-contain"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent" />
+        </div>
 
-          {/* Type pill — top-left */}
-          <div className="absolute top-4 left-4">
-            {(() => {
-              const style = EVENT_TYPE_STYLES[event.event_type];
-              if (style) {
-                const { gradient, Icon } = style;
-                return (
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r ${gradient} text-white text-sm font-bold shadow-md backdrop-blur-sm`}>
-                    <Icon className="w-3.5 h-3.5" />
-                    {event.type}
-                  </span>
-                );
-              }
+        {/* Title & type — placed below the image so the poster stays fully visible */}
+        <div className="px-5 pt-5 md:px-10 md:pt-8">
+          {(() => {
+            const style = EVENT_TYPE_STYLES[event.event_type];
+            if (style) {
+              const { gradient, Icon } = style;
               return (
-                <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-sm text-white text-sm font-bold shadow-md">
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r ${gradient} text-white text-sm font-bold shadow-md`}>
+                  <Icon className="w-3.5 h-3.5" />
                   {event.type}
                 </span>
               );
-            })()}
-          </div>
-
-          {/* Title — bottom of hero, with strong text shadow for legibility */}
-          <div className="absolute bottom-0 left-0 px-5 pb-5 md:px-10 md:pb-8 w-full">
-            <h1
-              className="font-serif text-2xl md:text-5xl lg:text-6xl font-extrabold text-white leading-tight tracking-tight"
-              style={{ textShadow: '0 2px 16px rgba(0,0,0,0.85), 0 1px 4px rgba(0,0,0,0.95)' }}
-            >
-              {event.name}
-            </h1>
-          </div>
+            }
+            return (
+              <span className="inline-flex items-center px-3 py-1.5 rounded-full bg-muted text-foreground text-sm font-bold shadow-sm">
+                {event.type}
+              </span>
+            );
+          })()}
+          <h1 className="font-serif text-2xl md:text-5xl lg:text-6xl font-extrabold text-foreground leading-tight tracking-tight mt-4">
+            {event.name}
+          </h1>
         </div>
 
         {/* Content Split */}
