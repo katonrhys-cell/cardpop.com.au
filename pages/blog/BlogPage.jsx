@@ -10,16 +10,22 @@ import { BookOpen, FileX, AlertCircle, Search, User, Calendar, ArrowRight } from
 import { htmlExcerpt } from '@/utils/htmlExcerpt.js';
 import { BLOG_CATEGORIES as CATEGORIES } from '@/data/blogCategories.js';
 
-const CATEGORY_MAP = Object.fromEntries(CATEGORIES.map(c => [c.slug, c.label]));
+const CATEGORY_MAP = Object.fromEntries(CATEGORIES.map(c => [c.slug, c]));
 
 const formatDate = (dateStr) =>
   new Date(dateStr).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 
 const CategoryBadge = ({ slug }) => {
-  const label = CATEGORY_MAP[slug] || slug;
+  const cat = CATEGORY_MAP[slug];
+  const label = cat?.label || slug;
   if (!label) return null;
+  // Colour the pill to match this category's icon in the Blog nav dropdown;
+  // unknown categories fall back to the brand primary colour.
+  const colorClass = cat?.gradient
+    ? `bg-gradient-to-br ${cat.gradient} text-white`
+    : 'bg-primary text-primary-foreground';
   return (
-    <span className="absolute -top-3 right-0 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm pointer-events-none">
+    <span className={`absolute -top-3 right-0 ${colorClass} text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm pointer-events-none`}>
       {label}
     </span>
   );
@@ -162,7 +168,7 @@ const BlogPage = () => {
     return counts;
   }, [articles]);
 
-  const activeCategory = categoryParam ? CATEGORY_MAP[categoryParam] : null;
+  const activeCategory = categoryParam ? (CATEGORY_MAP[categoryParam]?.label || null) : null;
   const pageTitle = activeCategory
     ? `${activeCategory} | Blog`
     : tagParam
