@@ -98,7 +98,6 @@ export const CartProvider = ({ children }) => {
 
       cartItemsRef.current = nextItems;
       setCartItems(nextItems);
-      setIsCartOpen(true);
       resolve();
     });
   }, []);

@@ -100,6 +100,7 @@ const BrowseListingsPage = () => {
     };
 
     addToCart(cartProduct, cartVariant, 1, 1);
+    toast.success('Added to cart');
   };
 
   const handleViewDetails = (id) => {

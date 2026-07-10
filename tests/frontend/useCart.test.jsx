@@ -70,14 +70,14 @@ describe('CartProvider — initialization', () => {
 // ─── addToCart ────────────────────────────────────────────────────────────────
 
 describe('addToCart', () => {
-  it('adds a new item and opens the cart', async () => {
+  it('adds a new item without opening the cart', async () => {
     const { result } = mount();
     const product = makeProduct('p1', { price: 1000 });
     await act(async () => { await result.current.addToCart(product); });
 
     expect(result.current.cartItems).toHaveLength(1);
     expect(result.current.cartItems[0].quantity).toBe(1);
-    expect(result.current.isCartOpen).toBe(true);
+    expect(result.current.isCartOpen).toBe(false);
   });
 
   it('increments quantity when the same variant is added again', async () => {
