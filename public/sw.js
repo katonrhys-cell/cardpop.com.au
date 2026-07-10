@@ -122,6 +122,19 @@ const cacheFirst = async (request) => {
 const isStorageImage = (url) =>
   /\/storage\/v1\/(object|render\/image)\/public\//.test(url.pathname);
 
+// Canonical Supabase Storage origin — the source of truth every storage object
+// is always readable from. Hardcoded like the project URL elsewhere
+// (lib/supabaseClient.js) and the worker's ORIGIN (cloudflare/image-proxy-worker.js).
+const SUPABASE_ORIGIN = 'https://odoglvswwymyjuwlonkf.supabase.co';
+
+// Map a storage image served through the image CDN (any non-Supabase host) back
+// to the canonical Supabase origin, keeping the /storage/v1/... path intact.
+// Returns null when the URL is already canonical (nothing to fall back to).
+// Mirrors canonicalStorageUrl() in utils/imageCdnFallback.js so a CDN outage
+// self-heals at the service-worker layer too.
+const canonicalStorageUrl = (url) =>
+  url.origin === SUPABASE_ORIGIN ? null : `${SUPABASE_ORIGIN}${url.pathname}${url.search}`;
+
 const trimCache = async (cacheName, maxEntries) => {
   const cache = await caches.open(cacheName);
   const keys = await cache.keys();
@@ -148,8 +161,29 @@ const imageCacheFirst = async (request) => {
     }
     return response;
   } catch (error) {
-    // CORS fetch failed (offline, or an origin without CORS) — fall back to
-    // the untouched original request.
+    // The fetch failed at the network level — most often the image CDN host
+    // is down/misconfigured. If this object was served through the CDN, retry
+    // against the canonical Supabase origin (always readable) and cache the
+    // result under the original CDN key so later hits skip the dead host. This
+    // self-heals a CDN outage here instead of rejecting respondWith (which the
+    // browser surfaces as "FetchEvent.respondWith received an error" + a broken
+    // <img>). The DOM-level net in utils/imageCdnFallback.js is the same idea a
+    // layer up; doing it here also keeps the image cached.
+    const canonical = canonicalStorageUrl(new URL(request.url));
+    if (canonical) {
+      try {
+        const originResponse = await fetch(canonical, { mode: 'cors' });
+        if (originResponse.ok) {
+          await cache.put(request.url, originResponse.clone());
+          trimCache(CACHE_NAMES.IMAGES, MAX_IMAGE_ENTRIES).catch(() => {});
+        }
+        return originResponse;
+      } catch {
+        // Origin unreachable too (genuinely offline) — fall through.
+      }
+    }
+    // Last resort: the untouched original request (offline, or an origin
+    // without CORS — an opaque response is still paintable in an <img>).
     return fetch(request);
   }
 };
