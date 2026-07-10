@@ -112,7 +112,6 @@ const ShopCategoryPage = () => {
       inventory_quantity: product.stock_quantity,
     };
     addToCart(cartProduct, cartVariant, 1, product.stock_quantity ?? 999)
-      .then(() => toast.success(`${product.title || 'Item'} added to cart`))
       .catch(e => toast.error(e.message));
   };
 

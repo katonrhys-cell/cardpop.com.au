@@ -108,7 +108,6 @@ const ShopSealedBoxesPage = () => {
       inventory_quantity: product.stock_quantity,
     };
     addToCart(cartProduct, cartVariant, 1, product.stock_quantity ?? 999);
-    toast.success(`${product.title || 'Item'} added to cart`);
   };
 
   const handleClearFilters = () => {

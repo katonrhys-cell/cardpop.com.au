@@ -99,7 +99,6 @@ const ShopPage = () => {
       inventory_quantity: product.stock_quantity,
     };
     addToCart(cartProduct, cartVariant, 1, product.stock_quantity ?? 999)
-      .then(() => toast.success('Added to cart'))
       .catch(e => toast.error(e.message));
   };
 

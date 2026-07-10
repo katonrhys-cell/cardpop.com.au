@@ -37,7 +37,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
   const { source: sourceParam, id } = useParams();
   const source = sourceProp || sourceParam;
   const navigate = useNavigate();
-  const { addToCart, setIsCartOpen } = useCart();
+  const { addToCart } = useCart();
   const { currentUser, isAdmin, loading: authLoading } = useAuth();
   
   const [product, setProduct] = useState(null);
@@ -270,14 +270,6 @@ const ProductDetailPage = ({ source: sourceProp }) => {
       inventory_quantity: product.stockQuantity
     };
     addToCart(cartProduct, cartVariant, 1, product.stockQuantity ?? 999)
-      .then(() => {
-        toast.success('Added to cart', {
-          action: {
-            label: 'View Cart',
-            onClick: () => setIsCartOpen(true)
-          }
-        });
-      })
       .catch(e => toast.error(e.message));
   };
 
