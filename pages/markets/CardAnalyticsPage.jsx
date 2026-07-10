@@ -630,11 +630,11 @@ const CardAnalyticsPage = () => {
 
         {/* Tabs: Buy Now / Trade / Sold History / Similar */}
         <Tabs defaultValue="buy">
-          <TabsList className="w-full mb-6 h-12">
-            <TabsTrigger value="buy"     className="flex-1 gap-1.5"><ShoppingCart className="w-4 h-4" /> Buy Now</TabsTrigger>
-            <TabsTrigger value="trade"   className="flex-1 gap-1.5"><RefreshCw className="w-4 h-4" /> For Trade</TabsTrigger>
-            <TabsTrigger value="sold"    className="flex-1 gap-1.5"><Clock className="w-4 h-4" /> Sold History</TabsTrigger>
-            <TabsTrigger value="similar" className="flex-1 gap-1.5"><Star className="w-4 h-4" /> Similar Cards</TabsTrigger>
+          <TabsList className="grid grid-cols-2 gap-1 w-full mb-6 h-auto p-1 sm:grid-cols-4 sm:h-12">
+            <TabsTrigger value="buy"     className="min-w-0 gap-1.5 py-2 text-xs sm:text-sm"><ShoppingCart className="w-4 h-4 shrink-0" /> <span className="truncate">Buy Now</span></TabsTrigger>
+            <TabsTrigger value="trade"   className="min-w-0 gap-1.5 py-2 text-xs sm:text-sm"><RefreshCw className="w-4 h-4 shrink-0" /> <span className="truncate">For Trade</span></TabsTrigger>
+            <TabsTrigger value="sold"    className="min-w-0 gap-1.5 py-2 text-xs sm:text-sm"><Clock className="w-4 h-4 shrink-0" /> <span className="truncate">Sold History</span></TabsTrigger>
+            <TabsTrigger value="similar" className="min-w-0 gap-1.5 py-2 text-xs sm:text-sm"><Star className="w-4 h-4 shrink-0" /> <span className="truncate">Similar Cards</span></TabsTrigger>
           </TabsList>
 
           {/* Buy Now */}
