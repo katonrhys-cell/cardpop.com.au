@@ -186,7 +186,7 @@ const AboutPage = () => {
               <Link to="/signup">Create Free Account</Link>
             </Button>
             <Button size="lg" variant="outline" asChild className="h-14 px-8 text-lg font-bold rounded-xl border-primary-foreground/30 hover:bg-primary-foreground/10 text-primary-foreground">
-              <Link to="/browse">Explore Marketplace <ArrowRight className="w-5 h-5 ml-2" /></Link>
+              <Link to="/marketplace">Explore Marketplace <ArrowRight className="w-5 h-5 ml-2" /></Link>
             </Button>
           </div>
         </div>

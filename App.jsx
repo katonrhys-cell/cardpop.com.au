@@ -71,7 +71,6 @@ const RouteErrorBoundary = ({ children }) => {
 
 // Marketplace
 const MarketplacePage = lazy(() => import('@/pages/marketplace/MarketplacePage.jsx'));
-const BrowseListingsPage = lazy(() => import('@/pages/BrowseListingsPage.jsx'));
 
 // Shop
 const ShopPage = lazy(() => import('@/pages/shop/ShopPage.jsx'));
@@ -288,7 +287,8 @@ const App = () => {
                             renders here directly (no client redirect that would create a duplicate
                             URL for Google to index). */}
                         <Route path="/marketplace/:id/:slug?" element={<FeatureRoute flag="enable_marketplace"><ProductDetailPage source="marketplace" /></FeatureRoute>} />
-                        <Route path="/browse" element={<FeatureRoute flag="enable_marketplace"><BrowseListingsPage /></FeatureRoute>} />
+                        {/* /browse was retired in favour of /marketplace — redirect any bookmarked or indexed links */}
+                        <Route path="/browse" element={<Navigate to="/marketplace" replace />} />
 
                         {/* Public Profile Routes */}
                         <Route path="/seller/:userId" element={<PublicSellerProfilePage />} />

@@ -224,8 +224,8 @@ describe('prerender landing pages', () => {
 
   it('renders an empty but valid landing when there are no items', async () => {
     state.listResult = { data: [] };
-    const { body } = await run('/browse');
-    expect(body).toContain('<title>Browse Listings | CardPop</title>');
+    const { body } = await run('/marketplace');
+    expect(body).toContain('<title>Buy &amp; Sell Trading Cards Online Australia | CardPop Marketplace</title>');
     expect(body).toContain('No items available right now.');
     expect(body).not.toContain('noindex');
   });

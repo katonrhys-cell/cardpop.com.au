@@ -70,7 +70,7 @@ const CheckoutPage = () => {
           if (!listing) {
             if (!cancelled) {
               toast.error('This item is not currently for sale.');
-              navigate('/browse');
+              navigate('/marketplace');
             }
             return;
           }
@@ -91,7 +91,7 @@ const CheckoutPage = () => {
         } catch (err) {
           if (!cancelled) {
             toast.error('Item not found or unavailable');
-            navigate('/browse');
+            navigate('/marketplace');
           }
         }
       }
@@ -282,7 +282,7 @@ const CheckoutPage = () => {
             shipping={shipping}
             discount={discount}
             total={total}
-            onEditCart={() => navigate('/browse')}
+            onEditCart={() => navigate('/marketplace')}
             onNext={() => {
               if (flatItems.length === 0) { toast.error('Your cart is empty!'); return; }
               setStep(STEPS.SHIPPING);
