@@ -1,10 +1,6 @@
 
-import React, { Suspense } from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useLocation } from 'react-router-dom';
-// React.lazy wrapped with one-time reload recovery: a code-split chunk that
-// 404s after a new deploy (stale index.html → purged chunk hash) self-heals
-// instead of throwing "Importing a module script failed". See utils/lazyWithRetry.js.
-import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry.js';
 import { Helmet, HelmetProvider } from 'react-helmet-async';
 import Toaster from '@/components/ToasterLazy.jsx';
 
