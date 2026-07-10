@@ -667,11 +667,6 @@ const LANDINGS = {
     description: 'Browse thousands of Pokémon, Magic: The Gathering, Yu-Gi-Oh and sports cards listed by Australian sellers. Filter by game, grade, price and more. Free to list — buy and sell trading cards online in Australia.',
     intro: "Discover cards directly from other collectors' vaults alongside official CardPop listings.",
   },
-  '/browse': {
-    title: 'Browse Listings | CardPop', h1: 'Browse Cards', breadcrumb: 'Browse', source: 'listings',
-    description: 'Browse all trading card listings on CardPop — Pokemon, Magic, Yu-Gi-Oh, sports cards and more.',
-    intro: 'Every active trading card listing on CardPop, from Pokémon to sports cards.',
-  },
 };
 
 async function renderLanding(supabase, path) {

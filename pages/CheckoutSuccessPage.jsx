@@ -77,7 +77,7 @@ const CheckoutSuccessPage = () => {
               <Link to="/checkout">Return to Checkout</Link>
             </Button>
             <Button asChild variant="outline" size="lg" className="rounded-full">
-              <Link to="/browse">Continue Browsing</Link>
+              <Link to="/marketplace">Continue Browsing</Link>
             </Button>
           </div>
         </div>
@@ -128,7 +128,7 @@ const CheckoutSuccessPage = () => {
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button asChild size="lg" className="rounded-full shadow-lg shadow-primary/20">
-            <Link to="/browse">
+            <Link to="/marketplace">
               Continue Shopping <ArrowRight className="w-4 h-4 ml-2" />
             </Link>
           </Button>

@@ -18,7 +18,7 @@ const CollectionsDropdown = ({ isMobile = false, onNavigate }) => {
   const navigate = useNavigate();
 
   const handleSelect = (collection) => {
-    navigate(`/browse?collection=${encodeURIComponent(collection)}&tab=community`);
+    navigate(`/marketplace?collection=${encodeURIComponent(collection)}&tab=community`);
     if (onNavigate) onNavigate();
   };
 

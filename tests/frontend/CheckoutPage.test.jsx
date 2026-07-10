@@ -86,7 +86,7 @@ function renderCheckout() {
     <MemoryRouter initialEntries={['/checkout']}>
       <Routes>
         <Route path="/checkout" element={<CheckoutPage />} />
-        <Route path="/browse" element={<div>Browse Page</div>} />
+        <Route path="/marketplace" element={<div>Marketplace Page</div>} />
       </Routes>
     </MemoryRouter>,
   );
