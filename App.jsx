@@ -171,7 +171,6 @@ const CommunityDiscussionPage = lazy(() => import('@/pages/community/CommunityDi
 const WhatnotShowsPage = lazy(() => import('@/pages/community/WhatnotShowsPage.jsx'));
 const ForumPage = lazy(() => import('@/pages/community/ForumPage.jsx'));
 const ProfilesPage = lazy(() => import('@/pages/community/ProfilesPage.jsx'));
-const RetailersPage = lazy(() => import('@/pages/community/RetailersPage.jsx'));
 const LocalTradersPage = lazy(() => import('@/pages/community/LocalTradersPage.jsx'));
 const LocalMapPage = lazy(() => import('@/pages/community/LocalMapPage.jsx'));
 
@@ -399,7 +398,7 @@ const App = () => {
                         <Route path="/community" element={<CommunityPage />} />
                         <Route path="/community/forum" element={<ForumPage />} />
                         <Route path="/community/profiles" element={<ProfilesPage />} />
-                        <Route path="/community/retailers" element={<RetailersPage />} />
+                        <Route path="/community/retailers" element={<Navigate to="/card-shops" replace />} />
                         <Route path="/community/local-traders" element={<LocalTradersPage />} />
                         <Route path="/community/map" element={<LocalMapPage />} />
                         <Route path="/events" element={<CommunityEventsPage />} />
