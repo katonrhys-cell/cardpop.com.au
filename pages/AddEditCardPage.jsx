@@ -7,6 +7,7 @@ import {
   Frame, Wand2, SlidersHorizontal, HandCoins,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import CardHierarchySelector from '@/components/CardHierarchySelector.jsx';
@@ -98,8 +99,28 @@ const AddEditCardPage = () => {
   const [saving, setSaving]             = useState(false);
   const [imageFile, setImageFile]       = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const [extraFiles, setExtraFiles]     = useState([null, null, null, null, null]);
-  const [extraPreviews, setExtraPreviews] = useState([null, null, null, null, null]);
+  // Number of extra photo slots is driven by the max_images_per_listing platform
+  // setting (main image + extras = the total cap). Clamped to a sane range.
+  const { settings: platformSettings } = usePlatformSettings();
+  const maxExtraSlots = Math.min(19, Math.max(0, (parseInt(platformSettings.max_images_per_listing, 10) || 10) - 1));
+  const [extraFiles, setExtraFiles]     = useState(() => Array(maxExtraSlots).fill(null));
+  const [extraPreviews, setExtraPreviews] = useState(() => Array(maxExtraSlots).fill(null));
+
+  // Resize the slot arrays if the setting resolves after mount, never dropping a
+  // photo the user already picked or an edited card already carries (grows to
+  // fit existing entries even if an admin later lowered the cap).
+  useEffect(() => {
+    const fit = (arr) => {
+      const highestFilled = arr.reduce((n, v, i) => (v != null ? i + 1 : n), 0);
+      const len = Math.max(maxExtraSlots, highestFilled);
+      if (len === arr.length) return arr;
+      const next = Array(len).fill(null);
+      for (let i = 0; i < Math.min(arr.length, len); i++) next[i] = arr[i];
+      return next;
+    };
+    setExtraFiles(fit);
+    setExtraPreviews(fit);
+  }, [maxExtraSlots]);
   const [errors, setErrors]             = useState({});
   const [isAutoFilled, setIsAutoFilled] = useState(false);
   // Hierarchy selection
@@ -374,7 +395,7 @@ const AddEditCardPage = () => {
           const urls = card.card_images.map(p =>
             publicImageUrl(p)
           );
-          const filled = Array.from({ length: 5 }, (_, i) => urls[i] ?? null);
+          const filled = Array.from({ length: Math.max(maxExtraSlots, urls.length) }, (_, i) => urls[i] ?? null);
           if (!cancelled) setExtraPreviews(filled);
         }
       } catch {
@@ -388,6 +409,9 @@ const AddEditCardPage = () => {
     };
     fetchCard();
     return () => { cancelled = true; };
+    // maxExtraSlots is intentionally omitted — the resize effect handles a late
+    // settings change; re-running the card fetch on it would be wrong.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, currentUser, navigate, isEdit]);
 
   // ─── Image handling ───────────────────────────────────────────────────────
@@ -880,8 +904,8 @@ const AddEditCardPage = () => {
               setFormData({ ...emptyForm, collection: formData.collection });
               setImageFile(null);
               setImagePreview(null);
-              setExtraFiles([null, null, null, null, null]);
-              setExtraPreviews([null, null, null, null, null]);
+              setExtraFiles(Array(maxExtraSlots).fill(null));
+              setExtraPreviews(Array(maxExtraSlots).fill(null));
               setErrors({});
               setIsAutoFilled(false);
               clearCrop();
@@ -1008,9 +1032,9 @@ const AddEditCardPage = () => {
                   />
                 )}
 
-                {/* Extra image slots — up to 5 additional photos */}
+                {/* Extra image slots — count driven by max_images_per_listing */}
                 <div className="mt-4">
-                  <p className="text-xs font-semibold text-muted-foreground mb-2">Additional Photos (up to 5)</p>
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">Additional Photos (up to {maxExtraSlots})</p>
                   <div className="grid grid-cols-5 gap-2">
                     {extraFiles.map((_, idx) => (
                       <div key={idx} className="aspect-square">

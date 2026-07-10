@@ -62,6 +62,33 @@ describe('CardImage', () => {
     expect(markTransformsUnavailable).toHaveBeenCalledTimes(1);
   });
 
+  it('steps transform → fallback → canonical (non-CDN origin) before giving up', () => {
+    render(
+      <CardImage
+        src="https://cdn/render/a.jpg?w=400"
+        srcSet="https://cdn/render/a.jpg?w=240 240w"
+        sizes="50vw"
+        fallbackSrc="https://cdn/object/a.jpg"
+        canonicalSrc="https://origin/object/a.jpg"
+        alt="A card"
+      />,
+    );
+    // transform → CDN fallback
+    fireEvent.error(screen.getByAltText('A card'));
+    expect(screen.getByAltText('A card').getAttribute('src')).toBe('https://cdn/object/a.jpg');
+    // CDN fallback → canonical Supabase origin (self-heals a CDN outage)
+    fireEvent.error(screen.getByAltText('A card'));
+    expect(screen.getByAltText('A card').getAttribute('src')).toBe('https://origin/object/a.jpg');
+    // only after the origin also fails do we show "No Image"
+    fireEvent.error(screen.getByAltText('A card'));
+    expect(screen.getByText('No Image')).toBeInTheDocument();
+  });
+
+  it('opts out of the global CDN fallback handler via data-managed-image', () => {
+    render(<CardImage src="https://cdn/object/a.jpg" alt="A card" />);
+    expect(screen.getByAltText('A card')).toHaveAttribute('data-managed-image');
+  });
+
   it('shows "No Image" when there is no usable fallback and the image errors', () => {
     render(<CardImage src="https://cdn/object/a.jpg" fallbackSrc="https://cdn/object/a.jpg" alt="A card" />);
     fireEvent.error(screen.getByAltText('A card'));

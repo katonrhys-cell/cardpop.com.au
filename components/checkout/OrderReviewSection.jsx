@@ -2,6 +2,7 @@ import React from 'react';
 import { MapPin, Package } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { toCdnUrl } from '@/utils/imageUrl.js';
 
 const AddressBlock = ({ data = {} }) => (
   <div className="text-sm space-y-0.5 text-muted-foreground">
@@ -22,6 +23,7 @@ const OrderReviewSection = ({
   subtotal = 0,
   serviceFee = 0,
   gst = 0,
+  shipping = 0,
   discount = 0,
   total = 0,
 }) => {
@@ -71,7 +73,7 @@ const OrderReviewSection = ({
           {items.map((item, i) => (
             <div key={item.id ?? i} className="flex items-center gap-3 text-sm">
               {item.image && (
-                <img src={item.image} alt={item.name} className="h-10 w-10 rounded object-cover border border-border" />
+                <img src={toCdnUrl(item.image)} alt={item.name} className="h-10 w-10 rounded object-cover border border-border" />
               )}
               <span className="flex-1">{item.name ?? 'Card'}</span>
               <span className="text-muted-foreground">${Number(item.price ?? 0).toFixed(2)}</span>
@@ -94,6 +96,11 @@ const OrderReviewSection = ({
           <div className="flex justify-between text-sm text-muted-foreground">
             <span>GST (10%)</span><span>${Number(gst).toFixed(2)}</span>
           </div>
+          {shipping > 0 && (
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>Shipping</span><span>${Number(shipping).toFixed(2)}</span>
+            </div>
+          )}
           <Separator />
           <div className="flex justify-between font-semibold text-base">
             <span>Total (AUD)</span><span>${Number(total).toFixed(2)}</span>

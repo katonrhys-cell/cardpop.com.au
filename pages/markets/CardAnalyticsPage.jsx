@@ -121,11 +121,11 @@ const ListingCard = ({ listing }) => {
       </div>
       <div className="flex-1 min-w-0 flex flex-col justify-between">
         <div>
-          <p className="font-semibold text-sm truncate">{listing.title || listing.name}</p>
+          <p className="font-semibold text-sm truncate">{listing.title || listing.name || listing.card_name}</p>
           {listing.condition && <Badge variant="outline" className="text-xs mt-1">{listing.condition}</Badge>}
         </div>
         <div className="flex items-end justify-between mt-2">
-          <p className="text-lg font-bold text-primary">${(listing.price || 0).toFixed(2)}</p>
+          <p className="text-lg font-bold text-primary">${(listing.price ?? listing.price_aud ?? listing.asking_price ?? 0).toFixed(2)}</p>
           <Button size="sm" variant="outline" className="text-xs h-7 gap-1">
             <ShoppingCart className="w-3 h-3" /> View
           </Button>
@@ -215,7 +215,7 @@ const CardAnalyticsPage = () => {
     const term = cardName.split(' ')[0].replace(/"/g, '');
 
     Promise.all([
-      supabase.from('listings').select('*').ilike('title', `%${term}%`).eq('type', 'shop').order('price_aud').limit(6).then(r => r.data ?? []),
+      supabase.from('shop_products').select('*').ilike('title', `%${term}%`).eq('status', 'active').order('price_aud').limit(6).then(r => r.data ?? []),
       supabase.from('vault_items').select('*').ilike('card_name', `%${term}%`).eq('is_public', true).order('created_at', { ascending: false }).limit(6).then(r => r.data ?? []),
     ]).then(([shop, vault]) => {
       if (!cancelled) {

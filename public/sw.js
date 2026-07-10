@@ -1,24 +1,20 @@
 // Service Worker for offline support and intelligent caching strategies
 // - Network First for API requests (try network, fallback to cache)
+// - Network First for navigations / HTML (see navigationNetworkFirst below)
 // - Cache First for static assets (serve from cache, update in background)
-// - Stale While Revalidate for HTML pages (serve cached, update in background)
 
 const CACHE_NAMES = {
-  // v4: purge caches that may hold Supabase REST responses. Until this
-  // version the fetch handler's "HTML pages" branch matched extension-less
-  // CROSS-ORIGIN paths too (e.g. odoglvswwymyjuwlonkf.supabase.co/rest/v1/…),
-  // so live data — homepage featured cards/sellers among it — was served
-  // stale-while-revalidate from the PAGES cache: one cached empty/aged
-  // response and the homepage stayed empty on every subsequent visit,
-  // regardless of what the database returned. The activate handler deletes
-  // anything not named below, so bumping the suffix evicts the bad entries.
-  // v5: HTML/navigations moved from stale-while-revalidate to network-first
-  // (see the fetch handler). The old behaviour served a cached index.html that
-  // referenced content-hashed chunk files a newer deploy had already purged,
-  // producing "Importing a module script failed" on lazy routes. Bumping the
-  // suffix evicts any stale shells cached under v4. IMAGES is deliberately left
-  // at v1 — those entries are immutable (timestamped filenames) and expensive
-  // to refetch against the Supabase egress quota, so they must survive the bump.
+  // v5: navigations/HTML moved from stale-while-revalidate to network-first.
+  // The old SWR branch served a CACHED (stale) app shell to returning visitors,
+  // so after a deploy their shell still referenced the PREVIOUS build's
+  // content-hashed lazy-chunk filenames. Those chunks no longer exist on the
+  // server, so importing a route like /marketplace fetched a dead hash and got
+  // the SPA's app.html fallback (Content-Type: text/html) back — the dynamic
+  // import then failed ("'text/html' is not a valid JavaScript MIME type" /
+  // "Importing a module script failed") and the page never loaded. Fresh /
+  // incognito visitors (no cached shell) were unaffected, which made it look
+  // like a logged-in-only bug. Booting the shell network-first fixes it; the
+  // bumped suffix evicts the stale PAGES entries via the activate handler.
   STATIC: 'cardpop-static-v5',
   DYNAMIC: 'cardpop-dynamic-v5',
   PAGES: 'cardpop-pages-v5',
@@ -158,15 +154,15 @@ const imageCacheFirst = async (request) => {
   }
 };
 
-// Helper: Network First for navigations / HTML documents. The app shell
-// (index.html) is the one resource that MUST be current: it carries the
-// <script> references to this deploy's content-hashed JS chunks. Serving a
-// stale shell (the previous stale-while-revalidate behaviour) pinned returning
-// visitors to chunk filenames a newer deploy had already purged, so lazy routes
-// failed with "Importing a module script failed". Going to the network first
-// guarantees an online visitor always gets the current shell; the PAGES cache
-// is kept only as an offline fallback.
-const networkFirstPage = async (request) => {
+// Helper: Network First for navigations / HTML app shell.
+//
+// The shell MUST come from the network so a returning visitor always boots the
+// CURRENT build — its content-hashed lazy-chunk references then match the files
+// still on the server. Serving a cached (stale) shell is what made returning
+// users request deleted chunk hashes and hit the SPA's text/html fallback,
+// breaking lazy routes like /marketplace. The cache is a pure offline fallback
+// here, never the primary source.
+const navigationNetworkFirst = async (request) => {
   try {
     const response = await fetch(request);
     if (response.ok) {
@@ -175,11 +171,13 @@ const networkFirstPage = async (request) => {
     }
     return response;
   } catch (error) {
-    const cached = await caches.match(request);
-    if (cached) {
-      console.log('[SW] Network failed, serving cached shell:', request.url);
-      return cached;
-    }
+    // Offline: fall back to the cached navigation, then any cached app shell.
+    const cached =
+      (await caches.match(request)) ||
+      (await caches.match('/app.html')) ||
+      (await caches.match('/index.html')) ||
+      (await caches.match('/'));
+    if (cached) return cached;
     return new Response('Offline', { status: 503 });
   }
 };
@@ -228,11 +226,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network First for navigations / HTML pages — always fetch a fresh app
-  // shell so its chunk references match the live deploy (offline falls back to
-  // the cached shell).
+  // Network First for navigations / HTML pages so the app shell is always the
+  // current build (stale shells reference deleted chunk hashes — see above).
   if (request.mode === 'navigate' || pathname.endsWith('.html') || !pathname.includes('.')) {
-    event.respondWith(networkFirstPage(request));
+    event.respondWith(navigationNetworkFirst(request));
     return;
   }
 

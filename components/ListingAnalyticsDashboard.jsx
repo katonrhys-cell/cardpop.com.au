@@ -4,6 +4,7 @@ import { Package, TrendingUp, Tags, AlertCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { supabase } from '@/lib/supabaseClient.js';
 import { formatCurrency } from '@/utils/formatCurrency.js';
+import { toCdnUrl } from '@/utils/imageUrl.js';
 
 const ListingAnalyticsDashboard = ({ listings = [] }) => {
   const analytics = useMemo(() => {
@@ -125,7 +126,7 @@ const ListingAnalyticsDashboard = ({ listings = [] }) => {
                   <div key={item.id} className="flex items-center gap-4 border-b border-border pb-4 last:border-0 last:pb-0">
                     <div className="h-10 w-10 rounded bg-muted flex items-center justify-center overflow-hidden shrink-0">
                       {item.image_url || item.image ? (
-                        <img src={item.image_url || item.image} alt={item.name} className="h-full w-full object-cover" />
+                        <img src={toCdnUrl(item.image_url || item.image)} alt={item.name} className="h-full w-full object-cover" />
                       ) : (
                         <Package className="w-5 h-5 text-muted-foreground" />
                       )}

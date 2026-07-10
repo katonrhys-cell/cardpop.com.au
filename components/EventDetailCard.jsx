@@ -51,11 +51,19 @@ const EventDetailCard = ({ event }) => {
 
       <div className="bg-card rounded-3xl overflow-hidden border border-border shadow-lg">
         {/* Hero Image */}
-        <div className="w-full h-64 md:h-96 lg:h-[450px] relative bg-muted">
+        <div className="w-full h-64 md:h-96 lg:h-[450px] relative bg-muted overflow-hidden">
+          {/* Blurred backdrop fills the frame so tall portrait posters don't leave bare side bars */}
+          <img
+            src={event.image}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110 opacity-50"
+          />
+          {/* Foreground poster shown in full — never cropped */}
           <img
             src={event.image}
             alt={event.name}
-            className="w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-contain"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent" />
 

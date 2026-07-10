@@ -7,6 +7,7 @@ import OAuthButtons from '@/components/OAuthButtons.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
 import Turnstile from '@/components/Turnstile.jsx';
 import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
+import { isPasswordPwned } from '@/utils/pwnedPassword.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -57,6 +58,13 @@ const SignupPage = () => {
 
     setLoading(true);
     try {
+      // Reject passwords found in known data breaches (HaveIBeenPwned, checked
+      // via k-anonymity so the password never leaves the browser). Fails open.
+      if (await isPasswordPwned(formData.password)) {
+        toast.error('This password has appeared in a known data breach. Please choose a different one to keep your account secure.');
+        return;
+      }
+
       // Turnstile token (when enabled) is verified server-side by Supabase Auth.
       const result = await signup(formData.email, formData.password, formData.name, captchaToken);
       const user = result?.user;

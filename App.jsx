@@ -13,6 +13,7 @@ import { AuthProvider } from '@/contexts/AuthContext.jsx';
 import { AdminProvider } from '@/contexts/AdminContext.jsx';
 import { CartProvider } from '@/hooks/useCart.jsx';
 import { CategoryHierarchyProvider } from '@/contexts/CategoryContext.jsx';
+import { PlatformSettingsProvider } from '@/contexts/PlatformSettingsContext.jsx';
 
 // Layouts & Core Components
 import Header from '@/components/Header.jsx';
@@ -34,6 +35,8 @@ import ShoppingCart from '@/components/ShoppingCartLazy.jsx';
 import AdminLayout from '@/components/AdminLayout.jsx';
 import MarketplaceListingRedirect from '@/components/MarketplaceListingRedirect.jsx';
 import ReferralCapture from '@/components/ReferralCapture.jsx';
+import FeatureRoute from '@/components/FeatureRoute.jsx';
+import MaintenanceGate from '@/components/MaintenanceGate.jsx';
 
 // ==========================================
 // LAZY LOADED PAGES (Performance Optimized)
@@ -242,6 +245,7 @@ const App = () => {
   return (
     <ErrorBoundary>
       <HelmetProvider>
+      <PlatformSettingsProvider>
       <AuthProvider>
         <AdminProvider>
           <CartProvider>
@@ -260,6 +264,7 @@ const App = () => {
                   <main className="flex-grow flex flex-col">
                     <RouteErrorBoundary>
                     <Suspense fallback={<PageLoader />}>
+                      <MaintenanceGate>
                       <Routes>
                         {/* --- PUBLIC ROUTES --- */}
                         <Route path="/" element={COMING_SOON ? <Navigate to="/launch" replace /> : <Suspense fallback={<HeroSection />}><HomePage /></Suspense>} />
@@ -278,16 +283,16 @@ const App = () => {
                         <Route path="/collections" element={<PublicCollectionsPage />} />
                         <Route path="/collections/:collectionSlug" element={<CollectionRoute />} />
 
-                        {/* Marketplace */}
-                        <Route path="/marketplace" element={<MarketplacePage />} />
+                        {/* Marketplace — gated by the enable_marketplace platform flag */}
+                        <Route path="/marketplace" element={<FeatureRoute flag="enable_marketplace"><MarketplacePage /></FeatureRoute>} />
                         {/* Orphaned category route (no inbound links, MarketplacePage doesn't read the param) — redirect to the base marketplace */}
                         <Route path="/marketplace/category/:category" element={<Navigate to="/marketplace" replace />} />
                         {/* Canonical marketplace listing URL — the sitemap, bot prerenderer and
                             most internal links all use /marketplace/:id/:slug, so the listing page
                             renders here directly (no client redirect that would create a duplicate
                             URL for Google to index). */}
-                        <Route path="/marketplace/:id/:slug?" element={<ProductDetailPage source="marketplace" />} />
-                        <Route path="/browse" element={<BrowseListingsPage />} />
+                        <Route path="/marketplace/:id/:slug?" element={<FeatureRoute flag="enable_marketplace"><ProductDetailPage source="marketplace" /></FeatureRoute>} />
+                        <Route path="/browse" element={<FeatureRoute flag="enable_marketplace"><BrowseListingsPage /></FeatureRoute>} />
 
                         {/* Public Profile Routes */}
                         <Route path="/seller/:userId" element={<PublicSellerProfilePage />} />
@@ -346,7 +351,7 @@ const App = () => {
                         <Route path="/vault/profile" element={<ProtectedRoute><VaultProfilePage /></ProtectedRoute>} />
                         <Route path="/vault/add" element={<ProtectedRoute><AddEditCardRoute /></ProtectedRoute>} />
                         <Route path="/vault/edit/:id" element={<ProtectedRoute><AddEditCardRoute /></ProtectedRoute>} />
-                        <Route path="/trade-requests" element={<ProtectedRoute><TradeRequestsPage /></ProtectedRoute>} />
+                        <Route path="/trade-requests" element={<FeatureRoute flag="enable_trading"><ProtectedRoute><TradeRequestsPage /></ProtectedRoute></FeatureRoute>} />
                         <Route path="/messaging" element={<ProtectedRoute><MessagingPage /></ProtectedRoute>} />
                         <Route path="/transactions" element={<ProtectedRoute><TransactionHistoryPage /></ProtectedRoute>} />
                         <Route path="/sales-history" element={<SalesHistoryPage />} />
@@ -390,11 +395,11 @@ const App = () => {
                         <Route path="/grading/estimator" element={<GradeEstimatorPage />} />
                         <Route path="/grading/roi-calculator" element={<GradingROIPage />} />
                         
-                        {/* Community & Blog */}
-                        <Route path="/blog" element={<BlogPage />} />
-                        <Route path="/blog/category/:category" element={<BlogCategoryPage />} />
-                        <Route path="/blog/slug/:slug" element={<BlogArticlePage />} />
-                        <Route path="/blog/:id" element={<BlogArticlePage />} />
+                        {/* Community & Blog — blog gated by the enable_blog platform flag */}
+                        <Route path="/blog" element={<FeatureRoute flag="enable_blog"><BlogPage /></FeatureRoute>} />
+                        <Route path="/blog/category/:category" element={<FeatureRoute flag="enable_blog"><BlogCategoryPage /></FeatureRoute>} />
+                        <Route path="/blog/slug/:slug" element={<FeatureRoute flag="enable_blog"><BlogArticlePage /></FeatureRoute>} />
+                        <Route path="/blog/:id" element={<FeatureRoute flag="enable_blog"><BlogArticlePage /></FeatureRoute>} />
                         <Route path="/community" element={<CommunityPage />} />
                         <Route path="/community/forum" element={<ForumPage />} />
                         <Route path="/community/profiles" element={<ProfilesPage />} />
@@ -473,6 +478,7 @@ const App = () => {
                         {/* --- CATCH-ALL 404 ROUTE --- */}
                         <Route path="*" element={<NotFoundPage />} />
                       </Routes>
+                      </MaintenanceGate>
                     </Suspense>
                     </RouteErrorBoundary>
                   </main>
@@ -488,6 +494,7 @@ const App = () => {
           </CartProvider>
         </AdminProvider>
       </AuthProvider>
+      </PlatformSettingsProvider>
       </HelmetProvider>
     </ErrorBoundary>
   );

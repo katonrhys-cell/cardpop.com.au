@@ -15,23 +15,28 @@ import {
   Settings, FolderTree, ListOrdered, BarChart3, Store, Shield,
   BookOpen, Globe, Star, Award, TrendingUp, Newspaper, BadgeCheck, Ticket, Handshake,
   Calculator, MapPin, ClipboardList, HelpCircle, MessageSquare,
+  ShoppingBag, LineChart, Info,
 } from 'lucide-react';
 import { TCG_CATEGORY_DATA, SPORTS_CATEGORY_DATA } from '@/components/CategoryIcons.jsx';
+import { toCdnUrl } from '@/utils/imageUrl.js';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { SheetClose } from '@/components/ui/sheet';
 import SearchBar from '@/components/SearchBar.jsx';
 import WhatnotIcon from '@/components/WhatnotIcon.jsx';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 
 export const NAV_LINKS = [
-  { label: 'Shop', href: '/shop' },
-  { label: 'Marketplace', href: '/marketplace' },
-  { label: 'Analytics', href: '/analytics' },
+  // `icon` (where present) matches the lucide icon in that page's own hero/heading,
+  // so the mobile menu's flat links carry the same visual cue as the page they open.
+  { label: 'Shop', href: '/shop', icon: ShoppingBag },
+  { label: 'Marketplace', href: '/marketplace', icon: Users },
+  { label: 'Analytics', href: '/analytics', icon: LineChart },
   { label: 'Blog', href: '/blog' },
   { label: 'Community', href: '/community' },
   { label: 'Events', href: '/events' },
   { label: 'Grading', href: '/grading' },
-  { label: 'About', href: '/about' },
+  { label: 'About', href: '/about', icon: Info },
 ];
 
 const ADMIN_LINKS = [
@@ -121,7 +126,7 @@ const MobileBrowseSection = ({ onNavigate }) => {
   };
 
   return (
-    <div className="mb-6">
+    <div className="mb-4">
       <p className="px-1 text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground mb-2">
         Browse Collections
       </p>
@@ -765,7 +770,7 @@ const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout })
       >
         <div className="relative h-8 w-8 rounded-full overflow-hidden shrink-0 bg-primary/10 flex items-center justify-center">
           {currentUser.avatar_url ? (
-            <img src={currentUser.avatar_url} alt={currentUser.name} className="h-full w-full object-cover" width="32" height="32" />
+            <img src={toCdnUrl(currentUser.avatar_url)} alt={currentUser.name} className="h-full w-full object-cover" width="32" height="32" />
           ) : (
             <User className="h-4 w-4 text-primary" />
           )}
@@ -819,14 +824,16 @@ const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout })
 // Row-2 desktop navigation (Browse mega-dropdown + top-level links/dropdowns).
 export const DesktopNavMenus = ({ onNavigate }) => {
   const location = useLocation();
+  const { settings } = usePlatformSettings();
   return (
     <>
       <BrowseDropdown onNavigate={onNavigate} />
       {NAV_LINKS.map((link) => {
-        if (link.label === 'Blog') return <BlogDropdown key="blog" onNavigate={onNavigate} />;
+        if (link.label === 'Blog') return settings.enable_blog === false ? null : <BlogDropdown key="blog" onNavigate={onNavigate} />;
         if (link.label === 'Community') return <CommunityDropdown key="community" onNavigate={onNavigate} />;
         if (link.label === 'Events') return <EventsDropdown key="events" onNavigate={onNavigate} />;
         if (link.label === 'Grading') return <GradingDropdown key="grading" onNavigate={onNavigate} />;
+        if (link.label === 'Marketplace' && settings.enable_marketplace === false) return null;
         const isActive = isNavLinkActive(link, location.pathname);
         return (
           <Link
@@ -861,11 +868,12 @@ export const MobileNavMenus = ({
   onLogout,
 }) => {
   const location = useLocation();
+  const { settings } = usePlatformSettings();
   return (
     <>
-      <div className="flex-1 overflow-y-auto py-6 px-4">
+      <div className="flex-1 overflow-y-auto pt-4 pb-6 px-4">
         {/* Mobile search */}
-        <div className="mb-5">
+        <div className="mb-4">
           <SearchBar
             onSearchChange={onSearch}
             placeholder="Search cards, sets, sellers..."
@@ -873,35 +881,33 @@ export const MobileNavMenus = ({
           />
         </div>
 
-        {/* Mobile Browse Collections — key resets accordion state each time menu opens */}
-        <MobileBrowseSection key={openKey} onNavigate={onNavigate} />
+        {/* Order mirrors the desktop Row-2 nav top-to-bottom: Browse Collections
+            leads, then NAV_LINKS in sequence — expandable sections (Blog,
+            Community, Events, Grading) and flat links interleaved so the mobile
+            menu reads in the same order as the desktop bar reads left-to-right.
+            key={openKey} resets accordion state each time the menu opens. */}
+        <nav className="flex flex-col mb-6">
+          <MobileBrowseSection key={openKey} onNavigate={onNavigate} />
 
-        {/* Mobile Blog categories */}
-        <MobileBlogSection key={`blog-${openKey}`} onNavigate={onNavigate} />
-
-        {/* Mobile Community */}
-        <MobileCommunitySection key={`community-${openKey}`} onNavigate={onNavigate} />
-
-        {/* Mobile Events */}
-        <MobileEventsSection key={`events-${openKey}`} onNavigate={onNavigate} />
-
-        {/* Mobile Grading */}
-        <MobileGradingSection key={`grading-${openKey}`} onNavigate={onNavigate} />
-
-        <nav className="flex flex-col gap-1.5 mb-6">
-          {NAV_LINKS.filter(l => l.label !== 'Blog' && l.label !== 'Community' && l.label !== 'Events' && l.label !== 'Grading').map((link) => {
+          {NAV_LINKS.map((link) => {
+            if (link.label === 'Blog') return <MobileBlogSection key={`blog-${openKey}`} onNavigate={onNavigate} />;
+            if (link.label === 'Community') return <MobileCommunitySection key={`community-${openKey}`} onNavigate={onNavigate} />;
+            if (link.label === 'Events') return <MobileEventsSection key={`events-${openKey}`} onNavigate={onNavigate} />;
+            if (link.label === 'Grading') return <MobileGradingSection key={`grading-${openKey}`} onNavigate={onNavigate} />;
             const isActive = isNavLinkActive(link, location.pathname);
+            const Icon = link.icon;
             return (
               <SheetClose key={link.label} asChild>
                 <Link
                   to={link.href}
                   onClick={onNavigate}
-                  className={`px-4 py-3.5 rounded-xl text-base font-bold transition-colors ${
+                  className={`flex items-center gap-2 px-4 py-3 mb-4 rounded-xl text-sm font-bold transition-colors ${
                     isActive
                       ? 'bg-primary text-primary-foreground shadow-sm'
                       : 'text-foreground hover:bg-muted'
                   }`}
                 >
+                  {Icon && <Icon className={`w-4 h-4 shrink-0 ${isActive ? '' : 'text-primary'}`} />}
                   {link.label}
                 </Link>
               </SheetClose>

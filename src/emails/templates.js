@@ -115,10 +115,11 @@ function invoiceBlock(invoice, orderId) {
 <td style="padding:6px 0;font-size:${bold ? '15px' : '14px'};color:${bold ? '#111827' : '#6B7280'};text-align:right;white-space:nowrap;${bold ? 'font-weight:700;border-top:2px solid #E5E7EB;padding-top:12px;' : ''}">${value}</td>
 </tr>`;
 
-  // Mirrors the on-page checkout summary: Subtotal → Discount → Service fee → GST → Total.
+  // Mirrors the on-page checkout summary: Subtotal → Discount → Service fee → GST → Shipping → Total.
   const discountRow = invoice.discount > 0 ? totalsRow('Discount', `−${money(invoice.discount)} AUD`) : '';
   const serviceFeeRow = invoice.serviceFee > 0 ? totalsRow('Service fee', `${money(invoice.serviceFee)} AUD`) : '';
   const gstRow = invoice.gst > 0 ? totalsRow('GST (10%)', `${money(invoice.gst)} AUD`) : '';
+  const shippingRow = invoice.shipping > 0 ? totalsRow('Shipping', `${money(invoice.shipping)} AUD`) : '';
 
   return `<div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:20px 24px;margin:24px 0;">
 <table cellpadding="0" cellspacing="0" border="0" width="100%">
@@ -127,6 +128,7 @@ ${totalsRow('Subtotal', `${money(invoice.subtotal)} AUD`)}
 ${discountRow}
 ${serviceFeeRow}
 ${gstRow}
+${shippingRow}
 ${totalsRow('Total (AUD)', `${money(invoice.total)} AUD`, true)}
 </table>
 </div>`;

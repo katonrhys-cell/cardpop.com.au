@@ -25,6 +25,7 @@ import { createIdentitySession, getIdentityStatus, applyIdentitySession } from '
 import { applyStripeSubscription } from '../services/subscriptionService.js';
 import { ensureWalletCustomer, getWalletBalanceCents, handleWalletTopup } from '../services/walletService.js';
 import { validateShippingAddress } from '../utils/addressValidation.js';
+import { requireEmailVerified } from '../middleware/requireEmailVerified.js';
 import { isValidAbn, normalizeAbn } from '../../utils/abn.js';
 
 const router = express.Router();
@@ -64,7 +65,7 @@ router.get('/calculate', authMiddleware, validateRequestQuery(calculateBreakdown
 
 // ─── POST /create-checkout ───────────────────────────────────────────────────
 
-router.post('/create-checkout', authMiddleware, validateRequestBody(createCheckoutSchema), createSingleItemCheckout);
+router.post('/create-checkout', authMiddleware, requireEmailVerified, validateRequestBody(createCheckoutSchema), createSingleItemCheckout);
 
 // ─── POST /create-cart-checkout ──────────────────────────────────────────────
 // Multi-item cart checkout. Each item is priced server-side from its source of
@@ -118,6 +119,7 @@ router.post('/calculate-cart', authMiddleware, async (req, res) => {
       subtotalAud: priced.itemsCents / 100,
       commissionAud: priced.commissionCents / 100,
       gstAud:      priced.gstCents / 100,
+      shippingAud: priced.shippingCents / 100,
       discountAud: (discountCents + walletAppliedCents) / 100,
       walletBalanceAud: walletBalanceCents / 100,
       walletAppliedAud: walletAppliedCents / 100,
@@ -131,7 +133,7 @@ router.post('/calculate-cart', authMiddleware, async (req, res) => {
   }
 });
 
-router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
+router.post('/create-cart-checkout', authMiddleware, requireEmailVerified, async (req, res) => {
   try {
     const { items, successUrl, cancelUrl, returnUrl, uiMode, shippingAddress, promoCode, useWalletBalance, billingDetails } = req.body;
 
@@ -174,7 +176,7 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
     const userId = req.user.id;
     const email  = req.user.email;
 
-    const { lineItems, orderLines, itemsCents, commissionCents, gstCents, grandCents } = await priceCart(items, userId);
+    const { lineItems, orderLines, itemsCents, commissionCents, gstCents, shippingCents, grandCents } = await priceCart(items, userId);
 
     // Fraud control: cap order size / frequency for brand-new, unverified buyers.
     const velocity = await checkPurchaseVelocity({ userId, orderValueAud: grandCents / 100 });
@@ -298,7 +300,7 @@ router.post('/create-cart-checkout', authMiddleware, async (req, res) => {
       listing_id:        null,
       stripe_session_id: session.id,
       item_price_aud:    itemsCents / 100,
-      shipping_aud:      0,
+      shipping_aud:      shippingCents / 100,
       platform_fee_aud:  (commissionCents + gstCents) / 100,
       gst_aud:           gstCents / 100,
       discount_aud:      discountCents / 100,
