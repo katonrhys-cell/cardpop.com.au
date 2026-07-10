@@ -5,10 +5,14 @@ import { compressImage } from '@/utils/compressImage.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Loader2, X, ImagePlus } from 'lucide-react';
+import { SHOP_CATEGORY_GROUPS, SHOP_CATEGORIES } from '@/utils/shopCategories.js';
+
+const KNOWN_CATEGORY_NAMES = SHOP_CATEGORIES.map((c) => c.name);
+const CUSTOM_CATEGORY = '__custom__';
 
 const INITIAL_STATE = {
   title: '',
@@ -29,6 +33,9 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
   // Each entry is either a File (new upload) or { isExisting: true, url } (kept).
   const [images, setImages] = useState([]);
   const [previewUrls, setPreviewUrls] = useState([]);
+  // When true, the category is a free-text value not in the shop category list
+  // (e.g. legacy "Pokémon"/"NBA" products) — show the text input instead.
+  const [useCustomCategory, setUseCustomCategory] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -47,10 +54,12 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         : (product.image_url ? [product.image_url] : []);
       setImages(existing.map(url => ({ isExisting: true, url })));
       setPreviewUrls(existing);
+      setUseCustomCategory(!!product.category && !KNOWN_CATEGORY_NAMES.includes(product.category));
     } else {
       setFormData(INITIAL_STATE);
       setImages([]);
       setPreviewUrls([]);
+      setUseCustomCategory(false);
     }
   }, [product]);
 
@@ -204,7 +213,45 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         <div className="space-y-5">
           <div className="space-y-2">
             <Label>Category</Label>
-            <Input value={formData.category} onChange={(e) => handleInputChange('category', e.target.value)} placeholder="e.g. Pokémon, NBA" className="bg-background" />
+            <Select
+              value={useCustomCategory ? CUSTOM_CATEGORY : (formData.category || '')}
+              onValueChange={(v) => {
+                if (v === CUSTOM_CATEGORY) {
+                  setUseCustomCategory(true);
+                  handleInputChange('category', '');
+                } else {
+                  setUseCustomCategory(false);
+                  handleInputChange('category', v);
+                }
+              }}
+            >
+              <SelectTrigger className="bg-background font-medium h-11">
+                <SelectValue placeholder="Select a category" />
+              </SelectTrigger>
+              <SelectContent>
+                {SHOP_CATEGORY_GROUPS.map((group) => (
+                  <SelectGroup key={group.slug}>
+                    <SelectLabel>{group.label}</SelectLabel>
+                    {group.items.map((item) => (
+                      <SelectItem key={item.slug} value={item.name}>{item.name}</SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
+                <SelectSeparator />
+                <SelectItem value={CUSTOM_CATEGORY}>Other / custom…</SelectItem>
+              </SelectContent>
+            </Select>
+            {useCustomCategory && (
+              <Input
+                value={formData.category}
+                onChange={(e) => handleInputChange('category', e.target.value)}
+                placeholder="e.g. Pokémon, NBA, Sealed Boxes"
+                className="bg-background mt-2"
+              />
+            )}
+            <p className="text-xs text-muted-foreground">
+              Pick a shop category so the product appears on its dropdown page, or choose “Other / custom…” for a one-off category.
+            </p>
           </div>
 
           <div className="space-y-2">
