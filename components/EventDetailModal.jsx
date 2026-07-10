@@ -28,25 +28,23 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
 
         <div className="relative h-72 w-full bg-muted flex items-center justify-center overflow-hidden">
           {imageUrl ? (
-            <>
-              <img src={imageUrl} alt={eventTitle} className="object-cover w-full h-full" />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-            </>
+            <img src={imageUrl} alt={eventTitle} className="object-contain w-full h-full" />
           ) : (
             <div className="flex flex-col items-center text-muted-foreground opacity-50">
               <Calendar className="w-16 h-16 mb-2" />
               <span>No Image Available</span>
             </div>
           )}
+        </div>
 
-          <div className="absolute bottom-4 left-6 right-6">
-            <Badge className="mb-3 border-none bg-primary text-primary-foreground">
-              {eventTypeLabel(event)}
-            </Badge>
-            <h2 className="text-3xl font-bold font-heading text-white text-balance line-clamp-2 drop-shadow-md">
-              {eventTitle}
-            </h2>
-          </div>
+        {/* Title & type — below the image so the poster stays fully visible */}
+        <div className="px-6 pt-5 bg-background">
+          <Badge className="mb-3 border-none bg-primary text-primary-foreground">
+            {eventTypeLabel(event)}
+          </Badge>
+          <h2 className="text-3xl font-bold font-heading text-foreground text-balance line-clamp-2">
+            {eventTitle}
+          </h2>
         </div>
 
         <div className="p-6 space-y-6 bg-background max-h-[60vh] overflow-y-auto">
