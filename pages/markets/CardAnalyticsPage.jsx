@@ -169,6 +169,11 @@ const CardAnalyticsPage = () => {
   const cardName      = searchParams.get('name')          || 'Unknown Card';
   const cardSet       = searchParams.get('set')           || '';
   const cardColl      = searchParams.get('collection')    || '';
+  // Split a trailing "(...)" qualifier (e.g. rarity) off the name so the
+  // heading can show a clean title with the qualifier as a subheading.
+  const nameMatch     = cardName.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+  const cardTitle     = nameMatch ? nameMatch[1].trim() : cardName;
+  const cardVariant   = nameMatch ? nameMatch[2].trim() : '';
   const rawPrice      = parseFloat(searchParams.get('price')  || '75');
   const rawChange     = parseFloat(searchParams.get('change') || '0');
   const cardsightId   = searchParams.get('cardsight_id')  || null;
@@ -342,7 +347,8 @@ const CardAnalyticsPage = () => {
                 >
                   <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, hsl(var(--primary)), transparent 70%)' }} />
                   <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3 relative z-10">{cardColl}</p>
-                  <p className="font-black text-lg leading-tight text-foreground relative z-10">{cardName}</p>
+                  <p className="font-black text-lg leading-tight text-foreground relative z-10">{cardTitle}</p>
+                  {cardVariant && <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground mt-1 relative z-10">{cardVariant}</p>}
                   {cardSet && <p className="text-xs text-muted-foreground mt-2 relative z-10">{cardSet}</p>}
                   <div className="mt-4 px-3 py-1 rounded-full bg-primary/20 text-primary text-xs font-bold relative z-10">CardPop</div>
                 </div>
@@ -380,7 +386,12 @@ const CardAnalyticsPage = () => {
                   </span>
                 ) : null}
               </div>
-              <h1 className="text-3xl md:text-4xl font-black leading-tight">{cardName}</h1>
+              <div className="space-y-1.5">
+                <h1 className="text-3xl md:text-4xl font-black leading-tight tracking-tight">{cardTitle}</h1>
+                {cardVariant && (
+                  <p className="text-xs md:text-sm font-semibold uppercase tracking-wider text-muted-foreground">{cardVariant}</p>
+                )}
+              </div>
               <div className="flex items-center gap-4 flex-wrap">
                 <span className="text-4xl font-black">${avgSale.toFixed(2)}</span>
                 <div className="space-y-1">
