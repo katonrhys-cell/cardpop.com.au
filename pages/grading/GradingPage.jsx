@@ -199,7 +199,7 @@ const GradingPage = () => (
             to="/grading/what-is-grading"
             className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-8 py-3.5 text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90 sm:w-auto"
           >
-            Open the book — start Chapter 1 <ArrowRight className="h-4 w-4" />
+            Start your journey <ArrowRight className="h-4 w-4" />
           </Link>
           <a
             href="#contents"
@@ -217,24 +217,29 @@ const GradingPage = () => (
       <section id="contents" className="scroll-mt-8">
         <div className="mb-6 flex items-center gap-3">
           <BookMarked className="h-6 w-6 text-primary" />
-          <h2 className="font-serif text-2xl font-bold sm:text-3xl">Table of Contents</h2>
+          <h2 className="font-serif text-2xl font-bold sm:text-3xl">Chapters</h2>
         </div>
-        <ol className="overflow-hidden rounded-3xl border border-border bg-card divide-y divide-border">
+        <ol className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {CHAPTERS.map(({ href, icon: Icon, title, label }, i) => (
             <li key={href}>
-              <a href={`#chapter-${i + 1}`} className="group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-primary/5 sm:px-7">
-                <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/5 font-serif text-base font-bold text-primary">
-                  {i + 1}
-                </span>
-                <Icon className="hidden h-5 w-5 flex-shrink-0 text-muted-foreground sm:block" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-bold leading-tight group-hover:text-primary">{title}</p>
-                  <p className="truncate text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+              <a
+                href={`#chapter-${i + 1}`}
+                className="group flex h-full flex-col rounded-2xl border border-border bg-card p-5 transition-all hover:border-primary/50 hover:shadow-md"
+              >
+                <div className="mb-4 flex items-center justify-between">
+                  <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-primary/30 bg-primary/5 font-serif text-lg font-bold text-primary">
+                    {i + 1}
+                  </span>
+                  <span className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+                    Chapter {i + 1}
+                  </span>
                 </div>
-                <span className="hidden text-xs font-semibold uppercase tracking-widest text-muted-foreground/60 sm:block">
-                  Chapter {i + 1}
+                <Icon className="mb-3 h-5 w-5 flex-shrink-0 text-muted-foreground" />
+                <p className="font-bold leading-tight group-hover:text-primary">{title}</p>
+                <p className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+                <span className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-primary">
+                  Read <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
                 </span>
-                <ArrowRight className="h-4 w-4 flex-shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-1 group-hover:text-primary" />
               </a>
             </li>
           ))}
