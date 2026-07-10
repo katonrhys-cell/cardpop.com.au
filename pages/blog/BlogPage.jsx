@@ -10,18 +10,75 @@ import { BookOpen, FileX, AlertCircle, Search, User, Calendar, ArrowRight } from
 import { htmlExcerpt } from '@/utils/htmlExcerpt.js';
 import { BLOG_CATEGORIES as CATEGORIES } from '@/data/blogCategories.js';
 
-const CATEGORY_MAP = Object.fromEntries(CATEGORIES.map(c => [c.slug, c.label]));
+const CATEGORY_MAP = Object.fromEntries(CATEGORIES.map(c => [c.slug, c]));
 
 const formatDate = (dateStr) =>
   new Date(dateStr).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 
 const CategoryBadge = ({ slug }) => {
-  const label = CATEGORY_MAP[slug] || slug;
+  const cat = CATEGORY_MAP[slug];
+  const label = cat?.label || slug;
   if (!label) return null;
+  // Colour the pill to match this category's icon in the Blog nav dropdown;
+  // unknown categories fall back to the brand primary colour.
+  const colorClass = cat?.gradient
+    ? `bg-gradient-to-br ${cat.gradient} text-white`
+    : 'bg-primary text-primary-foreground';
   return (
-    <span className="absolute -top-3 right-0 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm pointer-events-none">
+    <span className={`absolute -top-3 right-0 ${colorClass} text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm pointer-events-none`}>
       {label}
     </span>
+  );
+};
+
+// CardPop Conviction Rating™ — mirrors the scale rendered on the article page
+// (pages/blog/BlogArticlePage.jsx) and set in the editor (ArticleEditorModal).
+const CONVICTION_LABELS = ['', 'High Risk', 'Negative', 'Neutral', 'Positive', 'Strong Buy'];
+const CONVICTION_COLOURS = ['', '#dc2626', '#ea580c', '#ca8a04', '#16a34a', '#15803d'];
+
+// Compact 5-segment conviction meter for the blog card footer.
+const ConvictionMeter = ({ rating }) => {
+  const colour = CONVICTION_COLOURS[rating];
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
+          CardPop Conviction
+        </span>
+        <span className="text-[11px] font-bold" style={{ color: colour }}>
+          {rating}/5 &middot; {CONVICTION_LABELS[rating]}
+        </span>
+      </div>
+      <div className="flex items-center gap-1" role="img"
+           aria-label={`CardPop Conviction Rating ${rating} out of 5: ${CONVICTION_LABELS[rating]}`}>
+        {[1, 2, 3, 4, 5].map((i) => (
+          <span key={i} className="flex-1 h-1.5 rounded-full"
+                style={{ background: i <= rating ? colour : 'hsl(var(--muted))' }} />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Bottom-pinned footer for a blog card: the conviction meter for investment
+// pieces, or a read-time cue for how-to / educational articles that carry no
+// rating — so every card ends on a tidy, professional strip instead of a wall
+// of body text.
+const CardFooter = ({ article }) => {
+  const rating = Number(article.conviction_rating);
+  const hasRating = rating >= 1 && rating <= 5;
+  const mins = article.read_time_minutes;
+  return (
+    <div className="mt-auto pt-4">
+      {hasRating ? (
+        <ConvictionMeter rating={rating} />
+      ) : (
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <BookOpen className="w-3.5 h-3.5" />
+          {mins ? `${mins} min read` : 'Read guide'}
+        </span>
+      )}
+    </div>
   );
 };
 
@@ -47,13 +104,7 @@ const FeaturedCard = ({ article, showBadge = true }) => {
       </div>
       {showBadge && <CategoryBadge slug={article.category} />}
       <div className="p-6 flex flex-col flex-1">
-        <h3 className="font-bold text-xl mb-2 line-clamp-2 group-hover:text-primary transition-colors leading-snug">
-          {article.title}
-        </h3>
-        <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed mb-4 flex-1">
-          {article.excerpt || htmlExcerpt(article.content, 130)}
-        </p>
-        <div className="flex items-center justify-between text-xs text-muted-foreground border-t border-border pt-4 mt-auto">
+        <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
           <span className="flex items-center gap-1.5">
             <User className="w-3.5 h-3.5" />
             {article.author || 'CardPop Australia'}
@@ -63,6 +114,13 @@ const FeaturedCard = ({ article, showBadge = true }) => {
             {formatDate(article.created_at)}
           </span>
         </div>
+        <h3 className="font-bold text-xl mb-2 line-clamp-3 group-hover:text-primary transition-colors leading-snug">
+          {article.title}
+        </h3>
+        <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+          {article.excerpt || htmlExcerpt(article.content, 110)}
+        </p>
+        <CardFooter article={article} />
       </div>
     </Link>
   );
@@ -94,12 +152,13 @@ const ArticleCard = ({ article, showBadge = true }) => {
             {formatDate(article.created_at)}
           </span>
         </div>
-        <h3 className="font-bold text-lg mb-2 line-clamp-2 group-hover:text-primary transition-colors leading-snug">
+        <h3 className="font-bold text-lg mb-2 line-clamp-3 group-hover:text-primary transition-colors leading-snug">
           {article.title}
         </h3>
-        <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed mt-auto">
-          {article.excerpt || htmlExcerpt(article.content, 110)}
+        <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">
+          {article.excerpt || htmlExcerpt(article.content, 90)}
         </p>
+        <CardFooter article={article} />
       </div>
     </Link>
   );
@@ -162,7 +221,7 @@ const BlogPage = () => {
     return counts;
   }, [articles]);
 
-  const activeCategory = categoryParam ? CATEGORY_MAP[categoryParam] : null;
+  const activeCategory = categoryParam ? (CATEGORY_MAP[categoryParam]?.label || null) : null;
   const pageTitle = activeCategory
     ? `${activeCategory} | Blog`
     : tagParam
