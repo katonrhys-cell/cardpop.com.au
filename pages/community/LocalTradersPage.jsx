@@ -61,7 +61,11 @@ const LocalTradersPage = () => {
     try {
       let query = supabase
         .from('profiles')
-        .select('id, display_name, username, avatar_url, profile_photo_or_character, bio, location_state, location_suburb, rating, reviews_count, is_verified, listings_count, collection_count')
+        // NOTE: listings_count / collection_count are not columns on profiles —
+        // selecting them made PostgREST 400 the whole query, so no traders
+        // loaded. The stats block below guards on `> 0`, so it simply stays
+        // hidden until those counts exist (mirrors ProfilesPage's select('*')).
+        .select('id, display_name, username, avatar_url, profile_photo_or_character, bio, location_state, location_suburb, rating, reviews_count, is_verified')
         .eq('is_verified', true)
         .not('location_state', 'is', null)
         .order('rating', { ascending: false })
