@@ -21,8 +21,9 @@ const ShopCategoryBrowse = () => {
 
   return (
     <div>
-      {/* Overarching category cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+      {/* Overarching category cards — compact so they read as a control strip,
+          not full-bleed banners. Centered rather than stretched edge-to-edge. */}
+      <div className="flex flex-wrap justify-center gap-3">
         {SHOP_CATEGORY_GROUPS.map((group) => {
           const isActive = group.slug === activeSlug;
           return (
@@ -34,14 +35,14 @@ const ShopCategoryBrowse = () => {
               onFocus={() => setActiveSlug(group.slug)}
               aria-pressed={isActive}
               aria-label={`${group.label} supplies`}
-              className={`group flex flex-col items-center justify-center gap-3 p-4 rounded-2xl bg-gradient-to-br ${group.gradient} aspect-square shadow-sm transition-all duration-200 text-center leading-tight focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+              className={`group flex flex-col items-center justify-center gap-2 w-[104px] h-[104px] sm:w-28 sm:h-28 rounded-2xl bg-gradient-to-br ${group.gradient} shadow-sm transition-all duration-200 text-center leading-tight focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                 isActive
                   ? 'ring-2 ring-foreground/30 ring-offset-2 ring-offset-background shadow-lg -translate-y-1'
                   : 'hover:shadow-lg hover:-translate-y-1'
               }`}
             >
-              <group.Icon className="w-9 h-9 text-white drop-shadow-sm" />
-              <span className="text-[11px] sm:text-xs font-bold leading-tight text-white drop-shadow-sm">
+              <group.Icon className="w-6 h-6 text-white drop-shadow-sm" />
+              <span className="text-[11px] font-bold leading-tight text-white drop-shadow-sm">
                 {group.label}
               </span>
             </button>
