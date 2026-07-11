@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "kit": {
+      "type": "http",
+      "url": "https://app.kit.com/mcp"
+    }
+  }
+}
