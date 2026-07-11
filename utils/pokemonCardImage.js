@@ -73,6 +73,8 @@ const parseCard = (raw) => {
 
 const esc = (s) => s.replace(/"/g, '\\"');
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // Most-specific query first, loosening on each fallback so we still surface a
 // plausible image when the set name or number doesn't match exactly.
 const buildQueries = (name, set, number) => {
@@ -111,11 +113,25 @@ export const fetchPokemonCardImage = async (rawName, set) => {
 
   const headers = API_KEY ? { 'X-Api-Key': API_KEY } : {};
 
+  // Set when a query fails in a way that says "couldn't reach the data", not
+  // "no such card" — a 429 rate limit, a 5xx, or a network/parse error. We must
+  // not cache a null in those cases (see below).
+  let transientFailure = false;
+
   for (const q of buildQueries(name, set, number)) {
+    const url = `${API}?q=${encodeURIComponent(q)}&pageSize=1&select=id,images`;
     try {
-      const url = `${API}?q=${encodeURIComponent(q)}&pageSize=1&select=id,images`;
-      const res = await fetch(url, { headers });
-      if (!res.ok) continue;
+      let res = await fetch(url, { headers });
+      // The keyless API throttles bursts with 429; a short backoff usually
+      // clears it, so retry this query once before giving up on it.
+      if (res.status === 429) {
+        await sleep(600);
+        res = await fetch(url, { headers });
+      }
+      if (!res.ok) {
+        if (res.status === 429 || res.status >= 500) transientFailure = true;
+        continue; // 4xx (e.g. bad query) — try the next, looser query
+      }
       const json = await res.json();
       const card = json?.data?.[0];
       if (card?.images?.small) {
@@ -126,10 +142,17 @@ export const fetchPokemonCardImage = async (rawName, set) => {
         });
       }
     } catch {
-      // try the next, looser query
+      // network / parse error — transient; try the next query
+      transientFailure = true;
     }
   }
 
+  // Only remember a negative when the API was actually reachable and simply had
+  // no match. Caching a null after a transient failure would permanently blank
+  // this card's art for the whole session — sessionStorage survives reloads —
+  // so a momentary rate-limit blip would look like a broken image forever. Leave
+  // it uncached instead so the next visit retries.
+  if (transientFailure) return null;
   return finish(null);
 };
 
