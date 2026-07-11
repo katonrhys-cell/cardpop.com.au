@@ -31,6 +31,7 @@ import pricesRouter from './prices.js';
 import storesRouter from './stores.js';
 import catalogRouter from './catalog.js';
 import psaRouter from './psa.js';
+import gradingVerificationRouter from './grading-verification.js';
 import welcomeOfferRouter from './welcome-offer.js';
 import partnersRouter from './partners.js';
 import walletRouter from './wallet.js';
@@ -78,6 +79,10 @@ export default () => {
     // PSA certification routes with API rate limiting
     router.use('/psa', apiLimiter);
     router.use('/psa', psaRouter);
+
+    // Grading (PSA/Beckett) cert verification routes with API rate limiting
+    router.use('/grading-verification', apiLimiter);
+    router.use('/grading-verification', gradingVerificationRouter);
 
     // CardSight AI identification routes (image recognition only)
     router.use('/cardsight', apiLimiter);
