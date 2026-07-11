@@ -159,6 +159,7 @@ describe('worker R2 fast path', () => {
     expect(fetchSpy).not.toHaveBeenCalled(); // no Supabase egress
     expect(res.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    expect(res.headers.get('x-image-source')).toBe('r2'); // observability marker
     expect(ctx.waitUntil).toHaveBeenCalled(); // edge-cached
   });
 

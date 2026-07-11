@@ -101,6 +101,7 @@ async function serveFromR2(request, url, bucket, ctx) {
   headers.set('etag', object.httpEtag);
   headers.set('Cache-Control', 'public, max-age=31536000, immutable');
   headers.set('Access-Control-Allow-Origin', '*'); // service worker fetches in CORS mode
+  headers.set('x-image-source', 'r2'); // observability: served from R2, zero egress
 
   // Cache the full GET response at the edge, then hand the caller a body-correct
   // response for the actual method.
