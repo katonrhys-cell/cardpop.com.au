@@ -169,6 +169,11 @@ const CardAnalyticsPage = () => {
   const cardName      = searchParams.get('name')          || 'Unknown Card';
   const cardSet       = searchParams.get('set')           || '';
   const cardColl      = searchParams.get('collection')    || '';
+  // Split a trailing "(...)" qualifier (e.g. rarity) off the name so the
+  // heading can show a clean title with the qualifier as a subheading.
+  const nameMatch     = cardName.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+  const cardTitle     = nameMatch ? nameMatch[1].trim() : cardName;
+  const cardVariant   = nameMatch ? nameMatch[2].trim() : '';
   const rawPrice      = parseFloat(searchParams.get('price')  || '75');
   const rawChange     = parseFloat(searchParams.get('change') || '0');
   const cardsightId   = searchParams.get('cardsight_id')  || null;
@@ -349,7 +354,8 @@ const CardAnalyticsPage = () => {
                 >
                   <div className="absolute inset-0 opacity-5" style={{ backgroundImage: 'radial-gradient(circle at 50% 50%, hsl(var(--primary)), transparent 70%)' }} />
                   <p className="text-xs font-bold uppercase tracking-widest text-primary mb-3 relative z-10">{cardColl}</p>
-                  <p className="font-black text-lg leading-tight text-foreground relative z-10">{cardName}</p>
+                  <p className="font-black text-lg leading-tight text-foreground relative z-10">{cardTitle}</p>
+                  {cardVariant && <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground mt-1 relative z-10">{cardVariant}</p>}
                   {cardSet && <p className="text-xs text-muted-foreground mt-2 relative z-10">{cardSet}</p>}
                   <div className="mt-4 px-3 py-1 rounded-full bg-primary/20 text-primary text-xs font-bold relative z-10">CardPop</div>
                 </div>
@@ -387,7 +393,12 @@ const CardAnalyticsPage = () => {
                   </span>
                 ) : null}
               </div>
-              <h1 className="text-3xl md:text-4xl font-black leading-tight">{cardName}</h1>
+              <div className="space-y-1.5">
+                <h1 className="text-3xl md:text-4xl font-black leading-tight tracking-tight">{cardTitle}</h1>
+                {cardVariant && (
+                  <p className="text-xs md:text-sm font-semibold uppercase tracking-wider text-muted-foreground">{cardVariant}</p>
+                )}
+              </div>
               <div className="flex items-center gap-4 flex-wrap">
                 <span className="text-4xl font-black">${avgSale.toFixed(2)}</span>
                 <div className="space-y-1">
@@ -637,11 +648,11 @@ const CardAnalyticsPage = () => {
 
         {/* Tabs: Buy Now / Trade / Sold History / Similar */}
         <Tabs defaultValue="buy">
-          <TabsList className="w-full mb-6 h-12">
-            <TabsTrigger value="buy"     className="flex-1 gap-1.5"><ShoppingCart className="w-4 h-4" /> Buy Now</TabsTrigger>
-            <TabsTrigger value="trade"   className="flex-1 gap-1.5"><RefreshCw className="w-4 h-4" /> For Trade</TabsTrigger>
-            <TabsTrigger value="sold"    className="flex-1 gap-1.5"><Clock className="w-4 h-4" /> Sold History</TabsTrigger>
-            <TabsTrigger value="similar" className="flex-1 gap-1.5"><Star className="w-4 h-4" /> Similar Cards</TabsTrigger>
+          <TabsList className="grid grid-cols-2 gap-1 w-full mb-6 h-auto p-1 sm:grid-cols-4 sm:h-12">
+            <TabsTrigger value="buy"     className="min-w-0 gap-1.5 py-2 text-xs sm:text-sm"><ShoppingCart className="w-4 h-4 shrink-0" /> <span className="truncate">Buy Now</span></TabsTrigger>
+            <TabsTrigger value="trade"   className="min-w-0 gap-1.5 py-2 text-xs sm:text-sm"><RefreshCw className="w-4 h-4 shrink-0" /> <span className="truncate">For Trade</span></TabsTrigger>
+            <TabsTrigger value="sold"    className="min-w-0 gap-1.5 py-2 text-xs sm:text-sm"><Clock className="w-4 h-4 shrink-0" /> <span className="truncate">Sold History</span></TabsTrigger>
+            <TabsTrigger value="similar" className="min-w-0 gap-1.5 py-2 text-xs sm:text-sm"><Star className="w-4 h-4 shrink-0" /> <span className="truncate">Similar Cards</span></TabsTrigger>
           </TabsList>
 
           {/* Buy Now */}
