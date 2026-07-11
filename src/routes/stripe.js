@@ -412,6 +412,7 @@ router.get('/session/:sessionId', optionalAuthMiddleware, async (req, res) => {
       status:        session.payment_status,
       amountTotal:   session.amount_total,
       customerEmail: session.customer_details?.email,
+      customerName:  session.customer_details?.name || null,
       items,
     });
   } catch (err) {

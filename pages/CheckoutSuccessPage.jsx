@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { CheckCircle2, Package, ArrowRight, AlertTriangle, Loader2, UserPlus } from 'lucide-react';
@@ -10,16 +10,24 @@ import { useCart } from '@/hooks/useCart.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
 import { Card } from '@/components/ui/card';
+import Turnstile from '@/components/Turnstile.jsx';
+import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
 
 // Post-purchase account creation for guests. The order is already placed and
 // paid — this just lets the shopper turn their guest checkout into a real
 // account (same email) so they can track the order and reorder faster. Kept
 // entirely optional; the confirmation above stands on its own without it.
-const GuestAccountCard = ({ email }) => {
+const GuestAccountCard = ({ email, name }) => {
   const { signup } = useAuth();
   const [password, setPassword] = useState('');
+  // Turnstile token — required by Supabase Auth only when a site key is
+  // configured; the widget renders nothing (and this stays '') otherwise.
+  const [captchaToken, setCaptchaToken] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const turnstileRef = useRef(null);
+
+  const captchaMissing = TURNSTILE_ENABLED && !captchaToken;
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -27,15 +35,22 @@ const GuestAccountCard = ({ email }) => {
       toast.error('Please choose a password of at least 8 characters.');
       return;
     }
+    if (captchaMissing) {
+      toast.error('Please complete the verification challenge.');
+      return;
+    }
     setSubmitting(true);
     try {
-      await signup(email, password, '');
+      await signup(email, password, (name || '').trim(), captchaToken);
       setDone(true);
       toast.success('Account created! Check your email to confirm your address.');
     } catch (err) {
-      // Most likely the email already has an account, or CAPTCHA is enforced —
-      // point them at the full sign-in / registration page either way.
+      // Most likely the email already has an account. Surface the reason; the
+      // fallback link below lets them register/sign in the full way regardless.
       toast.error(err?.message || 'Could not create your account. Please try registering directly.');
+      // Turnstile tokens are single-use — reset so they can try again.
+      turnstileRef.current?.reset();
+      setCaptchaToken('');
     } finally {
       setSubmitting(false);
     }
@@ -82,11 +97,23 @@ const GuestAccountCard = ({ email }) => {
             autoComplete="new-password"
           />
         </div>
-        <Button type="submit" disabled={submitting || !email} className="rounded-full">
+        {TURNSTILE_ENABLED && (
+          <Turnstile
+            ref={turnstileRef}
+            onVerify={setCaptchaToken}
+            onExpire={() => setCaptchaToken('')}
+          />
+        )}
+        <Button type="submit" disabled={submitting || !email || captchaMissing} className="rounded-full">
           {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserPlus className="w-4 h-4 mr-2" />}
           Create account
         </Button>
       </form>
+      <p className="mt-4 text-xs text-muted-foreground">
+        Prefer to do it later?{' '}
+        <Link to="/signup" className="font-medium text-primary hover:underline">Register any time</Link>{' '}
+        with this email — your order stays linked to it.
+      </p>
     </Card>
   );
 };
@@ -213,7 +240,7 @@ const CheckoutSuccessPage = () => {
 
         {/* Guests who just checked out can turn this into a real account. */}
         {!isAuthenticated && sessionData?.customerEmail && (
-          <GuestAccountCard email={sessionData.customerEmail} />
+          <GuestAccountCard email={sessionData.customerEmail} name={sessionData.customerName} />
         )}
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
