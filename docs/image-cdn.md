@@ -82,6 +82,18 @@ requests fall back to Supabase). Transform requests
 (`/storage/v1/render/image/public/`) are never served from R2 — R2 can't resize —
 so they always proxy to Supabase.
 
+**Lazy write-through migration:** the Worker doesn't just *read* from R2 — the
+first successful Supabase proxy of an object also *copies* its bytes into R2 in
+the background (the response is `tee()`d: one half streams to the client, the
+other is written to R2 via `ctx.waitUntil`). So every object migrates itself the
+first time it's viewed, and every request after that is served from the R2 fast
+path for free. Net migration cost is **one Supabase read per object, once**, and
+only for objects actually viewed — cold objects nobody looks at are never copied
+(and cost no egress anyway). This means new uploads need **no write-path change**:
+they land in Supabase as they always have, then migrate to R2 on first view.
+Write-through is skipped for HEAD requests, non-2xx responses, and render/transform
+paths.
+
 The binding is optional: with no `IMAGES` binding the Worker behaves exactly as
 the Supabase-only proxy did. See `tests/backend/imageProxyWorker.test.js` for the
 covered behaviours.

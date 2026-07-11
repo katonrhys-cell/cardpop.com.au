@@ -131,7 +131,8 @@ describe('worker R2 fast path', () => {
     delete globalThis.caches;
   });
 
-  // An R2 bucket whose get() returns a stored object for `presentKey` only.
+  // An R2 bucket whose get() returns a stored object for `presentKey` only,
+  // and a put() that records write-through migrations.
   const bucketWith = (presentKey) => ({
     get: vi.fn(async (key) =>
       key === presentKey
@@ -142,6 +143,7 @@ describe('worker R2 fast path', () => {
           }
         : null
     ),
+    put: vi.fn().mockResolvedValue(undefined),
   });
 
   const ctx = { waitUntil: vi.fn() };
@@ -188,5 +190,41 @@ describe('worker R2 fast path', () => {
     const res = await run(OBJECT_PATH, env, { method: 'HEAD' });
     expect(res.status).toBe(200);
     expect(await res.text()).toBe('');
+  });
+
+  // ── lazy write-through migration ──────────────────────────────────────────
+
+  it('writes an object through to R2 on a proxy miss, and still returns the bytes', async () => {
+    const env = { IMAGES: bucketWith('not-this-key') }; // get() miss → proxy
+    const res = await run(OBJECT_PATH, env);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe('supabase-bytes'); // client still served
+    expect(fetchSpy).toHaveBeenCalledTimes(1); // one Supabase read
+    expect(env.IMAGES.put).toHaveBeenCalledTimes(1);
+    expect(env.IMAGES.put.mock.calls[0][0]).toBe('vault-images/123-card.webp');
+    expect(env.IMAGES.put.mock.calls[0][2]).toEqual({
+      httpMetadata: { contentType: 'image/webp' },
+    });
+    expect(ctx.waitUntil).toHaveBeenCalled();
+  });
+
+  it('does not write through for a HEAD request (no body to migrate)', async () => {
+    const env = { IMAGES: bucketWith('not-this-key') };
+    await run(OBJECT_PATH, env, { method: 'HEAD' });
+    expect(env.IMAGES.put).not.toHaveBeenCalled();
+  });
+
+  it('does not write a non-2xx response into R2', async () => {
+    fetchSpy.mockResolvedValue(new Response('missing', { status: 404 }));
+    const env = { IMAGES: bucketWith('not-this-key') };
+    const res = await run(OBJECT_PATH, env);
+    expect(res.status).toBe(404);
+    expect(env.IMAGES.put).not.toHaveBeenCalled();
+  });
+
+  it('never write-through migrates render/transform paths', async () => {
+    const env = { IMAGES: bucketWith('not-this-key') };
+    await run(RENDER_PATH, env);
+    expect(env.IMAGES.put).not.toHaveBeenCalled();
   });
 });
