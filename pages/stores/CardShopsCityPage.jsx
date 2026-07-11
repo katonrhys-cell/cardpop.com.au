@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Calendar, ExternalLink, MapPin, PlusCircle } from 'lucide-react';
 import SEOHead from '@/components/SEOHead.jsx';
+import BackButton from '@/components/BackButton.jsx';
 import {
   DIRECTORY_CITIES,
   STORE_CATEGORY_LABELS,
@@ -106,11 +107,7 @@ const CardShopsCityPage = () => {
       />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
-        <nav aria-label="Breadcrumb" className="text-sm text-muted-foreground">
-          <Link to="/card-shops" className="hover:text-foreground">Card Shops</Link>
-          {' / '}
-          <span className="text-foreground">{cityInfo.label}</span>
-        </nav>
+        <BackButton fallback="/card-shops" />
 
         <header>
           <h1 className="text-3xl md:text-4xl font-bold mb-2">

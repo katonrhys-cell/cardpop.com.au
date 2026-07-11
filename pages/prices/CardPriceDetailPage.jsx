@@ -5,6 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
 import SEOHead from '@/components/SEOHead.jsx';
+import BackButton from '@/components/BackButton.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
 import {
   PRICE_CATEGORIES,
@@ -185,13 +186,7 @@ const CardPriceDetailPage = () => {
       />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
-        <nav aria-label="Breadcrumb" className="text-sm text-muted-foreground">
-          <Link to="/prices" className="hover:text-foreground">Card Prices</Link>
-          {' / '}
-          <Link to={`/prices/${card.category}`} className="hover:text-foreground">{categoryInfo.label}</Link>
-          {' / '}
-          <span className="text-foreground">{card.name}</span>
-        </nav>
+        <BackButton fallback="/prices" />
 
         <header>
           <h1 className="text-3xl md:text-4xl font-bold mb-2">

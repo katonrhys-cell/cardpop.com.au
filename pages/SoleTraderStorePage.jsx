@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
+import BackButton from '@/components/BackButton.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import {
   Star, ShieldCheck, MapPin, Calendar, ExternalLink, ShieldAlert,
@@ -240,6 +241,7 @@ const SoleTraderStorePage = () => {
       {/* ── Hero Banner ─────────────────────────────────────────────────── */}
       <div className="bg-[hsl(var(--profile-bg))] border-b border-[hsl(var(--section-divider))]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12">
+          <BackButton fallback="/marketplace" className="mb-8" />
           <div className="flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
 
             {/* Logo */}
