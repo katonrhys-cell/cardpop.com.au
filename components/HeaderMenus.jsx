@@ -11,7 +11,7 @@ import React, { useState, useEffect, useRef, startTransition } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowRightLeft, LayoutDashboard, Package, Users, Calendar, FileText, Building2,
-  Layers, CheckCircle, Sun, Moon, ChevronDown, ArrowRight, Layers2, User, LogOut,
+  Layers, CheckCircle, Sun, Moon, ChevronDown, ChevronLeft, ChevronRight, ArrowRight, Layers2, User, LogOut,
   Settings, FolderTree, ListOrdered, BarChart3, Store, Shield,
   BookOpen, Globe, Star, Award, TrendingUp, Newspaper, BadgeCheck, Ticket, Handshake,
   Calculator, MapPin, ClipboardList, HelpCircle, MessageSquare,
@@ -346,10 +346,21 @@ const BrowseDropdown = ({ onNavigate }) => {
 };
 
 // ─── Shop mega-dropdown ───────────────────────────────────────────────────────
+// Mirrors the /shop "Shop by Category" browser: a strip of gradient category
+// cards you can rotate through (prev/next arrows, like the homepage Browse by
+// Category carousel) or hover, with the hovered/selected category's
+// subcategories revealed below.
 const ShopDropdown = ({ onNavigate }) => {
   const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
   const location = useLocation();
   const isShopActive = location.pathname === '/shop' || location.pathname.startsWith('/shop/');
+  const [activeIdx, setActiveIdx] = useState(0);
+  const count = SHOP_CATEGORY_GROUPS.length;
+  const activeGroup = SHOP_CATEGORY_GROUPS[activeIdx];
+  const rotate = (dir) => setActiveIdx((i) => (i + dir + count) % count);
+
+  // Start each open on the first category.
+  useEffect(() => { if (!open) setActiveIdx(0); }, [open]);
 
   return (
     <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
@@ -367,7 +378,7 @@ const ShopDropdown = ({ onNavigate }) => {
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-2 w-[720px] max-w-[calc(100vw-2rem)] bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+        <div className="absolute top-full left-0 mt-2 w-[560px] max-w-[calc(100vw-2rem)] bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
           <Link
             to="/shop"
             onClick={() => { setOpen(false); onNavigate?.(); }}
@@ -379,32 +390,70 @@ const ShopDropdown = ({ onNavigate }) => {
             </div>
             <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
           </Link>
-          <div className="grid grid-cols-3 gap-x-6 gap-y-5 p-5">
-            {SHOP_CATEGORY_GROUPS.map(group => (
-              <div key={group.slug}>
-                <div className="flex items-center gap-2 mb-2.5 px-1">
-                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${group.gradient} shrink-0 shadow-sm`}>
-                    <group.Icon className="w-3.5 h-3.5 text-white" />
+
+          {/* Category card strip with rotate arrows */}
+          <div className="flex items-center gap-2 px-4 pt-4">
+            <button
+              type="button"
+              aria-label="Previous category"
+              onClick={() => rotate(-1)}
+              className="shrink-0 w-8 h-8 rounded-full border border-border bg-background flex items-center justify-center hover:bg-muted transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <div className="flex-1 flex gap-2">
+              {SHOP_CATEGORY_GROUPS.map((group, i) => {
+                const active = i === activeIdx;
+                return (
+                  <button
+                    key={group.slug}
+                    type="button"
+                    onPointerEnter={(e) => { if (e.pointerType === 'mouse') setActiveIdx(i); }}
+                    onClick={() => setActiveIdx(i)}
+                    onFocus={() => setActiveIdx(i)}
+                    aria-pressed={active}
+                    aria-label={`${group.label} supplies`}
+                    className={`flex-1 flex flex-col items-center justify-center gap-1 h-16 rounded-xl bg-gradient-to-br ${group.gradient} transition-all duration-200 focus:outline-none ${
+                      active ? 'ring-2 ring-foreground/30 ring-offset-1 ring-offset-card shadow-md' : 'opacity-80 hover:opacity-100'
+                    }`}
+                  >
+                    <group.Icon className="w-4 h-4 text-white drop-shadow-sm" />
+                    <span className="text-[10px] font-bold text-white drop-shadow-sm leading-none">{group.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              aria-label="Next category"
+              onClick={() => rotate(1)}
+              className="shrink-0 w-8 h-8 rounded-full border border-border bg-background flex items-center justify-center hover:bg-muted transition-colors"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Subcategories for the active category */}
+          <div className="p-4">
+            <div className="flex items-baseline gap-2 mb-2 px-1">
+              <span className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground">{activeGroup.label}</span>
+              <span className="text-[11px] text-muted-foreground/70 truncate">{activeGroup.blurb}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-0.5">
+              {activeGroup.items.map(item => (
+                <Link
+                  key={item.slug}
+                  to={`/shop/category/${item.slug}`}
+                  onClick={() => { setOpen(false); onNavigate?.(); }}
+                  className="flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-muted transition-colors group/item"
+                >
+                  <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${activeGroup.gradient} shrink-0 shadow-sm transition-transform duration-300 group-hover/item:scale-110`}>
+                    <item.Icon className="w-3.5 h-3.5 text-white" />
                   </span>
-                  <span className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground">{group.label}</span>
-                </div>
-                <div className="grid gap-0.5">
-                  {group.items.map(item => (
-                    <Link
-                      key={item.slug}
-                      to={`/shop/category/${item.slug}`}
-                      onClick={() => { setOpen(false); onNavigate?.(); }}
-                      className="flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-muted transition-colors group/item"
-                    >
-                      <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${group.gradient} shrink-0 shadow-sm transition-transform duration-300 group-hover/item:scale-110`}>
-                        <item.Icon className="w-3.5 h-3.5 text-white" />
-                      </span>
-                      <span className="text-[13px] font-medium text-foreground group-hover/item:text-primary transition-colors truncate">{item.name}</span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            ))}
+                  <span className="text-[13px] font-medium text-foreground group-hover/item:text-primary transition-colors truncate">{item.name}</span>
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       )}
