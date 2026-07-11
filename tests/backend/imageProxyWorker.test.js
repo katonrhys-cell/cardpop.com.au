@@ -111,3 +111,82 @@ describe('worker fetch handler', () => {
     expect(cf.cacheTtl).toBeUndefined();
   });
 });
+
+// ─── R2 fast path ─────────────────────────────────────────────────────────────
+
+describe('worker R2 fast path', () => {
+  let fetchSpy, cachePut;
+
+  // Stub the edge Cache API (caches.default) — absent in the Node test runtime.
+  beforeEach(() => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('supabase-bytes', { status: 200, headers: { 'Content-Type': 'image/webp' } })
+    );
+    cachePut = vi.fn().mockResolvedValue(undefined);
+    globalThis.caches = { default: { match: vi.fn().mockResolvedValue(undefined), put: cachePut } };
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    delete globalThis.caches;
+  });
+
+  // An R2 bucket whose get() returns a stored object for `presentKey` only.
+  const bucketWith = (presentKey) => ({
+    get: vi.fn(async (key) =>
+      key === presentKey
+        ? {
+            body: 'r2-bytes',
+            httpEtag: '"abc"',
+            writeHttpMetadata: (h) => h.set('Content-Type', 'image/webp'),
+          }
+        : null
+    ),
+  });
+
+  const ctx = { waitUntil: vi.fn() };
+  const run = (path, env, opts) =>
+    worker.fetch(new Request(`https://img.cardpop.com.au${path}`, opts), env, ctx);
+
+  it('serves a migrated object from R2 without touching Supabase', async () => {
+    const env = { IMAGES: bucketWith('vault-images/123-card.webp') };
+    const res = await run(OBJECT_PATH, env);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe('r2-bytes');
+    expect(env.IMAGES.get).toHaveBeenCalledWith('vault-images/123-card.webp');
+    expect(fetchSpy).not.toHaveBeenCalled(); // no Supabase egress
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
+    expect(ctx.waitUntil).toHaveBeenCalled(); // edge-cached
+  });
+
+  it('falls through to the Supabase proxy when the object is not in R2', async () => {
+    const env = { IMAGES: bucketWith('some/other/object.webp') };
+    const res = await run(OBJECT_PATH, env);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe('supabase-bytes');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('never serves render/transform paths from R2 (R2 cannot resize)', async () => {
+    const env = { IMAGES: bucketWith('vault-images/123-card.webp') };
+    await run(RENDER_PATH, env);
+    expect(env.IMAGES.get).not.toHaveBeenCalled();
+    expect(fetchSpy).toHaveBeenCalledTimes(1); // proxied to Supabase
+  });
+
+  it('ignores cache-busting query strings when keying the R2 object', async () => {
+    const env = { IMAGES: bucketWith('vault-images/123-card.webp') };
+    const res = await run(`${OBJECT_PATH}?cachebust=999`, env);
+    expect(res.status).toBe(200);
+    expect(env.IMAGES.get).toHaveBeenCalledWith('vault-images/123-card.webp');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('returns a bodyless response for a HEAD hit', async () => {
+    const env = { IMAGES: bucketWith('vault-images/123-card.webp') };
+    const res = await run(OBJECT_PATH, env, { method: 'HEAD' });
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe('');
+  });
+});
