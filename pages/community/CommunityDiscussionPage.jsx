@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
+import BackButton from '@/components/BackButton.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MessageSquare } from 'lucide-react';
@@ -36,7 +37,9 @@ const CommunityDiscussionPage = () => {
   return (
     <div className="container-default section-padding min-h-screen max-w-4xl mx-auto">
       <SEOHead title={`${discussion.title || 'Discussion'} | CardPop Community`} description={`Join the discussion: ${discussion.title || 'Community discussion on CardPop'}`} />
-      
+
+      <BackButton fallback="/community" className="mb-8" />
+
       <div className="bg-card border border-border p-8 rounded-3xl mb-8">
         <h1 className="text-3xl font-bold mb-4">{discussion.title}</h1>
         <div className="flex items-center gap-4 text-sm text-muted-foreground mb-8 pb-4 border-b border-border">

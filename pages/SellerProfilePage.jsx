@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import ProductCard from '@/components/ProductCard';
+import BackButton from '@/components/BackButton.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const SellerProfilePage = () => {
@@ -104,6 +105,7 @@ const SellerProfilePage = () => {
       <div className="flex flex-col font-sans bg-background min-h-screen">
         <div className="flex-1 py-12">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+            <BackButton fallback="/community" className="mb-8" />
             <Card className="mb-12 rounded-3xl shadow-sm border-border bg-card">
               <CardContent className="p-8 md:p-10">
                 <div className="flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
