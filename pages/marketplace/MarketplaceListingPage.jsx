@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
+import { toast } from 'sonner';
 import SEOHead from '@/components/SEOHead.jsx';
 import { generateStructuredData, generateBreadcrumbStructuredData } from '@/utils/seoUtils.js';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -9,15 +10,46 @@ import ReportModal from '@/components/ReportModal.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import CertificationVerificationSection from '@/components/CertificationVerificationSection.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
+import { useCart } from '@/hooks/useCart.jsx';
+import { useAuth } from '@/contexts/AuthContext.jsx';
 
 const MarketplaceListingPage = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
+  const { addToCart, cartItems } = useCart();
+  const { currentUser } = useAuth();
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [csPrice, setCsPrice] = useState(null);
   const [csPriceLoading, setCsPriceLoading] = useState(false);
+  const [addingToCheckout, setAddingToCheckout] = useState(false);
   const fetchRef = useRef(null);
+
+  // "Buy Now" purchases a fixed-price listing. It drops the listing into the
+  // cart (once — a listing is a unique, single item) and jumps to checkout,
+  // which works for guests too. Auction / expression-of-interest / trade
+  // listings aren't bought this way, and you can't buy your own listing.
+  const handleBuyNow = async () => {
+    if (!listing || addingToCheckout) return;
+    setAddingToCheckout(true);
+    try {
+      const product = {
+        id: listing.id,
+        source: 'marketplace',
+        type: 'listing',
+        title: listing.vault_item?.card_name || listing.title || 'Trading Card',
+        price: Number(listing.price_aud) || 0,
+        image: listing.images?.[0] || listing.vault_item?.vault_images?.[0]?.image_url || null,
+      };
+      const alreadyInCart = cartItems.some((i) => (i.product?.id) === listing.id);
+      if (!alreadyInCart) await addToCart(product, product, 1);
+      navigate('/checkout');
+    } catch (err) {
+      toast.error(err?.message || 'Could not start checkout. Please try again.');
+      setAddingToCheckout(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -222,7 +254,31 @@ const MarketplaceListingPage = () => {
           )}
 
           <div className="mt-auto flex flex-col gap-3">
-            <Button size="lg" className="w-full text-lg h-14 radius-btn">Buy Now</Button>
+            {(() => {
+              const isFixed = listing.listing_type === 'fixed';
+              const isActive = listing.status === 'active';
+              const isOwn = currentUser?.id && currentUser.id === listing.seller_id;
+              const purchasable = isFixed && isActive && (Number(listing.price_aud) || 0) > 0 && !isOwn;
+              // Only fixed-price listings are bought outright; auctions / offers
+              // use their own flows. Show the Sold state on a sold fixed listing.
+              if (!isFixed && isActive) return null;
+              const label = !isActive
+                ? 'No longer available'
+                : isOwn
+                  ? 'This is your listing'
+                  : 'Buy Now';
+              return (
+                <Button
+                  size="lg"
+                  className="w-full text-lg h-14 radius-btn"
+                  onClick={handleBuyNow}
+                  disabled={!purchasable || addingToCheckout}
+                >
+                  {addingToCheckout ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : null}
+                  {label}
+                </Button>
+              );
+            })()}
             <Button size="lg" variant="secondary" className="w-full text-lg h-14 radius-btn">
               <MessageCircle className="w-5 h-5 mr-2" /> Make an Offer
             </Button>
