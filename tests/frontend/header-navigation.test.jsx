@@ -1,8 +1,16 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, configure } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
+
+// The Header's Row-2 desktop nav and the mobile Sheet body (MobileNavMenus) are
+// both lazy-loaded chunks. Testing Library's default 1s findBy/waitFor timeout
+// is enough locally but races on slow CI runners, where the chunk + its ~35
+// lucide icons occasionally aren't mounted yet when we look for "Shop" — an
+// intermittent "Unable to find role=link name Shop". Give the async helpers
+// more headroom so the lazy load can settle deterministically.
+configure({ asyncUtilTimeout: 5000 });
 
 vi.mock('@/contexts/AuthContext.jsx', () => ({ useAuth: vi.fn() }));
 vi.mock('@/hooks/useCart.jsx', () => ({ useCart: vi.fn() }));
