@@ -5,12 +5,16 @@ import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 // The Header's Row-2 desktop nav and the mobile Sheet body (MobileNavMenus) are
-// both lazy-loaded chunks. Testing Library's default 1s findBy/waitFor timeout
-// is enough locally but races on slow CI runners, where the chunk + its ~35
-// lucide icons occasionally aren't mounted yet when we look for "Shop" — an
-// intermittent "Unable to find role=link name Shop". Give the async helpers
-// more headroom so the lazy load can settle deterministically.
-configure({ asyncUtilTimeout: 5000 });
+// both lazy-loaded chunks. On a loaded CI runner the first cold dynamic import
+// can take several seconds — past Testing Library's 1s default findBy timeout
+// AND the 5s default test timeout — so these interaction tests intermittently
+// die waiting for e.g. the "Shop" link to mount ("Test timed out in 5000ms").
+// Give both the async helpers and the tests themselves generous headroom: this
+// is a test-environment cold-import cost, not a production concern. asyncUtil
+// must stay below testTimeout so a genuine miss still surfaces as a clear
+// "Unable to find" rather than a bare test timeout.
+vi.setConfig({ testTimeout: 20000 });
+configure({ asyncUtilTimeout: 10000 });
 
 vi.mock('@/contexts/AuthContext.jsx', () => ({ useAuth: vi.fn() }));
 vi.mock('@/hooks/useCart.jsx', () => ({ useCart: vi.fn() }));
