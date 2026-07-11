@@ -65,6 +65,48 @@ this is ample headroom.
 **Rollback**: delete the two env vars and redeploy — image URLs revert to
 Supabase immediately. The Worker can stay deployed; it costs nothing.
 
+### R2 fast path (free egress for migrated objects)
+
+The Worker also serves objects straight from a Cloudflare **R2 bucket** when one
+is bound as `IMAGES`. R2 has **no egress fee at all**, so any object served from
+R2 costs nothing — not against Supabase's quota, not against Cloudflare. This is
+strictly better than the Supabase proxy (which still pays Supabase egress on
+every edge-cache miss).
+
+How it works: an `/storage/v1/object/public/<bucket>/<path>` request is looked up
+in R2 under the key `<bucket>/<path>` — the exact suffix the public URL already
+carries — so **no URL changes and no frontend changes are needed**. A hit is
+served from R2; a **miss falls through to the Supabase proxy**, so objects can be
+migrated one at a time and the change is fully reversible (delete from R2 →
+requests fall back to Supabase). Transform requests
+(`/storage/v1/render/image/public/`) are never served from R2 — R2 can't resize —
+so they always proxy to Supabase.
+
+The binding is optional: with no `IMAGES` binding the Worker behaves exactly as
+the Supabase-only proxy did. See `tests/backend/imageProxyWorker.test.js` for the
+covered behaviours.
+
+**Bind the bucket (Cloudflare dashboard, ~2 min):**
+
+1. Create the R2 bucket `cardpop-images` (R2 → Create bucket; APAC/Oceania
+   location for AU proximity). *(Already done.)*
+2. Worker `cardpop-image-proxy` → **Settings → Bindings → Add → R2 bucket**.
+   - **Variable name**: `IMAGES` (must match exactly — the code reads
+     `env.IMAGES`).
+   - **R2 bucket**: `cardpop-images`.
+3. Re-deploy the Worker with the current `cloudflare/image-proxy-worker.js`
+   (Worker → Edit code → paste → Deploy). The binding only takes effect once the
+   R2-aware code is deployed.
+4. Verify: upload a test object to R2 under a real key (e.g.
+   `vault-images/<some-existing-path>.webp`), then
+   `curl -sI https://img.cardpop.com.au/storage/v1/object/public/vault-images/<that-path>.webp`.
+   It should return the R2 object; a key not in R2 should still return the
+   Supabase-served image.
+
+Migrating existing objects into R2 (backfill) and pointing new uploads at R2 are
+separate follow-ups — until then, the bucket simply sits empty and every request
+falls through to Supabase exactly as before.
+
 ## Option B — AWS CloudFront (alternative, no code)
 
 CloudFront's always-free tier is 1 TB/month egress + 10M requests and does
