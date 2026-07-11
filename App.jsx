@@ -307,7 +307,9 @@ const App = () => {
                         <Route path="/shop/category/:categorySlug" element={<ShopCategoryRoute />} />
                         
                         {/* Checkout */}
-                        <Route path="/checkout/:cardId?" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
+                        {/* Guest checkout: anyone can buy from the shop / marketplace.
+                            Account creation is offered after payment on the success page. */}
+                        <Route path="/checkout/:cardId?" element={<CheckoutPage />} />
                         <Route path="/checkout-success" element={<CheckoutSuccessPage />} />
                         <Route path="/success" element={<CheckoutSuccessPage />} />
                         

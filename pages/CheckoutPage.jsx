@@ -45,6 +45,10 @@ const CheckoutPage = () => {
   const [shippingData, setShippingData] = useState({ email: currentUser?.email || '' });
   const [billingData, setBillingData] = useState({});
   const [sameAsShipping, setSameAsShipping] = useState(true);
+  // Guest opt-in: email me order updates & CardPop news. Defaults off (explicit
+  // consent). Only surfaced to logged-out shoppers — members already have an
+  // account and manage email preferences in their settings.
+  const [subscribeNews, setSubscribeNews] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -196,9 +200,15 @@ const CheckoutPage = () => {
   const appliedPromoCode = discount > 0 ? promoCode : '';
 
   const validateShipping = () => {
-    const { firstName, lastName, address, suburb, state, postcode, verified, placesUnavailable } = shippingData;
+    const { email, firstName, lastName, address, suburb, state, postcode, verified, placesUnavailable } = shippingData;
     if (!firstName || !lastName || !address || !suburb || !state || !postcode) {
       toast.error('Please fill in all shipping address fields.');
+      return false;
+    }
+    // Email is required — it's the receipt address (and where the order
+    // confirmation is sent), especially for guests with no account on file.
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      toast.error('Please enter a valid email address for your receipt.');
       return false;
     }
     // When Amazon Location autocomplete is active, the address must be one the
@@ -237,8 +247,14 @@ const CheckoutPage = () => {
   // switches the server onto the tax-invoice path.
   const billingAbn = billingData.isBusiness && isValidAbn(billingData.abn) ? normalizeAbn(billingData.abn) : '';
   const billingBusinessName = billingAbn ? (billingData.businessName || '').trim() : '';
+  const contactEmail = (shippingData.email || '').trim();
   const checkoutRequestBody = useMemo(() => ({
     items: serverItems,
+    // Receipt address — for guests this is the only email on file; the server
+    // prefers a logged-in buyer's account email over it.
+    email: contactEmail,
+    // Guest opt-in to order-updates & news; the webhook subscribes on payment.
+    ...(subscribeNews ? { subscribeNewsletter: true } : {}),
     ...(useWallet ? { useWalletBalance: true } : (appliedPromoCode ? { promoCode: appliedPromoCode } : {})),
     shippingAddress: {
       name: shippingName,
@@ -251,6 +267,8 @@ const CheckoutPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [
     serverItemsKey,
+    contactEmail,
+    subscribeNews,
     useWallet,
     appliedPromoCode,
     shippingName,
@@ -302,6 +320,19 @@ const CheckoutPage = () => {
                 onChange={setShippingData}
                 showEmail
               />
+              {!currentUser && (
+                <label className="flex items-start gap-3 rounded-lg border border-border bg-muted/20 p-3 text-sm cursor-pointer">
+                  <Checkbox
+                    className="mt-0.5"
+                    checked={subscribeNews}
+                    onCheckedChange={(checked) => setSubscribeNews(!!checked)}
+                  />
+                  <span className="text-muted-foreground">
+                    Email me order updates and CardPop news. You'll be able to create an
+                    account after payment to track your order.
+                  </span>
+                </label>
+              )}
               <div className="flex justify-between pt-2">
                 <Button variant="outline" onClick={() => setStep(STEPS.SUMMARY)}>Back</Button>
                 <Button onClick={() => { if (validateShipping()) setStep(STEPS.BILLING); }}>
@@ -412,7 +443,7 @@ const CheckoutPage = () => {
         <div className="max-w-2xl mx-auto">
           {renderStep()}
 
-          {step === STEPS.SUMMARY && flatItems.length > 0 && walletBalance > 0 && (
+          {currentUser && step === STEPS.SUMMARY && flatItems.length > 0 && walletBalance > 0 && (
             <Card className="border-border shadow-sm mt-4">
               <CardContent className="pt-6">
                 <label className="flex items-center gap-3 text-sm cursor-pointer">
@@ -435,7 +466,7 @@ const CheckoutPage = () => {
             </Card>
           )}
 
-          {step === STEPS.SUMMARY && flatItems.length > 0 && (
+          {currentUser && step === STEPS.SUMMARY && flatItems.length > 0 && (
             <Card className="border-border shadow-sm mt-4">
               <CardContent className="pt-6">
                 <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">

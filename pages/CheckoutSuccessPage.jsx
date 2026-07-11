@@ -1,17 +1,102 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { CheckCircle2, Package, ArrowRight, AlertTriangle, Loader2 } from 'lucide-react';
+import { CheckCircle2, Package, ArrowRight, AlertTriangle, Loader2, UserPlus } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useCart } from '@/hooks/useCart.jsx';
+import { useAuth } from '@/contexts/AuthContext.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
 import { Card } from '@/components/ui/card';
+
+// Post-purchase account creation for guests. The order is already placed and
+// paid — this just lets the shopper turn their guest checkout into a real
+// account (same email) so they can track the order and reorder faster. Kept
+// entirely optional; the confirmation above stands on its own without it.
+const GuestAccountCard = ({ email }) => {
+  const { signup } = useAuth();
+  const [password, setPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    if (password.length < 8) {
+      toast.error('Please choose a password of at least 8 characters.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await signup(email, password, '');
+      setDone(true);
+      toast.success('Account created! Check your email to confirm your address.');
+    } catch (err) {
+      // Most likely the email already has an account, or CAPTCHA is enforced —
+      // point them at the full sign-in / registration page either way.
+      toast.error(err?.message || 'Could not create your account. Please try registering directly.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (done) {
+    return (
+      <Card className="premium-card p-6 md:p-8 text-left mb-8">
+        <h2 className="font-bold text-lg mb-2 flex items-center gap-2">
+          <CheckCircle2 className="w-5 h-5 text-green-600" /> Account created
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          We've sent a confirmation link to <span className="font-medium text-foreground">{email}</span>.
+          Confirm it, then sign in to track your order.
+        </p>
+        <Button asChild variant="outline" size="sm" className="mt-4 rounded-full">
+          <Link to="/login">Go to sign in</Link>
+        </Button>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="premium-card p-6 md:p-8 text-left mb-8">
+      <h2 className="font-bold text-lg mb-1 flex items-center gap-2">
+        <UserPlus className="w-5 h-5 text-primary" /> Create an account
+      </h2>
+      <p className="text-sm text-muted-foreground mb-4">
+        Save your details to track this order and check out faster next time. Optional — your order is already confirmed.
+      </p>
+      <form onSubmit={handleCreate} className="space-y-3">
+        <div className="space-y-1">
+          <Label>Email</Label>
+          <Input type="email" value={email} readOnly className="bg-muted/50" />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="guest-password">Choose a password</Label>
+          <Input
+            id="guest-password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="At least 8 characters"
+            autoComplete="new-password"
+          />
+        </div>
+        <Button type="submit" disabled={submitting || !email} className="rounded-full">
+          {submitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserPlus className="w-4 h-4 mr-2" />}
+          Create account
+        </Button>
+      </form>
+    </Card>
+  );
+};
 
 // 'verifying' | 'paid' | 'unpaid' | 'error' | 'missing'
 const CheckoutSuccessPage = () => {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('session_id');
   const { clearCart } = useCart();
+  const { isAuthenticated } = useAuth();
 
   const [sessionData, setSessionData] = useState(null);
   const [status, setStatus] = useState(sessionId ? 'verifying' : 'missing');
@@ -125,6 +210,11 @@ const CheckoutSuccessPage = () => {
             </div>
           </div>
         </Card>
+
+        {/* Guests who just checked out can turn this into a real account. */}
+        {!isAuthenticated && sessionData?.customerEmail && (
+          <GuestAccountCard email={sessionData.customerEmail} />
+        )}
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <Button asChild size="lg" className="rounded-full shadow-lg shadow-primary/20">
