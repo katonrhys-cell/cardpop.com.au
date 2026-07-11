@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
@@ -83,12 +83,16 @@ describe('Header mobile hamburger menu — consecutive navigations', () => {
     const user = userEvent.setup();
     renderHeader();
 
-    // First selection: open hamburger, tap "Shop". The Sheet body is lazily
-    // loaded, so wait for its links to appear.
+    // First selection: open hamburger, then navigate to /shop. Shop is an
+    // expandable section (not a flat link), so open it and tap "Shop All
+    // Supplies". Scope to the Sheet dialog — the desktop Row-2 nav renders the
+    // same labels, so unscoped queries would match two elements. The Sheet body
+    // is lazily loaded, so wait for its controls to appear.
     await user.click(screen.getByRole('button', { name: /open menu/i }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toBeInTheDocument();
-    await user.click(await screen.findByRole('link', { name: 'Shop' }));
+    await user.click(await within(dialog).findByRole('button', { name: 'Shop' }));
+    await user.click(await within(dialog).findByRole('link', { name: 'Shop All Supplies' }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/shop'));
 
     // Sheet must be fully closed and the page must be interactive again
@@ -97,8 +101,8 @@ describe('Header mobile hamburger menu — consecutive navigations', () => {
 
     // Second selection: open hamburger again, tap "Marketplace"
     await user.click(screen.getByRole('button', { name: /open menu/i }));
-    await screen.findByRole('dialog');
-    await user.click(await screen.findByRole('link', { name: 'Marketplace' }));
+    const dialog2 = await screen.findByRole('dialog');
+    await user.click(await within(dialog2).findByRole('link', { name: 'Marketplace' }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/marketplace'));
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -188,8 +192,10 @@ describe('Header body pointer-events failsafe', () => {
     renderHeader();
 
     await user.click(screen.getByRole('button', { name: /open menu/i }));
-    await screen.findByRole('dialog');
-    await user.click(await screen.findByRole('link', { name: 'Shop' }));
+    const dialog = await screen.findByRole('dialog');
+    // Shop is an expandable section: open it, then tap "Shop All Supplies".
+    await user.click(await within(dialog).findByRole('button', { name: 'Shop' }));
+    await user.click(await within(dialog).findByRole('link', { name: 'Shop All Supplies' }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/shop'));
 
     // Simulate the Radix scroll-lock leak: body left unclickable after close
