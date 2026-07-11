@@ -17,6 +17,7 @@ import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import EbayMarketSection from '@/components/EbayMarketSection.jsx';
 import CertificationVerificationSection from '@/components/CertificationVerificationSection.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
+import BnplMessage from '@/components/BnplMessage.jsx';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
 
@@ -477,6 +478,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
                     )}
                     {isShop && <span className="text-sm font-medium text-muted-foreground pb-1">+ Shipping</span>}
                   </div>
+                  <BnplMessage amount={product.price} className="mt-2" />
                 </>
               )}
             </div>

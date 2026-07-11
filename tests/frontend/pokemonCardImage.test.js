@@ -50,4 +50,20 @@ describe('fetchPokemonCardImage — name normalisation', () => {
     const res = await fetchPokemonCardImage('Nonexistent Card (Ultra Rare)', 'Nowhere');
     expect(res).toBeNull();
   });
+
+  it('does not cache a null after a transient failure, so a retry can succeed', async () => {
+    // First lookup: every query hits a network error → null, but this must NOT
+    // be cached (a rate-limit/network blip should not permanently blank the art).
+    const failSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network'));
+    const first = await fetchPokemonCardImage('Snorlax VMAX 141/185', 'Vivid Voltage');
+    expect(first).toBeNull();
+    failSpy.mockRestore();
+
+    // Second lookup for the SAME card now succeeds — it must hit the API again
+    // rather than return a poisoned cached null.
+    const okSpy = mockFetchReturning({ small: 's.png', large: 'l.png' });
+    const second = await fetchPokemonCardImage('Snorlax VMAX 141/185', 'Vivid Voltage');
+    expect(okSpy).toHaveBeenCalled();
+    expect(second).toEqual({ small: 's.png', large: 'l.png', id: 'x' });
+  });
 });
