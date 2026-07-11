@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { ShoppingBag, X, Plus, Minus, Loader2, ArrowRight, PackageOpen } from 'lucide-react';
 import { useCart } from '@/hooks/useCart.jsx';
 import { formatCurrency } from '@/utils/formatCurrency.js';
+import BnplMessage from '@/components/BnplMessage.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
 import { publicImageUrl } from '@/utils/imageUrl.js';
@@ -37,6 +38,16 @@ const ShoppingCart = () => {
   };
 
   const cartItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Numeric AUD subtotal for the "pay in 4" instalment line. getCartTotal()
+  // returns a preformatted string, so recompute the raw amount the same way each
+  // line item is priced above (sale price → variant price → product price).
+  const numericTotalAud = cartItems.reduce((sum, item) => {
+    const cents = item.variant?.sale_price_in_cents
+      || item.variant?.price_in_cents
+      || (item.product.price ? item.product.price * 100 : 0);
+    return sum + cents * item.quantity;
+  }, 0) / 100;
 
   return (
     <Sheet open={isCartOpen} onOpenChange={setIsCartOpen}>
@@ -194,6 +205,7 @@ const ShoppingCart = () => {
                   <span className="font-bold text-lg text-foreground">Total</span>
                   <span className="font-bold text-2xl text-foreground tabular-nums">{getCartTotal()}</span>
                 </div>
+                <BnplMessage amount={numericTotalAud} align="center" />
               </div>
 
               <Button
