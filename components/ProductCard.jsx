@@ -9,6 +9,7 @@ import { getRefractorLabel, getRefractorBadgeClass } from '@/lib/cardAttributeLa
 import CardMicroscope from '@/components/CardMicroscope.jsx';
 import CardImage from '@/components/CardImage.jsx';
 import CardShowcase from '@/components/vault/CardShowcase.jsx';
+import BnplMessage from '@/components/BnplMessage.jsx';
 import { getCardImage, CARD_GRID_SIZES, toCdnUrl } from '@/utils/imageUrl.js';
 import { isVerified } from '@/utils/verification.js';
 import GradeBadge from '@/components/GradeBadge.jsx';
@@ -157,6 +158,8 @@ const ProductCard = ({ product, onAddToCart }) => {
               </span>
             )}
           </div>
+
+          <BnplMessage amount={product.price ?? product.price_aud ?? product.askingPrice ?? product.estimatedValue} className="-mt-1" />
 
           {onAddToCart && (
             <Button

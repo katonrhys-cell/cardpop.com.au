@@ -1,0 +1,12 @@
+{
+  // Config for the Cloudflare Worker that fronts Supabase Storage on
+  // img.cardpop.com.au (source: cloudflare/image-proxy-worker.js; see
+  // docs/image-cdn.md). Without this file the dashboard Git-integration build
+  // runs `npx wrangler versions upload` with no entry point and fails with
+  // "Missing entry-point to Worker script". This only points wrangler at the
+  // script + compatibility date — the custom domain/route stays managed in the
+  // Cloudflare dashboard, so uploading a version here can't change routing.
+  "name": "cardpop-image-proxy",
+  "main": "cloudflare/image-proxy-worker.js",
+  "compatibility_date": "2026-07-11"
+}
