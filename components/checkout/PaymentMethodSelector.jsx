@@ -73,6 +73,15 @@ const GooglePayMark = () => (
   </svg>
 );
 
+// Stripe Link — saved card + address, one-tap checkout (the Stripe-native
+// equivalent of Shop Pay). Appears automatically for returning Link customers.
+const LinkMark = () => (
+  <svg viewBox="0 0 40 20" height="16" role="img" aria-hidden="true">
+    <rect width="40" height="20" rx="4" fill="#00D66F" />
+    <text x="20" y="14" textAnchor="middle" fontFamily="Arial, sans-serif" fontWeight="700" fontSize="11" fill="#011E0F">link</text>
+  </svg>
+);
+
 const METHODS = [
   { label: 'Visa', mark: VisaMark },
   { label: 'Mastercard', mark: MastercardMark },
@@ -81,6 +90,7 @@ const METHODS = [
   { label: 'Afterpay', mark: AfterpayMark },
   { label: 'Apple Pay', mark: ApplePayMark },
   { label: 'Google Pay', mark: GooglePayMark },
+  { label: 'Link', mark: LinkMark },
 ];
 
 const PaymentMethodSelector = () => {

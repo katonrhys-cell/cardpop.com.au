@@ -747,9 +747,12 @@ const MobileShopSection = ({ onNavigate }) => {
                     <Link
                       to={`/shop/category/${item.slug}`}
                       onClick={onNavigate}
-                      className="px-3 py-2 rounded-lg hover:bg-muted transition-colors text-xs font-semibold text-foreground truncate"
+                      className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors text-left"
                     >
-                      {item.name}
+                      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${group.gradient} shrink-0`}>
+                        <item.Icon className="w-3.5 h-3.5 text-white" />
+                      </span>
+                      <span className="text-xs font-semibold text-foreground truncate">{item.name}</span>
                     </Link>
                   </SheetClose>
                 ))}

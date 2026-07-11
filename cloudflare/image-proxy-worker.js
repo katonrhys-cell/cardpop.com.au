@@ -1,4 +1,4 @@
-// Cloudflare Worker: image proxy for Supabase Storage.
+// Cloudflare Worker: image proxy for Supabase Storage, with an R2 fast path.
 //
 // Serves public storage images through img.cardpop.com.au so repeat traffic
 // is absorbed by Cloudflare's edge cache instead of counting against the
@@ -9,6 +9,16 @@
 // The URL path is passed through verbatim, so the app only swaps hostnames:
 //   https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/object/public/…
 //   → https://img.cardpop.com.au/storage/v1/object/public/…
+//
+// R2 fast path: when the `IMAGES` R2 binding is present, an /object/public/
+// request first looks for the object in R2, keyed by the same "<bucket>/<path>"
+// suffix the public URL already carries (so no URL rewrite is needed). A hit is
+// served straight from R2 — bytes never leave Cloudflare, so zero Supabase
+// egress; a miss falls through to the Supabase proxy below. Objects can
+// therefore be migrated into R2 one at a time with no frontend change and full
+// reversibility (delete from R2 → requests fall back to Supabase again).
+// Transform requests (/render/image/public/) are never served from R2 — R2
+// can't resize — so they always proxy to Supabase.
 
 const ORIGIN = 'https://odoglvswwymyjuwlonkf.supabase.co';
 
@@ -62,15 +72,69 @@ export function canonicalSearch(pathname, searchParams) {
   return s ? `?${s}` : '';
 }
 
+// Serve an object request from R2 if the object exists there, else return null
+// so the caller can fall back to the Supabase proxy. Uses a query-stripped
+// cache key so cache-busting query strings can't multiply edge entries or R2
+// reads (object paths ignore the query entirely — see canonicalSearch).
+async function serveFromR2(request, url, bucket, ctx) {
+  const cache = caches.default;
+  // Canonical, query-free cache key (always GET) — collapses every query
+  // variant of this object onto one edge-cache entry.
+  const cacheKey = new Request(`${url.origin}${url.pathname}`, { method: 'GET' });
+
+  const cached = await cache.match(cacheKey);
+  if (cached) {
+    // HEAD must not return a body, even on a cached GET response.
+    return request.method === 'HEAD'
+      ? new Response(null, { status: cached.status, headers: cached.headers })
+      : cached;
+  }
+
+  const key = decodeURIComponent(url.pathname.replace(OBJECT_PATH, ''));
+  if (!key) return null;
+
+  const object = await bucket.get(key);
+  if (!object) return null; // not migrated → caller falls back to Supabase
+
+  const headers = new Headers();
+  object.writeHttpMetadata(headers); // content-type, etc. from the stored object
+  headers.set('etag', object.httpEtag);
+  headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+  headers.set('Access-Control-Allow-Origin', '*'); // service worker fetches in CORS mode
+
+  // Cache the full GET response at the edge, then hand the caller a body-correct
+  // response for the actual method.
+  const cacheable = new Response(object.body, { headers });
+  if (ctx && typeof ctx.waitUntil === 'function') {
+    ctx.waitUntil(cache.put(cacheKey, cacheable.clone()));
+  }
+  return request.method === 'HEAD'
+    ? new Response(null, { headers })
+    : cacheable;
+}
+
 export default {
-  async fetch(request) {
+  async fetch(request, env, ctx) {
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       return new Response('Method not allowed', { status: 405 });
     }
 
     const url = new URL(request.url);
-    if (!OBJECT_PATH.test(url.pathname) && !RENDER_PATH.test(url.pathname)) {
+    const isObject = OBJECT_PATH.test(url.pathname);
+    if (!isObject && !RENDER_PATH.test(url.pathname)) {
       return new Response('Not found', { status: 404 });
+    }
+
+    // ── R2 fast path (object requests only) ───────────────────────────────
+    // Serve migrated objects straight from R2 (free egress). The R2 key is the
+    // path after /storage/v1/object/public/ — the same "<bucket>/<path>" the
+    // public URL uses — so no rewrite is needed. A miss falls through to the
+    // Supabase proxy below, keeping migration transparent and reversible. The
+    // binding is optional: with no `IMAGES` binding this whole block is skipped
+    // and the Worker behaves exactly as the Supabase-only proxy did.
+    if (isObject && env && env.IMAGES) {
+      const r2 = await serveFromR2(request, url, env.IMAGES, ctx);
+      if (r2) return r2;
     }
 
     // cacheEverything + cacheTtlByStatus keeps successful responses at
