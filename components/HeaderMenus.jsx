@@ -367,7 +367,7 @@ const ShopDropdown = ({ onNavigate }) => {
       </button>
 
       {open && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-[760px] max-w-[calc(100vw-2rem)] bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+        <div className="absolute top-full left-0 mt-2 w-[720px] max-w-[calc(100vw-3rem)] bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
           <Link
             to="/shop"
             onClick={() => { setOpen(false); onNavigate?.(); }}
@@ -394,9 +394,14 @@ const ShopDropdown = ({ onNavigate }) => {
                       key={item.slug}
                       to={`/shop/category/${item.slug}`}
                       onClick={() => { setOpen(false); onNavigate?.(); }}
-                      className="px-2 py-1.5 rounded-lg text-[13px] font-medium text-foreground hover:text-primary hover:bg-muted transition-colors truncate"
+                      className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-muted transition-colors group"
                     >
-                      {item.name}
+                      <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${group.gradient} shrink-0 shadow-sm`}>
+                        <group.Icon className="w-4 h-4 text-white" />
+                      </span>
+                      <span className="text-[13px] font-medium text-foreground group-hover:text-primary transition-colors truncate">
+                        {item.name}
+                      </span>
                     </Link>
                   ))}
                 </div>
