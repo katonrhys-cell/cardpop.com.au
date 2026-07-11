@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { toCdnUrl } from '@/utils/imageUrl.js';
+import BnplMessage from '@/components/BnplMessage.jsx';
 
 const LineItem = ({ label, value, bold }) => (
   <div className={`flex justify-between text-sm ${bold ? 'font-semibold text-base' : 'text-muted-foreground'}`}>
@@ -46,6 +47,7 @@ const OrderSummary = ({ cartItems = [], subtotal = 0, serviceFee = 0, gst = 0, s
             {shipping > 0 && <LineItem label="Shipping" value={shipping} />}
             <Separator />
             <LineItem label="Total (AUD)" value={total} bold />
+            <BnplMessage amount={total} align="center" className="pt-1.5" />
           </div>
         </CardContent>
       </Card>

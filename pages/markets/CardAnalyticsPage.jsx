@@ -199,9 +199,16 @@ const CardAnalyticsPage = () => {
   // Official card art from the Pokémon TCG API (falls back to a passed-through
   // thumbnail, then to the text placeholder). Pokémon-only; skip other games.
   const [cardImage, setCardImage] = useState(null);
-  const [heroBroken, setHeroBroken] = useState(false);
+  const [heroSrcIndex, setHeroSrcIndex] = useState(0);
   const isPokemon = !cardColl || /pok[eé]mon/i.test(cardColl);
-  const heroImage = heroBroken ? null : (cardImage?.large || passedImage);
+  // Ordered image candidates: official API art (large, then small), then any
+  // thumbnail passed through the URL. On a load error we walk to the next before
+  // falling back to the text placeholder, so one flaky URL doesn't blank the art.
+  const heroCandidates = useMemo(
+    () => [cardImage?.large, cardImage?.small, passedImage].filter(Boolean),
+    [cardImage, passedImage]
+  );
+  const heroImage = heroCandidates[heroSrcIndex] || null;
 
   const rng = useMemo(() => makePrng(cardName + cardSet), [cardName, cardSet]);
 
@@ -236,7 +243,7 @@ const CardAnalyticsPage = () => {
   useEffect(() => {
     let cancelled = false;
     setCardImage(null);
-    setHeroBroken(false);
+    setHeroSrcIndex(0);
     if (!isPokemon || !cardName || cardName === 'Unknown Card') return;
     fetchPokemonCardImage(cardName, cardSet).then(img => {
       if (!cancelled && img) setCardImage(img);
@@ -337,7 +344,7 @@ const CardAnalyticsPage = () => {
                     alt={`${cardName}${cardSet ? ` — ${cardSet}` : ''}`}
                     className="w-full h-full object-contain"
                     loading="eager"
-                    onError={() => setHeroBroken(true)}
+                    onError={() => setHeroSrcIndex((i) => i + 1)}
                   />
                 </div>
               ) : (
