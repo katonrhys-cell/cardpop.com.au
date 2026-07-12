@@ -235,6 +235,7 @@ const TermsPage = lazy(() => import('@/pages/info/TermsPage.jsx'));
 const TrustSafetyPage = lazy(() => import('@/pages/info/TrustSafetyPage.jsx'));
 const AccessibilityPage = lazy(() => import('@/pages/info/AccessibilityPage.jsx'));
 const PhotographyStandardPage = lazy(() => import('@/pages/info/PhotographyStandardPage.jsx'));
+const ConvictionRatingPage = lazy(() => import('@/pages/info/ConvictionRatingPage.jsx'));
 
 const App = () => {
   return (
@@ -436,6 +437,7 @@ const App = () => {
                         <Route path="/accessibility" element={<AccessibilityPage />} />
                         <Route path="/photography-standard" element={<PhotographyStandardPage />} />
                         <Route path="/photography-guide" element={<PhotographyStandardPage />} />
+                        <Route path="/conviction-rating" element={<ConvictionRatingPage />} />
                         
                         {/* --- PROTECTED ADMIN ROUTES (NESTED UNDER ADMINLAYOUT) --- */}
                         <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>}>

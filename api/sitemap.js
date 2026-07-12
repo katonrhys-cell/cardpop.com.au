@@ -86,6 +86,7 @@ const STATIC_PAGES = [
   { loc: '/about',                 lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
   { loc: '/contact',               lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
   { loc: '/faq',                   lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
+  { loc: '/conviction-rating',     lastmod: '2026-07-12', freq: 'monthly', pri: '0.5' },
   { loc: '/privacy-policy',        lastmod: '2026-05-31', freq: 'yearly',  pri: '0.4' },
   { loc: '/terms',                 lastmod: '2026-05-31', freq: 'yearly',  pri: '0.4' },
   { loc: '/returns',               lastmod: '2026-05-31', freq: 'yearly',  pri: '0.4' },

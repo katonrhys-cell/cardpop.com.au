@@ -75,7 +75,10 @@ const Footer = () => {
             <h4 className="font-bold mb-6 uppercase tracking-wider text-sm">Connect</h4>
             <ul className="space-y-4 text-sm text-muted-foreground font-medium">
               {settings.enable_blog !== false && (
-                <li><Link to="/blog" className="hover:text-primary transition-colors">Blog</Link></li>
+                <>
+                  <li><Link to="/blog" className="hover:text-primary transition-colors">Blog</Link></li>
+                  <li><Link to="/conviction-rating" className="hover:text-primary transition-colors">Conviction Rating</Link></li>
+                </>
               )}
               <li><Link to="/community" className="hover:text-primary transition-colors">Community</Link></li>
               <li><Link to="/about" className="hover:text-primary transition-colors">About Us</Link></li>

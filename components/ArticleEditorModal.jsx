@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Upload, FileCode, CheckCircle2, Plus, Trash2 } from 'lucide-react';
+import { CONVICTION_LEVELS, CONVICTION_TYPES, convictionTypeForCategory } from '@/utils/convictionRating.js';
 
 const CATEGORIES = [
   { value: 'australia-focus',  label: 'Australia Focus'   },
@@ -21,13 +22,11 @@ const CATEGORIES = [
 ];
 
 // Mirrors the CardPop Conviction Rating™ scale rendered on the article page.
-const CONVICTION_OPTIONS = [
-  { value: '1', label: '1 · High Risk'  },
-  { value: '2', label: '2 · Negative'   },
-  { value: '3', label: '3 · Neutral'    },
-  { value: '4', label: '4 · Positive'   },
-  { value: '5', label: '5 · Strong Buy' },
-];
+// Levels are the universal strength labels; the TYPE (what the score is about)
+// is derived from the article's category — see convictionTypeForCategory below.
+const CONVICTION_OPTIONS = CONVICTION_LEVELS
+  .filter(Boolean)
+  .map((l) => ({ value: String(l.value), label: `${l.value} · ${l.label}` }));
 
 // Comma / newline separated text ⇄ trimmed, de-duplicated string array
 const parseList = (text) =>
@@ -168,6 +167,10 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
         tags: parseList(tags),
         marketplace_keywords: parseList(marketplaceKeywords),
         conviction_rating: convictionRating === 'none' ? null : Number(convictionRating),
+        // Type is fixed by the category (Buy / Keeper / Grade / Impact). Stored
+        // explicitly so the meter renders consistently even if the category
+        // vocabulary later drifts. Null when there's no rating.
+        conviction_type: convictionRating === 'none' ? null : convictionTypeForCategory(category),
         read_time_minutes: (() => {
           const n = parseInt(readTimeMinutes, 10);
           return Number.isFinite(n) && n > 0 ? n : null;
@@ -442,7 +445,16 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">Investment thesis conviction. Leave as None for how-to / educational articles.</p>
+                <p className="text-xs text-muted-foreground">
+                  {convictionRating === 'none' ? (
+                    'Strength of our call, 1 (Minimal) → 5 (Highest). Leave as None for how-to / educational articles.'
+                  ) : (() => {
+                    const t = convictionTypeForCategory(category);
+                    return t
+                      ? <>Shows as <span className="font-semibold text-foreground">{CONVICTION_TYPES[t].name}</span> — set by the “{category}” category. {CONVICTION_TYPES[t].question}</>
+                      : <>Pick a category (Investing, Card Spotlight, Grading Hub, News, Australia Focus) to set the rating type — otherwise it defaults to <span className="font-semibold text-foreground">Buy Conviction</span>.</>;
+                  })()}
+                </p>
               </div>
               <div className="space-y-1">
                 <Label>Read Time <span className="text-xs font-normal text-muted-foreground">(minutes)</span></Label>

@@ -8,40 +8,52 @@ import { ArrowLeft, FileText } from 'lucide-react';
 import { generateBlogPostingSchema, generateFAQStructuredData, generateBreadcrumbStructuredData } from '@/utils/seoUtils.js';
 import { htmlExcerpt } from '@/utils/htmlExcerpt.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import { resolveConviction, CONVICTION_METHODOLOGY_PATH } from '@/utils/convictionRating.js';
 
-const CONVICTION_LABELS = ['', 'High Risk', 'Negative', 'Neutral', 'Positive', 'Strong Buy'];
-const CONVICTION_COLOURS = ['', '#dc2626', '#ea580c', '#ca8a04', '#16a34a', '#15803d'];
-
-const ConvictionRating = ({ rating }) => {
-  if (!rating || rating < 1 || rating > 5) return null;
-  const colour = CONVICTION_COLOURS[rating];
+const ConvictionRating = ({ article }) => {
+  const conviction = resolveConviction(article);
+  if (!conviction) return null;
+  const { rating, label, colour, blurb, type, action } = conviction;
   return (
     <div className="mt-4 pt-4 border-t border-white/10">
-      {/* Heading + current reading */}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2.5">
+      {/* Type + current reading */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-1">
         <span className="text-[10px] font-bold tracking-widest uppercase text-white/40">
-          CardPop Conviction Rating™
+          CardPop {type.name}™
         </span>
         <span className="text-xs font-semibold" style={{ color: colour }}>
-          {rating}/5 &middot; {CONVICTION_LABELS[rating]}
+          {rating}/5 &middot; {label}
         </span>
       </div>
-      <p className="text-xs text-white/50 mb-3">Our confidence level in the card's investment thesis. 1 = High Risk, 5 = Strong Buy.</p>
+      <p className="text-xs text-white/50 mb-2.5">{type.question} {blurb}</p>
 
-      {/* Scale — 5 segments filled to the rating, with end-point meanings */}
+      {/* Scale — 5 segments filled to the rating, with strength end-points */}
       <div className="max-w-[15rem]">
         <div className="flex items-center gap-1" role="img"
-             aria-label={`Conviction ${rating} out of 5: ${CONVICTION_LABELS[rating]}`}>
+             aria-label={`${type.name} ${rating} out of 5: ${label} — ${action}`}>
           {[1, 2, 3, 4, 5].map((i) => (
             <span key={i} className="flex-1 h-1.5 rounded-full transition-colors"
                   style={{ background: i <= rating ? colour : 'rgba(255,255,255,0.12)' }} />
           ))}
         </div>
         <div className="flex justify-between mt-1.5">
-          <span className="text-[9px] uppercase tracking-wider text-white/35">High Risk</span>
-          <span className="text-[9px] uppercase tracking-wider text-white/35">Strong Buy</span>
+          <span className="text-[9px] uppercase tracking-wider text-white/35">Minimal</span>
+          <span className="text-[9px] uppercase tracking-wider text-white/35">Highest</span>
         </div>
       </div>
+
+      {/* What it means for you */}
+      <div className="mt-3 flex items-start gap-2">
+        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: colour }} />
+        <p className="text-xs text-white/70">
+          <span className="font-semibold text-white/90">What this means:</span> {action}.
+        </p>
+      </div>
+
+      <Link to={CONVICTION_METHODOLOGY_PATH}
+            className="mt-2.5 inline-block text-[11px] font-semibold underline underline-offset-2 text-white/45 hover:text-white/80 transition-colors">
+        How the CardPop Conviction Rating works →
+      </Link>
     </div>
   );
 };
@@ -425,7 +437,7 @@ const BlogArticlePage = () => {
             )}
           </div>
 
-          <ConvictionRating rating={article.conviction_rating} />
+          <ConvictionRating article={article} />
 
         </div>
       </div>
