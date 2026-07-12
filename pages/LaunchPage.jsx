@@ -40,7 +40,7 @@ const TikTokIcon = ({ className }) => (
 
 const SOCIAL_LINKS = [
   { label: 'Instagram', href: 'https://instagram.com/cardpopau', Icon: Instagram },
-  { label: 'Facebook', href: 'https://facebook.com/cardpopau', Icon: Facebook },
+  { label: 'Facebook', href: 'https://www.facebook.com/profile.php?id=61591488466915', Icon: Facebook },
   { label: 'TikTok', href: 'https://tiktok.com/@cardpopau', Icon: TikTokIcon },
   { label: 'Discord', href: 'https://discord.gg/cardpop', Icon: DiscordIcon },
 ];
