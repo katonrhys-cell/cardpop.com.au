@@ -72,6 +72,44 @@ describe('CertificationVerificationSection — merged PSA details', () => {
     expect(screen.queryByText(/psa certification verification/i)).not.toBeInTheDocument();
   });
 
+  it('renders the PSA card images and the full record detail rows', async () => {
+    mockVerify.mockResolvedValue({ verified: true, company: 'psa', gradeMatch: true, verifiedGrade: '10' });
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        certNumber: '138138870',
+        cardTitle: '1999 Pokemon Game Charizard #4',
+        cardYear: '1999',
+        cardSet: 'Pokemon Game',
+        cardNumber: '4',
+        grade: 10,
+        subject: 'Charizard-Holo',
+        category: 'TCG Cards',
+        variety: '1st Edition',
+        labelType: 'Standard Holographic',
+        frontImage: 'https://images.psacard.com/cert/138138870/front.jpg',
+        backImage: 'https://images.psacard.com/cert/138138870/back.jpg',
+      }),
+    });
+    render(<CertificationVerificationSection certNumber="138138870" gradingCompany="psa" grade="10" />);
+    await screen.findByText(/verified by cardpop/i);
+
+    // Detail rows (label + value) all render.
+    expect(screen.getByText('Subject')).toBeInTheDocument();
+    expect(screen.getByText('Charizard-Holo')).toBeInTheDocument();
+    expect(screen.getByText('Category')).toBeInTheDocument();
+    expect(screen.getByText('TCG Cards')).toBeInTheDocument();
+    expect(screen.getByText('Label Type')).toBeInTheDocument();
+    expect(screen.getByText('Standard Holographic')).toBeInTheDocument();
+    expect(screen.getByText('Pokemon Game')).toBeInTheDocument();
+
+    // Card images come through from PSA and render with correct sources.
+    const front = screen.getByAltText('Card Front');
+    const back = screen.getByAltText('Card Back');
+    expect(front).toHaveAttribute('src', 'https://images.psacard.com/cert/138138870/front.jpg');
+    expect(back).toHaveAttribute('src', 'https://images.psacard.com/cert/138138870/back.jpg');
+  });
+
   it('falls back to the PSA detail lookup when the verification endpoint fails', async () => {
     mockVerify.mockRejectedValue(new Error('network down'));
     mockFetch.mockResolvedValue({
