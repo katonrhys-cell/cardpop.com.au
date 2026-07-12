@@ -33,6 +33,13 @@ vi.mock('@/lib/supabaseClient.js', () => ({
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { useCart } from '@/hooks/useCart.jsx';
 import Header from '@/components/Header.jsx';
+// Warm the HeaderMenus module cache up front. The desktop nav and the mobile
+// Sheet body both lazy-import this chunk; paying its (one-time) compile cost
+// eagerly here means React.lazy resolves from cache within a microtask during
+// the tests, instead of racing a multi-second cold dynamic import on a loaded
+// CI runner — the cause of the intermittent "Unable to find … Shop" timeouts
+// the generous timeouts above only partially masked.
+import '@/components/HeaderMenus.jsx';
 
 const LocationProbe = () => {
   const location = useLocation();
