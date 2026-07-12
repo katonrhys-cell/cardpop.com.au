@@ -378,6 +378,17 @@ const ProductDetailPage = ({ source: sourceProp }) => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
           <div className="lg:col-span-6 xl:col-span-7">
             <ProductImageCarousel images={product.images} record={product} />
+
+            {/* Certification details live directly under the card image so the
+                PSA record (and any PSA card scans) sit alongside the listing's
+                own photos rather than below the buy box in the right column. */}
+            {!isShop && (vi?.cert_number || vi?.certification_number) && (
+              <CertificationVerificationSection
+                certNumber={vi?.cert_number || vi?.certification_number}
+                gradingCompany={vi?.grading_company || 'psa'}
+                grade={vi?.grade}
+              />
+            )}
           </div>
 
           <div className="lg:col-span-6 xl:col-span-5 flex flex-col">
@@ -583,21 +594,12 @@ const ProductDetailPage = ({ source: sourceProp }) => {
             </div>
 
             {!isShop && (
-              <>
-                {(vi?.cert_number || vi?.certification_number) && (
-                  <CertificationVerificationSection
-                    certNumber={vi?.cert_number || vi?.certification_number}
-                    gradingCompany={vi?.grading_company || 'psa'}
-                    grade={vi?.grade}
-                  />
-                )}
-                <EbayMarketSection
-                  cardName={product.name}
-                  cardSet={vi?.set_name || product.set}
-                  gradingService={vi?.grading_company}
-                  gradeScore={vi?.grade}
-                />
-              </>
+              <EbayMarketSection
+                cardName={product.name}
+                cardSet={vi?.set_name || product.set}
+                gradingService={vi?.grading_company}
+                gradeScore={vi?.grade}
+              />
             )}
           </div>
         </div>

@@ -104,12 +104,31 @@ export const psaApiClient = {
       );
 
       if (!response.ok) {
-        logger.warn(`[PSA_API] Image lookup for ${cert} returned ${response.status}`);
+        // Log the body too — a cert lookup can succeed while the image endpoint
+        // 401/403s because image access is a separate entitlement on the PSA
+        // plan. Without the body this failure is invisible (we return []), which
+        // looks identical to "cert genuinely has no images".
+        const body = await response.text().catch(() => '');
+        logger.warn(
+          `[PSA_API] Image lookup for ${cert} returned ${response.status} ${response.statusText}`
+          + (body ? `: ${body.slice(0, 300)}` : '')
+        );
         return [];
       }
 
       const data = await response.json();
-      return Array.isArray(data) ? data : [];
+
+      // The documented shape is a bare array of { IsFrontImage, ImageURL }.
+      // Be defensive in case PSA ever wraps it (e.g. { Images: [...] }): pull the
+      // first array-valued property rather than silently returning nothing.
+      const list = Array.isArray(data)
+        ? data
+        : (data && typeof data === 'object'
+            ? Object.values(data).find(Array.isArray) ?? []
+            : []);
+
+      logger.info(`[PSA_API] Image lookup for ${cert} returned ${list.length} image(s)`);
+      return list;
     } catch (error) {
       logger.warn(`[PSA_API] Image lookup failed for ${cert}: ${error.message}`);
       return [];

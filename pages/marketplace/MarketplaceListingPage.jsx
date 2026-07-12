@@ -155,6 +155,16 @@ const MarketplaceListingPage = () => {
                <div className="text-muted-foreground">No image available</div>
              )}
           </div>
+
+          {/* Certification details sit directly under the card image so the PSA
+              record (and any PSA card scans) sit alongside the listing photo. */}
+          {(listing?.grading_number || listing?.vault_item?.cert_number) && (
+            <CertificationVerificationSection
+              certNumber={listing.grading_number || listing.vault_item?.cert_number}
+              gradingCompany={listing.grading_company || listing.vault_item?.grading_company || 'psa'}
+              grade={listing.vault_item?.grade}
+            />
+          )}
         </div>
 
         <div className="w-full lg:w-2/5 flex flex-col">
@@ -191,15 +201,6 @@ const MarketplaceListingPage = () => {
                <span className="font-medium text-emerald-600 flex items-center gap-1"><ShieldCheck className="w-4 h-4"/> Covered</span>
              </div>
           </div>
-
-          {/* Certification Verification Section */}
-          {(listing?.grading_number || listing?.vault_item?.cert_number) && (
-            <CertificationVerificationSection
-              certNumber={listing.grading_number || listing.vault_item?.cert_number}
-              gradingCompany={listing.grading_company || listing.vault_item?.grading_company || 'psa'}
-              grade={listing.vault_item?.grade}
-            />
-          )}
 
           {/* CardSight market price reference */}
           {(csPriceLoading || csPrice) && (

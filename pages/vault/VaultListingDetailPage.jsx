@@ -127,6 +127,16 @@ const VaultListingDetailPage = () => {
         {/* Image Gallery */}
         <div>
           <ProductImageCarousel images={allImages} frameClassName="bg-zinc-950" />
+
+          {/* Certification details sit directly under the card image so the PSA
+              record (and any PSA card scans) sit alongside the listing photos. */}
+          {(vi?.cert_number || listing?.grading_number) && (
+            <CertificationVerificationSection
+              certNumber={vi?.cert_number || listing?.grading_number}
+              gradingCompany={vi?.grading_company || listing?.grading_company || 'psa'}
+              grade={vi?.grade}
+            />
+          )}
         </div>
 
         {/* Details */}
@@ -204,15 +214,6 @@ const VaultListingDetailPage = () => {
             )}
 
           </div>
-
-          {/* Certification Verification Section */}
-          {(vi?.cert_number || listing?.grading_number) && (
-            <CertificationVerificationSection
-              certNumber={vi?.cert_number || listing?.grading_number}
-              gradingCompany={vi?.grading_company || listing?.grading_company || 'psa'}
-              grade={vi?.grade}
-            />
-          )}
 
           <BuyerProtection className="mb-8" />
 
