@@ -27,6 +27,7 @@ const CardShowcase = ({
   width,
   height,
   loading = 'lazy',
+  priority = false,
   displayStyle = 'classic',
   className = '',
 }) => {
@@ -109,6 +110,7 @@ const CardShowcase = ({
             width={width}
             height={height}
             loading={loading}
+            priority={priority}
             imgClassName={`w-full h-full object-contain ${imgPad}`}
           />
           {styleKey === 'holographic' && <div className="cardshowcase__holo" aria-hidden="true" />}

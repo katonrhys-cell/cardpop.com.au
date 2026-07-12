@@ -25,7 +25,7 @@ const getStatusBadge = (listingType) => {
   }
 };
 
-const VaultListingCard = ({ vaultItem, listing }) => {
+const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
   const rawImg = vaultItem.vault_images?.[0]?.storage_path || vaultItem.card_image || vaultItem.vault_images?.[0]?.image_url || vaultItem.image_url || null;
   const { src: imgSrc, srcSet: imgSrcSet, fallbackSrc: imgFallback } = getCardImage(rawImg);
@@ -62,6 +62,7 @@ const VaultListingCard = ({ vaultItem, listing }) => {
           displayStyle={vaultItem.display_style}
           width="400"
           height="500"
+          priority={priority}
         />
         <div className="absolute top-3 left-3 z-10">
           <Badge className={`shadow-sm font-bold ${badgeConfig.className}`}>

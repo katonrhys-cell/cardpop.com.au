@@ -110,6 +110,25 @@ describe('CardImage', () => {
     expect(screen.getByAltText('A card').className).toContain('opacity-100');
   });
 
+  it('loads the priority (LCP) image eagerly at high fetch priority with no opacity fade', () => {
+    render(<CardImage src="https://cdn/object/a.jpg" alt="A card" priority />);
+    const img = screen.getByAltText('A card');
+    expect(img).toHaveAttribute('loading', 'eager');
+    // React lowercases the DOM attribute name for fetchPriority.
+    expect(img.getAttribute('fetchpriority')).toBe('high');
+    // Priority images render visible immediately — no opacity-0 start and no
+    // opacity transition, either of which would delay the LCP paint.
+    expect(img.className).not.toContain('opacity-0');
+    expect(img.className).not.toContain('transition-opacity');
+  });
+
+  it('lazy-loads a non-priority image with no fetchpriority hint (default)', () => {
+    render(<CardImage src="https://cdn/object/a.jpg" alt="A card" />);
+    const img = screen.getByAltText('A card');
+    expect(img).toHaveAttribute('loading', 'lazy');
+    expect(img.getAttribute('fetchpriority')).toBeNull();
+  });
+
   it('reveals a cached image that finished loading before onLoad could attach', () => {
     // Simulate a browser-cached image: `complete` is already true (with real
     // dimensions) at mount, so the `load` event never reaches our handler.

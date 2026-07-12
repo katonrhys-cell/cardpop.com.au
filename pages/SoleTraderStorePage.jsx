@@ -445,10 +445,10 @@ const SoleTraderStorePage = () => {
 
           {listings.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-              {listings.map(item => (
+              {listings.map((item, i) => (
                 item._type === 'vault'
-                  ? <VaultListingCard key={item.id} vaultItem={item} />
-                  : <MarketplaceListingCard key={item.id} listing={item} />
+                  ? <VaultListingCard key={item.id} vaultItem={item} priority={i < 2} />
+                  : <MarketplaceListingCard key={item.id} listing={item} priority={i < 2} />
               ))}
             </div>
           ) : (

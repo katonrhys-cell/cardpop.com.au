@@ -19,7 +19,7 @@ import { useWatchlist } from '@/hooks/useWatchlist.js';
 import SellerRatingDisplay from '@/components/SellerRatingDisplay.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
 
-const MarketplaceListingCard = ({ listing }) => {
+const MarketplaceListingCard = ({ listing, priority = false }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
   const { isAuthenticated } = useAuth();
   const { isWatchlisted, toggle } = useWatchlist();
@@ -72,6 +72,7 @@ const MarketplaceListingCard = ({ listing }) => {
           imgClassName={`w-full h-full object-cover transition-transform duration-500 ${isSold ? 'grayscale-[35%] group-hover:scale-100' : 'group-hover:scale-105'}`}
           width="400"
           height="500"
+          priority={priority}
         />
         {/* Sold overlay — the listing stays visible but is clearly marked sold */}
         {isSold && (

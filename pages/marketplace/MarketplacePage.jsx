@@ -621,8 +621,8 @@ const MarketplacePage = () => {
         ) : listings.length > 0 ? (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {listings.map(listing => (
-                <MarketplaceListingCard key={`${listing.source}-${listing.id}`} listing={listing} />
+              {listings.map((listing, i) => (
+                <MarketplaceListingCard key={`${listing.source}-${listing.id}`} listing={listing} priority={i < 2} />
               ))}
             </div>
             {totalCount > PAGE_SIZE && (

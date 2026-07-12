@@ -1051,12 +1051,12 @@ const CollectionPage = () => {
                 animate="visible"
                 variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.04 } } }}
               >
-                {listings.map(listing => (
+                {listings.map((listing, i) => (
                   <motion.div
                     key={listing.id}
                     variants={{ hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } }}
                   >
-                    <MarketplaceListingCard listing={listing} />
+                    <MarketplaceListingCard listing={listing} priority={i < 2} />
                   </motion.div>
                 ))}
               </motion.div>
