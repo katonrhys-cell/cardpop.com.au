@@ -64,6 +64,31 @@ function summaryTable(rows) {
 </div>`;
 }
 
+// ─── Pre-launch welcome (landing-page early-access registration) ──────────────
+
+export function launchWelcomeEmail({ name } = {}) {
+  const greeting = name ? `You're on the list, ${name}!` : "You're on the list!";
+  const body = `<p>Thanks for registering your interest in <strong>CardPop</strong> — Australia's home for buying, selling and trading collectible cards. We're still building, with a full launch planned for <strong>late 2026</strong>.</p>
+<p style="margin:0 0 8px;"><strong>As an early registrant, here's what you've locked in:</strong></p>
+<ul style="margin:0 0 20px;padding-left:20px;">
+<li style="margin-bottom:8px;"><strong>Reserved Pro-level early access.</strong> When we start opening the platform up, you'll be among the first invited in — at the Pro tier, on us, for a limited time.</li>
+<li style="margin-bottom:8px;"><strong>Front-row seat to the launch.</strong> We'll email you the moment new features go live, including peer-to-peer (P2P) trading, the collection vault and live Australian market pricing.</li>
+<li><strong>Founding-member perks.</strong> Early registrants get first dibs on launch offers and community events.</li>
+</ul>
+<p>Just so you know what to expect: the marketplace and its features — including P2P trading — aren't live yet. This is your ticket to explore them first as they roll out.</p>
+<p>We've attached a short early-access guide with everything that's coming. Keep an eye on your inbox — the best is on its way.</p>`;
+
+  return cpEmail(
+    "You're in — CardPop early access reserved. Here's what's coming.",
+    'Early Access Reserved 🎴',
+    greeting,
+    body,
+    'https://cardpop.com.au/launch',
+    'Explore CardPop',
+    "You're receiving this because you registered your interest at cardpop.com.au. We'll only email you about the launch.",
+  );
+}
+
 // ─── Welcome offer (new registration) ─────────────────────────────────────────
 
 export function welcomeOfferEmail({ name, code, trialDays, discountPct, expiresAt }) {

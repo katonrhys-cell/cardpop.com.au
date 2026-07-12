@@ -12,9 +12,12 @@ const NewsletterSignup = ({
   // Alternate Kit list to subscribe to (e.g. 'launch' for the pre-launch
   // notify list). Omitted for the default newsletter form.
   list,
+  // Attribution for launch registrations (e.g. 'launch_modal', 'launch_page').
+  source,
   buttonLabel = 'Subscribe',
   successMessage = "You're subscribed!",
   toastMessage = "You're subscribed! Welcome to the CardPop community.",
+  onSubscribed,
 }) => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -36,7 +39,7 @@ const NewsletterSignup = ({
       const res = await apiServerClient.fetch('/newsletter/subscribe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), recaptchaToken, ...(list && { list }) }),
+        body: JSON.stringify({ email: email.trim(), recaptchaToken, ...(list && { list }), ...(source && { source }) }),
       });
 
       if (!res.ok) {
@@ -47,6 +50,7 @@ const NewsletterSignup = ({
       setSubscribed(true);
       setEmail('');
       toast.success(toastMessage);
+      onSubscribed?.();
     } catch (err) {
       // The token is single-use; reset so the user can try again.
       recaptchaRef.current?.reset();

@@ -1,4 +1,7 @@
 import { Resend } from 'resend';
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import logger from './logger.js';
 import {
   orderConfirmedEmail,
@@ -6,7 +9,10 @@ import {
   refundProcessedEmail,
   refundIssuedEmail,
   welcomeOfferEmail,
+  launchWelcomeEmail,
 } from '../emails/templates.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const FROM = 'CardPop <noreply@cardpop.com.au>';
 
@@ -22,11 +28,13 @@ function getClient() {
   return _client;
 }
 
-async function send({ to, subject, html }) {
+async function send({ to, subject, html, attachments }) {
   const client = getClient();
   if (!client) return false;
   try {
-    const { error } = await client.emails.send({ from: FROM, to, subject, html });
+    const payload = { from: FROM, to, subject, html };
+    if (attachments?.length) payload.attachments = attachments;
+    const { error } = await client.emails.send(payload);
     if (error) {
       logger.error(`[EMAIL] Send failed to ${to}: ${error.message}`);
       return false;
@@ -37,6 +45,53 @@ async function send({ to, subject, html }) {
     logger.error(`[EMAIL] Unexpected error sending to ${to}: ${err.message}`);
     return false;
   }
+}
+
+// Filename the recipient sees for the early-access PDF.
+const LAUNCH_PDF_FILENAME = 'CardPop-Early-Access.pdf';
+// Committed fallback location — drop the real PDF here (or set
+// LAUNCH_WELCOME_PDF_URL to a hosted file) and it's attached automatically.
+const LAUNCH_PDF_PATH = join(__dirname, '..', 'emails', 'assets', 'launch-welcome.pdf');
+
+/**
+ * Build the attachments array for the pre-launch welcome email.
+ *
+ * Resolution order (first hit wins):
+ *   1. LAUNCH_WELCOME_PDF_URL env var → Resend fetches it by URL.
+ *   2. A committed PDF at src/emails/assets/launch-welcome.pdf → attached inline.
+ *   3. Neither present → no attachment (the email still sends). This is the
+ *      expected state until a real PDF is supplied, so it's a debug log only.
+ *
+ * @returns {Promise<Array<object>>}
+ */
+async function launchWelcomeAttachments() {
+  const url = process.env.LAUNCH_WELCOME_PDF_URL?.trim();
+  if (url) return [{ filename: LAUNCH_PDF_FILENAME, path: url }];
+
+  try {
+    const buf = await readFile(LAUNCH_PDF_PATH);
+    return [{ filename: LAUNCH_PDF_FILENAME, content: buf.toString('base64') }];
+  } catch {
+    logger.debug?.('[EMAIL] No launch welcome PDF found (set LAUNCH_WELCOME_PDF_URL or add src/emails/assets/launch-welcome.pdf)');
+    return [];
+  }
+}
+
+/**
+ * Pre-launch welcome email: sent when someone registers on the "coming soon"
+ * landing modal. Confirms their spot, explains the reserved Pro-level early
+ * access, and attaches the early-access PDF when one is configured.
+ *
+ * @returns {Promise<boolean>} whether the email was actually sent
+ */
+export async function sendLaunchWelcome({ to, name }) {
+  const attachments = await launchWelcomeAttachments();
+  return send({
+    to,
+    subject: "You're in — CardPop early access reserved 🎴",
+    html: launchWelcomeEmail({ name }),
+    attachments,
+  });
 }
 
 export async function sendWelcomeOffer({ to, name, code, trialDays, discountPct, expiresAt }) {
