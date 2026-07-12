@@ -64,7 +64,7 @@ const LaunchRegisterModal = () => {
       <DialogContent className="sm:max-w-md overflow-hidden p-0 gap-0">
         <div className="bg-brand-red px-6 pt-7 pb-6 text-center text-white">
           <p className="text-2xl font-black tracking-tight">CardPop</p>
-          <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-white/70">
+          <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-white/90">
             Australia's Card Marketplace
           </p>
         </div>
