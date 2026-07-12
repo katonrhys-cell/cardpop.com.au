@@ -6,6 +6,14 @@ vi.mock('../../src/middleware/auth.js', () => ({
   optionalAuthMiddleware: (req, _res, next) => { if (req.headers.authorization) req.user = { id: 'u1' }; next(); },
 }));
 
+// The launch branch persists to Supabase + sends the welcome email; that path
+// is exercised in launchRegistrationService.test.js, so here we just stub it.
+const mockRegisterLaunchInterest = vi.hoisted(() => vi.fn());
+vi.mock('../../src/services/launchRegistrationService.js', () => ({
+  registerLaunchInterest: mockRegisterLaunchInterest,
+  default: mockRegisterLaunchInterest,
+}));
+
 import newsletterRouter from '../../src/routes/newsletter.js';
 
 function makeApp() {
@@ -40,6 +48,7 @@ beforeEach(() => {
   delete process.env.KIT_LAUNCH_FORM_ID;
   delete process.env.RECAPTCHA_SECRET_KEY;
   global.fetch = vi.fn();
+  mockRegisterLaunchInterest.mockResolvedValue({ created: true, emailed: true });
 });
 
 afterEach(() => {
@@ -159,6 +168,40 @@ describe('POST /subscribe — launch list', () => {
 
     expect(res.status).toBe(200);
     expect(global.fetch.mock.calls[0][0]).toBe('https://api.kit.com/v4/forms/form_123/subscribers');
+    // Non-launch lists never touch the launch registration table.
+    expect(mockRegisterLaunchInterest).not.toHaveBeenCalled();
+  });
+
+  it('persists a launch signup (email + source) via registerLaunchInterest', async () => {
+    global.fetch.mockResolvedValue(fetchResponse({ ok: true }));
+
+    const res = await request(app)
+      .post('/subscribe')
+      .send({ email: 'a@b.com', list: 'launch', source: 'launch_modal' });
+
+    expect(res.status).toBe(200);
+    expect(mockRegisterLaunchInterest).toHaveBeenCalledWith(
+      expect.objectContaining({ email: 'a@b.com', source: 'launch_modal' }),
+    );
+  });
+
+  it('still returns 200 for a launch signup when the Kit push fails (best-effort)', async () => {
+    global.fetch.mockResolvedValue(fetchResponse({ ok: false, status: 422, body: { message: 'already subscribed' } }));
+
+    const res = await request(app).post('/subscribe').send({ email: 'a@b.com', list: 'launch' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true });
+    expect(mockRegisterLaunchInterest).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns 500 for a launch signup when registration itself throws', async () => {
+    mockRegisterLaunchInterest.mockRejectedValue(new Error('db down'));
+    global.fetch.mockResolvedValue(fetchResponse({ ok: true }));
+
+    const res = await request(app).post('/subscribe').send({ email: 'a@b.com', list: 'launch' });
+
+    expect(res.status).toBe(500);
   });
 });
 

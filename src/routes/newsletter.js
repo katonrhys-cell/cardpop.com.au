@@ -1,13 +1,14 @@
 import logger from '../utils/logger.js';
 import express from 'express';
 import { subscribeToNewsletter } from '../utils/newsletter.js';
+import { registerLaunchInterest } from '../services/launchRegistrationService.js';
 import { verifyRecaptchaToken } from '../utils/recaptcha.js';
 import { optionalAuthMiddleware } from '../middleware/auth.js';
 
 const router = express.Router();
 
 router.post('/subscribe', optionalAuthMiddleware, async (req, res) => {
-  const { email, firstName, recaptchaToken, list } = req.body;
+  const { email, firstName, recaptchaToken, list, source } = req.body;
 
   if (!email || typeof email !== 'string' || !email.includes('@')) {
     return res.status(400).json({ error: 'A valid email address is required.' });
@@ -28,11 +29,20 @@ router.post('/subscribe', optionalAuthMiddleware, async (req, res) => {
   }
 
   try {
-    // Only 'launch' is a recognised alternate list; anything else falls
-    // through to the default newsletter form.
-    const result = await subscribeToNewsletter(email, firstName, {
-      list: list === 'launch' ? 'launch' : undefined,
-    });
+    // The pre-launch landing modal registers early-access interest. Our own
+    // launch_registrations table is the source of truth (it reserves Pro-level
+    // access and sends the welcome email + PDF); Kit is a best-effort marketing
+    // push on top, so a Kit outage/config gap never blocks the signup.
+    if (list === 'launch') {
+      await registerLaunchInterest({ email, firstName, source });
+      // Awaited (not fire-and-forget) so it reliably completes on serverless,
+      // but its failure is swallowed — the registration already succeeded.
+      await subscribeToNewsletter(email, firstName, { list: 'launch' })
+        .catch((e) => logger.error('[newsletter] launch Kit subscribe failed:', e));
+      return res.status(200).json({ success: true });
+    }
+
+    const result = await subscribeToNewsletter(email, firstName, {});
     if (!result.ok) {
       return res.status(result.status).json({ error: result.error });
     }
