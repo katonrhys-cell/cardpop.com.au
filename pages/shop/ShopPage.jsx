@@ -1,9 +1,8 @@
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
-import { SHOP_CATEGORY_GROUPS } from '@/utils/shopCategories.js';
+import ShopCategoryBrowse from '@/components/ShopCategoryBrowse.jsx';
 import { escapeLike } from '@/src/utils/escapeLike.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PackageX, SlidersHorizontal, Search, ShoppingBag } from 'lucide-react';
@@ -121,30 +120,7 @@ const ShopPage = () => {
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 w-full">
         <h2 className="text-2xl font-bold mb-6">Shop by Category</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {SHOP_CATEGORY_GROUPS.map(group => (
-            <div key={group.slug} className="bg-card border border-border rounded-2xl p-5 flex flex-col">
-              <div className="flex items-center gap-3 mb-3">
-                <span className={`inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br ${group.gradient} shadow-sm shrink-0`}>
-                  <group.Icon className="w-5 h-5 text-white" />
-                </span>
-                <h3 className="font-bold text-lg leading-tight">{group.label}</h3>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">{group.blurb}</p>
-              <div className="flex flex-wrap gap-2 mt-auto">
-                {group.items.map(item => (
-                  <Link
-                    key={item.slug}
-                    to={`/shop/category/${item.slug}`}
-                    className="text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-muted/60 hover:bg-primary hover:text-primary-foreground transition-colors"
-                  >
-                    {item.name}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+        <ShopCategoryBrowse />
       </section>
 
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
