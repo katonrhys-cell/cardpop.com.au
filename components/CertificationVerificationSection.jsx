@@ -15,6 +15,19 @@ const numericGrade = (value) => {
   return match ? parseFloat(match[1]) : null;
 };
 
+// A single PSA record field rendered as a horizontal row: the label sits on the
+// left, the value on the right with the rest of the row's width to breathe. This
+// keeps long values (Subject, Category, Label Type) readable instead of being
+// squeezed into a narrow vertical cell where they hyphenate mid-word.
+const DetailRow = ({ label, children }) => (
+  <div className="flex items-baseline justify-between gap-4 py-2.5 border-b border-border/40">
+    <dt className="shrink-0 text-xs font-bold uppercase tracking-wider text-muted-foreground">{label}</dt>
+    <dd className="flex min-w-0 justify-end text-right text-sm font-bold text-foreground [overflow-wrap:anywhere]">
+      {children}
+    </dd>
+  </div>
+);
+
 /**
  * Single unified certification section. Combines the verification status check
  * (cert exists + listed grade matches) with the full PSA certificate details
@@ -249,64 +262,26 @@ const CertificationVerificationSection = ({ certNumber, gradingCompany = 'psa', 
             </div>
           )}
 
-          {/* Card Details Grid */}
-          {(psaData.cardYear || psaData.cardSet || psaData.cardNumber || psaData.grade != null) && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              {psaData.cardYear && (
-                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Year</p>
-                  <p className="font-bold text-foreground">{psaData.cardYear}</p>
-                </div>
-              )}
-              {psaData.cardSet && (
-                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Set</p>
-                  <p className="font-bold text-foreground text-sm">{psaData.cardSet}</p>
-                </div>
-              )}
-              {psaData.cardNumber && (
-                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Card #</p>
-                  <p className="font-bold text-foreground">#{psaData.cardNumber}</p>
-                </div>
-              )}
+          {/* Card record details — horizontal label / value rows so long
+              values (Subject, Category, Label Type) get the full row width and
+              stay readable instead of being hyphenated inside a narrow cell.
+              Two columns on wider screens, one on mobile. */}
+          {(psaData.cardYear || psaData.cardSet || psaData.cardNumber || psaData.grade != null
+            || psaData.subject || psaData.category || psaData.variety || psaData.labelType) && (
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 mb-6 rounded-lg border border-border/50 bg-muted/20 px-4">
+              {psaData.cardYear && <DetailRow label="Year">{psaData.cardYear}</DetailRow>}
+              {psaData.cardSet && <DetailRow label="Set">{psaData.cardSet}</DetailRow>}
+              {psaData.cardNumber && <DetailRow label="Card #">#{psaData.cardNumber}</DetailRow>}
               {psaData.grade != null && (
-                <div className="p-3 bg-muted/30 rounded-lg border border-border/50 flex flex-col justify-center">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Grade</p>
+                <DetailRow label="Grade">
                   <GradeBadge grade={psaData.grade} gradingCompany="psa" isPositioned={false} className="w-fit" />
-                </div>
+                </DetailRow>
               )}
-            </div>
-          )}
-
-          {/* Additional PSA record details */}
-          {(psaData.subject || psaData.category || psaData.variety || psaData.labelType) && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              {psaData.subject && (
-                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Subject</p>
-                  <p className="font-bold text-foreground text-sm">{psaData.subject}</p>
-                </div>
-              )}
-              {psaData.category && (
-                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Category</p>
-                  <p className="font-bold text-foreground text-sm">{psaData.category}</p>
-                </div>
-              )}
-              {psaData.variety && (
-                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Variety</p>
-                  <p className="font-bold text-foreground text-sm">{psaData.variety}</p>
-                </div>
-              )}
-              {psaData.labelType && (
-                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Label Type</p>
-                  <p className="font-bold text-foreground text-sm">{psaData.labelType}</p>
-                </div>
-              )}
-            </div>
+              {psaData.subject && <DetailRow label="Subject">{psaData.subject}</DetailRow>}
+              {psaData.category && <DetailRow label="Category">{psaData.category}</DetailRow>}
+              {psaData.variety && <DetailRow label="Variety">{psaData.variety}</DetailRow>}
+              {psaData.labelType && <DetailRow label="Label Type">{psaData.labelType}</DetailRow>}
+            </dl>
           )}
 
           {/* Grade Category / cert flags */}
