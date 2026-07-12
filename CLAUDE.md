@@ -55,6 +55,8 @@ All pages are lazy-loaded in `App.jsx` via React Router v7. The provider wrappin
 - `ProtectedRoute` — redirects to `/login` if unauthenticated; accepts `requireVerification` prop.
 - `ProtectedAdminRoute` — additionally checks `currentUser.role === 'admin'`.
 
+**Social login (OAuth)**: `components/OAuthButtons.jsx` surfaces Google / GitHub / Facebook buttons via `supabase.auth.signInWithOAuth`; a provider only works once enabled in the Supabase dashboard. On first sign-in the `on_auth_user_created` trigger (`handle_new_user()`) creates the `profiles` row — hardened in `supabase/migrations/20260712010000_harden_handle_new_user_oauth.sql` so a Facebook login with no email can't fail the `username` NOT NULL/UNIQUE constraints. Provider setup, step by step, is in `docs/oauth-login.md`.
+
 ### Data Access (Frontend)
 
 The frontend has two data sources:
