@@ -279,33 +279,26 @@ const CertificationVerificationSection = ({ certNumber, gradingCompany = 'psa', 
             </div>
           )}
 
-          {/* Additional PSA record details */}
+          {/* Additional PSA record details — horizontal definition rows so
+              longer values (subject, category, label type) stay readable on
+              the full width instead of being cramped into narrow grid tiles. */}
           {(psaData.subject || psaData.category || psaData.variety || psaData.labelType) && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              {psaData.subject && (
-                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Subject</p>
-                  <p className="font-bold text-foreground text-sm">{psaData.subject}</p>
-                </div>
-              )}
-              {psaData.category && (
-                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Category</p>
-                  <p className="font-bold text-foreground text-sm">{psaData.category}</p>
-                </div>
-              )}
-              {psaData.variety && (
-                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Variety</p>
-                  <p className="font-bold text-foreground text-sm">{psaData.variety}</p>
-                </div>
-              )}
-              {psaData.labelType && (
-                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Label Type</p>
-                  <p className="font-bold text-foreground text-sm">{psaData.labelType}</p>
-                </div>
-              )}
+            <div className="mb-6 rounded-lg border border-border/50 bg-muted/30 divide-y divide-border/50">
+              {[
+                ['Subject', psaData.subject],
+                ['Category', psaData.category],
+                ['Variety', psaData.variety],
+                ['Label Type', psaData.labelType],
+              ]
+                .filter(([, value]) => value)
+                .map(([label, value]) => (
+                  <div key={label} className="flex flex-col sm:flex-row sm:gap-4 px-4 py-3">
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-0.5 sm:mb-0 sm:w-28 sm:shrink-0 sm:pt-0.5">
+                      {label}
+                    </p>
+                    <p className="font-bold text-foreground text-sm break-words">{value}</p>
+                  </div>
+                ))}
             </div>
           )}
 
