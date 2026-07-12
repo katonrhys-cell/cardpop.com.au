@@ -249,58 +249,43 @@ const CertificationVerificationSection = ({ certNumber, gradingCompany = 'psa', 
             </div>
           )}
 
-          {/* Card Details Grid */}
-          {(psaData.cardYear || psaData.cardSet || psaData.cardNumber || psaData.grade != null) && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              {psaData.cardYear && (
-                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Year</p>
-                  <p className="font-bold text-foreground">{psaData.cardYear}</p>
-                </div>
-              )}
-              {psaData.cardSet && (
-                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Set</p>
-                  <p className="font-bold text-foreground text-sm">{psaData.cardSet}</p>
-                </div>
-              )}
-              {psaData.cardNumber && (
-                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Card #</p>
-                  <p className="font-bold text-foreground">#{psaData.cardNumber}</p>
-                </div>
-              )}
-              {psaData.grade != null && (
-                <div className="p-3 bg-muted/30 rounded-lg border border-border/50 flex flex-col justify-center">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Grade</p>
-                  <GradeBadge grade={psaData.grade} gradingCompany="psa" isPositioned={false} className="w-fit" />
-                </div>
-              )}
-            </div>
-          )}
+          {/* Card record details — horizontal definition rows so longer values
+              (set, subject, category, label type) stay readable across the full
+              width instead of being cramped into narrow grid tiles. Grade renders
+              its badge in place of plain text. */}
+          {(() => {
+            const rows = [
+              ['Year', psaData.cardYear],
+              ['Set', psaData.cardSet],
+              ['Card #', psaData.cardNumber ? `#${psaData.cardNumber}` : null],
+              ['Grade', psaData.grade != null
+                ? <GradeBadge grade={psaData.grade} gradingCompany="psa" isPositioned={false} className="w-fit" />
+                : null],
+              ['Subject', psaData.subject],
+              ['Category', psaData.category],
+              ['Variety', psaData.variety],
+              ['Label Type', psaData.labelType],
+            ].filter(([, value]) => value != null && value !== '');
 
-          {/* Additional PSA record details — horizontal definition rows so
-              longer values (subject, category, label type) stay readable on
-              the full width instead of being cramped into narrow grid tiles. */}
-          {(psaData.subject || psaData.category || psaData.variety || psaData.labelType) && (
-            <div className="mb-6 rounded-lg border border-border/50 bg-muted/30 divide-y divide-border/50">
-              {[
-                ['Subject', psaData.subject],
-                ['Category', psaData.category],
-                ['Variety', psaData.variety],
-                ['Label Type', psaData.labelType],
-              ]
-                .filter(([, value]) => value)
-                .map(([label, value]) => (
-                  <div key={label} className="flex flex-col sm:flex-row sm:gap-4 px-4 py-3">
-                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-0.5 sm:mb-0 sm:w-28 sm:shrink-0 sm:pt-0.5">
+            if (rows.length === 0) return null;
+
+            return (
+              <div className="mb-6 rounded-lg border border-border/50 bg-muted/30 divide-y divide-border/50">
+                {rows.map(([label, value]) => (
+                  <div key={label} className="flex flex-col sm:flex-row sm:items-center sm:gap-4 px-4 py-3">
+                    <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1 sm:mb-0 sm:w-28 sm:shrink-0">
                       {label}
                     </p>
-                    <p className="font-bold text-foreground text-sm break-words">{value}</p>
+                    {typeof value === 'string' || typeof value === 'number' ? (
+                      <p className="font-bold text-foreground text-sm break-words">{value}</p>
+                    ) : (
+                      value
+                    )}
                   </div>
                 ))}
-            </div>
-          )}
+              </div>
+            );
+          })()}
 
           {/* Grade Category / cert flags */}
           {(psaData.gradeCategory || psaData.isDualCert || psaData.isPsaDna) && (
