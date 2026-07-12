@@ -1743,7 +1743,7 @@ ${sections}</main>`,
 async function renderPriceCard(supabase, categorySlug, cardSlug) {
   const { data: card } = await supabase
     .from('tracked_cards')
-    .select('id, slug, name, set_name, card_number, category, blurb')
+    .select('id, slug, name, set_name, card_number, category, blurb, image_url')
     .eq('slug', cardSlug)
     .eq('active', true)
     .maybeSingle();
@@ -1808,6 +1808,9 @@ async function renderPriceCard(supabase, categorySlug, cardSlug) {
       name: fullName,
       description: card.blurb || description,
       category: `${categoryLabel} Trading Cards`,
+      url: `${BASE_URL}${canonicalPath}`,
+      ...(publicImageUrl(card.image_url) ? { image: publicImageUrl(card.image_url) } : {}),
+      ...(card.card_number ? { sku: card.card_number, mpn: card.card_number } : {}),
       offers: {
         '@type': 'AggregateOffer',
         priceCurrency: 'AUD',
