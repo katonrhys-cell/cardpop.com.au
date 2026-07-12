@@ -23,6 +23,10 @@ vi.mock('../../src/middleware/auth.js', () => ({
     req.user = { id: 'user-123', email: 'test@example.com' };
     next();
   },
+  optionalAuthMiddleware: (req, _res, next) => {
+    req.user = { id: 'user-123', email: 'test@example.com' };
+    next();
+  },
 }));
 const mockMaybeSingle = vi.hoisted(() => vi.fn());
 

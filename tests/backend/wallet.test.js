@@ -24,6 +24,10 @@ vi.mock('../../src/middleware/auth.js', () => ({
     req.user = { id: 'user-123', email: 'buyer@example.com' };
     next();
   },
+  optionalAuthMiddleware: (req, _res, next) => {
+    req.user = { id: 'user-123', email: 'buyer@example.com' };
+    next();
+  },
 }));
 
 vi.mock('../../src/utils/emailService.js', () => ({
