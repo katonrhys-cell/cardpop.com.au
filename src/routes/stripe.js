@@ -3,7 +3,7 @@ import express from 'express';
 import stripe from '../utils/stripeClient.js';
 import logger from '../utils/logger.js';
 import { supabase } from '../utils/supabaseClient.js';
-import { authMiddleware } from '../middleware/auth.js';
+import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
 import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
 import { handleDisputeCreated, handleDisputeClosed } from '../services/disputeService.js';
 import { calculateBreakdown } from '../services/commissionService.js';
@@ -30,6 +30,13 @@ import { isValidAbn, normalizeAbn } from '../../utils/abn.js';
 
 const router = express.Router();
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+
+// Email-verification gate that only applies to signed-in buyers. Guest checkout
+// runs behind optionalAuthMiddleware (no req.user), and a guest has no account
+// to verify — so the gate is skipped for them and only enforced for logged-in
+// users when the platform flag is on.
+const requireEmailVerifiedIfAuthed = (req, res, next) =>
+  (req.user ? requireEmailVerified(req, res, next) : next());
 
 // ─── GET /calculate ──────────────────────────────────────────────────────────
 
@@ -76,14 +83,18 @@ router.post('/create-checkout', authMiddleware, requireEmailVerified, validateRe
 
 // Preview the authoritative cart total (so the UI never shows a number that
 // differs from what Stripe will charge).
-router.post('/calculate-cart', authMiddleware, async (req, res) => {
+router.post('/calculate-cart', optionalAuthMiddleware, async (req, res) => {
   try {
     const { items, promoCode, useWalletBalance } = req.body;
     if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'items is required' });
     if (promoCode && useWalletBalance) {
       return res.status(400).json({ error: 'Apply either a promo code or your wallet balance, not both.' });
     }
-    const priced = await priceCart(items, req.user.id);
+    // Guests check out without an account. userId is null for them, which
+    // priceCart tolerates (they can't be the seller of any listing), and promo
+    // codes / wallet balance are account-only perks that are simply ignored.
+    const userId = req.user?.id ?? null;
+    const priced = await priceCart(items, userId);
 
     // Preview the promo discount without creating any Stripe objects. Codes in
     // the POP-XXXX-XXXX shape are personal welcome offers; anything else is a
@@ -94,13 +105,16 @@ router.post('/calculate-cart', authMiddleware, async (req, res) => {
     let promoError = null;
     let walletBalanceCents = 0;
     let walletAppliedCents = 0;
-    if (typeof promoCode === 'string' && promoCode.trim()) {
+    if (!userId) {
+      // Guest: no welcome offer / partner attribution / wallet — leave totals
+      // undiscounted and don't surface an error for a harmlessly-ignored code.
+    } else if (typeof promoCode === 'string' && promoCode.trim()) {
       try {
         if (isWelcomeCodeFormat(promoCode)) {
-          const offer = await validateWelcomeDiscount(req.user.id, promoCode);
+          const offer = await validateWelcomeDiscount(userId, promoCode);
           discountCents = welcomeDiscountCents(offer, priced.itemsCents);
         } else {
-          const partner = await validatePartnerCode(req.user.id, promoCode);
+          const partner = await validatePartnerCode(userId, promoCode);
           discountCents = partnerDiscountCents(partner, priced.orderLines);
           if (discountCents <= 0) promoError = 'This code applies to CardPop Shop items only.';
         }
@@ -110,7 +124,7 @@ router.post('/calculate-cart', authMiddleware, async (req, res) => {
       }
     } else if (useWalletBalance) {
       // Live read from Stripe — CardPop keeps no local wallet ledger for buyers.
-      walletBalanceCents = await getWalletBalanceCents(stripe, req.user.id);
+      walletBalanceCents = await getWalletBalanceCents(stripe, userId);
       walletAppliedCents = Math.min(walletBalanceCents, priced.grandCents);
     }
 
@@ -133,9 +147,20 @@ router.post('/calculate-cart', authMiddleware, async (req, res) => {
   }
 });
 
-router.post('/create-cart-checkout', authMiddleware, requireEmailVerified, async (req, res) => {
+router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifiedIfAuthed, async (req, res) => {
   try {
-    const { items, successUrl, cancelUrl, returnUrl, uiMode, shippingAddress, promoCode, useWalletBalance, billingDetails } = req.body;
+    const { items, successUrl, cancelUrl, returnUrl, uiMode, shippingAddress, promoCode, useWalletBalance, billingDetails, email: guestEmailInput, subscribeNewsletter } = req.body;
+
+    // Guest checkout: no account required. A guest has no user id — promo codes,
+    // wallet balance and partner attribution are account-only and are skipped
+    // for them. The email they typed at checkout is the receipt address (and,
+    // if they opted in, the newsletter address).
+    const userId = req.user?.id || null;
+    const email  = (req.user?.email || (typeof guestEmailInput === 'string' ? guestEmailInput.trim() : '')) || null;
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: 'A valid email address is required to place an order.' });
+    }
+    const wantsNewsletter = subscribeNewsletter === true || subscribeNewsletter === 'true';
 
     // Business / ABN buyers get a proper tax invoice. Re-validate the ABN
     // server-side — never trust the client's checksum. Anything invalid is
@@ -173,9 +198,6 @@ router.post('/create-cart-checkout', authMiddleware, requireEmailVerified, async
       return res.status(400).json({ error: message, code: 'address_unverified' });
     }
 
-    const userId = req.user.id;
-    const email  = req.user.email;
-
     const { lineItems, orderLines, itemsCents, commissionCents, gstCents, shippingCents, grandCents } = await priceCart(items, userId);
 
     // Fraud control: cap order size / frequency for brand-new, unverified buyers.
@@ -195,7 +217,10 @@ router.post('/create-cart-checkout', authMiddleware, requireEmailVerified, async
     let partnerMeta = {};
     let walletCents = 0;
     let walletCustomerId = null;
-    if (typeof promoCode === 'string' && promoCode.trim()) {
+    if (!userId) {
+      // Guest checkout — promo codes, wallet balance and partner attribution are
+      // all account-scoped, so any supplied code is harmlessly ignored.
+    } else if (typeof promoCode === 'string' && promoCode.trim()) {
       if (isWelcomeCodeFormat(promoCode)) {
         const offer = await validateWelcomeDiscount(userId, promoCode);
         const built = await buildWelcomeDiscount(stripe, offer, itemsCents);
@@ -246,8 +271,12 @@ router.post('/create-cart-checkout', authMiddleware, requireEmailVerified, async
     let billingCustomerId = walletCustomerId;
     if (business) {
       try {
+        // Registered buyers reuse their wallet Customer (keyed on user id); a
+        // guest has none, so create a one-off Customer just for the invoice.
         billingCustomerId = billingCustomerId
-          || await ensureWalletCustomer(stripe, userId, { email, displayName: business.name });
+          || (userId
+            ? await ensureWalletCustomer(stripe, userId, { email, displayName: business.name })
+            : (await stripe.customers.create({ email, name: business.name || undefined })).id);
         if (business.name) {
           await stripe.customers.update(billingCustomerId, { name: business.name });
         }
@@ -279,7 +308,11 @@ router.post('/create-cart-checkout', authMiddleware, requireEmailVerified, async
       // Business buyers get an itemised tax invoice carrying their ABN.
       ...(business ? { invoice_creation: { enabled: true } } : {}),
       metadata:             {
-        userId, cartCheckout: 'true',
+        userId: userId || '', cartCheckout: 'true',
+        // Guest orders have no buyer_id — carry the email so the webhook can
+        // still send the receipt and (if opted in) the newsletter subscription.
+        ...(userId ? {} : { guestCheckout: 'true', guestEmail: email }),
+        ...(wantsNewsletter ? { subscribeNewsletter: 'true' } : {}),
         ...(welcomeOfferId ? { welcomeOfferId } : {}),
         ...partnerMeta,
         ...(walletCents > 0 ? { walletCents: String(walletCents) } : {}),
@@ -296,6 +329,11 @@ router.post('/create-cart-checkout', authMiddleware, requireEmailVerified, async
     const streetLine = s.address2 ? `${s.address2}, ${s.address || ''}`.trim() : (s.address || '');
     const { error: orderErr } = await supabase.from('orders').insert({
       buyer_id:          userId,
+      // Only guests carry buyer_email (a registered buyer's email comes from
+      // their profile). Keeping it off the registered-buyer insert leaves that
+      // common path byte-identical to before, so it can't break in the window
+      // before the buyer_email migration lands.
+      ...(userId ? {} : { buyer_email: email }),
       seller_id:         null,
       listing_id:        null,
       stripe_session_id: session.id,
@@ -341,7 +379,7 @@ router.post('/create-cart-checkout', authMiddleware, requireEmailVerified, async
 
 // ─── GET /session/:sessionId ─────────────────────────────────────────────────
 
-router.get('/session/:sessionId', authMiddleware, async (req, res) => {
+router.get('/session/:sessionId', optionalAuthMiddleware, async (req, res) => {
   try {
     const { sessionId } = req.params;
     if (!sessionId?.trim()) return res.status(400).json({ error: 'sessionId is required' });
@@ -352,8 +390,13 @@ router.get('/session/:sessionId', authMiddleware, async (req, res) => {
 
     if (!session) return res.status(404).json({ error: 'Checkout session not found' });
 
-    if (session.metadata?.userId && session.metadata.userId !== req.user.id) {
-      logger.warn(`[STRIPE] Unauthorised session access by ${req.user.id} for ${sessionId}`);
+    // A registered buyer's receipt is private to them (guard on the session's
+    // userId metadata). A guest order has no userId — the unguessable Stripe
+    // session id in the return URL is the capability that lets the buyer view
+    // their own confirmation, so no auth is required for it.
+    const sessionUserId = session.metadata?.userId;
+    if (sessionUserId && sessionUserId !== req.user?.id) {
+      logger.warn(`[STRIPE] Unauthorised session access by ${req.user?.id || 'guest'} for ${sessionId}`);
       return res.status(403).json({ error: 'Forbidden' });
     }
 
@@ -369,6 +412,7 @@ router.get('/session/:sessionId', authMiddleware, async (req, res) => {
       status:        session.payment_status,
       amountTotal:   session.amount_total,
       customerEmail: session.customer_details?.email,
+      customerName:  session.customer_details?.name || null,
       items,
     });
   } catch (err) {

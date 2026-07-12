@@ -11,8 +11,6 @@ import { ShoppingBag, X, Plus, Minus, Loader2, ArrowRight, PackageOpen } from 'l
 import { useCart } from '@/hooks/useCart.jsx';
 import { formatCurrency } from '@/utils/formatCurrency.js';
 import BnplMessage from '@/components/BnplMessage.jsx';
-import { useAuth } from '@/contexts/AuthContext.jsx';
-import { toast } from 'sonner';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 
 // Storage path or absolute URL → CDN-aware public URL.
@@ -20,7 +18,6 @@ const resolveImg = (path) => publicImageUrl(path);
 
 const ShoppingCart = () => {
   const { cartItems, isCartOpen, setIsCartOpen, removeFromCart, updateQuantity, getCartTotal } = useCart();
-  const { currentUser } = useAuth();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const navigate = useNavigate();
 
@@ -28,12 +25,9 @@ const ShoppingCart = () => {
     if (cartItems.length === 0) return;
     setIsCheckingOut(true);
     setIsCartOpen(false);
-    if (!currentUser) {
-      toast.error('Please sign in to check out.');
-      navigate('/login', { state: { from: { pathname: '/checkout' } } });
-      return;
-    }
-    // The multi-step CheckoutPage handles shipping, review and Stripe payment.
+    // Guest checkout — no sign-in required. The multi-step CheckoutPage handles
+    // shipping, review and Stripe payment, and offers account creation after
+    // payment on the success page.
     navigate('/checkout');
   };
 

@@ -31,6 +31,7 @@ import ShoppingCart from '@/components/ShoppingCartLazy.jsx';
 import AdminLayout from '@/components/AdminLayout.jsx';
 import MarketplaceListingRedirect from '@/components/MarketplaceListingRedirect.jsx';
 import ReferralCapture from '@/components/ReferralCapture.jsx';
+import LaunchRegisterModal from '@/components/LaunchRegisterModal.jsx';
 import FeatureRoute from '@/components/FeatureRoute.jsx';
 import MaintenanceGate from '@/components/MaintenanceGate.jsx';
 
@@ -247,6 +248,7 @@ const App = () => {
               <Router>
                 <ScrollToTop />
                 <ReferralCapture />
+                <LaunchRegisterModal />
                 <div className="flex flex-col min-h-screen bg-background text-foreground">
                   <Helmet>
                     <title>CardPop | Australia's Trading Card Marketplace</title>
@@ -307,7 +309,9 @@ const App = () => {
                         <Route path="/shop/category/:categorySlug" element={<ShopCategoryRoute />} />
                         
                         {/* Checkout */}
-                        <Route path="/checkout/:cardId?" element={<ProtectedRoute><CheckoutPage /></ProtectedRoute>} />
+                        {/* Guest checkout: anyone can buy from the shop / marketplace.
+                            Account creation is offered after payment on the success page. */}
+                        <Route path="/checkout/:cardId?" element={<CheckoutPage />} />
                         <Route path="/checkout-success" element={<CheckoutSuccessPage />} />
                         <Route path="/success" element={<CheckoutSuccessPage />} />
                         

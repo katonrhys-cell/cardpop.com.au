@@ -5,6 +5,7 @@ import { payoutSeller } from './payoutService.js';
 import { markWelcomeDiscountRedeemed } from './welcomeOfferService.js';
 import { recordShopOrderReferral } from './partnerService.js';
 import { debitWallet } from './walletService.js';
+import { subscribeToNewsletter } from '../utils/newsletter.js';
 
 async function getPlatformSetting(key, defaultValue) {
   const { data } = await supabase
@@ -79,7 +80,7 @@ async function handleCheckoutSessionCompleted(session, stripe) {
 
   const { data: existing } = await supabase
     .from('orders')
-    .select('id, status, total_aud, order_items, buyer_id, item_price_aud, gst_aud, platform_fee_aud, discount_aud, shipping_aud, created_at, shipping_name, shipping_address, shipping_suburb, shipping_state, shipping_postcode')
+    .select('id, status, total_aud, order_items, buyer_id, buyer_email, item_price_aud, gst_aud, platform_fee_aud, discount_aud, shipping_aud, created_at, shipping_name, shipping_address, shipping_suburb, shipping_state, shipping_postcode')
     .eq('stripe_session_id', session.id)
     .maybeSingle();
 
@@ -207,50 +208,72 @@ async function handleCartOrder(existing, session, stripe) {
     });
   }
 
+  // Buyer receipt. Registered buyers resolve their address from their profile;
+  // guests have no profile, so we use the email captured at checkout (persisted
+  // on the order, with the Stripe session details as a fallback).
+  let receiptEmail = null;
+  let receiptName = 'Collector';
   if (existing.buyer_id) {
     const { data: buyerProfile } = await supabase.from('profiles')
       .select('email, display_name').eq('id', existing.buyer_id).maybeSingle();
-    if (buyerProfile?.email) {
-      const itemCount = lines.reduce((n, l) => n + (l.quantity || 1), 0);
-      // Build an itemised tax invoice from the persisted order so the emailed
-      // receipt carries every figure the buyer saw at checkout — line items,
-      // GST, discount, total — plus their business name and ABN when supplied.
-      const invoiceItems = lines.map(l => ({
-        name: l.title || l.name || l.card_name || 'Item',
-        quantity: l.quantity || 1,
-        total: Number(l.line_total_aud ?? l.price_aud ?? l.price ?? 0),
-      }));
-      await sendOrderConfirmed({
-        buyerEmail: buyerProfile.email,
-        buyerName: buyerProfile.display_name || 'Collector',
-        cardName: `${itemCount} item${itemCount === 1 ? '' : 's'}`,
-        itemPrice: Number(existing.item_price_aud ?? amountCents2 / 100),
+    receiptEmail = buyerProfile?.email || null;
+    receiptName = buyerProfile?.display_name || 'Collector';
+  } else {
+    receiptEmail = existing.buyer_email || session.customer_details?.email || session.metadata?.guestEmail || null;
+    receiptName = existing.shipping_name || session.customer_details?.name || 'Collector';
+  }
+
+  if (receiptEmail) {
+    const itemCount = lines.reduce((n, l) => n + (l.quantity || 1), 0);
+    // Build an itemised tax invoice from the persisted order so the emailed
+    // receipt carries every figure the buyer saw at checkout — line items,
+    // GST, discount, total — plus their business name and ABN when supplied.
+    const invoiceItems = lines.map(l => ({
+      name: l.title || l.name || l.card_name || 'Item',
+      quantity: l.quantity || 1,
+      total: Number(l.line_total_aud ?? l.price_aud ?? l.price ?? 0),
+    }));
+    await sendOrderConfirmed({
+      buyerEmail: receiptEmail,
+      buyerName: receiptName,
+      cardName: `${itemCount} item${itemCount === 1 ? '' : 's'}`,
+      itemPrice: Number(existing.item_price_aud ?? amountCents2 / 100),
+      total: amountCents2 / 100,
+      orderId: existing.id,
+      invoice: {
+        items: invoiceItems,
+        subtotal: Number(existing.item_price_aud ?? 0),
+        // platform_fee_aud bundles commission + GST; the service fee is the
+        // commission portion, shown separately from GST to mirror checkout.
+        serviceFee: Math.max(0, Number(existing.platform_fee_aud ?? 0) - Number(existing.gst_aud ?? 0)),
+        gst: Number(existing.gst_aud ?? 0),
+        shipping: Number(existing.shipping_aud ?? 0),
+        discount: Number(existing.discount_aud ?? 0),
         total: amountCents2 / 100,
-        orderId: existing.id,
-        invoice: {
-          items: invoiceItems,
-          subtotal: Number(existing.item_price_aud ?? 0),
-          // platform_fee_aud bundles commission + GST; the service fee is the
-          // commission portion, shown separately from GST to mirror checkout.
-          serviceFee: Math.max(0, Number(existing.platform_fee_aud ?? 0) - Number(existing.gst_aud ?? 0)),
-          gst: Number(existing.gst_aud ?? 0),
-          shipping: Number(existing.shipping_aud ?? 0),
-          discount: Number(existing.discount_aud ?? 0),
-          total: amountCents2 / 100,
-          // Read from the session metadata (set at checkout) so the invoice
-          // doesn't depend on the billing_* columns having been migrated yet.
-          businessName: session.metadata?.billingBusinessName || null,
-          abn: session.metadata?.billingAbn || null,
-          orderDate: existing.created_at || null,
-          shipping: {
-            name: existing.shipping_name || null,
-            address: existing.shipping_address || null,
-            suburb: existing.shipping_suburb || null,
-            state: existing.shipping_state || null,
-            postcode: existing.shipping_postcode || null,
-          },
+        // Read from the session metadata (set at checkout) so the invoice
+        // doesn't depend on the billing_* columns having been migrated yet.
+        businessName: session.metadata?.billingBusinessName || null,
+        abn: session.metadata?.billingAbn || null,
+        orderDate: existing.created_at || null,
+        shipping: {
+          name: existing.shipping_name || null,
+          address: existing.shipping_address || null,
+          suburb: existing.shipping_suburb || null,
+          state: existing.shipping_state || null,
+          postcode: existing.shipping_postcode || null,
         },
-      }).catch(e => logger.warn(`[STRIPE] cart confirm email failed: ${e.message}`));
+      },
+    }).catch(e => logger.warn(`[STRIPE] cart confirm email failed: ${e.message}`));
+  }
+
+  // Newsletter opt-in taken at checkout (guest or registered). Fired only now
+  // that payment completed. Best-effort: a Kit failure never affects the order.
+  if (session.metadata?.subscribeNewsletter === 'true') {
+    const subEmail = existing.buyer_email || session.customer_details?.email || session.metadata?.guestEmail || receiptEmail;
+    if (subEmail) {
+      const firstName = (existing.shipping_name || session.customer_details?.name || '').trim().split(/\s+/)[0] || undefined;
+      await subscribeToNewsletter(subEmail, firstName)
+        .catch(e => logger.warn(`[STRIPE] newsletter opt-in failed for order ${existing.id}: ${e.message}`));
     }
   }
 
