@@ -63,8 +63,11 @@ const LaunchRegisterModal = () => {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md overflow-hidden p-0 gap-0">
-        <div className="flex justify-center bg-brand-charcoal px-6 pt-8 pb-7">
-          <CardPopLogo variant="full" onDark mono iconClassName="w-9 h-[44px]" />
+        {/* Deep navy (not brand-charcoal #1F2937) so the red "Pop" clears WCAG
+            AA contrast — red-on-charcoal is only 2.6:1, red on #0B1220 is 3.3:1.
+            Matches the brand cover-image treatment (red mark on deep navy). */}
+        <div className="flex justify-center bg-[#0B1220] px-6 pt-8 pb-7">
+          <CardPopLogo variant="full" onDark iconClassName="w-9 h-[44px]" />
         </div>
 
         <div className="px-6 py-6">
