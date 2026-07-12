@@ -234,6 +234,7 @@ const ShippingPage = lazy(() => import('@/pages/info/ShippingPage.jsx'));
 const TermsPage = lazy(() => import('@/pages/info/TermsPage.jsx'));
 const TrustSafetyPage = lazy(() => import('@/pages/info/TrustSafetyPage.jsx'));
 const AccessibilityPage = lazy(() => import('@/pages/info/AccessibilityPage.jsx'));
+const DataDeletionPage = lazy(() => import('@/pages/info/DataDeletionPage.jsx'));
 const PhotographyStandardPage = lazy(() => import('@/pages/info/PhotographyStandardPage.jsx'));
 
 const App = () => {
@@ -434,6 +435,7 @@ const App = () => {
                         <Route path="/terms" element={<TermsPage />} />
                         <Route path="/trust-safety" element={<TrustSafetyPage />} />
                         <Route path="/accessibility" element={<AccessibilityPage />} />
+                        <Route path="/data-deletion" element={<DataDeletionPage />} />
                         <Route path="/photography-standard" element={<PhotographyStandardPage />} />
                         <Route path="/photography-guide" element={<PhotographyStandardPage />} />
                         

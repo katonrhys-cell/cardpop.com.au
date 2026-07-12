@@ -92,6 +92,7 @@ const Footer = () => {
               <li><Link to="/account/profile" className="hover:text-primary transition-colors">Profile Settings</Link></li>
               <li><Link to="/terms" className="hover:text-primary transition-colors">Terms of Service</Link></li>
               <li><Link to="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link></li>
+              <li><Link to="/data-deletion" className="hover:text-primary transition-colors">Data Deletion</Link></li>
               <li><Link to="/trust-safety" className="hover:text-primary transition-colors">Trust & Safety</Link></li>
             </ul>
           </div>
