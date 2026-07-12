@@ -66,8 +66,13 @@ function summaryTable(rows) {
 
 // ─── Pre-launch welcome (landing-page early-access registration) ──────────────
 
-export function launchWelcomeEmail({ name } = {}) {
+export function launchWelcomeEmail({ name, hasGuide = false } = {}) {
   const greeting = name ? `You're on the list, ${name}!` : "You're on the list!";
+  // Only promise the attached guide when one is actually attached (a committed
+  // PDF or LAUNCH_WELCOME_PDF_URL); otherwise close without referencing it.
+  const closing = hasGuide
+    ? `<p>We've attached a short early-access guide with everything that's coming. Keep an eye on your inbox — the best is on its way.</p>`
+    : `<p>Keep an eye on your inbox — we'll be in touch as soon as there's something new to explore. The best is on its way.</p>`;
   const body = `<p>Thanks for registering your interest in <strong>CardPop</strong> — Australia's home for buying, selling and trading collectible cards. We're still building, with a full launch planned for <strong>late 2026</strong>.</p>
 <p style="margin:0 0 8px;"><strong>As an early registrant, here's what you've locked in:</strong></p>
 <ul style="margin:0 0 20px;padding-left:20px;">
@@ -76,7 +81,7 @@ export function launchWelcomeEmail({ name } = {}) {
 <li><strong>Founding-member perks.</strong> Early registrants get first dibs on launch offers and community events.</li>
 </ul>
 <p>Just so you know what to expect: the marketplace and its features — including P2P trading — aren't live yet. This is your ticket to explore them first as they roll out.</p>
-<p>We've attached a short early-access guide with everything that's coming. Keep an eye on your inbox — the best is on its way.</p>`;
+${closing}`;
 
   return cpEmail(
     "You're in — CardPop early access reserved. Here's what's coming.",

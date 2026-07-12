@@ -89,7 +89,7 @@ export async function sendLaunchWelcome({ to, name }) {
   return send({
     to,
     subject: "You're in — CardPop early access reserved 🎴",
-    html: launchWelcomeEmail({ name }),
+    html: launchWelcomeEmail({ name, hasGuide: attachments.length > 0 }),
     attachments,
   });
 }
