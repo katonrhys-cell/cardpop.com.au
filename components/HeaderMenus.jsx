@@ -11,7 +11,7 @@ import React, { useState, useEffect, useRef, startTransition } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowRightLeft, LayoutDashboard, Package, Users, Calendar, FileText, Building2,
-  Layers, CheckCircle, Sun, Moon, ChevronDown, ArrowRight, Layers2, User, LogOut,
+  Layers, CheckCircle, Sun, Moon, ChevronDown, ChevronRight, ArrowRight, Layers2, User, LogOut,
   Settings, FolderTree, ListOrdered, BarChart3, Store, Shield,
   BookOpen, Globe, Star, Award, TrendingUp, Newspaper, BadgeCheck, Ticket, Handshake,
   Calculator, MapPin, ClipboardList, HelpCircle, MessageSquare,
@@ -346,10 +346,21 @@ const BrowseDropdown = ({ onNavigate }) => {
 };
 
 // ─── Shop mega-dropdown ───────────────────────────────────────────────────────
+// Two-level flyout: the five parent categories (Protection, Storage, …) list
+// down the left with their icon badges; hovering (or focusing) one reveals its
+// subcategories in the panel to the right. Leaf items carry the same coloured
+// icon badge used across the other menus.
 const ShopDropdown = ({ onNavigate }) => {
   const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
   const location = useLocation();
   const isShopActive = location.pathname === '/shop' || location.pathname.startsWith('/shop/');
+  const [activeSlug, setActiveSlug] = useState(SHOP_CATEGORY_GROUPS[0].slug);
+
+  // Re-open on the first category each time the menu closes, so the flyout is
+  // predictable rather than stuck on whatever the user last hovered.
+  useEffect(() => { if (!open) setActiveSlug(SHOP_CATEGORY_GROUPS[0].slug); }, [open]);
+
+  const activeGroup = SHOP_CATEGORY_GROUPS.find(g => g.slug === activeSlug) || SHOP_CATEGORY_GROUPS[0];
 
   return (
     <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
@@ -367,7 +378,7 @@ const ShopDropdown = ({ onNavigate }) => {
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-2 w-[720px] max-w-[calc(100vw-3rem)] bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+        <div className="absolute top-full left-0 mt-2 w-[620px] max-w-[calc(100vw-3rem)] bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
           <Link
             to="/shop"
             onClick={() => { setOpen(false); onNavigate?.(); }}
@@ -379,34 +390,61 @@ const ShopDropdown = ({ onNavigate }) => {
             </div>
             <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
           </Link>
-          <div className="grid grid-cols-3 gap-x-6 gap-y-5 p-5">
-            {SHOP_CATEGORY_GROUPS.map(group => (
-              <div key={group.slug}>
-                <div className="flex items-center gap-2 mb-2.5 px-1">
-                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${group.gradient} shrink-0 shadow-sm`}>
-                    <group.Icon className="w-3.5 h-3.5 text-white" />
-                  </span>
-                  <span className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground">{group.label}</span>
-                </div>
-                <div className="grid gap-0.5">
-                  {group.items.map(item => (
-                    <Link
-                      key={item.slug}
-                      to={`/shop/category/${item.slug}`}
-                      onClick={() => { setOpen(false); onNavigate?.(); }}
-                      className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-muted transition-colors group"
-                    >
-                      <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${group.gradient} shrink-0 shadow-sm`}>
-                        <group.Icon className="w-4 h-4 text-white" />
-                      </span>
-                      <span className="text-[13px] font-medium text-foreground group-hover:text-primary transition-colors truncate">
-                        {item.name}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
+
+          <div className="flex">
+            {/* Parent categories — hover/focus swaps the panel on the right */}
+            <div className="w-[236px] shrink-0 p-3 border-r border-border">
+              {SHOP_CATEGORY_GROUPS.map(group => {
+                const isActive = group.slug === activeSlug;
+                return (
+                  <button
+                    key={group.slug}
+                    type="button"
+                    onPointerEnter={() => setActiveSlug(group.slug)}
+                    onFocus={() => setActiveSlug(group.slug)}
+                    onClick={() => setActiveSlug(group.slug)}
+                    aria-expanded={isActive}
+                    className={`w-full flex items-center gap-2.5 px-2 py-2.5 rounded-xl transition-colors text-left ${
+                      isActive ? 'bg-muted' : 'hover:bg-muted'
+                    }`}
+                  >
+                    <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${group.gradient} shrink-0 shadow-sm`}>
+                      <group.Icon className="w-4 h-4 text-white" />
+                    </span>
+                    <span className={`text-[13px] font-medium transition-colors truncate ${isActive ? 'text-primary' : 'text-foreground'}`}>
+                      {group.label}
+                    </span>
+                    <ChevronRight className={`w-4 h-4 ml-auto shrink-0 transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Subcategories of the hovered category */}
+            <div className="flex-1 min-w-0 p-4">
+              <div className="flex items-center gap-2 mb-3 px-1">
+                <span className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                  {activeGroup.label}
+                </span>
               </div>
-            ))}
+              <div className="grid grid-cols-2 gap-0.5">
+                {activeGroup.items.map(item => (
+                  <Link
+                    key={item.slug}
+                    to={`/shop/category/${item.slug}`}
+                    onClick={() => { setOpen(false); onNavigate?.(); }}
+                    className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-muted transition-colors group"
+                  >
+                    <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${activeGroup.gradient} shrink-0 shadow-sm`}>
+                      <item.Icon className="w-4 h-4 text-white" />
+                    </span>
+                    <span className="text-[13px] font-medium text-foreground group-hover:text-primary transition-colors truncate">
+                      {item.name}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}
