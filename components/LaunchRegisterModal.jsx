@@ -64,7 +64,7 @@ const LaunchRegisterModal = () => {
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md overflow-hidden p-0 gap-0">
         <div className="flex justify-center bg-brand-charcoal px-6 pt-8 pb-7">
-          <CardPopLogo variant="full" onDark iconClassName="w-9 h-[44px]" />
+          <CardPopLogo variant="full" onDark mono iconClassName="w-9 h-[44px]" />
         </div>
 
         <div className="px-6 py-6">

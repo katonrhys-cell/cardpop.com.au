@@ -27,20 +27,27 @@ const CardIcon = ({ className }) => (
 const CardPopLogo = ({
   variant = 'header',
   onDark = false,
+  // Monochrome lockup: render the slab icon and the "Pop" accent in the
+  // wordmark colour instead of brand red. Use on solid dark/coloured panels
+  // where red-on-dark would fail WCAG contrast (the style guide permits a
+  // full-white or full-charcoal monochrome logo when colours can't be used).
+  mono = false,
   className = '',
   iconClassName = '',
 }) => {
   const cardText  = onDark ? 'text-white'              : 'text-foreground';
   const subText   = onDark ? 'text-white/50'           : 'text-muted-foreground';
   const lineColor = onDark ? 'bg-white/25'             : 'bg-border';
+  // Icon + "Pop" accent — brand red by default, wordmark colour when mono.
+  const accent    = mono ? cardText : 'text-primary';
 
   if (variant === 'icon') {
-    return <CardIcon className={`text-primary ${iconClassName} ${className}`} />;
+    return <CardIcon className={`${accent} ${iconClassName} ${className}`} />;
   }
 
   return (
     <span className={`inline-flex items-center gap-2.5 ${className}`}>
-      <CardIcon className={`text-primary shrink-0 ${iconClassName || 'w-7 h-[34px]'}`} />
+      <CardIcon className={`${accent} shrink-0 ${iconClassName || 'w-7 h-[34px]'}`} />
 
       <span className="flex flex-col leading-none">
         {/* Wordmark */}
@@ -52,7 +59,7 @@ const CardPopLogo = ({
               "Syne Fallback" face, whose size-adjust/ascent-override inflate
               and misplace the glyph. top-[0.22em] hangs the mark from the
               wordmark's cap line, per standard trademark lockup practice. */}
-          <span className="text-primary relative">Pop<sup className={`absolute left-full top-[0.22em] text-[0.65em] font-sans font-normal tracking-normal leading-none ${cardText}`}>™</sup></span>
+          <span className={`${accent} relative`}>Pop<sup className={`absolute left-full top-[0.22em] text-[0.65em] font-sans font-normal tracking-normal leading-none ${cardText}`}>™</sup></span>
         </span>
 
         {/* Australia subtitle */}
