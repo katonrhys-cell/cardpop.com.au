@@ -9,6 +9,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import NewsletterSignup from '@/components/NewsletterSignup.jsx';
+import CardPopLogo from '@/components/CardPopLogo.jsx';
 
 // Bump the version suffix to re-show the modal to everyone (e.g. after a big
 // messaging change). Stored value is 'dismissed' or 'registered'.
@@ -62,11 +63,8 @@ const LaunchRegisterModal = () => {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md overflow-hidden p-0 gap-0">
-        <div className="bg-brand-red px-6 pt-7 pb-6 text-center text-white">
-          <p className="text-2xl font-black tracking-tight">CardPop</p>
-          <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-white/90">
-            Australia's Card Marketplace
-          </p>
+        <div className="flex justify-center bg-brand-charcoal px-6 pt-8 pb-7">
+          <CardPopLogo variant="full" onDark iconClassName="w-9 h-[44px]" />
         </div>
 
         <div className="px-6 py-6">
@@ -86,8 +84,8 @@ const LaunchRegisterModal = () => {
           <ul className="my-5 space-y-2.5">
             {BENEFITS.map(({ Icon, text }) => (
               <li key={text} className="flex items-center gap-3 text-sm text-foreground">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-blue/10">
-                  <Icon className="h-3.5 w-3.5 text-brand-blue" />
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-red/10">
+                  <Icon className="h-3.5 w-3.5 text-brand-red" />
                 </span>
                 {text}
               </li>
