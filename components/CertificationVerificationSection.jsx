@@ -279,31 +279,33 @@ const CertificationVerificationSection = ({ certNumber, gradingCompany = 'psa', 
             </div>
           )}
 
-          {/* Additional PSA record details */}
+          {/* Additional PSA record details — full-width horizontal rows so long
+              values (Subject, Category, Label Type) stay readable instead of
+              being squeezed into narrow grid columns. */}
           {(psaData.subject || psaData.category || psaData.variety || psaData.labelType) && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="space-y-2 mb-6">
               {psaData.subject && (
-                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Subject</p>
-                  <p className="font-bold text-foreground text-sm">{psaData.subject}</p>
+                <div className="flex items-baseline justify-between gap-4 p-3 bg-muted/30 rounded-lg border border-border/50">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground shrink-0">Subject</p>
+                  <p className="font-bold text-foreground text-sm text-right">{psaData.subject}</p>
                 </div>
               )}
               {psaData.category && (
-                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Category</p>
-                  <p className="font-bold text-foreground text-sm">{psaData.category}</p>
+                <div className="flex items-baseline justify-between gap-4 p-3 bg-muted/30 rounded-lg border border-border/50">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground shrink-0">Category</p>
+                  <p className="font-bold text-foreground text-sm text-right">{psaData.category}</p>
                 </div>
               )}
               {psaData.variety && (
-                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Variety</p>
-                  <p className="font-bold text-foreground text-sm">{psaData.variety}</p>
+                <div className="flex items-baseline justify-between gap-4 p-3 bg-muted/30 rounded-lg border border-border/50">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground shrink-0">Variety</p>
+                  <p className="font-bold text-foreground text-sm text-right">{psaData.variety}</p>
                 </div>
               )}
               {psaData.labelType && (
-                <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Label Type</p>
-                  <p className="font-bold text-foreground text-sm">{psaData.labelType}</p>
+                <div className="flex items-baseline justify-between gap-4 p-3 bg-muted/30 rounded-lg border border-border/50">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground shrink-0">Label Type</p>
+                  <p className="font-bold text-foreground text-sm text-right">{psaData.labelType}</p>
                 </div>
               )}
             </div>
