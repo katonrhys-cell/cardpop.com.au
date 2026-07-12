@@ -191,15 +191,41 @@ const HomePage = () => {
   const [loading, setLoading]                 = useState(true);
   const [heroCards, setHeroCards]             = useState(HERO_CARDS);
 
-  const [deskStart, setDeskStart] = useState(0);
-  const [deskDir,   setDeskDir]   = useState(1);
   const DESK_VISIBLE = 8;
   const total = CATEGORIES.length;
-  const goDeskNext = () => { setDeskDir(1);  setDeskStart(i => (i + 1) % total); };
-  const goDeskPrev = () => { setDeskDir(-1); setDeskStart(i => (i - 1 + total) % total); };
-  const deskCats = Array.from({ length: DESK_VISIBLE }, (_, i) =>
-    CATEGORIES[(deskStart + i) % total]
-  );
+  // Continuous sliding track: render the full list with a DESK_VISIBLE-wide
+  // buffer of duplicated tiles on each side so rotating in either direction
+  // slides the icons smoothly instead of remounting the row (which made every
+  // tile flash from opacity 0 on each click). `deskPos` is the logical start
+  // index; it may briefly overshoot into a buffer, then snaps back
+  // (transition-free) once the slide settles, giving a seamless loop.
+  const deskLoop = [
+    ...CATEGORIES.slice(total - DESK_VISIBLE),
+    ...CATEGORIES,
+    ...CATEGORIES.slice(0, DESK_VISIBLE),
+  ];
+  const DESK_N = deskLoop.length;      // total + 2 * DESK_VISIBLE
+  const deskStep = 100 / DESK_N;       // width of one tile, as a % of the track
+  const [deskPos, setDeskPos] = useState(0);
+  const [deskInstant, setDeskInstant] = useState(false);
+
+  // After a transition-free snap back into range, re-enable the transition on
+  // the next frame so the following click animates again.
+  useEffect(() => {
+    if (!deskInstant) return;
+    const id = requestAnimationFrame(() => setDeskInstant(false));
+    return () => cancelAnimationFrame(id);
+  }, [deskInstant]);
+
+  const goDeskNext = () => setDeskPos(p => p + 1);
+  const goDeskPrev = () => setDeskPos(p => p - 1);
+  const onDeskSlideEnd = (e) => {
+    // Only react to the track's own transform slide, not bubbled hover
+    // transitions from the tiles inside it.
+    if (e.target !== e.currentTarget || e.propertyName !== 'transform') return;
+    if (deskPos >= total)  { setDeskInstant(true); setDeskPos(p => p - total); }
+    else if (deskPos < 0)  { setDeskInstant(true); setDeskPos(p => p + total); }
+  };
 
   const [tickerIdx, setTickerIdx] = useState(0);
   useEffect(() => {
@@ -538,24 +564,31 @@ const HomePage = () => {
             </button>
 
             <div className="flex-1 overflow-hidden">
-              {/* Keyed on deskStart so paging remounts the row and replays the
-                  directional slide-in (CSS replacement for AnimatePresence) */}
-              <div key={deskStart} className="flex gap-4">
-                  {deskCats.map((cat) => (
-                    <div
-                      key={cat.slug}
-                      className={deskDir > 0 ? 'anim-slide-in-right' : 'anim-slide-in-left'}
-                      style={{ width: `calc((100% - ${(DESK_VISIBLE - 1) * 16}px) / ${DESK_VISIBLE})`, flexShrink: 0 }}
+              {/* Continuous track — translates one tile per click. Nothing
+                  remounts, so the icons slide across instead of flashing. */}
+              <div
+                className={`flex cat-carousel-track${deskInstant ? ' cat-carousel-track--instant' : ''}`}
+                style={{
+                  width: `${(DESK_N / DESK_VISIBLE) * 100}%`,
+                  transform: `translateX(-${(deskPos + DESK_VISIBLE) * deskStep}%)`,
+                }}
+                onTransitionEnd={onDeskSlideEnd}
+              >
+                {deskLoop.map((cat, i) => (
+                  <div
+                    key={`${cat.slug}-${i}`}
+                    className="px-2"
+                    style={{ width: `${deskStep}%`, flexShrink: 0 }}
+                  >
+                    <Link
+                      to={cat.slug ? `/collections/${cat.slug}` : '/marketplace'}
+                      className={`group flex flex-col items-center justify-center gap-3 p-4 rounded-2xl bg-gradient-to-br ${cat.gradient} aspect-square shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-center leading-tight`}
                     >
-                      <Link
-                        to={cat.slug ? `/collections/${cat.slug}` : '/marketplace'}
-                        className={`group flex flex-col items-center justify-center gap-3 p-4 rounded-2xl bg-gradient-to-br ${cat.gradient} aspect-square shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-center leading-tight`}
-                      >
-                        <cat.Icon className="w-9 h-9 drop-shadow-sm" />
-                        <span className="text-[11px] font-bold leading-tight text-white drop-shadow-sm">{cat.name}</span>
-                      </Link>
-                    </div>
-                  ))}
+                      <cat.Icon className="w-9 h-9 drop-shadow-sm" />
+                      <span className="text-[11px] font-bold leading-tight text-white drop-shadow-sm">{cat.name}</span>
+                    </Link>
+                  </div>
+                ))}
               </div>
             </div>
 
