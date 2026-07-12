@@ -147,6 +147,7 @@ git push main
 | `PSA_API_TOKEN` | PSA certificate verification (`src/utils/psaApiClient.js`). **Unset = certs show "Verification error"** — the `/grading-verification/verify` endpoint has no non-API fallback, and the `/psa/cert` detail route only falls back to a bot-blocked, unreliable web scraper. Effectively required in production; obtain from the PSA Public API dashboard. |
 | `KIT_API_KEY` | Kit.com newsletter |
 | `KIT_FORM_ID` | Kit.com newsletter |
+| `FACEBOOK_APP_SECRET` | Meta (Facebook) data deletion request callback (`src/routes/data-deletion.js`) — used to verify the `signed_request` HMAC-SHA256 signature. Unset = the callback rejects every request with 400. Set it to the Facebook app secret and point the App Dashboard's **Data Deletion Request URL** at `https://cardpop.com.au/hcgi/api/data-deletion/facebook` |
 | `RESEND_API_KEY` | Resend transactional email (order/refund/welcome). Unset = emails silently skipped. Domain must be verified in Resend — see `docs/email.md` |
 | `KIT_LAUNCH_FORM_ID` | Kit.com pre-launch notify list (`/launch` page) — optional, falls back to `KIT_FORM_ID` |
 | `VITE_COMING_SOON` | Pre-launch mode (build-time): `true` redirects the homepage to `/launch` |

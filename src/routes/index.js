@@ -26,6 +26,7 @@ import wishlistRouter from './wishlist.js';
 import recommendationsRouter from './recommendations.js';
 import priceHistoryRouter from './price-history.js';
 import newsletterRouter from './newsletter.js';
+import dataDeletionRouter from './data-deletion.js';
 import marketDataRouter from './market-data.js';
 import pricesRouter from './prices.js';
 import storesRouter from './stores.js';
@@ -156,6 +157,12 @@ export default () => {
     // Newsletter subscription
     router.use('/newsletter', apiLimiter);
     router.use('/newsletter', newsletterRouter);
+
+    // Meta (Facebook) data deletion request callback + public status lookup.
+    // No auth: the callback is called server-to-server by Facebook and is
+    // authenticated by the signed_request HMAC signature, not a Bearer token.
+    router.use('/data-deletion', apiLimiter);
+    router.use('/data-deletion', dataDeletionRouter);
 
     // Registration welcome offer (code issue / trial redemption)
     router.use('/welcome-offer', apiLimiter);

@@ -1,8 +1,35 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Trash2, ShieldCheck, Mail } from 'lucide-react';
 import SEOHead from '@/components/SEOHead.jsx';
 import InfoPageLayout from '@/components/InfoPageLayout.jsx';
+import apiServerClient from '@/lib/apiServerClient.js';
+
+// Maps a backend request status to the human-readable explanation we show the
+// user — as Meta's Platform Terms require (a link + confirmation number that
+// give the user access to a human-readable status of their request).
+const STATUS_COPY = {
+  received: {
+    label: 'In progress',
+    detail:
+      'Your request has been received and is being processed. Your data will be permanently deleted within 30 days.',
+  },
+  completed: {
+    label: 'Completed',
+    detail:
+      'The account and personal data associated with this request have been deleted. Records we are legally required to retain (such as completed transaction records) are kept only for as long as the law requires.',
+  },
+  no_data: {
+    label: 'No matching data',
+    detail:
+      'We found no CardPop™ data associated with this request, so there is nothing further to delete. No action is required on your part.',
+  },
+  failed: {
+    label: 'Action required',
+    detail:
+      'We ran into an issue processing this request automatically. Please contact us using the confirmation number below and we will complete it manually.',
+  },
+};
 
 const DataDeletionPage = () => {
   const [searchParams] = useSearchParams();
@@ -10,6 +37,27 @@ const DataDeletionPage = () => {
   // code (e.g. /data-deletion?code=abc123 or ?id=abc123) so they can check the
   // status of their request.
   const confirmationCode = searchParams.get('code') || searchParams.get('id');
+
+  const [status, setStatus] = useState(null);
+
+  useEffect(() => {
+    if (!confirmationCode) return;
+    let cancelled = false;
+    apiServerClient
+      .fetch(`/data-deletion/status/${encodeURIComponent(confirmationCode)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled) setStatus(data);
+      })
+      .catch(() => {
+        /* Fall back to the generic in-progress message below. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [confirmationCode]);
+
+  const statusCopy = (status && STATUS_COPY[status.status]) || STATUS_COPY.received;
 
   return (
     <InfoPageLayout
@@ -38,8 +86,8 @@ const DataDeletionPage = () => {
             {confirmationCode}
           </p>
           <p className="text-muted-foreground mt-4 mb-0">
-            <strong>Status: In progress.</strong> Your request is being processed and your data
-            will be permanently deleted within 30 days. If you need an update, contact us at{' '}
+            <strong>Status: {statusCopy.label}.</strong> {statusCopy.detail} If you need an update,
+            contact us at{' '}
             <a href="mailto:privacy@cardpop.com.au" className="text-primary font-semibold">
               privacy@cardpop.com.au
             </a>{' '}
