@@ -20,7 +20,6 @@
 - [Complete Profile | Card Pop](https://cardpop.com.au/profilecompletion): No description available
 - [Confirming Order | Card Pop](https://cardpop.com.au/checkoutsuccess): No description available
 - [Hierarchy Management | CardPop Admin](https://cardpop.com.au/categorymanagement): No description available
-- [Identity Verification | CardPop](https://cardpop.com.au/accountverification): No description available
 - [Log In | CardPop](https://cardpop.com.au/login): No description available
 - [Manage Events | Admin Portal](https://cardpop.com.au/eventsmanagement): No description available
 - [Membership | CardPop](https://cardpop.com.au/accountmembership): No description available
