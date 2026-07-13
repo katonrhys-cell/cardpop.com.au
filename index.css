@@ -352,11 +352,17 @@
 .anim-slide-in-right { animation: anim-slide-in-right 0.22s ease-in-out both; }
 .anim-slide-in-left  { animation: anim-slide-in-left 0.22s ease-in-out both; }
 
+/* Category browse carousel — a single track that slides one tile per arrow
+   click. Only transform transitions, so icons glide without flashing. */
+.cat-carousel-track          { transition: transform 0.35s ease-in-out; will-change: transform; }
+.cat-carousel-track--instant { transition: none; }
+
 @media (prefers-reduced-motion: reduce) {
   .anim-fade-in, .anim-reveal-up, .anim-pop-in, .anim-ticker-in,
   .anim-slide-in-right, .anim-slide-in-left {
     animation: none;
   }
+  .cat-carousel-track { transition: none; }
 }
 /* ═══════════════════════════════════════════════════════
    PROSE STYLES — Generic content container spacing
