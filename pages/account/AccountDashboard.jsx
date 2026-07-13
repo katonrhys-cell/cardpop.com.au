@@ -137,16 +137,25 @@ const AccountDashboard = () => {
   }, [currentUser?.id, vaultPage]);
 
   // ── Realtime subscription (stable — never torn down while user is logged in)
+  // Every listener is filtered to this user's rows — unfiltered, any user's
+  // write anywhere would refetch every logged-in dashboard. Tables where the
+  // user can sit on either side (orders, trades) get one listener per column,
+  // since postgres_changes filters can't express OR.
   useEffect(() => {
     if (!currentUser?.id) return;
-    const channel = supabase.channel(`dashboard-rt-${currentUser.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' },
+    const uid = currentUser.id;
+    const channel = supabase.channel(`dashboard-rt-${uid}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `buyer_id=eq.${uid}` },
         () => fetchStatsRef.current?.())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'listings' },
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `seller_id=eq.${uid}` },
         () => fetchStatsRef.current?.())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vault_items' },
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'listings', filter: `seller_id=eq.${uid}` },
+        () => fetchStatsRef.current?.())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vault_items', filter: `owner_id=eq.${uid}` },
         () => { fetchStatsRef.current?.(); fetchVaultRef.current?.(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades' },
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades', filter: `initiator_id=eq.${uid}` },
+        () => fetchStatsRef.current?.())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades', filter: `responder_id=eq.${uid}` },
         () => fetchStatsRef.current?.())
       .subscribe();
     return () => { supabase.removeChannel(channel); };

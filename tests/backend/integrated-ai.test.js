@@ -68,10 +68,16 @@ beforeEach(() => {
 // ─── POST /stream ─────────────────────────────────────────────────────────────
 
 describe('POST /stream', () => {
-  it('returns 500 when message is missing', async () => {
+  it('returns 400 when message is missing', async () => {
     const res = await request(app).post('/stream').send({});
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/message is required/i);
+  });
+
+  it('returns 400 when message is valid JSON but not an array', async () => {
+    const res = await request(app).post('/stream').send({ message: '"hi"' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/JSON array/i);
   });
 
   it('returns 400 when message is not valid JSON', async () => {

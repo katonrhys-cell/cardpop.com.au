@@ -121,6 +121,15 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
     }
   };
 
+  // Every mount controls the dialog purely via the isOpen prop (no
+  // DialogTrigger), and Radix only calls onOpenChange for its own internal
+  // interactions — so the open/reset logic must run from an effect. Keyed on
+  // the card identity too, so opening for a different card fully resets the
+  // selection/price state and reloads its listing + market price range.
+  useEffect(() => {
+    if (isOpen && product?.id) handleOpen();
+  }, [isOpen, product?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleSelect = (opt) => {
     setSelected(opt);
     if (opt.needsPrice && !price) {
@@ -294,7 +303,7 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
   const CurrentIcon = currentOpt.icon;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (open) handleOpen(); else onClose(); }}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="sm:max-w-[440px] rounded-2xl border-border bg-background p-6">
         <DialogHeader className="mb-4">
           <DialogTitle className="text-2xl font-serif font-bold text-foreground">

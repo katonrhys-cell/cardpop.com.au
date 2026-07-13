@@ -185,6 +185,14 @@ router.patch('/refunds/:id', validateRequestParams(processRefundSchema), validat
       .from('refunds').select('*, order:orders!order_id(total_aud, platform_fee_aud)').eq('id', id).single();
     if (fetchErr || !refund) return res.status(404).json({ error: 'Refund not found' });
 
+    // Only a pending request can be approved/rejected. Re-approving an
+    // already-processed refund would re-open it for /stripe/refund, and once
+    // the ~24h Stripe idempotency window lapses that issues a second, duplicate
+    // refund for the same order.
+    if (refund.status !== 'pending') {
+      return res.status(409).json({ error: `Refund is already ${refund.status}` });
+    }
+
     if (action === 'reject') {
       const { error } = await supabase.from('refunds')
         .update({ status: 'rejected', rejection_reason, admin_notes: admin_notes || null })

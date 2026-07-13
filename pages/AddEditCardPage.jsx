@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
@@ -245,9 +245,21 @@ const AddEditCardPage = () => {
     });
   }, [formData.collection]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // One-shot cascade guards: when editing, the card fetch below restores
+  // franchise/set together with the dependent parallel/subset in one commit,
+  // which makes the cascade-reset effects below fire and wipe the restored
+  // values (they can't tell a restore from a user-driven change). Each ref
+  // holds the just-restored franchise/set id; the matching effect skips its
+  // reset exactly once when it fires for that id. Genuine user changes
+  // afterwards still cascade-clear as designed.
+  const restoredFranchiseRef = useRef(null);
+  const restoredSetRef       = useRef(null);
+
   // Load parallels whenever franchise changes
   useEffect(() => {
-    setParallelId('');
+    const isRestore = restoredFranchiseRef.current === franchiseId;
+    restoredFranchiseRef.current = null;
+    if (!isRestore) setParallelId('');
     setParallelOpts([]);
     if (franchiseId) getParallelsByFranchise(franchiseId).then(setParallelOpts);
   }, [franchiseId, getParallelsByFranchise]);
@@ -281,7 +293,9 @@ const AddEditCardPage = () => {
 
   // Load subsets whenever set changes
   useEffect(() => {
-    setSubsetId('');
+    const isRestore = restoredSetRef.current === setId;
+    restoredSetRef.current = null;
+    if (!isRestore) setSubsetId('');
     setSubsetOpts([]);
     if (setId) getSubsetsBySet(setId).then(setSubsetOpts);
   }, [setId, getSubsetsBySet]);
@@ -307,8 +321,13 @@ const AddEditCardPage = () => {
         }
         setLockedBaseValue(card.locked_base_value_aud ?? null);
 
-        // Restore hierarchy selectors
+        // Restore hierarchy selectors. Arm the one-shot cascade guards first:
+        // setting franchise/set here re-fires the cascade-reset effects after
+        // this commit, and without the guards they would wipe the parallel and
+        // subset restored in the same batch.
         const resolvedFranchise = card.franchise_id ?? null;
+        if (resolvedFranchise) restoredFranchiseRef.current = resolvedFranchise;
+        if (card.set_id) restoredSetRef.current = card.set_id;
         if (resolvedFranchise) setFranchiseId(resolvedFranchise);
         if (card.category_id) setSelCategoryId(card.category_id);
         if (card.manufacturer_id) setManufacturerId(card.manufacturer_id);

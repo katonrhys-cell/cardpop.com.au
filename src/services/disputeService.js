@@ -39,7 +39,7 @@ export async function handleDisputeCreated(stripe, dispute) {
     if (piId) {
       const { data } = await supabase
         .from('orders')
-        .select('id, seller_id, buyer_id, stripe_transfer_id, payout_status, seller_proceeds_aud')
+        .select('id, seller_id, buyer_id, stripe_transfer_id, payout_status, seller_proceeds_aud, order_items')
         .eq('stripe_payment_intent_id', piId)
         .maybeSingle();
       order = data;

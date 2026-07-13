@@ -394,10 +394,10 @@ const ProfileCompletionPage = () => {
                   </div>
                 </div>
 
-                <p className="text-xs text-muted-foreground">You can upload your documents now or do it later from Account Settings. You need verification to Sell, Trade, or use the Vault.</p>
+                <p className="text-xs text-muted-foreground">Verification is handled securely by Stripe — you can do it now or later from your account. You need verification to Sell, Trade, or use the Vault.</p>
 
                 <Button asChild className="w-full h-12 font-bold">
-                  <Link to="/account/verification">Upload Documents Now</Link>
+                  <Link to="/verify-identity">Verify Identity Now</Link>
                 </Button>
 
                 <Button variant="ghost" onClick={() => setStep(4)} className="w-full h-10 font-medium text-muted-foreground hover:text-foreground">

@@ -3,6 +3,7 @@ import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { sendRefundProcessed, sendRefundIssued } from '../utils/emailService.js';
 import { reverseSellerPayout } from './payoutService.js';
+import { creditWallet } from './walletService.js';
 import { getPlatformSetting } from './stripeWebhookService.js';
 import { isAdminUser } from '../middleware/auth.js';
 
@@ -16,7 +17,7 @@ export async function processRefund(req, res) {
 
     const { data: refund, error: rErr } = await supabase
       .from('refunds')
-      .select('*, order:orders!order_id(id, stripe_payment_intent_id, total_aud, platform_fee_aud, gst_aud, status, refund_status, seller_id, stripe_transfer_id, payout_status, seller_proceeds_aud)')
+      .select('*, order:orders!order_id(id, stripe_payment_intent_id, stripe_session_id, total_aud, platform_fee_aud, gst_aud, status, refund_status, seller_id, stripe_transfer_id, payout_status, seller_proceeds_aud, order_items)')
       .eq('id', refundId)
       .maybeSingle();
 
@@ -92,6 +93,33 @@ export async function processRefund(req, res) {
     const reversal = await reverseSellerPayout(stripe, refund.order);
     if (reversal.action === 'transfer_reversed' || reversal.action === 'wallet_clawback') {
       await supabase.from('orders').update({ payout_status: 'reversed' }).eq('id', refund.order_id);
+    }
+
+    // Restore any wallet credit the buyer applied at checkout. It was debited
+    // by the webhook on payment and is NOT part of the Stripe card refund above
+    // (total_aud is the post-wallet-discount card charge), so without this the
+    // buyer permanently lost that credit despite returning the goods.
+    try {
+      const sessionId = refund.order?.stripe_session_id;
+      if (sessionId) {
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+        const walletCents = parseInt(session.metadata?.walletCents || '0', 10) || 0;
+        const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
+        if (walletCents > 0 && customerId) {
+          await creditWallet(stripe, customerId, walletCents, `Refund for order ${refund.order_id}`, `wallet-refund-${refundId}`);
+          logger.info(`[STRIPE] Restored $${(walletCents / 100).toFixed(2)} wallet credit to customer ${customerId} for refunded order ${refund.order_id}`);
+          if (refund.buyer_id) {
+            await supabase.from('notifications').insert({
+              user_id: refund.buyer_id,
+              type: 'wallet_refund',
+              title: 'Wallet Credit Restored',
+              body: `$${(walletCents / 100).toFixed(2)} AUD you paid from your wallet has been returned to your wallet balance.`,
+            });
+          }
+        }
+      }
+    } catch (walletErr) {
+      logger.error(`[STRIPE] Failed to restore wallet credit for refund ${refundId}: ${walletErr.message} — restore manually`);
     }
 
     if (refund.buyer_id) {

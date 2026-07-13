@@ -158,7 +158,10 @@ export async function applyPaypalSubscription({ userId, paypalSubscriptionId, st
 export function mapPaypalStatus(paypalStatus) {
   switch ((paypalStatus || '').toUpperCase()) {
     case 'ACTIVE':     return 'active';
-    case 'APPROVAL_PENDING':
+    // APPROVAL_PENDING means the buyer has NOT yet approved at PayPal — it must
+    // not entitle. (A created-but-never-approved subscription id could otherwise
+    // be replayed through /paypal/activate to open the can_sell gate for free.)
+    case 'APPROVAL_PENDING': return 'none';
     case 'APPROVED':   return 'trialing'; // approved w/ trial plan → trialing until first charge
     case 'SUSPENDED':  return 'past_due';
     case 'CANCELLED':

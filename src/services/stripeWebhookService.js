@@ -4,7 +4,7 @@ import { sendOrderConfirmed, sendItemSold } from '../utils/emailService.js';
 import { payoutSeller } from './payoutService.js';
 import { markWelcomeDiscountRedeemed } from './welcomeOfferService.js';
 import { recordShopOrderReferral } from './partnerService.js';
-import { debitWallet } from './walletService.js';
+import { debitWalletForOrder } from './walletService.js';
 import { subscribeToNewsletter } from '../utils/newsletter.js';
 
 async function getPlatformSetting(key, defaultValue) {
@@ -121,10 +121,10 @@ async function handleCartOrder(existing, session, stripe) {
     return;
   }
 
-  // Payment completed — consume the welcome-offer discount, if one was applied.
-  if (session.metadata?.welcomeOfferId) {
-    await markWelcomeDiscountRedeemed(session.metadata.welcomeOfferId, existing.id);
-  }
+  // (The welcome-offer discount is consumed AFTER the lines are processed —
+  // see below — so a cart that turns out to be entirely a double-sale, and is
+  // fully refunded, doesn't burn the buyer's one-time code. Mirrors the
+  // single-item path.)
 
   // Payment completed — spend the wallet balance the buyer applied at checkout.
   // Only debited now (not when the session was created) so an abandoned
@@ -133,7 +133,7 @@ async function handleCartOrder(existing, session, stripe) {
     const walletCents = parseInt(session.metadata.walletCents, 10) || 0;
     const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
     if (walletCents > 0 && customerId) {
-      await debitWallet(stripe, customerId, walletCents, `Applied to order ${existing.id}`, `wallet-debit-${session.id}`)
+      await debitWalletForOrder(stripe, customerId, walletCents, `Applied to order ${existing.id}`, `wallet-debit-${session.id}`)
         .catch(e => logger.error(`[WALLET] debit failed for order ${existing.id}: ${e.message}`));
     }
   }
@@ -152,6 +152,8 @@ async function handleCartOrder(existing, session, stripe) {
   const lines = Array.isArray(existing.order_items) ? existing.order_items : [];
   const sellerIds = new Set();
   const oversoldShopItems = [];
+  let payoutsRecorded = false;
+  let fulfilledLines = 0;
 
   for (const line of lines) {
     if (line.type === 'listing' && line.id) {
@@ -163,12 +165,23 @@ async function handleCartOrder(existing, session, stripe) {
         await flagDoubleSale({ listingId: line.id, orderId: existing.id, buyerId: existing.buyer_id });
         continue;
       }
+      fulfilledLines += 1;
       if (line.seller_id) {
         sellerIds.add(line.seller_id);
         const proceeds = Number(line.line_total_aud || 0) - Number(line.commission_aud || 0);
         if (proceeds > 0) {
-          await payoutSeller(stripe, { sellerId: line.seller_id, sellerProceeds: proceeds, listingId: line.id })
-            .catch(e => logger.error(`[STRIPE] cart payout failed for seller ${line.seller_id}: ${e.message}`));
+          // Record the payout on the line itself (a cart can span multiple
+          // sellers, so the order-level payout columns can't hold it) —
+          // without this, refunds/chargebacks on cart orders had nothing to
+          // reverse and the seller kept the proceeds while the buyer was
+          // repaid from platform funds.
+          const payout = await payoutSeller(stripe, { sellerId: line.seller_id, sellerProceeds: proceeds, listingId: line.id })
+            .catch(e => {
+              logger.error(`[STRIPE] cart payout failed for seller ${line.seller_id}: ${e.message}`);
+              return { status: 'failed' };
+            });
+          line.payout = { status: payout.status, transferId: payout.transferId || null, proceeds };
+          payoutsRecorded = true;
         }
       }
     } else if (line.type === 'shop' && line.id) {
@@ -176,7 +189,26 @@ async function handleCartOrder(existing, session, stripe) {
       if (ok === false) {
         oversoldShopItems.push(line);
         logger.error(`[STRIPE] Oversell on shop product ${line.id} (qty ${line.quantity || 1}) for order ${existing.id} — needs manual resolution`);
+      } else {
+        fulfilledLines += 1;
       }
+    }
+  }
+
+  // Consume the welcome-offer discount only now that at least one line
+  // actually sold — a cart that was entirely a double-sale gets fully
+  // refunded, so its one-time code stays usable (mirrors the single-item path).
+  if (session.metadata?.welcomeOfferId && fulfilledLines > 0) {
+    await markWelcomeDiscountRedeemed(session.metadata.welcomeOfferId, existing.id);
+  }
+
+  // Persist the per-line payout records so refunds/disputes can reverse them.
+  if (payoutsRecorded) {
+    const { error: linesErr } = await supabase.from('orders')
+      .update({ order_items: lines })
+      .eq('id', existing.id);
+    if (linesErr) {
+      logger.error(`[STRIPE] Failed to persist payout records on cart order ${existing.id}: ${linesErr.message}`);
     }
   }
 
@@ -255,7 +287,10 @@ async function handleCartOrder(existing, session, stripe) {
         businessName: session.metadata?.billingBusinessName || null,
         abn: session.metadata?.billingAbn || null,
         orderDate: existing.created_at || null,
-        shipping: {
+        // Named shippingAddress: a second `shipping` key here silently
+        // overwrote the shipping *amount* above, dropping the Shipping row
+        // from the emailed tax invoice so its lines didn't sum to the total.
+        shippingAddress: {
           name: existing.shipping_name || null,
           address: existing.shipping_address || null,
           suburb: existing.shipping_suburb || null,
@@ -369,7 +404,7 @@ async function handleSingleItemOrder(session, stripe) {
     const walletCents = parseInt(meta.walletCents, 10) || 0;
     const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
     if (walletCents > 0 && customerId) {
-      await debitWallet(stripe, customerId, walletCents, `Applied to order for session ${session.id}`, `wallet-debit-${session.id}`)
+      await debitWalletForOrder(stripe, customerId, walletCents, `Applied to order for session ${session.id}`, `wallet-debit-${session.id}`)
         .catch(e => logger.error(`[WALLET] debit failed for session ${session.id}: ${e.message}`));
     }
   }

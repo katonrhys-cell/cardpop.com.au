@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { slugify } from '@/lib/slugify.js';
@@ -20,6 +20,13 @@ const ShoppingCart = () => {
   const { cartItems, isCartOpen, setIsCartOpen, removeFromCart, updateQuantity, getCartTotal } = useCart();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const navigate = useNavigate();
+
+  // The drawer stays mounted for the whole session (ShoppingCartLazy), so the
+  // checkout spinner flag must be reset when the drawer reopens — otherwise the
+  // button stays disabled forever after the first checkout.
+  useEffect(() => {
+    if (isCartOpen) setIsCheckingOut(false);
+  }, [isCartOpen]);
 
   const handleCheckout = () => {
     if (cartItems.length === 0) return;
@@ -105,6 +112,9 @@ const ShoppingCart = () => {
                   const gradeLabel = gradingCompany && grade && gradingCompany !== 'raw'
                     ? `${gradingCompany.toUpperCase()} ${grade}`
                     : (grade ? `Grade ${grade}` : null);
+                  // Marketplace listings are one-of-a-kind — the server charges
+                  // quantity 1 regardless (cartService), so don't offer +/-.
+                  const isListing = p.type === 'listing';
 
                   return (
                     <div key={itemId} className="flex gap-4 group">
@@ -152,6 +162,9 @@ const ShoppingCart = () => {
                         </div>
 
                         <div className="flex items-center justify-between mt-4">
+                          {isListing ? (
+                            <span className="text-xs font-medium text-muted-foreground">Qty 1 · one of a kind</span>
+                          ) : (
                           <div className="flex items-center border border-border rounded-lg bg-background">
                             <Button
                               variant="ghost"
@@ -173,6 +186,7 @@ const ShoppingCart = () => {
                               <Plus className="w-3 h-3" />
                             </Button>
                           </div>
+                          )}
                           <span className="font-bold text-foreground tabular-nums">
                             {formattedPrice}
                           </span>

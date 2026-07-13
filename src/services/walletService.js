@@ -86,6 +86,44 @@ export async function debitWallet(stripe, customerId, amountCents, description, 
   );
 }
 
+/**
+ * Webhook-side debit for a completed wallet-funded order.
+ *
+ * The coupon amount was decided at session-creation from a balance read, but a
+ * buyer can open several checkouts (tabs / cart + single-item) before any
+ * webhook fires — each carrying a full-balance coupon. The debit always posts
+ * in full so the Stripe balance stays a truthful ledger (it goes positive =
+ * customer owes), and when the balance couldn't cover it, admins are alerted
+ * to recover the shortfall instead of the platform silently eating it.
+ */
+export async function debitWalletForOrder(stripe, customerId, amountCents, description, idempotencyKey) {
+  if (!(amountCents > 0)) return;
+
+  let availableCents = null;
+  try {
+    const customer = await stripe.customers.retrieve(customerId);
+    availableCents = customer.deleted ? 0 : Math.max(0, -(customer.balance || 0));
+  } catch (e) {
+    logger.warn(`[WALLET] Could not read balance for ${customerId} before debit: ${e.message}`);
+  }
+
+  await debitWallet(stripe, customerId, amountCents, description, idempotencyKey);
+
+  if (availableCents !== null && availableCents < amountCents) {
+    const shortfall = amountCents - availableCents;
+    logger.error(`[WALLET] Over-redemption on ${customerId}: debit ${amountCents}¢ exceeded balance ${availableCents}¢ (${description}) — shortfall ${shortfall}¢ needs recovery`);
+    const { data: admins } = await supabase.from('profiles').select('id').eq('is_admin', true);
+    if (admins?.length) {
+      await supabase.from('notifications').insert(admins.map(a => ({
+        user_id: a.id,
+        type: 'wallet_over_redemption',
+        title: 'Wallet over-redemption detected',
+        body: `Customer ${customerId} redeemed $${(amountCents / 100).toFixed(2)} wallet credit with only $${(availableCents / 100).toFixed(2)} available (${description}). Shortfall $${(shortfall / 100).toFixed(2)} — review the customer's orders.`,
+      }))).catch(() => {});
+    }
+  }
+}
+
 /** Stripe webhook handler for a completed wallet top-up Checkout Session. */
 export async function handleWalletTopup(session, stripe) {
   const userId = session.metadata?.userId;

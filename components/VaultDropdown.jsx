@@ -101,7 +101,7 @@ const VaultDropdown = ({ isMobile = false }) => {
         {!isVerified && (
           <>
             <DropdownMenuItem asChild className="bg-muted/50 text-muted-foreground focus:bg-muted cursor-pointer">
-              <Link to="/account/verification" className="flex items-center w-full">
+              <Link to="/verify-identity" className="flex items-center w-full">
                 <ShieldAlert className="mr-2 h-4 w-4" />
                 <span>Verify account</span>
               </Link>

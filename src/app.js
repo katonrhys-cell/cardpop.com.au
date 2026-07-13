@@ -103,7 +103,14 @@ app.use((err, req, res, next) => {
 	if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
 		return res.status(400).json({ error: 'Invalid JSON in request body' });
 	}
-	next();
+	// Other body-parser errors (413 payload too large, aborted request, bad
+	// charset…) must stay on the error path — calling next() without the error
+	// resumed normal routing with req.body undefined, so handlers crashed with
+	// a generic 500 instead of the real 4xx.
+	if (err?.status >= 400 && err.status < 500) {
+		return res.status(err.status).json({ error: err.type === 'entity.too.large' ? 'Request body too large' : 'Invalid request body' });
+	}
+	next(err);
 });
 
 // Mount at / for local dev, /hcgi/api for Hostinger, and /api for Vercel.

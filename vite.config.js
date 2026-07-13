@@ -380,7 +380,12 @@ export default defineConfig({
 					// them off first paint, riding along with the lazy page that needs them.
 					if (id.includes('@sentry')) return 'vendor-sentry';
 					if (id.includes('date-fns') || id.includes('react-day-picker')) return 'vendor-dates';
-					if (id.includes('@stripe') || id.includes('stripe')) return 'vendor-stripe';
+					// NOTE: @stripe is deliberately NOT forced into a vendor-stripe chunk.
+					// Same failure mode as framer-motion/radix/forms above: rolldown
+					// hoisted a shared prop-types helper into the forced chunk, and since
+					// the eager entry needs prop-types it statically imported the whole
+					// Stripe loader on first paint — even though only the lazy checkout
+					// page uses it. Auto-splitting lets Stripe ride with CheckoutPage.
 				},
 			},
 		}

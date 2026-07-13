@@ -112,7 +112,6 @@ const AccountNotifications = lazy(() => import('@/pages/account/AccountNotificat
 const AccountNotificationSettings = lazy(() => import('@/pages/account/AccountNotificationSettings.jsx'));
 const AccountReviews = lazy(() => import('@/pages/account/AccountReviews.jsx'));
 const AccountSecurity = lazy(() => import('@/pages/account/AccountSecurity.jsx'));
-const AccountVerification = lazy(() => import('@/pages/account/AccountVerification.jsx'));
 const AccountSellerTier = lazy(() => import('@/pages/account/AccountSellerTier.jsx'));
 const AccountOrders = lazy(() => import('@/pages/account/AccountOrders.jsx'));
 const AccountEvents = lazy(() => import('@/pages/account/AccountEvents.jsx'));
@@ -337,7 +336,9 @@ const App = () => {
                         <Route path="/account/notification-settings" element={<ProtectedRoute><AccountNotificationSettings /></ProtectedRoute>} />
                         <Route path="/account/reviews" element={<ProtectedRoute><AccountReviews /></ProtectedRoute>} />
                         <Route path="/account/security" element={<ProtectedRoute><AccountSecurity /></ProtectedRoute>} />
-                        <Route path="/account/verification" element={<ProtectedRoute><AccountVerification /></ProtectedRoute>} />
+                        {/* Identity verification is handled entirely by Stripe Identity now —
+                            the old manual document-upload page is gone; keep the URL working. */}
+                        <Route path="/account/verification" element={<Navigate to="/verify-identity" replace />} />
                         <Route path="/account/seller-tier" element={<ProtectedRoute><AccountSellerTier /></ProtectedRoute>} />
                         <Route path="/account/orders" element={<ProtectedRoute><AccountOrders /></ProtectedRoute>} />
                         <Route path="/account/events" element={<ProtectedRoute><AccountEvents /></ProtectedRoute>} />

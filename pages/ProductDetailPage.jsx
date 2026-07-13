@@ -48,6 +48,15 @@ const ProductDetailPage = ({ source: sourceProp }) => {
   const [offerOpen, setOfferOpen] = useState(false);
   const fetchRef = useRef(null);
 
+  // Auth only affects the private-vault authorization branch. Depending on the
+  // `currentUser` object itself refetched every product 2-3 times during auth
+  // boot (session resolve, then profile merge, each swap the object identity),
+  // so the effect keys on projections that stay constant for marketplace/shop
+  // views and only change for vault views when the answer could change.
+  const vaultAuthPending = source === 'vault' && authLoading;
+  const vaultViewerId = source === 'vault' ? currentUser?.id ?? null : null;
+  const vaultIsAdmin = source === 'vault' ? isAdmin : false;
+
   useEffect(() => {
     let isMounted = true;
     const fetchProduct = async () => {
@@ -57,6 +66,9 @@ const ProductDetailPage = ({ source: sourceProp }) => {
         return;
       }
       if (isMounted) setError(null);
+      // Set when the fetch bails out to wait for auth — the skeleton must
+      // stay up (loading stays true) until the re-run decides the outcome.
+      let stillResolving = false;
       try {
         setLoading(true);
 
@@ -171,8 +183,13 @@ const ProductDetailPage = ({ source: sourceProp }) => {
 
           // Don't decide ownership until auth has resolved — otherwise an owner
           // can be shown a false 403 while currentUser is momentarily null.
-          // The effect re-runs (authLoading dep) once auth settles.
-          if (authLoading) return;
+          // The effect re-runs (vaultAuthPending dep) once auth settles. Keep
+          // the skeleton up meanwhile: letting `finally` clear `loading` here
+          // flashed the "Not Found" card at the owner until auth landed.
+          if (authLoading) {
+            stillResolving = true;
+            return;
+          }
 
           const userRole = isAdmin ? 'admin' : 'user';
           const isAuthorized = canViewVaultProduct(currentUser?.id, data.owner_id, data.is_public, userRole);
@@ -205,31 +222,33 @@ const ProductDetailPage = ({ source: sourceProp }) => {
       } catch (err) {
         if (isMounted) setError('Product not found or unavailable.');
       } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted && !stillResolving) setLoading(false);
       }
     };
 
     fetchRef.current = fetchProduct;
     fetchProduct();
     return () => { isMounted = false; };
-  }, [id, source, currentUser, isAdmin, authLoading, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- currentUser/isAdmin/authLoading are tracked via their vault-scoped projections above
+  }, [id, source, vaultAuthPending, vaultViewerId, vaultIsAdmin, navigate]);
 
   useEffect(() => {
     // For a marketplace listing, `id` is the listings.id — the vault_item's
     // own id (needed to filter that table) is only known once the listing
-    // fetch above resolves, so this listener subscribes unfiltered for the
-    // brief window before product loads, then narrows once vault_item.id is
-    // available. Without a filter here, every client viewing any marketplace
-    // product refetches on every vault_items UPDATE anywhere on the site.
+    // fetch above resolves. Don't listen to vault_items at all until then:
+    // the initial fetch is already in flight during that window, and an
+    // unfiltered listener would make every open product page refetch on
+    // every vault_items UPDATE anywhere on the site. This effect re-runs
+    // (vault_item.id dep) and subscribes filtered once the product loads.
     const vaultItemId = product?.vault_item?.id;
-    const channel = supabase
-      .channel(`product-detail-${id}`)
-      .on('postgres_changes',
-        vaultItemId
-          ? { event: 'UPDATE', schema: 'public', table: 'vault_items', filter: `id=eq.${vaultItemId}` }
-          : { event: 'UPDATE', schema: 'public', table: 'vault_items' },
+    let channel = supabase.channel(`product-detail-${id}`);
+    if (vaultItemId) {
+      channel = channel.on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'vault_items', filter: `id=eq.${vaultItemId}` },
         () => { if (source === 'marketplace' && fetchRef.current) fetchRef.current(); }
-      )
+      );
+    }
+    channel = channel
       // A sale (webhook) or admin action flips listings.status without touching
       // vault_items — listen here so an open page updates to "Sold" live.
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'listings', filter: `id=eq.${id}` },

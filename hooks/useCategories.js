@@ -5,6 +5,25 @@ import { toast } from 'sonner';
 // Simple in-memory cache to avoid redundant fetches across components
 const cache = { categories: null };
 
+// TTL cache for the unscoped "all options" lists (manufacturers, teams, sets,
+// parallels, subsets). The marketplace filter bar fires every one of these on
+// each visit — without a cache that's five unbounded table scans per mount.
+// TTL-bounded (unlike the categories cache) because these tables are edited
+// through admin flows that don't invalidate here.
+const LIST_CACHE_TTL_MS = 5 * 60 * 1000;
+const listCache = new Map(); // key → { at, promise }
+const cachedList = (key, fetcher) => {
+  const hit = listCache.get(key);
+  if (hit && Date.now() - hit.at < LIST_CACHE_TTL_MS) return hit.promise;
+  const promise = fetcher().then(({ data, error }) => {
+    // Never cache a failed read — drop the entry so the next call retries.
+    if (error) { listCache.delete(key); return []; }
+    return data ?? [];
+  }, (err) => { listCache.delete(key); throw err; });
+  listCache.set(key, { at: Date.now(), promise });
+  return promise;
+};
+
 export const useCategories = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(null);
@@ -124,52 +143,49 @@ export const useCategories = () => {
     return all.filter(c => c.parent_id !== null);
   }, [getCategories]);
 
-  const getAllManufacturers = useCallback(async () => {
-    const { data } = await supabase
+  const getAllManufacturers = useCallback(async () => (
+    cachedList('manufacturers', () => supabase
       .from('manufacturers')
       .select('*')
       .eq('is_active', true)
-      .order('name');
-    return data ?? [];
-  }, []);
+      .order('name'))
+  ), []);
 
-  const getAllTeams = useCallback(async () => {
-    const { data } = await supabase
+  const getAllTeams = useCallback(async () => (
+    cachedList('teams', () => supabase
       .from('teams')
       .select('*')
       .eq('is_active', true)
-      .order('name');
-    return data ?? [];
-  }, []);
+      .order('name'))
+  ), []);
 
-  const getAllSets = useCallback(async (manufacturerId = '') => {
-    let query = supabase
-      .from('sets')
-      .select('*')
-      .eq('is_active', true)
-      .order('name', { ascending: false });
-    if (manufacturerId) query = query.eq('manufacturer_id', manufacturerId);
-    const { data } = await query;
-    return data ?? [];
-  }, []);
+  const getAllSets = useCallback(async (manufacturerId = '') => (
+    cachedList(`sets:${manufacturerId}`, () => {
+      let query = supabase
+        .from('sets')
+        .select('*')
+        .eq('is_active', true)
+        .order('name', { ascending: false });
+      if (manufacturerId) query = query.eq('manufacturer_id', manufacturerId);
+      return query;
+    })
+  ), []);
 
-  const getAllParallels = useCallback(async () => {
-    const { data } = await supabase
+  const getAllParallels = useCallback(async () => (
+    cachedList('parallels', () => supabase
       .from('parallels')
       .select('*')
       .eq('is_active', true)
-      .order('name');
-    return data ?? [];
-  }, []);
+      .order('name'))
+  ), []);
 
-  const getAllSubsets = useCallback(async () => {
-    const { data } = await supabase
+  const getAllSubsets = useCallback(async () => (
+    cachedList('subsets', () => supabase
       .from('subsets')
       .select('*, set:sets(name)')
       .eq('is_active', true)
-      .order('name');
-    return data ?? [];
-  }, []);
+      .order('name'))
+  ), []);
 
   // Subcategories are now represented as categories with parent_id set
   const getSubcategoriesByCategory = useCallback(async (categoryId) => {

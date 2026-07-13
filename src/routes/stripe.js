@@ -201,7 +201,7 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
     const { lineItems, orderLines, itemsCents, commissionCents, gstCents, shippingCents, grandCents } = await priceCart(items, userId);
 
     // Fraud control: cap order size / frequency for brand-new, unverified buyers.
-    const velocity = await checkPurchaseVelocity({ userId, orderValueAud: grandCents / 100 });
+    const velocity = await checkPurchaseVelocity({ userId, guestEmail: userId ? null : email, orderValueAud: grandCents / 100 });
     if (!velocity.allowed) {
       logger.warn(`[VELOCITY] Blocked cart checkout for ${userId} (${velocity.reason})`);
       return res.status(429).json({ error: velocity.message, code: 'velocity_limit' });
@@ -251,7 +251,9 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       // abandoned).
       walletCustomerId = await ensureWalletCustomer(stripe, userId, { email });
       const availableCents = await getWalletBalanceCents(stripe, userId);
-      walletCents = Math.min(availableCents, grandCents);
+      // Leave at least Stripe's AUD minimum charge (50¢) on the card — a
+      // payment-mode session discounted to $0 is rejected by Stripe.
+      walletCents = Math.min(availableCents, Math.max(0, grandCents - 50));
       if (walletCents > 0) {
         const coupon = await stripe.coupons.create({
           amount_off: walletCents,
@@ -416,6 +418,11 @@ router.get('/session/:sessionId', optionalAuthMiddleware, async (req, res) => {
       items,
     });
   } catch (err) {
+    // Stripe throws StripeInvalidRequestError for unknown/malformed ids —
+    // that's the caller's 404, not our 500.
+    if (err?.type === 'StripeInvalidRequestError') {
+      return res.status(404).json({ error: 'Checkout session not found' });
+    }
     logger.error(`[STRIPE] get-session error: ${err.message}`);
     res.status(500).json({ error: 'Failed to retrieve session' });
   }
@@ -466,6 +473,13 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         const session = event.data.object;
         if (session.metadata?.walletTopup === 'true') {
           await handleWalletTopup(session, stripe);
+        } else if (session.mode === 'subscription' || session.metadata?.kind === 'subscription') {
+          // Membership signups are mirrored onto the profile by the
+          // customer.subscription.* events below. Falling through to the order
+          // handler used to insert a phantom $0 "payment_confirmed" order (all
+          // metadata amounts parse to 0, so the mismatch guard passed) and
+          // email the buyer a $0.00 receipt on every trial signup.
+          logger.info(`[STRIPE] Subscription checkout ${session.id} completed — no order to record`);
         } else {
           await handleCheckoutSessionCompleted(session, stripe);
         }

@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { escapeLike } from '@/src/utils/escapeLike.js';
@@ -103,15 +104,26 @@ const MarketplacePage = () => {
   // groups when a dropdown shows its full unscoped list
   const [allNames, setAllNames] = useState({});
 
-  // Search and price
-  const [search, setSearch]     = useState('');
+  // Search and price. The global header search navigates to /marketplace?q=…,
+  // so seed the search state from the URL param (both states, so the initial
+  // fetch already carries the query instead of firing once unfiltered).
+  const [searchParams] = useSearchParams();
+  const urlQuery = searchParams.get('q') || '';
+  const [search, setSearch]     = useState(urlQuery);
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState(urlQuery);
   const [debouncedMin, setDebouncedMin]       = useState('');
   const [debouncedMax, setDebouncedMax]       = useState('');
 
   const fetchRef = useRef(null);
+
+  // Apply ?q= changes made while already on this page (a new header search
+  // just updates the param — no remount).
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q !== null) setSearch(q);
+  }, [searchParams]);
 
   // Debounce
   useEffect(() => {
@@ -268,16 +280,30 @@ const MarketplacePage = () => {
     setPage(0);
   }, [sort, filterMode, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, filterPlayer, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
 
-  // Realtime subscription to vault_items changes to refresh listings
+  // Realtime subscription to vault_items changes to refresh listings.
+  // The subscription is unfiltered (any user's vault edit fires it), so
+  // coalesce bursts into at most one refetch per window — otherwise a seller
+  // bulk-editing their vault triggers a full list query per update on every
+  // connected viewer at once.
   useEffect(() => {
+    let refreshTimer = null;
     const channel = supabase
       .channel('marketplace-vault-items')
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vault_items' },
-        () => { if (fetchRef.current) fetchRef.current(); }
+        () => {
+          if (refreshTimer) return;
+          refreshTimer = setTimeout(() => {
+            refreshTimer = null;
+            if (fetchRef.current) fetchRef.current();
+          }, 5000);
+        }
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const clearFilters = () => {

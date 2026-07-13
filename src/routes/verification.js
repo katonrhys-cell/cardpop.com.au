@@ -25,15 +25,18 @@ router.post('/send-verification-email', authMiddleware, async (req, res) => {
     return res.status(404).json({ error: 'User not found' });
   }
 
-  // Use Supabase's built-in email verification
-  const { error } = await supabase.auth.admin.generateLink({
+  // auth.resend actually dispatches the confirmation email via Supabase's
+  // mailer — admin.generateLink (used previously) only RETURNS the link and
+  // never sends anything, so this endpoint claimed success while no email
+  // ever went out.
+  const { error } = await supabase.auth.resend({
     type: 'signup',
     email: user.email,
-    options: { redirectTo: `${process.env.APP_URL || 'https://cardpop.com.au'}/account` },
+    options: { emailRedirectTo: `${process.env.APP_URL || 'https://cardpop.com.au'}/account` },
   });
 
   if (error) {
-    logger.error(`[VERIFICATION] Failed to generate verification link: ${error.message}`);
+    logger.error(`[VERIFICATION] Failed to send verification email: ${error.message}`);
     return res.status(500).json({ error: 'Failed to send verification email' });
   }
 
@@ -58,10 +61,12 @@ router.post('/resend-verification', resendVerificationLimiter, async (req, res) 
 
   const trimmedEmail = email.trim().toLowerCase();
 
-  const { error } = await supabase.auth.admin.generateLink({
+  // auth.resend dispatches the email; admin.generateLink (used previously)
+  // only returned the link without sending it.
+  const { error } = await supabase.auth.resend({
     type: 'signup',
     email: trimmedEmail,
-    options: { redirectTo: `${process.env.APP_URL || 'https://cardpop.com.au'}/account` },
+    options: { emailRedirectTo: `${process.env.APP_URL || 'https://cardpop.com.au'}/account` },
   });
 
   // Always return success to prevent email enumeration

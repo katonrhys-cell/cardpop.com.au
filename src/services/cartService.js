@@ -18,7 +18,23 @@ export async function priceCart(items, userId) {
   // the fee and the free-shipping threshold key off the shop-item subtotal.
   let shopItemsCents = 0;
 
+  // Merge duplicate lines before pricing. Two lines for one listing would both
+  // charge but only one can win the sold-claim (the other becomes a manual
+  // refund), and duplicate shop lines each pass the per-line stock check while
+  // overselling at decrement time.
+  const merged = new Map();
   for (const raw of items) {
+    const key = `${raw?.type}:${raw?.id}`;
+    const prev = merged.get(key);
+    if (!prev) {
+      merged.set(key, { ...raw });
+    } else if (raw?.type === 'shop') {
+      prev.quantity = (Math.max(1, parseInt(prev.quantity, 10) || 1)) + (Math.max(1, parseInt(raw.quantity, 10) || 1));
+    }
+    // duplicate 'listing' lines collapse to one — a listing is one of a kind
+  }
+
+  for (const raw of merged.values()) {
     const type = raw?.type;
     const id = raw?.id;
     const quantity = Math.max(1, parseInt(raw?.quantity, 10) || 1);

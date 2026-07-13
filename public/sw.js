@@ -25,6 +25,13 @@ const CACHE_NAMES = {
 // oldest-first). Card photos average ~100-300 KB, so this is roughly 100 MB.
 const MAX_IMAGE_ENTRIES = 500;
 
+// Cap the other caches too. STATIC accumulates each deploy's content-hashed
+// JS/CSS (old hashes are never requested again but were never evicted between
+// version bumps), and DYNAMIC stores every same-origin API GET — both grew
+// the origin's storage quota forever on returning visitors' devices.
+const MAX_STATIC_ENTRIES = 150;
+const MAX_DYNAMIC_ENTRIES = 50;
+
 // Only precache the app shell. Vite emits content-hashed asset filenames
 // (assets/*.js|css) that aren't known at SW-author time, and the previous list
 // included dev-only paths (/index.css, /global.css, /main.jsx) that 404 in
@@ -70,7 +77,8 @@ const networkFirst = async (request) => {
     if (response.ok) {
       // Cache successful responses
       const cache = await caches.open(CACHE_NAMES.DYNAMIC);
-      cache.put(request, response.clone());
+      await cache.put(request, response.clone());
+      trimCache(CACHE_NAMES.DYNAMIC, MAX_DYNAMIC_ENTRIES).catch(() => {});
     }
     return response;
   } catch (error) {
@@ -105,7 +113,8 @@ const cacheFirst = async (request) => {
     const response = await fetch(request);
     if (response.ok) {
       const cache = await caches.open(CACHE_NAMES.STATIC);
-      cache.put(request, response.clone());
+      await cache.put(request, response.clone());
+      trimCache(CACHE_NAMES.STATIC, MAX_STATIC_ENTRIES).catch(() => {});
     }
     return response;
   } catch (error) {

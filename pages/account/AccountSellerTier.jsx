@@ -220,7 +220,7 @@ const AccountSellerTier = () => {
               {/* CTA if not yet verified */}
               {req.verified && !metVerified && !isCurrent && (
                 <Button asChild variant="outline" size="sm" className="w-full rounded-xl text-xs font-bold gap-1.5 border-blue-400/50 text-blue-600">
-                  <Link to="/account/verification"><ShieldCheck className="w-3.5 h-3.5" /> Verify Identity</Link>
+                  <Link to="/verify-identity"><ShieldCheck className="w-3.5 h-3.5" /> Verify Identity</Link>
                 </Button>
               )}
             </div>
@@ -231,7 +231,7 @@ const AccountSellerTier = () => {
       {/* FAQ note */}
       <div className="bg-muted/40 border border-border rounded-2xl p-5 text-sm text-muted-foreground">
         <p className="font-bold text-foreground mb-1">How are tiers calculated?</p>
-        <p>Tiers update automatically as you complete sales and receive reviews. Completed sales are counted when an order reaches <span className="font-bold">completed</span> status. Ratings are the average across all visible reviews. Identity verification is managed under <Link to="/account/verification" className="text-primary font-bold hover:underline">Account Verification</Link>.</p>
+        <p>Tiers update automatically as you complete sales and receive reviews. Completed sales are counted when an order reaches <span className="font-bold">completed</span> status. Ratings are the average across all visible reviews. Identity verification is handled securely by Stripe — start it at <Link to="/verify-identity" className="text-primary font-bold hover:underline">Verify Identity</Link>.</p>
       </div>
     </div>
   );

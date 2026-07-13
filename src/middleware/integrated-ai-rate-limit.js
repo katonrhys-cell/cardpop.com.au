@@ -5,7 +5,7 @@ import logger from '../utils/logger.js';
 // AI endpoint limiter: 10 requests/min. Keyed on the authenticated user id when
 // available, falling back to the derived client IP for anonymous callers. Every
 // router that mounts this (integrated-ai, card-ocr, card-description,
-// grade-estimator, id-verification) applies `supabaseAuth` at the router level
+// grade-estimator) applies `supabaseAuth` at the router level
 // BEFORE this limiter runs, so req.userId is populated for signed-in users.
 // Keying on user id (not raw IP) stops one budget being shared across every user
 // behind a shared NAT, and stops a signed-in user getting a fresh budget simply
