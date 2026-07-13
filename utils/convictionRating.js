@@ -125,17 +125,18 @@ export const convictionTypeForCategory = (category) =>
   CATEGORY_CONVICTION_TYPE[category] || null;
 
 // Resolve an article into everything the meter needs, or null when the article
-// carries no valid rating. `conviction_type` on the row wins; otherwise we fall
-// back to the category mapping, then to 'buy' so a rating always renders.
+// carries no rating we can render. `conviction_type` on the row wins; otherwise
+// we derive it from the category. If neither yields a type — e.g. an
+// educational category like Beginner Guides that intentionally has no rating —
+// we return null so the meter stays hidden rather than guessing a type.
 export const resolveConviction = (article) => {
   const rating = Number(article?.conviction_rating);
   if (!(rating >= 1 && rating <= 5)) return null;
 
   const typeKey =
-    article?.conviction_type ||
-    convictionTypeForCategory(article?.category) ||
-    'buy';
-  const type = CONVICTION_TYPES[typeKey] || CONVICTION_TYPES.buy;
+    article?.conviction_type || convictionTypeForCategory(article?.category);
+  const type = typeKey ? CONVICTION_TYPES[typeKey] : null;
+  if (!type) return null;
   const level = CONVICTION_LEVELS[rating];
 
   return {

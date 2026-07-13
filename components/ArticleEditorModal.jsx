@@ -11,15 +11,12 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Upload, FileCode, CheckCircle2, Plus, Trash2 } from 'lucide-react';
 import { CONVICTION_LEVELS, CONVICTION_TYPES, convictionTypeForCategory } from '@/utils/convictionRating.js';
+import { BLOG_CATEGORIES } from '@/data/blogCategories.js';
 
-const CATEGORIES = [
-  { value: 'australia-focus',  label: 'Australia Focus'   },
-  { value: 'beginner-guides',  label: 'Beginner Guides'   },
-  { value: 'card-spotlight',   label: 'Card Spotlight'    },
-  { value: 'grading-guides',   label: 'Grading Hub'       },
-  { value: 'investing-value',  label: 'Investing & Value' },
-  { value: 'news-releases',    label: 'News & Releases'   },
-];
+// Derived from the shared blog taxonomy (data/blogCategories.js) so the editor,
+// blog grid, article page, nav dropdown, sitemap and prerenderer never drift.
+const CATEGORIES = BLOG_CATEGORIES.map((c) => ({ value: c.slug, label: c.label }));
+const CATEGORY_LABEL = Object.fromEntries(CATEGORIES.map((c) => [c.value, c.label]));
 
 // Mirrors the CardPop Conviction Rating™ scale rendered on the article page.
 // Levels are the universal strength labels; the TYPE (what the score is about)
@@ -450,9 +447,10 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
                     'Strength of our call, 1 (Minimal) → 5 (Highest). Leave as None for how-to / educational articles.'
                   ) : (() => {
                     const t = convictionTypeForCategory(category);
+                    const catLabel = CATEGORY_LABEL[category];
                     return t
-                      ? <>Shows as <span className="font-semibold text-foreground">{CONVICTION_TYPES[t].name}</span> — set by the “{category}” category. {CONVICTION_TYPES[t].question}</>
-                      : <>Pick a category (Investing, Card Spotlight, Grading Hub, News, Australia Focus) to set the rating type — otherwise it defaults to <span className="font-semibold text-foreground">Buy Conviction</span>.</>;
+                      ? <>Shows as <span className="font-semibold text-foreground">{CONVICTION_TYPES[t].name}</span> — set by the {catLabel} category. {CONVICTION_TYPES[t].question}</>
+                      : <><span className="font-semibold text-foreground">Won't display:</span> {catLabel ? `the ${catLabel} category carries` : 'no category is set, so there is'} no rating type. Choose Investing, Card Spotlight, Grading Hub, News or Australia Focus to show a rating.</>;
                   })()}
                 </p>
               </div>

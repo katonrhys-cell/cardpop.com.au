@@ -27,6 +27,9 @@ begin
 end $$;
 
 -- Backfill existing rated rows from their category so old articles get a type.
+-- Categories with no mapping (e.g. 'beginner-guides', which is educational and
+-- carries no rating by design) are left null on purpose — the meter hides when
+-- it can't resolve a type, rather than guessing one.
 update public.blog_articles
 set conviction_type = case category
     when 'investing-value' then 'buy'
@@ -34,7 +37,7 @@ set conviction_type = case category
     when 'card-spotlight'  then 'keeper'
     when 'grading-guides'  then 'grade'
     when 'news-releases'   then 'impact'
-    else 'buy'
+    else null
   end
 where conviction_rating is not null
   and conviction_type is null;

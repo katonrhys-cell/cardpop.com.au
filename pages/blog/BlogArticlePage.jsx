@@ -9,6 +9,7 @@ import { generateBlogPostingSchema, generateFAQStructuredData, generateBreadcrum
 import { htmlExcerpt } from '@/utils/htmlExcerpt.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import { resolveConviction, CONVICTION_METHODOLOGY_PATH } from '@/utils/convictionRating.js';
+import { BLOG_CATEGORY_MAP } from '@/data/blogCategories.js';
 
 const ConvictionRating = ({ article }) => {
   const conviction = resolveConviction(article);
@@ -57,11 +58,6 @@ const ConvictionRating = ({ article }) => {
     </div>
   );
 };
-
-const VALID_CATEGORIES = new Set([
-  'Market Watch', 'Investment Outlook', 'Set Analysis', 'Rookie Report',
-  'Industry News', 'Collector Insights', 'Population Report', 'Parallel Spotlight',
-]);
 
 const formatPublishedDate = (dateStr) => {
   if (!dateStr) return null;
@@ -310,6 +306,12 @@ const BlogArticlePage = () => {
     ? htmlContent.replace(/<[^>]*>/g, ' ').replace(/&[a-z]+;/gi, ' ').split(/\s+/).filter(Boolean).length
     : 0;
 
+  // blog_articles.category stores the slug; resolve it to the shared taxonomy
+  // (data/blogCategories.js) for the human label + pill colour. Mirrors the
+  // server-side prerenderer (api/prerender.js) so on-page and bot metadata agree.
+  const categoryMeta = article.category ? BLOG_CATEGORY_MAP[article.category] : null;
+  const categoryLabel = categoryMeta?.label || article.category || null;
+
   const { html: contentHtml, toc } = buildTableOfContents(
     htmlContent ? DOMPurify.sanitize(htmlContent, { ADD_ATTR: ['target'] }) : ''
   );
@@ -322,7 +324,7 @@ const BlogArticlePage = () => {
     updated: article.updated_at,
     excerpt: article.seo_description || article.excerpt,
     url: canonicalUrl,
-    category: article.category,
+    category: categoryLabel,
     tags: article.tags,
     readTime: article.read_time_minutes,
     wordCount
@@ -340,7 +342,7 @@ const BlogArticlePage = () => {
   const breadcrumbStructuredData = generateBreadcrumbStructuredData([
     { name: 'CardPop', url: 'https://cardpop.com.au' },
     { name: 'The Parallel Report', url: 'https://cardpop.com.au/blog' },
-    ...(article.category ? [{ name: article.category, url: `https://cardpop.com.au/blog/category/${encodeURIComponent(article.category)}` }] : []),
+    ...(article.category ? [{ name: categoryLabel, url: `https://cardpop.com.au/blog/category/${encodeURIComponent(article.category)}` }] : []),
     { name: article.title, url: canonicalUrl },
   ]);
 
@@ -400,12 +402,13 @@ const BlogArticlePage = () => {
           {/* Divider */}
           <div className="border-t border-white/10 mb-7" />
 
-          {/* Category badge */}
-          {article.category && VALID_CATEGORIES.has(article.category) && (
-            <span className="inline-block text-[11px] font-bold tracking-widest uppercase px-3 py-1 rounded mb-5"
-                  style={{ background: '#CE1126', color: '#fff' }}>
-              {article.category}
-            </span>
+          {/* Category badge — colour matches this category's pill on the blog
+              grid and its icon in the nav dropdown (shared taxonomy). */}
+          {categoryMeta && (
+            <Link to={`/blog/category/${article.category}`}
+                  className={`inline-block text-[11px] font-bold tracking-widest uppercase px-3 py-1 rounded mb-5 bg-gradient-to-br ${categoryMeta.gradient} text-white hover:opacity-90 transition-opacity`}>
+              {categoryMeta.label}
+            </Link>
           )}
 
           {/* Article title */}
