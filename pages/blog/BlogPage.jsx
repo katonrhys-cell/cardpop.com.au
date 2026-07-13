@@ -196,6 +196,13 @@ const BlogPage = () => {
   // Articles for the main grid, filtered by category param, tag param or search
   const displayedArticles = useMemo(() => {
     let filtered = articles;
+    // On the unfiltered main page, articles shown in the Featured Stories strip
+    // are removed here so the same article never appears twice (featured + latest).
+    // Under a category/tag/search filter the Featured strip is hidden, so keep them.
+    if (featuredArticles.length > 0) {
+      const featuredIds = new Set(featuredArticles.map(a => a.id));
+      filtered = filtered.filter(a => !featuredIds.has(a.id));
+    }
     if (categoryParam) filtered = filtered.filter(a => a.category === categoryParam);
     if (tagParam) {
       const t = tagParam.toLowerCase();
@@ -210,7 +217,7 @@ const BlogPage = () => {
       );
     }
     return filtered;
-  }, [articles, categoryParam, tagParam, searchTerm]);
+  }, [articles, featuredArticles, categoryParam, tagParam, searchTerm]);
 
   // Article count per category for the Explore section
   const categoryCounts = useMemo(() => {
