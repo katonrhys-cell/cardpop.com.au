@@ -33,8 +33,9 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
   const gradingCompany = product.grading_company || product.gradingCompany || '';
   const isGraded = gradingCompany && gradingCompany !== 'raw' && product.grade;
   // Vault listings render through the Card Showcase Engine (their chosen display
-  // style); shop products keep the plain cover-cropped image. display_style is a
-  // vault-only field, so its presence reliably marks a vault item.
+  // style); shop products show the full uncropped image (object-contain) so the
+  // whole card scan is visible. display_style is a vault-only field, so its
+  // presence reliably marks a vault item.
   const useShowcase = product.source === 'vault' || !!product.display_style;
 
   return (
@@ -59,7 +60,7 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
             sizes={CARD_GRID_SIZES}
             fallbackSrc={imgFallback}
             alt={product.name || product.cardName || 'Product Image'}
-            imgClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            imgClassName="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-500"
             width="400"
             height="500"
             priority={priority}
