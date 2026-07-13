@@ -6,7 +6,7 @@
   "functions": {
     "api/index.js": {
       "maxDuration": 40,
-      "includeFiles": "node_modules/@img/**"
+      "includeFiles": "{node_modules/@img/**,src/emails/assets/**}"
     },
     "api/sitemap.js": {
       "maxDuration": 10

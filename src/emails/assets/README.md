@@ -1,18 +1,31 @@
 # Email assets
 
-## `launch-welcome.pdf` — pre-launch early-access guide
+## `launch-welcome.pdf` — free collector's guide
 
 The pre-launch welcome email (`sendLaunchWelcome` in `src/utils/emailService.js`)
-attaches a PDF as **CardPop-Early-Access.pdf**. There are two ways to supply it —
-the first one found wins:
+attaches this PDF as **The-Basketball-Card-Collecting-Bible-2026-CardPop.pdf**.
 
-1. **Hosted URL (recommended for production):** set the `LAUNCH_WELCOME_PDF_URL`
-   env var to a publicly reachable PDF URL (e.g. a Supabase Storage public URL or
-   any CDN link). Resend fetches it at send time — nothing needs to be committed.
+The committed `launch-welcome.pdf` is *The Basketball Card Collecting Bible
+(2026 Edition)* — a branded, print-styled export of the blog article
+`/blog/the-basketball-card-collecting-bible-2026-edition`. It is read from disk
+and attached inline, and `vercel.json` includes `src/emails/assets/**` in the
+`api/index.js` function bundle so the file ships with the serverless function.
 
-2. **Committed file:** drop the PDF in this folder as **`launch-welcome.pdf`**.
-   It's read from disk and attached inline.
+Two ways to supply the PDF — the first one found wins:
+
+1. **Hosted URL:** set the `LAUNCH_WELCOME_PDF_URL` env var to a publicly
+   reachable PDF URL. Resend fetches it at send time and this committed file is
+   ignored. Handy for swapping the guide without a redeploy.
+2. **Committed file (current setup):** the `launch-welcome.pdf` in this folder.
 
 If **neither** is present the welcome email still sends — just without the
-attachment (logged at debug level). So the flow works end-to-end today; add the
-real PDF whenever it's ready, no code change required.
+attachment (logged at debug level), and the email copy omits the "attached
+guide" line automatically (`hasGuide` flag in `launchWelcomeEmail`).
+
+### Regenerating the PDF
+
+The guide is generated from the live blog article with a small Playwright
+script (branded cover + print CSS). If the article changes and you want to
+refresh the PDF, re-run that render against the article HTML and overwrite
+`launch-welcome.pdf`. Keep it lean (well under a few MB) so it stays a
+comfortable email attachment.

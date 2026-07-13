@@ -71,7 +71,7 @@ export function launchWelcomeEmail({ name, hasGuide = false } = {}) {
   // Only promise the attached guide when one is actually attached (a committed
   // PDF or LAUNCH_WELCOME_PDF_URL); otherwise close without referencing it.
   const closing = hasGuide
-    ? `<p>We've attached a short early-access guide with everything that's coming. Keep an eye on your inbox — the best is on its way.</p>`
+    ? `<p>To get you started, we've attached your <strong>free collector's guide — The Basketball Card Collecting Bible (2026 Edition)</strong>: everything an Australian collector needs to know before buying their first card. Keep an eye on your inbox — the best is on its way.</p>`
     : `<p>Keep an eye on your inbox — we'll be in touch as soon as there's something new to explore. The best is on its way.</p>`;
   const body = `<p>Thanks for registering your interest in <strong>CardPop</strong> — Australia's home for buying, selling and trading collectible cards. We're still building, with a full launch planned for <strong>late 2026</strong>.</p>
 <p style="margin:0 0 8px;"><strong>As an early registrant, here's what you've locked in:</strong></p>

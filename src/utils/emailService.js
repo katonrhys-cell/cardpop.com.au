@@ -47,8 +47,8 @@ async function send({ to, subject, html, attachments }) {
   }
 }
 
-// Filename the recipient sees for the early-access PDF.
-const LAUNCH_PDF_FILENAME = 'CardPop-Early-Access.pdf';
+// Filename the recipient sees for the free guide attached to the welcome email.
+const LAUNCH_PDF_FILENAME = 'The-Basketball-Card-Collecting-Bible-2026-CardPop.pdf';
 // Committed fallback location — drop the real PDF here (or set
 // LAUNCH_WELCOME_PDF_URL to a hosted file) and it's attached automatically.
 const LAUNCH_PDF_PATH = join(__dirname, '..', 'emails', 'assets', 'launch-welcome.pdf');
