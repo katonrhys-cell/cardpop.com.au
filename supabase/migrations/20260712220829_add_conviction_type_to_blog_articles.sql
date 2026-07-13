@@ -5,8 +5,9 @@
 -- keeper call, a grade call or a market-impact call. Historically the meter
 -- inferred this from the free-text `category`, which is fragile. This column
 -- pins the type so the meter renders consistently even if the category
--- vocabulary drifts. Rendering still falls back to the category mapping, then
--- to 'buy', when this is null (see utils/convictionRating.js).
+-- vocabulary drifts. When this is null, rendering derives the type from the
+-- category; if that yields nothing (e.g. educational articles), the meter is
+-- hidden rather than guessed (see utils/convictionRating.js).
 --
 -- Idempotent + backward-compatible: nullable, no default, safe to land before
 -- the app that writes it.
@@ -39,6 +40,15 @@ set conviction_type = case category
     when 'news-releases'   then 'impact'
     else null
   end
+where conviction_rating is not null
+  and conviction_type is null;
+
+-- Clear inert ratings: a conviction_rating with no resolvable type never renders
+-- (the meter is hidden), so it's dead data. This targets educational articles
+-- (e.g. Beginner Guides) that were rated before the "educational = no rating"
+-- rule existed. Non-destructive to anything that displays.
+update public.blog_articles
+set conviction_rating = null
 where conviction_rating is not null
   and conviction_type is null;
 
