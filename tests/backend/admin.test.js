@@ -188,7 +188,7 @@ describe('PATCH /refunds/:id', () => {
       // The amount is computed from the joined ORDER (total_aud / platform_fee_aud),
       // NOT the buyer-supplied refund fields — those client values (here zeroed)
       // must be ignored so the fee retention can't be bypassed.
-      makeBuilder({ data: { id: 'r1', order_id: 'o1', buyer_id: 'b1', total_paid_aud: 0, commission_aud: 0, gst_aud: 0, order: { total_aud: 100, platform_fee_aud: 10 } }, error: null }), // fetch
+      makeBuilder({ data: { id: 'r1', order_id: 'o1', buyer_id: 'b1', status: 'pending', total_paid_aud: 0, commission_aud: 0, gst_aud: 0, order: { total_aud: 100, platform_fee_aud: 10 } }, error: null }), // fetch
       makeBuilder({ error: null }), // refunds update
       makeBuilder({ error: null }), // orders update
       makeBuilder({ error: null }), // notification insert
@@ -206,7 +206,7 @@ describe('PATCH /refunds/:id', () => {
 
   it('rejects a refund with a reason', async () => {
     queueFrom(
-      makeBuilder({ data: { id: 'r1', order_id: 'o1', buyer_id: 'b1' }, error: null }), // fetch
+      makeBuilder({ data: { id: 'r1', order_id: 'o1', buyer_id: 'b1', status: 'pending' }, error: null }), // fetch
       makeBuilder({ error: null }), makeBuilder({ error: null }), makeBuilder({ error: null }),
     );
     const res = await request(app).patch('/admin/refunds/r1').send({ action: 'reject', rejection_reason: 'Item delivered as described' });
@@ -218,6 +218,12 @@ describe('PATCH /refunds/:id', () => {
     queueFrom(makeBuilder({ data: null, error: null }));
     const res = await request(app).patch('/admin/refunds/missing').send({ action: 'approve' });
     expect(res.status).toBe(404);
+  });
+
+  it('409s when the refund is not pending — re-approving a processed refund would let it be double-issued', async () => {
+    queueFrom(makeBuilder({ data: { id: 'r1', order_id: 'o1', buyer_id: 'b1', status: 'processed' }, error: null }));
+    const res = await request(app).patch('/admin/refunds/r1').send({ action: 'approve' });
+    expect(res.status).toBe(409);
   });
 
   it('rejects an invalid action', async () => {

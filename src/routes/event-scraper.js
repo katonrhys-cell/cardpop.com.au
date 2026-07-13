@@ -340,10 +340,11 @@ router.post('/extract-event-from-content', authMiddleware, async (req, res) => {
   }
 
   const timeoutId = setTimeout(() => {
-    if (!responseEnded) {
-      responseEnded = true;
-      sendSSEError('AI processing timeout');
-    }
+    // sendSSEError no-ops once responseEnded is set, so it must be called
+    // FIRST — setting the flag before calling it left the response open
+    // forever on an AI timeout (destroying the source stream doesn't end res,
+    // since it's piped with end: false).
+    sendSSEError('AI processing timeout');
     sseStream.destroy();
   }, AI_PROCESSING_TIMEOUT);
 

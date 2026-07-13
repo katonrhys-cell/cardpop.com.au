@@ -88,13 +88,18 @@ export const CartProvider = ({ children }) => {
         }
       }
 
+      // One-of-a-kind marketplace listings are always quantity 1 — the server
+      // (cartService) hard-codes it at checkout, so a higher client quantity
+      // would show a total that diverges from the actual charge.
+      const isListing = product.type === 'listing';
+
       const nextItems = existingItem
         ? prevItems.map(item =>
             (item.variant?.id || item.product.id) === itemId
-              ? { ...item, quantity: item.quantity + quantity }
+              ? { ...item, quantity: isListing ? 1 : item.quantity + quantity }
               : item
           )
-        : [...prevItems, { product, variant, quantity }];
+        : [...prevItems, { product, variant, quantity: isListing ? 1 : quantity }];
 
       cartItemsRef.current = nextItems;
       setCartItems(nextItems);
@@ -112,9 +117,11 @@ export const CartProvider = ({ children }) => {
       return;
     }
     setCartItems(prevItems =>
-      prevItems.map(item =>
-        (item.variant?.id || item.product.id) === itemId ? { ...item, quantity } : item
-      )
+      prevItems.map(item => {
+        if ((item.variant?.id || item.product.id) !== itemId) return item;
+        // Marketplace listings are capped at quantity 1 (server hard-codes it)
+        return { ...item, quantity: item.product?.type === 'listing' ? 1 : quantity };
+      })
     );
   }, [removeFromCart]);
 

@@ -24,13 +24,16 @@ router.post('/stream', integratedAiRateLimit, uploadFiles({
 	const { message } = req.body;
 
 	if (!message) {
-		throw new Error('message is required');
+		return res.status(400).json({ error: 'message is required' });
 	}
 
 	let parsedMessage;
 	try {
 		parsedMessage = JSON.parse(message);
 	} catch {
+		return res.status(400).json({ error: 'message must be a valid JSON array' });
+	}
+	if (!Array.isArray(parsedMessage)) {
 		return res.status(400).json({ error: 'message must be a valid JSON array' });
 	}
 
@@ -52,7 +55,11 @@ router.post('/stream', integratedAiRateLimit, uploadFiles({
 	res.setHeader('Connection', 'keep-alive');
 	res.setHeader('X-Accel-Buffering', 'no');
 
-	sseStream.pipe(res, { end: false });
+	// Default pipe semantics (end: true): the stream ends itself after the
+	// [COMPLETED] event, and that must end the HTTP response too — piping with
+	// { end: false } left every response open until the client aborted or the
+	// function timed out.
+	sseStream.pipe(res);
 
 	res.on('close', () => sseStream.destroy());
 });

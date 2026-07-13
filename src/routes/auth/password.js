@@ -64,22 +64,25 @@ router.post('/reset/request', async (req, res) => {
   const trimmedEmail = email.trim().toLowerCase();
   logger.info(`Password reset requested for ${trimmedEmail}`);
 
-  // Use Supabase's built-in password reset email
-  const { data, error } = await supabase.auth.admin.generateLink({
-    type: 'recovery',
-    email: trimmedEmail,
-    options: { redirectTo: `${process.env.APP_URL || 'https://cardpop.com.au'}/reset-password` },
+  // resetPasswordForEmail actually dispatches the reset email via Supabase's
+  // mailer — admin.generateLink (used previously) only RETURNS the link and
+  // never sends anything, so this endpoint claimed success while doing nothing.
+  const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+    redirectTo: `${process.env.APP_URL || 'https://cardpop.com.au'}/reset-password`,
   });
 
   if (error) {
     logger.warn(`Password reset failed for ${trimmedEmail}: ${error.message}`);
   } else {
-    // Audit log (best-effort). generateLink already returns the resolved user;
-    // there is no supabase.auth.admin.getUserByEmail method.
-    const user = data?.user;
-    if (user) {
+    // Audit log (best-effort) — resolve the user id from the profile email.
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', trimmedEmail)
+      .maybeSingle();
+    if (profile?.id) {
       await supabase.from('audit_logs').insert({
-        user_id: user.id,
+        user_id: profile.id,
         event_type: 'password_reset_requested',
         description: 'Password reset requested',
         ip_address: req.ip || 'unknown',

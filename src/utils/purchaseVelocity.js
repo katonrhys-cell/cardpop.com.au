@@ -24,24 +24,32 @@ const NON_COUNTING_STATUSES = new Set(['payment_failed', 'cancelled', 'canceled'
 /**
  * @returns {Promise<{ allowed: true } | { allowed: false, reason: string, message: string }>}
  */
-export async function checkPurchaseVelocity({ userId, orderValueAud }) {
+export async function checkPurchaseVelocity({ userId, guestEmail = null, orderValueAud }) {
   // Fail OPEN: a velocity-check outage must not block all checkouts. Any error
   // below returns allowed:true (logged), so payments keep working.
   try {
     const value = Number(orderValueAud) || 0;
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('created_at, is_verified, verification_status')
-      .eq('id', userId)
-      .maybeSingle();
+    // Guests have no profile to age or verify — they get the new-account
+    // limits, keyed on the checkout email. (Previously a null userId resolved
+    // to ageMs = Infinity → "not new" → trusted, so guest checkout bypassed
+    // every cap — exactly the identity-free path a stolen card would use.)
+    const isGuest = !userId;
+
+    const { data: profile } = isGuest
+      ? { data: null }
+      : await supabase
+          .from('profiles')
+          .select('created_at, is_verified, verification_status')
+          .eq('id', userId)
+          .maybeSingle();
 
     const isVerified =
       profile?.is_verified === true || profile?.verification_status === 'approved';
     const ageMs = profile?.created_at
       ? Date.now() - new Date(profile.created_at).getTime()
       : Number.POSITIVE_INFINITY;
-    const isNewAccount = ageMs < NEW_ACCOUNT_WINDOW_MS;
+    const isNewAccount = isGuest || ageMs < NEW_ACCOUNT_WINDOW_MS;
 
     // Trusted: verified, or past the new-account window.
     if (isVerified || !isNewAccount) return { allowed: true };
@@ -55,11 +63,20 @@ export async function checkPurchaseVelocity({ userId, orderValueAud }) {
     }
 
     const since = new Date(Date.now() - VELOCITY_WINDOW_MS).toISOString();
-    const { data: recent } = await supabase
+    let recentQuery = supabase
       .from('orders')
       .select('total_aud, status')
-      .eq('buyer_id', userId)
       .gte('created_at', since);
+    if (isGuest) {
+      // Guest orders carry no buyer_id — key the rolling window on the
+      // checkout email instead. No email (shouldn't happen — the checkout
+      // route requires one) still leaves the per-order cap above in force.
+      if (!guestEmail) return { allowed: true };
+      recentQuery = recentQuery.eq('buyer_email', String(guestEmail).toLowerCase());
+    } else {
+      recentQuery = recentQuery.eq('buyer_id', userId);
+    }
+    const { data: recent } = await recentQuery;
 
     const counting = (recent || []).filter((o) => !NON_COUNTING_STATUSES.has(o.status));
     const orderCount = counting.length;

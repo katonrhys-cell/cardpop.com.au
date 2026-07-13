@@ -161,7 +161,11 @@ export async function createSingleItemCheckout(req, res) {
       walletCustomerId = await ensureWalletCustomer(stripe, userId, { email });
       const buyerTotalCents = Math.round(buyerTotal * 100);
       const availableCents = await getWalletBalanceCents(stripe, userId);
-      const walletCents = Math.min(availableCents, buyerTotalCents);
+      // Leave at least Stripe's AUD minimum charge (50¢) on the card — a
+      // payment-mode session discounted to $0 is rejected by Stripe, which
+      // surfaced as an opaque checkout failure for buyers whose balance
+      // covered the whole order.
+      const walletCents = Math.min(availableCents, Math.max(0, buyerTotalCents - 50));
       if (walletCents > 0) {
         const coupon = await stripe.coupons.create({
           amount_off: walletCents,

@@ -7,9 +7,9 @@ import request from 'supertest';
 const mockSupabase = vi.hoisted(() => ({
   from: vi.fn(),
   auth: {
+    resend: vi.fn(),
     admin: {
       getUserById: vi.fn(),
-      generateLink: vi.fn(),
     },
   },
 }));
@@ -70,16 +70,16 @@ describe('POST /send-verification-email', () => {
     expect(res.status).toBe(404);
   });
 
-  it('returns 500 when generateLink fails', async () => {
+  it('returns 500 when the resend call fails', async () => {
     mockSupabase.auth.admin.getUserById.mockResolvedValue({ data: { user: USER }, error: null });
-    mockSupabase.auth.admin.generateLink.mockResolvedValue({ error: { message: 'link error' } });
+    mockSupabase.auth.resend.mockResolvedValue({ error: { message: 'link error' } });
     const res = await request(app).post('/send-verification-email').send({});
     expect(res.status).toBe(500);
   });
 
   it('returns success when email is sent', async () => {
     mockSupabase.auth.admin.getUserById.mockResolvedValue({ data: { user: USER }, error: null });
-    mockSupabase.auth.admin.generateLink.mockResolvedValue({ error: null });
+    mockSupabase.auth.resend.mockResolvedValue({ error: null });
     mockSupabase.from.mockReturnValue(makeBuilder({ data: null, error: null }));
     const res = await request(app).post('/send-verification-email').send({});
     expect(res.status).toBe(200);
@@ -96,21 +96,21 @@ describe('POST /resend-verification', () => {
   });
 
   it('always returns success (prevents enumeration)', async () => {
-    mockSupabase.auth.admin.generateLink.mockResolvedValue({ error: null });
+    mockSupabase.auth.resend.mockResolvedValue({ error: null });
     const res = await request(app).post('/resend-verification').send({ email: 'test@example.com' });
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
   });
 
-  it('returns success even when generateLink fails', async () => {
-    mockSupabase.auth.admin.generateLink.mockResolvedValue({ error: { message: 'some error' } });
+  it('returns success even when the resend call fails', async () => {
+    mockSupabase.auth.resend.mockResolvedValue({ error: { message: 'some error' } });
     const res = await request(app).post('/resend-verification').send({ email: 'unknown@example.com' });
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
   });
 
   it('rate-limits repeated resends to the same email (anti-bombing)', async () => {
-    mockSupabase.auth.admin.generateLink.mockResolvedValue({ error: null });
+    mockSupabase.auth.resend.mockResolvedValue({ error: null });
     const email = 'bomb-target@example.com';
     const statuses = [];
     for (let i = 0; i < 4; i++) {
@@ -123,7 +123,7 @@ describe('POST /resend-verification', () => {
   });
 
   it('limits per target email, so a different email is unaffected', async () => {
-    mockSupabase.auth.admin.generateLink.mockResolvedValue({ error: null });
+    mockSupabase.auth.resend.mockResolvedValue({ error: null });
     const res = await request(app).post('/resend-verification').send({ email: 'fresh-user@example.com' });
     expect(res.status).toBe(200);
   });

@@ -7,8 +7,8 @@ import request from 'supertest';
 const mockSupabase = vi.hoisted(() => ({
   from: vi.fn(),
   auth: {
+    resetPasswordForEmail: vi.fn().mockResolvedValue({ error: null }),
     admin: {
-      generateLink: vi.fn().mockResolvedValue({ error: null }),
       getUserByEmail: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
       listUsers: vi.fn().mockResolvedValue({ data: { users: [] } }),
       updateUserById: vi.fn().mockResolvedValue({ error: null }),
@@ -54,6 +54,7 @@ function makeBuilder(result = { data: null, error: null }) {
     update: vi.fn().mockReturnThis(),
     delete: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    maybeSingle: vi.fn(() => Promise.resolve(result)),
     then: (resolve, reject) => Promise.resolve(result).then(resolve, reject),
     catch: fn => Promise.resolve(result).catch(fn),
   };
@@ -87,15 +88,18 @@ describe('POST /reset/request', () => {
   });
 
   it('always returns success (prevents enumeration)', async () => {
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: null, error: null }));
     const res = await request(app).post('/reset/request').send({ email: 'test@example.com' });
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
   });
 
-  it('calls generateLink with recovery type', async () => {
+  it('sends the reset email via resetPasswordForEmail (generateLink never sent anything)', async () => {
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: null, error: null }));
     await request(app).post('/reset/request').send({ email: 'test@example.com' });
-    expect(mockSupabase.auth.admin.generateLink).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'recovery', email: 'test@example.com' }),
+    expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalledWith(
+      'test@example.com',
+      expect.objectContaining({ redirectTo: expect.stringContaining('/reset-password') }),
     );
   });
 });

@@ -51,6 +51,12 @@ router.get('/public', async (_req, res) => {
   } catch (err) {
     logger.error(`[SETTINGS] public read failed, serving defaults: ${err.message}`);
   }
+  // Identical for every visitor and fetched on every SPA boot — let the
+  // Cloudflare edge absorb it (overrides the API-wide no-store default).
+  // s-maxage 60 keeps a maintenance-mode flip visible within a minute.
+  res.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+  res.removeHeader('Pragma');
+  res.removeHeader('Expires');
   res.json(out);
 });
 

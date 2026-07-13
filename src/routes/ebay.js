@@ -450,7 +450,13 @@ router.get('/popular-cards', async (req, res) => {
       };
     });
 
-    ebayCache.set(CACHE_KEY, output);
+    // Don't cache a total outage — every card failed means one transient eBay
+    // hiccup would otherwise serve null prices for the full cache TTL.
+    if (results.some(r => r.status === 'fulfilled')) {
+      ebayCache.set(CACHE_KEY, output);
+    } else {
+      logger.warn('[POPULAR_CARDS] Every card failed — result not cached');
+    }
     logger.info(`[POPULAR_CARDS] Returning ${output.length} cards`);
     res.json(output);
   } catch (error) {

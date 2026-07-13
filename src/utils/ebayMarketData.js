@@ -76,7 +76,13 @@ function parseCondition(conditionId) {
 function extractCardInfo(item) {
   const title = item.title || '';
   const price = item.price?.value ? parseFloat(item.price.value) : 0;
-  const soldDate = item.itemWebUrl ? new Date(item.itemWebUrl).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+  // Browse API summaries carry the listing dates in itemCreationDate /
+  // itemEndDate (there is no true sold date on this endpoint). Guarded so an
+  // unparseable value falls back to today instead of throwing — an Invalid
+  // Date's toISOString() would 502 the whole market-data response.
+  const rawDate = item.itemEndDate || item.itemCreationDate || null;
+  const parsedDate = rawDate ? new Date(rawDate) : null;
+  const soldDate = (parsedDate && !isNaN(parsedDate.getTime()) ? parsedDate : new Date()).toISOString().split('T')[0];
   const condition = parseCondition(item.condition || '3000');
   
   return {
@@ -214,9 +220,14 @@ async function getMarketData() {
   const stats = calculateStats(cards);
 
   const result = { cards, stats };
-  ebayCache.set(cacheKey, result);
-  
-  logger.info(`[EBAY_MARKET] Market data cached: ${cards.length} unique cards`);
+  // Don't cache a total outage — an empty result would otherwise serve zeroed
+  // market data for the full cache TTL after one transient eBay failure.
+  if (allItems.length > 0) {
+    ebayCache.set(cacheKey, result);
+    logger.info(`[EBAY_MARKET] Market data cached: ${cards.length} unique cards`);
+  } else {
+    logger.warn('[EBAY_MARKET] Every collection failed — result not cached');
+  }
   return result;
 }
 
