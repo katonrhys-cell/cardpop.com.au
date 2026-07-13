@@ -101,6 +101,7 @@ async function serveFromR2(request, url, bucket, ctx) {
   headers.set('etag', object.httpEtag);
   headers.set('Cache-Control', 'public, max-age=31536000, immutable');
   headers.set('Access-Control-Allow-Origin', '*'); // service worker fetches in CORS mode
+  headers.set('x-image-source', 'r2'); // observability: served from R2, zero egress
 
   // Cache the full GET response at the edge, then hand the caller a body-correct
   // response for the actual method.
@@ -162,7 +163,36 @@ export default {
       headers.set('Cache-Control', 'public, max-age=31536000, immutable');
     }
 
-    return new Response(originResponse.body, {
+    // ── Lazy write-through migration into R2 ──────────────────────────────
+    // The first successful proxy of an object copies its bytes into R2, so
+    // every later request is served from the R2 fast path above (free egress)
+    // instead of re-hitting Supabase. tee() splits the stream: one half streams
+    // to the client now, the other is written to R2 in the background via
+    // ctx.waitUntil. Net cost is one Supabase read per object, once — and only
+    // for objects actually viewed. Skipped for HEAD (no body), non-2xx (never
+    // migrate a miss/error), and when there's no binding or waitUntil.
+    let clientBody = originResponse.body;
+    if (
+      isObject &&
+      env && env.IMAGES &&
+      ctx && typeof ctx.waitUntil === 'function' &&
+      request.method === 'GET' &&
+      originResponse.ok &&
+      originResponse.body
+    ) {
+      const key = decodeURIComponent(url.pathname.replace(OBJECT_PATH, ''));
+      if (key) {
+        const [toClient, toR2] = originResponse.body.tee();
+        clientBody = toClient;
+        const httpMetadata = {
+          contentType: originResponse.headers.get('content-type') || undefined,
+        };
+        // Never let a failed migration break the response the user is getting.
+        ctx.waitUntil(env.IMAGES.put(key, toR2, { httpMetadata }).catch(() => {}));
+      }
+    }
+
+    return new Response(clientBody, {
       status: originResponse.status,
       statusText: originResponse.statusText,
       headers,

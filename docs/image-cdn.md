@@ -82,6 +82,18 @@ requests fall back to Supabase). Transform requests
 (`/storage/v1/render/image/public/`) are never served from R2 — R2 can't resize —
 so they always proxy to Supabase.
 
+**Lazy write-through migration:** the Worker doesn't just *read* from R2 — the
+first successful Supabase proxy of an object also *copies* its bytes into R2 in
+the background (the response is `tee()`d: one half streams to the client, the
+other is written to R2 via `ctx.waitUntil`). So every object migrates itself the
+first time it's viewed, and every request after that is served from the R2 fast
+path for free. Net migration cost is **one Supabase read per object, once**, and
+only for objects actually viewed — cold objects nobody looks at are never copied
+(and cost no egress anyway). This means new uploads need **no write-path change**:
+they land in Supabase as they always have, then migrate to R2 on first view.
+Write-through is skipped for HEAD requests, non-2xx responses, and render/transform
+paths.
+
 The binding is optional: with no `IMAGES` binding the Worker behaves exactly as
 the Supabase-only proxy did. See `tests/backend/imageProxyWorker.test.js` for the
 covered behaviours.
@@ -103,9 +115,29 @@ covered behaviours.
    It should return the R2 object; a key not in R2 should still return the
    Supabase-served image.
 
-Migrating existing objects into R2 (backfill) and pointing new uploads at R2 are
-separate follow-ups — until then, the bucket simply sits empty and every request
-falls through to Supabase exactly as before.
+**Backfill (optional pre-warm):** write-through already migrates each object the
+first time it's viewed, so no backfill is strictly required — the bucket fills
+itself as the site is used. To migrate everything up front (so even the first
+visitor gets the free R2 copy), run `scripts/backfill-images-to-r2.mjs`. It lists
+every object in the public buckets and requests each once through the CDN, which
+drives the same write-through — so it needs **no R2 credentials**, only the
+Supabase service-role key to list, and the Worker must already have the `IMAGES`
+binding:
+
+```
+SUPABASE_URL=https://odoglvswwymyjuwlonkf.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
+node scripts/backfill-images-to-r2.mjs --dry-run   # preview
+# then drop --dry-run to run for real
+```
+
+It reports how many objects it warmed vs. how many were already in R2 (via the
+`x-image-source: r2` response header), costs one Supabase read per not-yet-migrated
+object, and is safe to re-run.
+
+Pointing new uploads at R2 is **not** a separate task: because write-through
+migrates on first view, new uploads land in Supabase as before and move to R2 the
+first time they're shown — no upload-path change needed.
 
 ## Option B — AWS CloudFront (alternative, no code)
 
@@ -173,3 +205,6 @@ return traffic to the edge.
 - `scripts/backfill-image-cache-headers.mjs` — one-off script to re-upload
   pre-existing images with the long cache header (and recompress oversized
   ones if `sharp` is installed).
+- `scripts/backfill-images-to-r2.mjs` — one-off pre-warm that drives the
+  Worker's write-through to migrate every existing object into R2 (no R2
+  credentials needed).
