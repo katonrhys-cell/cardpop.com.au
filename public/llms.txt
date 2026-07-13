@@ -8,6 +8,7 @@
 - [Admin - Collection Sections | CardPop](https://cardpop.com.au/collectionsectionsadmin): No description available
 - [Admin - Hero Showcase | CardPop](https://cardpop.com.au/heroshowcaseadmin): No description available
 - [Admin - Manage Featured Cards | CardPop](https://cardpop.com.au/featuredcardsadmin): No description available
+- [Analytics & Reports | Admin Portal](https://cardpop.com.au/analyticsreports): No description available
 - [Brand Management | Admin Portal](https://cardpop.com.au/brandsmanagement): No description available
 - [Business Profiles | Admin](https://cardpop.com.au/businessprofilesmanagement): No description available
 - [Card Pop](https://cardpop.com.au/addeditcard): No description available
@@ -19,6 +20,7 @@
 - [Complete Profile | Card Pop](https://cardpop.com.au/profilecompletion): No description available
 - [Confirming Order | Card Pop](https://cardpop.com.au/checkoutsuccess): No description available
 - [Hierarchy Management | CardPop Admin](https://cardpop.com.au/categorymanagement): No description available
+- [Identity Verification | CardPop](https://cardpop.com.au/accountverification): No description available
 - [Log In | CardPop](https://cardpop.com.au/login): No description available
 - [Manage Events | Admin Portal](https://cardpop.com.au/eventsmanagement): No description available
 - [Membership | CardPop](https://cardpop.com.au/accountmembership): No description available
@@ -26,11 +28,14 @@
 - [My Digital Vault | CardPop](https://cardpop.com.au/myvault): No description available
 - [My Events | CardPop](https://cardpop.com.au/accountevents): No description available
 - [My Listings | CardPop](https://cardpop.com.au/accountlistings): No description available
+- [My Orders | CardPop](https://cardpop.com.au/accountorders): No description available
 - [My Vault | CardPop](https://cardpop.com.au/accountvault): No description available
 - [My Wallet | Card Pop](https://cardpop.com.au/userbalance): No description available
 - [Notification Settings | CardPop](https://cardpop.com.au/accountnotificationsettings): No description available
 - [Notifications | CardPop](https://cardpop.com.au/accountnotifications): No description available
+- [Offers | CardPop](https://cardpop.com.au/accountoffers): No description available
 - [Official Shop Management | Admin](https://cardpop.com.au/productmanagement): No description available
+- [Order Management | Admin](https://cardpop.com.au/ordermanagement): No description available
 - [Partner Dashboard | CardPop](https://cardpop.com.au/accountpartner): No description available
 - [Platform Settings | Admin](https://cardpop.com.au/adminsettings): No description available
 - [Product Lines Management | Admin Portal](https://cardpop.com.au/productlinesmanagement): No description available
@@ -57,5 +62,6 @@
 - [Verification Management | Admin](https://cardpop.com.au/adminverificationdashboard): No description available
 - [Verification Pending | Card Pop](https://cardpop.com.au/verificationpending): No description available
 - [Verification Status | CardPop](https://cardpop.com.au/verificationsubmission): No description available
+- [Verify Your Identity | Card Pop](https://cardpop.com.au/verifyidentity): No description available
 - [Wallet & Payouts | CardPop](https://cardpop.com.au/accountwallet): No description available
 - [Watchlist | CardPop](https://cardpop.com.au/accountwatchlist): No description available

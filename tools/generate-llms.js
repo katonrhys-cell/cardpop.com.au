@@ -6,7 +6,9 @@ import path from 'path';
 const CLEAN_CONTENT_REGEX = {
 	comments: /\/\*[\s\S]*?\*\/|\/\/.*$/gm,
 	templateLiterals: /`[\s\S]*?`/g,
-	strings: /'[^']*'|"[^"]*"/g,
+	// Bounded to one line: real string literals can't span raw newlines, and an
+	// apostrophe in JSX text (e.g. "you'll") must not swallow the lines below it.
+	strings: /'[^'\n]*'|"[^"\n]*"/g,
 	jsxExpressions: /\{.*?\}/g,
 	htmlEntities: {
 		quot: /&quot;/g,
