@@ -14,6 +14,8 @@ import PSAPopPanel from '@/components/PSAPopPanel.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import CertificationVerificationSection from '@/components/CertificationVerificationSection.jsx';
 import { getCardAttributeRows } from '@/lib/cardAttributeLabels.js';
+import { ROOKIE_VARIANT } from '@/lib/cardVariants.js';
+import RookiePill from '@/components/RookiePill.jsx';
 
 const VaultListingDetailPage = () => {
   const { itemId } = useParams();
@@ -171,7 +173,7 @@ const VaultListingDetailPage = () => {
                   {vi.is_foil && <Badge variant="outline" className="text-[10px] font-bold border-yellow-400/50 text-yellow-700 bg-yellow-400/10">Foil</Badge>}
                   {vi.is_refractor && <Badge variant="outline" className="text-[10px] font-bold border-indigo-400/50 text-indigo-700 bg-indigo-400/10">Refractor</Badge>}
                   {vi.is_auto && <Badge variant="outline" className="text-[10px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10">Auto</Badge>}
-                  {vi.is_rookie && <Badge variant="outline" className="text-[10px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10">Rookie Card</Badge>}
+                  {vi.is_rookie && <RookiePill />}
                   {vi.is_sealed && <Badge variant="outline" className="text-[10px] font-bold border-green-400/50 text-green-700 bg-green-400/10">Sealed</Badge>}
                 </div>
               </div>
@@ -182,7 +184,7 @@ const VaultListingDetailPage = () => {
               <div className="flex justify-between items-start pt-1">
                 <span className="text-muted-foreground">Variant / Finish</span>
                 <div className="flex flex-wrap gap-1.5 justify-end max-w-[60%]">
-                  {vi.variant.split(',').map(v => v.trim()).filter(Boolean).map(v => (
+                  {vi.variant.split(',').map(v => v.trim()).filter(v => v && v !== ROOKIE_VARIANT).map(v => (
                     <Badge key={v} variant="outline" className="text-[10px] font-bold border-primary/30 text-primary bg-primary/5">{v}</Badge>
                   ))}
                 </div>

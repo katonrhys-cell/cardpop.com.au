@@ -13,15 +13,13 @@ import BnplMessage from '@/components/BnplMessage.jsx';
 import { getCardImage, CARD_GRID_SIZES, toCdnUrl } from '@/utils/imageUrl.js';
 import { isVerified } from '@/utils/verification.js';
 import GradeBadge from '@/components/GradeBadge.jsx';
-
-const BasketballSinglet = ({ className = 'w-3 h-3' }) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M6 3h12M8 3l-1 6v12h10V9l-1-6M8 3h2M14 3h2M9 9h6M8 9v12h8V9" />
-  </svg>
-);
+import { ROOKIE_VARIANT } from '@/lib/cardVariants.js';
+import RookiePill from '@/components/RookiePill.jsx';
 
 const ProductCard = ({ product, onAddToCart, priority = false }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
+  const variants = (product.variant || product.cardVariant || '').split(',').map(v => v.trim()).filter(Boolean);
+  const isRookie = variants.includes(ROOKIE_VARIANT) || !!(product.is_rookie || product.isRookie);
   const rawImg = product.images?.[0] || product.cardImage?.[0] || product.card_image || product.image_url || null;
   const { src: imgSrc, srcSet: imgSrcSet, fallbackSrc: imgFallback } = getCardImage(rawImg);
   const sellerId = product.seller_id || product.seller || product.owner_id || product.owner || product.user_id;
@@ -131,13 +129,9 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
             {(product.is_foil || product.isFoil) && <Badge variant="outline" className="text-[10px] font-bold border-yellow-400/50 text-yellow-700 bg-yellow-400/10">Foil</Badge>}
             {getRefractorLabel(product) && <Badge variant="outline" className={`text-[10px] font-bold ${getRefractorBadgeClass(product)}`}>{getRefractorLabel(product)}</Badge>}
             {(product.is_auto || product.isAuto) && <Badge variant="outline" className="text-[10px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10">Auto</Badge>}
-            {(product.is_rookie || product.isRookie) && (
-              <Badge variant="outline" className="text-[10px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10 gap-1">
-                <BasketballSinglet /> RC
-              </Badge>
-            )}
+            {isRookie && <RookiePill />}
             {(product.is_sealed || product.isSealed) && <Badge variant="outline" className="text-[10px] font-bold border-green-400/50 text-green-700 bg-green-400/10">Sealed</Badge>}
-            {(product.variant || product.cardVariant) && (product.variant || product.cardVariant).split(',').map(v => v.trim()).filter(v => v && v !== 'Refractor').map(v => (
+            {variants.filter(v => v !== 'Refractor' && v !== ROOKIE_VARIANT).map(v => (
               <Badge key={v} variant="outline" className="text-[10px] font-bold border-primary/30 text-primary bg-primary/5">{v}</Badge>
             ))}
           </div>

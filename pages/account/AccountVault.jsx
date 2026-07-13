@@ -18,6 +18,8 @@ import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 import VaultListingModal from '@/components/VaultListingModal.jsx';
 import PSAPopPanel from '@/components/PSAPopPanel.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import { ROOKIE_VARIANT } from '@/lib/cardVariants.js';
+import RookiePill from '@/components/RookiePill.jsx';
 
 const CONDITION_LABELS = {
   mint: 'Mint', near_mint: 'Near Mint', excellent: 'Excellent',
@@ -192,7 +194,8 @@ const AccountVault = () => {
             {card.collection && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{card.collection}</Badge>}
             {card.year && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{card.year}</Badge>}
             {card.card_number && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">#{card.card_number}</Badge>}
-            {card.variant && card.variant.split(',').map(v => v.trim()).filter(Boolean).map(v => (
+            {(card.is_rookie || (card.variant || '').includes(ROOKIE_VARIANT)) && <RookiePill />}
+            {card.variant && card.variant.split(',').map(v => v.trim()).filter(v => v && v !== ROOKIE_VARIANT).map(v => (
               <Badge key={v} variant="secondary" className="text-[10px] font-medium bg-violet-500/10 text-violet-700 border border-violet-200/50">{v}</Badge>
             ))}
             {card.condition && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{CONDITION_LABELS[card.condition] || card.condition}</Badge>}
