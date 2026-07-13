@@ -29,11 +29,12 @@ const ProductGrid = ({ items, loading, isVault = true, onAddToCart }) => {
 
   return (
     <div className="seo-product-grid">
-      {items.map((item) => (
+      {items.map((item, i) => (
         <ProductCard
           key={item.id}
           product={{ ...item, source: item.source || (isVault ? 'vault' : 'shop') }}
           onAddToCart={onAddToCart}
+          priority={i < 2}
         />
       ))}
     </div>

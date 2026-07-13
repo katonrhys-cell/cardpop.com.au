@@ -20,7 +20,7 @@ const BasketballSinglet = ({ className = 'w-3 h-3' }) => (
   </svg>
 );
 
-const ProductCard = ({ product, onAddToCart }) => {
+const ProductCard = ({ product, onAddToCart, priority = false }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
   const rawImg = product.images?.[0] || product.cardImage?.[0] || product.card_image || product.image_url || null;
   const { src: imgSrc, srcSet: imgSrcSet, fallbackSrc: imgFallback } = getCardImage(rawImg);
@@ -50,6 +50,7 @@ const ProductCard = ({ product, onAddToCart }) => {
             displayStyle={product.display_style}
             width="400"
             height="500"
+            priority={priority}
           />
         ) : (
           <CardImage
@@ -61,6 +62,7 @@ const ProductCard = ({ product, onAddToCart }) => {
             imgClassName="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             width="400"
             height="500"
+            priority={priority}
           />
         )}
         {/* Condition badge — top left */}

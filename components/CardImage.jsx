@@ -31,6 +31,12 @@ const CardImage = ({
   width,
   height,
   loading = 'lazy',
+  // Mark the above-the-fold LCP image (e.g. the first card in a grid). Lazy-
+  // loading the LCP image is a documented anti-pattern that delays Largest
+  // Contentful Paint, so a priority image loads eagerly at high fetch priority
+  // and skips the opacity fade-in (which would push its first paint ~500ms
+  // later). Leave false for everything below the fold.
+  priority = false,
   ...props
 }) => {
   const [status, setStatus] = useState('loading'); // 'loading' | 'loaded' | 'error'
@@ -110,7 +116,8 @@ const CardImage = ({
         alt={alt}
         width={width}
         height={height}
-        loading={loading}
+        loading={priority ? 'eager' : loading}
+        fetchPriority={priority ? 'high' : undefined}
         decoding="async"
         // This component runs its own multi-tier fallback (above), so the
         // global CDN→origin safety net in utils/imageCdnFallback.js must not
@@ -118,8 +125,12 @@ const CardImage = ({
         data-managed-image=""
         onLoad={() => setStatus('loaded')}
         onError={handleError}
-        className={`${imgClassName} transition-opacity duration-500 ${
-          status === 'loaded' ? 'opacity-100' : 'opacity-0'
+        // Priority (LCP) images render at full opacity immediately — the fade-in
+        // used for below-the-fold cards would delay their first paint.
+        className={`${imgClassName} ${
+          priority
+            ? ''
+            : `transition-opacity duration-500 ${status === 'loaded' ? 'opacity-100' : 'opacity-0'}`
         }`}
         {...props}
       />

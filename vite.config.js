@@ -154,6 +154,34 @@ function addHomeRoutePreloads(html, bundle, warn) {
 const SYNE_FALLBACK_FONT_FACE =
 	"@font-face{font-family:'Syne Fallback';src:local('Arial'),local('Roboto'),local('Liberation Sans'),local('DejaVu Sans');ascent-override:94%;descent-override:26%;line-gap-override:0%;size-adjust:115%}";
 
+// Normalise a bare host or full URL to an origin (`https://img.cardpop.com.au`),
+// mirroring normalizeCdnHost in utils/imageUrl.js. Returns null when unset.
+function cdnPreconnectOrigin(host) {
+	if (!host || typeof host !== 'string') return null;
+	const trimmed = host.trim().replace(/\/+$/, '');
+	if (!trimmed) return null;
+	try {
+		return new URL(/^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`).origin;
+	} catch {
+		return null;
+	}
+}
+
+// Add a preconnect to the image CDN into a document's <head>, if one is
+// configured. No-op (returns the HTML unchanged) when VITE_IMAGE_CDN_HOST is
+// unset or the head marker is missing. Used for app.html only — see caller.
+function injectImageCdnPreconnect(html, warn) {
+	const origin = cdnPreconnectOrigin(process.env.VITE_IMAGE_CDN_HOST);
+	if (!origin) return html;
+	if (html.includes(`preconnect" href="${origin}"`)) return html;
+	const tag = `<link rel="preconnect" href="${origin}" crossorigin />`;
+	if (!html.includes('</head>')) {
+		warn?.('image-cdn-preconnect: no </head> found — preconnect not injected');
+		return html;
+	}
+	return html.replace('</head>', `    ${tag}\n  </head>`);
+}
+
 function homeShellPlugin() {
 	const shellPath = path.resolve(__dirname, 'tools/home-shell.html');
 	return {
@@ -165,9 +193,20 @@ function homeShellPlugin() {
 			if (!existsSync(indexPath)) return;
 
 			const builtIndex = applyCspBootstrap(readFileSync(indexPath, 'utf-8'), (m) => this.warn(m));
+
+			// Content routes (marketplace, shop, product, category…) render an
+			// above-the-fold card image from the image CDN as their LCP element, so
+			// warming that origin's DNS/TCP/TLS ahead of the image request shaves
+			// meaningful time off mobile LCP. This preconnect goes ONLY into app.html
+			// — the homepage (index.html) paints a text <h1> with no above-fold
+			// image, so it keeps the "preconnect only to first-paint origins" rule.
+			// Gated on VITE_IMAGE_CDN_HOST (a real build-time env var on Vercel) so
+			// there's never a wasted preconnect when the CDN is disabled — images
+			// then come from Supabase, which is already preconnected.
+			const appHtml = injectImageCdnPreconnect(builtIndex, (m) => this.warn(m));
 			// Shell-less document for all non-root routes (CSS stays render-blocking
 			// there — those pages are React-gated, so it costs them nothing).
-			writeFileSync(path.join(outDir, 'app.html'), builtIndex, 'utf-8');
+			writeFileSync(path.join(outDir, 'app.html'), appHtml, 'utf-8');
 
 			// Inject the hero shell into the "/"-only index.html.
 			const marker = '<div id="root"></div>';
