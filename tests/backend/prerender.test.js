@@ -57,7 +57,7 @@ describe('prerender blog articles', () => {
       seo_description: 'A complete guide to parallels.', excerpt: 'Excerpt here',
       content_html: '<h2>Intro</h2><p>Parallels are alternate versions.</p>',
       featured_image_url: 'https://cdn.test/hero.jpg', author: 'CardPop Research',
-      category: 'Collector Insights', published_at: '2026-01-02T00:00:00.000Z',
+      category: 'investing-value', published_at: '2026-01-02T00:00:00.000Z',
       updated_at: '2026-02-02T00:00:00.000Z', read_time_minutes: 7, is_published: true,
     } };
     const { status, body } = await run('/blog/parallels-guide');
@@ -71,7 +71,7 @@ describe('prerender blog articles', () => {
     state.result = { data: {
       id: UUID, slug: 'parallels-guide', title: 'Understanding Card Parallels',
       excerpt: 'Excerpt here', content_html: '<p>Body text.</p><script>alert(1)</script>',
-      author: 'CardPop Research', category: 'Collector Insights',
+      author: 'CardPop Research', category: 'investing-value',
       published_at: '2026-01-02T00:00:00.000Z', is_published: true,
     } };
     const { body } = await run('/blog/parallels-guide');

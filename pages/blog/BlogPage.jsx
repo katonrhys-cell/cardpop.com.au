@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { BookOpen, FileX, AlertCircle, Search, User, Calendar, ArrowRight } from 'lucide-react';
 import { htmlExcerpt } from '@/utils/htmlExcerpt.js';
 import { BLOG_CATEGORIES as CATEGORIES } from '@/data/blogCategories.js';
+import { resolveConviction } from '@/utils/convictionRating.js';
 
 const CATEGORY_MAP = Object.fromEntries(CATEGORIES.map(c => [c.slug, c]));
 
@@ -31,26 +32,24 @@ const CategoryBadge = ({ slug }) => {
   );
 };
 
-// CardPop Conviction Rating™ — mirrors the scale rendered on the article page
-// (pages/blog/BlogArticlePage.jsx) and set in the editor (ArticleEditorModal).
-const CONVICTION_LABELS = ['', 'High Risk', 'Negative', 'Neutral', 'Positive', 'Strong Buy'];
-const CONVICTION_COLOURS = ['', '#dc2626', '#ea580c', '#ca8a04', '#16a34a', '#15803d'];
-
-// Compact 5-segment conviction meter for the blog card footer.
-const ConvictionMeter = ({ rating }) => {
-  const colour = CONVICTION_COLOURS[rating];
+// Compact conviction meter for the blog card footer. The heading names the
+// rating TYPE (Buy / Keeper / Grade / Impact) so a reader can tell at a glance
+// what the score is about; the full scale + methodology lives on the article
+// page. Mirrors utils/convictionRating.js — the single source of truth.
+const ConvictionMeter = ({ conviction }) => {
+  const { rating, label, colour, type, action } = conviction;
   return (
     <div>
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground">
-          CardPop Conviction
+      <div className="flex items-center justify-between gap-2 mb-1.5">
+        <span className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground truncate">
+          CardPop {type.name}
         </span>
-        <span className="text-[11px] font-bold" style={{ color: colour }}>
-          {rating}/5 &middot; {CONVICTION_LABELS[rating]}
+        <span className="text-[11px] font-bold whitespace-nowrap" style={{ color: colour }}>
+          {rating}/5 &middot; {label}
         </span>
       </div>
       <div className="flex items-center gap-1" role="img"
-           aria-label={`CardPop Conviction Rating ${rating} out of 5: ${CONVICTION_LABELS[rating]}`}>
+           aria-label={`CardPop ${type.name} ${rating} out of 5: ${label} — ${action}`}>
         {[1, 2, 3, 4, 5].map((i) => (
           <span key={i} className="flex-1 h-1.5 rounded-full"
                 style={{ background: i <= rating ? colour : 'hsl(var(--muted))' }} />
@@ -65,13 +64,12 @@ const ConvictionMeter = ({ rating }) => {
 // rating — so every card ends on a tidy, professional strip instead of a wall
 // of body text.
 const CardFooter = ({ article }) => {
-  const rating = Number(article.conviction_rating);
-  const hasRating = rating >= 1 && rating <= 5;
+  const conviction = resolveConviction(article);
   const mins = article.read_time_minutes;
   return (
     <div className="mt-auto pt-4">
-      {hasRating ? (
-        <ConvictionMeter rating={rating} />
+      {conviction ? (
+        <ConvictionMeter conviction={conviction} />
       ) : (
         <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           <BookOpen className="w-3.5 h-3.5" />

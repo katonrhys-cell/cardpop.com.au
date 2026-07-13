@@ -5,9 +5,10 @@
 // human-readable name. `gradient` is the Tailwind `bg-gradient-to-br` pair that
 // colours the category — it matches the icon badge for the same category in the
 // Blog nav dropdown (components/HeaderMenus.jsx) so the category pills on blog
-// cards read in the same colour as their dropdown icon. Keep
-// components/ArticleEditorModal.jsx's CATEGORIES (value/label) in sync when
-// adding a category.
+// cards read in the same colour as their dropdown icon. This is the single
+// source of truth: the editor (components/ArticleEditorModal.jsx), article page
+// badge/breadcrumb (pages/blog/BlogArticlePage.jsx), sitemap and prerenderer all
+// derive their category list/labels from here — add a category once, here.
 export const BLOG_CATEGORIES = [
   { slug: 'australia-focus',  label: 'Australia Focus',   desc: 'Australian trading card market and events',       gradient: 'from-green-500 to-emerald-600'  },
   { slug: 'beginner-guides',  label: 'Beginner Guides',   desc: 'Essential guides for new collectors and traders', gradient: 'from-blue-500 to-indigo-600'    },

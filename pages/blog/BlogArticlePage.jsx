@@ -8,48 +8,56 @@ import { ArrowLeft, FileText } from 'lucide-react';
 import { generateBlogPostingSchema, generateFAQStructuredData, generateBreadcrumbStructuredData } from '@/utils/seoUtils.js';
 import { htmlExcerpt } from '@/utils/htmlExcerpt.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import { resolveConviction, CONVICTION_METHODOLOGY_PATH } from '@/utils/convictionRating.js';
+import { BLOG_CATEGORY_MAP } from '@/data/blogCategories.js';
 
-const CONVICTION_LABELS = ['', 'High Risk', 'Negative', 'Neutral', 'Positive', 'Strong Buy'];
-const CONVICTION_COLOURS = ['', '#dc2626', '#ea580c', '#ca8a04', '#16a34a', '#15803d'];
-
-const ConvictionRating = ({ rating }) => {
-  if (!rating || rating < 1 || rating > 5) return null;
-  const colour = CONVICTION_COLOURS[rating];
+const ConvictionRating = ({ article }) => {
+  const conviction = resolveConviction(article);
+  if (!conviction) return null;
+  const { rating, label, colour, blurb, type, action } = conviction;
   return (
     <div className="mt-4 pt-4 border-t border-white/10">
-      {/* Heading + current reading */}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2.5">
+      {/* Type + current reading */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mb-1">
         <span className="text-[10px] font-bold tracking-widest uppercase text-white/40">
-          CardPop Conviction Rating™
+          CardPop {type.name}™
         </span>
         <span className="text-xs font-semibold" style={{ color: colour }}>
-          {rating}/5 &middot; {CONVICTION_LABELS[rating]}
+          {rating}/5 &middot; {label}
         </span>
       </div>
-      <p className="text-xs text-white/50 mb-3">Our confidence level in the card's investment thesis. 1 = High Risk, 5 = Strong Buy.</p>
+      <p className="text-xs text-white/50 mb-2.5">{type.question} {blurb}</p>
 
-      {/* Scale — 5 segments filled to the rating, with end-point meanings */}
+      {/* Scale — 5 segments filled to the rating, with strength end-points */}
       <div className="max-w-[15rem]">
         <div className="flex items-center gap-1" role="img"
-             aria-label={`Conviction ${rating} out of 5: ${CONVICTION_LABELS[rating]}`}>
+             aria-label={`${type.name} ${rating} out of 5: ${label} — ${action}`}>
           {[1, 2, 3, 4, 5].map((i) => (
             <span key={i} className="flex-1 h-1.5 rounded-full transition-colors"
                   style={{ background: i <= rating ? colour : 'rgba(255,255,255,0.12)' }} />
           ))}
         </div>
         <div className="flex justify-between mt-1.5">
-          <span className="text-[9px] uppercase tracking-wider text-white/35">High Risk</span>
-          <span className="text-[9px] uppercase tracking-wider text-white/35">Strong Buy</span>
+          <span className="text-[9px] uppercase tracking-wider text-white/35">Minimal</span>
+          <span className="text-[9px] uppercase tracking-wider text-white/35">Highest</span>
         </div>
       </div>
+
+      {/* What it means for you */}
+      <div className="mt-3 flex items-start gap-2">
+        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: colour }} />
+        <p className="text-xs text-white/70">
+          <span className="font-semibold text-white/90">What this means:</span> {action}.
+        </p>
+      </div>
+
+      <Link to={CONVICTION_METHODOLOGY_PATH}
+            className="mt-2.5 inline-block text-[11px] font-semibold underline underline-offset-2 text-white/45 hover:text-white/80 transition-colors">
+        How the CardPop Conviction Rating works →
+      </Link>
     </div>
   );
 };
-
-const VALID_CATEGORIES = new Set([
-  'Market Watch', 'Investment Outlook', 'Set Analysis', 'Rookie Report',
-  'Industry News', 'Collector Insights', 'Population Report', 'Parallel Spotlight',
-]);
 
 const formatPublishedDate = (dateStr) => {
   if (!dateStr) return null;
@@ -298,6 +306,12 @@ const BlogArticlePage = () => {
     ? htmlContent.replace(/<[^>]*>/g, ' ').replace(/&[a-z]+;/gi, ' ').split(/\s+/).filter(Boolean).length
     : 0;
 
+  // blog_articles.category stores the slug; resolve it to the shared taxonomy
+  // (data/blogCategories.js) for the human label + pill colour. Mirrors the
+  // server-side prerenderer (api/prerender.js) so on-page and bot metadata agree.
+  const categoryMeta = article.category ? BLOG_CATEGORY_MAP[article.category] : null;
+  const categoryLabel = categoryMeta?.label || article.category || null;
+
   const { html: contentHtml, toc } = buildTableOfContents(
     htmlContent ? DOMPurify.sanitize(htmlContent, { ADD_ATTR: ['target'] }) : ''
   );
@@ -310,7 +324,7 @@ const BlogArticlePage = () => {
     updated: article.updated_at,
     excerpt: article.seo_description || article.excerpt,
     url: canonicalUrl,
-    category: article.category,
+    category: categoryLabel,
     tags: article.tags,
     readTime: article.read_time_minutes,
     wordCount
@@ -328,7 +342,7 @@ const BlogArticlePage = () => {
   const breadcrumbStructuredData = generateBreadcrumbStructuredData([
     { name: 'CardPop', url: 'https://cardpop.com.au' },
     { name: 'The Parallel Report', url: 'https://cardpop.com.au/blog' },
-    ...(article.category ? [{ name: article.category, url: `https://cardpop.com.au/blog/category/${encodeURIComponent(article.category)}` }] : []),
+    ...(article.category ? [{ name: categoryLabel, url: `https://cardpop.com.au/blog/category/${encodeURIComponent(article.category)}` }] : []),
     { name: article.title, url: canonicalUrl },
   ]);
 
@@ -388,12 +402,13 @@ const BlogArticlePage = () => {
           {/* Divider */}
           <div className="border-t border-white/10 mb-7" />
 
-          {/* Category badge */}
-          {article.category && VALID_CATEGORIES.has(article.category) && (
-            <span className="inline-block text-[11px] font-bold tracking-widest uppercase px-3 py-1 rounded mb-5"
-                  style={{ background: '#CE1126', color: '#fff' }}>
-              {article.category}
-            </span>
+          {/* Category badge — colour matches this category's pill on the blog
+              grid and its icon in the nav dropdown (shared taxonomy). */}
+          {categoryMeta && (
+            <Link to={`/blog/category/${article.category}`}
+                  className={`inline-block text-[11px] font-bold tracking-widest uppercase px-3 py-1 rounded mb-5 bg-gradient-to-br ${categoryMeta.gradient} text-white hover:opacity-90 transition-opacity`}>
+              {categoryMeta.label}
+            </Link>
           )}
 
           {/* Article title */}
@@ -425,7 +440,7 @@ const BlogArticlePage = () => {
             )}
           </div>
 
-          <ConvictionRating rating={article.conviction_rating} />
+          <ConvictionRating article={article} />
 
         </div>
       </div>

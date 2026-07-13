@@ -10,24 +10,20 @@ import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Upload, FileCode, CheckCircle2, Plus, Trash2 } from 'lucide-react';
+import { CONVICTION_LEVELS, CONVICTION_TYPES, convictionTypeForCategory } from '@/utils/convictionRating.js';
+import { BLOG_CATEGORIES } from '@/data/blogCategories.js';
 
-const CATEGORIES = [
-  { value: 'australia-focus',  label: 'Australia Focus'   },
-  { value: 'beginner-guides',  label: 'Beginner Guides'   },
-  { value: 'card-spotlight',   label: 'Card Spotlight'    },
-  { value: 'grading-guides',   label: 'Grading Hub'       },
-  { value: 'investing-value',  label: 'Investing & Value' },
-  { value: 'news-releases',    label: 'News & Releases'   },
-];
+// Derived from the shared blog taxonomy (data/blogCategories.js) so the editor,
+// blog grid, article page, nav dropdown, sitemap and prerenderer never drift.
+const CATEGORIES = BLOG_CATEGORIES.map((c) => ({ value: c.slug, label: c.label }));
+const CATEGORY_LABEL = Object.fromEntries(CATEGORIES.map((c) => [c.value, c.label]));
 
 // Mirrors the CardPop Conviction Rating™ scale rendered on the article page.
-const CONVICTION_OPTIONS = [
-  { value: '1', label: '1 · High Risk'  },
-  { value: '2', label: '2 · Negative'   },
-  { value: '3', label: '3 · Neutral'    },
-  { value: '4', label: '4 · Positive'   },
-  { value: '5', label: '5 · Strong Buy' },
-];
+// Levels are the universal strength labels; the TYPE (what the score is about)
+// is derived from the article's category — see convictionTypeForCategory below.
+const CONVICTION_OPTIONS = CONVICTION_LEVELS
+  .filter(Boolean)
+  .map((l) => ({ value: String(l.value), label: `${l.value} · ${l.label}` }));
 
 // Comma / newline separated text ⇄ trimmed, de-duplicated string array
 const parseList = (text) =>
@@ -168,6 +164,10 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
         tags: parseList(tags),
         marketplace_keywords: parseList(marketplaceKeywords),
         conviction_rating: convictionRating === 'none' ? null : Number(convictionRating),
+        // Type is fixed by the category (Buy / Keeper / Grade / Impact). Stored
+        // explicitly so the meter renders consistently even if the category
+        // vocabulary later drifts. Null when there's no rating.
+        conviction_type: convictionRating === 'none' ? null : convictionTypeForCategory(category),
         read_time_minutes: (() => {
           const n = parseInt(readTimeMinutes, 10);
           return Number.isFinite(n) && n > 0 ? n : null;
@@ -442,7 +442,17 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">Investment thesis conviction. Leave as None for how-to / educational articles.</p>
+                <p className="text-xs text-muted-foreground">
+                  {convictionRating === 'none' ? (
+                    'Strength of our call, 1 (Minimal) → 5 (Highest). Leave as None for how-to / educational articles.'
+                  ) : (() => {
+                    const t = convictionTypeForCategory(category);
+                    const catLabel = CATEGORY_LABEL[category];
+                    return t
+                      ? <>Shows as <span className="font-semibold text-foreground">{CONVICTION_TYPES[t].name}</span> — set by the {catLabel} category. {CONVICTION_TYPES[t].question}</>
+                      : <><span className="font-semibold text-foreground">Won't display:</span> {catLabel ? `the ${catLabel} category carries` : 'no category is set, so there is'} no rating type. Choose Investing, Card Spotlight, Grading Hub, News or Australia Focus to show a rating.</>;
+                  })()}
+                </p>
               </div>
               <div className="space-y-1">
                 <Label>Read Time <span className="text-xs font-normal text-muted-foreground">(minutes)</span></Label>
