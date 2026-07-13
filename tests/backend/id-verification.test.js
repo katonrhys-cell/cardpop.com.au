@@ -7,12 +7,14 @@ import { EventEmitter } from 'node:events';
 
 const state = vi.hoisted(() => ({ userId: 'user-1', files: [] }));
 const mockStreamOneShot = vi.hoisted(() => vi.fn());
-const mockUploadImages = vi.hoisted(() => vi.fn());
+const mockUploadPrivateImage = vi.hoisted(() => vi.fn());
+const mockDeletePrivateImage = vi.hoisted(() => vi.fn());
 
 vi.mock('../../src/api/integrated-ai.js', () => ({
   ContentBlockType: { Text: 'text', Image: 'image' },
   streamOneShot: mockStreamOneShot,
-  uploadImagesToSupabase: mockUploadImages,
+  uploadPrivateImage: mockUploadPrivateImage,
+  deletePrivateImage: mockDeletePrivateImage,
 }));
 vi.mock('../../src/middleware/file-upload.js', () => ({
   uploadFiles: () => (req, _res, next) => { req.files = state.files; next(); },
@@ -59,7 +61,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.userId = 'user-1';
   state.files = [{ originalname: 'id.jpg', buffer: Buffer.from('x'), mimetype: 'image/jpeg' }];
-  mockUploadImages.mockResolvedValue(['https://storage/id.jpg']);
+  mockUploadPrivateImage.mockResolvedValue({ signedUrl: 'https://storage/signed/id.jpg?token=abc', path: 'ai-extract/user-1/abcd.jpg' });
+  mockDeletePrivateImage.mockResolvedValue(undefined);
 });
 
 // ─── POST /extract-name ────────────────────────────────────────────────────────
@@ -90,9 +93,14 @@ describe('POST /extract-name', () => {
       confidence: 'high',
       document_type: 'passport',
     });
-    // The uploaded image URL should be forwarded to the model.
-    expect(mockUploadImages).toHaveBeenCalledTimes(1);
+    // The scan goes to the private bucket (signed URL), scoped to the user,
+    // and is deleted once extraction completes.
+    expect(mockUploadPrivateImage).toHaveBeenCalledTimes(1);
+    expect(mockUploadPrivateImage).toHaveBeenCalledWith(
+      expect.objectContaining({ pathPrefix: 'ai-extract/user-1' }),
+    );
     expect(mockStreamOneShot).toHaveBeenCalledTimes(1);
+    expect(mockDeletePrivateImage).toHaveBeenCalledWith('ai-extract/user-1/abcd.jpg');
   });
 
   it('reassembles a JSON response streamed across multiple chunks', async () => {
@@ -127,18 +135,21 @@ describe('POST /extract-name', () => {
     expect(res.body).toEqual({ extracted_name: null, confidence: 'low', document_type: 'unknown' });
   });
 
-  it('returns 500 when the stream emits an error event', async () => {
+  it('returns 500 when the stream emits an error event — and still deletes the scan', async () => {
     setStream([], { errorAfter: true });
     const res = await request(app).post('/extract-name');
     expect(res.status).toBe(500);
     expect(res.body.error).toMatch(/name extraction failed/i);
     expect(res.body.extracted_name).toBeNull();
+    expect(mockDeletePrivateImage).toHaveBeenCalledWith('ai-extract/user-1/abcd.jpg');
   });
 
   it('returns 500 when image upload fails', async () => {
-    mockUploadImages.mockRejectedValue(new Error('storage down'));
+    mockUploadPrivateImage.mockRejectedValue(new Error('storage down'));
     const res = await request(app).post('/extract-name');
     expect(res.status).toBe(500);
     expect(res.body.error).toMatch(/name extraction failed/i);
+    // Nothing was uploaded, so there is nothing to delete (called with null).
+    expect(mockDeletePrivateImage).toHaveBeenCalledWith(null);
   });
 });

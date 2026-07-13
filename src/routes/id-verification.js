@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { ContentBlockType, streamOneShot, uploadImagesToSupabase } from '../api/integrated-ai.js';
+import { ContentBlockType, streamOneShot, uploadPrivateImage, deletePrivateImage } from '../api/integrated-ai.js';
 import { uploadFiles } from '../middleware/file-upload.js';
 import { integratedAiRateLimit } from '../middleware/integrated-ai-rate-limit.js';
 import { supabaseAuth } from '../middleware/supabase-auth.js';
@@ -61,12 +61,22 @@ router.post(
       return res.status(400).json({ error: 'An ID image is required' });
     }
 
+    // Government ID scans are sensitive: they go to the PRIVATE
+    // verification-docs bucket (never the public ai-images bucket), the AI
+    // proxy gets a short-lived signed URL, and the scan is deleted as soon as
+    // extraction finishes — the durable copy for admin review is uploaded
+    // separately by the verification form.
+    let uploadedPath = null;
     try {
-      const [imageUrl] = await uploadImagesToSupabase({ images: req.files });
+      const { signedUrl, path } = await uploadPrivateImage({
+        image: req.files[0],
+        pathPrefix: `ai-extract/${req.userId}`,
+      });
+      uploadedPath = path;
 
       const userMessage = [
         { type: ContentBlockType.Text, text: 'Extract the full legal name from this government ID document.' },
-        { type: ContentBlockType.Image, image: imageUrl },
+        { type: ContentBlockType.Image, image: signedUrl },
       ];
 
       const sseStream = await streamOneShot({ systemPrompt: IDNameExtractionPrompt, userMessage });
@@ -86,6 +96,8 @@ router.post(
     } catch (err) {
       logger.error('ID name extraction error:', err);
       return res.status(500).json({ error: 'Name extraction failed', extracted_name: null, confidence: 'low' });
+    } finally {
+      await deletePrivateImage(uploadedPath);
     }
   }
 );

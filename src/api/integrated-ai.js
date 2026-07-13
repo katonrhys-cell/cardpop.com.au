@@ -180,6 +180,51 @@ export async function uploadImagesToSupabase({ images }) {
 	return Promise.all(uploadPromises);
 }
 
+const PRIVATE_DOCS_BUCKET = 'verification-docs';
+
+/**
+ * Uploads a sensitive image (e.g. a government ID scan) to the PRIVATE
+ * verification-docs bucket and returns a short-lived signed URL for the AI
+ * proxy to fetch, plus the storage path so the caller can delete the object
+ * once processing finishes. Never use the public ai-images bucket for
+ * identity documents — public objects are world-readable forever.
+ *
+ * @param {{ image: Express.Multer.File, pathPrefix: string, ttlSeconds?: number }} params
+ * @returns {Promise<{ signedUrl: string, path: string }>}
+ */
+export async function uploadPrivateImage({ image, pathPrefix, ttlSeconds = 600 }) {
+	const ext = image.detectedExt || 'jpg';
+	const path = `${pathPrefix}/${crypto.randomBytes(8).toString('hex')}.${ext}`;
+
+	const { buffer, contentType } = await compressImageBuffer(image.buffer, image.mimetype);
+
+	const { error } = await supabase.storage.from(PRIVATE_DOCS_BUCKET).upload(path, buffer, {
+		contentType,
+		upsert: false,
+	});
+	if (error) throw new Error(`Private image upload failed: ${error.message}`);
+
+	const { data, error: signErr } = await supabase.storage
+		.from(PRIVATE_DOCS_BUCKET)
+		.createSignedUrl(path, ttlSeconds);
+	if (signErr || !data?.signedUrl) {
+		// Don't leave an orphaned document behind if we can't produce a URL.
+		await deletePrivateImage(path);
+		throw new Error(`Could not sign private image URL: ${signErr?.message || 'no URL returned'}`);
+	}
+
+	return { signedUrl: data.signedUrl, path };
+}
+
+/** Best-effort removal of a private document once processing is done. */
+export async function deletePrivateImage(path) {
+	if (!path) return;
+	const { error } = await supabase.storage.from(PRIVATE_DOCS_BUCKET).remove([path]);
+	if (error) {
+		logger.error(`Failed to delete private image ${path}: ${error.message} — remove it manually`);
+	}
+}
+
 /**
  * One-shot AI call without conversation history or persistence.
  * Intended for structured extraction tasks like card OCR.

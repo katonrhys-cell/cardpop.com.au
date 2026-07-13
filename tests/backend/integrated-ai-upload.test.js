@@ -10,20 +10,31 @@ vi.mock('../../src/utils/compressImageBuffer.js', () => ({
 
 const mockUpload = vi.hoisted(() => vi.fn().mockResolvedValue({ error: null }));
 const mockGetPublicUrl = vi.hoisted(() => vi.fn().mockReturnValue({ data: { publicUrl: 'https://example.com/x' } }));
+const mockCreateSignedUrl = vi.hoisted(() => vi.fn().mockResolvedValue({ data: { signedUrl: 'https://example.com/signed?token=t' }, error: null }));
+const mockRemove = vi.hoisted(() => vi.fn().mockResolvedValue({ error: null }));
+const mockStorageFrom = vi.hoisted(() => vi.fn());
 vi.mock('../../src/utils/supabaseClient.js', () => ({
   supabase: {
     storage: {
-      from: () => ({ upload: mockUpload, getPublicUrl: mockGetPublicUrl }),
+      from: mockStorageFrom,
     },
   },
 }));
 
-import { uploadImagesToSupabase } from '../../src/api/integrated-ai.js';
+import { uploadImagesToSupabase, uploadPrivateImage, deletePrivateImage } from '../../src/api/integrated-ai.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockUpload.mockResolvedValue({ error: null });
   mockGetPublicUrl.mockReturnValue({ data: { publicUrl: 'https://example.com/x' } });
+  mockCreateSignedUrl.mockResolvedValue({ data: { signedUrl: 'https://example.com/signed?token=t' }, error: null });
+  mockRemove.mockResolvedValue({ error: null });
+  mockStorageFrom.mockReturnValue({
+    upload: mockUpload,
+    getPublicUrl: mockGetPublicUrl,
+    createSignedUrl: mockCreateSignedUrl,
+    remove: mockRemove,
+  });
 });
 
 describe('uploadImagesToSupabase', () => {
@@ -72,5 +83,41 @@ describe('uploadImagesToSupabase', () => {
 
     const [path] = mockUpload.mock.calls[0];
     expect(path).toMatch(/^ocr\/[0-9a-f]{16}\.jpg$/);
+  });
+});
+
+describe('uploadPrivateImage / deletePrivateImage', () => {
+  const file = {
+    buffer: Buffer.from('fake-id-scan'),
+    mimetype: 'image/jpeg',
+    originalname: 'passport.jpg',
+    detectedExt: 'jpg',
+  };
+
+  it('uploads to the private verification-docs bucket and returns a signed URL + path', async () => {
+    const result = await uploadPrivateImage({ image: file, pathPrefix: 'ai-extract/user-1' });
+
+    expect(mockStorageFrom).toHaveBeenCalledWith('verification-docs');
+    const [path] = mockUpload.mock.calls[0];
+    expect(path).toMatch(/^ai-extract\/user-1\/[0-9a-f]{16}\.jpg$/);
+    expect(mockGetPublicUrl).not.toHaveBeenCalled();
+    expect(result).toEqual({ signedUrl: 'https://example.com/signed?token=t', path });
+  });
+
+  it('deletes the freshly uploaded object when signing fails, and throws', async () => {
+    mockCreateSignedUrl.mockResolvedValue({ data: null, error: { message: 'nope' } });
+
+    await expect(uploadPrivateImage({ image: file, pathPrefix: 'ai-extract/user-1' }))
+      .rejects.toThrow(/could not sign/i);
+    expect(mockRemove).toHaveBeenCalledTimes(1);
+  });
+
+  it('deletePrivateImage removes the object and no-ops on a null path', async () => {
+    await deletePrivateImage('ai-extract/user-1/abc.jpg');
+    expect(mockRemove).toHaveBeenCalledWith(['ai-extract/user-1/abc.jpg']);
+
+    mockRemove.mockClear();
+    await deletePrivateImage(null);
+    expect(mockRemove).not.toHaveBeenCalled();
   });
 });
