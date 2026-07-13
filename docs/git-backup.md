@@ -1,19 +1,18 @@
 # Git backup (off-site repository archive)
 
 `/.github/workflows/git-backup.yml` zips the **entire repository including full
-git history** and uploads the archive off-site to **AWS S3** and/or **Google
-Drive**. It is a disaster-recovery net that is independent of GitHub: if the
-repo is ever deleted, corrupted, or GitHub is unavailable, the zip is a
-complete, restorable clone.
+git history** and uploads the archive off-site to **AWS S3**. It is a
+disaster-recovery net that is independent of GitHub: if the repo is ever
+deleted, corrupted, or GitHub is unavailable, the zip is a complete, restorable
+clone.
 
 ## When it runs
 
 - **Daily** at `15 18 * * *` UTC (≈ 04:15–05:15 in Australia, AEST/AEDT).
 - **On demand** — Actions tab → **Git backup** → **Run workflow**.
 
-Each destination's upload step is **self-guarding**: it only runs when its
-secrets are present. Configure S3, Google Drive, or both. If *no* destination
-is configured the workflow fails loudly so a silent no-op backup can't hide.
+The upload fails loudly if the S3 secrets are missing, so a silent no-op backup
+can't hide.
 
 ## What's in the archive
 
@@ -33,8 +32,6 @@ git status        # it's a real clone — history, branches and tags are intact
 
 Add these under **Settings → Secrets and variables → Actions**.
 
-### AWS S3
-
 | Secret | Value |
 |---|---|
 | `BACKUP_AWS_ACCESS_KEY_ID` | Access key of an IAM user scoped to `s3:PutObject` on the bucket. |
@@ -50,47 +47,15 @@ Minimal IAM policy for the backup user:
   "Statement": [{
     "Effect": "Allow",
     "Action": "s3:PutObject",
-    "Resource": "arn:aws:s3:::cardpop-backups/git/*"
+    "Resource": "arn:aws:s3:::cardpop-backups/*"
   }]
 }
 ```
 
-**Retention** — set an S3 **Lifecycle rule** on the prefix to expire old
+**Retention** — set an S3 **Lifecycle rule** on the bucket/prefix to expire old
 archives (e.g. delete after 90 days) so backups don't accumulate cost.
-
-### Google Drive
-
-Uploads go through a **GCP service account** (no interactive OAuth), driven by
-`rclone` in the workflow.
-
-| Secret | Value |
-|---|---|
-| `BACKUP_GDRIVE_SERVICE_ACCOUNT` | The full JSON key file contents of the service account (Drive API enabled). |
-| `BACKUP_GDRIVE_FOLDER_ID` | Destination folder ID — the part of the folder URL after `/folders/`. |
-
-Steps:
-
-1. In the [Google Cloud console](https://console.cloud.google.com/) create (or
-   pick) a project and **enable the Google Drive API**.
-2. Create a **service account**, then create a **JSON key** for it. Paste the
-   whole file into `BACKUP_GDRIVE_SERVICE_ACCOUNT`.
-3. Pick a destination folder and share it with the service account's email
-   (`...@...iam.gserviceaccount.com`) as **Editor**. Put the folder's ID in
-   `BACKUP_GDRIVE_FOLDER_ID`.
-
-> **Important — use a Shared Drive.** A service account has **no personal Drive
-> storage quota**. If you share a folder inside *your own* My Drive, uploads may
-> fail with a quota error because the uploaded file is owned by the service
-> account. The reliable setup is a **Shared Drive** (Google Workspace): create
-> one, add the service account as a **Content manager / Manager**, and use a
-> folder inside it. Files there are owned by the Shared Drive, not the SA.
-
-**Retention** — Drive has no lifecycle rules; prune old archives manually, or
-extend the workflow to run `rclone delete gdrive: --min-age 90d` before/after
-the copy.
 
 ## Testing it
 
-Run it manually from the Actions tab and watch the log. Steps announce where
-they uploaded, and print a `::notice::` for any destination whose secrets aren't
-set. Then confirm the object exists in your S3 bucket / Drive folder.
+Run it manually from the Actions tab and watch the log — the upload step prints
+`Uploaded to s3://…`. Then confirm the object exists in your S3 bucket.
