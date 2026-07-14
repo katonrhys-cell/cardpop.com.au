@@ -1,145 +1,75 @@
 #!/usr/bin/env node
 
+// Generates public/llms.txt — the entry point AI agents and LLMs read to
+// understand CardPop (see https://llmstxt.org). It is a curated map of the
+// PUBLIC, agent-relevant surface of the site: an H1 title, a blockquote
+// summary, then H2 sections of markdown links with absolute URLs and short
+// descriptions.
+//
+// This is intentionally hand-curated rather than scraped from the React
+// routes. Auto-scraping Helmet titles produced a flat, mostly-useless dump
+// (admin/account pages, "No description available" filler) that hurt more than
+// it helped. Every URL below is a real, public route in App.jsx — keep this
+// file in sync when public sections are added or renamed.
+
 import fs from 'fs';
 import path from 'path';
-
-const CLEAN_CONTENT_REGEX = {
-	comments: /\/\*[\s\S]*?\*\/|\/\/.*$/gm,
-	templateLiterals: /`[\s\S]*?`/g,
-	// Bounded to one line: real string literals can't span raw newlines, and an
-	// apostrophe in JSX text (e.g. "you'll") must not swallow the lines below it.
-	strings: /'[^'\n]*'|"[^"\n]*"/g,
-	jsxExpressions: /\{.*?\}/g,
-	htmlEntities: {
-		quot: /&quot;/g,
-		amp: /&amp;/g,
-		lt: /&lt;/g,
-		gt: /&gt;/g,
-		apos: /&apos;/g
-	}
-};
-
-const EXTRACTION_REGEX = {
-	route: /<Route\s+[^>]*>/g,
-	path: /path=["']([^"']+)["']/,
-	element: /element=\{<(\w+)[^}]*\/?\s*>\}/,
-	helmet: /<Helmet[^>]*?>([\s\S]*?)<\/Helmet>/i,
-	helmetTest: /<Helmet[\s\S]*?<\/Helmet>/i,
-	title: /<title[^>]*?>\s*(.*?)\s*<\/title>/i,
-	description: /<meta\s+name=["']description["']\s+content=["'](.*?)["']/i
-};
-
-function cleanContent(content) {
-	return content
-		.replace(CLEAN_CONTENT_REGEX.comments, '')
-		.replace(CLEAN_CONTENT_REGEX.templateLiterals, '""')
-		.replace(CLEAN_CONTENT_REGEX.strings, '""');
-}
-
-function cleanText(text) {
-	if (!text) return text;
-
-	return text
-		.replace(CLEAN_CONTENT_REGEX.jsxExpressions, '')
-		.replace(CLEAN_CONTENT_REGEX.htmlEntities.quot, '"')
-		.replace(CLEAN_CONTENT_REGEX.htmlEntities.amp, '&')
-		.replace(CLEAN_CONTENT_REGEX.htmlEntities.lt, '<')
-		.replace(CLEAN_CONTENT_REGEX.htmlEntities.gt, '>')
-		.replace(CLEAN_CONTENT_REGEX.htmlEntities.apos, "'")
-		// Strip leftover JSX/template-literal punctuation (e.g. `{` `}` backticks)
-		// and any leading separator so titles read cleanly.
-		.replace(/[`{}]/g, '')
-		.replace(/^[\s\-|–—]+/, '')
-		.replace(/\s{2,}/g, ' ')
-		.trim();
-}
-
-function extractRoutes(appJsxPath) {
-	if (!fs.existsSync(appJsxPath)) return new Map();
-
-	try {
-		const content = fs.readFileSync(appJsxPath, 'utf8');
-		const routes = new Map();
-		const routeMatches = [...content.matchAll(EXTRACTION_REGEX.route)];
-
-		for (const match of routeMatches) {
-			const routeTag = match[0];
-			const pathMatch = routeTag.match(EXTRACTION_REGEX.path);
-			const elementMatch = routeTag.match(EXTRACTION_REGEX.element);
-			const isIndex = routeTag.includes('index');
-
-			if (elementMatch) {
-				const componentName = elementMatch[1];
-				let routePath;
-
-				if (isIndex) {
-					routePath = '/';
-				} else if (pathMatch) {
-					routePath = pathMatch[1].startsWith('/') ? pathMatch[1] : `/${pathMatch[1]}`;
-				}
-
-				routes.set(componentName, routePath);
-			}
-		}
-
-		return routes;
-	} catch (error) {
-		return new Map();
-	}
-}
-
-function findReactFiles(dir) {
-	const results = [];
-	for (const item of fs.readdirSync(dir)) {
-		const full = path.join(dir, item);
-		if (fs.statSync(full).isDirectory()) {
-			results.push(...findReactFiles(full));
-		} else if (/\.(jsx|js)$/.test(item)) {
-			results.push(full);
-		}
-	}
-	return results;
-}
-
-function extractHelmetData(content, filePath, routes) {
-	const cleanedContent = cleanContent(content);
-
-	if (!EXTRACTION_REGEX.helmetTest.test(cleanedContent)) {
-		return null;
-	}
-
-	const helmetMatch = content.match(EXTRACTION_REGEX.helmet);
-	if (!helmetMatch) return null;
-
-	const helmetContent = helmetMatch[1];
-	const titleMatch = helmetContent.match(EXTRACTION_REGEX.title);
-	const descMatch = helmetContent.match(EXTRACTION_REGEX.description);
-
-	const title = cleanText(titleMatch?.[1]);
-	const description = cleanText(descMatch?.[1]);
-
-	const fileName = path.basename(filePath, path.extname(filePath));
-	// routes is a Map — use .size (the previous `.length` was always undefined,
-	// so every page fell back to a guessed slug instead of its real route).
-	const url = routes.size && routes.has(fileName)
-		? routes.get(fileName)
-		: generateFallbackUrl(fileName);
-
-	return {
-		url,
-		title: title || 'Untitled Page',
-		description: description || 'No description available'
-	};
-}
-
-function generateFallbackUrl(fileName) {
-	const cleanName = fileName.replace(/Page$/, '').toLowerCase();
-	return cleanName === 'app' ? '/' : `/${cleanName}`;
-}
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 const SITE_NAME = 'CardPop';
 const SITE_SUMMARY = "Australia's trading card marketplace for Pokémon, Magic: The Gathering, Yu-Gi-Oh and sports cards. Buy, sell, and trade authenticated cards with live AUD pricing and buyer protection.";
+
+// Ordered sections. Each entry: [path, title, description]. Paths are
+// site-relative and resolved against SITE_ORIGIN.
+const SECTIONS = [
+	['Marketplace & Shop', [
+		['/marketplace', 'Marketplace', 'Browse and buy trading cards listed by Australian sellers, with buyer protection.'],
+		['/shop', 'CardPop Shop', 'The official CardPop shop — sealed product and singles sold directly.'],
+		['/shop/singles', 'Shop — Singles', 'Individual single cards available to buy now.'],
+		['/shop/sealed-boxes', 'Shop — Sealed Boxes', 'Sealed booster boxes and cases.'],
+		['/collections', 'Collections', 'Curated collections grouping cards by set, franchise and theme.'],
+	]],
+	['Prices & Market Data', [
+		['/prices', 'Card Prices', 'Live AUD market pricing for trading cards, sourced from recent sales.'],
+		['/markets', 'Markets', 'Market trends and movements across trading card categories.'],
+		['/australian-markets', 'Australian Markets', 'Pricing and demand data specific to the Australian market.'],
+		['/analytics', 'Analytics', 'Aggregate analytics and reporting across the marketplace.'],
+	]],
+	['Grading', [
+		['/grading', 'Grading', 'Everything about card grading — how it works and who does it.'],
+		['/grading/what-is-grading', 'What Is Grading?', 'An introduction to trading card grading.'],
+		['/grading/scales', 'Grading Scales', 'How the major grading scales (PSA, Beckett and others) compare.'],
+		['/grading/companies', 'Grading Companies', 'Directory of grading companies and their services.'],
+		['/grading/local-graders', 'Local Graders', 'Grading services available within Australia.'],
+		['/grading/submission-partners', 'Submission Partners', 'Partners that handle grading submissions on your behalf.'],
+		['/grading/estimator', 'Grade Estimator', 'Estimate the likely grade of a card before submitting it.'],
+		['/grading/roi-calculator', 'Grading ROI Calculator', 'Estimate the return on investment of grading a card.'],
+	]],
+	['Community & Events', [
+		['/community', 'Community', 'The CardPop community hub — forums, traders and local groups.'],
+		['/community/forum', 'Community Forum', 'Discussion forum for collectors and traders.'],
+		['/community/local-traders', 'Local Traders', 'Find traders near you across Australia.'],
+		['/community/retailers', 'Retailers', 'Directory of trading card retailers.'],
+		['/community/whatnot', 'Whatnot Sellers', 'Australian card sellers streaming on Whatnot.'],
+		['/events', 'Events', 'Card shows, community events, store events and trade events.'],
+		['/card-shops', 'Card Shops Directory', 'Directory of trading card shops across Australia.'],
+	]],
+	['Guides & Blog', [
+		['/blog', 'Blog', 'Articles, guides and news about trading cards and collecting.'],
+		['/photography-guide', 'Photography Guide', 'How to photograph cards well for listings.'],
+	]],
+	['Company & Policies', [
+		['/about', 'About CardPop', 'What CardPop is and who is behind it.'],
+		['/contact', 'Contact', 'How to get in touch with CardPop.'],
+		['/faq', 'FAQ', 'Answers to common questions about buying, selling and grading.'],
+		['/trust-safety', 'Trust & Safety', 'How CardPop protects buyers and sellers.'],
+		['/returns', 'Returns', 'The returns policy for purchases.'],
+		['/shipping', 'Shipping', 'Shipping options, timings and costs.'],
+		['/privacy-policy', 'Privacy Policy', 'How CardPop handles personal data.'],
+		['/terms', 'Terms of Service', 'The terms governing use of CardPop.'],
+		['/accessibility', 'Accessibility', 'CardPop\'s accessibility commitments.'],
+	]],
+];
 
 function toAbsolute(url) {
 	if (!url) return SITE_ORIGIN;
@@ -147,70 +77,32 @@ function toAbsolute(url) {
 	return `${SITE_ORIGIN}${url.startsWith('/') ? '' : '/'}${url}`;
 }
 
-// Follows the llms.txt spec (https://llmstxt.org): an H1 site title, a
-// blockquote summary, then H2 sections of markdown links with absolute URLs.
-function generateLlmsTxt(pages) {
-	const sortedPages = pages.sort((a, b) => a.title.localeCompare(b.title));
-	const pageEntries = sortedPages.map(page =>
-		`- [${page.title}](${toAbsolute(page.url)}): ${page.description}`
-	).join('\n');
+function generateLlmsTxt() {
+	const lines = [`# ${SITE_NAME}`, '', `> ${SITE_SUMMARY}`, ''];
 
-	return [
-		`# ${SITE_NAME}`,
-		'',
-		`> ${SITE_SUMMARY}`,
-		'',
-		'## Pages',
-		pageEntries,
-		'',
-	].join('\n');
-}
-
-function ensureDirectoryExists(dirPath) {
-	if (!fs.existsSync(dirPath)) {
-		fs.mkdirSync(dirPath, { recursive: true });
+	for (const [heading, entries] of SECTIONS) {
+		lines.push(`## ${heading}`);
+		for (const [url, title, description] of entries) {
+			lines.push(`- [${title}](${toAbsolute(url)}): ${description}`);
+		}
+		lines.push('');
 	}
-}
 
-function processPageFile(filePath, routes) {
-	try {
-		const content = fs.readFileSync(filePath, 'utf8');
-		return extractHelmetData(content, filePath, routes);
-	} catch (error) {
-		console.error(`❌ Error processing ${filePath}:`, error.message);
-		return null;
-	}
+	lines.push('## Machine-readable resources');
+	lines.push(`- [API catalog](${SITE_ORIGIN}/.well-known/api-catalog): RFC 9727 linkset describing the public API.`);
+	lines.push(`- [OpenAPI description](${SITE_ORIGIN}/openapi.json): OpenAPI 3.1 description of the public API.`);
+	lines.push(`- [Sitemap](${SITE_ORIGIN}/sitemap.xml): XML sitemap of indexable pages.`);
+	lines.push(`- [Security policy](${SITE_ORIGIN}/.well-known/security.txt): How to report security issues (RFC 9116).`);
+	lines.push('');
+
+	return lines.join('\n');
 }
 
 function main() {
-	const pagesDir = path.join(process.cwd(), 'pages');
-	const appJsxPath = path.join(process.cwd(), 'App.jsx');
-
-	let pages = [];
-
-	if (!fs.existsSync(pagesDir)) {
-		pages.push(processPageFile(appJsxPath, []))
-		pages = pages.filter(Boolean);
-	} else {
-		const routes = extractRoutes(appJsxPath);
-		const reactFiles = findReactFiles(pagesDir);
-
-		pages = reactFiles
-			.map(filePath => processPageFile(filePath, routes))
-			.filter(Boolean);
-	}
-
-	if (pages.length === 0) {
-		console.error('❌ No pages with Helmet components found!');
-		process.exit(1);
-	}
-
-
-	const llmsTxtContent = generateLlmsTxt(pages);
 	const outputPath = path.join(process.cwd(), 'public', 'llms.txt');
-
-	ensureDirectoryExists(path.dirname(outputPath));
-	fs.writeFileSync(outputPath, llmsTxtContent, 'utf8');
+	const dir = path.dirname(outputPath);
+	if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+	fs.writeFileSync(outputPath, generateLlmsTxt(), 'utf8');
 }
 
 const isMainModule = import.meta.url === `file://${process.argv[1]}`;
@@ -218,3 +110,5 @@ const isMainModule = import.meta.url === `file://${process.argv[1]}`;
 if (isMainModule) {
 	main();
 }
+
+export { generateLlmsTxt };

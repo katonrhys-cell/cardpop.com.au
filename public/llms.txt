@@ -2,65 +2,55 @@
 
 > Australia's trading card marketplace for Pokémon, Magic: The Gathering, Yu-Gi-Oh and sports cards. Buy, sell, and trade authenticated cards with live AUD pricing and buyer protection.
 
-## Pages
-- [Account Dashboard | CardPop](https://cardpop.com.au/accountdashboard): No description available
-- [Add Your First Card | Card Pop](https://cardpop.com.au/addyourfirstcard): No description available
-- [Admin - Collection Sections | CardPop](https://cardpop.com.au/collectionsectionsadmin): No description available
-- [Admin - Hero Showcase | CardPop](https://cardpop.com.au/heroshowcaseadmin): No description available
-- [Admin - Manage Featured Cards | CardPop](https://cardpop.com.au/featuredcardsadmin): No description available
-- [Analytics & Reports | Admin Portal](https://cardpop.com.au/analyticsreports): No description available
-- [Brand Management | Admin Portal](https://cardpop.com.au/brandsmanagement): No description available
-- [Business Profiles | Admin](https://cardpop.com.au/businessprofilesmanagement): No description available
-- [Card Pop](https://cardpop.com.au/addeditcard): No description available
-- [Category Mapping Tools | Admin](https://cardpop.com.au/categorymapping): No description available
-- [Chargebacks | Admin](https://cardpop.com.au/disputesadmin): No description available
-- [Chat Moderation | CardPop Admin](https://cardpop.com.au/chatmoderation): No description available
-- [Check Your Email | Card Pop](https://cardpop.com.au/signup): No description available
-- [Commission Settings | CardPop Admin](https://cardpop.com.au/commissionsettings): No description available
-- [Complete Profile | Card Pop](https://cardpop.com.au/profilecompletion): No description available
-- [Confirming Order | Card Pop](https://cardpop.com.au/checkoutsuccess): No description available
-- [Hierarchy Management | CardPop Admin](https://cardpop.com.au/categorymanagement): No description available
-- [Log In | CardPop](https://cardpop.com.au/login): No description available
-- [Manage Events | Admin Portal](https://cardpop.com.au/eventsmanagement): No description available
-- [Membership | CardPop](https://cardpop.com.au/accountmembership): No description available
-- [Messaging | Card Pop](https://cardpop.com.au/messaging): No description available
-- [My Digital Vault | CardPop](https://cardpop.com.au/myvault): No description available
-- [My Events | CardPop](https://cardpop.com.au/accountevents): No description available
-- [My Listings | CardPop](https://cardpop.com.au/accountlistings): No description available
-- [My Orders | CardPop](https://cardpop.com.au/accountorders): No description available
-- [My Vault | CardPop](https://cardpop.com.au/accountvault): No description available
-- [My Wallet | Card Pop](https://cardpop.com.au/userbalance): No description available
-- [Notification Settings | CardPop](https://cardpop.com.au/accountnotificationsettings): No description available
-- [Notifications | CardPop](https://cardpop.com.au/accountnotifications): No description available
-- [Offers | CardPop](https://cardpop.com.au/accountoffers): No description available
-- [Official Shop Management | Admin](https://cardpop.com.au/productmanagement): No description available
-- [Order Management | Admin](https://cardpop.com.au/ordermanagement): No description available
-- [Partner Dashboard | CardPop](https://cardpop.com.au/accountpartner): No description available
-- [Platform Settings | Admin](https://cardpop.com.au/adminsettings): No description available
-- [Product Lines Management | Admin Portal](https://cardpop.com.au/productlinesmanagement): No description available
-- [Public Profile | CardPop](https://cardpop.com.au/userprofile): No description available
-- [Public Profile | CardPop](https://cardpop.com.au/accountprofile): No description available
-- [Recover Account | Card Pop](https://cardpop.com.au/passwordreset): No description available
-- [Reports & Moderation | Admin](https://cardpop.com.au/reportsmoderation): No description available
-- [Reviews | CardPop](https://cardpop.com.au/accountreviews): No description available
-- [Secure Checkout | Card Pop](https://cardpop.com.au/checkout): No description available
-- [Security Settings | Card Pop](https://cardpop.com.au/securitysettings): No description available
-- [Security Settings | CardPop](https://cardpop.com.au/accountsecurity): No description available
-- [Seller Profile - Card Pop Australia](https://cardpop.com.au/sellerprofile): No description available
-- [Seller Tier | CardPop](https://cardpop.com.au/accountsellertier): No description available
-- [Sellers Management | Admin Portal](https://cardpop.com.au/sellersmanagement): No description available
-- [Sole Trader Account | CardPop](https://cardpop.com.au/accountsoletrader): No description available
-- [Subcategory Management | Admin Portal](https://cardpop.com.au/subcategorymanagement): No description available
-- [System Diagnostics | Admin](https://cardpop.com.au/systemdiagnostics): No description available
-- [System Diagnostics | Emergency Console](https://cardpop.com.au/diagnostics): No description available
-- [Transactions | Card Pop](https://cardpop.com.au/transactionhistory): No description available
-- [Transactions | CardPop](https://cardpop.com.au/accounttransactions): No description available
-- [User Details](https://cardpop.com.au/userdetail): No description available
-- [User Management | Admin Portal](https://cardpop.com.au/usermanagement): No description available
-- [Vault Profile | CardPop](https://cardpop.com.au/vaultprofile): No description available
-- [Verification Management | Admin](https://cardpop.com.au/adminverificationdashboard): No description available
-- [Verification Pending | Card Pop](https://cardpop.com.au/verificationpending): No description available
-- [Verification Status | CardPop](https://cardpop.com.au/verificationsubmission): No description available
-- [Verify Your Identity | Card Pop](https://cardpop.com.au/verifyidentity): No description available
-- [Wallet & Payouts | CardPop](https://cardpop.com.au/accountwallet): No description available
-- [Watchlist | CardPop](https://cardpop.com.au/accountwatchlist): No description available
+## Marketplace & Shop
+- [Marketplace](https://cardpop.com.au/marketplace): Browse and buy trading cards listed by Australian sellers, with buyer protection.
+- [CardPop Shop](https://cardpop.com.au/shop): The official CardPop shop — sealed product and singles sold directly.
+- [Shop — Singles](https://cardpop.com.au/shop/singles): Individual single cards available to buy now.
+- [Shop — Sealed Boxes](https://cardpop.com.au/shop/sealed-boxes): Sealed booster boxes and cases.
+- [Collections](https://cardpop.com.au/collections): Curated collections grouping cards by set, franchise and theme.
+
+## Prices & Market Data
+- [Card Prices](https://cardpop.com.au/prices): Live AUD market pricing for trading cards, sourced from recent sales.
+- [Markets](https://cardpop.com.au/markets): Market trends and movements across trading card categories.
+- [Australian Markets](https://cardpop.com.au/australian-markets): Pricing and demand data specific to the Australian market.
+- [Analytics](https://cardpop.com.au/analytics): Aggregate analytics and reporting across the marketplace.
+
+## Grading
+- [Grading](https://cardpop.com.au/grading): Everything about card grading — how it works and who does it.
+- [What Is Grading?](https://cardpop.com.au/grading/what-is-grading): An introduction to trading card grading.
+- [Grading Scales](https://cardpop.com.au/grading/scales): How the major grading scales (PSA, Beckett and others) compare.
+- [Grading Companies](https://cardpop.com.au/grading/companies): Directory of grading companies and their services.
+- [Local Graders](https://cardpop.com.au/grading/local-graders): Grading services available within Australia.
+- [Submission Partners](https://cardpop.com.au/grading/submission-partners): Partners that handle grading submissions on your behalf.
+- [Grade Estimator](https://cardpop.com.au/grading/estimator): Estimate the likely grade of a card before submitting it.
+- [Grading ROI Calculator](https://cardpop.com.au/grading/roi-calculator): Estimate the return on investment of grading a card.
+
+## Community & Events
+- [Community](https://cardpop.com.au/community): The CardPop community hub — forums, traders and local groups.
+- [Community Forum](https://cardpop.com.au/community/forum): Discussion forum for collectors and traders.
+- [Local Traders](https://cardpop.com.au/community/local-traders): Find traders near you across Australia.
+- [Retailers](https://cardpop.com.au/community/retailers): Directory of trading card retailers.
+- [Whatnot Sellers](https://cardpop.com.au/community/whatnot): Australian card sellers streaming on Whatnot.
+- [Events](https://cardpop.com.au/events): Card shows, community events, store events and trade events.
+- [Card Shops Directory](https://cardpop.com.au/card-shops): Directory of trading card shops across Australia.
+
+## Guides & Blog
+- [Blog](https://cardpop.com.au/blog): Articles, guides and news about trading cards and collecting.
+- [Photography Guide](https://cardpop.com.au/photography-guide): How to photograph cards well for listings.
+
+## Company & Policies
+- [About CardPop](https://cardpop.com.au/about): What CardPop is and who is behind it.
+- [Contact](https://cardpop.com.au/contact): How to get in touch with CardPop.
+- [FAQ](https://cardpop.com.au/faq): Answers to common questions about buying, selling and grading.
+- [Trust & Safety](https://cardpop.com.au/trust-safety): How CardPop protects buyers and sellers.
+- [Returns](https://cardpop.com.au/returns): The returns policy for purchases.
+- [Shipping](https://cardpop.com.au/shipping): Shipping options, timings and costs.
+- [Privacy Policy](https://cardpop.com.au/privacy-policy): How CardPop handles personal data.
+- [Terms of Service](https://cardpop.com.au/terms): The terms governing use of CardPop.
+- [Accessibility](https://cardpop.com.au/accessibility): CardPop's accessibility commitments.
+
+## Machine-readable resources
+- [API catalog](https://cardpop.com.au/.well-known/api-catalog): RFC 9727 linkset describing the public API.
+- [OpenAPI description](https://cardpop.com.au/openapi.json): OpenAPI 3.1 description of the public API.
+- [Sitemap](https://cardpop.com.au/sitemap.xml): XML sitemap of indexable pages.
+- [Security policy](https://cardpop.com.au/.well-known/security.txt): How to report security issues (RFC 9116).

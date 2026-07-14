@@ -1,0 +1,28 @@
+{
+  "linkset": [
+    {
+      "anchor": "https://cardpop.com.au/api",
+      "service-desc": [
+        {
+          "href": "https://cardpop.com.au/openapi.json",
+          "type": "application/openapi+json",
+          "title": "CardPop public API — OpenAPI description"
+        }
+      ],
+      "service-doc": [
+        {
+          "href": "https://cardpop.com.au/llms.txt",
+          "type": "text/markdown",
+          "title": "CardPop — guidance for AI agents and LLMs"
+        }
+      ],
+      "status": [
+        {
+          "href": "https://cardpop.com.au/api/health",
+          "type": "application/json",
+          "title": "CardPop API health check"
+        }
+      ]
+    }
+  ]
+}
