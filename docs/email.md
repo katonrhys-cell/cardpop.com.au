@@ -166,6 +166,40 @@ is sending as `cardpop.com.au` **without** alignment — fix those before tighte
 Only the `p=` (and `pct=`) values change between stages — keep the rest of the
 record identical.
 
+### Enforcement stages — copy-paste values
+
+Work down this table over several weeks, editing the **same** `_dmarc` TXT
+record in Cloudflare each time (never add a second record). Hold at each stage
+for about a week and read the `rua` reports before moving on; if any legitimate
+mail starts failing, **step back up** to the previous stage while you fix the
+sender's SPF/DKIM.
+
+| Stage | When to move here | Record value |
+|---|---|---|
+| 1 — Monitor | Now (initial) | `v=DMARC1; p=none; rua=mailto:dmarc-reports@cardpop.com.au; ruf=mailto:dmarc-reports@cardpop.com.au; fo=1; adkim=r; aspf=r; pct=100` |
+| 2 — Quarantine 25% | ~2–4 weeks of clean `none` reports | `v=DMARC1; p=quarantine; pct=25; rua=mailto:dmarc-reports@cardpop.com.au; ruf=mailto:dmarc-reports@cardpop.com.au; fo=1; adkim=r; aspf=r` |
+| 3 — Quarantine 50% | ~1 week, nothing legit in spam | `v=DMARC1; p=quarantine; pct=50; rua=mailto:dmarc-reports@cardpop.com.au; ruf=mailto:dmarc-reports@cardpop.com.au; fo=1; adkim=r; aspf=r` |
+| 4 — Quarantine 100% | ~1 week | `v=DMARC1; p=quarantine; pct=100; rua=mailto:dmarc-reports@cardpop.com.au; ruf=mailto:dmarc-reports@cardpop.com.au; fo=1; adkim=r; aspf=r` |
+| 5 — Reject | ~1 week of clean quarantine-100 reports | `v=DMARC1; p=reject; pct=100; sp=reject; rua=mailto:dmarc-reports@cardpop.com.au; ruf=mailto:dmarc-reports@cardpop.com.au; fo=1; adkim=r; aspf=r` |
+
+Notes:
+
+- **`pct`** applies the policy to a random sample — at stage 2, 25% of failing
+  mail is quarantined and the rest still passes through, so a missed sender
+  surfaces in reports without junking most of its mail. It only matters while
+  ramping; `p=none` ignores it.
+- **`sp=reject`** (stage 5 only) sets the policy for *subdomains* explicitly.
+  Without `sp`, subdomains inherit `p`. Add it once you're confident no
+  subdomain sends legitimate `@*.cardpop.com.au` mail — it stops spoofers from
+  hiding under a made-up subdomain. If a subdomain *does* send mail later (e.g.
+  a future `mail.cardpop.com.au`), authenticate it first or leave `sp` off.
+- Tag order doesn't matter except that `v=DMARC1` must come first; the values
+  above keep the reporting/alignment tags identical across every stage so the
+  only real change is `p`/`pct`.
+
+At stage 5 the domain is fully protected: mail failing both SPF and DKIM
+alignment is rejected outright.
+
 ### Verify
 
 After publishing, confirm the record resolves and is valid:
