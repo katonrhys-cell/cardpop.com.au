@@ -92,7 +92,8 @@ logger.debug(`[MAIN] Configuring body parser with limit: ${BodyLimit} bytes`);
 // parsing for that path so express.raw() inside the route handler sees the buffer.
 // The /stripe/webhook route handler (in src/routes/stripe.js) validates the signature
 // with stripe.webhooks.constructEvent() before processing the event.
-// endsWith handles both /stripe/webhook (dev) and /hcgi/api/stripe/webhook (Hostinger proxy).
+// endsWith handles both /stripe/webhook (dev) and /hcgi/api/stripe/webhook (the
+// frontend's proxied prefix, which Vercel rewrites to /api).
 app.use((req, res, next) => {
 	if (req.path.endsWith('/stripe/webhook')) return next();
 	express.json({ limit: BodyLimit })(req, res, next);
@@ -113,7 +114,8 @@ app.use((err, req, res, next) => {
 	next(err);
 });
 
-// Mount at / for local dev, /hcgi/api for Hostinger, and /api for Vercel.
+// Mount at / for local dev, and both /hcgi/api (the frontend's proxied prefix,
+// rewritten by Vercel) and /api for the Vercel serverless function.
 const apiRouter = routes();
 app.use('/', noCacheHeaders, apiRouter);
 app.use('/hcgi/api', noCacheHeaders, apiRouter);
