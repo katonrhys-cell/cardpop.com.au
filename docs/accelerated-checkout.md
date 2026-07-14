@@ -22,10 +22,9 @@ the **functional equivalent** through Stripe.
 ## What we offer instead (and where it's controlled)
 
 The embedded checkout (`components/checkout/EmbeddedStripeCheckout.jsx`) renders
-Stripe's Embedded Checkout on our own page. Because the Checkout Session uses
-`automatic_payment_methods: { enabled: true }` (`src/routes/stripe.js`), Stripe
-presents **every method enabled on the account**, each shown only when the order
-is eligible:
+Stripe's Embedded Checkout on our own page. Because the Checkout Session omits
+`payment_method_types` (`src/routes/stripe.js`), Stripe presents **every method
+enabled on the account**, each shown only when the order is eligible:
 
 | Method | What it is | Turned on where |
 |---|---|---|
