@@ -7,6 +7,7 @@ import ReactDOM from 'react-dom/client';
 import App from '@/App.jsx';
 import { installChunkReloadGuard } from '@/lib/chunkReload.js';
 import { installImageCdnFallback } from '@/utils/imageCdnFallback.js';
+import { installWebMcp } from '@/lib/webmcp.js';
 import '@/index.css';
 import '@/global.css';
 
@@ -20,6 +21,12 @@ installChunkReloadGuard();
 // across the site (see utils/imageCdnFallback.js). Installed before first paint
 // so the listener catches the earliest image loads.
 installImageCdnFallback();
+
+// Expose safe, read-only site actions (search, section navigation) to
+// WebMCP-capable in-browser AI agents. A no-op in browsers without
+// navigator.modelContext, so it never affects normal visitors (see
+// lib/webmcp.js).
+installWebMcp();
 
 // The homepage ships its full stylesheet as media="print" (non-render-blocking,
 // with critical above-the-fold CSS inlined in the HTML head) so it never delays
