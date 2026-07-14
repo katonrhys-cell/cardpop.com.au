@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schemas.agentskills.io/discovery/0.2.0/schema.json",
+  "skills": [
+    {
+      "name": "check-card-prices",
+      "type": "skill-md",
+      "description": "Look up live Australian-dollar market prices and recent-sales trends for trading cards on CardPop.",
+      "url": "https://cardpop.com.au/.well-known/agent-skills/check-card-prices/SKILL.md",
+      "digest": "sha256:5d1bf3cc3f6522a70b31285ef9d708d86bb6c2f548d47d72855470212e28a2e7"
+    },
+    {
+      "name": "search-cardpop",
+      "type": "skill-md",
+      "description": "Search CardPop, Australia's trading card marketplace, for listings of a specific card (Pokémon, Magic, Yu-Gi-Oh, sports) and read the results.",
+      "url": "https://cardpop.com.au/.well-known/agent-skills/search-cardpop/SKILL.md",
+      "digest": "sha256:34b3e76d06b368accac53bd51b047c7dd86f98a9208a34eff491a0047bb50d23"
+    }
+  ]
+}
