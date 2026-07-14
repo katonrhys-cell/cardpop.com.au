@@ -201,7 +201,7 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
               </span>
             ) : (
               <span className={`font-extrabold text-xl tabular-nums ${isSold ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
-                ${(listing.price_aud || 0).toFixed(2)}
+                ${Number(listing.price_aud || 0).toFixed(2)}
               </span>
             )}
             {isSold && (
