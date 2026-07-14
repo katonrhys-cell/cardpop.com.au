@@ -1,0 +1,47 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CardPop Public API",
+    "version": "1.0.0",
+    "description": "Public, unauthenticated endpoints for CardPop — Australia's trading card marketplace. Most CardPop functionality (accounts, vault, checkout, listings) requires an authenticated session and is not part of this public description.",
+    "contact": {
+      "name": "CardPop Developers",
+      "email": "developers@cardpop.com.au",
+      "url": "https://cardpop.com.au"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://cardpop.com.au/api",
+      "description": "Production API"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "Service health check",
+        "description": "Returns the API's health status. No authentication required.",
+        "responses": {
+          "200": {
+            "description": "The API is healthy.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ok"
+                    }
+                  },
+                  "required": ["status"]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
