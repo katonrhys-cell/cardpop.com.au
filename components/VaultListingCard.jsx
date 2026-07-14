@@ -8,7 +8,8 @@ const ImageZoomModal = lazy(() => import('@/components/ImageZoomModal.jsx'));
 import CardShowcase from '@/components/vault/CardShowcase.jsx';
 import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
-import { VARIANT_BADGES } from '@/lib/cardVariants.js';
+import { VARIANT_BADGES, ROOKIE_VARIANT } from '@/lib/cardVariants.js';
+import RookiePill from '@/components/RookiePill.jsx';
 import { formatAutograph, getRefractorLabel, getRefractorBadgeClass } from '@/lib/cardAttributeLabels.js';
 import { getCardImage, CARD_GRID_SIZES, toCdnUrl } from '@/utils/imageUrl.js';
 import { isVerified } from '@/utils/verification.js';
@@ -45,7 +46,10 @@ const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
     : (Array.isArray(vaultItem.cardVariants) ? vaultItem.cardVariants : (vaultItem.cardVariants ? [vaultItem.cardVariants] : []));
   const variants = rawVariants;
   const specialBadge = Object.entries(VARIANT_BADGES).find(([key]) => variants.includes(key));
-  const extraVariants = variants.filter(v => !VARIANT_BADGES[v]).slice(0, 2);
+  // Image overlay badge — rookie is excluded (overlay: false): its one
+  // reference is the RookiePill under the card.
+  const overlayBadge = Object.entries(VARIANT_BADGES).find(([key, cfg]) => cfg.overlay !== false && variants.includes(key));
+  const isRookie = variants.includes(ROOKIE_VARIANT) || !!vaultItem.is_rookie;
   const borderClass = specialBadge
     ? `${specialBadge[1].border} ${specialBadge[1].glow}`
     : 'border border-border';
@@ -69,9 +73,9 @@ const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
             <StatusIcon className="w-3 h-3 mr-1.5" /> {vaultItem.listing_type || 'Private'}
           </Badge>
         </div>
-        {specialBadge && (
-          <div className={`absolute top-3 right-3 z-10 px-2.5 py-1 rounded-full text-[11px] font-extrabold tracking-wide shadow-md ${specialBadge[1].bg} ${specialBadge[1].text}`}>
-            {specialBadge[1].label}
+        {overlayBadge && (
+          <div className={`absolute top-3 right-3 z-10 px-2.5 py-1 rounded-full text-[11px] font-extrabold tracking-wide shadow-md ${overlayBadge[1].bg} ${overlayBadge[1].text}`}>
+            {overlayBadge[1].label}
           </div>
         )}
 
@@ -137,9 +141,9 @@ const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
                 {formatAutograph(vaultItem) || 'Auto'}
               </Badge>
             )}
-            {vaultItem.is_rookie && <Badge variant="outline" className="text-[10px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10">RC</Badge>}
+            {isRookie && <RookiePill />}
             {vaultItem.is_sealed && <Badge variant="outline" className="text-[10px] font-bold border-green-400/50 text-green-700 bg-green-400/10">Sealed</Badge>}
-            {variants.filter(v => v !== 'Refractor').map(v => (
+            {variants.filter(v => v !== 'Refractor' && v !== ROOKIE_VARIANT).map(v => (
               <Badge key={v} variant="outline" className="text-[10px] font-bold border-primary/30 text-primary bg-primary/5">{v}</Badge>
             ))}
           </div>

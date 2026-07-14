@@ -16,7 +16,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 import VaultListingModal from '@/components/VaultListingModal.jsx';
-import { VARIANT_BADGES } from '@/lib/cardVariants.js';
+import { VARIANT_BADGES, ROOKIE_VARIANT } from '@/lib/cardVariants.js';
+import RookiePill from '@/components/RookiePill.jsx';
 import { slugify } from '@/lib/slugify.js';
 import GradeBadge from '@/components/GradeBadge.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
@@ -168,7 +169,10 @@ const MyVaultPage = () => {
     const rawVariants = card.variant
       ? card.variant.split(',').map(s => s.trim()).filter(Boolean)
       : (Array.isArray(card.cardVariants) ? card.cardVariants : (card.cardVariants ? [card.cardVariants] : []));
-    const specialBadge = Object.entries(VARIANT_BADGES).find(([key]) => rawVariants.includes(key));
+    // Image overlay badge — rookie is excluded (overlay: false): its one
+    // reference is the RookiePill under the card.
+    const overlayBadge = Object.entries(VARIANT_BADGES).find(([key, cfg]) => cfg.overlay !== false && rawVariants.includes(key));
+    const isRookie = rawVariants.includes(ROOKIE_VARIANT) || !!card.is_rookie;
 
     return (
       <div key={card.id} className="group bg-card border border-border rounded-2xl overflow-hidden shadow-sm hover:shadow-lg hover:border-primary/40 transition-all duration-300 flex flex-col h-full relative">
@@ -210,9 +214,9 @@ const MyVaultPage = () => {
           </div>
 
           {/* Special variant badge — top right */}
-          {specialBadge && (
-            <div className={`absolute top-3 right-3 z-10 px-2.5 py-1 rounded-full text-[11px] font-extrabold tracking-wide shadow-md ${specialBadge[1].bg} ${specialBadge[1].text}`}>
-              {specialBadge[1].label}
+          {overlayBadge && (
+            <div className={`absolute top-3 right-3 z-10 px-2.5 py-1 rounded-full text-[11px] font-extrabold tracking-wide shadow-md ${overlayBadge[1].bg} ${overlayBadge[1].text}`}>
+              {overlayBadge[1].label}
             </div>
           )}
 
@@ -238,7 +242,8 @@ const MyVaultPage = () => {
             {card.collection && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{card.collection}</Badge>}
             {card.year && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{card.year}</Badge>}
             {card.card_number && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">#{card.card_number}</Badge>}
-            {card.variant && card.variant.split(',').map(v => v.trim()).filter(Boolean).map(v => (
+            {isRookie && <RookiePill />}
+            {rawVariants.filter(v => v !== ROOKIE_VARIANT).map(v => (
               <Badge key={v} variant="secondary" className="text-[10px] font-medium bg-violet-500/10 text-violet-700 border border-violet-200/50">{v}</Badge>
             ))}
             {card.condition && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{CONDITION_LABELS[card.condition] || card.condition}</Badge>}

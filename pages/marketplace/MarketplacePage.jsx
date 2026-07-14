@@ -248,7 +248,7 @@ const MarketplacePage = () => {
         else if (filterMode === 'ForTrade') query = query.eq('accepts_trade', true);
         else if (filterMode === 'MakeOffer') query = query.eq('accepts_offers', true);
 
-        // is_rookie is set by the add-card form (attribute tick or RC variant)
+        // is_rookie is derived from the "Rookie Card (RC)" variant chip on the add-card form
         if (filterRookie) query = query.eq('vault_item.is_rookie', true);
 
         if (sort === 'price_asc')  query = query.order('price_aud', { ascending: true });

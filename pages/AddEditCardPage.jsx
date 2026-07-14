@@ -174,7 +174,6 @@ const AddEditCardPage = () => {
     // Attributes
     isFoil:         false,
     isSealed:       false,
-    isRookie:       false,
     serialNumber:   '',
     isAuto:         false,
     autoType:       '',
@@ -353,10 +352,16 @@ const AddEditCardPage = () => {
           setName:        card.set_name       || '',
           cardNumber:     card.card_number    || '',
           year:           card.year           ? String(card.year) : '',
-          variant:        card.variant ? card.variant.split(',').map(s => s.trim()).filter(Boolean) : [],
+          // The "Rookie Card (RC)" variant chip is the single source of truth for
+          // the rookie designation — surface the legacy is_rookie flag through it
+          // so older rows still show (and keep) their rookie status when edited.
+          variant:        (() => {
+            const v = card.variant ? card.variant.split(',').map(s => s.trim()).filter(Boolean) : [];
+            if (card.is_rookie && !v.includes('Rookie Card (RC)')) v.push('Rookie Card (RC)');
+            return v;
+          })(),
           isFoil:         card.is_foil        ?? false,
           isSealed:       card.is_sealed      ?? false,
-          isRookie:       card.is_rookie      ?? false,
           serialNumber:   card.serial_number  || '',
           isAuto:         card.is_auto        ?? false,
           autoType:       card.auto_type      || '',
@@ -582,7 +587,7 @@ const AddEditCardPage = () => {
       variant:         formData.variant,
       parallelName:    formData.parallelName || parallelOpts.find(p => p.id === parallelId)?.name || '',
       serialNumber:    formData.serialNumber,
-      isRookie:        formData.isRookie || formData.variant.includes('Rookie Card (RC)'),
+      isRookie:        formData.variant.includes('Rookie Card (RC)'),
       isFoil:          formData.isFoil,
       isSealed:        formData.isSealed,
       gradingCompany:  formData.gradingCompany,
@@ -853,9 +858,9 @@ const AddEditCardPage = () => {
         variant:             formData.variant.length ? formData.variant.join(', ') : null,
         is_foil:             formData.isFoil,
         is_sealed:           formData.isSealed,
-        // A card counts as a rookie whether the user ticked the attribute or
-        // picked the "Rookie Card (RC)" variant chip — filters query this flag
-        is_rookie:           formData.isRookie || formData.variant.includes('Rookie Card (RC)'),
+        // The "Rookie Card (RC)" variant chip is the single source of truth for
+        // the rookie designation — filters query this derived flag
+        is_rookie:           formData.variant.includes('Rookie Card (RC)'),
         is_refractor:        formData.variant.includes('Refractor'),
         serial_number:       formData.serialNumber?.trim() || null,
         is_auto:             formData.isAuto,
@@ -1474,13 +1479,15 @@ const AddEditCardPage = () => {
                               key={v}
                               type="button"
                               onClick={() => set('variant', active ? formData.variant.filter(x => x !== v) : [...formData.variant, v])}
-                              className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
+                              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
                                 active
                                   ? 'border-primary bg-primary/10 text-primary shadow-sm'
                                   : 'border-border bg-background text-foreground hover:border-muted-foreground/40'
                               }`}
                             >
-                              {active && <span className="mr-1">✓</span>}{v}
+                              {active && <span>✓</span>}
+                              {v === 'Rookie Card (RC)' && <RookieJerseyIcon className="w-3.5 h-3.5 shrink-0" />}
+                              {v}
                             </button>
                           );
                         };
@@ -1536,10 +1543,11 @@ const AddEditCardPage = () => {
                   <div className="space-y-2 md:col-span-2">
                     <Label className="font-bold">Card Attributes</Label>
                     <div className="flex gap-3">
+                      {/* Rookie Card lives in the Card Variant / Finish section above
+                          (the "Rookie Card (RC)" chip) — not duplicated here. */}
                       {[
                         { key: 'isFoil',   label: '🃏 Individual Card (Single)', desc: 'A single individual card' },
                         { key: 'isSealed', label: '📦 Sealed Product', desc: 'Booster, box, or sealed item' },
-                        { key: 'isRookie', label: <span className="inline-flex items-center gap-1.5"><RookieJerseyIcon className="w-4 h-4" /> Rookie Card</span>, desc: 'First-year professional card' },
                       ].map(({ key, label, desc }) => (
                         <button
                           key={key}
@@ -1872,7 +1880,7 @@ const AddEditCardPage = () => {
                         is selected in the Card Variant / Finish section (Attributes group). */}
                     {formData.variant.includes('Rookie Card (RC)') && (
                       <div className="mt-3 p-4 rounded-xl border-2 border-teal-400/30 bg-teal-400/5 space-y-4 animate-in fade-in slide-in-from-top-1">
-                        <p className="text-xs font-extrabold uppercase tracking-widest text-teal-700 dark:text-teal-400">Rookie Card Details</p>
+                        <p className="inline-flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-widest text-teal-700 dark:text-teal-400"><RookieJerseyIcon className="w-4 h-4 shrink-0" /> Rookie Card Details</p>
 
                         {/* Rookie designation */}
                         <div className="space-y-2">
