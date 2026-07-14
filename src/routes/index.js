@@ -3,6 +3,7 @@ import { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, pwnedChe
 import { verifyTradeAccess } from '../middleware/verifyTradeAccess.js';
 import { authMiddleware } from '../middleware/auth.js';
 import healthCheck from './health-check.js';
+import mcpRouter from './mcp.js';
 import ebayRouter from './ebay.js';
 import cardsightRouter from './cardsight.js';
 import authRouter from './auth/index.js';
@@ -43,7 +44,11 @@ const router = Router();
 export default () => {
     // Health check - no rate limiting
     router.get('/health', healthCheck);
-    
+
+    // MCP server (read-only tools for AI agents) with API rate limiting
+    router.use('/mcp', apiLimiter);
+    router.use('/mcp', mcpRouter);
+
     // Google verification endpoint - no rate limiting, no auth required
     router.use('/', verificationRouter);
     
