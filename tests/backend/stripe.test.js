@@ -346,8 +346,10 @@ describe('POST /create-cart-checkout', () => {
   });
 
   it('returns 400 for an unknown item type', async () => {
+    // Unknown item types are now rejected by cart-input validation before any
+    // pricing, so no GST/product reads happen — don't queue them (leftover
+    // mockResolvedValueOnce values would bleed into later tests).
     emailVerifyOff();
-    gstSettings();
     const res = await request(app).post('/create-cart-checkout').send({
       items: [{ type: 'mystery', id: 'x' }], successUrl: 'a', cancelUrl: 'b',
     });
