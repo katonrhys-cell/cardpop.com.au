@@ -16,14 +16,35 @@
 --
 -- Deleting the storage.objects row severs all API/public-URL access to the
 -- file immediately (requests 404). Idempotent: re-running deletes nothing.
+--
+-- NOTE (2026-07-15): current Supabase blocks direct DELETE on storage.objects
+-- with "Direct deletion from storage tables is not allowed. Use the Storage
+-- API instead. (SQLSTATE 42501)", raised by a built-in trigger. That made this
+-- migration fail on `db push` and — because push stops at the first failing
+-- migration — it silently blocked every later migration from applying. Each
+-- delete is therefore wrapped so a blocked attempt is a logged no-op instead of
+-- aborting the push. Where direct deletion is still permitted the purge runs as
+-- before; where it is blocked the objects must be purged out-of-band via the
+-- Storage API (service-role client) instead. Either way the migration applies
+-- cleanly so it can no longer wedge the migration pipeline.
 
-delete from storage.objects
-where bucket_id = 'verification-docs';
+do $$
+begin
+  delete from storage.objects
+  where bucket_id = 'verification-docs';
+exception when insufficient_privilege then
+  raise notice 'Skipped verification-docs purge: direct storage.objects deletion is blocked by Supabase; purge via the Storage API instead.';
+end $$;
 
-delete from storage.objects o
-where o.bucket_id = 'ai-images'
-  and o.name like 'ocr/%'
-  and not exists (
-    select 1 from public.ai_messages m
-    where m.content like '%' || o.name || '%'
-  );
+do $$
+begin
+  delete from storage.objects o
+  where o.bucket_id = 'ai-images'
+    and o.name like 'ocr/%'
+    and not exists (
+      select 1 from public.ai_messages m
+      where m.content like '%' || o.name || '%'
+    );
+exception when insufficient_privilege then
+  raise notice 'Skipped ai-images ocr/* purge: direct storage.objects deletion is blocked by Supabase; purge via the Storage API instead.';
+end $$;
