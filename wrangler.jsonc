@@ -8,5 +8,31 @@
   // Cloudflare dashboard, so uploading a version here can't change routing.
   "name": "cardpop-image-proxy",
   "main": "cloudflare/image-proxy-worker.js",
-  "compatibility_date": "2026-07-11"
+  "compatibility_date": "2026-07-11",
+
+  // R2 binding for the image fast path (env.IMAGES in the Worker). This MUST be
+  // declared here, not only in the dashboard: each Git-integration deploy runs
+  // wrangler and overwrites the Worker's bindings with whatever this config
+  // lists. A binding added by hand in the dashboard therefore vanishes on the
+  // next deploy ("the binding keeps disappearing") — declaring it here makes it
+  // part of every deploy so it sticks. `binding` must stay "IMAGES" to match
+  // env.IMAGES; `bucket_name` is the R2 bucket created for this (see
+  // docs/image-cdn.md → "Bind the bucket").
+  "r2_buckets": [
+    { "binding": "IMAGES", "bucket_name": "cardpop-images" }
+  ],
+
+  // Workers Observability: capture runtime logs (incl. per-invocation logs) and
+  // traces for the Worker, viewable in the Cloudflare dashboard. Like bindings,
+  // this is owned by the config — each Git-integration deploy applies whatever
+  // is declared here, so it must live in the repo to persist across deploys.
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": true
+    }
+  }
 }
