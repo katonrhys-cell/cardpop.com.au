@@ -150,6 +150,83 @@ describe('webhook single-item idempotency', () => {
     // Mismatch must short-circuit before any order is inserted or paid out.
     expect(dbCalls.some(c => c.table === 'orders' && c.op === 'insert')).toBe(false);
     expect(mockStripe.transfers.create).not.toHaveBeenCalled();
+    // The captured payment must be auto-refunded (money was already taken).
+    expect(mockStripe.refunds.create).toHaveBeenCalledWith({ payment_intent: 'pi_single' });
+  });
+});
+
+// ─── payment_status gating: don't fulfil an unpaid/async-pending session ───────
+
+describe('webhook payment_status gating', () => {
+  it('defers fulfilment when checkout.session.completed arrives unpaid', async () => {
+    mockStripe.webhooks.constructEvent.mockReturnValue({
+      type: 'checkout.session.completed',
+      data: { object: { id: 'cs_async', payment_status: 'unpaid', amount_total: 11000, payment_intent: 'pi_a', metadata: {} } },
+    });
+    let ordersTouched = false;
+    state.respond = (ctx) => {
+      if (ctx.table === 'orders') ordersTouched = true;
+      return { data: null, error: null };
+    };
+
+    const res = await postWebhook();
+
+    expect(res.status).toBe(200);
+    // Deferred before any order work — no fulfilment for an uncaptured payment.
+    expect(ordersTouched).toBe(false);
+    expect(mockStripe.transfers.create).not.toHaveBeenCalled();
+  });
+
+  it('fulfils on checkout.session.async_payment_succeeded once paid', async () => {
+    mockStripe.webhooks.constructEvent.mockReturnValue({
+      type: 'checkout.session.async_payment_succeeded',
+      data: { object: { id: 'cs_cart', payment_status: 'paid', amount_total: 11000, payment_intent: 'pi_cart' } },
+    });
+    const pendingOrder = {
+      id: 'order-async-1', status: 'pending', total_aud: 110,
+      order_items: [{ type: 'shop', id: 'p1', quantity: 1, seller_id: null }], buyer_id: 'buyer-1',
+    };
+    state.respond = (ctx) => {
+      if (ctx.table === 'orders' && ctx.single) return { data: pendingOrder, error: null };
+      if (ctx.table === 'orders' && ctx.op === 'update') return { data: [{ id: pendingOrder.id }], error: null };
+      if (ctx.table === 'profiles' && ctx.single) return { data: { email: null, display_name: 'Buyer' }, error: null };
+      return { data: null, error: null };
+    };
+
+    const res = await postWebhook();
+
+    expect(res.status).toBe(200);
+    // The paid async event drives the normal cart fulfilment (stock decrement).
+    expect(rpcCalls.filter(c => c.name === 'decrement_shop_stock')).toHaveLength(1);
+  });
+});
+
+// ─── DB error on the confirm CAS must retry (500), not be treated as done ──────
+
+describe('webhook confirm-CAS error handling', () => {
+  it('returns 500 (so Stripe retries) when the confirm update errors', async () => {
+    mockStripe.webhooks.constructEvent.mockReturnValue({
+      type: 'checkout.session.completed',
+      data: { object: { id: 'cs_cart', amount_total: 11000, payment_intent: 'pi_cart' } },
+    });
+    const pendingOrder = {
+      id: 'order-err-1', status: 'pending', total_aud: 110,
+      order_items: [{ type: 'shop', id: 'p1', quantity: 1, seller_id: null }], buyer_id: 'buyer-1',
+    };
+    state.respond = (ctx) => {
+      if (ctx.table === 'orders' && ctx.single) return { data: pendingOrder, error: null };
+      // Transient DB error on the pending→confirmed compare-and-swap.
+      if (ctx.table === 'orders' && ctx.op === 'update') return { data: null, error: { code: 'XX000', message: 'db hiccup' } };
+      return { data: null, error: null };
+    };
+
+    const res = await postWebhook();
+
+    expect(res.status).toBe(500);
+    // Must NOT have recorded the event as processed (so the retry reprocesses).
+    expect(dbCalls.some(c => c.table === 'stripe_webhook_events' && c.op === 'insert')).toBe(false);
+    // Must NOT have paid the seller on the failed confirm.
+    expect(mockStripe.transfers.create).not.toHaveBeenCalled();
   });
 });
 

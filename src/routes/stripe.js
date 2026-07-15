@@ -502,7 +502,13 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
   try {
     switch (event.type) {
-      case 'checkout.session.completed': {
+      // async_payment_succeeded fires when a delayed method (e.g. some
+      // bank-debit / BNPL flows) settles after checkout completed. It carries an
+      // identical session object with payment_status 'paid', so it shares the
+      // same fulfilment path; the completed event for those methods arrives
+      // 'unpaid' and is deferred inside handleCheckoutSessionCompleted.
+      case 'checkout.session.completed':
+      case 'checkout.session.async_payment_succeeded': {
         const session = event.data.object;
         if (session.metadata?.walletTopup === 'true') {
           await handleWalletTopup(session, stripe);
@@ -518,6 +524,13 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         }
         break;
       }
+
+      // A delayed/async payment failed to settle after checkout completed.
+      // Release the pending order the same way an expiry does, so it isn't left
+      // hanging as 'pending'.
+      case 'checkout.session.async_payment_failed':
+        await handleCheckoutSessionExpired(event.data.object);
+        break;
 
       case 'checkout.session.expired':
         await handleCheckoutSessionExpired(event.data.object);
