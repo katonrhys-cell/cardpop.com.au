@@ -304,8 +304,12 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       mode:                 'payment',
       // Embedded checkout keeps the buyer on our page and returns to return_url
       // once payment completes; hosted checkout redirects out and back.
+      // Stripe renamed the ui_mode enum on 2026-03-25 — the full-page embedded
+      // mode is now 'embedded_page' ('embedded' is rejected by current API
+      // versions). @stripe/react-stripe-js v6 / stripe-js v9 consume the same
+      // client_secret this returns via createEmbeddedCheckoutPage().
       ...(embedded
-        ? { ui_mode: 'embedded', return_url: returnUrl }
+        ? { ui_mode: 'embedded_page', return_url: returnUrl }
         : { success_url: successUrl, cancel_url: cancelUrl }),
       ...(billingCustomerId ? { customer: billingCustomerId } : { customer_email: email }),
       // Business buyers get an itemised tax invoice carrying their ABN.
