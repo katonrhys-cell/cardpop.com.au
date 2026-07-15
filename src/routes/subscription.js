@@ -152,8 +152,12 @@ router.post('/paypal/activate', authMiddleware, async (req, res) => {
     if (!subscriptionId) return res.status(400).json({ error: 'subscriptionId is required' });
 
     const sub = await getPaypalSubscription(subscriptionId);
-    // Guard: the subscription must belong to this user (custom_id set at creation).
-    if (sub.custom_id && sub.custom_id !== req.user.id) {
+    // Guard: the subscription must belong to this user. custom_id is set to the
+    // owner's user id at creation (paypalClient.createPaypalSubscription), so a
+    // missing/empty custom_id is treated as a hard failure rather than skipping
+    // the check — otherwise a user could claim a custom_id-less subscription's
+    // entitlement onto their own account.
+    if (sub.custom_id !== req.user.id) {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
