@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
+import { buildCardAnalyticsUrl } from '@/utils/cardSlug.js';
 import {
   TrendingUp, TrendingDown, Search, LineChart, Star, StarOff,
   ArrowUpRight, ArrowDownRight, Activity, DollarSign, BarChart3,
@@ -271,7 +272,7 @@ const MarketsPage = () => {
     setSearchResult(null);
   };
 
-  const cardUrl = (card) => `/analytics/card?name=${encodeURIComponent(card.name)}&set=${encodeURIComponent(card.set ?? '')}&collection=${encodeURIComponent(card.collection ?? '')}&price=${card.price ?? 0}&change=${card.change ?? 0}${card.thumbnailUrl ? `&image=${encodeURIComponent(card.thumbnailUrl)}` : ''}`;
+  const cardUrl = (card) => buildCardAnalyticsUrl(card);
 
   const MoverRow = ({ card }) => (
     <Link

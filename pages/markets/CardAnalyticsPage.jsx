@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, useParams, useNavigate, Link } from 'react-router-dom';
+import { buildCardAnalyticsUrl, parseCardSlug, cardSlug } from '@/utils/cardSlug.js';
 import { supabase } from '@/lib/supabaseClient.js';
 import apiServerClient from '@/lib/apiServerClient.js';
 import {
@@ -166,8 +167,14 @@ const SOURCES = (name, set) => [
 // ─── Main page ────────────────────────────────────────────────────────────────
 const CardAnalyticsPage = () => {
   const [searchParams] = useSearchParams();
-  const cardName      = searchParams.get('name')          || 'Unknown Card';
-  const cardSet       = searchParams.get('set')           || '';
+  const { slug }      = useParams();
+  const navigate      = useNavigate();
+  // Fallback identity parsed from the slug — used only when a crawler or shared
+  // link hits the canonical URL with no query params. In-app navigation always
+  // passes exact name/set via the query string.
+  const fromSlug      = useMemo(() => parseCardSlug(slug), [slug]);
+  const cardName      = searchParams.get('name')          || fromSlug.name || 'Unknown Card';
+  const cardSet       = searchParams.get('set')           || fromSlug.set  || '';
   const cardColl      = searchParams.get('collection')    || '';
   // Split a trailing "(...)" qualifier (e.g. rarity) off the name so the
   // heading can show a clean title with the qualifier as a subheading.
@@ -178,6 +185,21 @@ const CardAnalyticsPage = () => {
   const rawChange     = parseFloat(searchParams.get('change') || '0');
   const cardsightId   = searchParams.get('cardsight_id')  || null;
   const passedImage   = searchParams.get('image')         || null;
+
+  // Canonical slug for this card. Every analytics URL should live under
+  // /analytics/card/<slug> so each card gets a unique, descriptive canonical
+  // (the old query-only path collapsed them all into one URL).
+  const canonicalSlug = useMemo(() => cardSlug(cardName, cardSet), [cardName, cardSet]);
+  const canonicalPath = `/analytics/card/${canonicalSlug}`;
+
+  // Redirect legacy/mismatched paths to the canonical slug, preserving the exact
+  // data in the query string. Runs when landing on the bare `/analytics/card`
+  // route, or when the slug in the URL doesn't match the current card.
+  useEffect(() => {
+    if (cardName === 'Unknown Card') return;
+    if (slug === canonicalSlug) return;
+    navigate(`${canonicalPath}${window.location.search}`, { replace: true });
+  }, [slug, canonicalSlug, canonicalPath, cardName, navigate]);
 
   const [listings, setListings]     = useState([]);
   const [vaultItems, setVaultItems] = useState([]);
@@ -320,11 +342,34 @@ const CardAnalyticsPage = () => {
     return () => { cancelled = true; };
   }, [cardName, cardSet]);
 
-  const cardUrl = (c) => `/analytics/card?name=${encodeURIComponent(c.name)}&set=${encodeURIComponent(c.set)}&collection=${encodeURIComponent(c.collection)}&price=${c.price}&change=${c.change}`;
+  const cardUrl = (c) => buildCardAnalyticsUrl(c);
+
+  // SEO: unique, descriptive title/description per card + breadcrumb schema.
+  const seoLabel   = [cardTitle, cardVariant && `(${cardVariant})`].filter(Boolean).join(' ');
+  const seoContext = [cardSet, cardColl].filter(Boolean).join(' · ');
+  const seoTitle   = `${seoLabel}${seoContext ? ` — ${seoContext}` : ''} Price & Value | CardPop Analytics`;
+  const seoDesc    = `See live prices, sold history, 30-day trends and marketplace listings for ${seoLabel}${cardSet ? ` from ${cardSet}` : ''} on CardPop — Australia's trading card marketplace.`;
+  const breadcrumbLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://cardpop.com.au/' },
+      { '@type': 'ListItem', position: 2, name: 'Market Analytics', item: 'https://cardpop.com.au/analytics' },
+      { '@type': 'ListItem', position: 3, name: seoLabel, item: `https://cardpop.com.au${canonicalPath}` },
+    ],
+  };
 
   return (
     <div className="min-h-screen bg-background">
-      <SEOHead title={`${cardName} | Card Analytics | CardPop`} description={`Track price history, market trends and analytics for ${cardName} on CardPop Australia.`} />
+      <SEOHead
+        title={seoTitle}
+        description={seoDesc}
+        canonicalUrl={canonicalPath}
+        ogImage={heroImage || undefined}
+        ogImageAlt={seoLabel}
+        structuredData={cardName !== 'Unknown Card' ? breadcrumbLd : undefined}
+        noindex={cardName === 'Unknown Card'}
+      />
 
       {/* Hero */}
       <section className="bg-card border-b border-border py-10">
