@@ -32,6 +32,29 @@ const toolMap = new Map(tools.map((t) => [t.name, t]));
 const result = (id, value) => ({ jsonrpc: '2.0', id, result: value });
 const error = (id, code, message) => ({ jsonrpc: '2.0', id, error: { code, message } });
 
+// A JSON-RPC batch fans out into per-message handling, and each tools/call runs
+// 1–2 service-role Supabase queries. Rate limiters count HTTP requests, not
+// batch elements, so without these bounds one large POST (the body limit allows
+// ~20 MB) could carry hundreds of thousands of messages and spawn that many
+// concurrent DB queries from a single request — exhausting the function and the
+// connection pool. Cap the batch length and process it with bounded concurrency.
+const MAX_BATCH_SIZE = 20;
+const BATCH_CONCURRENCY = 4;
+
+// Map over items with a fixed concurrency, preserving input order.
+async function mapWithConcurrency(items, fn, limit) {
+	const results = new Array(items.length);
+	let next = 0;
+	async function worker() {
+		while (next < items.length) {
+			const i = next++;
+			results[i] = await fn(items[i]);
+		}
+	}
+	await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+	return results;
+}
+
 // Handle one JSON-RPC message. Returns a response object, or null for a
 // notification (no id) / message that needs no reply.
 async function handleMessage(msg) {
@@ -82,7 +105,10 @@ router.post('/', async (req, res) => {
 
 	if (Array.isArray(body)) {
 		if (body.length === 0) return res.status(400).json(error(null, -32600, 'Empty batch'));
-		const responses = (await Promise.all(body.map(handleMessage))).filter(Boolean);
+		if (body.length > MAX_BATCH_SIZE) {
+			return res.status(400).json(error(null, -32600, `Batch too large: ${body.length} messages (max ${MAX_BATCH_SIZE})`));
+		}
+		const responses = (await mapWithConcurrency(body, handleMessage, BATCH_CONCURRENCY)).filter(Boolean);
 		if (responses.length === 0) return res.status(202).end();
 		return res.json(responses);
 	}
