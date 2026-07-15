@@ -20,5 +20,19 @@
   // docs/image-cdn.md → "Bind the bucket").
   "r2_buckets": [
     { "binding": "IMAGES", "bucket_name": "cardpop-images" }
-  ]
+  ],
+
+  // Workers Observability: capture runtime logs (incl. per-invocation logs) and
+  // traces for the Worker, viewable in the Cloudflare dashboard. Like bindings,
+  // this is owned by the config — each Git-integration deploy applies whatever
+  // is declared here, so it must live in the repo to persist across deploys.
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true
+    },
+    "traces": {
+      "enabled": true
+    }
+  }
 }
