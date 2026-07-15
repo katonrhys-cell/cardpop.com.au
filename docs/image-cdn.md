@@ -98,22 +98,32 @@ The binding is optional: with no `IMAGES` binding the Worker behaves exactly as
 the Supabase-only proxy did. See `tests/backend/imageProxyWorker.test.js` for the
 covered behaviours.
 
-**Bind the bucket (Cloudflare dashboard, ~2 min):**
+**Bind the bucket — declare it in `wrangler.jsonc`, NOT the dashboard:**
+
+The Worker is deployed by the Cloudflare Git integration, which runs Wrangler
+against `wrangler.jsonc`. **Each deploy overwrites the Worker's bindings with
+whatever that config lists.** So a binding added by hand in the dashboard
+(Settings → Bindings) vanishes on the very next deploy — the classic "the
+binding keeps disappearing". The binding must therefore live in the config:
 
 1. Create the R2 bucket `cardpop-images` (R2 → Create bucket; APAC/Oceania
    location for AU proximity). *(Already done.)*
-2. Worker `cardpop-image-proxy` → **Settings → Bindings → Add → R2 bucket**.
-   - **Variable name**: `IMAGES` (must match exactly — the code reads
-     `env.IMAGES`).
-   - **R2 bucket**: `cardpop-images`.
-3. Re-deploy the Worker with the current `cloudflare/image-proxy-worker.js`
-   (Worker → Edit code → paste → Deploy). The binding only takes effect once the
-   R2-aware code is deployed.
-4. Verify: upload a test object to R2 under a real key (e.g.
-   `vault-images/<some-existing-path>.webp`), then
-   `curl -sI https://img.cardpop.com.au/storage/v1/object/public/vault-images/<that-path>.webp`.
-   It should return the R2 object; a key not in R2 should still return the
-   Supabase-served image.
+2. Declare the binding in `wrangler.jsonc` (already committed) so it deploys
+   with the Worker and can't be wiped:
+   ```jsonc
+   "r2_buckets": [
+     { "binding": "IMAGES", "bucket_name": "cardpop-images" }
+   ]
+   ```
+   `binding` must stay `IMAGES` (the code reads `env.IMAGES`); `bucket_name` is
+   the R2 bucket from step 1. Do **not** also add it in the dashboard — the
+   config is authoritative and a dashboard entry just gets overwritten.
+3. Deploy the Worker (push to the branch the Git integration builds from, or
+   trigger a redeploy in the dashboard). The binding takes effect on that deploy.
+4. Verify: `curl -sI https://img.cardpop.com.au/storage/v1/object/public/vault-images/<a-real-path>.jpeg`
+   twice. The first request migrates the object into R2 (write-through, no
+   `x-image-source` header yet); the second returns it from R2 with
+   `x-image-source: r2`. A key not in R2 still returns the Supabase-served image.
 
 **Backfill (optional pre-warm):** write-through already migrates each object the
 first time it's viewed, so no backfill is strictly required — the bucket fills
