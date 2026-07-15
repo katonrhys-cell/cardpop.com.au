@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import SEOHead from '@/components/SEOHead.jsx';
 import { generateStructuredData, generateBreadcrumbStructuredData } from '@/utils/seoUtils.js';
 import { supabase } from '@/lib/supabaseClient.js';
+import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { Button } from '@/components/ui/button';
 import { ShieldCheck, MessageCircle, User, TrendingUp, Loader2, Flag } from 'lucide-react';
 import ReportModal from '@/components/ReportModal.jsx';
@@ -57,7 +58,7 @@ const MarketplaceListingPage = () => {
       try {
         const { data, error } = await supabase
           .from('listings')
-          .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(*)')
+          .select(`*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(${PUBLIC_PROFILE_COLUMNS})`)
           .eq('id', id)
           .single();
         if (error) throw error;

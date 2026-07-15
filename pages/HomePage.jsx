@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient.js';
+import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { cachedQuery } from '@/lib/queryCache.js';
 import VaultListingCard from '@/components/VaultListingCard.jsx';
 import SellerCard from '@/components/SellerCard.jsx';
@@ -284,7 +285,7 @@ const HomePage = () => {
             5 * 60 * 1000
           ),
           cachedQuery('homepage_featured_sellers', () =>
-            supabase.from('profiles').select('*').eq('is_featured_seller', true).eq('is_active', true).limit(4),
+            supabase.from('profiles').select(PUBLIC_PROFILE_COLUMNS).eq('is_featured_seller', true).eq('is_active', true).limit(4),
             5 * 60 * 1000
           ),
         ]);

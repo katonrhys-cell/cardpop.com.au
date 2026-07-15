@@ -84,7 +84,7 @@ const AnalyticsReportsPage = () => {
           allOrdersRes,
           allUsersRes
         ] = await Promise.all([
-          supabase.from('profiles').select('*', { count: 'exact', head: true }),
+          supabase.from('profiles').select('id', { count: 'exact', head: true }),
           supabase.from('listings').select('*', { count: 'exact', head: true }),
           supabase.from('events').select('*', { count: 'exact', head: true }),
           supabase.from('categories').select('*', { count: 'exact', head: true }),

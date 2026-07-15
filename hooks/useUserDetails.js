@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
+import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 
 export const useUserDetails = (userId) => {
   const [data, setData] = useState({
@@ -33,7 +34,7 @@ export const useUserDetails = (userId) => {
         reviewsRes,
         addressesRes,
       ] = await Promise.allSettled([
-        supabase.from('profiles').select('*').eq('id', userId).single(),
+        supabase.from('profiles').select(PUBLIC_PROFILE_COLUMNS).eq('id', userId).single(),
         supabase.from('vault_items').select('*, categories(name,slug)').eq('owner_id', userId).order('created_at', { ascending: false }).limit(50),
         supabase.from('orders').select('*, profiles!seller_id(username,display_name,avatar_url)').eq('buyer_id', userId).order('created_at', { ascending: false }).limit(50),
         supabase.from('orders').select('*, profiles!buyer_id(username,display_name,avatar_url)').eq('seller_id', userId).order('created_at', { ascending: false }).limit(50),
