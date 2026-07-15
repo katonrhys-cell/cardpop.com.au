@@ -1,0 +1,16 @@
+{
+  "name": "CardPop",
+  "description": "Read-only MCP tools for CardPop, Australia's trading card marketplace: search buyable listings and look up live AUD card prices.",
+  "serverInfo": {
+    "name": "cardpop",
+    "version": "1.0.0"
+  },
+  "transport": {
+    "type": "streamable-http",
+    "url": "https://cardpop.com.au/api/mcp"
+  },
+  "capabilities": {
+    "tools": {}
+  },
+  "documentation": "https://cardpop.com.au/llms.txt"
+}
