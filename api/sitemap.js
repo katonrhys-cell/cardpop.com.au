@@ -128,7 +128,7 @@ export default async function handler(req, res) {
           .limit(200),
         supabase
           .from('listings')
-          .select('id, slug, updated_at, created_at')
+          .select('id, slug, title, updated_at, created_at, vault_item:vault_items(card_name)')
           .eq('status', 'active')
           .order('created_at', { ascending: false })
           .limit(500),
@@ -255,7 +255,9 @@ export default async function handler(req, res) {
       parts.push('', `  <!-- Marketplace listings (${listings.length}) -->`);
       for (const listing of listings) {
         const lastmod = (listing.updated_at || listing.created_at || TODAY).split('T')[0];
-        const urlSlug = listing.slug || 'listing';
+        // Descriptive, keyword-rich slug from the card name — matches the client
+        // and prerender canonicals so the sitemap doesn't advertise a weaker URL.
+        const urlSlug = listing.slug || slugify(listing.title || listing.vault_item?.card_name) || 'listing';
         parts.push(xmlUrl(`${BASE_URL}/marketplace/${listing.id}/${urlSlug}`, lastmod, 'weekly', '0.6'));
       }
     }

@@ -489,7 +489,13 @@ async function renderListing(supabase, id, slugParam) {
     .eq('id', id)
     .maybeSingle();
 
-  const canonical = `${BASE_URL}/marketplace/${id}/${listing?.slug || slugParam || 'listing'}`;
+  // Derive a descriptive slug from the card name (the ID is the stable key; the
+  // slug is decorative but should carry the keyword). Falls back to the DB slug,
+  // then the URL param, then a generic word — mirrors the shop-product handler
+  // and the client canonical so all three agree.
+  const card = listing?.vault_item || {};
+  const cardName = listing?.title || card.card_name || 'Trading Card';
+  const canonical = `${BASE_URL}/marketplace/${id}/${listing?.slug || slugify(cardName) || slugParam || 'listing'}`;
 
   if (!listing || listing.status !== 'active') {
     return notFound({
@@ -499,9 +505,6 @@ async function renderListing(supabase, id, slugParam) {
       bodyHtml: '<main><h1>Listing Unavailable</h1><p>This listing is sold or no longer active.</p></main>',
     });
   }
-
-  const card = listing.vault_item || {};
-  const cardName = listing.title || card.card_name || 'Trading Card';
   const imgPath = listing.images?.[0] || card.vault_images?.[0]?.storage_path || card.card_image;
   const image = publicImageUrl(imgPath);
   const price = listing.price_aud ?? listing.price;
