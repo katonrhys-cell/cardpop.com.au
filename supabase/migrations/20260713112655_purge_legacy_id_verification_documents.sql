@@ -14,26 +14,29 @@
 --    no chat message references is an ID scan or an orphaned one-shot OCR
 --    image and is safe to remove without breaking conversations.
 --
--- Deleting the storage.objects row severs all API/public-URL access to the
--- file immediately (requests 404). Idempotent: re-running deletes nothing.
+-- NOTE (2026-07-15): this migration cannot perform its purge as SQL against the
+-- current project and is now a best-effort no-op that always applies cleanly:
 --
--- NOTE (2026-07-15): current Supabase blocks direct DELETE on storage.objects
--- with "Direct deletion from storage tables is not allowed. Use the Storage
--- API instead. (SQLSTATE 42501)", raised by a built-in trigger. That made this
--- migration fail on `db push` and — because push stops at the first failing
--- migration — it silently blocked every later migration from applying. Each
--- delete is therefore wrapped so a blocked attempt is a logged no-op instead of
--- aborting the push. Where direct deletion is still permitted the purge runs as
--- before; where it is blocked the objects must be purged out-of-band via the
--- Storage API (service-role client) instead. Either way the migration applies
--- cleanly so it can no longer wedge the migration pipeline.
+--   * Supabase blocks direct DELETE on storage.objects — "Direct deletion from
+--     storage tables is not allowed. Use the Storage API instead." (42501) —
+--     via a built-in trigger, so neither delete below can remove anything.
+--   * public.ai_messages does not exist in this project (42P01), so the second
+--     delete's subquery cannot even be planned.
+--
+-- Because `supabase db push` stops at the first failing migration, the original
+-- raw deletes silently blocked EVERY later migration from applying to
+-- production since 2026-07-13. Each delete is therefore wrapped in a block that
+-- swallows any error and emits a notice, so the migration can no longer wedge
+-- the pipeline. The actual purge of legacy identity documents must be done
+-- out-of-band via the Storage API (service-role client) — see the follow-up
+-- cleanup script rather than a SQL migration.
 
 do $$
 begin
   delete from storage.objects
   where bucket_id = 'verification-docs';
-exception when insufficient_privilege then
-  raise notice 'Skipped verification-docs purge: direct storage.objects deletion is blocked by Supabase; purge via the Storage API instead.';
+exception when others then
+  raise notice 'Skipped verification-docs purge (%): %. Purge via the Storage API instead.', sqlstate, sqlerrm;
 end $$;
 
 do $$
@@ -45,6 +48,6 @@ begin
       select 1 from public.ai_messages m
       where m.content like '%' || o.name || '%'
     );
-exception when insufficient_privilege then
-  raise notice 'Skipped ai-images ocr/* purge: direct storage.objects deletion is blocked by Supabase; purge via the Storage API instead.';
+exception when others then
+  raise notice 'Skipped ai-images ocr/* purge (%): %. Purge via the Storage API instead.', sqlstate, sqlerrm;
 end $$;
