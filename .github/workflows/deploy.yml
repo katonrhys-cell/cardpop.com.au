@@ -47,44 +47,14 @@ jobs:
       - name: Bundle-size budget
         run: npm run check:bundle
 
-  e2e:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: '24'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Cache Playwright browsers
-        uses: actions/cache@v5
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('**/package-lock.json') }}
-
-      # The hosted runner image periodically ships broken Microsoft apt repos
-      # (azure-cli / prod) whose InRelease signatures fail to verify. The
-      # `apt-get update` that `playwright install --with-deps` runs then aborts
-      # with exit 100 ("repository is no longer signed" / "Clearsigned file
-      # isn't valid, got 'NOSPLIT'"), failing the browser install. Those repos
-      # aren't needed for Chromium's system libraries, so drop them first.
-      - name: Remove broken Microsoft apt repos
-        run: sudo rm -f /etc/apt/sources.list.d/*microsoft* /etc/apt/sources.list.d/*azure*
-
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
-
-      - name: Run E2E tests
-        run: npm run test:e2e
-
+  # No e2e job on the main-push path. Browser E2E already runs on every pull
+  # request (e2e.yml) as the merge gate, so re-running the slow Playwright suite
+  # on the post-merge push to main just duplicated it and burned Actions
+  # minutes. Deploy now gates on `verify` only; if a merge could land code that
+  # skipped PR e2e (e.g. a direct push to main), rely on branch protection to
+  # require the PR e2e check instead of re-running it here.
   deploy:
-    needs: [verify, e2e]
+    needs: [verify]
     runs-on: ubuntu-latest
     # OIDC: the job mints a short-lived token GitHub signs, AWS trusts it, and we
     # assume an IAM role for temporary credentials — no long-lived AWS keys here.
