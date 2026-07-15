@@ -360,6 +360,9 @@ const App = () => {
 
                         {/* Markets & Analytics */}
                         <Route path="/analytics" element={<MarketsPage />} />
+                        {/* SEO-friendly slug path (canonical); the bare query-param
+                            form is kept for back-compat and self-redirects to the slug. */}
+                        <Route path="/analytics/card/:slug" element={<CardAnalyticsPage />} />
                         <Route path="/analytics/card" element={<CardAnalyticsPage />} />
                         {/* Orphaned category route (no inbound links, MarketsPage has no category filter) — redirect to the base analytics page */}
                         <Route path="/analytics/:category" element={<Navigate to="/analytics" replace />} />
