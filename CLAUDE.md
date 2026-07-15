@@ -127,13 +127,22 @@ Cloudflare (proxying all traffic) is the volumetric DDoS layer; Express rate lim
 
 ### Deployment
 
-GitHub Actions (`.github/workflows/deploy.yml`) deploys to Vercel on every push to `main`:
+Vercel's **native Git integration** builds and deploys on every push to `main`
+(and creates preview deployments for pull requests) — no GitHub Actions step is
+involved in deploying:
 
 ```
 git push main
-  → GitHub Actions: npm install → vercel --prod
   → Vercel builds dist/ and serves api/index.js as a serverless function
 ```
+
+CI on GitHub Actions is now quality-gating only: `.github/workflows/ci.yml`
+(lint + tests + build) and `e2e.yml` run on pull requests, and
+`.github/workflows/main-ci.yml` re-runs the same `verify` gate on pushes to
+`main`. The old `deploy.yml` (which ran `vercel --prod` via the CLI using an AWS
+OIDC role + SSM-stored token) was removed when deploys moved to Vercel's Git
+integration; the AWS role and `/cardpop/vercel/*` SSM parameters are now unused
+and can be cleaned up.
 
 **Vercel environment variables** required in production (set in Vercel dashboard → Settings → Environment Variables):
 
