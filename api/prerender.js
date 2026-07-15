@@ -1282,7 +1282,7 @@ const STATIC_CONTENT = {
     title: "Safe Buying — Australia's Safest Place to Buy Trading Cards | CardPop™",
     description: 'Buy Pokémon, Magic and sports cards safely in Australia. CardPop protects every order with secure Stripe payments (PCI-DSS), ID-verified sellers via Stripe Identity, and a 14-day Buyer Protection Guarantee.',
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Safe Buying', path: '/safe-buying' }],
-    h1: 'Is CardPop Safe? Buyer Protection & Secure Payments',
+    h1: 'Why CardPop Is Safe: Buyer Protection & Secure Payments',
     intro: 'Buying trading cards online should never feel like a gamble. CardPop™ is built to be Australia’s safest place to buy Pokémon, Magic: The Gathering, Yu-Gi-Oh! and sports cards — every order is paid securely, backed by buyer protection, and handled by identity-verified members.',
     sections: [
       { h2: 'Every payment is secure', paras: [
