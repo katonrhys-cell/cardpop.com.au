@@ -66,7 +66,7 @@ router.get('/calculate', authMiddleware, validateRequestQuery(calculateBreakdown
     });
   } catch (err) {
     logger.error(`[STRIPE] /calculate error: ${err.message}`);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
   }
 });
 
@@ -81,12 +81,30 @@ router.post('/create-checkout', authMiddleware, requireEmailVerified, validateRe
 // the normal commission + GST breakdown. A single Stripe session collects the
 // payment; a 'pending' order row is written as the snapshot the webhook confirms.
 
+// Bound cart input before it reaches priceCart, which does one DB lookup per
+// item. Without this an unbounded `items[]` (or a non-string id fed into a
+// Supabase .eq() filter) is a cheap resource-exhaustion vector on these
+// guest-callable endpoints. Returns an error string, or null when valid.
+const MAX_CART_ITEMS = 50;
+function validateCartItems(items) {
+  if (!Array.isArray(items) || items.length === 0) return 'items is required';
+  if (items.length > MAX_CART_ITEMS) return `Too many items in the cart (max ${MAX_CART_ITEMS}).`;
+  for (const it of items) {
+    if (!it || typeof it !== 'object' || Array.isArray(it)) return 'Invalid cart item.';
+    if (it.type !== 'shop' && it.type !== 'listing') return 'Each cart item needs a valid type ("shop" or "listing").';
+    if (typeof it.id !== 'string' || it.id.length === 0 || it.id.length > 100) return 'Each cart item needs a valid id.';
+  }
+  return null;
+}
+
 // Preview the authoritative cart total (so the UI never shows a number that
 // differs from what Stripe will charge).
 router.post('/calculate-cart', optionalAuthMiddleware, async (req, res) => {
   try {
     const { items, promoCode, useWalletBalance } = req.body;
-    if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'items is required' });
+    const itemsError = validateCartItems(items);
+    if (itemsError) return res.status(400).json({ error: itemsError });
+    if (typeof promoCode === 'string' && promoCode.length > 64) return res.status(400).json({ error: 'Invalid promo code.' });
     if (promoCode && useWalletBalance) {
       return res.status(400).json({ error: 'Apply either a promo code or your wallet balance, not both.' });
     }
@@ -143,7 +161,7 @@ router.post('/calculate-cart', optionalAuthMiddleware, async (req, res) => {
   } catch (err) {
     const code = err.statusCode || 500;
     if (code === 500) logger.error(`[STRIPE] /calculate-cart error: ${err.message}`);
-    res.status(code).json({ error: err.message });
+    res.status(code).json({ error: code === 500 ? 'Something went wrong. Please try again.' : err.message });
   }
 });
 
@@ -156,11 +174,21 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
     // for them. The email they typed at checkout is the receipt address (and,
     // if they opted in, the newsletter address).
     const userId = req.user?.id || null;
-    const email  = (req.user?.email || (typeof guestEmailInput === 'string' ? guestEmailInput.trim() : '')) || null;
-    if (!email || !email.includes('@')) {
+    // Normalize to lowercase: the guest purchase-velocity window queries
+    // buyer_email lowercased, so storing a mixed-case address would silently
+    // never match — disabling the guest order/spend caps. Email delivery is
+    // case-insensitive in practice, so lowercasing the receipt address is safe.
+    const email  = ((req.user?.email || (typeof guestEmailInput === 'string' ? guestEmailInput.trim() : '')) || '').toLowerCase() || null;
+    if (!email || !email.includes('@') || email.length > 254) {
       return res.status(400).json({ error: 'A valid email address is required to place an order.' });
     }
     const wantsNewsletter = subscribeNewsletter === true || subscribeNewsletter === 'true';
+
+    const itemsError = validateCartItems(items);
+    if (itemsError) return res.status(400).json({ error: itemsError });
+    if (typeof promoCode === 'string' && promoCode.length > 64) {
+      return res.status(400).json({ error: 'Invalid promo code.' });
+    }
 
     // Business / ABN buyers get a proper tax invoice. Re-validate the ABN
     // server-side — never trust the client's checksum. Anything invalid is
@@ -380,7 +408,7 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
   } catch (err) {
     const code = err.statusCode || 500;
     if (code === 500) logger.error(`[STRIPE] create-cart-checkout error: ${err.message}`);
-    res.status(code).json({ error: err.message });
+    res.status(code).json({ error: code === 500 ? 'Something went wrong. Please try again.' : err.message });
   }
 });
 
@@ -474,7 +502,13 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
   try {
     switch (event.type) {
-      case 'checkout.session.completed': {
+      // async_payment_succeeded fires when a delayed method (e.g. some
+      // bank-debit / BNPL flows) settles after checkout completed. It carries an
+      // identical session object with payment_status 'paid', so it shares the
+      // same fulfilment path; the completed event for those methods arrives
+      // 'unpaid' and is deferred inside handleCheckoutSessionCompleted.
+      case 'checkout.session.completed':
+      case 'checkout.session.async_payment_succeeded': {
         const session = event.data.object;
         if (session.metadata?.walletTopup === 'true') {
           await handleWalletTopup(session, stripe);
@@ -490,6 +524,13 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         }
         break;
       }
+
+      // A delayed/async payment failed to settle after checkout completed.
+      // Release the pending order the same way an expiry does, so it isn't left
+      // hanging as 'pending'.
+      case 'checkout.session.async_payment_failed':
+        await handleCheckoutSessionExpired(event.data.object);
+        break;
 
       case 'checkout.session.expired':
         await handleCheckoutSessionExpired(event.data.object);

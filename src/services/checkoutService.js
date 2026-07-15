@@ -203,6 +203,6 @@ export async function createSingleItemCheckout(req, res) {
   } catch (err) {
     const code = err.statusCode || 500;
     if (code === 500) logger.error(`[STRIPE] create-checkout error: ${err.message}`);
-    res.status(code).json({ error: err.message });
+    res.status(code).json({ error: code === 500 ? 'Something went wrong. Please try again.' : err.message });
   }
 }
