@@ -91,6 +91,7 @@ function generateLlmsTxt() {
 	lines.push('## Machine-readable resources');
 	lines.push(`- [API catalog](${SITE_ORIGIN}/.well-known/api-catalog): RFC 9727 linkset describing the public API.`);
 	lines.push(`- [OpenAPI description](${SITE_ORIGIN}/openapi.json): OpenAPI 3.1 description of the public API.`);
+	lines.push(`- [Agent skills index](${SITE_ORIGIN}/.well-known/agent-skills/index.json): Discoverable SKILL.md docs for AI agents (Agent Skills Discovery RFC).`);
 	lines.push(`- [Sitemap](${SITE_ORIGIN}/sitemap.xml): XML sitemap of indexable pages.`);
 	lines.push(`- [Security policy](${SITE_ORIGIN}/.well-known/security.txt): How to report security issues (RFC 9116).`);
 	lines.push('');
