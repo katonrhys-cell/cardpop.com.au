@@ -9,10 +9,18 @@ async function fetchPSACertification(certNumber) {
     throw new Error('Certificate number is required');
   }
 
+  // PSA cert numbers are alphanumeric (with optional dashes). Validate before
+  // building the outbound URL so a route param containing '/', '?', '#' or an
+  // encoded traversal can't manipulate the request path/query against
+  // psacard.com. This mirrors the validation in psaApiClient (the API path).
+  if (!/^[A-Za-z0-9-]+$/.test(certNumber)) {
+    throw new Error('Invalid certificate number');
+  }
+
   try {
     logger.info(`[PSA_SCRAPER] Fetching cert: ${certNumber}`);
 
-    const url = `${PSA_BASE_URL}/${certNumber}`;
+    const url = `${PSA_BASE_URL}/${encodeURIComponent(certNumber)}`;
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
