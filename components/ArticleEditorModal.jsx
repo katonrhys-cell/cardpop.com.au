@@ -73,6 +73,8 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
   const [author, setAuthor] = useState('');
   const [category, setCategory] = useState('');
   const [featuredImageUrl, setFeaturedImageUrl] = useState('');
+  const [tocImageUrl, setTocImageUrl] = useState('');
+  const [tocImageAlt, setTocImageAlt] = useState('');
   const [featured, setFeatured] = useState(false);
   const [isPublished, setIsPublished] = useState(false);
   const [faqs, setFaqs] = useState([]);
@@ -94,6 +96,8 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
     setAuthor(article?.author ?? '');
     setCategory(article?.category ?? '');
     setFeaturedImageUrl(article?.featured_image_url ?? '');
+    setTocImageUrl(article?.toc_image_url ?? '');
+    setTocImageAlt(article?.toc_image_alt ?? '');
     setFeatured(article?.featured ?? false);
     setIsPublished(article?.is_published ?? false);
     setFaqs(Array.isArray(article?.faqs) ? article.faqs : []);
@@ -156,6 +160,8 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
         author: author.trim() || null,
         category: category || null,
         featured_image_url: featuredImageUrl.trim() || null,
+        toc_image_url: tocImageUrl.trim() || null,
+        toc_image_alt: tocImageAlt.trim() || null,
         featured,
         is_published: isPublished,
         published_at: isPublished ? (article?.published_at ?? new Date().toISOString()) : null,
@@ -309,6 +315,31 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
               placeholder="https://…"
               type="url"
             />
+          </div>
+
+          {/* ── Contents-panel card image ── */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label>Card Image URL <span className="text-xs font-normal text-muted-foreground">(contents panel)</span></Label>
+              <Input
+                value={tocImageUrl}
+                onChange={e => setTocImageUrl(e.target.value)}
+                placeholder="https://…"
+                type="url"
+              />
+              <p className="text-xs text-muted-foreground">
+                Portrait card/slab image shown beside the &ldquo;On this page&rdquo; list. Upload via Media Library, then paste the URL.
+              </p>
+            </div>
+            <div className="space-y-1">
+              <Label>Card Image Alt Text</Label>
+              <Input
+                value={tocImageAlt}
+                onChange={e => setTocImageAlt(e.target.value)}
+                placeholder="e.g. 2003 Topps Chrome LeBron James #111 PSA 10"
+              />
+              <p className="text-xs text-muted-foreground">Describes the card for screen readers. Falls back to the article title.</p>
+            </div>
           </div>
 
           {/* ── Excerpt ── */}

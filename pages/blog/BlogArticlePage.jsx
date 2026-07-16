@@ -299,6 +299,9 @@ const BlogArticlePage = () => {
   }
 
   const imageUrl = article.featured_image_url || null;
+  // Portrait card/slab image shown in the empty right side of the "On this
+  // page" panel — routed through the image CDN like every rendered image.
+  const tocImageUrl = publicImageUrl(article.toc_image_url, 'media');
   const articleSlug = article.slug;
   const canonicalUrl = `https://cardpop.com.au/blog/${articleSlug}`;
 
@@ -465,17 +468,32 @@ const BlogArticlePage = () => {
           <div className="w-full max-w-4xl mx-auto px-4">
             {toc.length >= 3 && (
               <nav aria-label="Table of contents" className="mb-10 rounded-xl border border-border bg-muted/30 p-5">
-                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">On this page</p>
-                <ol className="space-y-2">
-                  {toc.map((item, i) => (
-                    <li key={item.id} className="text-sm leading-snug">
-                      <a href={`#${item.id}`} className="inline-flex gap-2 text-muted-foreground hover:text-primary transition-colors">
-                        <span className="text-primary/50 tabular-nums shrink-0">{String(i + 1).padStart(2, '0')}</span>
-                        <span>{item.text}</span>
-                      </a>
-                    </li>
-                  ))}
-                </ol>
+                <div className="flex gap-6">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">On this page</p>
+                    <ol className="space-y-2">
+                      {toc.map((item, i) => (
+                        <li key={item.id} className="text-sm leading-snug">
+                          <a href={`#${item.id}`} className="inline-flex gap-2 text-muted-foreground hover:text-primary transition-colors">
+                            <span className="text-primary/50 tabular-nums shrink-0">{String(i + 1).padStart(2, '0')}</span>
+                            <span>{item.text}</span>
+                          </a>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                  {tocImageUrl && (
+                    <div className="hidden sm:flex shrink-0 items-center">
+                      <img
+                        src={tocImageUrl}
+                        alt={article.toc_image_alt || article.title}
+                        className="w-40 md:w-52 max-h-80 object-contain rounded-lg drop-shadow-md"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </div>
+                  )}
+                </div>
               </nav>
             )}
             <div
