@@ -41,10 +41,39 @@ const LaunchRegisterModal = () => {
     }
     if (seen) return;
 
-    // Small delay so it appears once the landing page has settled, not on top
-    // of a blank flash.
-    const t = setTimeout(() => setOpen(true), 1200);
-    return () => clearTimeout(t);
+    // Open on the visitor's first interaction, with a timed fallback a few
+    // seconds AFTER the load event for visitors who never touch the page.
+    // The old fixed 1.2s-after-navigation timer landed mid-load: the dialog's
+    // render/layout work joined the initial-load main-thread window (hurting
+    // TBT/Speed Index) and interrupted people before the page had settled.
+    // Scroll only (not pointerdown/tap): popping a dialog at the instant of a
+    // click would land it under the visitor's finger and swallow the tap.
+    let opened = false;
+    let timer = null;
+    const interactionEvents = ['scroll', 'wheel'];
+
+    const cleanup = () => {
+      for (const evt of interactionEvents) window.removeEventListener(evt, openOnce);
+      window.removeEventListener('load', armFallback);
+      if (timer) clearTimeout(timer);
+    };
+    const openOnce = () => {
+      if (opened) return;
+      opened = true;
+      cleanup();
+      setOpen(true);
+    };
+    const armFallback = () => { timer = setTimeout(openOnce, 6000); };
+
+    for (const evt of interactionEvents) {
+      window.addEventListener(evt, openOnce, { once: true, passive: true });
+    }
+    if (document.readyState === 'complete') {
+      armFallback();
+    } else {
+      window.addEventListener('load', armFallback, { once: true });
+    }
+    return cleanup;
   }, [pathname]);
 
   const remember = (value) => {
@@ -62,7 +91,13 @@ const LaunchRegisterModal = () => {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md overflow-hidden p-0 gap-0">
+      <DialogContent
+        className="sm:max-w-md overflow-hidden p-0 gap-0"
+        // Don't autofocus the email input on open: it pops the keyboard on
+        // mobile, and the focus event would arm the (intent-gated) reCAPTCHA
+        // inside NewsletterSignup before the visitor has touched the form.
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         {/* Deep navy (not brand-charcoal #1F2937) so the red "Pop" clears WCAG
             AA contrast — red-on-charcoal is only 2.6:1, red on #0B1220 is 3.3:1.
             Matches the brand cover-image treatment (red mark on deep navy). */}

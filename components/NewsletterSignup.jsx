@@ -23,6 +23,13 @@ const NewsletterSignup = ({
   const [loading, setLoading] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
   const [recaptchaToken, setRecaptchaToken] = useState('');
+  // Google reCAPTCHA is ~1 MB+ of script/iframes and a large slice of
+  // main-thread work. Mounting it with the form meant every visitor paid that
+  // cost on page load (this form is on /launch AND in the auto-opening launch
+  // modal). Only mount the widget once the visitor shows intent by focusing or
+  // typing in the email field — solving it still happens before submit.
+  const [recaptchaArmed, setRecaptchaArmed] = useState(false);
+  const armRecaptcha = () => setRecaptchaArmed(true);
   const recaptchaRef = useRef(null);
 
   const handleSubmit = async (e) => {
@@ -79,7 +86,8 @@ const NewsletterSignup = ({
           autoComplete="email"
           required
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => { armRecaptcha(); setEmail(e.target.value); }}
+          onFocus={armRecaptcha}
           placeholder="Your email address"
           disabled={loading}
           className="h-10 bg-background"
@@ -93,11 +101,13 @@ const NewsletterSignup = ({
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : buttonLabel}
         </Button>
       </div>
-      <Recaptcha
-        ref={recaptchaRef}
-        onVerify={setRecaptchaToken}
-        onExpire={() => setRecaptchaToken('')}
-      />
+      {recaptchaArmed && (
+        <Recaptcha
+          ref={recaptchaRef}
+          onVerify={setRecaptchaToken}
+          onExpire={() => setRecaptchaToken('')}
+        />
+      )}
     </form>
   );
 };

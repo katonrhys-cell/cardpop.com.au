@@ -27,6 +27,10 @@ import PageLoader from '@/components/PageLoader.jsx';
 // shell baked into index.html — instead of flashing a spinner while HomePage
 // (and framer-motion) lazy-load.
 import HeroSection from '@/components/HeroSection.jsx';
+// Same idea for /launch in coming-soon builds (the "/" redirect target): the
+// eager hero fallback matches the static launch shell so no spinner flashes
+// while LaunchPage lazy-loads. Tree-shaken out of non-coming-soon builds.
+import LaunchHero from '@/components/LaunchHero.jsx';
 import ShoppingCart from '@/components/ShoppingCartLazy.jsx';
 import AdminLayout from '@/components/AdminLayout.jsx';
 import MarketplaceListingRedirect from '@/components/MarketplaceListingRedirect.jsx';
@@ -266,7 +270,7 @@ const App = () => {
                       <Routes>
                         {/* --- PUBLIC ROUTES --- */}
                         <Route path="/" element={COMING_SOON ? <Navigate to="/launch" replace /> : <Suspense fallback={<HeroSection />}><HomePage /></Suspense>} />
-                        <Route path="/launch" element={<LaunchPage />} />
+                        <Route path="/launch" element={COMING_SOON ? <Suspense fallback={<LaunchHero />}><LaunchPage /></Suspense> : <LaunchPage />} />
 
                         {/* Auth */}
                         <Route path="/logout" element={<LogoutPage />} />

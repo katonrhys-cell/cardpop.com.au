@@ -6,7 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
     <meta name="theme-color" content="#CE1126" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#1F2937" media="(prefers-color-scheme: dark)" />
-    <link rel="icon" type="image/png" href="cardpop-favicon-icon.png">
+    <!-- Properly sized icons (source art: cardpop-favicon-icon.png, 1254px —
+         referencing it directly shipped a 690 KB PNG on every page view). -->
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 
     <!-- NO hreflang tags here: this document is served for every SPA route
          (copied to app.html at build), so static hreflang links pointing at

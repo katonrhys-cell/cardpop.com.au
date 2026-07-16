@@ -27,6 +27,7 @@ import {
   toCdnUrl,
   publicImageUrl,
   canonicalStorageUrl,
+  parseStorageObjectUrl,
   _setCdnHostForTests,
 } from '@/utils/imageUrl.js';
 
@@ -183,19 +184,47 @@ describe('publicImageUrl', () => {
   });
 });
 
-describe('getCardImage with a CDN host', () => {
-  // The mocked getPublicUrl returns https://cdn/... which doesn't match the
-  // Supabase URL shape, so CDN rewriting of built URLs is covered by the
-  // toCdnUrl tests above. Here we just check absolute Supabase URLs stored in
-  // the DB get rewritten when passed straight in.
-  it('rewrites stored absolute Supabase URLs', () => {
-    _setCdnHostForTests('dxxxx.cloudfront.net');
+describe('getCardImage with stored absolute Supabase URLs', () => {
+  // Absolute Supabase *object* URLs (the shape stored whole in DB columns like
+  // hero_showcase_cards.image_url) are parsed back into bucket + path so they
+  // get resize transforms like any storage path — serving the full-resolution
+  // original was a multi-MB payload per image.
+  it('derives bucket/path and builds transformed URLs', () => {
+    const stored =
+      'https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/object/public/vault-images/u/c.webp';
+    const r = getCardImage(stored, { widths: [240, 400, 600] });
+    expect(r.src).toBe('https://cdn/render/vault-images/u/c.webp?w=400&q=75');
+    expect(r.srcSet).toMatch(/240w.*400w.*600w/);
+    expect(r.fallbackSrc).toBe('https://cdn/object/vault-images/u/c.webp');
+  });
+
+  it('serves the untransformed object URL once transforms are flagged off', () => {
+    markTransformsUnavailable();
     const stored =
       'https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/object/public/vault-images/u/c.webp';
     const r = getCardImage(stored);
-    expect(r.src).toBe(
-      'https://dxxxx.cloudfront.net/storage/v1/object/public/vault-images/u/c.webp'
-    );
-    expect(r.fallbackSrc).toBe(r.src);
+    expect(r.src).toBe('https://cdn/object/vault-images/u/c.webp');
+    expect(r.srcSet).toBeNull();
+  });
+});
+
+describe('parseStorageObjectUrl', () => {
+  it('splits an absolute Supabase object URL into bucket and path', () => {
+    expect(
+      parseStorageObjectUrl(
+        'https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/object/public/vault-images/u/c%20d.webp?v=1'
+      )
+    ).toEqual({ bucket: 'vault-images', path: 'u/c d.webp' });
+  });
+
+  it('returns null for non-storage and non-Supabase URLs, paths, and non-strings', () => {
+    expect(parseStorageObjectUrl('https://example.com/pic.png')).toBeNull();
+    expect(
+      parseStorageObjectUrl(
+        'https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/render/image/public/vault-images/u/c.webp'
+      )
+    ).toBeNull();
+    expect(parseStorageObjectUrl('user/card.jpg')).toBeNull();
+    expect(parseStorageObjectUrl(null)).toBeNull();
   });
 });

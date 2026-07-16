@@ -113,6 +113,27 @@ export function _resetTransformState() {
 
 const isHttp = (s) => typeof s === 'string' && /^https?:\/\//.test(s);
 
+// Matches an absolute Supabase storage *object* URL and captures bucket + path.
+// Used to recover the storage path from URLs stored whole in the database
+// (e.g. hero_showcase_cards.image_url), so they can get resize transforms too.
+const SUPABASE_OBJECT_URL_RE =
+  /^https?:\/\/[^/]+\.supabase\.(?:co|in)\/storage\/v1\/object\/public\/([^/]+)\/([^?]+)/;
+
+/**
+ * Split an absolute Supabase storage object URL into { bucket, path }, or
+ * return null for anything else (external images, render/image URLs, paths).
+ */
+export function parseStorageObjectUrl(url) {
+  if (typeof url !== 'string') return null;
+  const m = url.match(SUPABASE_OBJECT_URL_RE);
+  if (!m) return null;
+  try {
+    return { bucket: m[1], path: decodeURIComponent(m[2]) };
+  } catch {
+    return null; // malformed percent-encoding — treat as opaque URL
+  }
+}
+
 /**
  * Build a responsive image descriptor for a card/grid image.
  *
@@ -130,19 +151,28 @@ export function getCardImage(pathOrUrl, opts = {}) {
     return { src: null, srcSet: null, fallbackSrc: null, canonicalSrc: null };
   }
 
-  // Already an absolute URL (legacy/external image) — nothing to transform.
-  // `canonicalSrc` is the un-rewritten original, so a CDN outage falls back to
-  // the source URL (DB-stored URLs are canonical Supabase URLs by design).
+  // Absolute URL: if it's a Supabase storage object URL (the shape stored in
+  // DB columns like image_url), recover its bucket/path so it can be resized
+  // like any storage path — DB-stored originals are full-resolution scans, and
+  // serving them untransformed was a multi-MB payload per image. Any other
+  // absolute URL (external/legacy image) has nothing to transform.
+  let effectivePath = pathOrUrl;
+  let effectiveBucket = bucket;
   if (isHttp(pathOrUrl)) {
-    const direct = toCdnUrl(pathOrUrl);
-    return { src: direct, srcSet: null, fallbackSrc: direct, canonicalSrc: pathOrUrl };
+    const parsed = parseStorageObjectUrl(pathOrUrl);
+    if (!parsed) {
+      const direct = toCdnUrl(pathOrUrl);
+      return { src: direct, srcSet: null, fallbackSrc: direct, canonicalSrc: pathOrUrl };
+    }
+    effectivePath = parsed.path;
+    effectiveBucket = parsed.bucket;
   }
 
   // Canonical (non-CDN) public URL — the last-resort fallback that always hits
   // Supabase directly, so a CDN failure self-heals instead of showing a broken
   // image. `fallbackSrc` stays CDN-routed (untransformed) to keep egress off
   // the metered quota in the normal case where only transforms are the problem.
-  const canonicalSrc = supabase.storage.from(bucket).getPublicUrl(pathOrUrl).data.publicUrl;
+  const canonicalSrc = supabase.storage.from(effectiveBucket).getPublicUrl(effectivePath).data.publicUrl;
   const fallbackSrc = toCdnUrl(canonicalSrc);
 
   // Feature known-off this session → just serve the original.
@@ -152,7 +182,7 @@ export function getCardImage(pathOrUrl, opts = {}) {
 
   const at = (width) =>
     toCdnUrl(
-      supabase.storage.from(bucket).getPublicUrl(pathOrUrl, {
+      supabase.storage.from(effectiveBucket).getPublicUrl(effectivePath, {
         transform: { width, quality, resize: 'cover' },
       }).data.publicUrl
     );
