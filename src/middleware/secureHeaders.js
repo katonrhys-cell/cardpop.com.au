@@ -4,7 +4,11 @@ const secureHeadersMiddleware = helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
+      // No 'unsafe-inline' for scripts: these headers apply to the Express API,
+      // which only ever returns JSON (no inline script executes), so there is no
+      // reason to weaken script-src. The user-facing HTML is served by Vercel
+      // with its own stricter CSP (see vercel.json).
+      scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", 'data:', 'https:'],
       connectSrc: ["'self'"],

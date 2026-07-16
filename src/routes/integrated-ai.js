@@ -7,6 +7,25 @@ import { supabaseAuth } from '../middleware/supabase-auth.js';
 
 const router = Router();
 
+// Client-supplied image blocks in the chat message are forwarded to the
+// downstream AI service, which fetches them — so an attacker could point one at
+// an internal address (e.g. http://169.254.169.254/…) to make that service
+// perform an SSRF on their behalf. Only allow image URLs that live on our own
+// storage / image CDN over https; anything else is dropped before forwarding.
+// The server's own uploads (uploadImagesToSupabase) already use these hosts.
+const ALLOWED_IMAGE_HOSTS = new Set([
+	'odoglvswwymyjuwlonkf.supabase.co',
+	'img.cardpop.com.au',
+]);
+function isAllowedImageUrl(value) {
+	try {
+		const parsed = new URL(value);
+		return parsed.protocol === 'https:' && ALLOWED_IMAGE_HOSTS.has(parsed.hostname);
+	} catch {
+		return false;
+	}
+}
+
 router.use(supabaseAuth);
 
 // Reject unauthenticated callers BEFORE the multipart upload middleware runs.
@@ -44,6 +63,12 @@ router.post('/stream', requireUserId, integratedAiRateLimit, uploadFiles({
 	if (!Array.isArray(parsedMessage)) {
 		return res.status(400).json({ error: 'message must be a valid JSON array' });
 	}
+
+	// Drop any client-supplied image blocks that don't point at our own storage,
+	// so the downstream AI service can't be made to fetch an attacker URL (SSRF).
+	parsedMessage = parsedMessage.filter(
+		(block) => block?.type !== ContentBlockType.Image || isAllowedImageUrl(block?.image),
+	);
 
 	if (req.files?.length > 0) {
 		const imageUrls = await uploadImagesToSupabase({ images: req.files });

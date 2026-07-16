@@ -160,6 +160,24 @@ describe('POST /stream', () => {
     expect(mockStream).not.toHaveBeenCalled();
   });
 
+  it('drops client image blocks that are not on our own storage (SSRF-by-proxy defence)', async () => {
+    mockStream.mockResolvedValue(makeSseStream());
+    const okUrl = 'https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/object/public/ai-images/ok.png';
+    const userMessage = [
+      { type: 'text', text: 'what is this?' },
+      { type: 'image', image: 'http://169.254.169.254/latest/meta-data/' },
+      { type: 'image', image: 'https://evil.example/x.png' },
+      { type: 'image', image: okUrl },
+    ];
+    await request(app).post('/stream').send({ message: JSON.stringify(userMessage) });
+
+    const sent = mockStream.mock.calls[0][0].userMessage;
+    expect(sent).toEqual([
+      { type: 'text', text: 'what is this?' },
+      { type: 'image', image: okUrl },
+    ]);
+  });
+
   it('returns 500 when stream throws', async () => {
     mockStream.mockRejectedValue(new Error('AI service down'));
 
