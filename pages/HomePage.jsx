@@ -81,6 +81,24 @@ const STATS = [
   { value: 4.9,   suffix: '★', label: 'Average Rating', isDecimal: true },
 ];
 
+const TRUST_SIGNALS = [
+  {
+    icon: ShieldCheck,
+    title: 'Secure payments',
+    body: 'Processed by Stripe on a PCI-DSS checkout — your card details never touch our servers.',
+  },
+  {
+    icon: CheckCircle2,
+    title: 'ID-verified members',
+    body: 'Sellers confirm their identity with Stripe Identity, so you only trade with verified people.',
+  },
+  {
+    icon: Package,
+    title: '14-day buyer protection',
+    body: 'A full refund if your item never arrives or isn\'t as described.',
+  },
+];
+
 const CATEGORIES = HOMEPAGE_CATEGORIES;
 
 const HOW_IT_WORKS = [
@@ -518,6 +536,34 @@ const HomePage = () => {
               <StatItem key={stat.label} {...stat} inView={statsInView} />
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ── Trust strip ──────────────────────────────────────────────────── */}
+      <section className="py-10 bg-background border-b border-border">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {TRUST_SIGNALS.map(({ icon: Icon, title, body }) => (
+              <Link
+                key={title}
+                to="/trust-safety"
+                className="group flex items-start gap-3 rounded-2xl border border-border bg-card p-5 transition-colors hover:border-primary/40 hover:bg-primary/[0.03]"
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Icon className="h-[22px] w-[22px]" />
+                </span>
+                <div className="leading-snug">
+                  <p className="text-sm font-bold text-foreground">{title}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{body}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+          <p className="mt-4 text-center text-xs text-muted-foreground">
+            <Link to="/trust-safety" className="font-semibold text-primary hover:underline">
+              See how we keep every trade safe <ArrowRight className="inline h-3 w-3 align-[-1px]" />
+            </Link>
+          </p>
         </div>
       </section>
 
