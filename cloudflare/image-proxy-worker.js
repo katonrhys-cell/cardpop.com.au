@@ -47,6 +47,22 @@ const WIDTH_LADDER = [160, 240, 320, 480, 640, 800, 1200, 1600, 2000, 2560];
 const QUALITY_LADDER = [50, 75, 90];
 const RESIZE_MODES = new Set(['cover', 'contain', 'fill']);
 
+// Neutralise stored SVGs so a user-uploaded SVG in a public bucket can never
+// execute script when served from our image subdomain. An SVG opened as a
+// top-level document (direct navigation) or embedded via <iframe>/<object> can
+// run embedded <script> / on* handlers — a stored-XSS vector. Forcing a
+// download disposition plus a locked-down CSP sandbox stops that. Legitimate
+// <img> embeds are unaffected: browsers render <img> regardless of
+// Content-Disposition, and an SVG loaded through <img> is already non-scripting.
+function hardenIfSvg(headers) {
+  const type = (headers.get('content-type') || '').toLowerCase();
+  if (type.includes('svg')) {
+    headers.set('Content-Disposition', 'attachment');
+    headers.set('X-Content-Type-Options', 'nosniff');
+    headers.set('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox");
+  }
+}
+
 function snapUp(value, ladder) {
   const n = Number.parseInt(value, 10);
   if (!Number.isFinite(n) || n <= 0) return null;
@@ -102,6 +118,7 @@ async function serveFromR2(request, url, bucket, ctx) {
   headers.set('Cache-Control', 'public, max-age=31536000, immutable');
   headers.set('Access-Control-Allow-Origin', '*'); // service worker fetches in CORS mode
   headers.set('x-image-source', 'r2'); // observability: served from R2, zero egress
+  hardenIfSvg(headers); // baked into the cached copy below
 
   // Cache the full GET response at the edge, then hand the caller a body-correct
   // response for the actual method.
@@ -162,6 +179,7 @@ export default {
     if (originResponse.ok) {
       headers.set('Cache-Control', 'public, max-age=31536000, immutable');
     }
+    hardenIfSvg(headers);
 
     // ── Lazy write-through migration into R2 ──────────────────────────────
     // The first successful proxy of an object copies its bytes into R2, so

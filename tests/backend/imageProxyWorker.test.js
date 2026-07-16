@@ -102,6 +102,25 @@ describe('worker fetch handler', () => {
     expect(res.headers.get('Cache-Control')).not.toBe('public, max-age=31536000, immutable');
   });
 
+  it('neutralises SVG responses (force download + CSP sandbox) to block stored XSS', async () => {
+    fetchSpy.mockResolvedValueOnce(
+      new Response('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>', {
+        status: 200,
+        headers: { 'Content-Type': 'image/svg+xml' },
+      })
+    );
+    const res = await run('/storage/v1/object/public/media/evil.svg');
+    expect(res.headers.get('Content-Disposition')).toBe('attachment');
+    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(res.headers.get('Content-Security-Policy')).toContain('sandbox');
+  });
+
+  it('leaves non-SVG images inline (no attachment disposition)', async () => {
+    const res = await run(OBJECT_PATH);
+    expect(res.headers.get('Content-Disposition')).toBeNull();
+    expect(res.headers.get('Content-Security-Policy')).toBeNull();
+  });
+
   it('scopes the year-long edge cache TTL to 2xx only, so a transient error is never pinned at the edge for a year', async () => {
     await run(OBJECT_PATH);
     const cf = fetchSpy.mock.calls[0][1].cf;
