@@ -23,6 +23,19 @@
 -- drop the drifted duplicate too. anon can never satisfy auth.uid() = user_id,
 -- so a single `authenticated` policy loses no legitimate access.
 
+-- Prod's user_verifications table pre-dates the repo's create-table migration
+-- (it was created out-of-band via the dashboard), so `create table if not exists`
+-- in 20260706140841 never added the AI name-match columns the WITH CHECK below
+-- references — the original form of this migration failed on prod with
+-- `column "id_extracted_name" does not exist`, which blocked every later
+-- migration. Add the columns idempotently first so the policy is valid on every
+-- environment (a no-op wherever they already exist; it also fixes the admin
+-- verification dashboard, which reads these columns).
+alter table public.user_verifications
+  add column if not exists id_extracted_name text,
+  add column if not exists name_match boolean,
+  add column if not exists name_match_confidence text;
+
 drop policy if exists "users_insert_own_verification" on public.user_verifications;
 drop policy if exists "Users can submit their own verification" on public.user_verifications;
 create policy "Users can submit their own verification"
