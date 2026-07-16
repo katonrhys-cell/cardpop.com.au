@@ -606,6 +606,23 @@
   margin-bottom: 0.375rem;
 }
 
+/* Anchor scroll offset for "On this page" TOC jumps — clears the sticky
+   site header so every heading lands with the same small gap above it.
+   The header is a single ~69px row on mobile but gains a second nav row
+   (~117px total) at the lg breakpoint, so the offset grows to match. */
+.article-content h2,
+.article-content h3,
+.article-content h4 {
+  scroll-margin-top: 5.5rem;
+}
+@media (min-width: 1024px) {
+  .article-content h2,
+  .article-content h3,
+  .article-content h4 {
+    scroll-margin-top: 8.5rem;
+  }
+}
+
 /* Ordered and unordered lists — restore numbers/bullets and indentation.
    .article-takeaways ul/.article-sources ol (specificity 0,2,1) beat
    these (0,1,1) so component styling is unaffected.                  */

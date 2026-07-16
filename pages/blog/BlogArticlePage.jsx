@@ -174,7 +174,9 @@ const buildTableOfContents = (sanitizedHtml) => {
         if (!text) return null;
         if (!h.id) h.id = slugifyHeading(text, used);
         else used.add(h.id);
-        h.style.scrollMarginTop = '6rem';
+        // Scroll offset for TOC anchor jumps lives in CSS (.article-content
+        // headings) so it can respond to the sticky header's taller desktop
+        // height — an inline style here couldn't carry a media query.
         return { id: h.id, text };
       })
       .filter(Boolean);
