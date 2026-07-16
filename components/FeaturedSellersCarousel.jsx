@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Star, ShieldCheck, UserCircle2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient.js';
+import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 
 const FeaturedSellersCarousel = () => {
   const [sellers, setSellers] = useState([]);
@@ -19,7 +20,7 @@ const FeaturedSellersCarousel = () => {
 
         const { data: topUsers } = await supabase
           .from('profiles')
-          .select('*')
+          .select(PUBLIC_PROFILE_COLUMNS)
           .gt('total_sales', 0)
           .order('positive_feedback_pct', { ascending: false })
           .limit(4);

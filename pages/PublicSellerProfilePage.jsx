@@ -4,6 +4,7 @@ import { useParams, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import BackButton from '@/components/BackButton.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { Star, ShieldCheck, MapPin, Calendar, ExternalLink, ShieldAlert, Package, MessageSquare, Flag } from 'lucide-react';
 import ReportModal from '@/components/ReportModal.jsx';
 import { isVerified } from '@/utils/verification.js';
@@ -35,7 +36,7 @@ const PublicSellerProfilePage = () => {
         // Fetch user profile
         const { data: userData, error: userError } = await supabase
           .from('profiles')
-          .select('*')
+          .select(PUBLIC_PROFILE_COLUMNS)
           .eq('id', userId)
           .single();
 

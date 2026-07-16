@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { Camera, MapPin, Calendar, Star, Package, TrendingUp, ShieldCheck, Edit2, Save, X, Eye } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { compressImage } from '@/utils/compressImage.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,7 +45,7 @@ const VaultProfilePage = () => {
       try {
         const { data: record, error: profileError } = await supabase
           .from('profiles')
-          .select('*')
+          .select(PUBLIC_PROFILE_COLUMNS)
           .eq('id', currentUser.id)
           .single();
 

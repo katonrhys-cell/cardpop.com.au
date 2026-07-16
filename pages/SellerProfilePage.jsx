@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Star, MapPin, Calendar, Package, MessageSquare } from 'lucide-react';
+import { Star, MapPin, Calendar, Package, MessageSquare, CalendarDays, Store, Users, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
+import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
+import { fetchUserEvents } from '@/lib/eventRsvp.js';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import ProductCard from '@/components/ProductCard';
+import { Badge } from '@/components/ui/badge';
 import BackButton from '@/components/BackButton.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import { eventPath, eventTypeLabel, formatEventDate, formatEventLocation } from '@/lib/eventSeo.js';
 
 const SellerProfilePage = () => {
   const { sellerId } = useParams();
@@ -16,6 +20,7 @@ const SellerProfilePage = () => {
   const [seller, setSeller] = useState(null);
   const [products, setProducts] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -24,7 +29,7 @@ const SellerProfilePage = () => {
       try {
         const { data: sellerData } = await supabase
           .from('profiles')
-          .select('*')
+          .select(PUBLIC_PROFILE_COLUMNS)
           .eq('id', sellerId)
           .single();
         if (cancelled) return;
@@ -66,6 +71,11 @@ const SellerProfilePage = () => {
           .order('created_at', { ascending: false })
           .limit(10);
         if (!cancelled) setReviews(reviewsData ?? []);
+
+        // Events this collector has RSVP'd to (which show, and in what
+        // capacity — attending as a buyer or selling as a vendor).
+        const rsvpEvents = await fetchUserEvents(sellerId).catch(() => []);
+        if (!cancelled) setEvents(rsvpEvents);
       } catch (error) {
       } finally {
         if (!cancelled) setLoading(false);
@@ -178,6 +188,63 @@ const SellerProfilePage = () => {
                       priority={i < 2}
                     />
                   ))}
+                </div>
+              )}
+            </section>
+
+            <section className="mb-16">
+              <h2 className="font-serif text-2xl md:text-3xl font-bold mb-8 text-foreground">Events</h2>
+              {events.length === 0 ? (
+                <div className="bg-card p-12 text-center rounded-3xl border border-border border-dashed shadow-sm">
+                  <CalendarDays className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                  <p className="text-foreground font-bold">Not attending any events yet</p>
+                  <p className="text-muted-foreground text-sm mt-1">
+                    Events this collector is attending or selling at will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {events.map((event) => {
+                    const isVendor = event.rsvpRole === 'vendor';
+                    return (
+                      <Link
+                        key={event.id}
+                        to={eventPath(event)}
+                        className="group bg-card border border-border rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-primary/30 transition-all flex flex-col gap-3"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <Badge variant="outline" className="text-[10px] font-semibold uppercase tracking-wide border-primary/30 text-primary">
+                            {eventTypeLabel(event)}
+                          </Badge>
+                          <Badge
+                            className={`gap-1 font-bold border-none ${
+                              isVendor
+                                ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
+                                : 'bg-primary/10 text-primary'
+                            }`}
+                          >
+                            {isVendor ? <Store className="w-3 h-3" /> : <Users className="w-3 h-3" />}
+                            {isVendor ? 'Selling as Vendor' : 'Attending'}
+                          </Badge>
+                        </div>
+                        <h3 className="font-bold text-foreground leading-snug line-clamp-2 group-hover:text-primary transition-colors">
+                          {event.title}
+                        </h3>
+                        <div className="mt-auto space-y-1.5 text-sm text-muted-foreground font-medium">
+                          <span className="flex items-center gap-1.5">
+                            <CalendarDays className="w-4 h-4 shrink-0" /> {formatEventDate(event)}
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <MapPin className="w-4 h-4 shrink-0" />
+                            <span className="truncate">{formatEventLocation(event)}</span>
+                          </span>
+                        </div>
+                        <span className="flex items-center gap-1 text-xs font-bold text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+                          View event <ChevronRight className="w-3.5 h-3.5" />
+                        </span>
+                      </Link>
+                    );
+                  })}
                 </div>
               )}
             </section>

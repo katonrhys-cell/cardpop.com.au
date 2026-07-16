@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
+import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { isVerified } from '@/utils/verification.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
@@ -28,7 +29,7 @@ const ProfilesPage = () => {
     try {
       let query = supabase
         .from('profiles')
-        .select('*')
+        .select(PUBLIC_PROFILE_COLUMNS)
         .order('created_at', { ascending: false })
         .limit(60);
 
