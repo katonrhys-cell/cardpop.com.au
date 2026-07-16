@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import HeroCardImage from '@/components/HeroCardImage.jsx';
+import { getCardImage, markTransformsUnavailable } from '@/utils/imageUrl.js';
 
 // The built-in HERO_CARDS reference extension-less stems
 // ("/images/hero/black-lotus") that resolve to responsive AVIF/WebP/JPG
@@ -8,18 +9,55 @@ import HeroCardImage from '@/components/HeroCardImage.jsx';
 // extension. Render each kind appropriately so the photos actually load.
 const hasFileExtension = (src) => /\.(avif|webp|jpe?g|png|gif)$/i.test(src || '');
 
-const CardArt = ({ image, padding = 'p-1' }) => {
+// DB-driven showcase art. Rows store the full-resolution Supabase object URL
+// (multi-megabyte card scans) — route it through getCardImage so the browser
+// fetches a right-sized, CDN-routed transform instead of the original, with
+// the same tiered fallback CardImage uses (transformed → untransformed CDN →
+// Supabase origin) so a missing transform feature or CDN outage self-heals.
+const REMOTE_ART_WIDTHS = [160, 320, 480];
+
+const RemoteCardArt = ({ image, padding, sizes }) => {
+  const [tier, setTier] = useState(0);
+  const art = useMemo(() => getCardImage(image, { widths: REMOTE_ART_WIDTHS, quality: 70 }), [image]);
+
+  const candidates = useMemo(() => {
+    const list = [];
+    if (art.src) list.push({ url: art.src, srcSet: art.srcSet || undefined });
+    if (art.fallbackSrc && art.fallbackSrc !== art.src) list.push({ url: art.fallbackSrc });
+    if (art.canonicalSrc && art.canonicalSrc !== art.src && art.canonicalSrc !== art.fallbackSrc) {
+      list.push({ url: art.canonicalSrc });
+    }
+    return list;
+  }, [art]);
+
+  const active = candidates[Math.min(tier, candidates.length - 1)];
+  if (!active) return null;
+
+  return (
+    <img
+      src={active.url}
+      srcSet={active.srcSet}
+      sizes={active.srcSet ? sizes : undefined}
+      alt=""
+      className={`absolute inset-0 w-full h-full object-contain ${padding}`}
+      draggable={false}
+      loading="lazy"
+      decoding="async"
+      // Runs its own tiered fallback — opt out of the global CDN→origin net
+      // in utils/imageCdnFallback.js so the two don't fight over src.
+      data-managed-image=""
+      onError={() => {
+        if (tier === 0) markTransformsUnavailable();
+        if (tier < candidates.length - 1) setTier(tier + 1);
+      }}
+    />
+  );
+};
+
+const CardArt = ({ image, padding = 'p-1', sizes = '160px' }) => {
   if (!image) return null;
   if (hasFileExtension(image)) {
-    return (
-      <img
-        src={image}
-        alt=""
-        className={`absolute inset-0 w-full h-full object-contain ${padding}`}
-        draggable={false}
-        loading="lazy"
-      />
-    );
+    return <RemoteCardArt image={image} padding={padding} sizes={sizes} />;
   }
   return <HeroCardImage stem={image} alt="" />;
 };
@@ -111,7 +149,7 @@ const HeroCardShowcase = ({ cards = [] }) => {
                     boxShadow: '0 8px 16px -6px rgba(0,0,0,0.7), inset 0 0 0 1px rgba(255,255,255,0.05)',
                   }}
                 >
-                  <CardArt image={card.image} padding="p-0.5" />
+                  <CardArt image={card.image} padding="p-0.5" sizes="68px" />
                 </div>
               </div>
             );
@@ -179,7 +217,7 @@ const HeroCardShowcase = ({ cards = [] }) => {
           }
         >
           {/* Card art */}
-          <CardArt image={activeCard.image} padding="p-1" />
+          <CardArt image={activeCard.image} padding="p-1" sizes="160px" />
 
           {/* Holographic shimmer */}
           <div
