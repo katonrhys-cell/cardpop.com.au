@@ -586,7 +586,7 @@ const HomePage = () => {
             {CATEGORIES.map((cat, i) => (
               <div
                 key={cat.name}
-                className={`flex-shrink-0 snap-start w-20 ${categoriesInView ? 'anim-reveal-up' : 'opacity-0'}`}
+                className={`flex-shrink-0 snap-start w-[88px] ${categoriesInView ? 'anim-reveal-up' : 'opacity-0'}`}
                 style={categoriesInView ? { animationDuration: '0.2s', animationDelay: `${Math.min(i, 8) * 0.03}s` } : undefined}
               >
                 <Link

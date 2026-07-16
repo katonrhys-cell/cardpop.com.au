@@ -36,7 +36,7 @@ const ShopCategoryBrowse = () => {
               onFocus={() => setActiveSlug(group.slug)}
               aria-pressed={isActive}
               aria-label={`${group.label} supplies`}
-              className={`group flex flex-shrink-0 snap-start flex-col items-center justify-center gap-1.5 w-20 h-20 sm:w-[88px] sm:h-[88px] rounded-xl bg-gradient-to-br ${group.gradient} shadow-sm transition-all duration-200 text-center leading-tight focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+              className={`group flex flex-shrink-0 snap-start flex-col items-center justify-center gap-1.5 w-[88px] h-[88px] rounded-xl bg-gradient-to-br ${group.gradient} shadow-sm transition-all duration-200 text-center leading-tight focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                 isActive
                   ? 'ring-2 ring-foreground/30 ring-offset-2 ring-offset-background shadow-lg -translate-y-0.5'
                   : 'hover:shadow-lg hover:-translate-y-0.5'
