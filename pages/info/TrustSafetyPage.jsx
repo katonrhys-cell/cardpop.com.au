@@ -131,7 +131,7 @@ const TrustSafetyPage = () => {
       ))}
 
       <p className="mt-10 text-sm text-muted-foreground">
-        Ready to start? <Link to="/signup" className="font-semibold text-primary hover:underline">Create your verified account</Link> or <Link to="/marketplace" className="font-semibold text-primary hover:underline">browse the marketplace</Link>.
+        New here? See <Link to="/safe-buying" className="font-semibold text-primary hover:underline">how to buy safely on CardPop</Link>, then <Link to="/signup" className="font-semibold text-primary hover:underline">create your verified account</Link> or <Link to="/marketplace" className="font-semibold text-primary hover:underline">browse the marketplace</Link>.
       </p>
     </InfoPageLayout>
   );

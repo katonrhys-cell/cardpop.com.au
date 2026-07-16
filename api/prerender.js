@@ -1413,6 +1413,10 @@ const STATIC_CONTENT = {
       { h2: 'Authentication services', paras: ['For high-value items and trades we offer middleman authentication — items are shipped to CardPop’s facility where experts verify authenticity and condition before forwarding to the buyer.'] },
       { h2: 'Community guidelines', paras: ['We have a zero-tolerance policy for fraud, harassment and market manipulation. Violators are permanently banned from the platform.'] },
     ],
+    links: [
+      { text: 'How to buy safely on CardPop', href: '/safe-buying' },
+      { text: 'Browse the Marketplace', href: '/marketplace' },
+    ],
   },
 
   '/accessibility': {
