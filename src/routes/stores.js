@@ -2,6 +2,7 @@ import express from 'express';
 import supabase from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { escapeLike } from '../utils/escapeLike.js';
+import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -110,6 +111,31 @@ router.post('/submit', async (req, res) => {
   } catch (error) {
     logger.error(`[STORES_SUBMIT] ${error.message}`);
     res.status(500).json({ error: 'Submission failed. Please try again later.' });
+  }
+});
+
+/**
+ * GET /stores/admin
+ * Admin-only full store list, including submitter_email — which the public
+ * column grants deliberately hide from the anon client. Read with the service
+ * role after an isAdminUser check so the moderation dashboard can still show the
+ * submitter's contact.
+ */
+router.get('/admin', authMiddleware, async (req, res) => {
+  if (!(await isAdminUser(req))) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  try {
+    const { data, error } = await supabase
+      .from('local_game_stores')
+      .select('id, slug, name, suburb, city, state, website, categories, description, status, submitter_email, created_at')
+      .order('created_at', { ascending: false })
+      .limit(300);
+    if (error) throw new Error(error.message);
+    res.json({ stores: data || [] });
+  } catch (error) {
+    logger.error(`[STORES_ADMIN] ${error.message}`);
+    res.status(500).json({ error: 'Failed to load stores' });
   }
 });
 

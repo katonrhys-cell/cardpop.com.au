@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Check, ExternalLink, Store, X } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
+import apiServerClient from '@/lib/apiServerClient.js';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DIRECTORY_CITIES, STORE_CATEGORY_LABELS } from '@/lib/storeDirectory.js';
@@ -61,16 +62,21 @@ const StoreDirectoryAdminPage = () => {
   const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // submitter_email is hidden from the anon client by column-level grants, so the
+  // full list (with the submitter's contact) is read via the service-role admin
+  // endpoint rather than a direct Supabase query.
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('local_game_stores')
-      .select('id, slug, name, suburb, city, state, website, categories, description, status, submitter_email, created_at')
-      .order('created_at', { ascending: false })
-      .limit(300);
-    if (error) toast.error(`Failed to load stores: ${error.message}`);
-    setStores(data || []);
-    setLoading(false);
+    try {
+      const res = await apiServerClient.fetch('/stores/admin');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const { stores: data } = await res.json();
+      setStores(data || []);
+    } catch (error) {
+      toast.error(`Failed to load stores: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
