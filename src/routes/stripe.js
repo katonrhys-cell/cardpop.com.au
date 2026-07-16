@@ -23,7 +23,7 @@ import { processRefund } from '../services/refundService.js';
 import { connectOnboard, getConnectStatus, getDashboardLink } from '../services/connectService.js';
 import { createIdentitySession, getIdentityStatus, applyIdentitySession } from '../services/identityService.js';
 import { applyStripeSubscription } from '../services/subscriptionService.js';
-import { ensureWalletCustomer, getWalletBalanceCents, handleWalletTopup } from '../services/walletService.js';
+import { ensureWalletCustomer, getWalletBalanceCents, handleWalletTopup, assertNoOpenWalletCheckout } from '../services/walletService.js';
 import { validateShippingAddress } from '../utils/addressValidation.js';
 import { requireEmailVerified } from '../middleware/requireEmailVerified.js';
 import { isValidAbn, normalizeAbn } from '../../utils/abn.js';
@@ -278,6 +278,8 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       // payment actually completes (never pre-emptively, in case checkout is
       // abandoned).
       walletCustomerId = await ensureWalletCustomer(stripe, userId, { email });
+      // Prevent double-spend: refuse a new wallet checkout while one is still open.
+      await assertNoOpenWalletCheckout(stripe, walletCustomerId);
       const availableCents = await getWalletBalanceCents(stripe, userId);
       // Leave at least Stripe's AUD minimum charge (50¢) on the card — a
       // payment-mode session discounted to $0 is rejected by Stripe.
