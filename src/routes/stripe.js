@@ -12,7 +12,7 @@ import { validateRequestBody, validateRequestQuery } from '../middleware/validat
 import { createCheckoutSchema, calculateBreakdownSchema, processRefundSchema } from '../schemas/stripeSchemas.js';
 import { createSingleItemCheckout } from '../services/checkoutService.js';
 import { priceCart } from '../services/cartService.js';
-import { validateWelcomeDiscount, welcomeDiscountCents, buildWelcomeDiscount } from '../services/welcomeOfferService.js';
+import { validateWelcomeDiscount, welcomeDiscountCents, buildWelcomeDiscount, reserveWelcomeDiscount } from '../services/welcomeOfferService.js';
 import {
   isWelcomeCodeFormat,
   validatePartnerCode,
@@ -225,6 +225,9 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
         const offer = await validateWelcomeDiscount(userId, promoCode);
         const built = await buildWelcomeDiscount(stripe, offer, itemsCents);
         if (built) {
+          // Claim the one-time offer for this checkout so concurrent sessions
+          // can't each apply it (409 if another live checkout already holds it).
+          await reserveWelcomeDiscount(offer.id);
           discounts = [{ coupon: built.couponId }];
           discountCents = built.discountCents;
           welcomeOfferId = offer.id;
