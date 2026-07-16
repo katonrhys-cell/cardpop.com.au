@@ -109,14 +109,18 @@ function collectRouteChunkFiles(bundle, facadeSuffix) {
 	return { js, css: [...css] };
 }
 
-// Append the homepage route's chunk files to the CSP bootstrap's data-preload
+// Append the "/" route's chunk files to the CSP bootstrap's data-preload
 // list (deduped against the critical-path preloads already there) and emit
 // <link rel="preload" as="style"> for its CSS. Attribute-only change: the
 // bootstrap script text — and therefore its CSP hash — is untouched.
-function addHomeRoutePreloads(html, bundle, warn) {
-	const files = collectRouteChunkFiles(bundle, 'pages/HomePage.jsx');
+// facadeSuffix picks WHICH route's graph to preload: the homepage normally,
+// but the /launch page in coming-soon builds (see homeShellPlugin) — "/"
+// immediately redirects there, so preloading HomePage's ~25 chunks was pure
+// wasted bandwidth on every visit.
+function addHomeRoutePreloads(html, bundle, warn, facadeSuffix) {
+	const files = collectRouteChunkFiles(bundle, facadeSuffix);
 	if (!files) {
-		warn('home-shell: HomePage chunk not found in bundle — route preloads skipped');
+		warn(`home-shell: ${facadeSuffix} chunk not found in bundle — route preloads skipped`);
 		return html;
 	}
 	const preloadAttr = html.match(/data-preload="([^"]*)"/);
@@ -183,7 +187,14 @@ function injectImageCdnPreconnect(html, warn) {
 }
 
 function homeShellPlugin() {
-	const shellPath = path.resolve(__dirname, 'tools/home-shell.html');
+	// Coming-soon builds redirect "/" to /launch on mount, so the static shell
+	// and the preloaded route graph must both be the LAUNCH page's — otherwise
+	// the LCP paints homepage content that's immediately replaced, and ~25
+	// homepage chunks download only to be thrown away (VITE_COMING_SOON is a
+	// build-time env var, same as its use in App.jsx).
+	const comingSoon = process.env.VITE_COMING_SOON === 'true';
+	const shellPath = path.resolve(__dirname, comingSoon ? 'tools/launch-shell.html' : 'tools/home-shell.html');
+	const routeFacade = comingSoon ? 'pages/LaunchPage.jsx' : 'pages/HomePage.jsx';
 	return {
 		name: 'cardpop-home-shell',
 		apply: 'build',
@@ -259,9 +270,9 @@ function homeShellPlugin() {
 				this.warn(`home-shell: critical-CSS inlining skipped (${e.message}); CSS stays render-blocking`);
 			}
 
-			// Preload the homepage route's lazy chunk graph in parallel with the
+			// Preload the "/" route's lazy chunk graph in parallel with the
 			// critical path (see collectRouteChunkFiles above).
-			indexHtml = addHomeRoutePreloads(indexHtml, bundle, (m) => this.warn(m));
+			indexHtml = addHomeRoutePreloads(indexHtml, bundle, (m) => this.warn(m), routeFacade);
 
 			// Beasties drops the local()-only 'Syne Fallback' face from the inlined
 			// critical CSS — put it back so the shell's LCP <h1> paints with the
