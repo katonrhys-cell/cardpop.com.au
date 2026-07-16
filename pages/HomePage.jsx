@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, CheckCircle2, IdCard, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
@@ -89,8 +89,8 @@ const TRUST_SIGNALS = [
     body: 'Processed by Stripe on a PCI-DSS checkout — your card details never touch our servers.',
   },
   {
-    icon: CheckCircle2,
-    title: 'ID-verified members',
+    icon: IdCard,
+    title: 'Verified Members',
     body: 'Sellers confirm their identity with Stripe Identity, so you only trade with verified people.',
   },
   {
