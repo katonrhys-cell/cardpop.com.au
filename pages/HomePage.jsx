@@ -582,7 +582,7 @@ const HomePage = () => {
           </div>
 
           {/* Mobile: touch swipe through all 24 */}
-          <div ref={categoriesRef} className="sm:hidden flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory scrollbar-hide -mx-4 px-4">
+          <div ref={categoriesRef} className="sm:hidden flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory scroll-px-4 scrollbar-hide -mx-4 px-4">
             {CATEGORIES.map((cat, i) => (
               <div
                 key={cat.name}

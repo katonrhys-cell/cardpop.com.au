@@ -24,7 +24,7 @@ const ShopCategoryBrowse = () => {
       {/* Overarching category cards — compact so they read as a control strip,
           not full-bleed banners. Mobile: single-row touch carousel (matches the
           homepage "Browse by Category" mobile strip). Desktop: centered, wraps. */}
-      <div className="flex flex-nowrap sm:flex-wrap justify-start sm:justify-center gap-3 overflow-x-auto sm:overflow-visible snap-x snap-mandatory sm:snap-none scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 sm:pb-0">
+      <div className="flex flex-nowrap sm:flex-wrap justify-start sm:justify-center gap-3 overflow-x-auto sm:overflow-visible snap-x snap-mandatory sm:snap-none scroll-px-4 scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 sm:pb-0">
         {SHOP_CATEGORY_GROUPS.map((group) => {
           const isActive = group.slug === activeSlug;
           return (
