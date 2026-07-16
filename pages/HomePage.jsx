@@ -586,15 +586,15 @@ const HomePage = () => {
             {CATEGORIES.map((cat, i) => (
               <div
                 key={cat.name}
-                className={`flex-shrink-0 snap-start w-24 ${categoriesInView ? 'anim-reveal-up' : 'opacity-0'}`}
+                className={`flex-shrink-0 snap-start w-20 ${categoriesInView ? 'anim-reveal-up' : 'opacity-0'}`}
                 style={categoriesInView ? { animationDuration: '0.2s', animationDelay: `${Math.min(i, 8) * 0.03}s` } : undefined}
               >
                 <Link
                   to={cat.slug ? `/collections/${cat.slug}` : '/marketplace'}
-                  className={`group flex flex-col items-center justify-center gap-2 p-3 rounded-2xl bg-gradient-to-br ${cat.gradient} aspect-square shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-center leading-tight`}
+                  className={`group flex flex-col items-center justify-center gap-1.5 rounded-xl bg-gradient-to-br ${cat.gradient} aspect-square shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 text-center leading-tight`}
                 >
-                  <cat.Icon className="w-7 h-7 drop-shadow-sm" />
-                  <span className="text-[10px] font-bold leading-tight text-white drop-shadow-sm">{cat.name}</span>
+                  <cat.Icon className="w-5 h-5 drop-shadow-sm" />
+                  <span className="text-[10px] font-bold leading-tight text-white drop-shadow-sm px-1">{cat.name}</span>
                 </Link>
               </div>
             ))}
