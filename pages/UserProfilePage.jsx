@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Calendar, Save, Edit3, X, ShieldAlert, Upload, Trash2 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
+import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { compressImage } from '@/utils/compressImage.js';
 import { isVerified } from '@/utils/verification.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -41,7 +42,7 @@ const UserProfilePage = () => {
       try {
         const { data: p, error } = await supabase
           .from('profiles')
-          .select('*')
+          .select(PUBLIC_PROFILE_COLUMNS)
           .eq('id', currentUser.id)
           .maybeSingle();
 
