@@ -12,7 +12,7 @@ import { globalRateLimit } from './middleware/global-rate-limit.js';
 import { isCloudflareIp } from './utils/cloudflareIps.js';
 import { secureHeadersMiddleware, noCacheHeaders } from './middleware/secureHeaders.js';
 import logger from './utils/logger.js';
-import { BodyLimit } from './constants/common.js';
+import { BodyLimit, LargeBodyLimit } from './constants/common.js';
 
 Sentry.init({
 	dsn: process.env.SENTRY_DSN || 'https://6477807dc7f2422d3cf0eacd260645b3@o4511534905884672.ingest.us.sentry.io/4511534929543168',
@@ -96,7 +96,10 @@ logger.debug(`[MAIN] Configuring body parser with limit: ${BodyLimit} bytes`);
 // frontend's proxied prefix, which Vercel rewrites to /api).
 app.use((req, res, next) => {
 	if (req.path.endsWith('/stripe/webhook')) return next();
-	express.json({ limit: BodyLimit })(req, res, next);
+	// The admin event-scraper accepts a pasted page's text, which can exceed the
+	// tight default; everything else parses under the small default limit.
+	const limit = req.path.includes('/event-scraper') ? LargeBodyLimit : BodyLimit;
+	express.json({ limit })(req, res, next);
 });
 app.use(express.urlencoded({ extended: true, limit: BodyLimit }));
 
