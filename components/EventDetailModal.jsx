@@ -20,13 +20,13 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-[650px] p-0 overflow-hidden gap-0 border-none shadow-xl">
+      <DialogContent className="sm:max-w-[650px] p-0 overflow-hidden gap-0 border-none shadow-xl max-h-[90vh] flex flex-col">
         <DialogHeader className="sr-only">
           <DialogTitle>Event Details: {eventTitle}</DialogTitle>
           <DialogDescription>Full details for {eventTitle}</DialogDescription>
         </DialogHeader>
 
-        <div className="relative h-72 w-full bg-muted flex items-center justify-center overflow-hidden">
+        <div className="relative h-72 w-full bg-muted flex items-center justify-center overflow-hidden shrink-0">
           {imageUrl ? (
             <img src={imageUrl} alt={eventTitle} className="object-contain w-full h-full" />
           ) : (
@@ -38,7 +38,7 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
         </div>
 
         {/* Title & type — below the image so the poster stays fully visible */}
-        <div className="px-6 pt-5 bg-background">
+        <div className="px-6 pt-5 bg-background shrink-0">
           <Badge className="mb-3 border-none bg-primary text-primary-foreground">
             {eventTypeLabel(event)}
           </Badge>
@@ -47,7 +47,7 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
           </h2>
         </div>
 
-        <div className="p-6 space-y-6 bg-background max-h-[60vh] overflow-y-auto">
+        <div className="p-6 space-y-6 bg-background flex-1 overflow-y-auto">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-secondary/50 p-4 rounded-xl border border-border">
             <div className="flex items-start gap-3">
               <div className="p-2 bg-background rounded-lg shadow-sm shrink-0 text-primary">
@@ -96,7 +96,7 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
           </div>
         </div>
 
-        <DialogFooter className="p-4 bg-muted/20 border-t border-border flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+        <DialogFooter className="p-4 bg-muted/20 border-t border-border flex flex-col-reverse sm:flex-row sm:justify-end gap-2 shrink-0">
           <Button variant="outline" onClick={onClose}>Close</Button>
           {ticketLink && (
             <Button variant="secondary" asChild>
