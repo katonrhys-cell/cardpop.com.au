@@ -118,7 +118,7 @@ const AdminDashboard = () => {
 
         const [usersRes, ordersRes, tradesRes, sysHealth, vaultRes] = await Promise.all([
           Promise.resolve(supabase.from('profiles').select('id', { count: 'exact', head: true })).catch(() => ({ count: 0 })),
-          Promise.resolve(supabase.from('orders').select('total_aud').neq('status', 'cancelled')).catch(() => ({ data: [] })),
+          Promise.resolve(supabase.from('orders').select('total_aud').in('status', ['payment_confirmed', 'shipped', 'completed', 'refunded'])).catch(() => ({ data: [] })),
           Promise.resolve(supabase.from('listings').select('*', { count: 'exact' }).eq('status', 'active').limit(1)).catch(() => ({ count: 0 })),
           getSystemHealth().catch(() => ({ database: 'OK', storage: 'OK', api: 'OK', uptime: 'Unknown' })),
           Promise.resolve(vaultQuery).catch(() => ({ data: [], count: 0 }))
