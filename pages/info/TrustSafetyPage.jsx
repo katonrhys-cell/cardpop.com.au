@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import InfoPageLayout from '@/components/InfoPageLayout.jsx';
+import CardPopBrand from '@/components/CardPopBrand.jsx';
 import {
   ShieldHalf,
   ShieldCheck,
@@ -20,9 +21,20 @@ import {
 // with PayPal/Afterpay/wallets offered as methods), PayPal for membership
 // billing, and Stripe Identity for the ID check at registration.
 
+// Stripe brand mark — white parallelogram, shown on Stripe's blurple tile
+// (per Stripe's brand assets). Drawn inline so no external asset is fetched.
+const StripeGlyph = ({ className }) => (
+  <svg viewBox="0 0 48 48" aria-hidden="true" className={className}>
+    <polygon points="13,18.2 35,13.4 35,31.4 13,36.2" fill="#fff" />
+  </svg>
+);
+
 const PILLARS = [
   {
-    icon: Lock,
+    icon: StripeGlyph,
+    // Full-bleed glyph on Stripe's blurple, proportioned like Stripe's app icon.
+    iconClassName: 'h-12 w-12',
+    tileClassName: 'bg-[#635BFF]',
     title: 'Payments secured by Stripe',
     body: 'Every order is processed on Stripe’s PCI-DSS Level 1 checkout. Your card details are encrypted by Stripe and never touch CardPop’s servers.',
   },
@@ -33,15 +45,15 @@ const PILLARS = [
   },
   {
     icon: BadgeCheck,
-    title: 'ID-verified members',
-    body: 'Sellers confirm their identity with a government ID and selfie through Stripe Identity, so you only ever trade with a verified human.',
+    title: 'ID Verification',
+    body: 'Sellers must be verified to sell and trade — every seller confirms their identity with a government ID and selfie through Stripe Identity, so you only ever deal with a verified human.',
   },
 ];
 
-const Pillar = ({ icon: Icon, title, body }) => (
+const Pillar = ({ icon: Icon, title, body, tileClassName = 'bg-primary/10 text-primary', iconClassName = 'h-6 w-6' }) => (
   <div className="rounded-2xl border border-border bg-card p-6 text-center">
-    <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-      <Icon className="h-6 w-6" />
+    <span className={`mx-auto mb-4 flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl ${tileClassName}`}>
+      <Icon className={iconClassName} />
     </span>
     <h3 className="mb-2 text-base font-bold text-foreground">{title}</h3>
     <p className="text-sm leading-relaxed text-muted-foreground">{body}</p>
@@ -97,7 +109,11 @@ const TrustSafetyPage = () => {
   return (
     <InfoPageLayout
       icon={ShieldHalf}
-      eyebrow="CardPop™ Australia"
+      eyebrow={
+        // Single span: the Badge is a flex container, which would otherwise
+        // drop the whitespace-only text node between wordmark and "Australia".
+        <span><CardPopBrand /> Australia</span>
+      }
       title="Trust & Safety"
       description="Secure payments, verified members and buyer protection on every order — here’s exactly how we keep your money and your trades safe."
     >
@@ -115,7 +131,7 @@ const TrustSafetyPage = () => {
       </div>
 
       <SectionHeading icon={Lock}>Secure Payments</SectionHeading>
-      <p>Every purchase on CardPop™ is processed by <strong>Stripe</strong>, a globally certified <strong>PCI-DSS Level 1</strong> payment provider. Card details are entered inside Stripe’s encrypted, hosted checkout — they never touch or pass through CardPop’s servers. At checkout you can pay with <strong>Visa, Mastercard, American Express, PayPal, Afterpay, Apple Pay, Google Pay or Stripe Link</strong>, and CardPop memberships can also be billed securely through PayPal. All traffic is protected by 256-bit SSL end to end.</p>
+      <p>Every purchase on <CardPopBrand /> is processed by <strong>Stripe</strong>, a globally certified <strong>PCI-DSS Level 1</strong> payment provider. Card details are entered inside Stripe’s encrypted, hosted checkout — they never touch or pass through CardPop’s servers. At checkout you can pay with <strong>Visa, Mastercard, American Express, PayPal, Afterpay, Apple Pay, Google Pay or Stripe Link</strong>, and CardPop memberships can also be billed securely through PayPal. All traffic is protected by 256-bit SSL end to end.</p>
 
       <SectionHeading icon={ShieldCheck}>Buyer Protection</SectionHeading>
       <p>Every order is backed by our <strong>14-day Buyer Protection Guarantee</strong>. If an item doesn’t arrive within the expected timeframe, or is significantly not as described, you can request a full refund through our resolution process. Your payment is only ever released to the seller once the transaction completes cleanly, so you’re never left out of pocket for an order that goes wrong.</p>
@@ -124,7 +140,7 @@ const TrustSafetyPage = () => {
       <p>Sellers are protected against fraudulent chargebacks and false claims. As long as you ship to the buyer’s <strong>verified address with tracking and signature confirmation</strong>, you’re covered — a would-be scammer can’t claim “item not received” against a signed, tracked delivery.</p>
 
       <SectionHeading icon={BadgeCheck}>Verified Identity at Registration</SectionHeading>
-      <p>What sets CardPop™ apart from open marketplaces is that <strong>real people stand behind every account</strong>. During registration, members verify their identity through <strong>Stripe Identity</strong>: you photograph a government-issued ID (passport or driver licence) and take a matching selfie. Stripe performs the check and confirms the match — <strong>CardPop never stores your document images</strong>. Verified accounts earn the <strong>Verified badge</strong> that buyers and sellers look for, and selling requires a verified identity. The result is a community where fraudsters and throwaway accounts have nowhere to hide.</p>
+      <p>What sets <CardPopBrand /> apart from open marketplaces is that <strong>real people stand behind every account</strong>. During registration, members verify their identity through <strong>Stripe Identity</strong>: you photograph a government-issued ID (passport or driver licence) and take a matching selfie. Stripe performs the check and confirms the match — <strong>CardPop never stores your document images</strong>. Verified accounts earn the <strong>Verified badge</strong> that buyers and sellers look for, and selling requires a verified identity. The result is a community where fraudsters and throwaway accounts have nowhere to hide.</p>
 
       <SectionHeading icon={RefreshCw}>Authentication Services</SectionHeading>
       <p>For high-value items and trades, we offer <strong>middleman authentication</strong>. Items are shipped to our facility where experts verify authenticity and condition before forwarding to the buyer — so both sides can transact with total confidence.</p>
