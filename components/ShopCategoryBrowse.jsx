@@ -22,8 +22,9 @@ const ShopCategoryBrowse = () => {
   return (
     <div>
       {/* Overarching category cards — compact so they read as a control strip,
-          not full-bleed banners. Centered rather than stretched edge-to-edge. */}
-      <div className="flex flex-wrap justify-center gap-3">
+          not full-bleed banners. Mobile: single-row touch carousel (matches the
+          homepage "Browse by Category" mobile strip). Desktop: centered, wraps. */}
+      <div className="flex flex-nowrap sm:flex-wrap justify-start sm:justify-center gap-3 overflow-x-auto sm:overflow-visible snap-x snap-mandatory sm:snap-none scrollbar-hide -mx-4 px-4 sm:mx-0 sm:px-0 pb-1 sm:pb-0">
         {SHOP_CATEGORY_GROUPS.map((group) => {
           const isActive = group.slug === activeSlug;
           return (
@@ -35,7 +36,7 @@ const ShopCategoryBrowse = () => {
               onFocus={() => setActiveSlug(group.slug)}
               aria-pressed={isActive}
               aria-label={`${group.label} supplies`}
-              className={`group flex flex-col items-center justify-center gap-1.5 w-20 h-20 sm:w-[88px] sm:h-[88px] rounded-xl bg-gradient-to-br ${group.gradient} shadow-sm transition-all duration-200 text-center leading-tight focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+              className={`group flex flex-shrink-0 snap-start flex-col items-center justify-center gap-1.5 w-20 h-20 sm:w-[88px] sm:h-[88px] rounded-xl bg-gradient-to-br ${group.gradient} shadow-sm transition-all duration-200 text-center leading-tight focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                 isActive
                   ? 'ring-2 ring-foreground/30 ring-offset-2 ring-offset-background shadow-lg -translate-y-0.5'
                   : 'hover:shadow-lg hover:-translate-y-0.5'
