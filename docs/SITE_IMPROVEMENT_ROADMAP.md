@@ -295,11 +295,10 @@ Status legend: `[ ]` todo · `[~]` in progress · `[x]` done
 
 ---
 
-## Hostinger decommission (carry-over)
+## Hostinger decommission (complete)
 - [x] Removed the 11 CDN image references in `data/events.js` — the file was dead
       code (no importers; the live events page reads from Supabase), so it was
       deleted outright rather than re-hosted.
-- [ ] Re-host the 1 remaining CDN image — the hero on `/vault/welcome`
-      (`AddYourFirstCardPage.jsx`). Blocked in agent env (`horizons-cdn.hostinger.com`
-      egress denied); needs the image file supplied, then the reference repointed to
-      Supabase Storage.
+- [x] Replaced the last CDN image — the hero on `/vault/welcome`
+      (`AddYourFirstCardPage.jsx`) — with a self-contained placeholder (no external
+      asset needed). No remaining `horizons-cdn.hostinger.com` references in code.
