@@ -78,11 +78,9 @@ const AddYourFirstCardPage = () => {
               </div>
               
               <div className="aspect-[4/5] sm:aspect-square lg:aspect-[4/5] relative bg-secondary overflow-hidden">
-                <img 
-                  src="https://horizons-cdn.hostinger.com/a224e9ed-ba64-477f-bdc4-88304137ba6e/dcdd4aaa4a4ea37a8e212c446a13dc30.jpg" 
-                  alt="1998 P.M. Japanese Promo Pikachu - Holo Illustrator" 
-                  className="w-full h-full object-cover object-top transition-transform duration-700 hover:scale-105"
-                />
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-secondary via-muted to-secondary">
+                  <Layers className="w-20 h-20 text-muted-foreground/25" strokeWidth={1.25} />
+                </div>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent"></div>
                 <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
                   <p className="text-xs font-bold uppercase tracking-wider text-primary mb-1">Pokemon • Extremely Rare Promo</p>
