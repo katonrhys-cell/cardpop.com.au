@@ -1,18 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Handshake, Store } from 'lucide-react';
+import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { formatEntryFee, youTubeEmbedUrl } from '@/lib/eventSeo.js';
+import { formatEntryFee, eventTypeStyle, youTubeEmbedUrl } from '@/lib/eventSeo.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
 import { toast } from 'sonner';
-
-const EVENT_TYPE_STYLES = {
-  card_show:       { gradient: 'from-red-500 to-rose-600',      Icon: Ticket    },
-  trade_event:     { gradient: 'from-blue-500 to-indigo-600',   Icon: Handshake },
-  community_event: { gradient: 'from-violet-500 to-purple-600', Icon: Users     },
-  lgs_event:       { gradient: 'from-amber-500 to-orange-500',  Icon: Store     },
-};
 
 const EventDetailCard = ({ event }) => {
   const videoEmbedUrl = youTubeEmbedUrl(event.youtube_url);
@@ -71,7 +64,7 @@ const EventDetailCard = ({ event }) => {
         {/* Title & type — placed below the image so the poster stays fully visible */}
         <div className="px-5 pt-5 md:px-10 md:pt-8">
           {(() => {
-            const style = EVENT_TYPE_STYLES[event.event_type];
+            const style = eventTypeStyle(event);
             if (style) {
               const { gradient, Icon } = style;
               return (

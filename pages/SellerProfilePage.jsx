@@ -12,7 +12,7 @@ import ProductCard from '@/components/ProductCard';
 import { Badge } from '@/components/ui/badge';
 import BackButton from '@/components/BackButton.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
-import { eventPath, eventTypeLabel, formatEventDate, formatEventLocation } from '@/lib/eventSeo.js';
+import { eventPath, eventTypeLabel, eventTypeStyle, formatEventDate, formatEventLocation } from '@/lib/eventSeo.js';
 
 const SellerProfilePage = () => {
   const { sellerId } = useParams();
@@ -239,6 +239,7 @@ const SellerProfilePage = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {events.map((event) => {
                     const isVendor = event.rsvpRole === 'vendor';
+                    const style = eventTypeStyle(event);
                     return (
                       <Link
                         key={event.id}
@@ -246,9 +247,16 @@ const SellerProfilePage = () => {
                         className="group bg-card border border-border rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-primary/30 transition-all flex flex-col gap-3"
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <Badge variant="outline" className="text-[10px] font-semibold uppercase tracking-wide border-primary/30 text-primary">
-                            {eventTypeLabel(event)}
-                          </Badge>
+                          {style ? (
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r ${style.gradient} text-white text-[10px] font-bold uppercase tracking-wide shadow-sm`}>
+                              <style.Icon className="w-3 h-3" />
+                              {eventTypeLabel(event)}
+                            </span>
+                          ) : (
+                            <Badge variant="secondary" className="text-[10px] font-semibold uppercase tracking-wide">
+                              {eventTypeLabel(event)}
+                            </Badge>
+                          )}
                           <Badge
                             className={`gap-1 font-bold border-none ${
                               isVendor

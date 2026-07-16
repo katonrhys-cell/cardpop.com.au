@@ -1,18 +1,11 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, MapPin, Clock, Users, Edit, Trash2, Info, ImageOff, Ticket, Handshake, Store } from 'lucide-react';
+import { Calendar, MapPin, Clock, Edit, Trash2, Info, ImageOff } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { eventPath, eventTypeLabel, formatEventDate, formatEventTime, formatEventLocation } from '@/lib/eventSeo.js';
+import { eventPath, eventTypeLabel, eventTypeStyle, formatEventDate, formatEventTime, formatEventLocation } from '@/lib/eventSeo.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
-
-const EVENT_TYPE_STYLES = {
-  card_show:       { gradient: 'from-red-500 to-rose-600',       Icon: Ticket    },
-  trade_event:     { gradient: 'from-blue-500 to-indigo-600',    Icon: Handshake },
-  community_event: { gradient: 'from-violet-500 to-purple-600',  Icon: Users     },
-  lgs_event:       { gradient: 'from-amber-500 to-orange-500',   Icon: Store     },
-};
 
 const EventCard = ({ event, isAdmin, onView, onEdit, onDelete }) => {
   const eventTitle = event.title || event.name;
@@ -42,7 +35,7 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete }) => {
         )}
         <div className="absolute top-3 left-3 flex gap-2">
           {(() => {
-            const style = EVENT_TYPE_STYLES[event.event_type];
+            const style = eventTypeStyle(event);
             if (style) {
               const { gradient, Icon } = style;
               return (
