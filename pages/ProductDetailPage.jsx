@@ -184,6 +184,26 @@ const ProductDetailPage = ({ source: sourceProp }) => {
             return;
           }
 
+          // No active listing — if the item's latest listing sold, send the
+          // viewer to that listing page instead: it renders the Sold state.
+          // A sale only flips listings.status (the webhook never touches
+          // vault_items), so falling through here used to show the stale
+          // 'For Sale' vault view with a Buy Now button on a card that had
+          // already sold.
+          const { data: soldListing } = await supabase
+            .from('listings')
+            .select('id')
+            .eq('vault_item_id', id)
+            .eq('status', 'sold')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (isMounted && soldListing) {
+            navigate(`/marketplace/${soldListing.id}`, { replace: true });
+            return;
+          }
+
           // Don't decide ownership until auth has resolved — otherwise an owner
           // can be shown a false 403 while currentUser is momentarily null.
           // The effect re-runs (vaultAuthPending dep) once auth settles. Keep
@@ -556,9 +576,20 @@ const ProductDetailPage = ({ source: sourceProp }) => {
             ) : (
               <div className="flex flex-col gap-3 mb-8">
                 {product.listing_type === 'For Sale' || product.listing_type === 'For Sale & Trade' ? (
-                  <Button size="lg" className="w-full h-14 rounded-xl font-bold text-lg shadow-md" onClick={handleAddToCart}>
-                    Buy Now
-                  </Button>
+                  // A vault item is only purchasable through its marketplace
+                  // listing (checkout prices from the listings row). Reaching
+                  // the vault view means no active listing exists — its listing
+                  // sold, expired or was archived — so a Buy Now here could
+                  // only ever fail at checkout.
+                  source === 'vault' ? (
+                    <Button size="lg" variant="secondary" className="w-full h-14 rounded-xl font-bold text-lg" disabled>
+                      <PackageX className="w-5 h-5 mr-2" /> Not currently available
+                    </Button>
+                  ) : (
+                    <Button size="lg" className="w-full h-14 rounded-xl font-bold text-lg shadow-md" onClick={handleAddToCart}>
+                      Buy Now
+                    </Button>
+                  )
                 ) : null}
 
                 {canOffer && (

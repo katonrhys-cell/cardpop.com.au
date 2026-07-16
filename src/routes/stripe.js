@@ -440,6 +440,27 @@ router.get('/session/:sessionId', optionalAuthMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'Forbidden' });
     }
 
+    // Webhook fallback: the buyer landing on the success page proves payment
+    // completed, so fulfil the order here too. Fulfilment is idempotent (unique
+    // stripe_session_id insert, compare-and-swap status/sold claims), so when
+    // the webhook already handled this session — or handles it moments later —
+    // the second pass is a no-op. Without this, a broken or misconfigured
+    // webhook endpoint leaves a paid-for listing 'active' and buyable by
+    // everyone else. Wallet top-ups and subscriptions keep their own webhook
+    // handlers; the session data is retrieved from Stripe above, so the client
+    // contributes nothing but the session id.
+    const isSubscription = session.mode === 'subscription' || session.metadata?.kind === 'subscription';
+    const isWalletTopup = session.metadata?.walletTopup === 'true';
+    if (session.payment_status === 'paid' && !isSubscription && !isWalletTopup) {
+      try {
+        await handleCheckoutSessionCompleted(session, stripe);
+      } catch (fulfilErr) {
+        // The receipt must still render — Stripe will retry the webhook for
+        // anything this pass couldn't finish.
+        logger.error(`[STRIPE] Success-page fulfilment fallback failed for ${sessionId}: ${fulfilErr.message}`);
+      }
+    }
+
     const items = (session.line_items?.data || []).map((item) => ({
       name:       item.description || item.price?.product?.name || 'Unknown',
       quantity:   item.quantity,

@@ -30,6 +30,15 @@ vi.mock('../../src/middleware/auth.js', () => ({
 }));
 const mockMaybeSingle = vi.hoisted(() => vi.fn());
 
+// Replace only the fulfilment entrypoint so the success-page fallback (and the
+// webhook dispatch) can be asserted directly; every other service export stays
+// real (cartService and the routes import getPlatformSetting from this module).
+const mockFulfil = vi.hoisted(() => vi.fn());
+vi.mock('../../src/services/stripeWebhookService.js', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, handleCheckoutSessionCompleted: mockFulfil };
+});
+
 vi.mock('../../src/utils/supabaseClient.js', () => {
   const chain = () => {
     const q = {};
@@ -177,6 +186,71 @@ describe('GET /session/:sessionId', () => {
     expect(res.body.status).toBe('paid');
     expect(res.body.customerEmail).toBe('buyer@example.com');
     expect(res.body.items).toHaveLength(1);
+  });
+
+  // The success page proves payment completed, so the route also fulfils the
+  // order (idempotently) — the webhook fallback that keeps a paid-for listing
+  // from staying 'active' and buyable when webhook delivery is down.
+  describe('fulfilment fallback', () => {
+    const paidSession = {
+      id: 'cs_paid',
+      mode: 'payment',
+      payment_status: 'paid',
+      amount_total: 500,
+      metadata: { userId: 'user-123', listingId: 'listing-1' },
+      customer_details: { email: 'buyer@example.com' },
+      line_items: { data: [] },
+    };
+
+    it('fulfils a paid payment-mode session with the session retrieved from Stripe', async () => {
+      mockStripe.checkout.sessions.retrieve.mockResolvedValue(paidSession);
+      const res = await request(app).get('/session/cs_paid');
+      expect(res.status).toBe(200);
+      expect(mockFulfil).toHaveBeenCalledTimes(1);
+      expect(mockFulfil.mock.calls[0][0]).toBe(paidSession);
+    });
+
+    it('does not fulfil an unpaid session', async () => {
+      mockStripe.checkout.sessions.retrieve.mockResolvedValue({ ...paidSession, payment_status: 'unpaid' });
+      const res = await request(app).get('/session/cs_paid');
+      expect(res.status).toBe(200);
+      expect(mockFulfil).not.toHaveBeenCalled();
+    });
+
+    it('does not fulfil a wallet top-up session', async () => {
+      mockStripe.checkout.sessions.retrieve.mockResolvedValue({
+        ...paidSession,
+        metadata: { ...paidSession.metadata, walletTopup: 'true' },
+      });
+      const res = await request(app).get('/session/cs_paid');
+      expect(res.status).toBe(200);
+      expect(mockFulfil).not.toHaveBeenCalled();
+    });
+
+    it('does not fulfil a subscription session', async () => {
+      mockStripe.checkout.sessions.retrieve.mockResolvedValue({ ...paidSession, mode: 'subscription' });
+      const res = await request(app).get('/session/cs_paid');
+      expect(res.status).toBe(200);
+      expect(mockFulfil).not.toHaveBeenCalled();
+    });
+
+    it("does not fulfil (or leak) another user's session", async () => {
+      mockStripe.checkout.sessions.retrieve.mockResolvedValue({
+        ...paidSession,
+        metadata: { ...paidSession.metadata, userId: 'someone-else' },
+      });
+      const res = await request(app).get('/session/cs_paid');
+      expect(res.status).toBe(403);
+      expect(mockFulfil).not.toHaveBeenCalled();
+    });
+
+    it('still returns the receipt when fulfilment throws (webhook retries cover it)', async () => {
+      mockStripe.checkout.sessions.retrieve.mockResolvedValue(paidSession);
+      mockFulfil.mockRejectedValueOnce(new Error('db down'));
+      const res = await request(app).get('/session/cs_paid');
+      expect(res.status).toBe(200);
+      expect(res.body.id).toBe('cs_paid');
+    });
   });
 });
 
