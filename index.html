@@ -23,8 +23,13 @@
          needed. Supabase is the first data origin the app hits. -->
     <link rel="preconnect" href="https://odoglvswwymyjuwlonkf.supabase.co" crossorigin />
     <!-- Preload the self-hosted Syne heading font (crossorigin required even
-         same-origin — fonts fetch in CORS/anonymous mode). @font-face is in index.css. -->
-    <link rel="preload" as="font" type="font/woff2" href="/fonts/syne-latin-var.woff2" crossorigin />
+         same-origin — fonts fetch in CORS/anonymous mode). @font-face is in index.css.
+         fetchpriority=high so the font beats the modulepreloaded JS chunks in the
+         bandwidth race — @font-face uses font-display: fallback, so Syne arriving
+         inside the ~100ms block window means the first paint needs no font swap.
+         The same preload is also sent as a Link header on "/" (vercel.json) so
+         Cloudflare Early Hints can start the fetch before the HTML body arrives. -->
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/syne-latin-var.woff2" crossorigin fetchpriority="high" />
     
     <!-- Prevent CLS: width+height attrs + height:auto lets browser compute aspect-ratio before load -->
     <!-- Critical CSS: minimal above-the-fold styles to enable rendering without full CSS file -->

@@ -40,6 +40,9 @@ const MAX_DYNAMIC_ENTRIES = 50;
 const STATIC_ASSETS = [
   '/',
   '/index.html',
+  // Stable (unhashed) path. Precaching the heading font guarantees repeat
+  // visits paint Syne on the first frame even if the HTTP cache was evicted.
+  '/fonts/syne-latin-var.woff2',
 ];
 
 // Install: cache static assets
