@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Handshake, Store } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { formatEntryFee } from '@/lib/eventSeo.js';
+import { formatEntryFee, youTubeEmbedUrl } from '@/lib/eventSeo.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
 import { toast } from 'sonner';
 
@@ -15,6 +15,7 @@ const EVENT_TYPE_STYLES = {
 };
 
 const EventDetailCard = ({ event }) => {
+  const videoEmbedUrl = youTubeEmbedUrl(event.youtube_url);
 
   const handleShare = (platform) => {
     const url = encodeURIComponent(window.location.href);
@@ -100,6 +101,23 @@ const EventDetailCard = ({ event }) => {
             <p className="text-muted-foreground leading-relaxed text-lg whitespace-pre-wrap">
               {event.description}
             </p>
+
+            {videoEmbedUrl && (
+              <div className="mt-10">
+                <h2 className="font-serif text-2xl font-bold mb-4">Event Video</h2>
+                <div className="aspect-video w-full overflow-hidden rounded-2xl border border-border bg-muted shadow-md">
+                  <iframe
+                    src={videoEmbedUrl}
+                    title={`${event.name} — event video`}
+                    className="w-full h-full"
+                    loading="lazy"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerPolicy="strict-origin-when-cross-origin"
+                    allowFullScreen
+                  />
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Sidebar Details */}

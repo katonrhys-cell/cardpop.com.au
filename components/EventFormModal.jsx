@@ -65,6 +65,7 @@ const INITIAL_STATE = {
   ticket_url: '',
   instagram_url: '',
   facebook_url: '',
+  youtube_url: '',
   entry_fee_aud: '',
   is_free: true,
   capacity: '',
@@ -211,6 +212,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         ticket_url:          event.ticket_url || '',
         instagram_url:       event.instagram_url || '',
         facebook_url:        event.facebook_url || '',
+        youtube_url:         event.youtube_url || '',
         entry_fee_aud:       event.entry_fee_aud != null ? String(event.entry_fee_aud) : '',
         is_free:             event.is_free ?? true,
         capacity:            event.capacity != null ? String(event.capacity) : '',
@@ -319,6 +321,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         ticket_url:          formData.ticket_url.trim() || null,
         instagram_url:       formData.instagram_url.trim() || null,
         facebook_url:        formData.facebook_url.trim() || null,
+        youtube_url:         formData.youtube_url.trim() || null,
         entry_fee_aud:       formData.is_free ? 0 : (parseFloat(formData.entry_fee_aud) || 0),
         is_free:             formData.is_free,
         capacity:            formData.capacity ? parseInt(formData.capacity, 10) : null,
@@ -601,6 +604,11 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   <div className="space-y-2">
                     <Label htmlFor="facebook_url" className="font-bold">Facebook URL</Label>
                     <Input id="facebook_url" name="facebook_url" type="url" value={formData.facebook_url} onChange={handleChange} className={inputCls} placeholder="https://facebook.com/..." disabled={loading} />
+                  </div>
+                  <div className="sm:col-span-2 space-y-2">
+                    <Label htmlFor="youtube_url" className="font-bold">YouTube Video URL</Label>
+                    <Input id="youtube_url" name="youtube_url" type="url" value={formData.youtube_url} onChange={handleChange} className={inputCls} placeholder="https://www.youtube.com/watch?v=..." disabled={loading} />
+                    <p className="text-xs text-muted-foreground">Embedded on the event page and added to its structured data for video SEO.</p>
                   </div>
                 </div>
 

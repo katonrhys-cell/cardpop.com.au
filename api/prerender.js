@@ -779,8 +779,40 @@ const eventIsoDate = (date, time) => {
 const EVENT_FIELDS =
   'id, slug, title, description, short_description, image_url, event_type, status, ' +
   'venue_name, address, suburb, state, postcode, start_date, end_date, start_time, end_time, ' +
-  'entry_fee_aud, is_free, website_url, ticket_url, organizer_name, seo_title, seo_description, ' +
+  'entry_fee_aud, is_free, website_url, ticket_url, youtube_url, organizer_name, seo_title, seo_description, ' +
   'created_at, updated_at';
+
+// YouTube video id from any common URL shape — mirrors lib/eventSeo.js.
+const youTubeVideoId = (url) => {
+  if (!url) return null;
+  const match = String(url).match(
+    /(?:youtube(?:-nocookie)?\.com\/(?:watch\?(?:[^#]*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/,
+  );
+  return match ? match[1] : null;
+};
+
+// schema.org VideoObject for an event's YouTube video — video rich results.
+// Google requires uploadDate; the closest truthful value we hold is when the
+// listing was last updated (i.e. when the video link was added).
+function buildEventVideoLd(event) {
+  const id = youTubeVideoId(event.youtube_url);
+  if (!id) return null;
+  const name = event.title || 'Trading Card Event';
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'VideoObject',
+    name: `${name} — Event Video`,
+    description: toText(
+      event.short_description || event.description
+        || `Video for ${name}, a trading card event listed on CardPop Australia.`,
+      500,
+    ),
+    thumbnailUrl: [`https://i.ytimg.com/vi/${id}/hqdefault.jpg`],
+    uploadDate: event.updated_at || event.created_at || event.start_date,
+    contentUrl: `https://www.youtube.com/watch?v=${id}`,
+    embedUrl: `https://www.youtube-nocookie.com/embed/${id}`,
+  };
+}
 
 // Full schema.org Event for a Supabase event record. Every field Google's
 // event rich-result report checks (description, image, eventStatus, offers,
@@ -927,6 +959,8 @@ async function renderEvent(supabase, param) {
     || `${name}${location ? ` at ${location}` : ''}${when ? ` on ${when}` : ''} — a trading card event listed on CardPop Australia.`;
 
   const eventLd = { ...buildEventLd(event), description: toText(description, 500) };
+  const videoLd = buildEventVideoLd(event);
+  const videoId = youTubeVideoId(event.youtube_url);
 
   const breadcrumb = {
     '@context': 'https://schema.org',
@@ -951,10 +985,11 @@ async function renderEvent(supabase, param) {
     ${event.organizer_name ? `<li>Organiser: ${esc(event.organizer_name)}</li>` : ''}
   </ul>
   ${event.description ? `<p>${esc(toText(event.description, 800))}</p>` : ''}
+  ${videoId ? `<p><a href="https://www.youtube.com/watch?v=${esc(videoId)}">Watch the event video</a></p>` : ''}
   ${event.website_url ? `<p><a href="${esc(event.website_url)}" rel="nofollow">Event website</a></p>` : ''}
 </main>`;
 
-  return htmlDoc({ title, description, canonical, ogImage: image, ogType: 'website', jsonLdItems: [eventLd, breadcrumb], bodyHtml });
+  return htmlDoc({ title, description, canonical, ogImage: image, ogType: 'website', jsonLdItems: [eventLd, breadcrumb, ...(videoLd ? [videoLd] : [])], bodyHtml });
 }
 
 // Ranked local grader lists are shown identically on /grading/local-graders and

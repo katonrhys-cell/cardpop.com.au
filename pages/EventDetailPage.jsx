@@ -15,6 +15,7 @@ import {
   formatEventLocation,
   buildEventJsonLd,
   buildBreadcrumbJsonLd,
+  buildVideoJsonLd,
 } from '@/lib/eventSeo.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -112,7 +113,7 @@ const EventDetailPage = () => {
         description={seoDescription}
         canonicalUrl={`${SITE_URL}/events/${event.slug || event.id}`}
         ogImage={event.image_url || undefined}
-        structuredData={[buildEventJsonLd(event), buildBreadcrumbJsonLd(event)]}
+        structuredData={[buildEventJsonLd(event), buildBreadcrumbJsonLd(event), buildVideoJsonLd(event)].filter(Boolean)}
       />
 
       <div className="flex-1 max-w-6xl mx-auto px-4 py-12 w-full">
