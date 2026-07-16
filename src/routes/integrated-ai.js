@@ -9,7 +9,15 @@ const router = Router();
 
 router.use(supabaseAuth);
 
-router.post('/stream', integratedAiRateLimit, uploadFiles({
+// Reject unauthenticated callers BEFORE the multipart upload middleware runs.
+// supabaseAuth is optional (it never 401s — it only populates req.userId), and
+// uploadFiles uses in-memory storage, so without this guard an anonymous caller
+// could make the server buffer up to ~50 MB of image data only to be rejected
+// afterwards. Gating here means their body is never read.
+const requireUserId = (req, res, next) =>
+	req.userId ? next() : res.status(401).json({ error: 'Authentication required' });
+
+router.post('/stream', requireUserId, integratedAiRateLimit, uploadFiles({
 	allowedMimeTypes: [
 		'image/jpeg',
 		'image/png',
