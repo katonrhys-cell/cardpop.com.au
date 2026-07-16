@@ -19,8 +19,11 @@ const makeBuilder = (result = { data: [], error: null }) => {
 };
 
 let nextResult = { data: [], error: null };
+// fetchRsvpCounts now calls an RPC (get_event_rsvp_counts) instead of a view.
+// Hoisted so the vi.mock factory (itself hoisted) can reference it directly.
+const rpc = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/supabaseClient.js', () => ({
-  supabase: { from: vi.fn(() => makeBuilder(nextResult)) },
+  supabase: { from: vi.fn(() => makeBuilder(nextResult)), rpc },
 }));
 
 import {
@@ -34,6 +37,8 @@ import {
 beforeEach(() => {
   nextResult = { data: [], error: null };
   lastBuilder = undefined;
+  rpc.mockReset();
+  rpc.mockImplementation(() => Promise.resolve(nextResult));
 });
 
 describe('eventRsvp helpers', () => {
@@ -45,15 +50,16 @@ describe('eventRsvp helpers', () => {
   it('fetchRsvpCounts returns an empty map for no ids without querying', async () => {
     const map = await fetchRsvpCounts([]);
     expect(map).toEqual({});
-    expect(lastBuilder).toBeUndefined();
+    expect(rpc).not.toHaveBeenCalled();
   });
 
-  it('fetchRsvpCounts maps rows into a per-event count object', async () => {
+  it('fetchRsvpCounts calls the counts RPC and maps rows into a per-event object', async () => {
     nextResult = {
       data: [{ event_id: 'e1', buyer_count: 3, vendor_count: 1 }],
       error: null,
     };
     const map = await fetchRsvpCounts(['e1', 'e1']); // de-duplicates ids
+    expect(rpc).toHaveBeenCalledWith('get_event_rsvp_counts', { event_ids: ['e1'] });
     expect(map).toEqual({ e1: { buyer: 3, vendor: 1 } });
   });
 
