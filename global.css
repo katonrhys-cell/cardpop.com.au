@@ -41,11 +41,12 @@ body {
   margin: 0 auto;
   font-size: 16px;
   line-height: 1.65;
-  word-break: break-word;
+  /* Only break words that would otherwise overflow (long URLs, hashes) —
+     never hyphenate or split ordinary prose mid-word. */
+  overflow-wrap: break-word;
   font-kerning: auto;
   font-variant: normal;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  hyphens: auto;
 }

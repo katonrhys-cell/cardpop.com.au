@@ -48,6 +48,16 @@ const Pillar = ({ icon: Icon, title, body }) => (
   </div>
 );
 
+// Section heading with a leading icon. items-start + a small top margin keeps
+// the icon centred on the FIRST line, so it doesn't float awkwardly in the
+// middle when the title wraps to two lines on mobile.
+const SectionHeading = ({ icon: Icon, children }) => (
+  <h2 className="flex items-start gap-2">
+    <Icon className="mt-1.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+    <span>{children}</span>
+  </h2>
+);
+
 // FAQ pairs drive both the on-page accordion feel and the FAQPage structured
 // data below, which lets these questions surface directly in Google results.
 const FAQ = [
@@ -104,22 +114,22 @@ const TrustSafetyPage = () => {
         ))}
       </div>
 
-      <h2 className="flex items-center gap-2"><Lock className="h-5 w-5 text-primary" /> Secure Payments</h2>
+      <SectionHeading icon={Lock}>Secure Payments</SectionHeading>
       <p>Every purchase on CardPop™ is processed by <strong>Stripe</strong>, a globally certified <strong>PCI-DSS Level 1</strong> payment provider. Card details are entered inside Stripe’s encrypted, hosted checkout — they never touch or pass through CardPop’s servers. At checkout you can pay with <strong>Visa, Mastercard, American Express, PayPal, Afterpay, Apple Pay, Google Pay or Stripe Link</strong>, and CardPop memberships can also be billed securely through PayPal. All traffic is protected by 256-bit SSL end to end.</p>
 
-      <h2 className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /> Buyer Protection</h2>
+      <SectionHeading icon={ShieldCheck}>Buyer Protection</SectionHeading>
       <p>Every order is backed by our <strong>14-day Buyer Protection Guarantee</strong>. If an item doesn’t arrive within the expected timeframe, or is significantly not as described, you can request a full refund through our resolution process. Your payment is only ever released to the seller once the transaction completes cleanly, so you’re never left out of pocket for an order that goes wrong.</p>
 
-      <h2 className="flex items-center gap-2"><PackageCheck className="h-5 w-5 text-primary" /> Seller Protection</h2>
+      <SectionHeading icon={PackageCheck}>Seller Protection</SectionHeading>
       <p>Sellers are protected against fraudulent chargebacks and false claims. As long as you ship to the buyer’s <strong>verified address with tracking and signature confirmation</strong>, you’re covered — a would-be scammer can’t claim “item not received” against a signed, tracked delivery.</p>
 
-      <h2 className="flex items-center gap-2"><BadgeCheck className="h-5 w-5 text-primary" /> Verified Identity at Registration</h2>
+      <SectionHeading icon={BadgeCheck}>Verified Identity at Registration</SectionHeading>
       <p>What sets CardPop™ apart from open marketplaces is that <strong>real people stand behind every account</strong>. During registration, members verify their identity through <strong>Stripe Identity</strong>: you photograph a government-issued ID (passport or driver licence) and take a matching selfie. Stripe performs the check and confirms the match — <strong>CardPop never stores your document images</strong>. Verified accounts earn the <strong>Verified badge</strong> that buyers and sellers look for, and selling requires a verified identity. The result is a community where fraudsters and throwaway accounts have nowhere to hide.</p>
 
-      <h2 className="flex items-center gap-2"><RefreshCw className="h-5 w-5 text-primary" /> Authentication Services</h2>
+      <SectionHeading icon={RefreshCw}>Authentication Services</SectionHeading>
       <p>For high-value items and trades, we offer <strong>middleman authentication</strong>. Items are shipped to our facility where experts verify authenticity and condition before forwarding to the buyer — so both sides can transact with total confidence.</p>
 
-      <h2 className="flex items-center gap-2"><Users className="h-5 w-5 text-primary" /> Community Guidelines</h2>
+      <SectionHeading icon={Users}>Community Guidelines</SectionHeading>
       <p>We maintain a <strong>zero-tolerance policy</strong> for fraud, harassment, and market manipulation. Users found violating these guidelines are permanently banned from the platform.</p>
 
       <h2>Frequently Asked Questions</h2>
