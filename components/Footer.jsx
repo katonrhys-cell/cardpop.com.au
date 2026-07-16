@@ -36,10 +36,10 @@ const Footer = () => {
             {/* Trust promo — secure payments, verified members, buyer protection */}
             <Link
               to="/trust-safety"
-              className="inline-flex items-center gap-2 mb-6 rounded-full border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+              className="inline-flex items-center gap-2 mb-6 rounded-full bg-muted px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-primary hover:bg-muted/70 transition-colors"
             >
               <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-              Secure payments · ID-verified members · Buyer protection
+              Secure Payments · Verified Members · Buyer Protection
             </Link>
 
             {/* Newsletter signup */}
