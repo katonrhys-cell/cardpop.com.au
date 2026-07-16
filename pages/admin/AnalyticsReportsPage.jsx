@@ -27,6 +27,12 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
+import OrderDetailDialog from '@/components/admin/OrderDetailDialog.jsx';
+
+// Orders sit in 'pending' until Stripe confirms payment, and can end in
+// 'payment_failed'/'cancelled' without money ever changing hands — none of
+// those are real revenue, so the report only counts orders that actually paid.
+const PAID_STATUSES = ['payment_confirmed', 'shipped', 'completed', 'refunded'];
 
 const StatCard = ({ title, value, icon: Icon, description, loading }) => (
   <Card className="shadow-sm border-border hover:border-primary/40 transition-colors">
@@ -67,6 +73,7 @@ const AnalyticsReportsPage = () => {
   
   const [chartData, setChartData] = useState([]);
   const [recentOrders, setRecentOrders] = useState([]);
+  const [viewOrderId, setViewOrderId] = useState(null);
 
   useEffect(() => {
     const fetchAnalyticsData = async () => {
@@ -88,9 +95,9 @@ const AnalyticsReportsPage = () => {
           supabase.from('listings').select('*', { count: 'exact', head: true }),
           supabase.from('events').select('*', { count: 'exact', head: true }),
           supabase.from('categories').select('*', { count: 'exact', head: true }),
-          supabase.from('orders').select('*', { count: 'exact', head: true }),
+          supabase.from('orders').select('*', { count: 'exact', head: true }).in('status', PAID_STATUSES),
           supabase.from('orders').select('*, profiles!orders_buyer_id_fkey(username, display_name)').order('created_at', { ascending: false }).range(0, 9),
-          supabase.from('orders').select('total_aud,created_at').neq('status', 'cancelled'),
+          supabase.from('orders').select('total_aud,created_at').in('status', PAID_STATUSES),
           supabase.from('profiles').select('created_at')
         ]);
 
@@ -255,18 +262,18 @@ const AnalyticsReportsPage = () => {
 
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <StatCard 
-          title="Total Revenue" 
-          value={formatCurrency(stats.revenue)} 
-          icon={DollarSign} 
-          description="Lifetime platform revenue"
+        <StatCard
+          title="Total Revenue"
+          value={formatCurrency(stats.revenue)}
+          icon={DollarSign}
+          description="Lifetime revenue from paid orders"
           loading={loading}
         />
-        <StatCard 
-          title="Total Orders" 
-          value={stats.orders.toLocaleString()} 
-          icon={ShoppingCart} 
-          description="All processed orders"
+        <StatCard
+          title="Total Orders"
+          value={stats.orders.toLocaleString()}
+          icon={ShoppingCart}
+          description="Paid orders (excludes pending)"
           loading={loading}
         />
         <StatCard 
@@ -364,7 +371,7 @@ const AnalyticsReportsPage = () => {
             <h3 className="text-lg font-bold text-foreground">Recent Orders</h3>
             <p className="text-sm text-muted-foreground">Latest transactions across the platform</p>
           </div>
-          <Button variant="outline" className="rounded-xl h-9 px-4" onClick={() => navigate('/admin/marketplace')}>
+          <Button variant="outline" className="rounded-xl h-9 px-4" onClick={() => navigate('/admin/orders')}>
             View All
           </Button>
         </div>
@@ -400,7 +407,15 @@ const AnalyticsReportsPage = () => {
               ) : (
                 recentOrders.map((order) => (
                   <TableRow key={order.id} className="group hover:bg-muted/40 transition-colors">
-                    <TableCell className="font-mono text-xs text-muted-foreground">{order.order_number || order.id}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setViewOrderId(order.id)}
+                        className="text-primary hover:underline underline-offset-2"
+                      >
+                        {order.order_number || order.id}
+                      </button>
+                    </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
                       {new Date(order.created_at).toLocaleDateString()}
                     </TableCell>
@@ -429,6 +444,10 @@ const AnalyticsReportsPage = () => {
           </Table>
         </div>
       </Card>
+
+      {viewOrderId && (
+        <OrderDetailDialog orderId={viewOrderId} onClose={() => setViewOrderId(null)} />
+      )}
     </div>
   );
 };

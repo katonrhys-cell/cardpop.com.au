@@ -19,6 +19,7 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { apiServerClient as apiClient } from '@/lib/apiServerClient.js';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import OrderDetailDialog from '@/components/admin/OrderDetailDialog.jsx';
 
 const STATUS_BADGE = {
   payment_confirmed: 'bg-blue-500/10 text-blue-700 border-blue-200',
@@ -216,6 +217,7 @@ const OrderManagementPage = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [selectedRefund, setSelectedRefund] = useState(null);
+  const [viewOrderId, setViewOrderId] = useState(null);
   const isMounted = useRef(true);
 
   const fetchOrders = useCallback(async () => {
@@ -359,7 +361,15 @@ const OrderManagementPage = () => {
                 </TableRow>
               ) : filtered.map((order) => (
                 <TableRow key={order.id} className={order.refund_status === 'requested' ? 'bg-amber-500/5' : ''}>
-                  <TableCell className="font-mono text-xs text-muted-foreground">{order.order_number || order.id.slice(0,8).toUpperCase()}</TableCell>
+                  <TableCell className="font-mono text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setViewOrderId(order.id)}
+                      className="text-primary hover:underline underline-offset-2"
+                    >
+                      {order.order_number || order.id.slice(0,8).toUpperCase()}
+                    </button>
+                  </TableCell>
                   <TableCell className="text-muted-foreground text-sm whitespace-nowrap">{format(new Date(order.created_at), 'dd MMM yyyy')}</TableCell>
                   <TableCell className="font-medium">{order.buyer?.display_name || order.buyer?.username || 'Unknown'}</TableCell>
                   <TableCell className="tabular-nums font-medium">{fmt(order.total_aud)}</TableCell>
@@ -384,6 +394,10 @@ const OrderManagementPage = () => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="rounded-xl">
+                        <DropdownMenuItem onClick={() => setViewOrderId(order.id)} className="cursor-pointer gap-2 font-medium">
+                          <Eye className="w-4 h-4" /> View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => handleStatusChange(order.id, 'shipped')} className="cursor-pointer gap-2 font-medium">
                           Mark as Shipped
                         </DropdownMenuItem>
@@ -419,6 +433,10 @@ const OrderManagementPage = () => {
           onClose={() => { setSelectedOrder(null); setSelectedRefund(null); }}
           onUpdate={fetchOrders}
         />
+      )}
+
+      {viewOrderId && (
+        <OrderDetailDialog orderId={viewOrderId} onClose={() => setViewOrderId(null)} />
       )}
     </div>
   );
