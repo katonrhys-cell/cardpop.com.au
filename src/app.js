@@ -3,7 +3,6 @@ dotenv.config();
 import * as Sentry from '@sentry/node';
 import express from 'express';
 import cors from 'cors';
-import helmet from 'helmet';
 import morgan from 'morgan';
 
 import routes from './routes/index.js';
@@ -42,31 +41,12 @@ const trustProxyHops = (() => {
 })();
 app.set('trust proxy', (addr, hop) => hop < trustProxyHops || isCloudflareIp(addr));
 
+// A single Helmet instance (secureHeadersMiddleware) sets the security headers,
+// including the CSP. It is a strict superset of the previous second, inline
+// helmet() block that used to sit here (same directives plus baseUri/formAction
+// and a permissions policy), so that duplicate was removed — two stacked helmet
+// instances just meant the last one silently won and the two could drift.
 app.use(secureHeadersMiddleware);
-app.use(helmet({
-	contentSecurityPolicy: {
-		directives: {
-			defaultSrc: ["'self'"],
-			scriptSrc: ["'self'", "'unsafe-inline'"],
-			styleSrc: ["'self'", "'unsafe-inline'"],
-			imgSrc: ["'self'", 'data:', 'https:'],
-			connectSrc: ["'self'"],
-			fontSrc: ["'self'"],
-			objectSrc: ["'none'"],
-			mediaSrc: ["'self'"],
-			frameSrc: ["'none'"],
-		},
-	},
-	frameguard: { action: 'deny' },
-	contentTypeOptions: true,
-	xssFilter: true,
-	hsts: {
-		maxAge: 31536000,
-		includeSubDomains: true,
-		preload: true,
-	},
-	referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-}));
 
 const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
 app.use(cors({
