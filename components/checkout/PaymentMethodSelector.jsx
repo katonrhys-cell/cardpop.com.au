@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { ShieldCheck, Lock } from 'lucide-react';
 
 /*
@@ -117,7 +118,13 @@ const PaymentMethodSelector = () => {
 
       <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
         <Lock className="h-3.5 w-3.5 shrink-0" />
-        <span>256-bit SSL · PCI-DSS compliant. Card details are entered inside Stripe's encrypted form and never touch our servers.</span>
+        <span>
+          256-bit SSL · PCI-DSS compliant. Card details are entered inside Stripe's encrypted form and never touch our servers.{' '}
+          <Link to="/trust-safety" className="font-medium text-primary hover:underline">
+            See how you're protected
+          </Link>
+          .
+        </span>
       </div>
     </div>
   );
