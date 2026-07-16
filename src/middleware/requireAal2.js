@@ -1,0 +1,75 @@
+import { supabase } from '../utils/supabaseClient.js';
+import logger from '../utils/logger.js';
+
+// Read the `aal` (Authenticator Assurance Level) claim from a Supabase access
+// token WITHOUT verifying the signature. This is safe here because the token has
+// already been validated upstream by authMiddleware (supabase.auth.getUser);
+// we only need to read a claim from a token we already trust. Returns the claim
+// string ('aal1' | 'aal2') or null if it can't be parsed.
+export function decodeAal(token) {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+    const json = Buffer.from(
+      payload.replace(/-/g, '+').replace(/_/g, '/'),
+      'base64',
+    ).toString('utf8');
+    return JSON.parse(json).aal ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Enforce MFA (AAL2) server-side for users who have a verified MFA factor.
+//
+// Supabase's signInWithPassword returns a valid session even when TOTP is
+// enrolled — that session is AAL1, and the second factor only *upgrades* it to
+// AAL2. The backend validates tokens with getUser(), which happily accepts an
+// AAL1 token, so the "require MFA" rule was enforced only in the React UI
+// (ProtectedAdminRoute). An attacker who obtained an admin's password could
+// therefore mint an AAL1 token directly against the public auth endpoint and
+// call privileged APIs, bypassing MFA entirely.
+//
+// Policy (chosen): reject an AAL1 token ONLY when the user actually has a
+// verified MFA factor — i.e. they enrolled MFA but skipped the login step-up.
+// Users who never enrolled MFA are unaffected, so this can never lock anyone
+// out; it simply makes the step-up they already opted into mandatory on the
+// server, not just in the browser.
+//
+// Must run AFTER authMiddleware (it relies on req.user) and is intended for
+// privileged surfaces such as the admin router. Fails CLOSED: if MFA status
+// can't be determined for a privileged request, access is denied.
+export async function requireAal2(req, res, next) {
+  try {
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!token || !req.user?.id) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    // Already stepped up — nothing to check.
+    if (decodeAal(token) === 'aal2') return next();
+
+    // AAL1 (or unknown): allowed only if the user has NO verified factor.
+    const { data, error } = await supabase.auth.admin.mfa.listFactors({ userId: req.user.id });
+    if (error) {
+      logger.error('requireAal2: listFactors failed:', error);
+      return res.status(403).json({ error: 'Could not verify MFA status', code: 'mfa_check_failed' });
+    }
+
+    const hasVerifiedFactor = (data?.factors ?? []).some((f) => f.status === 'verified');
+    if (hasVerifiedFactor) {
+      return res.status(403).json({
+        error: 'Multi-factor authentication required. Complete the MFA challenge and try again.',
+        code: 'mfa_required',
+      });
+    }
+
+    return next();
+  } catch (err) {
+    logger.error('requireAal2 middleware error:', err);
+    return res.status(403).json({ error: 'Could not verify MFA status', code: 'mfa_check_failed' });
+  }
+}
+
+export default requireAal2;

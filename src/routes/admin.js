@@ -3,6 +3,7 @@ import supabase from '../utils/supabaseClient.js';
 import stripe from '../utils/stripeClient.js';
 import { payoutSeller } from '../services/payoutService.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
+import { requireAal2 } from '../middleware/requireAal2.js';
 import { validateRequestBody, validateRequestParams, validateRequestQuery } from '../middleware/validateRequest.js';
 import { setUserRoleSchema, setUserRoleBodySchema, reviewVerificationSchema, reviewVerificationBodySchema, processRefundSchema, processRefundBodySchema, getDisputesSchema, resolveDisputeSchema, resolveDisputeBodySchema, setUserStatusSchema, setUserStatusBodySchema, createBusinessProfileBodySchema, businessProfileIdSchema, updateBusinessProfileBodySchema } from '../schemas/adminSchemas.js';
 import logger from '../utils/logger.js';
@@ -23,6 +24,10 @@ router.use(async (req, res, next) => {
   }
   next();
 });
+// Enforce MFA server-side: an admin who enrolled MFA must present an AAL2
+// (stepped-up) token. Runs after the admin check so non-admins still get the
+// 403 above, and never blocks admins who haven't enabled MFA.
+router.use(requireAal2);
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
