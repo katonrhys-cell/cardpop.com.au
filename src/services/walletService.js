@@ -66,6 +66,40 @@ export async function getWalletBalanceCents(stripe, userId) {
   return Math.max(0, -(customer.balance || 0));
 }
 
+/**
+ * Guard against wallet double-spend.
+ *
+ * A wallet coupon is sized from a live balance read at checkout-session creation
+ * but only debited when the completion webhook fires. So a buyer could open
+ * several checkouts (multiple tabs, or cart + single-item) that each carry a
+ * full-balance coupon and complete them all, extracting more discount than their
+ * balance at the platform's expense.
+ *
+ * Reject creating a new wallet-funded checkout while the customer still has an
+ * OPEN wallet-funded session. This closes the practical exploit (sequentially
+ * opened tabs). A sub-second concurrent race (two creations before either
+ * session is listable) can still slip through — the post-completion
+ * over-redemption alert in debitWalletForOrder remains the backstop for that.
+ */
+export async function assertNoOpenWalletCheckout(stripe, customerId) {
+  if (!customerId) return;
+  const open = await stripe.checkout.sessions.list({
+    customer: customerId,
+    status: 'open',
+    limit: 100,
+  });
+  const hasOpenWalletSession = (open?.data ?? []).some(
+    (s) => Number(s.metadata?.walletCents) > 0,
+  );
+  if (hasOpenWalletSession) {
+    const err = new Error(
+      'You already have a wallet-funded checkout in progress. Please complete or cancel it before starting another.',
+    );
+    err.statusCode = 409;
+    throw err;
+  }
+}
+
 /** Adds store credit to a customer's wallet (e.g. after a successful top-up payment). */
 export async function creditWallet(stripe, customerId, amountCents, description, idempotencyKey) {
   if (!(amountCents > 0)) return;

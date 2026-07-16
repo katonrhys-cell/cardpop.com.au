@@ -4,7 +4,7 @@ import logger from '../utils/logger.js';
 import { calculateBreakdown } from './commissionService.js';
 import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
 import { validateWelcomeDiscount, buildWelcomeDiscount } from './welcomeOfferService.js';
-import { ensureWalletCustomer, getWalletBalanceCents } from './walletService.js';
+import { ensureWalletCustomer, getWalletBalanceCents, assertNoOpenWalletCheckout } from './walletService.js';
 
 export async function createSingleItemCheckout(req, res) {
   try {
@@ -159,6 +159,8 @@ export async function createSingleItemCheckout(req, res) {
       // payment actually completes (never pre-emptively, in case checkout is
       // abandoned).
       walletCustomerId = await ensureWalletCustomer(stripe, userId, { email });
+      // Prevent double-spend: refuse a new wallet checkout while one is still open.
+      await assertNoOpenWalletCheckout(stripe, walletCustomerId);
       const buyerTotalCents = Math.round(buyerTotal * 100);
       const availableCents = await getWalletBalanceCents(stripe, userId);
       // Leave at least Stripe's AUD minimum charge (50¢) on the card — a
