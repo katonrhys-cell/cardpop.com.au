@@ -561,7 +561,7 @@ const HomePage = () => {
             ))}
           </div>
           <p className="mt-4 text-center text-xs text-muted-foreground">
-            <Link to="/trust-safety" className="font-semibold text-primary hover:underline">
+            <Link to="/trust-safety" className="font-medium text-muted-foreground hover:text-foreground hover:underline">
               See how we keep every trade safe <ArrowRight className="inline h-3 w-3 align-[-1px]" />
             </Link>
           </p>
