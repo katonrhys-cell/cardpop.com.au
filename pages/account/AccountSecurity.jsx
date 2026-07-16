@@ -79,10 +79,18 @@ const TOTPSetup = ({ onComplete, onCancel }) => {
               Open <strong>Google Authenticator</strong>, <strong>Authy</strong>, or any TOTP app
               and scan this QR code. All are free to download.
             </p>
-            {/* QR code returned as SVG string from Supabase */}
-            <div
+            {/* QR code returned as an SVG string from Supabase. Render it via an
+                <img> data URI rather than dangerouslySetInnerHTML: an SVG loaded
+                through <img src> cannot execute scripts, so even if the source
+                were ever tampered with it can't become an XSS sink. */}
+            <img
+              src={
+                enrollment.totp.qr_code?.startsWith('data:')
+                  ? enrollment.totp.qr_code
+                  : `data:image/svg+xml;charset=utf-8,${encodeURIComponent(enrollment.totp.qr_code || '')}`
+              }
+              alt="Two-factor authentication QR code"
               className="w-48 h-48 mx-auto border rounded-xl p-2 bg-white"
-              dangerouslySetInnerHTML={{ __html: enrollment.totp.qr_code }}
             />
             <p className="text-xs text-center text-muted-foreground">
               Can't scan?{' '}
