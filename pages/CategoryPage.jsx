@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Loader2, PackageX } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
+import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { formatCurrency } from '@/utils/formatCurrency.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -35,7 +36,7 @@ const CategoryPage = () => {
 
         let query = supabase
           .from('listings')
-          .select('*, seller:profiles!seller_id(*)', { count: 'exact' })
+          .select(`*, seller:profiles!seller_id(${PUBLIC_PROFILE_COLUMNS})`, { count: 'exact' })
           .ilike('category', `%${categoryNameStr}%`)
           .eq('status', 'active')
           .range(from, from + perPage - 1);
