@@ -1278,6 +1278,46 @@ const STATIC_CONTENT = {
     ],
   },
 
+  '/safe-buying': {
+    title: "Safe Buying — Australia's Safest Place to Buy Trading Cards | CardPop™",
+    description: 'Buy Pokémon, Magic and sports cards safely in Australia. CardPop protects every order with secure Stripe payments (PCI-DSS), ID-verified sellers via Stripe Identity, and a 14-day Buyer Protection Guarantee.',
+    breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Safe Buying', path: '/safe-buying' }],
+    h1: 'Why CardPop Is Safe: Buyer Protection & Secure Payments',
+    intro: 'Buying trading cards online should never feel like a gamble. CardPop™ is built to be Australia’s safest place to buy Pokémon, Magic: The Gathering, Yu-Gi-Oh! and sports cards — every order is paid securely, backed by buyer protection, and handled by identity-verified members.',
+    sections: [
+      { h2: 'Every payment is secure', paras: [
+        'All purchases are processed by Stripe, a globally certified PCI-DSS Level 1 payment provider. Your card details are entered on Stripe’s encrypted checkout and never touch CardPop’s servers. You can pay with Visa, Mastercard, American Express, PayPal, Afterpay, Apple Pay, Google Pay or Stripe Link, all in Australian dollars — and CardPop memberships can also be billed securely through PayPal.',
+      ] },
+      { h2: 'Buyer protection on every order', paras: [
+        'Every purchase is backed by our 14-day Buyer Protection Guarantee. If your item doesn’t arrive within the expected timeframe, or is significantly not as described, you can request a full refund through our resolution process. You’re never left out of pocket for an order that goes wrong.',
+      ] },
+      { h2: 'You only trade with verified people', paras: [
+        'What makes CardPop safer than open marketplaces and social-media groups is that real, verified people stand behind every account. Sellers confirm their identity with a government-issued ID and a matching selfie through Stripe Identity before they can sell. Verified accounts carry a Verified badge, so you always know who you’re buying from — and fraudsters and throwaway accounts have nowhere to hide.',
+      ] },
+      { h2: 'Authentication for high-value cards', paras: [
+        'For high-value cards and trades, we offer middleman authentication: items ship to our facility where experts verify authenticity and condition before forwarding to the buyer. Both sides transact with total confidence.',
+      ] },
+      { h2: 'How to buy safely on CardPop', items: [
+        { text: 'Buy from verified sellers — look for the Verified badge on seller profiles.' },
+        { text: 'Pay through CardPop’s Stripe checkout — never send money off-platform, so your Buyer Protection always applies.' },
+        { text: 'Use authentication for big-ticket cards — add middleman authentication for peace of mind on high-value purchases.' },
+        { text: 'Keep communication on-platform — it keeps a record and keeps you protected.' },
+      ] },
+    ],
+    faqs: [
+      { q: 'Is CardPop a safe place to buy trading cards?', a: 'Yes. Every order is paid through Stripe’s PCI-DSS Level 1 checkout, backed by a 14-day Buyer Protection Guarantee, and sellers are identity-verified through Stripe Identity — so you buy Pokémon, Magic and sports cards from real, verified Australian sellers with a full refund if anything goes wrong.' },
+      { q: 'Where is the safest place to buy Pokémon cards in Australia?', a: 'CardPop is built specifically for safe trading-card transactions in Australia: secure Stripe payments in AUD, ID-verified sellers, buyer protection on every order, and optional middleman authentication for high-value cards — protections general marketplaces and social-media groups don’t offer.' },
+      { q: 'What if my card never arrives or isn’t as described?', a: 'You’re covered by our 14-day Buyer Protection Guarantee. Open a case through our resolution process and, if the item didn’t arrive or was significantly not as described, you’ll receive a full refund.' },
+      { q: 'How do I know the seller is genuine?', a: 'Sellers verify their identity with a government ID and a matching selfie through Stripe Identity before they can sell. Verified accounts carry a Verified badge, so you’re never trading with an anonymous or throwaway account.' },
+      { q: 'Are my payment details secure?', a: 'Yes. Payments are processed entirely on Stripe’s encrypted, PCI-DSS-compliant checkout. Your card details are never stored on or transmitted through CardPop’s servers.' },
+    ],
+    links: [
+      { text: 'Read our Trust & Safety policy', href: '/trust-safety' },
+      { text: 'Browse the Marketplace', href: '/marketplace' },
+      { text: 'Create your verified account', href: '/signup' },
+    ],
+  },
+
   '/privacy-policy': {
     title: 'Privacy Policy | CardPop',
     description: "CardPop's privacy policy — how we collect, use and protect your personal information on our Australian trading card marketplace.",

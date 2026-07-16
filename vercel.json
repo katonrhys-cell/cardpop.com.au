@@ -191,7 +191,7 @@
       "destination": "/api/prerender?path=/events/:slug"
     },
     {
-      "source": "/:page(about|contact|faq|privacy-policy|terms|returns|shipping|trust-safety|accessibility|community|australian-markets|insider-trading|analytics|blog)",
+      "source": "/:page(about|contact|faq|privacy-policy|terms|returns|shipping|trust-safety|safe-buying|accessibility|community|australian-markets|insider-trading|analytics|blog)",
       "has": [
         {
           "type": "header",

@@ -232,6 +232,7 @@ const ReturnsPage = lazy(() => import('@/pages/info/ReturnsPage.jsx'));
 const ShippingPage = lazy(() => import('@/pages/info/ShippingPage.jsx'));
 const TermsPage = lazy(() => import('@/pages/info/TermsPage.jsx'));
 const TrustSafetyPage = lazy(() => import('@/pages/info/TrustSafetyPage.jsx'));
+const SafeBuyingPage = lazy(() => import('@/pages/info/SafeBuyingPage.jsx'));
 const AccessibilityPage = lazy(() => import('@/pages/info/AccessibilityPage.jsx'));
 const DataDeletionPage = lazy(() => import('@/pages/info/DataDeletionPage.jsx'));
 const PhotographyStandardPage = lazy(() => import('@/pages/info/PhotographyStandardPage.jsx'));
@@ -439,6 +440,7 @@ const App = () => {
                         <Route path="/shipping" element={<ShippingPage />} />
                         <Route path="/terms" element={<TermsPage />} />
                         <Route path="/trust-safety" element={<TrustSafetyPage />} />
+                        <Route path="/safe-buying" element={<SafeBuyingPage />} />
                         <Route path="/accessibility" element={<AccessibilityPage />} />
                         <Route path="/data-deletion" element={<DataDeletionPage />} />
                         <Route path="/photography-standard" element={<PhotographyStandardPage />} />
