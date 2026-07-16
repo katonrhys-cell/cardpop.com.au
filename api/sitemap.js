@@ -92,6 +92,7 @@ const STATIC_PAGES = [
   { loc: '/returns',               lastmod: '2026-05-31', freq: 'yearly',  pri: '0.4' },
   { loc: '/shipping',              lastmod: '2026-05-31', freq: 'yearly',  pri: '0.4' },
   { loc: '/trust-safety',          lastmod: '2026-05-31', freq: 'yearly',  pri: '0.4' },
+  { loc: '/safe-buying',           lastmod: '2026-07-15', freq: 'monthly', pri: '0.7' },
   { loc: '/accessibility',         lastmod: '2026-05-31', freq: 'yearly',  pri: '0.3' },
   // Collection landing pages (config-driven, one per TCG/sport in
   // data/collectionSeo.js) — evergreen category pages worth indexing.

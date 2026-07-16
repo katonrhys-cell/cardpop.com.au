@@ -1,3 +1,5 @@
+import { slugify } from '@/lib/slugify.js';
+
 // Build and parse SEO-friendly slugs for the card analytics page.
 //
 // The analytics page used to live at `/analytics/card?name=…&set=…&price=…`,
@@ -11,16 +13,10 @@
 // demo price/change/image) still ride along as query params so in-app
 // navigation renders precise data; the slug is the SEO-facing, canonical part.
 
-// Lowercase, strip diacritics, collapse anything non-alphanumeric to single
-// hyphens. Keeps Pokémon accents (é → e) tidy and URL-safe.
-export const slugify = (str = '') =>
-  String(str)
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '') // drop combining accents
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .replace(/-{2,}/g, '-');
+// String → URL slug is the shared helper in lib/slugify.js — one source of
+// truth (also used by the marketplace/product/vault link builders). Re-exported
+// here so existing importers of this module keep working.
+export { slugify };
 
 // Identity slug for a card = name + set, slugified. Falls back to "card" so we
 // never emit an empty path segment.

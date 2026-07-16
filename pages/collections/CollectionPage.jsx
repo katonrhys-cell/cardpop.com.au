@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/lib/supabaseClient.js';
+import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
@@ -445,14 +446,14 @@ const CollectionPage = () => {
     const loadHolyGrail = async () => {
       try {
         let query = supabase.from('vault_items')
-          .select('*, vault_images(*), owner:profiles!vault_items_owner_id_fkey(*)')
+          .select(`*, vault_images(*), owner:profiles!vault_items_owner_id_fkey(${PUBLIC_PROFILE_COLUMNS})`)
           .eq('is_public', true)
           .gt('estimated_value_aud', 0)
           .order('estimated_value_aud', { ascending: false })
           .limit(6);
         if (categoryId) query = query.or(`category_id.eq.${categoryId},franchise_id.eq.${categoryId}`);
         const [pinned, { data: featured }] = await Promise.all([
-          fetchPinnedSectionItems(slug, 'holy_grail', '*, vault_images(*), owner:profiles!vault_items_owner_id_fkey(*)'),
+          fetchPinnedSectionItems(slug, 'holy_grail', `*, vault_images(*), owner:profiles!vault_items_owner_id_fkey(${PUBLIC_PROFILE_COLUMNS})`),
           query,
         ]);
         if (cancelled) return;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Twitter, Instagram, Facebook, Youtube } from 'lucide-react';
+import { Twitter, Instagram, Facebook, Youtube, ShieldCheck } from 'lucide-react';
 import CardPopLogo from '@/components/CardPopLogo.jsx';
 import NewsletterSignup from '@/components/NewsletterSignup.jsx';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
@@ -29,9 +29,18 @@ const Footer = () => {
             <Link to="/" className="inline-block mb-6 text-2xl">
               <CardPopLogo variant="full" iconClassName="w-8 h-[39px]" />
             </Link>
-            <p className="text-muted-foreground text-sm max-w-sm leading-relaxed mb-6">
+            <p className="text-muted-foreground text-sm max-w-sm leading-relaxed mb-4">
               The premier destination for collecting, trading, and analyzing trading cards and sports memorabilia.
             </p>
+
+            {/* Trust promo — secure payments, verified members, buyer protection */}
+            <Link
+              to="/trust-safety"
+              className="inline-flex items-center gap-2 mb-6 rounded-full border border-primary/30 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/10 transition-colors"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+              Secure payments · ID-verified members · Buyer protection
+            </Link>
 
             {/* Newsletter signup */}
             <div className="mb-6">
@@ -67,6 +76,7 @@ const Footer = () => {
               <li><Link to="/prices" className="hover:text-primary transition-colors">Card Prices (AUD)</Link></li>
               <li><Link to="/card-shops" className="hover:text-primary transition-colors">Card Shop Directory</Link></li>
               <li><Link to="/grading" className="hover:text-primary transition-colors">Grading Hub</Link></li>
+              <li><Link to="/safe-buying" className="hover:text-primary transition-colors">Safe Buying Guide</Link></li>
               <li><Link to="/photography-standard" className="hover:text-primary transition-colors">Photography Guide</Link></li>
             </ul>
           </div>
@@ -96,7 +106,7 @@ const Footer = () => {
               <li><Link to="/terms" className="hover:text-primary transition-colors">Terms of Service</Link></li>
               <li><Link to="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link></li>
               <li><Link to="/data-deletion" className="hover:text-primary transition-colors">Data Deletion</Link></li>
-              <li><Link to="/trust-safety" className="hover:text-primary transition-colors">Trust & Safety</Link></li>
+              <li><Link to="/trust-safety" className="hover:text-primary transition-colors">Buyer Protection & Safety</Link></li>
             </ul>
           </div>
         </div>

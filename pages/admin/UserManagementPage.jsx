@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient.js';
+import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { isVerified } from '@/utils/verification.js';
 import { apiServerClient as apiClient } from '@/lib/apiServerClient.js';
 import { toast } from 'sonner';
@@ -67,7 +68,7 @@ const UserManagementPage = () => {
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
-      let query = supabase.from('profiles').select('*', { count: 'exact' }).order('created_at', { ascending: false }).range((page - 1) * 20, page * 20 - 1);
+      let query = supabase.from('profiles').select(PUBLIC_PROFILE_COLUMNS, { count: 'exact' }).order('created_at', { ascending: false }).range((page - 1) * 20, page * 20 - 1);
 
       if (debouncedSearch) {
         query = query.or(`display_name.ilike.%${debouncedSearch}%,username.ilike.%${debouncedSearch}%`);

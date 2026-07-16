@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef, useMemo 
 import { supabase } from '@/lib/supabaseClient.js';
 import apiServerClient from '@/lib/apiServerClient.js';
 import { isEntitled } from '@/config/subscription.js';
+import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 
 const AuthContext = createContext();
 
@@ -25,7 +26,7 @@ export const AuthProvider = ({ children }) => {
     if (!userId) return null;
     const { data, error } = await supabase
       .from('profiles')
-      .select('*')
+      .select(PUBLIC_PROFILE_COLUMNS)
       .eq('id', userId)
       .single();
     if (error) console.warn('[AuthContext] fetchProfile error:', error.message);

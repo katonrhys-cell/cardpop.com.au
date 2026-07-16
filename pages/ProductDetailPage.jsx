@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { canViewVaultProduct } from '@/utils/vaultSecurityUtils.js';
 import { slugify } from '@/lib/slugify.js';
@@ -162,7 +163,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
         // Only the 'vault' source reaches here.
         const { data, error: fetchError } = await supabase
           .from('vault_items')
-          .select('*, owner:profiles!vault_items_owner_id_fkey(*)')
+          .select(`*, owner:profiles!vault_items_owner_id_fkey(${PUBLIC_PROFILE_COLUMNS})`)
           .eq('id', id)
           .single();
 
@@ -215,7 +216,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
           });
         } else if (data.owner_id) {
           try {
-            const { data: user } = await supabase.from('profiles').select('*').eq('id', data.owner_id).single();
+            const { data: user } = await supabase.from('profiles').select(PUBLIC_PROFILE_COLUMNS).eq('id', data.owner_id).single();
             if (isMounted) setSeller({ business_name: user?.display_name || user?.username || user?.full_name || 'Community Member', is_verified: user?.is_verified || false, type: 'user' });
           } catch (e) {
             if (isMounted) setSeller({ business_name: 'Community Member', is_verified: false, type: 'user' });

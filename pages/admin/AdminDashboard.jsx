@@ -117,7 +117,7 @@ const AdminDashboard = () => {
         if (filterCat) vaultQuery = vaultQuery.eq('category_id', filterCat);
 
         const [usersRes, ordersRes, tradesRes, sysHealth, vaultRes] = await Promise.all([
-          Promise.resolve(supabase.from('profiles').select('*', { count: 'exact' }).limit(1)).catch(() => ({ count: 0 })),
+          Promise.resolve(supabase.from('profiles').select('id', { count: 'exact', head: true })).catch(() => ({ count: 0 })),
           Promise.resolve(supabase.from('orders').select('total_aud').neq('status', 'cancelled')).catch(() => ({ data: [] })),
           Promise.resolve(supabase.from('listings').select('*', { count: 'exact' }).eq('status', 'active').limit(1)).catch(() => ({ count: 0 })),
           getSystemHealth().catch(() => ({ database: 'OK', storage: 'OK', api: 'OK', uptime: 'Unknown' })),

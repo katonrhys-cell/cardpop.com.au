@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import BackButton from '@/components/BackButton.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import {
   Star, ShieldCheck, MapPin, Calendar, ExternalLink, ShieldAlert,
   Package, MessageSquare, BadgeCheck, CheckCircle2, Truck, Heart, Zap, RotateCcw, Instagram,
@@ -62,7 +63,7 @@ const SoleTraderStorePage = () => {
       try {
         // Resolve by slug, or by UUID for legacy/back-compat links.
         const byUuid = UUID_RE.test(routeParam);
-        let profileQuery = supabase.from('profiles').select('*');
+        let profileQuery = supabase.from('profiles').select(PUBLIC_PROFILE_COLUMNS);
         profileQuery = byUuid
           ? profileQuery.eq('id', routeParam)
           : profileQuery.eq('store_slug', routeParam);

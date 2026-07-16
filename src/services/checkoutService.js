@@ -4,7 +4,7 @@ import logger from '../utils/logger.js';
 import { calculateBreakdown } from './commissionService.js';
 import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
 import { validateWelcomeDiscount, buildWelcomeDiscount, reserveWelcomeDiscount } from './welcomeOfferService.js';
-import { ensureWalletCustomer, getWalletBalanceCents } from './walletService.js';
+import { ensureWalletCustomer, getWalletBalanceCents, assertNoOpenWalletCheckout } from './walletService.js';
 
 export async function createSingleItemCheckout(req, res) {
   try {
@@ -162,6 +162,8 @@ export async function createSingleItemCheckout(req, res) {
       // payment actually completes (never pre-emptively, in case checkout is
       // abandoned).
       walletCustomerId = await ensureWalletCustomer(stripe, userId, { email });
+      // Prevent double-spend: refuse a new wallet checkout while one is still open.
+      await assertNoOpenWalletCheckout(stripe, walletCustomerId);
       const buyerTotalCents = Math.round(buyerTotal * 100);
       const availableCents = await getWalletBalanceCents(stripe, userId);
       // Leave at least Stripe's AUD minimum charge (50¢) on the card — a
@@ -206,6 +208,6 @@ export async function createSingleItemCheckout(req, res) {
   } catch (err) {
     const code = err.statusCode || 500;
     if (code === 500) logger.error(`[STRIPE] create-checkout error: ${err.message}`);
-    res.status(code).json({ error: err.message });
+    res.status(code).json({ error: code === 500 ? 'Something went wrong. Please try again.' : err.message });
   }
 }

@@ -207,6 +207,9 @@ const VerifyIdentityPage = () => {
       <div className="mt-6 text-center text-sm text-muted-foreground">
         <Link to={nextPath} className="hover:underline">Skip for now</Link>
         <p className="mt-2 text-xs">You can verify any time from Account → Verification. Selling requires a verified identity.</p>
+        <p className="mt-2 text-xs">
+          <Link to="/trust-safety" className="text-primary hover:underline">Why we ask for your ID →</Link>
+        </p>
       </div>
     </Panel>
   );

@@ -191,7 +191,7 @@
       "destination": "/api/prerender?path=/events/:slug"
     },
     {
-      "source": "/:page(about|contact|faq|privacy-policy|terms|returns|shipping|trust-safety|accessibility|community|australian-markets|insider-trading|analytics|blog)",
+      "source": "/:page(about|contact|faq|privacy-policy|terms|returns|shipping|trust-safety|safe-buying|accessibility|community|australian-markets|insider-trading|analytics|blog)",
       "has": [
         {
           "type": "header",
@@ -414,7 +414,7 @@
         },
         {
           "key": "Permissions-Policy",
-          "value": "camera=(), microphone=(), geolocation=(), payment=()"
+          "value": "camera=(), microphone=(), geolocation=(), payment=(self \"https://js.stripe.com\")"
         },
         {
           "key": "Strict-Transport-Security",
@@ -422,7 +422,7 @@
         },
         {
           "key": "Cross-Origin-Opener-Policy",
-          "value": "same-origin"
+          "value": "same-origin-allow-popups"
         },
         {
           "key": "Content-Security-Policy",
@@ -455,7 +455,7 @@
         },
         {
           "key": "Permissions-Policy",
-          "value": "camera=(), microphone=(), geolocation=(), payment=()"
+          "value": "camera=(), microphone=(), geolocation=(), payment=(self \"https://js.stripe.com\")"
         },
         {
           "key": "Strict-Transport-Security",
@@ -463,7 +463,7 @@
         },
         {
           "key": "Cross-Origin-Opener-Policy",
-          "value": "same-origin"
+          "value": "same-origin-allow-popups"
         },
         {
           "key": "Content-Security-Policy",

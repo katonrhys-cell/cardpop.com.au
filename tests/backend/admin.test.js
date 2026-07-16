@@ -19,6 +19,13 @@ vi.mock('../../src/middleware/auth.js', () => ({
   authMiddleware: (req, _res, next) => { req.user = { id: 'admin-1' }; next(); },
   isAdminUser: mockIsAdminUser,
 }));
+// The server-side MFA (AAL2) gate is covered by its own unit test
+// (requireAal2.test.js); stub it to a pass-through here so these tests stay
+// focused on the admin authorization logic.
+vi.mock('../../src/middleware/requireAal2.js', () => ({
+  requireAal2: (_req, _res, next) => next(),
+  default: (_req, _res, next) => next(),
+}));
 
 import adminRouter from '../../src/routes/admin.js';
 

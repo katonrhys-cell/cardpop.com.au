@@ -12,7 +12,9 @@ const mockStripe = vi.hoisted(() => ({
     retrieve: vi.fn(),
     createBalanceTransaction: vi.fn(),
   },
-  checkout: { sessions: { create: vi.fn(), retrieve: vi.fn() } },
+  // list() backs the wallet double-spend guard (assertNoOpenWalletCheckout);
+  // default to no open sessions so the wallet checkout path proceeds.
+  checkout: { sessions: { create: vi.fn(), retrieve: vi.fn(), list: vi.fn().mockResolvedValue({ data: [] }) } },
   coupons: { create: vi.fn() },
   webhooks: { constructEvent: vi.fn() },
 }));

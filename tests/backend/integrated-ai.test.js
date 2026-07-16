@@ -7,20 +7,23 @@ vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
+// Mutable auth state so a test can simulate an unauthenticated caller.
+// supabaseAuth is optional in production (never 401s — only populates userId).
+const authState = vi.hoisted(() => ({ userId: 'user-1' }));
 vi.mock('../../src/middleware/supabase-auth.js', () => ({
-  supabaseAuth: (req, _res, next) => { req.userId = 'user-1'; next(); },
+  supabaseAuth: (req, _res, next) => { if (authState.userId) req.userId = authState.userId; next(); },
 }));
 
 vi.mock('../../src/middleware/integrated-ai-rate-limit.js', () => ({
   integratedAiRateLimit: (_req, _res, next) => next(),
 }));
 
-let mockFiles = [];
+// The upload middleware is a spy so tests can assert it does NOT run for an
+// unauthenticated request (the request body must never be buffered).
+const uploadState = vi.hoisted(() => ({ files: [] }));
+const uploadInner = vi.hoisted(() => vi.fn((req, _res, next) => { req.files = uploadState.files; next(); }));
 vi.mock('../../src/middleware/file-upload.js', () => ({
-  uploadFiles: vi.fn().mockImplementation(() => (req, _res, next) => {
-    req.files = mockFiles;
-    next();
-  }),
+  uploadFiles: vi.fn(() => uploadInner),
 }));
 
 const mockStream = vi.hoisted(() => vi.fn());
@@ -62,7 +65,8 @@ const app = makeApp();
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockFiles = [];
+  uploadState.files = [];
+  authState.userId = 'user-1';
 });
 
 // ─── POST /stream ─────────────────────────────────────────────────────────────
@@ -121,14 +125,14 @@ describe('POST /stream', () => {
   });
 
   it('appends image content blocks when files are present', async () => {
-    mockFiles = [{ buffer: Buffer.from('img'), mimetype: 'image/jpeg', originalname: 'card.jpg' }];
+    uploadState.files = [{ buffer: Buffer.from('img'), mimetype: 'image/jpeg', originalname: 'card.jpg' }];
     mockUploadImagesToSupabase.mockResolvedValue(['https://storage.example.com/card.jpg']);
     mockStream.mockResolvedValue(makeSseStream());
 
     const userMessage = [{ type: 'text', text: 'What is this card?' }];
     await request(app).post('/stream').send({ message: JSON.stringify(userMessage) });
 
-    expect(mockUploadImagesToSupabase).toHaveBeenCalledWith({ images: mockFiles });
+    expect(mockUploadImagesToSupabase).toHaveBeenCalledWith({ images: uploadState.files });
     const { userMessage: sent } = mockStream.mock.calls[0][0];
     expect(sent).toHaveLength(2);
     expect(sent[1]).toEqual(
@@ -143,6 +147,17 @@ describe('POST /stream', () => {
     await request(app).post('/stream').send({ message: JSON.stringify(userMessage) });
 
     expect(mockUploadImagesToSupabase).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unauthenticated request with 401 before the upload middleware runs', async () => {
+    authState.userId = null;
+    const res = await request(app)
+      .post('/stream')
+      .send({ message: JSON.stringify([{ type: 'text', text: 'hi' }]) });
+    expect(res.status).toBe(401);
+    // The body must never be buffered for an anonymous caller.
+    expect(uploadInner).not.toHaveBeenCalled();
+    expect(mockStream).not.toHaveBeenCalled();
   });
 
   it('returns 500 when stream throws', async () => {

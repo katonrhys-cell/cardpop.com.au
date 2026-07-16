@@ -72,17 +72,81 @@ async function flagDoubleSale({ listingId, orderId, buyerId }) {
 }
 
 /**
+ * The amount Stripe actually charged doesn't match the order total we computed.
+ * checkout.session.completed means the money was already captured, so refund it
+ * and alert admins (and the buyer). Amounts are server-derived, so this should
+ * never fire for a legitimate order — a hit is a genuine anomaly, and the old
+ * behaviour (mark failed / silently return) left the buyer charged with no
+ * refund and no alert.
+ */
+async function flagAmountMismatch({ stripe, session, orderId, buyerId, amountCents, expectedCents }) {
+  logger.error(`[STRIPE] Amount mismatch on session ${session.id}: charged ${amountCents}¢ vs expected ${expectedCents}¢ (order ${orderId || 'n/a'}) — refunding`);
+
+  const paymentIntentId = typeof session.payment_intent === 'string'
+    ? session.payment_intent
+    : (session.payment_intent?.id ?? null);
+  if (paymentIntentId) {
+    try {
+      await stripe.refunds.create({ payment_intent: paymentIntentId });
+    } catch (e) {
+      logger.error(`[STRIPE] Auto-refund failed for mismatched session ${session.id}: ${e.message} — needs manual refund`);
+    }
+  }
+
+  // Best-effort notifications — never let a notify failure re-throw and turn a
+  // handled mismatch into a webhook 500 (which Stripe would retry).
+  try {
+    const { data: admins } = await supabase.from('profiles').select('id').eq('is_admin', true);
+    if (admins?.length) {
+      await supabase.from('notifications').insert(admins.map(a => ({
+        user_id: a.id,
+        type: 'order_amount_mismatch',
+        title: 'Payment amount mismatch — auto-refunded',
+        body: `Session ${session.id} charged $${(amountCents / 100).toFixed(2)} but expected $${(expectedCents / 100).toFixed(2)} (order ${orderId || 'n/a'}). An automatic refund was attempted — verify it settled.`,
+      })));
+    }
+    if (buyerId) {
+      await supabase.from('notifications').insert({
+        user_id: buyerId,
+        type: 'order_refund_pending',
+        title: 'Refund on the way',
+        body: 'We hit a problem confirming your order total, so your payment is being refunded in full — no action needed.',
+      });
+    }
+  } catch (e) {
+    logger.warn(`[STRIPE] mismatch notification failed for session ${session.id}: ${e.message}`);
+  }
+}
+
+/**
  * Handle checkout.session.completed event
  * Processes both cart orders (pre-created 'pending') and single-item orders
  */
 async function handleCheckoutSessionCompleted(session, stripe) {
-  logger.info(`[STRIPE] checkout.session.completed: ${session.id}`);
+  logger.info(`[STRIPE] checkout.session.completed: ${session.id} (payment_status=${session.payment_status ?? 'n/a'})`);
 
-  const { data: existing } = await supabase
+  // Delayed/asynchronous payment methods fire checkout.session.completed while
+  // the payment is still 'unpaid'/'processing'; it settles later via
+  // checkout.session.async_payment_succeeded (which routes back here). Only
+  // fulfil once actually paid, so we never claim the listing, decrement stock,
+  // pay the seller or email a receipt for money that was never captured.
+  // (payment_status is absent in older API versions / unit tests → treat as paid
+  // to preserve existing behaviour.)
+  if (session.payment_status && session.payment_status !== 'paid') {
+    logger.info(`[STRIPE] Session ${session.id} not paid yet (payment_status=${session.payment_status}) — deferring fulfilment`);
+    return;
+  }
+
+  const { data: existing, error: existingErr } = await supabase
     .from('orders')
     .select('id, status, total_aud, order_items, buyer_id, buyer_email, item_price_aud, gst_aud, platform_fee_aud, discount_aud, shipping_aud, created_at, shipping_name, shipping_address, shipping_suburb, shipping_state, shipping_postcode')
     .eq('stripe_session_id', session.id)
     .maybeSingle();
+
+  // A transient DB error must NOT be mistaken for "no order found" — that would
+  // route a cart session into the single-item path (and reject it). Throw so the
+  // webhook returns 500 and Stripe retries rather than silently 200-ing.
+  if (existingErr) throw new Error(`Order lookup failed for session ${session.id}: ${existingErr.message}`);
 
   if (existing && existing.status !== 'pending') {
     logger.info(`[STRIPE] Order already processed for session ${session.id}, skipping`);
@@ -103,6 +167,7 @@ async function handleCartOrder(existing, session, stripe) {
   if (Math.abs(amountCents - expectedCents) > 2) {
     logger.error(`[STRIPE] Cart amount mismatch for ${session.id}: Stripe=${amountCents}¢ expected=${expectedCents}¢ — marking failed`);
     await supabase.from('orders').update({ status: 'payment_failed' }).eq('id', existing.id);
+    await flagAmountMismatch({ stripe, session, orderId: existing.id, buyerId: existing.buyer_id, amountCents, expectedCents });
     return;
   }
 
@@ -110,11 +175,15 @@ async function handleCartOrder(existing, session, stripe) {
     ? session.payment_intent
     : (session.payment_intent?.id ?? null);
 
-  const { data: claimed } = await supabase.from('orders')
+  const { data: claimed, error: claimErr } = await supabase.from('orders')
     .update({ status: 'payment_confirmed', stripe_payment_intent_id: cartPaymentIntentId })
     .eq('id', existing.id)
     .eq('status', 'pending')
     .select('id');
+
+  // Throw on a real error so Stripe retries; only treat a genuine empty result
+  // (no error, zero rows) as "already confirmed by a concurrent delivery".
+  if (claimErr) throw new Error(`Cart confirm CAS failed for session ${session.id}: ${claimErr.message}`);
 
   if (!claimed || claimed.length === 0) {
     logger.info(`[STRIPE] Cart order ${existing.id} already confirmed concurrently for session ${session.id}, skipping`);
@@ -338,6 +407,7 @@ async function handleSingleItemOrder(session, stripe) {
   const expectedTotalCents = Math.round((itemPrice + commissionAud + gstAud - discountAud) * 100);
   if (Math.abs(amountCents - expectedTotalCents) > 2) {
     logger.error(`[STRIPE] Amount mismatch for session ${session.id}: Stripe=${amountCents}¢ expected=${expectedTotalCents}¢ — order rejected`);
+    await flagAmountMismatch({ stripe, session, orderId: null, buyerId: userId, amountCents, expectedCents: expectedTotalCents });
     return;
   }
 

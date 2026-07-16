@@ -159,4 +159,40 @@ describe('MCP server', () => {
 		expect(res.status).toBe(405);
 		expect(res.headers.allow).toBe('POST');
 	});
+
+	// ─── batch handling ─────────────────────────────────────────────────────────
+
+	it('processes a batch and preserves per-message order', async () => {
+		const batch = [
+			{ jsonrpc: '2.0', id: 'a', method: 'ping' },
+			{ jsonrpc: '2.0', id: 'b', method: 'tools/list' },
+			{ jsonrpc: '2.0', id: 'c', method: 'ping' },
+		];
+		const res = await rpc(batch);
+		expect(res.status).toBe(200);
+		expect(res.body.map((r) => r.id)).toEqual(['a', 'b', 'c']);
+	});
+
+	it('rejects an empty batch', async () => {
+		const res = await rpc([]);
+		expect(res.status).toBe(400);
+		expect(res.body.error.code).toBe(-32600);
+	});
+
+	it('rejects an oversized batch without processing any message (DoS guard)', async () => {
+		const batch = Array.from({ length: 21 }, (_, i) => ({ jsonrpc: '2.0', id: i, method: 'ping' }));
+		const res = await rpc(batch);
+		expect(res.status).toBe(400);
+		expect(res.body.error.code).toBe(-32600);
+		expect(res.body.error.message).toMatch(/too large/i);
+		// No tool/DB work should have been attempted for a rejected batch.
+		expect(mockSupabase.from).not.toHaveBeenCalled();
+	});
+
+	it('accepts a batch exactly at the limit', async () => {
+		const batch = Array.from({ length: 20 }, (_, i) => ({ jsonrpc: '2.0', id: i, method: 'ping' }));
+		const res = await rpc(batch);
+		expect(res.status).toBe(200);
+		expect(res.body).toHaveLength(20);
+	});
 });
