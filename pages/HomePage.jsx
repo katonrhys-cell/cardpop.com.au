@@ -95,8 +95,8 @@ const TRUST_SIGNALS = [
   },
   {
     icon: Package,
-    title: '14-day buyer protection',
-    body: 'A full refund if your item never arrives or isn\'t as described.',
+    title: 'Buyer Protection',
+    body: 'A full refund within 14 days if your item never arrives or isn\'t as described.',
   },
 ];
 
