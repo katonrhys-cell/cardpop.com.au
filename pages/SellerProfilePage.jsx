@@ -53,6 +53,7 @@ const SellerProfilePage = () => {
           return {
           id: c.id,
           source: 'vault',
+          name: c.card_name || 'Vault Card',
           title: c.card_name || 'Vault Card',
           collectionType: c.collection,
           condition: c.condition,
@@ -105,6 +106,16 @@ const SellerProfilePage = () => {
       </div>
     );
   }
+
+  // Break active listings down by intent. "For Sale & Trade" items carry their
+  // own badge so they live under For Sale (they have a price) rather than being
+  // duplicated into both sections.
+  const forSaleListings = products.filter(
+    (p) => p.listing_type === 'For Sale' || p.listing_type === 'For Sale & Trade'
+  );
+  const forTradeListings = products.filter(
+    (p) => p.listing_type === 'For Trade' || p.listing_type === 'Expression of Interest'
+  );
 
   return (
     <>
@@ -172,25 +183,47 @@ const SellerProfilePage = () => {
               </CardContent>
             </Card>
 
-            <section className="mb-16">
-              <h2 className="font-serif text-2xl md:text-3xl font-bold mb-8 text-foreground">Active Listings</h2>
-              {products.length === 0 ? (
+            {products.length === 0 ? (
+              <section className="mb-16">
+                <h2 className="font-serif text-2xl md:text-3xl font-bold mb-8 text-foreground">Active Listings</h2>
                 <div className="bg-card p-12 text-center rounded-3xl border border-border border-dashed shadow-sm">
                   <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
                   <p className="text-foreground font-bold">No active listings at the moment</p>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {products.map((product, i) => (
-                    <ProductCard
-                      key={product.id}
-                      product={product}
-                      priority={i < 2}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
+              </section>
+            ) : (
+              <>
+                {forSaleListings.length > 0 && (
+                  <section className="mb-16">
+                    <h2 className="font-serif text-2xl md:text-3xl font-bold mb-8 text-foreground">For Sale</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                      {forSaleListings.map((product, i) => (
+                        <ProductCard
+                          key={product.id}
+                          product={product}
+                          priority={i < 2}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {forTradeListings.length > 0 && (
+                  <section className="mb-16">
+                    <h2 className="font-serif text-2xl md:text-3xl font-bold mb-8 text-foreground">For Trade or Expression of Interest</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                      {forTradeListings.map((product, i) => (
+                        <ProductCard
+                          key={product.id}
+                          product={product}
+                          priority={i < 2}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )}
+              </>
+            )}
 
             <section className="mb-16">
               <h2 className="font-serif text-2xl md:text-3xl font-bold mb-8 text-foreground">Events</h2>
