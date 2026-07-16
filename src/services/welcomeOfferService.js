@@ -215,6 +215,48 @@ export function welcomeDiscountCents(offer, itemsCents) {
   return Math.round(itemsCents * Number(offer.discount_pct) / 100);
 }
 
+// A reservation older than this is treated as abandoned and reclaimable — a
+// safety net so a missed checkout.session.expired webhook can't lock a buyer
+// out of their own welcome discount indefinitely.
+const RESERVATION_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+/**
+ * Atomically claim the one-time welcome discount for a single in-flight
+ * checkout. Prevents applying it to several concurrent checkouts (each of which
+ * would otherwise mint its own platform-funded coupon). Throws httpError(409) if
+ * the offer is already reserved by another live checkout.
+ *
+ * Race-free: the conditional UPDATE is a compare-and-swap — Postgres row locking
+ * serialises concurrent calls, so the second sees the just-set reservation and
+ * matches zero rows. Call ONLY at real checkout-session creation (never on the
+ * price-preview path, which must not consume the offer).
+ */
+export async function reserveWelcomeDiscount(offerId) {
+  const staleBefore = new Date(Date.now() - RESERVATION_TTL_MS).toISOString();
+  const { data } = await supabase
+    .from('welcome_offers')
+    .update({ discount_reserved_at: new Date().toISOString() })
+    .eq('id', offerId)
+    .is('discount_redeemed_at', null)
+    .or(`discount_reserved_at.is.null,discount_reserved_at.lt.${staleBefore}`)
+    .select('id')
+    .maybeSingle();
+  if (!data) {
+    throw httpError(409, 'A checkout using your welcome code is already in progress. Please finish or cancel it before starting another.');
+  }
+}
+
+/** Release a welcome-discount reservation (e.g. when its checkout session expires). */
+export async function releaseWelcomeDiscount(offerId) {
+  if (!offerId) return;
+  const { error } = await supabase
+    .from('welcome_offers')
+    .update({ discount_reserved_at: null })
+    .eq('id', offerId)
+    .is('discount_redeemed_at', null);
+  if (error) logger.warn(`[WELCOME] Failed to release reservation for offer ${offerId}: ${error.message}`);
+}
+
 /**
  * Create the single-use Stripe coupon carrying the discount for one checkout
  * session. Amount-off (not percent-off) so platform fees and the GST line are

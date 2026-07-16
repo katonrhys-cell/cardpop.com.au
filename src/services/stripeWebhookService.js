@@ -2,7 +2,7 @@ import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { sendOrderConfirmed, sendItemSold } from '../utils/emailService.js';
 import { payoutSeller } from './payoutService.js';
-import { markWelcomeDiscountRedeemed } from './welcomeOfferService.js';
+import { markWelcomeDiscountRedeemed, releaseWelcomeDiscount } from './welcomeOfferService.js';
 import { recordShopOrderReferral } from './partnerService.js';
 import { debitWalletForOrder } from './walletService.js';
 import { subscribeToNewsletter } from '../utils/newsletter.js';
@@ -604,6 +604,11 @@ async function handlePaymentFailed(paymentIntent) {
  */
 async function handleCheckoutSessionExpired(session) {
   logger.info(`[STRIPE] checkout.session.expired: ${session.id}`);
+  // Free the one-time welcome discount this abandoned checkout had reserved, so
+  // the buyer can use it on a later order.
+  if (session.metadata?.welcomeOfferId) {
+    await releaseWelcomeDiscount(session.metadata.welcomeOfferId);
+  }
   const { data: cancelled } = await supabase
     .from('orders')
     .update({ status: 'cancelled' })
