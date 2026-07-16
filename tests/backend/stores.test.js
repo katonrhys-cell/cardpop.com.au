@@ -3,10 +3,15 @@ import express from 'express';
 import request from 'supertest';
 
 const mockSupabase = vi.hoisted(() => ({ from: vi.fn() }));
+const mockIsAdminUser = vi.hoisted(() => vi.fn());
 
 vi.mock('../../src/utils/supabaseClient.js', () => ({ default: mockSupabase, supabase: mockSupabase }));
 vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+vi.mock('../../src/middleware/auth.js', () => ({
+  authMiddleware: (req, _res, next) => { req.user = { id: 'admin-1' }; next(); },
+  isAdminUser: mockIsAdminUser,
 }));
 
 import storesRouter from '../../src/routes/stores.js';
@@ -32,6 +37,7 @@ function makeBuilder(result = { data: null, error: null }) {
 let builders;
 beforeEach(() => {
   vi.clearAllMocks();
+  mockIsAdminUser.mockResolvedValue(true);
   builders = [];
   mockSupabase.from.mockImplementation(() => {
     const next = builders.shift();
@@ -134,5 +140,25 @@ describe('POST /stores/submit', () => {
 
     await request(app).post('/submit').send({ ...validBody, categories: ['pokemon', 'weapons'] });
     expect(insert.insert.mock.calls[0][0].categories).toEqual(['pokemon']);
+  });
+});
+
+describe('GET /stores/admin', () => {
+  it('returns the full store list (including submitter_email) for an admin', async () => {
+    builders.push(makeBuilder({
+      data: [{ id: 's1', name: 'Top Deck', status: 'pending', submitter_email: 'owner@example.com' }],
+      error: null,
+    }));
+    const res = await request(app).get('/admin');
+    expect(res.status).toBe(200);
+    expect(res.body.stores).toHaveLength(1);
+    expect(res.body.stores[0].submitter_email).toBe('owner@example.com');
+  });
+
+  it('rejects a non-admin with 403 and runs no query', async () => {
+    mockIsAdminUser.mockResolvedValue(false);
+    const res = await request(app).get('/admin');
+    expect(res.status).toBe(403);
+    expect(mockSupabase.from).not.toHaveBeenCalled();
   });
 });
