@@ -170,6 +170,7 @@ and can be cleaned up.
 | `CORS_ORIGIN` | Express CORS (set to `https://cardpop.com.au`) |
 | `APP_URL` | App base URL |
 | `VITE_POKEMONTCG_API_KEY` | *(optional)* Pokémon TCG API key ([dev.pokemontcg.io](https://dev.pokemontcg.io)) for analytics card art (`utils/pokemonCardImage.js`) — blank works keyless (~1,000 req/day); a free key raises the limit to 20,000/day. Images are served from the API's own CDN, so they cost nothing against Supabase egress |
+| `VITE_CF_BEACON_TOKEN` | *(optional, build-time)* Cloudflare Web Analytics site token — `main.jsx` loads the RUM beacon itself so it passes the `strict-dynamic` CSP. **Keep the Cloudflare dashboard's "automatic setup" (edge auto-injection) switched OFF** — the injected snippet has no nonce/hash and is blocked by the CSP, producing console errors. Blank = beacon not loaded |
 | `VITE_IMAGE_CDN_HOST` | *(optional)* Image CDN host (e.g. CloudFront) — frontend image URLs |
 | `IMAGE_CDN_HOST` | *(optional)* Same host, for `api/prerender.js` og:image URLs |
 

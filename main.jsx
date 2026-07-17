@@ -158,6 +158,22 @@ const loadThirdPartyScripts = () => {
     document.head.appendChild(gtagScript);
   } catch { /* analytics is non-critical */ }
 
+  // Cloudflare Web Analytics (RUM beacon). Loaded here instead of Cloudflare's
+  // edge auto-injection: the auto-injected snippet carries no nonce/hash, so the
+  // `strict-dynamic` CSP blocks it — a script this app creates is trusted
+  // transitively. Requires the site token (Cloudflare dashboard → Web Analytics)
+  // and the dashboard auto-injection to be switched OFF; unset token = skipped.
+  const cfBeaconToken = import.meta.env.VITE_CF_BEACON_TOKEN;
+  if (cfBeaconToken) {
+    try {
+      const cfScript = document.createElement('script');
+      cfScript.defer = true;
+      cfScript.src = 'https://static.cloudflareinsights.com/beacon.min.js';
+      cfScript.setAttribute('data-cf-beacon', JSON.stringify({ token: cfBeaconToken }));
+      document.head.appendChild(cfScript);
+    } catch { /* analytics is non-critical */ }
+  }
+
   // Impact affiliate tracking
   try {
     (function (i, m, p, a, c, t) {
