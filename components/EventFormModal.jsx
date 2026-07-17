@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, UploadCloud, X, Wand2, Trash2, Plus, Tag } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
+import { apiServerClient } from '@/lib/apiServerClient.js';
 import { compressImage } from '@/utils/compressImage.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { slugify } from '@/lib/slugify.js';
@@ -343,15 +344,27 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       } else {
         // SEO-friendly slug for the event detail URL; suffix on collision
         payload.slug = `${slugify(formData.title)}-${formData.start_date}`;
-        let { error } = await supabase.from('events').insert(payload);
+        let { data: inserted, error } = await supabase.from('events').insert(payload).select('id').single();
         if (error?.code === '23505') {
           payload.slug = `${payload.slug}-${Math.random().toString(36).slice(2, 6)}`;
-          ({ error } = await supabase.from('events').insert(payload));
+          ({ data: inserted, error } = await supabase.from('events').insert(payload).select('id').single());
         }
         if (error) throw error;
         toast.success(isUserMode
           ? 'Event submitted! Our team will review it before it appears on the calendar.'
           : 'Event created successfully');
+
+        // Notify admins that a user submission is awaiting review. Fire-and-forget
+        // so a mail hiccup never blocks the (already-saved) submission.
+        if (isUserMode && inserted?.id) {
+          apiServerClient
+            .fetch('/events/notify-submission', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ eventId: inserted.id }),
+            })
+            .catch(() => {});
+        }
       }
 
       if (onSaved) onSaved();

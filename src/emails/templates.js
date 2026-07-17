@@ -255,6 +255,47 @@ ${summaryTable([
   );
 }
 
+// ─── Event submitted (admin notification) ────────────────────────────────────
+
+// Sent to the admin notification recipient when a user submits an event to the
+// community calendar. It's an internal heads-up, not a customer email, so it
+// links straight to the moderation queue rather than a public page.
+export function eventSubmittedEmail({ event }) {
+  const EVENT_TYPE_LABELS = {
+    card_show: 'Card Show',
+    trade_event: 'Trade Event',
+    community_event: 'Community Event',
+    lgs_event: 'LGS Event',
+  };
+  const location = [event.suburb, event.state].filter(Boolean).join(', ') || '—';
+  const startDate = event.start_date
+    ? new Date(event.start_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney' })
+    : '—';
+  const submittedBy = event.organizer_name
+    ? `${event.organizer_name}${event.organizer_email ? ` (${event.organizer_email})` : ''}`
+    : (event.organizer_email || '—');
+
+  const body = `<p>A community member has submitted a new event for review. It won't appear on the public calendar until you approve it.</p>
+${summaryTable([
+  ['Event', event.title || 'Untitled'],
+  ['Type', EVENT_TYPE_LABELS[event.event_type] || event.event_type || '—'],
+  ['Location', location],
+  ['Start date', startDate],
+  ['Submitted by', submittedBy],
+])}
+<p>Review it in the Events moderation queue to approve, edit, or reject the submission.</p>`;
+
+  return cpEmail(
+    `New event pending review: ${event.title || 'Untitled'}`,
+    'New Event Submission',
+    'A new event needs your review',
+    body,
+    'https://cardpop.com.au/admin/events',
+    'Review in Admin',
+    'You received this because you are the CardPop admin contact. Change the recipient under Admin → Platform Settings → Contact Email.',
+  );
+}
+
 // ─── Refund issued (seller) ───────────────────────────────────────────────────
 
 export function refundIssuedEmail({ sellerName, refundAmount, retainedFee, orderId }) {

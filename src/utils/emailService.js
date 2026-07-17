@@ -10,6 +10,7 @@ import {
   refundIssuedEmail,
   welcomeOfferEmail,
   launchWelcomeEmail,
+  eventSubmittedEmail,
 } from '../emails/templates.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -132,5 +133,15 @@ export async function sendRefundIssued({ sellerEmail, sellerName, refundAmount, 
     to: sellerEmail,
     subject: 'A refund was issued on your CardPop sale',
     html: refundIssuedEmail({ sellerName, refundAmount, retainedFee, orderId }),
+  });
+}
+
+// Admin heads-up when a user submits an event to the community calendar. Sent to
+// the configurable admin contact address, not to a customer.
+export async function sendEventSubmitted({ to, event }) {
+  return send({
+    to,
+    subject: `New event pending review: ${event?.title || 'Untitled'}`,
+    html: eventSubmittedEmail({ event }),
   });
 }
