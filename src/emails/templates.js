@@ -211,6 +211,35 @@ ${summaryTable([
   );
 }
 
+// ─── New order (admin notification) ──────────────────────────────────────────
+
+// Internal heads-up sent to the admin contact for every confirmed order, so
+// sales are visible without watching the dashboard. Links to Order Management,
+// not a customer-facing page.
+export function orderAdminNoticeEmail({ orderId, buyerName, buyerEmail, total, itemsSummary, sellerName }) {
+  const rows = [
+    ['Order', `#${String(orderId || '').slice(0, 8).toUpperCase() || '—'}`],
+    ['Items', itemsSummary || '—'],
+    ['Buyer', [buyerName, buyerEmail].filter(Boolean).join(' · ') || '—'],
+  ];
+  if (sellerName) rows.push(['Seller', sellerName]);
+  rows.push(['Total', `$${Number(total || 0).toFixed(2)} AUD`, true]);
+
+  const body = `<p>A new order was just placed and paid on CardPop.</p>
+${summaryTable(rows)}
+<p>Open Order Management to view the full details, buyer address, and fulfilment status.</p>`;
+
+  return cpEmail(
+    `New order received — $${Number(total || 0).toFixed(2)} AUD`,
+    'New Order',
+    'A new order has come in',
+    body,
+    'https://cardpop.com.au/admin/orders',
+    'View in Admin',
+    'You received this because you are the CardPop admin contact. Change the recipient under Admin → Platform Settings → Contact Email.',
+  );
+}
+
 // ─── Item sold (seller) ───────────────────────────────────────────────────────
 
 export function itemSoldEmail({ sellerName, cardName, itemPrice, commissionAud, gstAud, sellerProceeds, orderId }) {

@@ -11,6 +11,7 @@ import {
   welcomeOfferEmail,
   launchWelcomeEmail,
   eventSubmittedEmail,
+  orderAdminNoticeEmail,
 } from '../emails/templates.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -109,6 +110,16 @@ export async function sendOrderConfirmed({ buyerEmail, buyerName, cardName, item
     to: buyerEmail,
     subject: isTaxInvoice ? 'Your CardPop tax invoice & order confirmation' : 'Your CardPop purchase is confirmed!',
     html: orderConfirmedEmail({ buyerName, cardName, itemPrice, total, orderId, invoice }),
+  });
+}
+
+// Admin heads-up for every confirmed order. Sent to the configurable admin
+// contact address, not to the buyer or seller.
+export async function sendOrderAdminNotice({ to, orderId, buyerName, buyerEmail, total, itemsSummary, sellerName }) {
+  return send({
+    to,
+    subject: `New order received — $${Number(total || 0).toFixed(2)} AUD`,
+    html: orderAdminNoticeEmail({ orderId, buyerName, buyerEmail, total, itemsSummary, sellerName }),
   });
 }
 
