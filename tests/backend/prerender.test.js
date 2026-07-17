@@ -278,6 +278,29 @@ describe('prerender events', () => {
     expect(body).not.toContain('noindex');
   });
 
+  it('emits GA and presale offers when the event has both prices', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'presale-show', title: 'Presale Show', status: 'approved',
+      start_date: '2026-10-01', entry_fee_aud: 15, presale_fee_aud: 25, is_free: false,
+    } };
+    const { body } = await run('/events/presale-show');
+    expect(body).toContain('"offers":[{');
+    expect(body).toContain('"price":"15.00"');
+    expect(body).toContain('"name":"General admission"');
+    expect(body).toContain('"price":"25.00"');
+    expect(body).toContain('"name":"Presale / early bird"');
+  });
+
+  it('emits the presale offer alone when the GA price is unpublished', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'presale-only', title: 'Presale Only Show', status: 'approved',
+      start_date: '2026-10-01', entry_fee_aud: 0, presale_fee_aud: 40, is_free: false,
+    } };
+    const { body } = await run('/events/presale-only');
+    expect(body).toContain('"offers":{"@type":"Offer","price":"40.00"');
+    expect(body).toContain('"name":"Presale / early bird"');
+  });
+
   it('always emits offers, image, organizer, eventStatus and description for a sparse event', async () => {
     state.result = { data: {
       id: UUID, slug: 'tiny-meetup', title: 'Tiny Meetup', status: 'approved',

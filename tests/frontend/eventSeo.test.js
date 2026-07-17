@@ -4,6 +4,8 @@ import {
   youTubeEmbedUrl,
   youTubeThumbnailUrl,
   buildVideoJsonLd,
+  buildEventJsonLd,
+  formatEntryFee,
 } from '@/lib/eventSeo.js';
 
 describe('youTubeVideoId', () => {
@@ -72,5 +74,42 @@ describe('buildVideoJsonLd', () => {
     expect(buildVideoJsonLd({ ...event, youtube_url: null })).toBeNull();
     expect(buildVideoJsonLd({ ...event, youtube_url: 'https://vimeo.com/1' })).toBeNull();
     expect(buildVideoJsonLd(null)).toBeNull();
+  });
+});
+
+describe('formatEntryFee', () => {
+  it('formats free, GA-only, GA+presale and presale-only pricing', () => {
+    expect(formatEntryFee({ is_free: true })).toBe('Free entry');
+    expect(formatEntryFee({ entry_fee_aud: 15 })).toBe('$15.00 AUD');
+    expect(formatEntryFee({ entry_fee_aud: 15, presale_fee_aud: 25 }))
+      .toBe('$15.00 AUD (presale/early bird $25.00)');
+    expect(formatEntryFee({ presale_fee_aud: 40 })).toBe('Presale/early bird $40.00 AUD');
+    expect(formatEntryFee({})).toBe('See organiser for ticket pricing');
+  });
+});
+
+describe('buildEventJsonLd offers', () => {
+  const base = { slug: 'test-show', title: 'Test Show', start_date: '2026-10-01' };
+
+  it('emits a single GA offer when there is no presale price', () => {
+    const ld = buildEventJsonLd({ ...base, entry_fee_aud: 15 });
+    expect(ld.offers).toMatchObject({ '@type': 'Offer', price: 15, priceCurrency: 'AUD' });
+  });
+
+  it('emits GA + presale offers when both prices are known', () => {
+    const ld = buildEventJsonLd({ ...base, entry_fee_aud: 15, presale_fee_aud: 25 });
+    expect(ld.offers).toHaveLength(2);
+    expect(ld.offers[0]).toMatchObject({ name: 'General admission', price: 15 });
+    expect(ld.offers[1]).toMatchObject({ name: 'Presale / early bird', price: 25 });
+  });
+
+  it('emits the presale offer alone when the GA price is unpublished', () => {
+    const ld = buildEventJsonLd({ ...base, entry_fee_aud: 0, is_free: false, presale_fee_aud: 40 });
+    expect(ld.offers).toMatchObject({ '@type': 'Offer', name: 'Presale / early bird', price: 40 });
+  });
+
+  it('keeps the free-event offer at price 0 alongside a presale price', () => {
+    const ld = buildEventJsonLd({ ...base, is_free: true, presale_fee_aud: 10 });
+    expect(ld.offers[0]).toMatchObject({ name: 'General admission', price: 0 });
   });
 });
