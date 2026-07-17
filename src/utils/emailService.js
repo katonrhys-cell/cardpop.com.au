@@ -10,6 +10,8 @@ import {
   refundIssuedEmail,
   welcomeOfferEmail,
   launchWelcomeEmail,
+  eventSubmittedEmail,
+  orderAdminNoticeEmail,
 } from '../emails/templates.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -111,6 +113,16 @@ export async function sendOrderConfirmed({ buyerEmail, buyerName, cardName, item
   });
 }
 
+// Admin heads-up for every confirmed order. Sent to the configurable admin
+// contact address, not to the buyer or seller.
+export async function sendOrderAdminNotice({ to, orderId, buyerName, buyerEmail, total, itemsSummary, sellerName }) {
+  return send({
+    to,
+    subject: `New order received — $${Number(total || 0).toFixed(2)} AUD`,
+    html: orderAdminNoticeEmail({ orderId, buyerName, buyerEmail, total, itemsSummary, sellerName }),
+  });
+}
+
 export async function sendItemSold({ sellerEmail, sellerName, cardName, itemPrice, commissionAud, gstAud, sellerProceeds, orderId }) {
   await send({
     to: sellerEmail,
@@ -132,5 +144,15 @@ export async function sendRefundIssued({ sellerEmail, sellerName, refundAmount, 
     to: sellerEmail,
     subject: 'A refund was issued on your CardPop sale',
     html: refundIssuedEmail({ sellerName, refundAmount, retainedFee, orderId }),
+  });
+}
+
+// Admin heads-up when a user submits an event to the community calendar. Sent to
+// the configurable admin contact address, not to a customer.
+export async function sendEventSubmitted({ to, event }) {
+  return send({
+    to,
+    subject: `New event pending review: ${event?.title || 'Untitled'}`,
+    html: eventSubmittedEmail({ event }),
   });
 }

@@ -1,6 +1,7 @@
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
-import { sendOrderConfirmed, sendItemSold } from '../utils/emailService.js';
+import { sendOrderConfirmed, sendItemSold, sendOrderAdminNotice } from '../utils/emailService.js';
+import { getAdminNotificationEmail } from '../utils/adminNotificationRecipient.js';
 import { payoutSeller } from './payoutService.js';
 import { markWelcomeDiscountRedeemed, releaseWelcomeDiscount } from './welcomeOfferService.js';
 import { recordShopOrderReferral } from './partnerService.js';
@@ -14,6 +15,19 @@ async function getPlatformSetting(key, defaultValue) {
     .eq('key', key)
     .maybeSingle();
   return data?.value !== undefined ? data.value : defaultValue;
+}
+
+// Email the admin notification inbox about a confirmed order. Best-effort — a
+// mail failure must never re-throw and turn a fulfilled order into a webhook 500
+// (which Stripe would retry). Recipient is resolved from the admin Settings page
+// (dedicated Notification Email, then Contact Email, then a default inbox).
+async function notifyAdminOfOrder({ orderId, buyerName, buyerEmail, total, itemsSummary, sellerName }) {
+  try {
+    const to = await getAdminNotificationEmail();
+    await sendOrderAdminNotice({ to, orderId, buyerName, buyerEmail, total, itemsSummary, sellerName });
+  } catch (e) {
+    logger.warn(`[STRIPE] admin order notice failed for order ${orderId || 'n/a'}: ${e.message}`);
+  }
 }
 
 /**
@@ -370,6 +384,22 @@ async function handleCartOrder(existing, session, stripe) {
     }).catch(e => logger.warn(`[STRIPE] cart confirm email failed: ${e.message}`));
   }
 
+  // Admin heads-up for the confirmed order (every order, buyer email or not).
+  {
+    const itemCount = lines.reduce((n, l) => n + (l.quantity || 1), 0);
+    const names = lines.map(l => l.title || l.name || l.card_name).filter(Boolean);
+    const itemsSummary = names.length
+      ? `${itemCount} item${itemCount === 1 ? '' : 's'} — ${names.slice(0, 5).join(', ')}${names.length > 5 ? ', …' : ''}`
+      : `${itemCount} item${itemCount === 1 ? '' : 's'}`;
+    await notifyAdminOfOrder({
+      orderId: existing.id,
+      buyerName: receiptName,
+      buyerEmail: receiptEmail,
+      total: amountCents2 / 100,
+      itemsSummary,
+    });
+  }
+
   // Newsletter opt-in taken at checkout (guest or registered). Fired only now
   // that payment completed. Best-effort: a Kit failure never affects the order.
   if (session.metadata?.subscribeNewsletter === 'true') {
@@ -568,6 +598,16 @@ async function handleSingleItemOrder(session, stripe) {
       orderId,
     });
   }
+
+  // Admin heads-up for the confirmed order (independent of buyer/seller emails).
+  await notifyAdminOfOrder({
+    orderId,
+    buyerName: buyerProfile?.display_name || 'Collector',
+    buyerEmail: buyerProfile?.email || null,
+    total: amountCents / 100,
+    itemsSummary: cardName || 'Trading Card',
+    sellerName: sellerProfile?.display_name || null,
+  });
 
   if (sellerId && sellerProceeds > 0) {
     await payoutSeller(stripe, {

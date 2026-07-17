@@ -211,6 +211,35 @@ ${summaryTable([
   );
 }
 
+// ─── New order (admin notification) ──────────────────────────────────────────
+
+// Internal heads-up sent to the admin contact for every confirmed order, so
+// sales are visible without watching the dashboard. Links to Order Management,
+// not a customer-facing page.
+export function orderAdminNoticeEmail({ orderId, buyerName, buyerEmail, total, itemsSummary, sellerName }) {
+  const rows = [
+    ['Order', `#${String(orderId || '').slice(0, 8).toUpperCase() || '—'}`],
+    ['Items', itemsSummary || '—'],
+    ['Buyer', [buyerName, buyerEmail].filter(Boolean).join(' · ') || '—'],
+  ];
+  if (sellerName) rows.push(['Seller', sellerName]);
+  rows.push(['Total', `$${Number(total || 0).toFixed(2)} AUD`, true]);
+
+  const body = `<p>A new order was just placed and paid on CardPop.</p>
+${summaryTable(rows)}
+<p>Open Order Management to view the full details, buyer address, and fulfilment status.</p>`;
+
+  return cpEmail(
+    `New order received — $${Number(total || 0).toFixed(2)} AUD`,
+    'New Order',
+    'A new order has come in',
+    body,
+    'https://cardpop.com.au/admin/orders',
+    'View in Admin',
+    'You received this because you are the CardPop admin contact. Change the recipient under Admin → Platform Settings → Notification Email.',
+  );
+}
+
 // ─── Item sold (seller) ───────────────────────────────────────────────────────
 
 export function itemSoldEmail({ sellerName, cardName, itemPrice, commissionAud, gstAud, sellerProceeds, orderId }) {
@@ -252,6 +281,47 @@ ${summaryTable([
     `https://cardpop.com.au/orders/${orderId}`,
     'View Order',
     null,
+  );
+}
+
+// ─── Event submitted (admin notification) ────────────────────────────────────
+
+// Sent to the admin notification recipient when a user submits an event to the
+// community calendar. It's an internal heads-up, not a customer email, so it
+// links straight to the moderation queue rather than a public page.
+export function eventSubmittedEmail({ event }) {
+  const EVENT_TYPE_LABELS = {
+    card_show: 'Card Show',
+    trade_event: 'Trade Event',
+    community_event: 'Community Event',
+    lgs_event: 'LGS Event',
+  };
+  const location = [event.suburb, event.state].filter(Boolean).join(', ') || '—';
+  const startDate = event.start_date
+    ? new Date(event.start_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney' })
+    : '—';
+  const submittedBy = event.organizer_name
+    ? `${event.organizer_name}${event.organizer_email ? ` (${event.organizer_email})` : ''}`
+    : (event.organizer_email || '—');
+
+  const body = `<p>A community member has submitted a new event for review. It won't appear on the public calendar until you approve it.</p>
+${summaryTable([
+  ['Event', event.title || 'Untitled'],
+  ['Type', EVENT_TYPE_LABELS[event.event_type] || event.event_type || '—'],
+  ['Location', location],
+  ['Start date', startDate],
+  ['Submitted by', submittedBy],
+])}
+<p>Review it in the Events moderation queue to approve, edit, or reject the submission.</p>`;
+
+  return cpEmail(
+    `New event pending review: ${event.title || 'Untitled'}`,
+    'New Event Submission',
+    'A new event needs your review',
+    body,
+    'https://cardpop.com.au/admin/events',
+    'Review in Admin',
+    'You received this because you are the CardPop admin contact. Change the recipient under Admin → Platform Settings → Notification Email.',
   );
 }
 

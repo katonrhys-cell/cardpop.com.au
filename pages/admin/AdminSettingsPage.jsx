@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supabaseClient.js';
 const DEFAULT_SETTINGS = {
   site_name: 'CardPop',
   contact_email: 'support@cardpop.com.au',
+  notification_email: 'notifications@cardpop.com.au',
   maintenance_mode: false,
   listing_approval_required: false,
   max_images_per_listing: '10',
@@ -135,6 +136,12 @@ const AdminSettingsPage = () => {
               <div className="space-y-2">
                 <Label>Contact Email</Label>
                 <Input type="email" value={settings.contact_email} onChange={e => set('contact_email', e.target.value)} className="max-w-md bg-background" />
+                <p className="text-xs text-muted-foreground">Public support address shown to customers.</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Notification Email</Label>
+                <Input type="email" value={settings.notification_email} onChange={e => set('notification_email', e.target.value)} className="max-w-md bg-background" placeholder="notifications@cardpop.com.au" />
+                <p className="text-xs text-muted-foreground">Internal inbox for admin alerts — new orders and user event submissions. Falls back to the contact email if left blank.</p>
               </div>
               <div className="flex items-center justify-between max-w-md rounded-lg border border-border p-3 bg-muted/30">
                 <div className="space-y-0.5">

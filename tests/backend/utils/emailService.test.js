@@ -86,6 +86,29 @@ describe('emailService — sending', () => {
       .resolves.toBeUndefined();
   });
 
+  it('sends an admin order notice with the total in the subject', async () => {
+    const svc = await load({ withKey: true });
+    await svc.sendOrderAdminNotice({
+      to: 'admin@cardpop.com.au', orderId: 'order-9', buyerName: 'Ada',
+      buyerEmail: 'ada@x.com', total: 129.5, itemsSummary: '2 items — Charizard, Pikachu',
+    });
+    const payload = mockSend.mock.calls[0][0];
+    expect(payload.to).toBe('admin@cardpop.com.au');
+    expect(payload.subject).toBe('New order received — $129.50 AUD');
+    expect(payload.html).toContain('Charizard');
+  });
+
+  it('sends an event-submitted notice to the admin contact', async () => {
+    const svc = await load({ withKey: true });
+    await svc.sendEventSubmitted({
+      to: 'admin@cardpop.com.au',
+      event: { title: 'Sydney Card Show', event_type: 'card_show', suburb: 'Parramatta', state: 'NSW' },
+    });
+    const payload = mockSend.mock.calls[0][0];
+    expect(payload.to).toBe('admin@cardpop.com.au');
+    expect(payload.subject).toMatch(/Sydney Card Show/);
+  });
+
   it('reuses a single Resend client across multiple sends', async () => {
     const svc = await load({ withKey: true });
     await svc.sendOrderConfirmed({ buyerEmail: 'a@b.com', total: '$1' });
