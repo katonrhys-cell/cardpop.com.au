@@ -120,7 +120,8 @@ EXTRACT the following and GENERATE what cannot be found:
    - organizer_phone: contact phone if visible
    - website_url: event or organiser website URL
    - ticket_url: registration or ticket purchase URL (Eventbrite, Humanitix, Trybooking, etc.)
-   - entry_fee_aud: numeric entry fee in AUD (e.g. 5.00), or 0 if free
+   - entry_fee_aud: numeric general-admission entry fee in AUD (e.g. 5.00), or 0 if free
+   - presale_fee_aud: numeric presale/early-bird ticket price in AUD if a separate advance price is advertised, or null
    - is_free: true if the event is free to attend, false otherwise
    - capacity: expected attendance or venue capacity as integer, or null
    - registration_required: true if attendees must register in advance
@@ -159,6 +160,7 @@ JSON FORMAT:
   "website_url": "string or null",
   "ticket_url": "string or null",
   "entry_fee_aud": number or null,
+  "presale_fee_aud": number or null,
   "is_free": boolean,
   "capacity": number or null,
   "registration_required": boolean,

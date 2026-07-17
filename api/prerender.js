@@ -779,7 +779,7 @@ const eventIsoDate = (date, time) => {
 const EVENT_FIELDS =
   'id, slug, title, description, short_description, image_url, event_type, status, ' +
   'venue_name, address, suburb, state, postcode, start_date, end_date, start_time, end_time, ' +
-  'entry_fee_aud, is_free, website_url, ticket_url, youtube_url, organizer_name, seo_title, seo_description, ' +
+  'entry_fee_aud, presale_fee_aud, is_free, website_url, ticket_url, youtube_url, organizer_name, seo_title, seo_description, ' +
   'created_at, updated_at';
 
 // YouTube video id from any common URL shape — mirrors lib/eventSeo.js.
@@ -864,15 +864,31 @@ function buildEventLd(event) {
     // Card shows have no headline act, so the organising entity stands in as
     // the performing group (schema.org Event recommends a performer).
     performer: { '@type': 'Organization', name: organizerName },
-    offers: {
-      '@type': 'Offer',
-      price: event.is_free ? '0' : (Number(event.entry_fee_aud) > 0 ? Number(event.entry_fee_aud).toFixed(2) : '0'),
-      priceCurrency: 'AUD',
-      availability: 'https://schema.org/InStock',
-      url: event.ticket_url || event.website_url || canonical,
-      ...(event.created_at || startDate ? { validFrom: event.created_at || startDate } : {}),
-    },
+    offers: buildEventOffers(event, canonical, startDate),
   };
+}
+
+// One Offer for the general-admission price, plus a second when a separate
+// presale/early-bird price is known — or the presale Offer alone when the GA
+// price hasn't been published yet (mirrors lib/eventSeo.js).
+function buildEventOffers(event, canonical, startDate) {
+  const mkOffer = (price, name) => ({
+    '@type': 'Offer',
+    price,
+    priceCurrency: 'AUD',
+    availability: 'https://schema.org/InStock',
+    url: event.ticket_url || event.website_url || canonical,
+    ...(event.created_at || startDate ? { validFrom: event.created_at || startDate } : {}),
+    ...(name ? { name } : {}),
+  });
+  const presaleFee = Number(event.presale_fee_aud) > 0 ? Number(event.presale_fee_aud) : null;
+  if (!presaleFee) {
+    return mkOffer(event.is_free ? '0' : (Number(event.entry_fee_aud) > 0 ? Number(event.entry_fee_aud).toFixed(2) : '0'));
+  }
+  const presaleOffer = mkOffer(presaleFee.toFixed(2), 'Presale / early bird');
+  const gaKnown = event.is_free || Number(event.entry_fee_aud) > 0;
+  if (!gaKnown) return presaleOffer;
+  return [mkOffer(event.is_free ? '0' : Number(event.entry_fee_aud).toFixed(2), 'General admission'), presaleOffer];
 }
 
 async function renderEventsLanding(supabase, categorySlug) {

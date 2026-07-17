@@ -193,6 +193,10 @@ function validateAndNormalizeEventData(eventData) {
     ? (isNaN(Number(eventData.entry_fee_aud)) ? null : Number(eventData.entry_fee_aud))
     : null;
 
+  const presaleFee = (eventData.presale_fee_aud !== null && eventData.presale_fee_aud !== undefined)
+    ? (isNaN(Number(eventData.presale_fee_aud)) ? null : Number(eventData.presale_fee_aud))
+    : null;
+
   const capacity = (eventData.capacity !== null && eventData.capacity !== undefined)
     ? (isNaN(parseInt(eventData.capacity, 10)) ? null : parseInt(eventData.capacity, 10))
     : null;
@@ -237,6 +241,7 @@ function validateAndNormalizeEventData(eventData) {
     website_url: websiteUrl,
     ticket_url: ticketUrl,
     entry_fee_aud: entryFee,
+    presale_fee_aud: presaleFee,
     is_free: typeof eventData.is_free === 'boolean' ? eventData.is_free : (entryFee === 0 || entryFee === null),
     capacity,
     registration_required: typeof eventData.registration_required === 'boolean' ? eventData.registration_required : false,

@@ -67,6 +67,7 @@ const INITIAL_STATE = {
   facebook_url: '',
   youtube_url: '',
   entry_fee_aud: '',
+  presale_fee_aud: '',
   is_free: true,
   capacity: '',
   registration_required: false,
@@ -164,6 +165,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         instagram_url:       scrapedData.instagram_url || '',
         facebook_url:        scrapedData.facebook_url || '',
         entry_fee_aud:       scrapedData.entry_fee_aud != null ? String(scrapedData.entry_fee_aud) : scrapedData.price != null ? String(scrapedData.price) : '',
+        presale_fee_aud:     scrapedData.presale_fee_aud != null ? String(scrapedData.presale_fee_aud) : '',
         is_free:             scrapedData.is_free ?? (!scrapedData.entry_fee_aud && !scrapedData.price),
         capacity:            scrapedData.capacity != null ? String(scrapedData.capacity) : '',
         registration_required: scrapedData.registration_required || false,
@@ -214,6 +216,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         facebook_url:        event.facebook_url || '',
         youtube_url:         event.youtube_url || '',
         entry_fee_aud:       event.entry_fee_aud != null ? String(event.entry_fee_aud) : '',
+        presale_fee_aud:     event.presale_fee_aud != null ? String(event.presale_fee_aud) : '',
         is_free:             event.is_free ?? true,
         capacity:            event.capacity != null ? String(event.capacity) : '',
         registration_required: event.registration_required || false,
@@ -323,6 +326,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         facebook_url:        formData.facebook_url.trim() || null,
         youtube_url:         formData.youtube_url.trim() || null,
         entry_fee_aud:       formData.is_free ? 0 : (parseFloat(formData.entry_fee_aud) || 0),
+        presale_fee_aud:     formData.is_free ? null : (parseFloat(formData.presale_fee_aud) || null),
         is_free:             formData.is_free,
         capacity:            formData.capacity ? parseInt(formData.capacity, 10) : null,
         registration_required: formData.registration_required,
@@ -615,16 +619,22 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                 <div className="pt-2 border-t border-border space-y-5">
                   <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Entry & Capacity</p>
                   <div className="flex items-center gap-3 p-3 bg-muted/20 rounded-xl border border-border">
-                    <Switch checked={formData.is_free} onCheckedChange={v => { set('is_free', v); if (v) set('entry_fee_aud', ''); }} disabled={loading} />
+                    <Switch checked={formData.is_free} onCheckedChange={v => { set('is_free', v); if (v) { set('entry_fee_aud', ''); set('presale_fee_aud', ''); } }} disabled={loading} />
                     <div>
                       <p className="text-sm font-semibold">Free Entry</p>
                       <p className="text-xs text-muted-foreground">Toggle off to set an entry fee</p>
                     </div>
                   </div>
                   {!formData.is_free && (
-                    <div className="space-y-2">
-                      <Label htmlFor="entry_fee_aud" className="font-bold">Entry Fee (AUD)</Label>
-                      <Input id="entry_fee_aud" name="entry_fee_aud" type="number" min="0" step="0.01" value={formData.entry_fee_aud} onChange={handleChange} className={inputCls} placeholder="0.00" disabled={loading} />
+                    <div className="grid grid-cols-2 gap-5">
+                      <div className="space-y-2">
+                        <Label htmlFor="entry_fee_aud" className="font-bold">Entry Fee (AUD)</Label>
+                        <Input id="entry_fee_aud" name="entry_fee_aud" type="number" min="0" step="0.01" value={formData.entry_fee_aud} onChange={handleChange} className={inputCls} placeholder="0.00" disabled={loading} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="presale_fee_aud" className="font-bold">Presale / Early Bird (AUD)</Label>
+                        <Input id="presale_fee_aud" name="presale_fee_aud" type="number" min="0" step="0.01" value={formData.presale_fee_aud} onChange={handleChange} className={inputCls} placeholder="Optional" disabled={loading} />
+                      </div>
                     </div>
                   )}
                   <div className="grid grid-cols-2 gap-5">
