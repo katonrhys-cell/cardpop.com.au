@@ -8,15 +8,37 @@ import { supabase } from '@/lib/supabaseClient.js';
 // and emit a srcset so the browser picks the smallest sufficient file per
 // viewport/DPR.
 //
-// Image transformations are a paid Supabase feature. Rather than assume it's
-// enabled, this degrades gracefully: every result carries a `fallbackSrc` (the
-// untransformed public URL) and `CardImage` swaps to it if a transformed URL
-// fails to load. The first such failure flips a session flag so we stop
-// requesting transforms entirely — bounding the cost to ~1 wasted request if
-// the feature is off.
+// Image transformations are a paid Supabase feature. It is OFF by default here:
+// when it isn't enabled on the project the render endpoint 403s, and because a
+// card grid fires one transform request per image on first paint, every page
+// load produced a burst of 403s before falling back to the original. So we only
+// emit transform URLs when VITE_SUPABASE_IMAGE_TRANSFORMS is explicitly enabled;
+// otherwise `getCardImage` serves the untransformed public URL directly and
+// never touches /render/image.
+//
+// Even when enabled, this still degrades gracefully: every result carries a
+// `fallbackSrc` (the untransformed public URL) and `CardImage` swaps to it if a
+// transformed URL fails to load. The first such failure flips a session flag so
+// we stop requesting transforms entirely — bounding the cost to ~1 wasted
+// request if the feature turns out to be unavailable.
 
 const DEFAULT_BUCKET = 'vault-images';
 const DEFAULT_WIDTHS = [240, 400, 600];
+
+// Master switch for Supabase Storage image transformations (a paid feature).
+// Default OFF: unless VITE_SUPABASE_IMAGE_TRANSFORMS is truthy at build time we
+// never request the /render/image endpoint, so no 403s and no wasted first-load
+// requests. Flip this to `true` only once transformations are enabled on the
+// Supabase plan (Dashboard → Storage → Settings).
+function truthyEnv(v) {
+  return v === true || v === 'true' || v === '1';
+}
+let transformsEnabled = truthyEnv(import.meta.env?.VITE_SUPABASE_IMAGE_TRANSFORMS);
+
+// For tests — toggle the env-gated switch without stubbing import.meta.env.
+export function _setTransformsEnabledForTests(enabled) {
+  transformsEnabled = !!enabled;
+}
 
 // Optional image CDN in front of Supabase Storage (a Cloudflare Worker on
 // img.cardpop.com.au — see cloudflare/image-proxy-worker.js — or any host
@@ -179,8 +201,9 @@ export function getCardImage(pathOrUrl, opts = {}) {
   const canonicalSrc = supabase.storage.from(effectiveBucket).getPublicUrl(effectivePath).data.publicUrl;
   const fallbackSrc = toCdnUrl(canonicalSrc);
 
-  // Feature known-off this session → just serve the original.
-  if (transformsUnavailable) {
+  // Transforms disabled by config (default) or known-unavailable this session →
+  // serve the untransformed original directly and never hit /render/image.
+  if (!transformsEnabled || transformsUnavailable) {
     return { src: fallbackSrc, srcSet: null, fallbackSrc, canonicalSrc };
   }
 

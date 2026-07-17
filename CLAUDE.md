@@ -170,6 +170,7 @@ and can be cleaned up.
 | `CORS_ORIGIN` | Express CORS (set to `https://cardpop.com.au`) |
 | `APP_URL` | App base URL |
 | `VITE_POKEMONTCG_API_KEY` | *(optional)* Pokémon TCG API key ([dev.pokemontcg.io](https://dev.pokemontcg.io)) for analytics card art (`utils/pokemonCardImage.js`) — blank works keyless (~1,000 req/day); a free key raises the limit to 20,000/day. Images are served from the API's own CDN, so they cost nothing against Supabase egress |
+| `VITE_SUPABASE_IMAGE_TRANSFORMS` | *(optional, build-time)* `true` enables Supabase Storage image transformations (responsive `srcSet` resizing via `/render/image`) in `utils/imageUrl.js`. **Default off** — the render endpoint 403s unless transformations are enabled on the Supabase plan (Dashboard → Storage → Settings), and leaving it on spams the logs with 403s on every page load. Enable the plan feature first, then set this to `true`. See `docs/image-cdn.md` |
 | `VITE_IMAGE_CDN_HOST` | *(optional)* Image CDN host (e.g. CloudFront) — frontend image URLs |
 | `IMAGE_CDN_HOST` | *(optional)* Same host, for `api/prerender.js` og:image URLs |
 
