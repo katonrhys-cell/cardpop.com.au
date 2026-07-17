@@ -95,8 +95,12 @@ export function publicImageUrl(pathOrUrl, bucket = DEFAULT_BUCKET) {
   return toCdnUrl(supabase.storage.from(bucket).getPublicUrl(pathOrUrl).data.publicUrl);
 }
 
-// Session-scoped: set true the first time a transformed URL 404/errors.
-let transformsUnavailable = false;
+// Session-scoped: set true the first time a transformed URL 404/errors. Also
+// starts true when VITE_IMAGE_TRANSFORMS='off', so the app never requests
+// Supabase image transforms (a paid Pro feature) at all — it serves the
+// already-upload-compressed originals directly. Flip the env var (or remove it)
+// once transformations are enabled on the plan to resume right-sized delivery.
+let transformsUnavailable = import.meta.env.VITE_IMAGE_TRANSFORMS === 'off';
 
 export function markTransformsUnavailable() {
   transformsUnavailable = true;

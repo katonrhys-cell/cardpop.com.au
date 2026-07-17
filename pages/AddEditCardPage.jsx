@@ -646,12 +646,19 @@ const AddEditCardPage = () => {
     try {
       setIsUploadingTemplate(true);
       const blob = await previewUrlToBlob(previewUrl);
-      const filePath = `${currentUser.id}/template-${id}-${Date.now()}.jpg`;
+      // Compress before upload, mirroring the normal image path — the formatted
+      // blob is otherwise a full-size image. compressImage needs a File, so wrap
+      // the blob first; it returns a smaller File (or the original if not worth it).
+      const compressed = await compressImage(
+        new File([blob], `template-${id}.jpg`, { type: blob.type || 'image/jpeg' })
+      );
+      const fileExt = compressed.name.split('.').pop();
+      const filePath = `${currentUser.id}/template-${id}-${Date.now()}.${fileExt}`;
       const { error: uploadError } = await supabase.storage
         .from('vault-images')
-        .upload(filePath, blob, {
+        .upload(filePath, compressed, {
           upsert: true,
-          contentType: blob.type || 'image/jpeg',
+          contentType: compressed.type || 'image/jpeg',
           cacheControl: '31536000',
         });
       if (uploadError) throw uploadError;
