@@ -84,6 +84,92 @@ hostnames**, so there is no conflict:
    domain shows **Verified**, all transactional emails deliver again — no
    redeploy needed.
 
+## Supabase Auth email (SMTP via Resend)
+
+Supabase Auth — signup confirmation, **password reset / account recovery**,
+magic links, email-change confirmation — is a **separate pipeline** from the
+Resend SDK used for transactional mail. It is configured entirely in the
+**Supabase dashboard**, and **nothing in this repo changes it**: the app only
+calls `supabase.auth.resetPasswordForEmail(...)` (see
+`contexts/AuthContext.jsx` → `resetPassword`, and the backend
+`src/routes/auth/password.js` → `POST /auth/reset/request`). Whether the email
+actually *delivers* depends on which mailer Supabase Auth is pointed at.
+
+### Why you must use custom SMTP (don't rely on the built-in mailer)
+
+Out of the box, Supabase Auth uses its **built-in email service**, which is:
+
+- **Hard-capped at ~2 emails/hour** for the whole project, and
+- **explicitly not for production** — poor deliverability, and it sends from a
+  Supabase address (not `@cardpop.com.au`), so it fails our DMARC alignment and
+  gets junked.
+
+The failure mode is silent and confusing: `POST /recover` still returns **200**
+and the UI shows "recovery link is on its way", but no mail is sent once the cap
+is hit. The tell is in `auth.users` — a successful send stamps
+`recovery_sent_at` to *now*; if that column stays frozen in the past while the
+request returned 200, the mail was **dropped**, not sent. (A real SMTP send also
+shows up as a ~1–2s `/recover` duration in the auth logs and logs a
+`user_recovery_requested` auth event; the dropped built-in send completes in
+~150ms with no auth event.)
+
+The fix is to route Supabase Auth through **Resend over SMTP** — the same
+already-verified `cardpop.com.au` domain, so recovery mail gets proper DKIM/SPF
+alignment.
+
+### Setup
+
+1. **Create a dedicated Resend API key** — **Resend → API Keys → Create API
+   Key**, name it `supabase-auth-smtp`, permission **Sending access**, domain
+   `cardpop.com.au`. Copy the `re_…` value (shown once).
+
+   Use a **separate** key — not the one the Resend↔Vercel integration syncs into
+   `RESEND_API_KEY` (that powers the transactional SDK in
+   `src/utils/emailService.js`), and not the default "Onboarding" key. A
+   dedicated key means Supabase Auth can be rotated/revoked without knocking out
+   checkout/refund email, and Resend's logs attribute sends cleanly.
+
+2. **Supabase → Authentication → Emails → SMTP Settings → Enable Custom SMTP:**
+
+   | Field | Value |
+   |---|---|
+   | Host | `smtp.resend.com` |
+   | Port | `465` (SSL) or `587` (TLS) |
+   | Username | `resend` |
+   | Password | the `re_…` key from step 1 |
+   | Sender email | `noreply@cardpop.com.au` |
+   | Sender name | `Card Pop` |
+
+   The sender domain must be **Verified in Resend** (see the section above) — it
+   already is for `cardpop.com.au`.
+
+3. **Raise the Auth email rate limit.** Only possible **after** custom SMTP is
+   enabled — the built-in ceiling (2/hour) locks the field until then.
+   **Authentication → Rate Limits → "Rate limit for sending emails"** → set the
+   per-hour value (we run **100/hour** — project-wide across *all* auth mail, not
+   per user). Enabling SMTP auto-bumps the default 2 → 30; raise from there.
+
+4. **URL Configuration.** Confirm `https://cardpop.com.au/reset-password` (and
+   `https://cardpop.com.au/**`) is in the **Redirect Allow List** — the recovery
+   link's `redirectTo` targets `/reset-password`, which renders
+   `pages/PasswordResetPage.jsx`.
+
+### Verify it works
+
+Request a recovery link (`/reset-password`), then confirm the send actually
+fired — not just that the request returned 200:
+
+```sql
+-- recovery_sent_at should jump to ~now for the address you tested
+select email, recovery_sent_at, updated_at, now()
+from auth.users
+where email = 'you@example.com';
+```
+
+If `recovery_sent_at` moved to the current time, Supabase handed the mail to
+Resend successfully. If it stayed in the past despite a 200, SMTP isn't being
+accepted — recheck the key/host/port and that the domain is Verified in Resend.
+
 ## DMARC
 
 DMARC tells receiving mail servers what to do with mail claiming to be from
@@ -185,5 +271,5 @@ once a single valid record is live.
 |---|---|---|
 | `[EMAIL] Send failed to …: The cardpop.com.au domain is not verified` | Domain not verified in Resend | Complete the DNS verification above |
 | `[EMAIL] RESEND_API_KEY not set — emails will not be sent` | Missing key | Set `RESEND_API_KEY` in the server environment |
-| Auth emails (signup/reset) missing, but order/refund emails work | Not a Resend issue | Check Supabase dashboard → Authentication → Email settings |
+| Auth emails (signup/reset/recovery) missing, but order/refund emails work | Supabase Auth pipeline, not the Resend SDK — usually the built-in mailer's 2/hour cap silently dropping mail | Enable custom SMTP + raise the rate limit — see [Supabase Auth email (SMTP via Resend)](#supabase-auth-email-smtp-via-resend). Confirm with the `recovery_sent_at` check there |
 | Marketing/newsletter not sending | Not a Resend issue | Check Kit.com (`src/routes/newsletter.js`, `KIT_*` env vars) |
