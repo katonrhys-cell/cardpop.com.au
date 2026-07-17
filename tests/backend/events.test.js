@@ -4,6 +4,7 @@ import request from 'supertest';
 
 const mockSupabase = vi.hoisted(() => ({ from: vi.fn() }));
 const mockSendEventSubmitted = vi.hoisted(() => vi.fn());
+const mockGetAdminEmail = vi.hoisted(() => vi.fn());
 
 vi.mock('../../src/utils/supabaseClient.js', () => ({ default: mockSupabase, supabase: mockSupabase }));
 vi.mock('../../src/utils/logger.js', () => ({
@@ -13,6 +14,7 @@ vi.mock('../../src/middleware/auth.js', () => ({
   authMiddleware: (req, _res, next) => { req.user = { id: 'user-1' }; next(); },
 }));
 vi.mock('../../src/utils/emailService.js', () => ({ sendEventSubmitted: mockSendEventSubmitted }));
+vi.mock('../../src/utils/adminNotificationRecipient.js', () => ({ getAdminNotificationEmail: mockGetAdminEmail }));
 
 import eventsRouter from '../../src/routes/events.js';
 
@@ -48,6 +50,7 @@ let builders;
 beforeEach(() => {
   vi.clearAllMocks();
   mockSendEventSubmitted.mockResolvedValue(true);
+  mockGetAdminEmail.mockResolvedValue('notifications@cardpop.com.au');
   builders = [];
   mockSupabase.from.mockImplementation(() => {
     const next = builders.shift();
@@ -57,29 +60,17 @@ beforeEach(() => {
 });
 
 describe('POST /events/notify-submission', () => {
-  it('emails the configured admin contact for the submitter\'s pending event', async () => {
+  it('emails the resolved admin notification address for the submitter\'s pending event', async () => {
     builders.push(makeBuilder({ data: pendingEvent, error: null }));
-    builders.push(makeBuilder({ data: { value: 'admin@cardpop.com.au' }, error: null }));
 
     const res = await request(app).post('/notify-submission').send({ eventId: 'evt-1' });
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ ok: true });
     expect(mockSendEventSubmitted).toHaveBeenCalledWith({
-      to: 'admin@cardpop.com.au',
+      to: 'notifications@cardpop.com.au',
       event: pendingEvent,
     });
-  });
-
-  it('falls back to the support inbox when no contact_email is set', async () => {
-    builders.push(makeBuilder({ data: pendingEvent, error: null }));
-    builders.push(makeBuilder({ data: null, error: null }));
-
-    await request(app).post('/notify-submission').send({ eventId: 'evt-1' });
-
-    expect(mockSendEventSubmitted).toHaveBeenCalledWith(
-      expect.objectContaining({ to: 'support@cardpop.com.au' }),
-    );
   });
 
   it('requires an eventId', async () => {

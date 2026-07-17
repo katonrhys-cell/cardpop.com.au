@@ -3,19 +3,18 @@ import supabase from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { sendEventSubmitted } from '../utils/emailService.js';
+import { getAdminNotificationEmail } from '../utils/adminNotificationRecipient.js';
 
 const router = Router();
-
-// Where event-submission notices are sent when no admin contact is configured.
-const FALLBACK_RECIPIENT = 'support@cardpop.com.au';
 
 /**
  * POST /events/notify-submission
  *
  * Fired by the user-facing event form immediately after a user inserts a
  * `pending_review` event, so a new community submission doesn't sit unnoticed
- * in the moderation queue. The recipient is the admin contact address set under
- * Admin → Platform Settings → Contact Email (falls back to the support inbox).
+ * in the moderation queue. The recipient is the dedicated Notification Email set
+ * under Admin → Platform Settings (falls back to the contact address, then a
+ * default alerts inbox).
  *
  * Auth + ownership are checked so a user can only trigger a notice for their own
  * freshly-submitted, still-pending event — never email an arbitrary address or
@@ -45,14 +44,7 @@ router.post('/notify-submission', authMiddleware, async (req, res) => {
       return res.json({ ok: true, skipped: 'not_pending' });
     }
 
-    let recipient = FALLBACK_RECIPIENT;
-    const { data: settingRow } = await supabase
-      .from('platform_settings')
-      .select('value')
-      .eq('key', 'contact_email')
-      .maybeSingle();
-    if (settingRow?.value) recipient = String(settingRow.value).trim() || FALLBACK_RECIPIENT;
-
+    const recipient = await getAdminNotificationEmail();
     await sendEventSubmitted({ to: recipient, event });
 
     logger.info(`[EVENTS] Notified ${recipient} of pending event ${event.id}`);

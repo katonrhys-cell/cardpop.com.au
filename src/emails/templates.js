@@ -236,7 +236,7 @@ ${summaryTable(rows)}
     body,
     'https://cardpop.com.au/admin/orders',
     'View in Admin',
-    'You received this because you are the CardPop admin contact. Change the recipient under Admin → Platform Settings → Contact Email.',
+    'You received this because you are the CardPop admin contact. Change the recipient under Admin → Platform Settings → Notification Email.',
   );
 }
 
@@ -321,7 +321,7 @@ ${summaryTable([
     body,
     'https://cardpop.com.au/admin/events',
     'Review in Admin',
-    'You received this because you are the CardPop admin contact. Change the recipient under Admin → Platform Settings → Contact Email.',
+    'You received this because you are the CardPop admin contact. Change the recipient under Admin → Platform Settings → Notification Email.',
   );
 }
 

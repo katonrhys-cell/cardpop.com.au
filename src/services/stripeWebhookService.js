@@ -1,6 +1,7 @@
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { sendOrderConfirmed, sendItemSold, sendOrderAdminNotice } from '../utils/emailService.js';
+import { getAdminNotificationEmail } from '../utils/adminNotificationRecipient.js';
 import { payoutSeller } from './payoutService.js';
 import { markWelcomeDiscountRedeemed, releaseWelcomeDiscount } from './welcomeOfferService.js';
 import { recordShopOrderReferral } from './partnerService.js';
@@ -16,15 +17,13 @@ async function getPlatformSetting(key, defaultValue) {
   return data?.value !== undefined ? data.value : defaultValue;
 }
 
-// Email the admin contact about a confirmed order. Best-effort — a mail failure
-// must never re-throw and turn a fulfilled order into a webhook 500 (which
-// Stripe would retry). Recipient is the configurable Contact Email from the
-// admin Settings page, falling back to the support inbox.
-const ADMIN_NOTICE_FALLBACK = 'support@cardpop.com.au';
+// Email the admin notification inbox about a confirmed order. Best-effort — a
+// mail failure must never re-throw and turn a fulfilled order into a webhook 500
+// (which Stripe would retry). Recipient is resolved from the admin Settings page
+// (dedicated Notification Email, then Contact Email, then a default inbox).
 async function notifyAdminOfOrder({ orderId, buyerName, buyerEmail, total, itemsSummary, sellerName }) {
   try {
-    const contact = await getPlatformSetting('contact_email', ADMIN_NOTICE_FALLBACK);
-    const to = (typeof contact === 'string' && contact.trim()) || ADMIN_NOTICE_FALLBACK;
+    const to = await getAdminNotificationEmail();
     await sendOrderAdminNotice({ to, orderId, buyerName, buyerEmail, total, itemsSummary, sellerName });
   } catch (e) {
     logger.warn(`[STRIPE] admin order notice failed for order ${orderId || 'n/a'}: ${e.message}`);
