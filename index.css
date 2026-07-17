@@ -6,12 +6,20 @@
    unicode-range is the standard latin subset MINUS U+2122 (™): Syne's own ™
    glyph is drawn with a built-in underline, which reads as an underlined
    trademark mark in the logo and headings. Excluding the codepoint makes ™
-   fall through to the fallback fonts, whose ™ has no underline. */
+   fall through to the fallback fonts, whose ™ has no underline.
+   font-display: fallback (not swap) — swap paints the fallback face on the very
+   first frame and then visibly re-paints headings whenever Syne lands, which
+   reads as "the fonts lag in". fallback gives a ~100ms block window: the file
+   is small (~34 KB), same-origin, preloaded from index.html AND from an Early
+   Hints Link header (vercel.json), so on most connections it arrives inside
+   that window and the FIRST paint is already Syne — no swap at all. On slow
+   connections it behaves like swap but with a bounded (~3s) swap period, so
+   there's never a jarring re-paint long after the user started reading. */
 @font-face {
   font-family: 'Syne';
   font-style: normal;
   font-weight: 400 800;
-  font-display: swap;
+  font-display: fallback;
   src: url('/fonts/syne-latin-var.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
     U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2191, U+2193,
