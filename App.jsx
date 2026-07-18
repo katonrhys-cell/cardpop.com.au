@@ -35,7 +35,6 @@ import ShoppingCart from '@/components/ShoppingCartLazy.jsx';
 import AdminLayout from '@/components/AdminLayout.jsx';
 import MarketplaceListingRedirect from '@/components/MarketplaceListingRedirect.jsx';
 import ReferralCapture from '@/components/ReferralCapture.jsx';
-import LaunchRegisterModal from '@/components/LaunchRegisterModal.jsx';
 import FeatureRoute from '@/components/FeatureRoute.jsx';
 import MaintenanceGate from '@/components/MaintenanceGate.jsx';
 
@@ -254,7 +253,6 @@ const App = () => {
               <Router>
                 <ScrollToTop />
                 <ReferralCapture />
-                <LaunchRegisterModal />
                 <div className="flex flex-col min-h-screen bg-background text-foreground">
                   <Helmet>
                     <title>CardPop | Australia's Trading Card Marketplace</title>
