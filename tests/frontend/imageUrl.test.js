@@ -29,11 +29,15 @@ import {
   canonicalStorageUrl,
   parseStorageObjectUrl,
   _setCdnHostForTests,
+  _setTransformsEnabledForTests,
 } from '@/utils/imageUrl.js';
 
 beforeEach(() => {
   _resetTransformState();
   _setCdnHostForTests(null);
+  // Transforms are OFF by default (paid feature). Most cases here exercise the
+  // transform path, so enable it explicitly; the "disabled" block flips it off.
+  _setTransformsEnabledForTests(true);
 });
 
 describe('getCardImage', () => {
@@ -93,6 +97,35 @@ describe('getCardImage', () => {
 
   it('exposes a sensible default sizes string', () => {
     expect(CARD_GRID_SIZES).toMatch(/vw/);
+  });
+});
+
+describe('getCardImage with transforms disabled (default)', () => {
+  beforeEach(() => {
+    _setTransformsEnabledForTests(false);
+  });
+
+  it('serves the untransformed original with no srcSet for a storage path', () => {
+    const r = getCardImage('user/card.jpg', { widths: [240, 400, 600] });
+    expect(r.src).toBe('https://cdn/object/vault-images/user/card.jpg');
+    expect(r.src).toBe(r.fallbackSrc);
+    expect(r.srcSet).toBeNull();
+    // Crucially, it never emits a /render/image (transform) URL.
+    expect(r.src).not.toContain('render');
+  });
+
+  it('does not transform stored absolute Supabase object URLs either', () => {
+    const stored =
+      'https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/object/public/vault-images/u/c.webp';
+    const r = getCardImage(stored, { widths: [240, 400, 600] });
+    expect(r.src).toBe('https://cdn/object/vault-images/u/c.webp');
+    expect(r.srcSet).toBeNull();
+    expect(r.src).not.toContain('render');
+  });
+
+  it('still exposes a canonical origin source', () => {
+    const r = getCardImage('user/card.jpg');
+    expect(r.canonicalSrc).toBe('https://cdn/object/vault-images/user/card.jpg');
   });
 });
 

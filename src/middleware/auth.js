@@ -2,11 +2,20 @@ import 'dotenv/config';
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 
+// RFC 9728 §5.1: point unauthenticated callers at the protected-resource
+// metadata so agents can discover how to obtain a token.
+const RESOURCE_METADATA_URL =
+  'https://cardpop.com.au/.well-known/oauth-protected-resource';
+const WWW_AUTHENTICATE = `Bearer resource_metadata="${RESOURCE_METADATA_URL}"`;
+
 async function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing or invalid authorization header' });
+    return res
+      .status(401)
+      .set('WWW-Authenticate', WWW_AUTHENTICATE)
+      .json({ error: 'Missing or invalid authorization header' });
   }
 
   const token = authHeader.substring(7);
@@ -15,7 +24,10 @@ async function authMiddleware(req, res, next) {
     const { data, error } = await supabase.auth.getUser(token);
 
     if (error || !data?.user) {
-      return res.status(401).json({ error: 'Invalid or expired token' });
+      return res
+        .status(401)
+        .set('WWW-Authenticate', WWW_AUTHENTICATE)
+        .json({ error: 'Invalid or expired token' });
     }
 
     req.user = data.user;
@@ -23,7 +35,10 @@ async function authMiddleware(req, res, next) {
     next();
   } catch (error) {
     logger.error('Auth middleware error:', error);
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    return res
+      .status(401)
+      .set('WWW-Authenticate', WWW_AUTHENTICATE)
+      .json({ error: 'Invalid or expired token' });
   }
 }
 

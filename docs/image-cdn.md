@@ -19,6 +19,30 @@ Two free options below. **Option A (Cloudflare) is the one in use** — the
 first-party subdomain with unmetered bandwidth. Option B (CloudFront) is kept
 as the no-code alternative.
 
+## Image transformations (off by default)
+
+Supabase Storage can server-side resize images via its `/storage/v1/render/image/`
+endpoint (the `?width=…&resize=cover&quality=…` params `getCardImage` builds).
+It's a **paid** Storage feature, and it is **disabled on this project** — the
+render endpoint returns `403` when it isn't enabled on the plan. Because a card
+grid requests one transformed image per card on first paint, leaving it on
+produced a burst of `403`s in the Supabase logs on every fresh page load (the
+images still displayed via the untransformed fallback, but each load hammered
+the render endpoint first).
+
+So transforms are gated behind a build-time flag, **default off**:
+
+- `VITE_SUPABASE_IMAGE_TRANSFORMS` — unset/false (default): `utils/imageUrl.js`
+  never emits a `/render/image` URL; `getCardImage` serves the untransformed
+  public object URL directly (still CDN-routed via `VITE_IMAGE_CDN_HOST`). No
+  `403`s, no wasted first-load requests. Set it to `true` **only** after
+  enabling image transformations in the Supabase dashboard
+  (Storage → Settings → Image Transformations, requires a paid plan) — then the
+  responsive `srcSet` resizing switches back on.
+
+Even with the flag on, the old graceful-degradation path still applies: a failed
+transform flips a session flag and `CardImage` falls back to the original.
+
 ## Option A — Cloudflare Worker on `img.cardpop.com.au` (in use)
 
 The Worker source is `cloudflare/image-proxy-worker.js` (this repo is the
