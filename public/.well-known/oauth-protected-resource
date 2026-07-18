@@ -1,0 +1,9 @@
+{
+  "resource": "https://cardpop.com.au/api",
+  "resource_name": "CardPop API",
+  "authorization_servers": [
+    "https://odoglvswwymyjuwlonkf.supabase.co/auth/v1"
+  ],
+  "bearer_methods_supported": ["header"],
+  "resource_documentation": "https://cardpop.com.au/auth.md"
+}
