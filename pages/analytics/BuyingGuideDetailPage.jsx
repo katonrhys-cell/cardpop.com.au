@@ -72,7 +72,9 @@ const ChaseCard = ({ card, guide }) => {
         <p className="text-sm mt-2 leading-relaxed text-muted-foreground">{card.blurb}</p>
         <p className="mt-2 text-sm font-bold text-foreground">
           {card.value}
-          <span className="text-xs font-normal text-muted-foreground"> AUD</span>
+          {/^[$\d]/.test(card.value) && (
+            <span className="text-xs font-normal text-muted-foreground"> AUD</span>
+          )}
         </p>
       </div>
     </div>

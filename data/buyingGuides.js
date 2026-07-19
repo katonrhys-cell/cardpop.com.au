@@ -53,6 +53,10 @@ export const GUIDE_CATEGORY_META = {
     label: 'Baseball',
     gradient: 'from-blue-500 to-indigo-600',
   },
+  basketball: {
+    label: 'Basketball',
+    gradient: 'from-orange-500 to-red-600',
+  },
 };
 
 export const BUYING_GUIDES = [
@@ -291,6 +295,84 @@ export const BUYING_GUIDES = [
       '1952 variations are the anniversary play — verify the design details carefully, as they’re easy to miss against the base card.',
     ],
     marketplaceQuery: 'Topps Series 2 2026',
+  },
+
+  // ─── 2025-26 Topps Basketball (NBA flagship) ────────────────────────────────
+  {
+    slug: 'topps-basketball-2025-26-nba',
+    title: '2025-26 Topps Basketball',
+    shortTitle: 'Topps Basketball 2025-26',
+    category: 'basketball',
+    game: 'Basketball',
+    status: 'available',
+    releaseDate: '2025-10-23',
+    releaseLabel: '23 October 2025',
+    updated: '2026-07-19',
+    gradient: 'from-orange-600 to-red-700',
+    tagline: 'Topps’ NBA flagship is back — a historic rookie class and the first-ever Wembanyama Spurs autos.',
+    summary:
+      'Topps’ return to NBA hardwood lands a 300-card base set led by a stacked Cooper Flagg rookie class. Chase the first-ever Victor Wembanyama Spurs autographs, fully licensed LeBron autos and the Golden Mirror short-print variations.',
+    overview: [
+      '2025-26 Topps Basketball released on 23 October 2025 — the flagship NBA set from Topps’ return to fully-licensed basketball, and the launch collectors built the season around.',
+      'The 300-card base set spans stars, legends and one of the deepest rookie classes in years, headlined by No. 1 pick Cooper Flagg alongside Dylan Harper, Ace Bailey, V.J. Edgecombe and Kon Knueppel, plus combo cards, relics and super-short-print inserts.',
+      'The premium chases are the story: the first-ever Victor Wembanyama autographs in a Spurs jersey, fully-licensed LeBron James autos exclusive to this release, ultra-rare Home Court and Comic Court case hits, and the returning Golden Mirror photo variations. Hobby boxes run 20 packs of 12 cards.',
+    ],
+    quickFacts: [
+      { label: 'Set', value: '2025-26 Topps Basketball (NBA flagship)' },
+      { label: 'Released', value: '23 October 2025' },
+      { label: 'Base set', value: '300 cards' },
+      { label: 'Box config', value: '20 packs × 12 cards (Hobby)' },
+      { label: 'Top rookies', value: 'Cooper Flagg, Dylan Harper, Ace Bailey, V.J. Edgecombe, Kon Knueppel' },
+      { label: 'Key hits', value: 'Wembanyama Spurs autos, LeBron autos, Golden Mirror SSP, Home/Comic Court' },
+    ],
+    chaseCards: [
+      {
+        name: 'Cooper Flagg',
+        subtitle: 'Flagship rookie · base + autograph',
+        value: '$40–$400+',
+        tier: 'grail',
+        blurb:
+          'The rookie the whole set revolves around. The No. 1 pick’s base RC is the entry point, but his on-card autographs and short-print variations are the true grails driving this release.',
+      },
+      {
+        name: 'Victor Wembanyama',
+        subtitle: 'First-ever Spurs autograph',
+        value: 'Chase',
+        tier: 'grail',
+        blurb:
+          'A genuine milestone card — Wembanyama’s first-ever autographs in a Spurs jersey are exclusive to this release. Numbered versions are the marquee pull of the entire set.',
+      },
+      {
+        name: 'LeBron James',
+        subtitle: 'Fully-licensed autograph (release-exclusive)',
+        value: 'Chase',
+        tier: 'grail',
+        blurb:
+          'Fully-licensed LeBron autos can now be chased here for the first time. Scarce, iconic and a case-hit-level pull for the biggest name in the game.',
+      },
+      {
+        name: 'Golden Mirror Variations',
+        subtitle: 'Short-print photo variation (SSP)',
+        value: '$50–$300',
+        tier: 'high',
+        blurb:
+          'The set’s signature short-print. Golden Mirror photo variations on stars and rookies are tough pulls and among the most-tracked chases on the secondary market.',
+      },
+      {
+        name: 'Dylan Harper',
+        subtitle: 'Rookie card · base + auto',
+        value: '$15–$120',
+        tier: 'high',
+        blurb:
+          'The next name after Flagg in the rookie pecking order. Strong upside makes his autos and short prints a smart value chase before the season plays out.',
+      },
+    ],
+    collectingTips: [
+      'Cooper Flagg drives box prices — decide whether you’re ripping for the hit or buying his singles, because his autos carry most of the set’s value.',
+      'The Wembanyama and LeBron autographs are case-hit rare; treat pulling one as the jackpot, not the expectation.',
+      'Golden Mirror variations are easy to overlook against the base card — check the photo carefully before selling a "base" star short.',
+    ],
+    marketplaceQuery: 'Topps Basketball 2025-26',
   },
 ];
 

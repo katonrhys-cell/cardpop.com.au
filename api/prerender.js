@@ -1704,9 +1704,10 @@ function renderBuyingGuide(slug) {
 
   const overviewHtml = guide.overview.map((p) => `  <p>${esc(p)}</p>`).join('\n');
   const factsHtml = guide.quickFacts.map((f) => `    <li><strong>${esc(f.label)}:</strong> ${esc(f.value)}</li>`).join('\n');
-  const chaseHtml = guide.chaseCards.map((c) =>
-    `    <li><strong>${esc(c.name)}</strong> — ${esc(c.subtitle)} (${esc(c.value)} AUD). ${esc(c.blurb)}</li>`
-  ).join('\n');
+  const chaseHtml = guide.chaseCards.map((c) => {
+    const valueText = /^[$\d]/.test(c.value) ? `${c.value} AUD` : c.value;
+    return `    <li><strong>${esc(c.name)}</strong> — ${esc(c.subtitle)} (${esc(valueText)}). ${esc(c.blurb)}</li>`;
+  }).join('\n');
   const tipsHtml = (guide.collectingTips || []).map((t) => `    <li>${esc(t)}</li>`).join('\n');
 
   const bodyHtml = `<main>
