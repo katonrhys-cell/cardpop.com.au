@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, MapPin, Clock, Info, Ticket, ExternalLink } from 'lucide-react';
+import { Calendar, MapPin, Clock, Info, Ticket, ExternalLink, Accessibility, ShieldAlert } from 'lucide-react';
 import { eventPath, eventTypeLabel, formatEventDate, formatEventTime, formatEventLocation } from '@/lib/eventSeo.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
 
@@ -94,6 +94,28 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
               {event.description || 'No description provided for this event.'}
             </p>
           </div>
+
+          {event.accessibility_info && (
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-3 flex items-center gap-2">
+                <Accessibility className="w-5 h-5 text-primary" aria-hidden="true" /> Accessibility
+              </h3>
+              <p className="text-muted-foreground leading-relaxed text-balance whitespace-pre-wrap bg-muted/30 p-4 rounded-xl border border-border">
+                {event.accessibility_info}
+              </p>
+            </div>
+          )}
+
+          {event.age_restrictions && (
+            <div>
+              <h3 className="text-lg font-bold text-foreground mb-3 flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-primary" aria-hidden="true" /> Age Restrictions
+              </h3>
+              <p className="text-muted-foreground leading-relaxed text-balance whitespace-pre-wrap bg-muted/30 p-4 rounded-xl border border-border">
+                {event.age_restrictions}
+              </p>
+            </div>
+          )}
         </div>
 
         <DialogFooter className="p-4 bg-muted/20 border-t border-border flex flex-col-reverse sm:flex-row sm:justify-end gap-2 shrink-0">

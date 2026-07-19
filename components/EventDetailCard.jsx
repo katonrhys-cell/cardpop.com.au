@@ -1,14 +1,33 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe } from 'lucide-react';
+import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Accessibility, ShieldAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { formatEntryFee, eventTypeStyle, youTubeEmbedUrl } from '@/lib/eventSeo.js';
+import { formatEntryFee, eventTypeStyle, youTubeEmbedUrl, facebookEmbedUrl } from '@/lib/eventSeo.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
 import { toast } from 'sonner';
 
 const EventDetailCard = ({ event }) => {
   const videoEmbedUrl = youTubeEmbedUrl(event.youtube_url);
+  const fbEmbedUrl = facebookEmbedUrl(event.facebook_video_url);
+  const ytFrameRef = useRef(null);
+
+  // Start the YouTube video automatically 10 seconds after the page loads.
+  // Uses the iframe player API via postMessage (enabled by ?enablejsapi=1 on
+  // the embed src) rather than swapping in an autoplay URL, so the frame never
+  // reloads — a visitor who already pressed play keeps watching uninterrupted.
+  // Muted first: browsers block programmatic autoplay with sound.
+  useEffect(() => {
+    if (!videoEmbedUrl) return;
+    const timer = setTimeout(() => {
+      const win = ytFrameRef.current?.contentWindow;
+      if (!win) return;
+      ['mute', 'playVideo'].forEach((func) =>
+        win.postMessage(JSON.stringify({ event: 'command', func, args: [] }), '*'),
+      );
+    }, 10_000);
+    return () => clearTimeout(timer);
+  }, [videoEmbedUrl]);
 
   const handleShare = (platform) => {
     const url = encodeURIComponent(window.location.href);
@@ -95,20 +114,58 @@ const EventDetailCard = ({ event }) => {
               {event.description}
             </p>
 
-            {videoEmbedUrl && (
+            {event.accessibility_info && (
               <div className="mt-10">
-                <h2 className="font-serif text-2xl font-bold mb-4">Event Video</h2>
-                <div className="aspect-video w-full overflow-hidden rounded-2xl border border-border bg-muted shadow-md">
-                  <iframe
-                    src={videoEmbedUrl}
-                    title={`${event.name} — event video`}
-                    className="w-full h-full"
-                    loading="lazy"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    referrerPolicy="strict-origin-when-cross-origin"
-                    allowFullScreen
-                  />
-                </div>
+                <h2 className="font-serif text-2xl font-bold mb-4 flex items-center gap-3">
+                  <Accessibility className="w-6 h-6 text-primary shrink-0" aria-hidden="true" /> Accessibility
+                </h2>
+                <p className="text-muted-foreground leading-relaxed text-lg whitespace-pre-wrap">
+                  {event.accessibility_info}
+                </p>
+              </div>
+            )}
+
+            {event.age_restrictions && (
+              <div className="mt-10">
+                <h2 className="font-serif text-2xl font-bold mb-4 flex items-center gap-3">
+                  <ShieldAlert className="w-6 h-6 text-primary shrink-0" aria-hidden="true" /> Age Restrictions
+                </h2>
+                <p className="text-muted-foreground leading-relaxed text-lg whitespace-pre-wrap">
+                  {event.age_restrictions}
+                </p>
+              </div>
+            )}
+
+            {(videoEmbedUrl || fbEmbedUrl) && (
+              <div className="mt-10">
+                <h2 className="font-serif text-2xl font-bold mb-4">{videoEmbedUrl && fbEmbedUrl ? 'Event Videos' : 'Event Video'}</h2>
+                {videoEmbedUrl && (
+                  <div className="aspect-video w-full overflow-hidden rounded-2xl border border-border bg-muted shadow-md">
+                    <iframe
+                      ref={ytFrameRef}
+                      src={`${videoEmbedUrl}?enablejsapi=1`}
+                      title={`${event.name} — event video`}
+                      className="w-full h-full"
+                      loading="lazy"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      referrerPolicy="strict-origin-when-cross-origin"
+                      allowFullScreen
+                    />
+                  </div>
+                )}
+                {fbEmbedUrl && (
+                  <div className={`aspect-video w-full overflow-hidden rounded-2xl border border-border bg-muted shadow-md ${videoEmbedUrl ? 'mt-6' : ''}`}>
+                    <iframe
+                      src={fbEmbedUrl}
+                      title={`${event.name} — Facebook video`}
+                      className="w-full h-full"
+                      loading="lazy"
+                      allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                      referrerPolicy="strict-origin-when-cross-origin"
+                      allowFullScreen
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>

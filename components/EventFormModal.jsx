@@ -43,6 +43,8 @@ const INITIAL_STATE = {
   title: '',
   short_description: '',
   description: '',
+  accessibility_info: '',
+  age_restrictions: '',
   event_type: 'community_event',
   status: 'approved',
   featured_card_games: [],
@@ -67,6 +69,7 @@ const INITIAL_STATE = {
   instagram_url: '',
   facebook_url: '',
   youtube_url: '',
+  facebook_video_url: '',
   entry_fee_aud: '',
   presale_fee_aud: '',
   is_free: true,
@@ -145,6 +148,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         title:               scrapedData.title || scrapedData.name || '',
         short_description:   scrapedData.short_description || '',
         description:         scrapedData.description || '',
+        accessibility_info:  scrapedData.accessibility_info || '',
+        age_restrictions:    scrapedData.age_restrictions || '',
         event_type:          scrapedData.event_type || 'community_event',
         status:              'approved',
         featured_card_games: scrapedData.featured_card_games || [],
@@ -195,6 +200,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         title:               event.title || '',
         short_description:   event.short_description || '',
         description:         event.description || '',
+        accessibility_info:  event.accessibility_info || '',
+        age_restrictions:    event.age_restrictions || '',
         event_type:          event.event_type || 'community_event',
         status:              event.status || 'approved',
         featured_card_games: event.featured_card_games || [],
@@ -216,6 +223,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         instagram_url:       event.instagram_url || '',
         facebook_url:        event.facebook_url || '',
         youtube_url:         event.youtube_url || '',
+        facebook_video_url:  event.facebook_video_url || '',
         entry_fee_aud:       event.entry_fee_aud != null ? String(event.entry_fee_aud) : '',
         presale_fee_aud:     event.presale_fee_aud != null ? String(event.presale_fee_aud) : '',
         is_free:             event.is_free ?? true,
@@ -300,6 +308,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         title:               formData.title.trim(),
         short_description:   formData.short_description.trim() || null,
         description:         formData.description.trim() || null,
+        accessibility_info:  formData.accessibility_info.trim() || null,
+        age_restrictions:    formData.age_restrictions.trim() || null,
         event_type:          formData.event_type,
         // User submissions always enter the review queue — RLS enforces this too
         status:              isUserMode ? 'pending_review' : formData.status,
@@ -326,6 +336,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         instagram_url:       formData.instagram_url.trim() || null,
         facebook_url:        formData.facebook_url.trim() || null,
         youtube_url:         formData.youtube_url.trim() || null,
+        facebook_video_url:  formData.facebook_video_url.trim() || null,
         entry_fee_aud:       formData.is_free ? 0 : (parseFloat(formData.entry_fee_aud) || 0),
         presale_fee_aud:     formData.is_free ? null : (parseFloat(formData.presale_fee_aud) || null),
         is_free:             formData.is_free,
@@ -412,7 +423,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   { id: 'details',   label: 'Details' },
                   { id: 'venue',     label: 'Venue & Dates' },
                   { id: 'organiser', label: 'Organiser' },
-                  ...(isUserMode ? [] : [{ id: 'seo', label: 'SEO' }]),
+                  { id: 'seo',       label: 'SEO' },
                 ].map(tab => (
                   <TabsTrigger
                     key={tab.id}
@@ -446,6 +457,16 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   <div className="sm:col-span-2 space-y-2">
                     <Label htmlFor="description" className="font-bold">Full Description</Label>
                     <Textarea id="description" name="description" value={formData.description} onChange={handleChange} className="bg-background min-h-[140px] rounded-xl resize-y" disabled={loading} />
+                  </div>
+
+                  <div className="sm:col-span-2 space-y-2">
+                    <Label htmlFor="accessibility_info" className="font-bold">Accessibility <span className="text-muted-foreground font-normal text-xs">(optional — shown under "About this event")</span></Label>
+                    <Textarea id="accessibility_info" name="accessibility_info" value={formData.accessibility_info} onChange={handleChange} className="bg-background min-h-[80px] rounded-xl resize-y" placeholder="e.g. Wheelchair accessible venue with step-free entry, accessible parking and toilets" disabled={loading} />
+                  </div>
+
+                  <div className="sm:col-span-2 space-y-2">
+                    <Label htmlFor="age_restrictions" className="font-bold">Age Restrictions <span className="text-muted-foreground font-normal text-xs">(optional — shown under "About this event")</span></Label>
+                    <Input id="age_restrictions" name="age_restrictions" value={formData.age_restrictions} onChange={handleChange} className={inputCls} placeholder="e.g. All ages — under 15s must be accompanied by an adult" disabled={loading} />
                   </div>
 
                   <div className="space-y-2">
@@ -627,6 +648,11 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                     <Input id="youtube_url" name="youtube_url" type="url" value={formData.youtube_url} onChange={handleChange} className={inputCls} placeholder="https://www.youtube.com/watch?v=..." disabled={loading} />
                     <p className="text-xs text-muted-foreground">Embedded on the event page and added to its structured data for video SEO.</p>
                   </div>
+                  <div className="sm:col-span-2 space-y-2">
+                    <Label htmlFor="facebook_video_url" className="font-bold">Facebook Public Post / Reel URL</Label>
+                    <Input id="facebook_video_url" name="facebook_video_url" type="url" value={formData.facebook_video_url} onChange={handleChange} className={inputCls} placeholder="https://www.facebook.com/..." disabled={loading} />
+                    <p className="text-xs text-muted-foreground">Public Facebook video post or Reel — embedded on the event page under "About this event", below the YouTube video when both are set.</p>
+                  </div>
                 </div>
 
                 <div className="pt-2 border-t border-border space-y-5">
@@ -663,11 +689,12 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                 </div>
               </TabsContent>
 
-              {/* ── TAB 4: SEO (admin only) ── */}
-              {!isUserMode && (
+              {/* ── TAB 4: SEO ── */}
               <TabsContent value="seo" className="mt-0 space-y-5 animate-in fade-in">
                 <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 text-sm text-muted-foreground">
-                  Complete SEO fields are auto-generated by the AI scraper. Review and refine them here for best search performance.
+                  {isUserMode
+                    ? 'Optional — a search-friendly title, description and keywords help your event rank on Google. Leave anything blank and sensible defaults are generated from your event details.'
+                    : 'Complete SEO fields are auto-generated by the AI scraper. Review and refine them here for best search performance.'}
                 </div>
 
                 <div className="space-y-2">
@@ -703,7 +730,6 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   </div>
                 )}
               </TabsContent>
-              )}
 
             </div>
           </Tabs>

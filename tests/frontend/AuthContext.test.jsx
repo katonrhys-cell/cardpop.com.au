@@ -76,9 +76,13 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext.jsx';
 // ─── harness ────────────────────────────────────────────────────────────────────
 
 let captured;
+// Every render's loading flags, so tests can assert a state change never even
+// transiently flipped them (a transient true unmounts guarded routes).
+const renderLog = [];
 function Consumer() {
   captured = useAuth();
   const a = captured;
+  renderLog.push({ loading: a.loading, profileLoading: a.profileLoading });
   return (
     <div>
       <span data-testid="loading">{String(a.loading)}</span>
@@ -131,6 +135,7 @@ beforeEach(() => {
   h.signInResult = { data: { session: null, user: null }, error: null };
   h.signUpResult = { data: { user: {} }, error: null };
   h.verifyResult = { data: { session: null }, error: null };
+  renderLog.length = 0;
   try { localStorage.clear(); } catch { /* ignore */ }
 });
 
@@ -174,6 +179,64 @@ describe('AuthProvider — session state', () => {
     });
     expect(txt('isVerified')).toBe('false');
     expect(txt('isAdmin')).toBe('false');
+  });
+
+  it('never flips loading/profileLoading when the token refreshes for the same user (tab refocus)', async () => {
+    // Regression: supabase-js refreshes the session token whenever the tab
+    // regains focus and re-fires onAuthStateChange. Flipping either loading
+    // flag makes ProtectedRoute/ProtectedAdminRoute swap the page for a
+    // spinner, unmounting it and destroying in-progress form/modal state
+    // (e.g. the admin event editor closing when you switch tabs and back).
+    h.profileResult = { data: { is_admin: true, full_name: 'Ada Lovelace' }, error: null };
+    renderAuth();
+    await emitAuth('SIGNED_IN', SESSION);
+    expect(txt('loading')).toBe('false');
+    expect(txt('profileLoading')).toBe('false');
+
+    renderLog.length = 0;
+    await emitAuth('TOKEN_REFRESHED', { ...SESSION, access_token: 'token-refreshed' });
+
+    expect(renderLog.length).toBeGreaterThan(0);
+    expect(renderLog.some(r => r.loading || r.profileLoading)).toBe(false);
+    expect(txt('isAuthenticated')).toBe('true');
+    expect(txt('authToken')).toBe('token-refreshed');
+  });
+
+  it('keeps the last good profile when a background profile re-fetch fails', async () => {
+    // A transient profiles read failure on refocus must not wipe isAdmin —
+    // that would bounce an admin out of /admin mid-edit.
+    h.profileResult = { data: { is_admin: true, full_name: 'Ada Lovelace' }, error: null };
+    renderAuth();
+    await emitAuth('SIGNED_IN', SESSION);
+    expect(txt('isAdmin')).toBe('true');
+
+    h.profileResult = { data: null, error: { message: 'network hiccup' } };
+    await emitAuth('TOKEN_REFRESHED', { ...SESSION, access_token: 'token-refreshed' });
+
+    expect(txt('isAdmin')).toBe('true');
+    expect(txt('userName')).toBe('Ada Lovelace');
+  });
+
+  it('still gates behind profileLoading when a different user signs in', async () => {
+    h.profileResult = { data: { is_admin: true, full_name: 'Ada Lovelace' }, error: null };
+    renderAuth();
+    await emitAuth('SIGNED_IN', SESSION);
+
+    renderLog.length = 0;
+    h.profileResult = { data: { is_admin: false, full_name: 'Grace Hopper' }, error: null };
+    await emitAuth('SIGNED_IN', {
+      access_token: 'token-user-2',
+      user: { id: 'user-2', email: 'g@h.com', email_confirmed_at: '2026-01-01T00:00:00Z' },
+    });
+
+    // The switch to a new user must re-gate (transient loading render) so the
+    // old user's profile/isAdmin is never shown as the new user's.
+    expect(renderLog.some(r => r.loading || r.profileLoading)).toBe(true);
+    expect(txt('userId')).toBe('user-2');
+    expect(txt('userName')).toBe('Grace Hopper');
+    expect(txt('isAdmin')).toBe('false');
+    expect(txt('loading')).toBe('false');
+    expect(txt('profileLoading')).toBe('false');
   });
 
   it('keeps isAuthenticated false while an MFA challenge is outstanding (aal1 → aal2)', async () => {

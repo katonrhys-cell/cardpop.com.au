@@ -3,6 +3,7 @@ import {
   youTubeVideoId,
   youTubeEmbedUrl,
   youTubeThumbnailUrl,
+  facebookEmbedUrl,
   buildVideoJsonLd,
   buildEventJsonLd,
   formatEntryFee,
@@ -111,5 +112,54 @@ describe('buildEventJsonLd offers', () => {
   it('keeps the free-event offer at price 0 alongside a presale price', () => {
     const ld = buildEventJsonLd({ ...base, is_free: true, presale_fee_aud: 10 });
     expect(ld.offers[0]).toMatchObject({ name: 'General admission', price: 0 });
+  });
+});
+
+describe('facebookEmbedUrl', () => {
+  it.each([
+    'https://www.facebook.com/somepage/videos/1234567890/',
+    'https://www.facebook.com/reel/1234567890',
+    'https://www.facebook.com/watch/?v=1234567890',
+    'https://fb.watch/abc123/',
+    'https://www.facebook.com/share/v/abc123/',
+    'https://www.facebook.com/share/r/abc123/',
+    'https://m.facebook.com/somepage/videos/1234567890/',
+  ])('uses the video player plugin for %s', (url) => {
+    expect(facebookEmbedUrl(url)).toBe(
+      `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=false`,
+    );
+  });
+
+  it('uses the post plugin for a non-video public post URL', () => {
+    const url = 'https://www.facebook.com/somepage/posts/1234567890';
+    expect(facebookEmbedUrl(url)).toBe(
+      `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(url)}`,
+    );
+  });
+
+  it.each([
+    ['null', null],
+    ['empty string', ''],
+    ['not a URL', 'not a url'],
+    ['non-facebook host', 'https://www.youtube.com/watch?v=abc'],
+    ['lookalike domain', 'https://facebook.com.evil.com/videos/1'],
+    ['lookalike prefix', 'https://notfacebook.com/videos/1'],
+    ['non-http scheme', 'javascript:alert(1)'],
+  ])('returns null for %s', (_label, url) => {
+    expect(facebookEmbedUrl(url)).toBeNull();
+  });
+});
+
+describe('buildEventJsonLd typicalAgeRange', () => {
+  const base = { slug: 'test-show', title: 'Test Show', start_date: '2026-10-01' };
+
+  it('emits typicalAgeRange when the event has age restrictions', () => {
+    const ld = buildEventJsonLd({ ...base, age_restrictions: '18+' });
+    expect(ld.typicalAgeRange).toBe('18+');
+  });
+
+  it('omits typicalAgeRange when age restrictions are not set', () => {
+    const ld = buildEventJsonLd(base);
+    expect(ld).not.toHaveProperty('typicalAgeRange');
   });
 });

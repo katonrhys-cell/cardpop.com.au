@@ -125,6 +125,8 @@ EXTRACT the following and GENERATE what cannot be found:
    - is_free: true if the event is free to attend, false otherwise
    - capacity: expected attendance or venue capacity as integer, or null
    - registration_required: true if attendees must register in advance
+   - accessibility_info: accessibility details explicitly stated on the page (wheelchair access, step-free entry, accessible parking/toilets, hearing loop, quiet hours) as plain text, or null — do NOT invent or assume
+   - age_restrictions: any age restriction or guidance explicitly stated (e.g. "18+", "All ages — under 15s must be accompanied by an adult"), or null — do NOT invent or assume
 
 4. IMAGES
    - image_url: the best quality event banner, poster or promotional image URL found on the page (full URL starting with http/https), or null
@@ -164,6 +166,8 @@ JSON FORMAT:
   "is_free": boolean,
   "capacity": number or null,
   "registration_required": boolean,
+  "accessibility_info": "string or null",
+  "age_restrictions": "string or null",
   "image_url": "string or null",
   "seo_title": "string (50-60 chars)",
   "seo_description": "string (140-155 chars)",
