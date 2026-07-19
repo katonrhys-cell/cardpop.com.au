@@ -354,13 +354,16 @@ const ShopDropdown = ({ onNavigate }) => {
   const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
   const location = useLocation();
   const isShopActive = location.pathname === '/shop' || location.pathname.startsWith('/shop/');
-  const [activeSlug, setActiveSlug] = useState(SHOP_CATEGORY_GROUPS[0].slug);
+  // No category is active until the user hovers (or focuses) one — the menu
+  // opens as just the category list and the subcategory panel expands out on
+  // first hover.
+  const [activeSlug, setActiveSlug] = useState(null);
 
-  // Re-open on the first category each time the menu closes, so the flyout is
-  // predictable rather than stuck on whatever the user last hovered.
-  useEffect(() => { if (!open) setActiveSlug(SHOP_CATEGORY_GROUPS[0].slug); }, [open]);
+  // Collapse back to the bare category list each time the menu closes, so the
+  // flyout is predictable rather than stuck on whatever the user last hovered.
+  useEffect(() => { if (!open) setActiveSlug(null); }, [open]);
 
-  const activeGroup = SHOP_CATEGORY_GROUPS.find(g => g.slug === activeSlug) || SHOP_CATEGORY_GROUPS[0];
+  const activeGroup = SHOP_CATEGORY_GROUPS.find(g => g.slug === activeSlug) || null;
 
   return (
     <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
@@ -378,22 +381,22 @@ const ShopDropdown = ({ onNavigate }) => {
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-2 w-[620px] max-w-[calc(100vw-3rem)] bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+        <div className={`absolute top-full left-0 mt-2 max-w-[calc(100vw-3rem)] bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden transition-[width] duration-300 ease-out ${activeGroup ? 'w-[620px]' : 'w-[236px]'}`}>
           <Link
             to="/shop"
             onClick={() => { setOpen(false); onNavigate?.(); }}
             className="flex items-center justify-between px-5 py-3.5 border-b border-border hover:bg-muted/60 transition-colors group"
           >
-            <div>
+            <div className="min-w-0">
               <span className="text-sm font-bold text-foreground">Shop All Supplies</span>
-              <p className="text-xs text-muted-foreground mt-0.5">Sleeves, storage, display, shipping &amp; grading gear</p>
+              <p className="text-xs text-muted-foreground mt-0.5 truncate">Sleeves, storage, display, shipping &amp; grading gear</p>
             </div>
             <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
           </Link>
 
           <div className="flex">
-            {/* Parent categories — hover/focus swaps the panel on the right */}
-            <div className="w-[236px] shrink-0 p-3 border-r border-border">
+            {/* Parent categories — hover/focus opens the panel on the right */}
+            <div className={`w-[236px] shrink-0 p-3 ${activeGroup ? 'border-r border-border' : ''}`}>
               {SHOP_CATEGORY_GROUPS.map(group => {
                 const isActive = group.slug === activeSlug;
                 return (
@@ -420,31 +423,34 @@ const ShopDropdown = ({ onNavigate }) => {
               })}
             </div>
 
-            {/* Subcategories of the hovered category */}
-            <div className="flex-1 min-w-0 p-4">
-              <div className="flex items-center gap-2 mb-3 px-1">
-                <span className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground">
-                  {activeGroup.label}
-                </span>
+            {/* Subcategories of the hovered category — absent until a
+                category is hovered, then the panel expands out */}
+            {activeGroup && (
+              <div className="flex-1 min-w-0 p-4">
+                <div className="flex items-center gap-2 mb-3 px-1">
+                  <span className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                    {activeGroup.label}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-0.5">
+                  {activeGroup.items.map(item => (
+                    <Link
+                      key={item.slug}
+                      to={`/shop/category/${item.slug}`}
+                      onClick={() => { setOpen(false); onNavigate?.(); }}
+                      className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-muted transition-colors group"
+                    >
+                      <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${activeGroup.gradient} shrink-0 shadow-sm`}>
+                        <item.Icon className="w-4 h-4 text-white" />
+                      </span>
+                      <span className="text-[13px] font-medium text-foreground group-hover:text-primary transition-colors truncate">
+                        {item.name}
+                      </span>
+                    </Link>
+                  ))}
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-0.5">
-                {activeGroup.items.map(item => (
-                  <Link
-                    key={item.slug}
-                    to={`/shop/category/${item.slug}`}
-                    onClick={() => { setOpen(false); onNavigate?.(); }}
-                    className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-muted transition-colors group"
-                  >
-                    <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${activeGroup.gradient} shrink-0 shadow-sm`}>
-                      <item.Icon className="w-4 h-4 text-white" />
-                    </span>
-                    <span className="text-[13px] font-medium text-foreground group-hover:text-primary transition-colors truncate">
-                      {item.name}
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}
