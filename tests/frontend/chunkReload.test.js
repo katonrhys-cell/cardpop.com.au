@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { isStaleChunkError, STALE_CHUNK_RE, installChunkReloadGuard } from '@/lib/chunkReload.js';
+import { isStaleChunkError, STALE_CHUNK_RE, installChunkReloadGuard, dropRecoveredErrors } from '@/lib/chunkReload.js';
 
 describe('chunkReload — stale-chunk detection', () => {
   it('matches the deploy-related dynamic-import failures we see in Sentry', () => {
@@ -21,6 +21,36 @@ describe('chunkReload — stale-chunk detection', () => {
 
   it('exports a case-insensitive regex', () => {
     expect(STALE_CHUNK_RE.test('IMPORTING A MODULE SCRIPT FAILED')).toBe(true);
+  });
+});
+
+describe('chunkReload — Sentry beforeSend filter (dropRecoveredErrors)', () => {
+  const eventWithValue = (value) => ({ exception: { values: [{ value }] } });
+
+  it('drops stale-chunk errors read from the hint (auto-recovered)', () => {
+    const event = eventWithValue('Importing a module script failed.');
+    const hint = { originalException: new Error('Importing a module script failed.') };
+    expect(dropRecoveredErrors(event, hint)).toBeNull();
+  });
+
+  it('drops stale-chunk errors read from the event when no hint is present', () => {
+    expect(dropRecoveredErrors(eventWithValue("'text/html' is not a valid JavaScript MIME type."), {})).toBeNull();
+  });
+
+  it('drops benign service-worker lifecycle noise', () => {
+    expect(dropRecoveredErrors(eventWithValue('InvalidStateError: newestWorker is null'), {})).toBeNull();
+    const swLoad = { originalException: new Error('TypeError: Script https://cardpop.com.au/sw.js load failed') };
+    expect(dropRecoveredErrors(eventWithValue(''), swLoad)).toBeNull();
+  });
+
+  it('keeps real application errors', () => {
+    const event = eventWithValue("TypeError: Cannot read properties of undefined (reading 'total')");
+    expect(dropRecoveredErrors(event, {})).toBe(event);
+  });
+
+  it('keeps events with no extractable message', () => {
+    const event = { message: undefined };
+    expect(dropRecoveredErrors(event, {})).toBe(event);
   });
 });
 
