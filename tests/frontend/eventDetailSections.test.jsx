@@ -1,7 +1,7 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { vi, describe, it, expect } from 'vitest';
+import { vi, describe, it, expect, afterEach } from 'vitest';
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 // EventRsvp pulls in auth + supabase; the sections under test don't need it.
@@ -88,6 +88,35 @@ describe('EventDetailCard — video embeds', () => {
   it('ignores a non-Facebook URL in facebook_video_url', () => {
     renderCard({ ...baseEvent, facebook_video_url: 'https://evil.example.com/videos/1' });
     expect(screen.queryByTitle('Test Card Show — Facebook video')).not.toBeInTheDocument();
+  });
+});
+
+describe('EventDetailCard — YouTube 10s autoplay', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('enables the iframe player API on the embed src', () => {
+    renderCard({ ...baseEvent, youtube_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' });
+    const yt = screen.getByTitle('Test Card Show — event video');
+    expect(yt.getAttribute('src')).toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?enablejsapi=1');
+  });
+
+  it('sends mute + playVideo to the player 10 seconds after load, not before', () => {
+    vi.useFakeTimers();
+    renderCard({ ...baseEvent, youtube_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' });
+    const yt = screen.getByTitle('Test Card Show — event video');
+    const postMessage = vi.fn();
+    // happy-dom doesn't give cross-origin iframes a real contentWindow; stub it.
+    Object.defineProperty(yt, 'contentWindow', { value: { postMessage }, configurable: true });
+
+    act(() => { vi.advanceTimersByTime(9_000); });
+    expect(postMessage).not.toHaveBeenCalled();
+
+    act(() => { vi.advanceTimersByTime(1_000); });
+    expect(postMessage).toHaveBeenCalledTimes(2);
+    expect(postMessage).toHaveBeenNthCalledWith(1, JSON.stringify({ event: 'command', func: 'mute', args: [] }), '*');
+    expect(postMessage).toHaveBeenNthCalledWith(2, JSON.stringify({ event: 'command', func: 'playVideo', args: [] }), '*');
   });
 });
 

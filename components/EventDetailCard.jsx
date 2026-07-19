@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Accessibility, ShieldAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,24 @@ import { toast } from 'sonner';
 const EventDetailCard = ({ event }) => {
   const videoEmbedUrl = youTubeEmbedUrl(event.youtube_url);
   const fbEmbedUrl = facebookEmbedUrl(event.facebook_video_url);
+  const ytFrameRef = useRef(null);
+
+  // Start the YouTube video automatically 10 seconds after the page loads.
+  // Uses the iframe player API via postMessage (enabled by ?enablejsapi=1 on
+  // the embed src) rather than swapping in an autoplay URL, so the frame never
+  // reloads — a visitor who already pressed play keeps watching uninterrupted.
+  // Muted first: browsers block programmatic autoplay with sound.
+  useEffect(() => {
+    if (!videoEmbedUrl) return;
+    const timer = setTimeout(() => {
+      const win = ytFrameRef.current?.contentWindow;
+      if (!win) return;
+      ['mute', 'playVideo'].forEach((func) =>
+        win.postMessage(JSON.stringify({ event: 'command', func, args: [] }), '*'),
+      );
+    }, 10_000);
+    return () => clearTimeout(timer);
+  }, [videoEmbedUrl]);
 
   const handleShare = (platform) => {
     const url = encodeURIComponent(window.location.href);
@@ -124,7 +142,8 @@ const EventDetailCard = ({ event }) => {
                 {videoEmbedUrl && (
                   <div className="aspect-video w-full overflow-hidden rounded-2xl border border-border bg-muted shadow-md">
                     <iframe
-                      src={videoEmbedUrl}
+                      ref={ytFrameRef}
+                      src={`${videoEmbedUrl}?enablejsapi=1`}
                       title={`${event.name} — event video`}
                       className="w-full h-full"
                       loading="lazy"
