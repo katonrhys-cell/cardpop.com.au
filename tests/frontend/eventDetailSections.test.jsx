@@ -55,6 +55,42 @@ describe('EventDetailCard — accessibility & age restriction sections', () => {
   });
 });
 
+describe('EventDetailCard — video embeds', () => {
+  it('shows no video section when neither URL is set', () => {
+    renderCard(baseEvent);
+    expect(screen.queryByText('Event Video')).not.toBeInTheDocument();
+    expect(screen.queryByText('Event Videos')).not.toBeInTheDocument();
+  });
+
+  it('embeds a Facebook video alone under About This Event', () => {
+    renderCard({ ...baseEvent, facebook_video_url: 'https://www.facebook.com/reel/123' });
+    expect(screen.getByText('Event Video')).toBeInTheDocument();
+    const iframe = screen.getByTitle('Test Card Show — Facebook video');
+    expect(iframe.getAttribute('src')).toContain('https://www.facebook.com/plugins/video.php');
+    expect(screen.queryByTitle('Test Card Show — event video')).not.toBeInTheDocument();
+  });
+
+  it('stacks the Facebook embed beneath the YouTube embed when both are set', () => {
+    renderCard({
+      ...baseEvent,
+      youtube_url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      facebook_video_url: 'https://www.facebook.com/somepage/videos/123/',
+    });
+    expect(screen.getByText('Event Videos')).toBeInTheDocument();
+    const yt = screen.getByTitle('Test Card Show — event video');
+    const fb = screen.getByTitle('Test Card Show — Facebook video');
+    expect(yt.getAttribute('src')).toContain('youtube-nocookie.com/embed');
+    expect(fb.getAttribute('src')).toContain('facebook.com/plugins/video.php');
+    // The YouTube iframe precedes the Facebook one in document order.
+    expect(yt.compareDocumentPosition(fb) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('ignores a non-Facebook URL in facebook_video_url', () => {
+    renderCard({ ...baseEvent, facebook_video_url: 'https://evil.example.com/videos/1' });
+    expect(screen.queryByTitle('Test Card Show — Facebook video')).not.toBeInTheDocument();
+  });
+});
+
 describe('EventDetailModal — accessibility & age restriction sections', () => {
   it('hides both sections when the fields are empty', () => {
     renderModal(baseEvent);

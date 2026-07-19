@@ -69,6 +69,7 @@ const INITIAL_STATE = {
   instagram_url: '',
   facebook_url: '',
   youtube_url: '',
+  facebook_video_url: '',
   entry_fee_aud: '',
   presale_fee_aud: '',
   is_free: true,
@@ -222,6 +223,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         instagram_url:       event.instagram_url || '',
         facebook_url:        event.facebook_url || '',
         youtube_url:         event.youtube_url || '',
+        facebook_video_url:  event.facebook_video_url || '',
         entry_fee_aud:       event.entry_fee_aud != null ? String(event.entry_fee_aud) : '',
         presale_fee_aud:     event.presale_fee_aud != null ? String(event.presale_fee_aud) : '',
         is_free:             event.is_free ?? true,
@@ -334,6 +336,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         instagram_url:       formData.instagram_url.trim() || null,
         facebook_url:        formData.facebook_url.trim() || null,
         youtube_url:         formData.youtube_url.trim() || null,
+        facebook_video_url:  formData.facebook_video_url.trim() || null,
         entry_fee_aud:       formData.is_free ? 0 : (parseFloat(formData.entry_fee_aud) || 0),
         presale_fee_aud:     formData.is_free ? null : (parseFloat(formData.presale_fee_aud) || null),
         is_free:             formData.is_free,
@@ -644,6 +647,11 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                     <Label htmlFor="youtube_url" className="font-bold">YouTube Video URL</Label>
                     <Input id="youtube_url" name="youtube_url" type="url" value={formData.youtube_url} onChange={handleChange} className={inputCls} placeholder="https://www.youtube.com/watch?v=..." disabled={loading} />
                     <p className="text-xs text-muted-foreground">Embedded on the event page and added to its structured data for video SEO.</p>
+                  </div>
+                  <div className="sm:col-span-2 space-y-2">
+                    <Label htmlFor="facebook_video_url" className="font-bold">Facebook Public Post / Reel URL</Label>
+                    <Input id="facebook_video_url" name="facebook_video_url" type="url" value={formData.facebook_video_url} onChange={handleChange} className={inputCls} placeholder="https://www.facebook.com/..." disabled={loading} />
+                    <p className="text-xs text-muted-foreground">Public Facebook video post or Reel — embedded on the event page under "About this event", below the YouTube video when both are set.</p>
                   </div>
                 </div>
 
