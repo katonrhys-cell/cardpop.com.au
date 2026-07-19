@@ -28,6 +28,28 @@ const ORIGIN = 'https://odoglvswwymyjuwlonkf.supabase.co';
 const OBJECT_PATH = /^\/storage\/v1\/object\/public\//;
 const RENDER_PATH = /^\/storage\/v1\/render\/image\/public\//;
 
+// ── Card-art passthrough (img.cardpop.com.au/card-art?src=<upstream>) ────────
+//
+// The card analytics/movers thumbnails resolve official art from free card
+// APIs whose images live on their OWN CDNs. Hotlinking those CDNs is free but
+// leaves us dependent on their uptime. This route lets us serve that art from
+// our own edge/R2 instead: on first request the upstream image is fetched and
+// written through to R2 (keyed by upstream host+path), so every later request
+// is served from R2 — insulated from the upstream CDN and, like the Supabase
+// fast path, at zero egress cost. Off by default: the app only emits /card-art
+// URLs when CARD_ART_CDN_HOST is set server-side (see src/utils/
+// cardImageResolver.js); until then this route is simply never hit.
+const CARD_ART_PATH = /^\/card-art\/?$/;
+
+// SSRF guard: the ONLY upstream hosts this route will fetch. Without a strict
+// allowlist, `?src=` would turn the Worker into an open proxy for arbitrary
+// URLs. Keep in sync with the allowlist in src/utils/cardImageResolver.js.
+const CARD_ART_HOSTS = new Set([
+  'images.pokemontcg.io', // Pokémon TCG API card art
+  'cards.scryfall.io',    // Scryfall (Magic) card art
+  'images.ygoprodeck.com',// YGOPRODeck (Yu-Gi-Oh) card art
+]);
+
 // ── Query-string canonicalisation ─────────────────────────────────────────
 //
 // The edge cache keys on the full URL, so every distinct query string is a
@@ -131,6 +153,95 @@ async function serveFromR2(request, url, bucket, ctx) {
     : cacheable;
 }
 
+// Serve /card-art?src=<upstream> from R2 (or the upstream CDN on a miss, writing
+// through to R2 so the next request is served locally). Mirrors the Supabase R2
+// fast path: R2 hit → serve; miss → fetch upstream, stream to the client AND
+// copy into R2 in the background. The R2 key ignores the upstream query string
+// (a version cache-buster) — the path already identifies the image uniquely and
+// the content is immutable — collapsing every variant onto one stored object.
+async function serveCardArt(request, url, env, ctx) {
+  const src = url.searchParams.get('src');
+  if (!src) return new Response('Missing src', { status: 400 });
+
+  let target;
+  try {
+    target = new URL(src);
+  } catch {
+    return new Response('Bad src', { status: 400 });
+  }
+  // Reject anything not on the allowlist so this can never be an open proxy.
+  if (target.protocol !== 'https:' || !CARD_ART_HOSTS.has(target.host)) {
+    return new Response('Host not allowed', { status: 403 });
+  }
+
+  const key = `card-art/${target.host}${target.pathname}`;
+  const cache = caches.default;
+  // Canonical, query-free edge-cache key so scryfall's ?<version> can't multiply
+  // entries. Always GET (a HEAD reuses the cached GET response, bodyless).
+  const cacheKey = new Request(`${url.origin}/card-art?k=${encodeURIComponent(key)}`, { method: 'GET' });
+
+  const cached = await cache.match(cacheKey);
+  if (cached) {
+    return request.method === 'HEAD'
+      ? new Response(null, { status: cached.status, headers: cached.headers })
+      : cached;
+  }
+
+  // ── R2 fast path ──────────────────────────────────────────────────────────
+  if (env && env.IMAGES) {
+    const object = await env.IMAGES.get(key);
+    if (object) {
+      const headers = new Headers();
+      object.writeHttpMetadata(headers);
+      headers.set('etag', object.httpEtag);
+      headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+      headers.set('Access-Control-Allow-Origin', '*');
+      headers.set('x-image-source', 'r2-card-art');
+      const cacheable = new Response(object.body, { headers });
+      if (ctx && typeof ctx.waitUntil === 'function') {
+        ctx.waitUntil(cache.put(cacheKey, cacheable.clone()));
+      }
+      return request.method === 'HEAD' ? new Response(null, { headers }) : cacheable;
+    }
+  }
+
+  // ── Miss → fetch upstream (with the full src incl. query) ──────────────────
+  const upstream = await fetch(target.toString(), {
+    cf: {
+      cacheEverything: true,
+      cacheTtlByStatus: { '200-299': 31536000, '300-399': 0, '400-599': 0 },
+    },
+  });
+
+  const headers = new Headers();
+  const contentType = upstream.headers.get('content-type') || '';
+  if (contentType) headers.set('content-type', contentType);
+  headers.set('Access-Control-Allow-Origin', '*');
+  if (upstream.ok) headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+
+  // Lazy write-through: split the stream so the client is served now while the
+  // other half is copied into R2 in the background. Skipped for HEAD (no body),
+  // non-2xx (never cache a miss/error), and when there's no binding/waitUntil.
+  let clientBody = upstream.body;
+  if (
+    env && env.IMAGES &&
+    ctx && typeof ctx.waitUntil === 'function' &&
+    request.method === 'GET' &&
+    upstream.ok &&
+    upstream.body
+  ) {
+    const [toClient, toR2] = upstream.body.tee();
+    clientBody = toClient;
+    ctx.waitUntil(
+      env.IMAGES.put(key, toR2, { httpMetadata: { contentType: contentType || undefined } }).catch(() => {})
+    );
+  }
+
+  return request.method === 'HEAD'
+    ? new Response(null, { status: upstream.status, headers })
+    : new Response(clientBody, { status: upstream.status, statusText: upstream.statusText, headers });
+}
+
 export default {
   async fetch(request, env, ctx) {
     if (request.method !== 'GET' && request.method !== 'HEAD') {
@@ -138,6 +249,12 @@ export default {
     }
 
     const url = new URL(request.url);
+
+    // Card-art passthrough is a distinct namespace from Supabase storage paths.
+    if (CARD_ART_PATH.test(url.pathname)) {
+      return serveCardArt(request, url, env, ctx);
+    }
+
     const isObject = OBJECT_PATH.test(url.pathname);
     if (!isObject && !RENDER_PATH.test(url.pathname)) {
       return new Response('Not found', { status: 404 });

@@ -122,6 +122,41 @@ The binding is optional: with no `IMAGES` binding the Worker behaves exactly as
 the Supabase-only proxy did. See `tests/backend/imageProxyWorker.test.js` for the
 covered behaviours.
 
+### Card-art passthrough (`/card-art` — insulate third-party card CDNs)
+
+The card analytics / market-movers thumbnails resolve official card art from the
+free card APIs (Pokémon TCG, Scryfall, YGOPRODeck) server-side — see
+`src/utils/cardImageResolver.js`. Those images live on the APIs' **own** CDNs, so
+serving them costs nothing against Supabase egress, but it leaves us dependent on
+those CDNs staying up. The Worker's `/card-art` route removes that dependency by
+caching the art in our own R2.
+
+How it works, mirroring the Supabase R2 fast path:
+
+- The resolver, when `CARD_ART_CDN_HOST` is set, rewrites an upstream image URL
+  onto `https://<host>/card-art?src=<upstream-url>`. When it's unset the resolver
+  returns the raw upstream URL and this route is never hit (the default).
+- On request, the Worker validates `src`'s host against a strict allowlist
+  (`CARD_ART_HOSTS` — `images.pokemontcg.io`, `cards.scryfall.io`,
+  `images.ygoprodeck.com`), then looks it up in R2 under
+  `card-art/<host><path>`. **The allowlist is essential** — without it `?src=`
+  would make the Worker an open proxy for any URL.
+- A hit is served from R2 (`x-image-source: r2-card-art`); a **miss** fetches the
+  upstream image, streams it to the client, and `tee()`s a copy into R2 so every
+  later request is free and CDN-independent. The R2 key ignores the query string
+  (Scryfall appends a `?<version>`) since the path already identifies the
+  immutable image.
+
+**Activation is gated on its own var, deliberately.** `CARD_ART_CDN_HOST` is
+separate from the always-on `IMAGE_CDN_HOST` so the resolver only starts emitting
+`/card-art` URLs *after* you've confirmed the Worker carrying this route is
+deployed — otherwise a deploy-order race (Vercel updates the resolver before the
+Cloudflare build ships the Worker) would 404 the art. To turn it on: deploy the
+Worker (merge to the branch the Git integration builds), confirm `/card-art`
+serves, then set `CARD_ART_CDN_HOST=img.cardpop.com.au` in Vercel. To turn it
+off, unset it — the resolver instantly reverts to raw upstream URLs. It reuses
+the same `IMAGES` R2 binding; no new bucket or binding is needed.
+
 **Bind the bucket — declare it in `wrangler.jsonc`, NOT the dashboard:**
 
 The Worker is deployed by the Cloudflare Git integration, which runs Wrangler

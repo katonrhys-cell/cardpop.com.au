@@ -198,4 +198,24 @@ describe('POST /images', () => {
     });
     expect(res.body.results[0].image).toEqual({ small: 'http://s/small.jpg', large: 'http://s/normal.jpg', id: 's5', source: 'scryfall' });
   });
+
+  it('rewrites allowlisted art onto the card-art CDN when CARD_ART_CDN_HOST is set', async () => {
+    const SMALL = 'https://images.pokemontcg.io/swsh9/18.png';
+    const LARGE = 'https://images.pokemontcg.io/swsh9/18_hires.png';
+    h.pokemon = [{ id: 'p20', images: { small: SMALL, large: LARGE } }];
+    process.env.CARD_ART_CDN_HOST = 'img.cardpop.com.au';
+    try {
+      const res = await request(app).post('/images').send({
+        cards: [{ name: 'Charizard ImgCdn', set: 'Brilliant Stars', collection: 'Pokémon' }],
+      });
+      expect(res.body.results[0].image).toEqual({
+        small: `https://img.cardpop.com.au/card-art?src=${encodeURIComponent(SMALL)}`,
+        large: `https://img.cardpop.com.au/card-art?src=${encodeURIComponent(LARGE)}`,
+        id: 'p20',
+        source: 'pokemon-tcg',
+      });
+    } finally {
+      delete process.env.CARD_ART_CDN_HOST;
+    }
+  });
 });

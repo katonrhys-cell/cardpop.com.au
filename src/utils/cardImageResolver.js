@@ -49,6 +49,43 @@ function cacheSet(key, value, ttl) {
 const POKEMON_API_KEY =
   process.env.POKEMONTCG_API_KEY || process.env.VITE_POKEMONTCG_API_KEY || '';
 
+// Optional: serve resolved card art through our own image CDN/R2 instead of
+// hotlinking the upstream API CDNs, so we're insulated from their uptime (see
+// cloudflare/image-proxy-worker.js → /card-art). Off by default — when
+// CARD_ART_CDN_HOST is unset the resolver returns the raw upstream URLs exactly
+// as before. Gated on its OWN var (not the always-on IMAGE_CDN_HOST) so it can
+// be switched on only AFTER the Worker carrying the /card-art route is live,
+// avoiding a deploy-order race. Only these hosts are rewritten — they must match
+// the Worker's CARD_ART_HOSTS allowlist.
+const CARD_ART_CDN_HOSTS = new Set([
+  'images.pokemontcg.io',
+  'cards.scryfall.io',
+  'images.ygoprodeck.com',
+]);
+
+// Rewrite an upstream card-art URL onto the configured CDN host. Read the env at
+// call time (not module load) so the switch takes effect without a cold start
+// and stays trivially testable. Returns the URL unchanged when the CDN is off,
+// the input is falsy, or the host isn't one we proxy.
+function toCardArtCdn(imageUrl) {
+  const host = (process.env.CARD_ART_CDN_HOST || '').trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  if (!host || !imageUrl) return imageUrl;
+  try {
+    if (!CARD_ART_CDN_HOSTS.has(new URL(imageUrl).host)) return imageUrl;
+    return `https://${host}/card-art?src=${encodeURIComponent(imageUrl)}`;
+  } catch {
+    return imageUrl;
+  }
+}
+
+// Apply the CDN rewrite to a resolved result's image URLs. The module cache
+// stores canonical upstream URLs; wrapping happens on the way out so toggling
+// the CDN never serves a stale-host cache entry.
+function withCardArtCdn(result) {
+  if (!result) return result;
+  return { ...result, small: toCardArtCdn(result.small), large: toCardArtCdn(result.large) };
+}
+
 // "Charizard VSTAR 018/172"                  → { name: 'Charizard VSTAR', number: '18' }
 // "Charizard ex (Special Illustration Rare)" → { name: 'Charizard ex', number: null }
 // "Charizard Holo (Base Set)"                → { name: 'Charizard', number: null }
@@ -160,7 +197,7 @@ export async function resolveCardImage({ name, set, collection } = {}) {
 
   const key = `${rawName}|${set || ''}|${collection || ''}`.toLowerCase();
   const cached = cacheGet(key);
-  if (cached !== undefined) return cached;
+  if (cached !== undefined) return withCardArtCdn(cached);
 
   const parsed = parseCard(rawName);
   if (!parsed.name) {
@@ -176,8 +213,8 @@ export async function resolveCardImage({ name, set, collection } = {}) {
       else if (api === 'scryfall') result = await resolveScryfall(parsed.name);
       else if (api === 'yugioh') result = await resolveYugioh(parsed.name);
       if (result) {
-        cacheSet(key, result, CACHE_TTL_MS);
-        return result;
+        cacheSet(key, result, CACHE_TTL_MS); // cache canonical upstream URLs
+        return withCardArtCdn(result);
       }
     } catch (err) {
       // Transient (429/5xx/timeout/network) — remember so we don't cache a null.

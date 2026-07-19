@@ -248,3 +248,102 @@ describe('worker R2 fast path', () => {
     expect(env.IMAGES.put).not.toHaveBeenCalled();
   });
 });
+
+// ─── /card-art passthrough ────────────────────────────────────────────────────
+
+describe('worker /card-art route', () => {
+  let fetchSpy;
+
+  beforeEach(() => {
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('upstream-bytes', { status: 200, headers: { 'Content-Type': 'image/png' } })
+    );
+    globalThis.caches = { default: { match: vi.fn().mockResolvedValue(undefined), put: vi.fn().mockResolvedValue(undefined) } };
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
+    delete globalThis.caches;
+  });
+
+  const ctx = { waitUntil: vi.fn() };
+  const POKE = 'https://images.pokemontcg.io/swsh9/18.png';
+  const POKE_KEY = 'card-art/images.pokemontcg.io/swsh9/18.png';
+  const artUrl = (src) => `/card-art?src=${encodeURIComponent(src)}`;
+  const run = (path, env, opts) =>
+    worker.fetch(new Request(`https://img.cardpop.com.au${path}`, opts), env, ctx);
+
+  const bucketWith = (presentKey) => ({
+    get: vi.fn(async (key) =>
+      key === presentKey
+        ? { body: 'r2-art', httpEtag: '"z"', writeHttpMetadata: (h) => h.set('Content-Type', 'image/png') }
+        : null
+    ),
+    put: vi.fn().mockResolvedValue(undefined),
+  });
+
+  it('rejects a missing src with 400 and no upstream fetch', async () => {
+    const res = await run('/card-art', {});
+    expect(res.status).toBe(400);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-allowlisted host with 403 (no open proxy)', async () => {
+    const res = await run(artUrl('https://evil.example.com/steal.png'), {});
+    expect(res.status).toBe(403);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-https src with 403', async () => {
+    const res = await run(artUrl('http://images.pokemontcg.io/swsh9/18.png'), {});
+    expect(res.status).toBe(403);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('serves art from R2 without touching the upstream CDN', async () => {
+    const env = { IMAGES: bucketWith(POKE_KEY) };
+    const res = await run(artUrl(POKE), env);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe('r2-art');
+    expect(env.IMAGES.get).toHaveBeenCalledWith(POKE_KEY);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(res.headers.get('x-image-source')).toBe('r2-card-art');
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=31536000, immutable');
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
+  });
+
+  it('fetches the upstream image and writes it through to R2 on a miss', async () => {
+    const env = { IMAGES: bucketWith('not-this-key') };
+    const res = await run(artUrl(POKE), env);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe('upstream-bytes');
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0][0]).toBe(POKE);
+    expect(env.IMAGES.put).toHaveBeenCalledTimes(1);
+    expect(env.IMAGES.put.mock.calls[0][0]).toBe(POKE_KEY);
+    expect(env.IMAGES.put.mock.calls[0][2]).toEqual({ httpMetadata: { contentType: 'image/png' } });
+  });
+
+  it('keys R2 by host+path only, ignoring the upstream version query', async () => {
+    const env = { IMAGES: bucketWith(POKE_KEY) };
+    const res = await run(artUrl('https://images.pokemontcg.io/swsh9/18.png?v=42'), env);
+    expect(res.status).toBe(200);
+    expect(env.IMAGES.get).toHaveBeenCalledWith(POKE_KEY);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not write a non-2xx upstream response into R2', async () => {
+    fetchSpy.mockResolvedValue(new Response('nope', { status: 404 }));
+    const env = { IMAGES: bucketWith('not-this-key') };
+    const res = await run(artUrl(POKE), env);
+    expect(res.status).toBe(404);
+    expect(env.IMAGES.put).not.toHaveBeenCalled();
+  });
+
+  it('returns a bodyless HEAD hit and never migrates on HEAD', async () => {
+    const env = { IMAGES: bucketWith('not-this-key') };
+    const res = await run(artUrl(POKE), env, { method: 'HEAD' });
+    expect(await res.text()).toBe('');
+    expect(env.IMAGES.put).not.toHaveBeenCalled();
+  });
+});
