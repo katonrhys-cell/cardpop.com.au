@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { BookOpen, FileX, AlertCircle, Search, User, Calendar, ArrowRight } from 'lucide-react';
 import { htmlExcerpt } from '@/utils/htmlExcerpt.js';
+import { toCdnUrl } from '@/utils/imageUrl.js';
 import { BLOG_CATEGORIES as CATEGORIES } from '@/data/blogCategories.js';
 import { resolveConviction } from '@/utils/convictionRating.js';
 
@@ -88,7 +89,7 @@ const ImagePlaceholder = () => (
 
 // Large card for Featured Stories (2-col grid)
 const FeaturedCard = ({ article, showBadge = true }) => {
-  const imageUrl = article.featured_image_url || null;
+  const imageUrl = toCdnUrl(article.featured_image_url) || null;
   return (
     <Link
       to={`/blog/${article.slug || article.id}`}
@@ -126,7 +127,7 @@ const FeaturedCard = ({ article, showBadge = true }) => {
 
 // Standard card for the main articles grid (3-col)
 const ArticleCard = ({ article, showBadge = true }) => {
-  const imageUrl = article.featured_image_url || null;
+  const imageUrl = toCdnUrl(article.featured_image_url) || null;
   return (
     <Link
       to={`/blog/${article.slug || article.id}`}

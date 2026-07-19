@@ -29,7 +29,7 @@ const getStatusBadge = (listingType) => {
 const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
   const rawImg = vaultItem.vault_images?.[0]?.storage_path || vaultItem.card_image || vaultItem.vault_images?.[0]?.image_url || vaultItem.image_url || null;
-  const { src: imgSrc, srcSet: imgSrcSet, fallbackSrc: imgFallback } = getCardImage(rawImg);
+  const { src: imgSrc, srcSet: imgSrcSet, fallbackSrc: imgFallback, thumbSrc: imgThumb } = getCardImage(rawImg);
   const sellerObj = vaultItem.profiles || vaultItem.owner || vaultItem.seller || vaultItem.expand?.user_id || null;
   const sellerId = vaultItem.user_id || vaultItem.owner_id || sellerObj?.id;
   const titleSlug = slugify(vaultItem.card_name || vaultItem.name || vaultItem.title || 'card');
@@ -62,6 +62,7 @@ const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
           srcSet={imgSrcSet}
           sizes={CARD_GRID_SIZES}
           fallbackSrc={imgFallback}
+          thumbSrc={imgThumb}
           alt={vaultItem.card_name || vaultItem.name || 'Vault Image'}
           displayStyle={vaultItem.display_style}
           width="400"

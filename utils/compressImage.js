@@ -87,6 +87,28 @@ export async function compressImage(file, options = {}) {
   }
 }
 
+// Card grids render at ~300 px but were serving the full 1600 px upload. A
+// pre-generated grid thumbnail cuts each grid view's payload ~5-10× — which
+// also shrinks CDN/edge cache pressure and the one-off R2 migration cost.
+// Uploaded alongside the full image under a deterministic name (see
+// thumbStoragePath in utils/imageUrl.js) so renderers can derive its URL
+// without a DB column.
+const THUMB_DEFAULTS = {
+  maxDimension: 480, // ≥ the largest grid cell across breakpoints (~300 px @2x ≈ 600… 480 is the srcset sweet spot)
+  quality: 0.7,
+  mimeType: 'image/webp',
+  skipUnderBytes: 20 * 1024, // tiny files are their own thumbnail
+};
+
+/**
+ * Generate a small grid thumbnail for an image File. Same defensive behaviour
+ * as {@link compressImage}: anything unprocessable comes back unchanged, so
+ * the caller can always upload the result.
+ */
+export function createThumbnail(file, options = {}) {
+  return compressImage(file, { ...THUMB_DEFAULTS, ...options });
+}
+
 /**
  * Compress an array of files, preserving order. Non-File entries (e.g. already
  * uploaded {url} placeholders) are passed through untouched.

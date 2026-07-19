@@ -105,6 +105,22 @@ export function toCdnUrl(url) {
   return match ? `${cdnOrigin}${match[2]}` : url;
 }
 
+// Matches every Supabase storage public URL inside a blob of HTML, so stored
+// article/content HTML can be rewritten onto the CDN in one pass.
+const SUPABASE_STORAGE_URL_IN_HTML_RE =
+  /https?:\/\/[^/"'\s]+\.supabase\.(?:co|in)(\/storage\/v1\/(?:object|render\/image)\/public\/)/g;
+
+/**
+ * Rewrite every Supabase storage public URL embedded in an HTML string onto
+ * the image CDN. Admin-authored article bodies store canonical Supabase URLs
+ * in their <img> tags; per-call-site helpers can't reach those, so the whole
+ * HTML blob is rewritten just before render. No-op when no CDN is configured.
+ */
+export function cdnifyStorageUrlsInHtml(html) {
+  if (!cdnOrigin || typeof html !== 'string') return html;
+  return html.replace(SUPABASE_STORAGE_URL_IN_HTML_RE, `${cdnOrigin}$1`);
+}
+
 /**
  * Public URL for an image that may be stored as a bucket path or an absolute
  * URL (both shapes exist in the database). Routes through the image CDN when
@@ -160,6 +176,41 @@ export function parseStorageObjectUrl(url) {
   }
 }
 
+// ── Pre-generated grid thumbnails ──────────────────────────────────────────
+//
+// Uploads from THUMBNAILS_SINCE onward store a small companion thumbnail next
+// to the full image (utils/compressImage.js createThumbnail), under a
+// deterministic name so no DB column is needed: `<path minus ext>.thumb.webp`.
+// Upload filenames embed their Date.now() timestamp, which lets renderers know
+// whether a thumbnail exists WITHOUT probing: older uploads simply never get a
+// thumbSrc, so legacy images cost zero extra requests.
+export const THUMB_SUFFIX = '.thumb.webp';
+
+// Uploads at/after this epoch-ms carry a companion thumbnail. Set just ahead
+// of the feature's deploy; an upload with a thumb but a timestamp below the
+// line merely serves the full image (harmless), whereas the reverse would 404.
+export const THUMBNAILS_SINCE = 1784500000000; // 2026-07-19T23:06:40Z
+
+/** Storage path of the companion thumbnail for a full-image storage path. */
+export function thumbStoragePath(path) {
+  return path.replace(/\.[^./]+$/, '') + THUMB_SUFFIX;
+}
+
+// Extract the upload timestamp embedded in a storage filename (the last
+// 13-digit run in the basename — covers `<ts>.jpg`, `<ts>-extra-x.jpg`,
+// `template-<id>-<ts>.webp`). Returns null when there isn't one.
+function uploadTimestamp(path) {
+  const base = String(path).split('/').pop() || '';
+  const runs = base.match(/\d{13}/g);
+  return runs ? Number(runs[runs.length - 1]) : null;
+}
+
+function hasThumbnail(path) {
+  if (typeof path !== 'string' || path.endsWith(THUMB_SUFFIX)) return false;
+  const ts = uploadTimestamp(path);
+  return ts !== null && ts >= THUMBNAILS_SINCE;
+}
+
 /**
  * Build a responsive image descriptor for a card/grid image.
  *
@@ -168,13 +219,13 @@ export function parseStorageObjectUrl(url) {
  * @param {number[]} [opts.widths]  Candidate widths for the srcset.
  * @param {string}   [opts.bucket]  Storage bucket (default `vault-images`).
  * @param {number}   [opts.quality] Transform quality (default 75).
- * @returns {{ src: string|null, srcSet: string|null, fallbackSrc: string|null, canonicalSrc: string|null }}
+ * @returns {{ src: string|null, srcSet: string|null, fallbackSrc: string|null, canonicalSrc: string|null, thumbSrc: string|null }}
  */
 export function getCardImage(pathOrUrl, opts = {}) {
   const { widths = DEFAULT_WIDTHS, bucket = DEFAULT_BUCKET, quality = 75 } = opts;
 
   if (!pathOrUrl || typeof pathOrUrl !== 'string') {
-    return { src: null, srcSet: null, fallbackSrc: null, canonicalSrc: null };
+    return { src: null, srcSet: null, fallbackSrc: null, canonicalSrc: null, thumbSrc: null };
   }
 
   // Absolute URL: if it's a Supabase storage object URL (the shape stored in
@@ -188,11 +239,20 @@ export function getCardImage(pathOrUrl, opts = {}) {
     const parsed = parseStorageObjectUrl(pathOrUrl);
     if (!parsed) {
       const direct = toCdnUrl(pathOrUrl);
-      return { src: direct, srcSet: null, fallbackSrc: direct, canonicalSrc: pathOrUrl };
+      return { src: direct, srcSet: null, fallbackSrc: direct, canonicalSrc: pathOrUrl, thumbSrc: null };
     }
     effectivePath = parsed.path;
     effectiveBucket = parsed.bucket;
   }
+
+  // Companion grid thumbnail (uploads since THUMBNAILS_SINCE) — CDN-routed.
+  // Grid components try this first; CardImage falls back to the full image.
+  const thumbSrc = hasThumbnail(effectivePath)
+    ? toCdnUrl(
+        supabase.storage.from(effectiveBucket).getPublicUrl(thumbStoragePath(effectivePath)).data
+          .publicUrl
+      )
+    : null;
 
   // Canonical (non-CDN) public URL — the last-resort fallback that always hits
   // Supabase directly, so a CDN failure self-heals instead of showing a broken
@@ -204,7 +264,7 @@ export function getCardImage(pathOrUrl, opts = {}) {
   // Transforms disabled by config (default) or known-unavailable this session →
   // serve the untransformed original directly and never hit /render/image.
   if (!transformsEnabled || transformsUnavailable) {
-    return { src: fallbackSrc, srcSet: null, fallbackSrc, canonicalSrc };
+    return { src: fallbackSrc, srcSet: null, fallbackSrc, canonicalSrc, thumbSrc };
   }
 
   const at = (width) =>
@@ -219,7 +279,7 @@ export function getCardImage(pathOrUrl, opts = {}) {
   // Default src = middle width (a sensible pick for no-srcset browsers).
   const src = at(sorted[Math.floor(sorted.length / 2)] ?? sorted[0]);
 
-  return { src, srcSet, fallbackSrc, canonicalSrc };
+  return { src, srcSet, fallbackSrc, canonicalSrc, thumbSrc };
 }
 
 // Sensible default `sizes` for the 1→2→3→4 column card grids used across the

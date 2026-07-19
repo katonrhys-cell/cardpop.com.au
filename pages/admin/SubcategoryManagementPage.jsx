@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient.js';
+import { toCdnUrl } from '@/utils/imageUrl.js';
 
 const SubcategoryManagementPage = () => {
   const navigate = useNavigate();
@@ -282,7 +283,7 @@ const SubcategoryManagementPage = () => {
                       <TableCell className="text-center">
                         <div className="w-10 h-10 rounded-xl bg-background border border-border flex items-center justify-center mx-auto overflow-hidden shadow-sm p-1">
                           {subcategory.icon_url ? (
-                            <img src={subcategory.icon_url} alt={subcategory.name} className="w-full h-full object-contain" />
+                            <img src={toCdnUrl(subcategory.icon_url)} alt={subcategory.name} className="w-full h-full object-contain" />
                           ) : (
                             <ImageOff className="w-4 h-4 text-muted-foreground opacity-50" />
                           )}

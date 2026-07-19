@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { toCdnUrl } from '@/utils/imageUrl.js';
 
 const ProductLinesManagementPage = () => {
   const navigate = useNavigate();
@@ -273,7 +274,7 @@ const ProductLinesManagementPage = () => {
                       <TableCell className="text-center">
                         <div className="w-10 h-10 rounded-xl bg-background border border-border flex items-center justify-center mx-auto overflow-hidden shadow-sm p-1">
                           {line.image_url ? (
-                            <img src={line.image_url} alt={line.name} className="w-full h-full object-contain" />
+                            <img src={toCdnUrl(line.image_url)} alt={line.name} className="w-full h-full object-contain" />
                           ) : (
                             <ImageOff className="w-4 h-4 text-muted-foreground opacity-50" />
                           )}

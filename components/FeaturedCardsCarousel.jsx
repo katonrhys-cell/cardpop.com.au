@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Sparkles, ImageOff, ZoomIn } from 'lucide-re
 const ImageZoomModal = lazy(() => import('@/components/ImageZoomModal.jsx'));
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
+import { toCdnUrl } from '@/utils/imageUrl.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 
@@ -231,7 +232,7 @@ const FeaturedCardsCarousel = () => {
                     <div className="aspect-[4/5] bg-muted/20 p-6 flex items-center justify-center relative overflow-hidden">
                       {card.image_urls && card.image_urls.length > 0 ? (
                         <img
-                          src={card.image_urls[0]}
+                          src={toCdnUrl(card.image_urls[0])}
                           alt={card.card_name || card.cardName || 'Trading Card'}
                           decoding="async"
                           className="w-full h-full object-contain drop-shadow-xl group-hover/card:scale-[1.03] transition-transform duration-500"
@@ -245,7 +246,7 @@ const FeaturedCardsCarousel = () => {
 
                       {card.image_urls && card.image_urls.length > 0 && (
                         <button
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setZoomImage({ url: card.image_urls[0], alt: card.card_name || card.cardName || 'Card Image' }); }}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setZoomImage({ url: toCdnUrl(card.image_urls[0]), alt: card.card_name || card.cardName || 'Card Image' }); }}
                           aria-label="Zoom image"
                           className="absolute bottom-3 right-3 z-10 w-8 h-8 rounded-full bg-background/80 backdrop-blur-sm text-foreground flex items-center justify-center shadow-md opacity-0 group-hover/card:opacity-100 transition-opacity duration-200 hover:bg-background"
                         >

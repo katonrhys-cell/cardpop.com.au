@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { isVerified } from '@/utils/verification.js';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toCdnUrl } from '@/utils/imageUrl.js';
 import { Button } from '@/components/ui/button';
 
 const TrustedSellersCarousel = () => {
@@ -178,7 +179,7 @@ const TrustedSellersCarousel = () => {
                 <div className="relative mb-5 group/avatar">
                   {seller.avatar_url ? (
                     <img
-                      src={seller.avatar_url}
+                      src={toCdnUrl(seller.avatar_url)}
                       alt={`${seller.display_name || seller.name || 'Seller'} avatar`}
                       className="w-24 h-24 rounded-2xl object-cover shadow-sm ring-4 ring-background"
                       width="96"

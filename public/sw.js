@@ -147,6 +147,31 @@ const SUPABASE_ORIGIN = 'https://odoglvswwymyjuwlonkf.supabase.co';
 const canonicalStorageUrl = (url) =>
   url.origin === SUPABASE_ORIGIN ? null : `${SUPABASE_ORIGIN}${url.pathname}${url.search}`;
 
+// Image CDN origin, passed by main.jsx as ?cdn=<host> on the registration URL
+// (this file is static, so build-time env vars can't be inlined here). When
+// set, storage images requested from the canonical Supabase origin are
+// fetched via the CDN instead — the catch-all for raw DB-stored URLs
+// (article-body <img> tags, admin-entered URLs) that no render-time helper
+// reaches. Supabase meters all storage egress; the CDN doesn't.
+const CDN_ORIGIN = (() => {
+  try {
+    const host = new URL(self.location.href).searchParams.get('cdn');
+    if (!host) return null;
+    const trimmed = host.trim().replace(/\/+$/, '');
+    if (!trimmed) return null;
+    return /^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`;
+  } catch {
+    return null;
+  }
+})();
+
+// Canonical Supabase storage URL → its CDN equivalent, or null when no CDN is
+// configured or the request is already on the CDN host.
+const cdnStorageUrl = (url) =>
+  CDN_ORIGIN && url.origin === SUPABASE_ORIGIN
+    ? `${CDN_ORIGIN}${url.pathname}${url.search}`
+    : null;
+
 const trimCache = async (cacheName, maxEntries) => {
   const cache = await caches.open(cacheName);
   const keys = await cache.keys();
@@ -161,15 +186,31 @@ const imageCacheFirst = async (request) => {
   const cached = await cache.match(request.url);
   if (cached) return cached;
 
+  // Prefer the CDN even when the markup referenced the canonical Supabase URL.
+  // The response is cached under the ORIGINAL request URL, so later lookups hit
+  // no matter which host the markup used.
+  const cdnUrl = cdnStorageUrl(new URL(request.url));
+
   try {
     // <img> tags issue no-cors requests, whose opaque responses can't be
     // inspected and are stored with a large quota padding. Storage serves
     // `Access-Control-Allow-Origin: *`, so re-issue as a CORS request to get
     // a normal, cacheable response.
-    const response = await fetch(request.url, { mode: 'cors' });
+    const response = await fetch(cdnUrl || request.url, { mode: 'cors' });
     if (response.ok) {
       await cache.put(request.url, response.clone());
       trimCache(CACHE_NAMES.IMAGES, MAX_IMAGE_ENTRIES).catch(() => {});
+    } else if (cdnUrl) {
+      // The CDN answered with an error (misroute, worker misconfig). The
+      // object may still exist at the canonical origin — retry there rather
+      // than surfacing a broken image.
+      const originResponse = await fetch(request.url, { mode: 'cors' });
+      if (originResponse.ok) {
+        await cache.put(request.url, originResponse.clone());
+        trimCache(CACHE_NAMES.IMAGES, MAX_IMAGE_ENTRIES).catch(() => {});
+        return originResponse;
+      }
+      return response;
     }
     return response;
   } catch (error) {

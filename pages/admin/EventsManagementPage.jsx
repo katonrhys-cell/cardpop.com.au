@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import EventScraperPanel from '@/components/EventScraperPanel.jsx';
 import EventFormModal from '@/components/EventFormModal.jsx';
+import { toCdnUrl } from '@/utils/imageUrl.js';
 
 const STATUS_STYLES = {
   pending_review: 'bg-amber-500/10 text-amber-700 border-amber-200 dark:text-amber-400',
@@ -165,7 +166,7 @@ const EventsManagementPage = () => {
                       <div className="flex items-center gap-4">
                         <div className="w-16 h-12 bg-background rounded-lg flex items-center justify-center shrink-0 overflow-hidden border border-border shadow-sm">
                           {event.image_url ? (
-                            <img src={event.image_url} alt={event.title} className="w-full h-full object-cover" />
+                            <img src={toCdnUrl(event.image_url)} alt={event.title} className="w-full h-full object-cover" />
                           ) : (
                             <ImageOff className="w-4 h-4 text-muted-foreground/50" />
                           )}

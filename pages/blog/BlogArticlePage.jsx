@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { generateBlogPostingSchema, generateFAQStructuredData, generateBreadcrumbStructuredData } from '@/utils/seoUtils.js';
 import { htmlExcerpt } from '@/utils/htmlExcerpt.js';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { publicImageUrl, toCdnUrl, cdnifyStorageUrlsInHtml } from '@/utils/imageUrl.js';
 import { resolveConviction, CONVICTION_METHODOLOGY_PATH } from '@/utils/convictionRating.js';
 import { BLOG_CATEGORY_MAP } from '@/data/blogCategories.js';
 
@@ -231,7 +231,10 @@ const BlogArticlePage = () => {
         }
 
         setArticle(res);
-        setHtmlContent(res.content_html || res.content || '');
+        // Article bodies store canonical Supabase URLs in their <img> tags —
+        // rewrite them onto the image CDN before render so body images don't
+        // bill Supabase egress on every view.
+        setHtmlContent(cdnifyStorageUrlsInHtml(res.content_html || res.content || ''));
 
         const [relatedRes, cardsRes] = await Promise.all([
           supabase
@@ -300,7 +303,7 @@ const BlogArticlePage = () => {
     );
   }
 
-  const imageUrl = article.featured_image_url || null;
+  const imageUrl = toCdnUrl(article.featured_image_url) || null;
   // Portrait card/slab image shown in the empty right side of the "On this
   // page" panel — routed through the image CDN like every rendered image.
   const tocImageUrl = publicImageUrl(article.toc_image_url, 'media');
@@ -323,7 +326,7 @@ const BlogArticlePage = () => {
 
   const blogStructuredData = generateBlogPostingSchema({
     title: article.seo_title || article.title,
-    image: article.featured_image_url,
+    image: toCdnUrl(article.featured_image_url),
     author: article.author || 'The Parallel Report',
     publishedAt: article.published_at || article.created_at,
     updated: article.updated_at,
@@ -369,7 +372,7 @@ const BlogArticlePage = () => {
       <SEOHead
         title={article.seo_title || `${article.title} | The Parallel Report`}
         description={article.seo_description || article.excerpt || `Read ${article.title} on The Parallel Report — CardPop's trading card blog.`}
-        ogImage={article.featured_image_url || undefined}
+        ogImage={toCdnUrl(article.featured_image_url) || undefined}
         ogImageAlt={article.title}
         canonicalUrl={canonicalUrl}
         structuredData={structuredDataArray.length === 1 ? structuredDataArray[0] : structuredDataArray}
@@ -613,7 +616,7 @@ const BlogArticlePage = () => {
             <h2 className="text-3xl font-bold mb-10 text-center">More from Parallel Reports</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
               {relatedArticles.map((related) => {
-                const relImg = related.featured_image_url || null;
+                const relImg = toCdnUrl(related.featured_image_url) || null;
                 const relLink = related.slug ? `/blog/${related.slug}` : `/blog/${related.id}`;
                 return (
                   <Link
