@@ -12,7 +12,34 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { CheckCircle2, Circle, Loader2, MailCheck, ScrollText } from 'lucide-react';
+import { BadgeCheck, CheckCircle2, Circle, KeyRound, Loader2, MailCheck, ScrollText, ShieldCheck, Smartphone, Vault } from 'lucide-react';
+
+// Security copy is deliberately accurate to what we actually run (see
+// TrustSafetyPage): Stripe PCI-DSS checkout, Stripe Identity ID checks,
+// HaveIBeenPwned breach screening (in this page's submit handler) and
+// optional authenticator-app MFA.
+const SECURITY_FEATURES = [
+  {
+    icon: ShieldCheck,
+    title: 'Bank-grade payment security',
+    body: 'Every order runs through Stripe’s PCI-DSS Level 1 checkout — your card details never touch CardPop’s servers.',
+  },
+  {
+    icon: BadgeCheck,
+    title: 'Verified members only',
+    body: 'Sellers confirm their identity with a government ID and selfie through Stripe Identity, so you only ever deal with a verified person.',
+  },
+  {
+    icon: KeyRound,
+    title: 'Breach-checked passwords',
+    body: 'Your password is screened against known data breaches before it’s accepted — without it ever leaving your browser.',
+  },
+  {
+    icon: Smartphone,
+    title: 'Two-factor authentication',
+    body: 'Add an authenticator app after signup for a second lock on your vault every time you sign in.',
+  },
+];
 
 const SignupPage = () => {
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
@@ -22,7 +49,7 @@ const SignupPage = () => {
   const [success, setSuccess] = useState(false);
   const [captchaToken, setCaptchaToken] = useState('');
   const turnstileRef = useRef(null);
-  
+
   const [passwordValidation, setPasswordValidation] = useState({
     length: false,
     uppercase: false,
@@ -30,7 +57,7 @@ const SignupPage = () => {
     number: false,
     special: false,
   });
-  
+
   const { signup } = useAuth();
   const navigate = useNavigate();
 
@@ -176,140 +203,179 @@ const SignupPage = () => {
   return (
     <div className="flex flex-col bg-background font-sans min-h-[calc(100vh-4rem)]">
       <Helmet><title>Join | Card Pop</title><meta name="robots" content="noindex, nofollow" /></Helmet>
-      
-      <div className="flex-1 flex items-center justify-center p-4 py-12 lg:py-20 bg-muted/20">
-        <div className="w-full max-w-md bg-card p-8 border border-border rounded-2xl shadow-lg">
-          <div className="text-center mb-8">
-            <h1 className="font-serif text-3xl font-bold mb-2">Create Your Vault</h1>
-            <p className="text-muted-foreground">Join the elite collector network securely</p>
-          </div>
-          
-          <form onSubmit={handleAccountSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="name" className="font-bold text-xs uppercase tracking-wide">Full Name</Label>
-              <Input
-                id="name"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                className="bg-background h-12"
-                placeholder="e.g. Maya Chen"
-                disabled={loading}
-              />
-              <p className="text-xs text-muted-foreground">Must match the identification you provide</p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email" className="font-bold text-xs uppercase tracking-wide">Email Address</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                required 
-                value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
-                className="bg-background h-12"
-                placeholder="you@example.com"
-                disabled={loading}
-              />
-            </div>
-            <div className="space-y-3 pb-2">
-              <Label htmlFor="password" className="font-bold text-xs uppercase tracking-wide">Master Password</Label>
-              <Input 
-                id="password" 
-                type="password" 
-                required 
-                value={formData.password}
-                onChange={(e) => setFormData({...formData, password: e.target.value})}
-                className="bg-background h-12"
-                placeholder="Create a strong password"
-                disabled={loading}
-              />
-              
-              <div className="flex gap-1 h-1.5 mt-3">
-                {[1, 2, 3, 4, 5].map(idx => (
-                  <div 
-                    key={idx} 
-                    className={`flex-1 rounded-full transition-colors duration-300 ${idx <= score ? getProgressColor() : 'bg-muted'}`}
-                  />
-                ))}
-              </div>
-              
-              <ul className="space-y-2 mt-4 bg-muted/30 p-4 rounded-xl border border-border/50">
-                <ValidationItem met={passwordValidation.length} text="At least 8 characters" />
-                <ValidationItem met={passwordValidation.uppercase} text="One uppercase letter" />
-                <ValidationItem met={passwordValidation.lowercase} text="One lowercase letter" />
-                <ValidationItem met={passwordValidation.number} text="One number" />
-                <ValidationItem met={passwordValidation.special} text="One special character" />
-              </ul>
-            </div>
-            
-            <label className="flex items-start gap-3 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={newsletterOptIn}
-                onChange={(e) => setNewsletterOptIn(e.target.checked)}
-                disabled={loading}
-                className="mt-0.5 w-4 h-4 rounded border-border accent-primary"
-              />
-              <span className="text-sm text-muted-foreground leading-snug">
-                Subscribe to the CardPop newsletter for market insights, new card releases, and community news.
-              </span>
-            </label>
 
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <ScrollText className="w-4 h-4 text-muted-foreground shrink-0" />
-                <Label className="font-bold text-xs uppercase tracking-wide">Terms &amp; Conditions</Label>
+      <div className="flex-1 py-12 lg:py-20 bg-muted/20">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:grid-rows-[auto_1fr] gap-10 lg:gap-x-16 items-start">
+
+          {/* ── Heading + vault icon ────────────────────────────────────── */}
+          <div className="text-center lg:text-left">
+            <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto lg:mx-0 mb-6">
+              <Vault className="w-8 h-8 text-primary" />
+            </div>
+            <h1 className="font-serif text-3xl lg:text-4xl font-bold tracking-tight mb-3">Create Your Vault</h1>
+            <p className="text-muted-foreground text-base leading-relaxed">
+              Join the elite collector network securely. One account unlocks your vault,
+              the marketplace and live market analytics.
+            </p>
+          </div>
+
+          {/* ── Security summary ────────────────────────────────────────── */}
+          <div className="order-3 lg:order-none lg:col-start-1 lg:row-start-2">
+            <h2 className="font-bold text-xs uppercase tracking-wide text-muted-foreground mb-5 text-center lg:text-left">
+              Why your vault is secure
+            </h2>
+            <ul className="space-y-5">
+              {SECURITY_FEATURES.map(({ icon: Icon, title, body }) => (
+                <li key={title} className="flex items-start gap-4">
+                  <span className="w-10 h-10 shrink-0 bg-primary/10 rounded-xl flex items-center justify-center">
+                    <Icon className="w-5 h-5 text-primary" />
+                  </span>
+                  <div>
+                    <h3 className="font-bold text-sm text-foreground mb-0.5">{title}</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-6 text-sm text-muted-foreground text-center lg:text-left">
+              Read more about how we protect you in our{' '}
+              <Link to="/trust-safety" className="text-primary hover:underline font-medium">
+                Trust &amp; Safety
+              </Link>{' '}
+              hub.
+            </p>
+          </div>
+
+          {/* ── Signup form ─────────────────────────────────────────────── */}
+          <div className="order-2 lg:order-none w-full bg-card p-6 sm:p-8 border border-border rounded-2xl shadow-lg lg:col-start-2 lg:row-start-1 lg:row-span-2">
+            <form onSubmit={handleAccountSubmit} className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="name" className="font-bold text-xs uppercase tracking-wide">Full Name</Label>
+                <Input
+                  id="name"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  className="bg-background h-12"
+                  placeholder="e.g. Maya Chen"
+                  disabled={loading}
+                />
+                <p className="text-xs text-muted-foreground">Must match the identification you provide</p>
               </div>
-              <div className="h-40 overflow-y-auto rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground space-y-3 leading-relaxed">
-                <p className="text-xs text-muted-foreground/70">Last Updated: May 10, 2026</p>
-                <p><strong className="text-foreground">1. Acceptance of Terms</strong><br />By accessing or using CardPop, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our platform.</p>
-                <p><strong className="text-foreground">2. User Accounts</strong><br />You must be at least 18 years old to create an account. You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account.</p>
-                <p><strong className="text-foreground">3. Marketplace Rules</strong><br />Users agree to provide accurate descriptions and images of items listed for sale. CardPop reserves the right to remove listings that violate our policies or appear fraudulent.</p>
-                <p><strong className="text-foreground">4. Fees and Payments</strong><br />CardPop charges fees for certain services, including sales commissions. All fees are clearly displayed before you commit to a transaction. You agree to pay all applicable fees.</p>
-                <p><strong className="text-foreground">5. Limitation of Liability</strong><br />CardPop is a marketplace facilitator. We are not responsible for the actions of individual users, though we provide protection programs as outlined in our Trust &amp; Safety policy.</p>
+              <div className="space-y-2">
+                <Label htmlFor="email" className="font-bold text-xs uppercase tracking-wide">Email Address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  required
+                  value={formData.email}
+                  onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  className="bg-background h-12"
+                  placeholder="you@example.com"
+                  disabled={loading}
+                />
               </div>
+              <div className="space-y-3 pb-2">
+                <Label htmlFor="password" className="font-bold text-xs uppercase tracking-wide">Master Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  required
+                  value={formData.password}
+                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  className="bg-background h-12"
+                  placeholder="Create a strong password"
+                  disabled={loading}
+                />
+
+                <div className="flex gap-1 h-1.5 mt-3">
+                  {[1, 2, 3, 4, 5].map(idx => (
+                    <div
+                      key={idx}
+                      className={`flex-1 rounded-full transition-colors duration-300 ${idx <= score ? getProgressColor() : 'bg-muted'}`}
+                    />
+                  ))}
+                </div>
+
+                <ul className="space-y-2 mt-4 bg-muted/30 p-4 rounded-xl border border-border/50">
+                  <ValidationItem met={passwordValidation.length} text="At least 8 characters" />
+                  <ValidationItem met={passwordValidation.uppercase} text="One uppercase letter" />
+                  <ValidationItem met={passwordValidation.lowercase} text="One lowercase letter" />
+                  <ValidationItem met={passwordValidation.number} text="One number" />
+                  <ValidationItem met={passwordValidation.special} text="One special character" />
+                </ul>
+              </div>
+
               <label className="flex items-start gap-3 cursor-pointer select-none">
                 <input
                   type="checkbox"
-                  required
-                  checked={termsAccepted}
-                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  checked={newsletterOptIn}
+                  onChange={(e) => setNewsletterOptIn(e.target.checked)}
                   disabled={loading}
                   className="mt-0.5 w-4 h-4 rounded border-border accent-primary"
                 />
                 <span className="text-sm text-muted-foreground leading-snug">
-                  I have read and agree to the{' '}
-                  <Link to="/terms" className="text-primary hover:underline font-medium" target="_blank" rel="noopener noreferrer">
-                    Terms &amp; Conditions
-                  </Link>
+                  Subscribe to the CardPop newsletter for market insights, new card releases, and community news.
                 </span>
               </label>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <ScrollText className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <Label className="font-bold text-xs uppercase tracking-wide">Terms &amp; Conditions</Label>
+                </div>
+                <div className="h-40 overflow-y-auto rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground space-y-3 leading-relaxed">
+                  <p className="text-xs text-muted-foreground/70">Last Updated: May 10, 2026</p>
+                  <p><strong className="text-foreground">1. Acceptance of Terms</strong><br />By accessing or using CardPop, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our platform.</p>
+                  <p><strong className="text-foreground">2. User Accounts</strong><br />You must be at least 18 years old to create an account. You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account.</p>
+                  <p><strong className="text-foreground">3. Marketplace Rules</strong><br />Users agree to provide accurate descriptions and images of items listed for sale. CardPop reserves the right to remove listings that violate our policies or appear fraudulent.</p>
+                  <p><strong className="text-foreground">4. Fees and Payments</strong><br />CardPop charges fees for certain services, including sales commissions. All fees are clearly displayed before you commit to a transaction. You agree to pay all applicable fees.</p>
+                  <p><strong className="text-foreground">5. Limitation of Liability</strong><br />CardPop is a marketplace facilitator. We are not responsible for the actions of individual users, though we provide protection programs as outlined in our Trust &amp; Safety policy.</p>
+                </div>
+                <label className="flex items-start gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    required
+                    checked={termsAccepted}
+                    onChange={(e) => setTermsAccepted(e.target.checked)}
+                    disabled={loading}
+                    className="mt-0.5 w-4 h-4 rounded border-border accent-primary"
+                  />
+                  <span className="text-sm text-muted-foreground leading-snug">
+                    I have read and agree to the{' '}
+                    <Link to="/terms" className="text-primary hover:underline font-medium" target="_blank" rel="noopener noreferrer">
+                      Terms &amp; Conditions
+                    </Link>
+                  </span>
+                </label>
+              </div>
+
+              <Turnstile
+                ref={turnstileRef}
+                onVerify={setCaptchaToken}
+                onExpire={() => setCaptchaToken('')}
+                className="flex justify-center"
+              />
+
+              <Button
+                type="submit"
+                className="w-full h-12 font-bold text-base mt-4 transition-all"
+                disabled={loading || !isFormValid}
+              >
+                {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
+                {loading ? 'Creating Account...' : 'Create Secure Account'}
+              </Button>
+            </form>
+
+            <div className="mt-6">
+              <OAuthButtons redirectTo={`${window.location.origin}/account`} disabled={loading} />
             </div>
 
-            <Turnstile
-              ref={turnstileRef}
-              onVerify={setCaptchaToken}
-              onExpire={() => setCaptchaToken('')}
-              className="flex justify-center"
-            />
-
-            <Button
-              type="submit"
-              className="w-full h-12 font-bold text-base mt-4 transition-all"
-              disabled={loading || !isFormValid}
-            >
-              {loading ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-              {loading ? 'Creating Account...' : 'Create Secure Account'}
-            </Button>
-          </form>
-
-          <div className="mt-6">
-            <OAuthButtons redirectTo={`${window.location.origin}/account`} disabled={loading} />
+            <div className="mt-8 text-center text-sm text-muted-foreground pt-6 border-t border-border">
+              Already have an account? <Link to="/login" className="text-primary hover:underline font-bold ml-1">Sign In</Link>
+            </div>
           </div>
 
-          <div className="mt-8 text-center text-sm text-muted-foreground pt-6 border-t border-border">
-            Already have an account? <Link to="/login" className="text-primary hover:underline font-bold ml-1">Sign In</Link>
-          </div>
         </div>
       </div>
     </div>
