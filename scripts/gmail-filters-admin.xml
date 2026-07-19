@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  CardPop — Gmail filters for the admin@cardpop.com.au business inbox.
+
+  Import into admin@cardpop.com.au ONLY (not your personal Gmail):
+    Gmail → Settings (gear) → See all settings → Filters and Blocked Addresses
+      → Import filters → choose this file → Open File → select all → Create filters.
+
+  These route each role-address alias to its own label and quiet the deploy/
+  billing noise, so a single inbox stays navigable. Labels are created on import.
+  Safe to re-import; adjust or delete any you don't want.
+-->
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:apps="http://schemas.google.com/apps/2006">
+  <title>CardPop admin@ filters</title>
+
+  <!-- Customer support: highlight and never spam -->
+  <entry>
+    <category term="filter"></category>
+    <title>support@ -> Support</title>
+    <apps:property name="to" value="support@cardpop.com.au"/>
+    <apps:property name="label" value="Support"/>
+    <apps:property name="markAsImportant" value="true"/>
+    <apps:property name="shouldNeverSpam" value="true"/>
+  </entry>
+
+  <!-- Operational app alerts (new orders, event submissions) -->
+  <entry>
+    <category term="filter"></category>
+    <title>notifications@ -> Ops-Alerts</title>
+    <apps:property name="to" value="notifications@cardpop.com.au"/>
+    <apps:property name="label" value="Ops-Alerts"/>
+    <apps:property name="markAsImportant" value="true"/>
+    <apps:property name="shouldNeverSpam" value="true"/>
+  </entry>
+
+  <!-- Privacy / data-deletion requests -->
+  <entry>
+    <category term="filter"></category>
+    <title>privacy@ -> Legal-Privacy</title>
+    <apps:property name="to" value="privacy@cardpop.com.au"/>
+    <apps:property name="label" value="Legal-Privacy"/>
+    <apps:property name="shouldNeverSpam" value="true"/>
+  </entry>
+
+  <!-- Accessibility requests -->
+  <entry>
+    <category term="filter"></category>
+    <title>accessibility@ -> Legal-Privacy</title>
+    <apps:property name="to" value="accessibility@cardpop.com.au"/>
+    <apps:property name="label" value="Legal-Privacy"/>
+    <apps:property name="shouldNeverSpam" value="true"/>
+  </entry>
+
+  <!-- Security.txt / API / developer contact -->
+  <entry>
+    <category term="filter"></category>
+    <title>developers@ -> Dev-Security</title>
+    <apps:property name="to" value="developers@cardpop.com.au"/>
+    <apps:property name="label" value="Dev-Security"/>
+    <apps:property name="shouldNeverSpam" value="true"/>
+  </entry>
+
+  <!-- General / marketing catch-all -->
+  <entry>
+    <category term="filter"></category>
+    <title>hello@ -> General</title>
+    <apps:property name="to" value="hello@cardpop.com.au"/>
+    <apps:property name="label" value="General"/>
+  </entry>
+
+  <!-- Deploy / CI bot noise: label and skip the inbox (find it under Deploys) -->
+  <entry>
+    <category term="filter"></category>
+    <title>GitHub/Vercel/Cloudflare bots -> Deploys (archive)</title>
+    <apps:property name="from" value="notifications@github.com OR noreply@vercel.com OR no-reply@cloudflare.com"/>
+    <apps:property name="label" value="Deploys"/>
+    <apps:property name="shouldArchive" value="true"/>
+    <apps:property name="shouldNeverSpam" value="true"/>
+  </entry>
+
+  <!-- Billing / invoices: keep them together and never spam -->
+  <entry>
+    <category term="filter"></category>
+    <title>Supabase/Stripe/GitHub billing -> Billing</title>
+    <apps:property name="hasTheWord" value="from:(invoice+statements@supabase.com OR receipts.stripe.com OR receipts@stripe.com OR billing@github.com) OR subject:(invoice OR receipt)"/>
+    <apps:property name="label" value="Billing"/>
+    <apps:property name="shouldNeverSpam" value="true"/>
+  </entry>
+
+  <!-- Error monitoring digests -->
+  <entry>
+    <category term="filter"></category>
+    <title>Sentry -> Monitoring</title>
+    <apps:property name="from" value="getsentry.com OR sentry.io"/>
+    <apps:property name="label" value="Monitoring"/>
+    <apps:property name="shouldNeverSpam" value="true"/>
+  </entry>
+</feed>
