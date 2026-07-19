@@ -1,0 +1,71 @@
+# On-demand image maintenance — run from the GitHub UI, no terminal needed:
+# Actions → "Image maintenance" → Run workflow.
+#
+# Jobs (choose via the dropdown):
+#   prewarm-r2  — drives the img.cardpop.com.au Worker's write-through so every
+#                 existing storage object is migrated into R2 (free egress).
+#                 Safe to re-run: objects already in R2 cost nothing.
+#   recompress  — re-uploads oversized legacy images (>500 KB) recompressed to
+#                 WebP with long cache headers. NOTE: objects already migrated
+#                 into R2 keep their old bytes there (the Worker serves R2
+#                 first) — delete them from the cardpop-images R2 bucket in the
+#                 Cloudflare dashboard afterwards so the smaller versions
+#                 re-migrate on next view.
+#   both        — recompress first, then pre-warm (the right order).
+#
+# "Dry run" (default ON) only prints what would happen. Untick it to act.
+#
+# Requires one repository secret: SUPABASE_SERVICE_ROLE_KEY
+# (GitHub → Settings → Secrets and variables → Actions → New repository secret;
+# value from Supabase dashboard → Project Settings → API → service_role).
+
+name: Image maintenance
+
+on:
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 'Which maintenance job to run'
+        type: choice
+        options:
+          - prewarm-r2
+          - recompress
+          - both
+        default: prewarm-r2
+      dry_run:
+        description: 'Dry run (print what would happen, change nothing)'
+        type: boolean
+        default: true
+
+jobs:
+  image-maintenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_URL: https://odoglvswwymyjuwlonkf.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - name: Check secret is configured
+        run: |
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "::error::Repository secret SUPABASE_SERVICE_ROLE_KEY is not set. Add it under Settings → Secrets and variables → Actions (value: Supabase dashboard → Project Settings → API → service_role)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Recompress oversized legacy images
+        if: inputs.job == 'recompress' || inputs.job == 'both'
+        run: node scripts/backfill-image-cache-headers.mjs ${{ inputs.dry_run == true && '--dry-run' || '' }}
+
+      - name: Pre-warm R2 via the image CDN
+        if: inputs.job == 'prewarm-r2' || inputs.job == 'both'
+        run: node scripts/backfill-images-to-r2.mjs ${{ inputs.dry_run == true && '--dry-run' || '' }}
