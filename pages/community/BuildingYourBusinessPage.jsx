@@ -63,6 +63,16 @@ const BuildingYourBusinessPage = () => {
       <SEOHead
         title="Building Your Business | CardPop"
         description="The tools we use and recommend to grow a trading card business in Australia — payments, live selling, email, socials and more. A multi-pronged approach to organically build your presence."
+        canonicalUrl="https://cardpop.com.au/community/building-your-business"
+        structuredData={{
+          '@context': 'https://schema.org',
+          '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://cardpop.com.au/' },
+            { '@type': 'ListItem', position: 2, name: 'Community', item: 'https://cardpop.com.au/community' },
+            { '@type': 'ListItem', position: 3, name: 'Building Your Business', item: 'https://cardpop.com.au/community/building-your-business' },
+          ],
+        }}
       />
 
       {/* Hero */}

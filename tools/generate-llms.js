@@ -51,6 +51,7 @@ const SECTIONS = [
 		['/community/local-traders', 'Local Traders', 'Find traders near you across Australia.'],
 		['/community/retailers', 'Retailers', 'Directory of trading card retailers.'],
 		['/community/whatnot', 'Whatnot Sellers', 'Australian card sellers streaming on Whatnot.'],
+		['/community/building-your-business', 'Building Your Business', 'Tools and services CardPop uses and recommends to grow a trading card business.'],
 		['/events', 'Events', 'Card shows, community events, store events and trade events.'],
 		['/card-shops', 'Card Shops Directory', 'Directory of trading card shops across Australia.'],
 	]],

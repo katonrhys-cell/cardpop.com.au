@@ -31,6 +31,7 @@
 - [Local Traders](https://cardpop.com.au/community/local-traders): Find traders near you across Australia.
 - [Retailers](https://cardpop.com.au/community/retailers): Directory of trading card retailers.
 - [Whatnot Sellers](https://cardpop.com.au/community/whatnot): Australian card sellers streaming on Whatnot.
+- [Building Your Business](https://cardpop.com.au/community/building-your-business): Tools and services CardPop uses and recommends to grow a trading card business.
 - [Events](https://cardpop.com.au/events): Card shows, community events, store events and trade events.
 - [Card Shops Directory](https://cardpop.com.au/card-shops): Directory of trading card shops across Australia.
 
