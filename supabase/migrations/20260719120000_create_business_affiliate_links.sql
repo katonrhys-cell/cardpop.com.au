@@ -97,11 +97,11 @@ VALUES
    'https://www.facebook.com/business', 'Explore Meta for Business', 'Facebook', 'from-blue-600 to-indigo-600',
    NULL, 40),
 
-  ('kit', 'Kit (formerly ConvertKit)', 'Email marketing',
-   'Own your audience with email.',
-   'Kit is email marketing built for creators — capture sign-ups, send restock and show announcements, and automate a welcome sequence.',
-   'CardPop''s newsletter runs on Kit. It''s the one channel we own outright — no algorithm deciding who sees our restocks and launches.',
-   'Socials can throttle your reach overnight; an email list can''t. Collect emails at your show table and in your bio, then tell that list first every time you restock, go live or drop something rare. It''s the audience nobody can take away from you.',
+  ('kit', 'Kit (formerly ConvertKit)', 'Email & content',
+   'Own your audience across content, ads, dev and data.',
+   'Kit is a creator operating system that does far more than send email. Content management: build landing pages, sign-up forms and a public newsletter hub, and write broadcasts in a proper editor. Digital advertising: the Creator Network and paid Recommendations put your newsletter in front of other creators'' audiences, and sponsorships let you earn from yours. Development: a full API v4, webhooks and an MCP server mean you can automate sign-ups, tag buyers and wire Kit into your own store. Analytics: open and click rates, link tracking, growth stats and per-subscriber engagement show exactly what''s working.',
+   'CardPop''s newsletter runs on Kit. It''s the one channel we own outright — no algorithm deciding who sees our restocks and launches — and we lean on all of it: forms and landing pages to capture sign-ups (content), the Creator Network to grow reach (advertising), the API to sync buyers automatically (development), and the click and growth stats to see which drops land (analytics).',
+   'Socials can throttle your reach overnight; an email list can''t. Use Kit''s forms and landing pages to capture emails at your show table and in your bio (content management), grow that list through the Creator Network and recommendations (digital advertising), automate tagging and welcome sequences through its API and webhooks (development), and read the open, click and growth analytics to double down on the drops your buyers actually want. It''s the audience nobody can take away from you.',
    'https://kit.com/', 'Explore Kit', 'Mail', 'from-pink-500 to-rose-600',
    'Powers our newsletter', 50)
 ON CONFLICT (slug) DO NOTHING;
