@@ -140,3 +140,62 @@ describe('GET /pricing', () => {
     expect(res.status).toBe(502);
   });
 });
+
+// ─── POST /images ─────────────────────────────────────────────────────────────
+// Note: the resolver caches by name|set|collection at module scope, so each test
+// uses a distinct card name to avoid cross-test cache bleed.
+
+describe('POST /images', () => {
+  it('returns 400 when cards is not an array', async () => {
+    const res = await request(app).post('/images').send({ cards: 'nope' });
+    expect(res.status).toBe(400);
+  });
+
+  it('resolves Pokémon art and echoes the name|set key', async () => {
+    h.pokemon = [{ id: 'p9', images: { small: 'http://img/small.png', large: 'http://img/large.png' } }];
+    const res = await request(app).post('/images').send({
+      cards: [{ name: 'Blastoise ImgOne', set: 'Base Set', collection: 'Pokémon' }],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.results).toEqual([{
+      key: 'Blastoise ImgOne|Base Set',
+      image: { small: 'http://img/small.png', large: 'http://img/large.png', id: 'p9', source: 'pokemon-tcg' },
+    }]);
+    // Pokémon collection → only the Pokémon API is queried.
+    expect(global.fetch.mock.calls.every(([u]) => String(u).includes('pokemontcg.io'))).toBe(true);
+  });
+
+  it('de-duplicates identical cards into a single upstream lookup', async () => {
+    h.pokemon = [{ id: 'p10', images: { small: 'http://img/dup.png' } }];
+    const res = await request(app).post('/images').send({
+      cards: [
+        { name: 'Venusaur ImgDup', set: 'Jungle', collection: 'Pokémon' },
+        { name: 'Venusaur ImgDup', set: 'Jungle', collection: 'Pokémon' },
+      ],
+    });
+    expect(res.body.results).toHaveLength(1);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns image:null for a card the free APIs do not cover', async () => {
+    // NBA collection maps to no adapter → no upstream call, honest null.
+    const res = await request(app).post('/images').send({
+      cards: [{ name: 'LeBron James ImgMiss', set: '2003-04 Upper Deck', collection: 'NBA' }],
+    });
+    // apisFor() with an unknown collection tries all three; all miss here.
+    expect(res.body.results[0]).toEqual({ key: 'LeBron James ImgMiss|2003-04 Upper Deck', image: null });
+  });
+
+  it('resolves Magic art via Scryfall for a magic collection', async () => {
+    global.fetch = vi.fn((url) => {
+      if (String(url).includes('scryfall.com')) {
+        return Promise.resolve({ ok: true, json: async () => ({ id: 's5', image_uris: { small: 'http://s/small.jpg', normal: 'http://s/normal.jpg' } }) });
+      }
+      return Promise.resolve({ ok: false, json: async () => ({}) });
+    });
+    const res = await request(app).post('/images').send({
+      cards: [{ name: 'Black Lotus ImgMtg', set: 'Alpha', collection: 'Magic: The Gathering' }],
+    });
+    expect(res.body.results[0].image).toEqual({ small: 'http://s/small.jpg', large: 'http://s/normal.jpg', id: 's5', source: 'scryfall' });
+  });
+});

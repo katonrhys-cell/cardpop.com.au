@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { callEbayApi } from '../utils/ebayClient.js';
+import { resolveCardImage } from '../utils/cardImageResolver.js';
 import logger from '../utils/logger.js';
 
 const router = Router();
@@ -200,6 +201,47 @@ router.get('/pricing', async (req, res) => {
 	} catch (err) {
 		logger.warn(`[CATALOG_PRICING] ${err.message}`);
 		res.status(502).json({ error: 'Pricing lookup failed' });
+	}
+});
+
+// ── POST /catalog/images ───────────────────────────────────────────────────────
+// Batch-resolve official card art for a list of cards. One request resolves a
+// whole table's worth of thumbnails; each card is looked up once and cached
+// server-side (and shared across all visitors), so the browser only ever loads a
+// ready image URL from the upstream API's CDN — no per-visitor rate-limit
+// exposure and no Supabase egress.
+//
+// Body: { cards: [{ name, set?, collection? }] }  (max 50)
+// Response: { results: [{ key, image: { small, large, id, source } | null }] }
+// `key` is "<name>|<set>", echoed back so the client can map results to rows.
+router.post('/images', async (req, res) => {
+	const cards = Array.isArray(req.body?.cards) ? req.body.cards : null;
+	if (!cards) return res.status(400).json({ error: 'cards array is required' });
+
+	// Dedupe by name+set so a card appearing in several tabs is resolved once.
+	const byKey = new Map();
+	for (const c of cards) {
+		const name = typeof c?.name === 'string' ? c.name.trim() : '';
+		if (!name) continue;
+		const set = typeof c?.set === 'string' ? c.set.trim() : '';
+		const key = `${name}|${set}`;
+		if (!byKey.has(key)) {
+			byKey.set(key, { name, set, collection: typeof c?.collection === 'string' ? c.collection : '' });
+		}
+		if (byKey.size >= 50) break; // bound upstream fan-out per request
+	}
+
+	try {
+		const results = await Promise.all(
+			[...byKey.entries()].map(async ([key, card]) => ({
+				key,
+				image: await resolveCardImage(card), // never throws — null on miss
+			}))
+		);
+		res.json({ results });
+	} catch (err) {
+		logger.warn(`[CATALOG_IMAGES] ${err.message}`);
+		res.status(502).json({ error: 'Image resolution failed' });
 	}
 });
 
