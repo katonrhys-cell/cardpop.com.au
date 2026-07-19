@@ -157,6 +157,32 @@ serves, then set `CARD_ART_CDN_HOST=img.cardpop.com.au` in Vercel. To turn it
 off, unset it — the resolver instantly reverts to raw upstream URLs. It reuses
 the same `IMAGES` R2 binding; no new bucket or binding is needed.
 
+### Admin card-art overrides (sports cards & manual overrides)
+
+The free card APIs cover Pokémon, Magic and Yu-Gi-Oh but **not sports cards**
+(NBA, NFL, hockey…), so those rows fall back to a placeholder. The
+`card_art_overrides` table (migration `20260719130000_create_card_art_overrides`)
+lets an admin upload art for any card. The resolver checks it **first** — before
+the free-API lookups — keyed by `cardArtLookupKey(name, set, collection)` (a
+lowercased, whitespace-collapsed `name|set|collection`), so an override wins and
+covers cards no API can.
+
+- **Admin UI**: `/admin/card-art` (`pages/admin/CardArtManagementPage.jsx`) —
+  enter the card's name/set/collection exactly as it appears in the movers table,
+  upload an image. The image goes to the public `media` bucket (timestamped,
+  `cacheControl: 31536000`), so it's served through this Worker and caches into
+  R2 on first view like any other stored image — **no new bucket or credentials**.
+- **Write path**: the page uploads the file client-side, then POSTs the metadata
+  to `POST /admin/card-art` (admin-gated), which computes the lookup key
+  server-side (the same function the resolver reads with, so keys can't drift)
+  and upserts. `GET`/`DELETE /admin/card-art` list and remove.
+- **Serving**: the resolver rewrites the stored Supabase URL onto `IMAGE_CDN_HOST`
+  when set, so overrides ride the same CDN/R2 path. Overrides are cached in the
+  resolver for 10 minutes (short, so a newly-added override shows up promptly and
+  supersedes any already-cached API result). This is independent of
+  `CARD_ART_CDN_HOST` above — overrides work whenever `IMAGE_CDN_HOST` is set (or
+  even with no CDN at all, serving straight from Supabase).
+
 **Bind the bucket — declare it in `wrangler.jsonc`, NOT the dashboard:**
 
 The Worker is deployed by the Cloudflare Git integration, which runs Wrangler

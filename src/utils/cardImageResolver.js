@@ -17,6 +17,7 @@
 // UI keeps its placeholder.
 
 import logger from './logger.js';
+import supabase from './supabaseClient.js';
 
 const FETCH_TIMEOUT_MS = 8000;
 
@@ -84,6 +85,71 @@ function toCardArtCdn(imageUrl) {
 function withCardArtCdn(result) {
   if (!result) return result;
   return { ...result, small: toCardArtCdn(result.small), large: toCardArtCdn(result.large) };
+}
+
+// ── Admin card-art overrides ────────────────────────────────────────────────
+//
+// Admins can upload art for cards the free APIs don't cover (sports cards) or to
+// override any card's art (table card_art_overrides). We check it FIRST, so an
+// override always wins and non-Pokémon/Magic/Yu-Gi-Oh cards can still get art.
+
+// Normalized match key for a card. MUST stay identical to what the admin write
+// path stores (src/routes/admin.js imports this exact function), or overrides
+// won't match. Deliberately simple: lowercased, whitespace-collapsed
+// name|set|collection — the admin enters the same strings the card displays.
+export function cardArtLookupKey(name, set, collection) {
+  const norm = (s) => (typeof s === 'string' ? s : '').toLowerCase().replace(/\s+/g, ' ').trim();
+  return `${norm(name)}|${norm(set)}|${norm(collection)}`;
+}
+
+// Override art lives in the public Supabase `media` bucket. When an image CDN is
+// configured, rewrite the stored Supabase URL onto it (path unchanged) so the
+// override is served through the Worker/R2 like every other stored image,
+// instead of hitting Supabase egress on each view.
+function toStorageCdn(url) {
+  const host = (process.env.IMAGE_CDN_HOST || process.env.VITE_IMAGE_CDN_HOST || '')
+    .trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+  if (!host || !url) return url;
+  try {
+    const u = new URL(url);
+    if (!/\/storage\/v1\/object\/public\//.test(u.pathname)) return url;
+    return `https://${host}${u.pathname}${u.search}`;
+  } catch {
+    return url;
+  }
+}
+
+// Overrides change (admins add/remove them), so cache them only briefly — long
+// enough to spare the DB a query per card on a page load, short enough that a new
+// override shows up promptly. Fail-safe: any DB error resolves to null (no
+// override) so resolution falls through to the free APIs.
+const OVERRIDE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+async function lookupOverride(name, set, collection) {
+  const lookupKey = cardArtLookupKey(name, set, collection);
+  const cacheKey = `ov:${lookupKey}`;
+  const cached = cacheGet(cacheKey);
+  if (cached !== undefined) return cached;
+
+  let result = null;
+  try {
+    const { data, error } = await supabase
+      .from('card_art_overrides')
+      .select('image_url')
+      .eq('lookup_key', lookupKey)
+      .limit(1)
+      .maybeSingle();
+    if (!error && data?.image_url) {
+      const url = toStorageCdn(data.image_url);
+      result = { small: url, large: url, id: `override:${lookupKey}`, source: 'override' };
+    }
+  } catch (err) {
+    logger.debug(`[CARD_IMAGE] override lookup failed for "${lookupKey}": ${err.message}`);
+    result = null; // fail-safe → fall through to the free APIs
+  }
+
+  cacheSet(cacheKey, result, OVERRIDE_TTL_MS);
+  return result;
 }
 
 // "Charizard VSTAR 018/172"                  → { name: 'Charizard VSTAR', number: '18' }
@@ -194,6 +260,12 @@ async function resolveYugioh(name) {
 export async function resolveCardImage({ name, set, collection } = {}) {
   const rawName = (name || '').trim();
   if (!rawName) return null;
+
+  // An admin-uploaded override always wins — and covers cards (sports etc.) the
+  // free APIs can't. Checked before the API cache so a newly-added override
+  // supersedes an already-cached API result within its short TTL.
+  const override = await lookupOverride(rawName, set, collection);
+  if (override) return override;
 
   const key = `${rawName}|${set || ''}|${collection || ''}`.toLowerCase();
   const cached = cacheGet(key);

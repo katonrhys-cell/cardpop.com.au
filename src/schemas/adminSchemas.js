@@ -93,6 +93,21 @@ export const businessProfileIdSchema = z.object({
   id: z.string().min(1, 'Business profile ID is required'),
 });
 
+// Card-art overrides: admin-uploaded artwork for cards (see src/routes/admin.js
+// card-art endpoints). The image is uploaded to storage client-side; the body
+// carries the resulting URL/path plus the card identity used to build the key.
+export const createCardArtBodySchema = z.object({
+  name: z.string().min(1, 'Card name is required').max(200),
+  card_set: z.string().max(200).optional().nullable(),
+  collection: z.string().max(100).optional().nullable(),
+  image_url: z.string().url('A valid image URL is required'),
+  storage_path: z.string().max(500).optional().nullable(),
+});
+
+export const cardArtIdSchema = z.object({
+  id: z.string().min(1, 'Card art ID is required'),
+});
+
 export const updateBusinessProfileBodySchema = z.object({
   ...Object.fromEntries(Object.entries(businessProfileFields).map(([k, v]) => [k, v.optional()])),
   storefront_status: z.enum(['pending_review', 'approved', 'suspended']).optional(),

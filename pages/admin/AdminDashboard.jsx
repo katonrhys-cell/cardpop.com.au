@@ -270,6 +270,7 @@ const AdminDashboard = () => {
           <ManagementBox title="Hero Showcase" description="Manage cards in the homepage hero animation." icon={Sparkles} link="/admin/hero-showcase" />
           <ManagementBox title="Collection Sections" description="Pin cards to collection page strips." icon={LayoutList} link="/admin/collection-sections" />
           <ManagementBox title="Media Library" description="Upload and manage images." icon={Image} link="/admin/media" />
+          <ManagementBox title="Card Art" description="Upload thumbnails for sports cards and override card art in analytics." icon={Image} link="/admin/card-art" />
           <ManagementBox title="Analytics & Reports" description="View platform analytics." icon={BarChart3} link="/admin/analytics" />
           <ManagementBox title="System Diagnostics" description="Monitor system health." icon={Wrench} link="/admin/diagnostics" />
           <ManagementBox title="Admin Settings" description="Configure platform settings." icon={Settings} link="/admin/settings" />
