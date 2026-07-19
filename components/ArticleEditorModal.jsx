@@ -12,6 +12,7 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Upload, FileCode, CheckCircle2, Plus, Trash2 } from 'lucide-react';
 import { CONVICTION_LEVELS, CONVICTION_TYPES, convictionTypeForCategory } from '@/utils/convictionRating.js';
 import { BLOG_CATEGORIES } from '@/data/blogCategories.js';
+import { parseVideoUrl } from '@/utils/videoEmbed.js';
 
 // Derived from the shared blog taxonomy (data/blogCategories.js) so the editor,
 // blog grid, article page, nav dropdown, sitemap and prerenderer never drift.
@@ -73,6 +74,7 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
   const [author, setAuthor] = useState('');
   const [category, setCategory] = useState('');
   const [featuredImageUrl, setFeaturedImageUrl] = useState('');
+  const [featuredVideoUrl, setFeaturedVideoUrl] = useState('');
   const [tocImageUrl, setTocImageUrl] = useState('');
   const [tocImageAlt, setTocImageAlt] = useState('');
   const [featured, setFeatured] = useState(false);
@@ -96,6 +98,7 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
     setAuthor(article?.author ?? '');
     setCategory(article?.category ?? '');
     setFeaturedImageUrl(article?.featured_image_url ?? '');
+    setFeaturedVideoUrl(article?.featured_video_url ?? '');
     setTocImageUrl(article?.toc_image_url ?? '');
     setTocImageAlt(article?.toc_image_alt ?? '');
     setFeatured(article?.featured ?? false);
@@ -150,6 +153,10 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
 
   const handleSave = async () => {
     if (!title.trim()) { toast.error('Title is required.'); return; }
+    if (featuredVideoUrl.trim() && !parseVideoUrl(featuredVideoUrl)) {
+      toast.error('Featured video URL must be a YouTube or Vimeo link.');
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -160,6 +167,7 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
         author: author.trim() || null,
         category: category || null,
         featured_image_url: featuredImageUrl.trim() || null,
+        featured_video_url: featuredVideoUrl.trim() || null,
         toc_image_url: tocImageUrl.trim() || null,
         toc_image_alt: tocImageAlt.trim() || null,
         featured,
@@ -315,6 +323,38 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
               placeholder="https://…"
               type="url"
             />
+          </div>
+
+          {/* ── Featured Video URL ── */}
+          <div className="space-y-1">
+            <Label>Featured Video URL <span className="text-xs font-normal text-muted-foreground">(YouTube or Vimeo — optional)</span></Label>
+            <Input
+              value={featuredVideoUrl}
+              onChange={e => setFeaturedVideoUrl(e.target.value)}
+              placeholder="https://youtube.com/watch?v=… or https://vimeo.com/…"
+              type="url"
+            />
+            {(() => {
+              const trimmed = featuredVideoUrl.trim();
+              if (!trimmed) {
+                return (
+                  <p className="text-xs text-muted-foreground">
+                    When set, this video plays in place of the featured image on the article page. The featured image is still used as the card thumbnail (and social preview), so add both for the best result.
+                  </p>
+                );
+              }
+              const info = parseVideoUrl(trimmed);
+              return info ? (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                  {info.provider === 'youtube' ? 'YouTube' : 'Vimeo'} video recognised — it will embed in the article hero.
+                </p>
+              ) : (
+                <p className="text-xs text-destructive">
+                  Unrecognised link. Paste a YouTube (youtube.com / youtu.be) or Vimeo (vimeo.com) URL.
+                </p>
+              );
+            })()}
           </div>
 
           {/* ── Contents-panel card image ── */}

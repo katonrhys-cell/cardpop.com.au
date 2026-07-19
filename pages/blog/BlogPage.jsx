@@ -6,9 +6,10 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { BookOpen, FileX, AlertCircle, Search, User, Calendar, ArrowRight } from 'lucide-react';
+import { BookOpen, FileX, AlertCircle, Search, User, Calendar, ArrowRight, Play } from 'lucide-react';
 import { htmlExcerpt } from '@/utils/htmlExcerpt.js';
 import { toCdnUrl } from '@/utils/imageUrl.js';
+import { parseVideoUrl } from '@/utils/videoEmbed.js';
 import { BLOG_CATEGORIES as CATEGORIES } from '@/data/blogCategories.js';
 import { resolveConviction } from '@/utils/convictionRating.js';
 
@@ -87,9 +88,29 @@ const ImagePlaceholder = () => (
   </div>
 );
 
+// Resolve a card's poster image + whether it carries a featured video. The
+// featured image is the preferred poster; when absent we fall back to the
+// auto-derived thumbnail of a YouTube featured video (Vimeo has none, so such
+// cards show the placeholder). The article page is where the video actually
+// plays — cards only advertise it with a play badge.
+const cardMedia = (article) => {
+  const video = parseVideoUrl(article.featured_video_url);
+  const imageUrl = toCdnUrl(article.featured_image_url) || video?.thumbnailUrl || null;
+  return { imageUrl, hasVideo: !!video };
+};
+
+// Play badge overlaid on the poster of any card whose article has a video.
+const PlayBadge = () => (
+  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+    <span className="flex items-center justify-center w-12 h-12 rounded-full bg-black/55 backdrop-blur-sm ring-1 ring-white/25 shadow-lg">
+      <Play className="w-5 h-5 text-white fill-white translate-x-[1px]" />
+    </span>
+  </div>
+);
+
 // Large card for Featured Stories (2-col grid)
 const FeaturedCard = ({ article, showBadge = true }) => {
-  const imageUrl = toCdnUrl(article.featured_image_url) || null;
+  const { imageUrl, hasVideo } = cardMedia(article);
   return (
     <Link
       to={`/blog/${article.slug || article.id}`}
@@ -100,6 +121,7 @@ const FeaturedCard = ({ article, showBadge = true }) => {
           ? <img src={imageUrl} alt={article.title} loading="lazy" decoding="async" className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" />
           : <ImagePlaceholder />
         }
+        {hasVideo && <PlayBadge />}
       </div>
       {showBadge && <CategoryBadge slug={article.category} />}
       <div className="p-6 flex flex-col flex-1">
@@ -127,7 +149,7 @@ const FeaturedCard = ({ article, showBadge = true }) => {
 
 // Standard card for the main articles grid (3-col)
 const ArticleCard = ({ article, showBadge = true }) => {
-  const imageUrl = toCdnUrl(article.featured_image_url) || null;
+  const { imageUrl, hasVideo } = cardMedia(article);
   return (
     <Link
       to={`/blog/${article.slug || article.id}`}
@@ -138,6 +160,7 @@ const ArticleCard = ({ article, showBadge = true }) => {
           ? <img src={imageUrl} alt={article.title} loading="lazy" decoding="async" className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" />
           : <ImagePlaceholder />
         }
+        {hasVideo && <PlayBadge />}
       </div>
       {showBadge && <CategoryBadge slug={article.category} />}
       <div className="p-5 flex flex-col flex-1">

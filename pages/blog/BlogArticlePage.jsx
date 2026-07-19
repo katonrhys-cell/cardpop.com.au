@@ -10,6 +10,7 @@ import { htmlExcerpt } from '@/utils/htmlExcerpt.js';
 import { publicImageUrl, toCdnUrl, cdnifyStorageUrlsInHtml } from '@/utils/imageUrl.js';
 import { resolveConviction, CONVICTION_METHODOLOGY_PATH } from '@/utils/convictionRating.js';
 import { BLOG_CATEGORY_MAP } from '@/data/blogCategories.js';
+import { parseVideoUrl } from '@/utils/videoEmbed.js';
 
 const ConvictionRating = ({ article }) => {
   const conviction = resolveConviction(article);
@@ -304,6 +305,9 @@ const BlogArticlePage = () => {
   }
 
   const imageUrl = toCdnUrl(article.featured_image_url) || null;
+  // A featured VIDEO, when set, takes the hero slot in place of the image.
+  // Falls back to null for empty/unsupported URLs (the image then renders).
+  const videoInfo = parseVideoUrl(article.featured_video_url);
   // Portrait card/slab image shown in the empty right side of the "On this
   // page" panel — routed through the image CDN like every rendered image.
   const tocImageUrl = publicImageUrl(article.toc_image_url, 'media');
@@ -365,7 +369,20 @@ const BlogArticlePage = () => {
     publishingPrinciples: 'https://cardpop.com.au/blog',
   };
 
-  const structuredDataArray = [blogStructuredData, faqStructuredData, breadcrumbStructuredData, organisationSchema].filter(Boolean);
+  // Emit VideoObject when the article carries a featured video, so the embed is
+  // eligible for video rich results. thumbnailUrl prefers the auto-derived
+  // YouTube still, falling back to the article's featured image.
+  const videoStructuredData = videoInfo ? {
+    '@context': 'https://schema.org',
+    '@type': 'VideoObject',
+    name: article.seo_title || article.title,
+    description: article.seo_description || article.excerpt || article.title,
+    thumbnailUrl: videoInfo.thumbnailUrl || toCdnUrl(article.featured_image_url) || undefined,
+    uploadDate: article.published_at || article.created_at,
+    embedUrl: videoInfo.embedUrl,
+  } : null;
+
+  const structuredDataArray = [blogStructuredData, videoStructuredData, faqStructuredData, breadcrumbStructuredData, organisationSchema].filter(Boolean);
 
   return (
     <article className="min-h-[100dvh] bg-background pb-24 overflow-x-hidden">
@@ -453,7 +470,21 @@ const BlogArticlePage = () => {
         </div>
       </div>
 
-      {imageUrl && (
+      {videoInfo ? (
+        <div className="container-default max-w-4xl mx-auto mt-4 mb-4">
+          <div className="rounded-2xl overflow-hidden bg-black shadow-lg aspect-video">
+            <iframe
+              src={videoInfo.embedUrl}
+              title={article.title}
+              className="block w-full h-full"
+              loading="eager"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerPolicy="strict-origin-when-cross-origin"
+              allowFullScreen
+            />
+          </div>
+        </div>
+      ) : imageUrl && (
         <div className="container-default max-w-4xl mx-auto mt-4 mb-4">
           <div className="rounded-2xl overflow-hidden bg-muted shadow-lg aspect-video">
              <img
