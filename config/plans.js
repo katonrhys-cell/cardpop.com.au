@@ -91,7 +91,7 @@ export const PLANS = {
       'Browse and buy instantly — no membership needed',
       'List and sell up to 25 cards once your ID is verified',
       'Pay only a small fee when a sale or trade completes',
-      'Save a card on file for one-tap checkout (never charged until you buy)',
+      'Card on file required to sell or trade — never charged until you transact',
       'Trade with other verified collectors',
       'Community, wishlists and price tracking',
     ],

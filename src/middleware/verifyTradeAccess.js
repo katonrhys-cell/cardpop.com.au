@@ -38,12 +38,13 @@ async function verifyTradeAccess(req, res, next) {
       });
     }
 
-    // Identity gate: trading (like selling) requires Stripe Identity
-    // verification for Hobby and Pro accounts alike — matching the DB
-    // can_sell() rule. Buying is unaffected (it never hits a /trade route).
+    // Selling/trading gate (matches the DB can_sell() rule): trading requires
+    // BOTH Stripe Identity verification AND a card on file (so the per-trade
+    // fee can always be collected — a trade has no sale proceeds to net it
+    // from). Buying is unaffected (it never hits a /trade route).
     const { data: profile } = await supabase
       .from('profiles')
-      .select('is_verified')
+      .select('is_verified, has_saved_card')
       .eq('id', userId)
       .maybeSingle();
 
@@ -63,6 +64,25 @@ async function verifyTradeAccess(req, res, next) {
         error: 'Identity verification is required to trade',
         code: 'IDENTITY_NOT_VERIFIED',
         message: 'Verify your identity (a quick ID + selfie check via Stripe) before trading.',
+      });
+    }
+
+    if (profile?.has_saved_card !== true) {
+      logger.warn(`[TRADE_ACCESS] Card-less user ${userId} attempted trade: ${req.method} ${req.path}`);
+
+      await supabase.from('audit_logs').insert({
+        user_id: userId,
+        event_type: 'trade_attempt_no_card',
+        description: `User without a card on file attempted: ${req.method} ${req.path}`,
+        ip_address: req.ip || 'unknown',
+        user_agent: req.headers['user-agent'] || 'unknown',
+        status: 'blocked',
+      }).catch(() => {});
+
+      return res.status(403).json({
+        error: 'A saved card is required to trade',
+        code: 'CARD_REQUIRED',
+        message: 'Add a card on file before trading. It is never charged until a trade or sale completes.',
       });
     }
 

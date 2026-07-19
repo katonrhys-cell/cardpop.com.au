@@ -120,16 +120,16 @@ const PricingPage = () => {
           <CreditCard className="h-6 w-6 text-brand-red" />
           <h3 className="mt-3 font-heading font-bold text-foreground">Buy with no membership</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Anyone can check out. Save a card on file for one-tap buying — it's never charged until you
-            actually purchase.
+            Anyone can check out. A card on file gives one-tap buying and is required to sell or trade —
+            it's never charged until you actually transact.
           </p>
         </div>
         <div className="rounded-2xl border border-border bg-muted/30 p-6">
           <ShieldCheck className="h-6 w-6 text-brand-red" />
           <h3 className="mt-3 font-heading font-bold text-foreground">Verify to sell &amp; trade</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            A quick ID + selfie check via Stripe unlocks listing, selling and trading on any plan — it
-            keeps the marketplace safe for everyone.
+            To list, sell or trade on any plan, verify your ID (a quick selfie + document check via
+            Stripe) and keep a card on file. It keeps the marketplace safe and fees fair.
           </p>
         </div>
         <div className="rounded-2xl border border-border bg-muted/30 p-6">

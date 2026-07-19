@@ -188,9 +188,10 @@ const SignupPage = () => {
             </p>
             <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
               Your account is <span className="text-foreground font-bold">free, forever</span> — buy straight away.
-              To list, sell or trade, just verify your <span className="text-foreground font-bold">ID</span> (a quick
-              photo of your licence or passport, handled securely by Stripe). You'll only pay a small fee when a sale
-              completes. Want unlimited listings, a storefront and premium tools? Upgrade to{' '}
+              To list, sell or trade, verify your <span className="text-foreground font-bold">ID</span> (a quick photo
+              of your licence or passport, handled securely by Stripe) and add a{' '}
+              <span className="text-foreground font-bold">card on file</span> — it's never charged until a sale or
+              trade completes. Want unlimited listings, a storefront and premium tools? Upgrade to{' '}
               <span className="text-foreground font-bold">Pro</span> anytime.
             </p>
             <p className="text-sm text-muted-foreground mb-8 leading-relaxed">

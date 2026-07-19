@@ -537,9 +537,14 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       case 'checkout.session.async_payment_succeeded': {
         const session = event.data.object;
         if (session.mode === 'setup' || session.metadata?.saveCard === 'true') {
-          // "Save a card" flow (Hobby users putting a method on file). Stripe
-          // attaches the payment method to the Customer automatically — there's
-          // no order or charge to record here.
+          // "Save a card" flow (users putting a method on file). Stripe attaches
+          // the payment method to the Customer automatically — there's no order
+          // or charge. Mirror the fact that they now have a card on file onto
+          // the profile so the selling/trading gate (can_sell) opens.
+          const savedUserId = session.metadata?.userId;
+          if (savedUserId) {
+            await supabase.from('profiles').update({ has_saved_card: true }).eq('id', savedUserId);
+          }
           logger.info(`[STRIPE] Card-setup session ${session.id} completed — payment method saved`);
         } else if (session.metadata?.walletTopup === 'true') {
           await handleWalletTopup(session, stripe);

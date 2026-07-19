@@ -389,13 +389,15 @@ export const AuthProvider = ({ children }) => {
     ? Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / 86_400_000))
     : null;
 
-  // ── Selling / trading entitlement (identity verification) ──────────────────
+  // ── Selling / trading entitlement (identity verification + card on file) ───
   // Mirrors the DB `can_sell()` rule: ANY account — free Hobby included — may
-  // list/sell/trade once it has completed Stripe Identity verification. It is no
-  // longer gated on a paid subscription. `is_verified` is the identity flag
+  // list/sell/trade once it has (1) completed Stripe Identity verification AND
+  // (2) a card on file (so the per-sale/trade fee can always be collected). It
+  // is not gated on a paid subscription. `is_verified` is the identity flag
   // (distinct from `isVerified` below, which is *email* confirmation).
   const isIdentityVerified = isIdVerified(profile?.is_verified);
-  const canSell = isIdentityVerified;
+  const hasSavedCard = profile?.has_saved_card === true;
+  const canSell = isIdentityVerified && hasSavedCard;
 
   // Memoize so the reference is stable across re-renders that don't change the
   // user/profile (e.g. loading/mfaRequired toggles). Consumers that key effects
@@ -417,9 +419,11 @@ export const AuthProvider = ({ children }) => {
     isAdmin,
     isVerified,
     isEmailVerified: isVerified,
-    // Identity (Stripe Identity) verification — gates selling/trading.
+    // Identity (Stripe Identity) verification — one of the selling/trading gates.
     isIdentityVerified,
-    // Selling/trading entitlement — see the derivation above (= identity verified).
+    // Whether the user has a card on file — the other selling/trading gate.
+    hasSavedCard,
+    // Selling/trading entitlement — see the derivation above (identity + card).
     canSell,
     // Account plan.
     plan,               // 'hobby' | 'pro'

@@ -39,11 +39,11 @@ const ListingForm = ({ product, onSuccess, onCancel }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Listing a NEW card requires identity verification (free on every plan).
-    // Editing an existing listing is always allowed. The database RLS policy
-    // enforces this too; this is the friendly client-side guard.
+    // Listing a NEW card requires identity verification AND a card on file
+    // (free on every plan). Editing an existing listing is always allowed. The
+    // database RLS policy enforces this too; this is the friendly client guard.
     if (!product && !canSell) {
-      toast('Verify your identity to list cards for sale.');
+      toast('Verify your ID and add a card on file to list cards for sale.');
       return;
     }
 

@@ -133,6 +133,15 @@ router.get('/payment-methods', authMiddleware, async (req, res) => {
       expYear:  pm.card?.exp_year || null,
     }));
 
+    // Keep profiles.has_saved_card (which the can_sell gate reads) in sync with
+    // the real Stripe state — self-heals if the setup webhook was missed or a
+    // card was later removed. Best-effort; never fail the read over it.
+    supabase.from('profiles')
+      .update({ has_saved_card: paymentMethods.length > 0 })
+      .eq('id', req.user.id)
+      .then(({ error }) => { if (error) logger.warn(`[WALLET] has_saved_card sync failed for ${req.user.id}: ${error.message}`); })
+      .catch(() => {});
+
     res.json({ paymentMethods });
   } catch (err) {
     logger.error(`[WALLET] /payment-methods error: ${err.message}`);

@@ -3,19 +3,23 @@
 CardPop has two account plans, defined in `config/plans.js`:
 
 - **Hobby** — free, forever. Anyone can browse and buy immediately. To list,
-  sell or trade, a Hobby user completes **Stripe Identity verification**; after
-  that they sell for free and pay only the per-transaction fee. Hobby users are
-  encouraged (never forced) to **save a card on file** for one-tap buying — it's
-  never charged until they actually buy.
+  sell or trade, a Hobby user completes **Stripe Identity verification** *and*
+  keeps a **card on file** (so the per-sale/trade fee can always be collected —
+  trades have no proceeds to net it from). The card is never charged until a
+  sale or trade actually completes. After that they sell for free and pay only
+  the per-transaction fee.
 - **Pro** — a paid subscription (**$20 AUD/month**, with a 30-day free trial and
   a card/PayPal on file). Requires ID verification and a Stripe customer, and
   unlocks premium features, higher limits, and the Pro badge/storefront. Pro
   pays the **same** per-transaction fees as Hobby — it's for access, not fees.
 
 > **Important model note:** the subscription no longer gates *selling*. Selling
-> is gated on **identity verification** (`profiles.is_verified`) via the DB
-> `can_sell()` function — see
-> `supabase/migrations/20260719120000_can_sell_requires_identity_and_reset_plans.sql`.
+> is gated on **identity verification** (`profiles.is_verified`) **and a card on
+> file** (`profiles.has_saved_card`) via the DB `can_sell()` function — see
+> `supabase/migrations/20260719120000_can_sell_requires_identity_and_reset_plans.sql`
+> and `20260719130000_require_card_on_file_to_sell.sql`. The card flag is
+> mirrored from Stripe by the save-card webhook and the `/wallet/payment-methods`
+> read.
 > The Stripe/PayPal subscription described below drives the **Pro** tier only,
 > mirrored onto `profiles.subscription_status` **and** `profiles.subscription_tier`
 > (`'pro'` when trialing/active, `'free'` otherwise) by the webhook handlers.

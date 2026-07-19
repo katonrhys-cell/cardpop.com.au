@@ -14,7 +14,7 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
  *   • offers the Pro upgrade
  */
 const AccountPlanBanner = () => {
-  const { isPro, isIdentityVerified, trialActive, trialDaysLeft } = useAuth();
+  const { isPro, isIdentityVerified, hasSavedCard, trialActive, trialDaysLeft } = useAuth();
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -40,7 +40,7 @@ const AccountPlanBanner = () => {
         )}
       </div>
 
-      {/* Next-step nudges */}
+      {/* Next-step nudges — both are required to unlock selling & trading */}
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {!isIdentityVerified && (
           <Link
@@ -55,11 +55,19 @@ const AccountPlanBanner = () => {
         )}
         <Link
           to="/account/wallet"
-          className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm transition-colors hover:bg-muted/50"
+          className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-sm transition-colors ${
+            hasSavedCard
+              ? 'border-border bg-muted/30 hover:bg-muted/50'
+              : 'border-brand-red/30 bg-brand-red/5 hover:bg-brand-red/10'
+          }`}
         >
-          <CreditCard className="h-5 w-5 shrink-0 text-muted-foreground" />
+          <CreditCard className={`h-5 w-5 shrink-0 ${hasSavedCard ? 'text-muted-foreground' : 'text-brand-red'}`} />
           <span className="text-foreground">
-            <span className="font-bold">Save a card</span> for one-tap checkout — never charged until you buy.
+            {hasSavedCard ? (
+              <><span className="font-bold">Manage your saved card</span> — used for one-tap checkout.</>
+            ) : (
+              <><span className="font-bold">Add a card on file</span> to sell or trade — never charged until you transact.</>
+            )}
           </span>
         </Link>
       </div>

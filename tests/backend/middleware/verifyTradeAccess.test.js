@@ -3,10 +3,10 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 // ─── mocks ────────────────────────────────────────────────────────────────────
 
 const mockInsert = vi.hoisted(() => vi.fn());
-// The profiles identity lookup: verifyTradeAccess does
-// supabase.from('profiles').select('is_verified').eq('id', uid).maybeSingle().
+// The profiles lookup: verifyTradeAccess does
+// supabase.from('profiles').select('is_verified, has_saved_card').eq('id', uid).maybeSingle().
 // Tests set `state.profileRow` to control what that returns.
-const state = vi.hoisted(() => ({ profileRow: { is_verified: true } }));
+const state = vi.hoisted(() => ({ profileRow: { is_verified: true, has_saved_card: true } }));
 const mockMaybeSingle = vi.hoisted(() => vi.fn(async () => ({ data: state.profileRow, error: null })));
 const mockSupabase = vi.hoisted(() => ({
   from: vi.fn((table) => {
@@ -41,8 +41,8 @@ function makeRes() {
 beforeEach(() => {
   vi.clearAllMocks();
   mockInsert.mockResolvedValue({ error: null });
-  // Default: the user is identity-verified so email-verified callers pass.
-  state.profileRow = { is_verified: true };
+  // Default: identity-verified + card on file, so email-verified callers pass.
+  state.profileRow = { is_verified: true, has_saved_card: true };
   mockMaybeSingle.mockResolvedValue({ data: state.profileRow, error: null });
 });
 
@@ -106,7 +106,7 @@ describe('verifyTradeAccess', () => {
   });
 
   it('blocks email-verified but ID-unverified users with 403 IDENTITY_NOT_VERIFIED', async () => {
-    state.profileRow = { is_verified: false };
+    state.profileRow = { is_verified: false, has_saved_card: true };
     mockMaybeSingle.mockResolvedValue({ data: state.profileRow, error: null });
     const next = vi.fn();
     const res = makeRes();
@@ -126,6 +126,30 @@ describe('verifyTradeAccess', () => {
     expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({
       user_id: 'user-3',
       event_type: 'trade_attempt_id_unverified',
+      status: 'blocked',
+    }));
+  });
+
+  it('blocks ID-verified users without a card on file with 403 CARD_REQUIRED', async () => {
+    state.profileRow = { is_verified: true, has_saved_card: false };
+    mockMaybeSingle.mockResolvedValue({ data: state.profileRow, error: null });
+    const next = vi.fn();
+    const res = makeRes();
+    const req = {
+      path: '/trade/offers',
+      method: 'POST',
+      user: { id: 'user-4', email_confirmed_at: '2026-01-01T00:00:00Z' },
+      ip: '9.9.9.9',
+      headers: { 'user-agent': 'jest' },
+    };
+    await verifyTradeAccess(req, res, next);
+
+    expect(res.statusCode).toBe(403);
+    expect(res.body).toMatchObject({ code: 'CARD_REQUIRED' });
+    expect(next).not.toHaveBeenCalled();
+    expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({
+      user_id: 'user-4',
+      event_type: 'trade_attempt_no_card',
       status: 'blocked',
     }));
   });

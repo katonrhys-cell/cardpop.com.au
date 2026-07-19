@@ -79,8 +79,9 @@ const SavePaymentMethod = () => {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Save a card for one-tap checkout. It's stored securely by Stripe and{' '}
-          <span className="font-semibold text-foreground">never charged until you actually buy something</span>.
+          Keep a card on file for one-tap checkout — and it's required to sell or trade, so we can
+          collect the fee when a deal completes. It's stored securely by Stripe and{' '}
+          <span className="font-semibold text-foreground">never charged until you actually transact</span>.
         </p>
 
         {loading ? (
