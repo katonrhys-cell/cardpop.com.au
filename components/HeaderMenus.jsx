@@ -15,7 +15,7 @@ import {
   Settings, FolderTree, ListOrdered, BarChart3, Store, Shield,
   BookOpen, Globe, Star, Award, TrendingUp, Newspaper, BadgeCheck, Ticket, Handshake,
   Calculator, MapPin, ClipboardList, HelpCircle, MessageSquare,
-  ShoppingBag, LineChart, Info,
+  ShoppingBag, LineChart, Info, Rocket,
 } from 'lucide-react';
 import { TCG_CATEGORY_DATA, SPORTS_CATEGORY_DATA } from '@/components/CategoryIcons.jsx';
 import { SHOP_CATEGORY_GROUPS } from '@/utils/shopCategories.js';
@@ -72,6 +72,7 @@ const COMMUNITY_ITEMS = [
   { href: '/card-shops',               label: 'Card Shop Directory',   desc: 'Find local card shops city by city',     Icon: Store,         gradient: 'from-amber-500 to-orange-500'  },
   { href: '/community/map',            label: 'Community Map',         desc: 'Stores, shows & traders near you',       Icon: MapPin,        gradient: 'from-blue-500 to-indigo-600'   },
   { href: '/community/whatnot',        label: 'Whatnot',               desc: 'Live buying and selling shows',          Icon: WhatnotIcon,   gradient: 'from-green-500 to-emerald-600', isWhatnot: true },
+  { href: '/community/building-your-business', label: 'Building Your Business', desc: 'Tools we use to grow a card business', Icon: Rocket,     gradient: 'from-rose-500 to-orange-500'   },
 ];
 
 const EVENT_ITEMS = [
