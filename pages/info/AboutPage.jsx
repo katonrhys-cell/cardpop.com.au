@@ -40,31 +40,35 @@ const AboutPage = () => {
         {/* Brand glow accents */}
         <div className="pointer-events-none absolute -top-24 -right-24 w-96 h-96 rounded-full bg-brand-red/20 blur-3xl" aria-hidden="true" />
         <div className="pointer-events-none absolute -bottom-32 -left-24 w-96 h-96 rounded-full bg-brand-red/10 blur-3xl" aria-hidden="true" />
-        <div className="relative max-w-[100rem] mx-auto">
-          <span className="inline-flex items-center gap-2 rounded-full border border-background/20 bg-background/5 px-4 py-1.5 text-xs font-bold uppercase tracking-wider mb-7">
-            <span className="w-2 h-2 rounded-full bg-brand-red" aria-hidden="true" />
-            About CardPop™ · Buy. Sell. Collect.
-          </span>
-          <h1 className="text-[clamp(2.4rem,5vw,4rem)] leading-[1.05] font-extrabold mb-6 max-w-3xl">
-            The card show that<br />never <span className="text-brand-red">closes.</span>
-          </h1>
-          <p className="text-lg leading-relaxed max-w-xl opacity-70 mb-10">
-            Every collector remembers the moment the hobby truly clicked. CardPop™
-            was built to recreate the trust, excitement and community of card
-            shows — online, every day of the year.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <Button asChild size="lg" className="rounded-full px-7 font-bold">
-              <Link to="/marketplace">Explore Marketplace</Link>
-            </Button>
-            <Button
-              asChild
-              size="lg"
-              variant="outline"
-              className="rounded-full px-7 font-bold border-background/30 text-background bg-transparent hover:bg-background/10 hover:text-background hover:border-background/50"
-            >
-              <Link to="/signup">Join Community</Link>
-            </Button>
+        <div className="relative max-w-[100rem] mx-auto grid lg:grid-cols-2 gap-10 lg:gap-16 items-end">
+          <div>
+            <span className="inline-flex items-center gap-2 rounded-full border border-background/20 bg-background/5 px-4 py-1.5 text-xs font-bold uppercase tracking-wider mb-7">
+              <span className="w-2 h-2 rounded-full bg-brand-red" aria-hidden="true" />
+              About CardPop™ · Buy. Sell. Collect.
+            </span>
+            <h1 className="text-[clamp(2.4rem,5vw,4rem)] leading-[1.05] font-extrabold">
+              The card show that<br />never <span className="text-brand-red">closes.</span>
+            </h1>
+          </div>
+          <div>
+            <p className="text-lg leading-relaxed opacity-70 mb-8">
+              Every collector remembers the moment the hobby truly clicked. CardPop™
+              was built to recreate the trust, excitement and community of card
+              shows — online, every day of the year.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Button asChild size="lg" className="rounded-full px-7 font-bold">
+                <Link to="/marketplace">Explore Marketplace</Link>
+              </Button>
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="rounded-full px-7 font-bold border-background/30 text-background bg-transparent hover:bg-background/10 hover:text-background hover:border-background/50"
+              >
+                <Link to="/signup">Join Community</Link>
+              </Button>
+            </div>
           </div>
         </div>
       </section>
