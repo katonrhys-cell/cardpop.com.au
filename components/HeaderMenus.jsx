@@ -37,6 +37,7 @@ export const NAV_LINKS = [
   { label: 'Community', href: '/community' },
   { label: 'Events', href: '/events' },
   { label: 'Grading', href: '/grading' },
+  { label: 'Pricing', href: '/pricing', icon: Sparkles },
   { label: 'About', href: '/about', icon: Info },
 ];
 
