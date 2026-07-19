@@ -167,7 +167,7 @@ const VaultProfilePage = () => {
 
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto px-4 py-12 space-y-8">
+      <div className="max-w-[90rem] mx-auto px-4 py-12 space-y-8">
         <Skeleton className="h-64 w-full rounded-2xl" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <Skeleton className="h-96 md:col-span-2 rounded-2xl" />
@@ -197,7 +197,7 @@ const VaultProfilePage = () => {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.2),transparent_50%)]" />
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 -mt-24 relative z-10">
+      <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 -mt-24 relative z-10">
         
         {!isVerified && (
           <div className="mb-6 p-4 bg-muted border border-border rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">

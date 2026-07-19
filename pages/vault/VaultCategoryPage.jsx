@@ -173,7 +173,7 @@ const VaultCategoryPage = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 py-12">
       <SEOHead 
         title="Public Vault Listings | CardPop" 
         description="Browse public vault listings from collectors around the world." 

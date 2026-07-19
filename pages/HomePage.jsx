@@ -531,7 +531,7 @@ const HomePage = () => {
 
       {/* ── Stats strip ──────────────────────────────────────────────────── */}
       <section ref={statsRef} className="py-12 border-y border-border bg-card">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-4">
             {STATS.map((stat) => (
               <StatItem key={stat.label} {...stat} inView={statsInView} />
@@ -542,7 +542,7 @@ const HomePage = () => {
 
       {/* ── Trust strip ──────────────────────────────────────────────────── */}
       <section className="py-10 bg-background border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {TRUST_SIGNALS.map(({ icon: Icon, title, body }) => (
               <Link

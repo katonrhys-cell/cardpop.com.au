@@ -379,7 +379,7 @@ const LocalMapPage = () => {
         </div>
       </section>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
         {/* ── Controls ── */}
         <div className="flex flex-col lg:flex-row gap-4 mb-5">

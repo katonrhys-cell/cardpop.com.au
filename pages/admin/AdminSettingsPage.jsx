@@ -99,7 +99,7 @@ const AdminSettingsPage = () => {
   }
 
   return (
-    <div className="w-full space-y-6 animate-in fade-in duration-300 py-6 px-4 sm:px-6 md:px-8 max-w-5xl mx-auto">
+    <div className="w-full space-y-6 animate-in fade-in duration-300 py-6 px-4 sm:px-6 md:px-8 max-w-[90rem] mx-auto">
       <Helmet><title>Platform Settings | Admin</title></Helmet>
 
       <AdminPageHeader

@@ -125,7 +125,7 @@ const ShopSealedBoxesPage = () => {
 
       {/* Header Section */}
       <section className="bg-secondary border-b border-border py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-[90rem] mx-auto">
           <Button variant="ghost" asChild className="mb-6 pl-0 hover:bg-transparent hover:text-primary text-secondary-foreground/80">
             <Link to="/shop"><ArrowLeft className="w-4 h-4 mr-2" /> Back to Shop</Link>
           </Button>
@@ -142,7 +142,7 @@ const ShopSealedBoxesPage = () => {
       </section>
 
       {/* Main Content Layout */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 flex flex-col lg:flex-row gap-8 lg:gap-12">
+      <section className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 mt-12 flex flex-col lg:flex-row gap-8 lg:gap-12">
         
         {/* Sidebar Filters */}
         <aside className="w-full lg:w-72 shrink-0">

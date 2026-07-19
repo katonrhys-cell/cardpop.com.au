@@ -91,7 +91,7 @@ const AccountSellerTier = () => {
   }, [currentUser?.id]);
 
   if (loading) return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 space-y-6">
+    <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 space-y-6">
       <Skeleton className="h-8 w-48" />
       <Skeleton className="h-40 rounded-2xl" />
       <div className="grid md:grid-cols-2 gap-4">{[0,1,2,3].map(i => <Skeleton key={i} className="h-64 rounded-2xl" />)}</div>
@@ -108,7 +108,7 @@ const AccountSellerTier = () => {
   const nextTier = currentTierIdx < TIERS.length - 1 ? TIERS[currentTierIdx + 1] : null;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 space-y-8 animate-in fade-in duration-300">
+    <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 space-y-8 animate-in fade-in duration-300">
       <Helmet><title>Seller Tier | CardPop</title></Helmet>
       <Breadcrumb items={[{ label: 'Account', path: '/account' }, { label: 'Seller Tier' }]} />
 

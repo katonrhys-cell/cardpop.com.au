@@ -41,7 +41,7 @@ const TransactionHistoryPage = () => {
     <div className="flex flex-col bg-background font-sans">
       <Helmet><title>Transactions | Card Pop</title></Helmet>
       
-      <div className="flex-1 max-w-7xl mx-auto px-4 py-12 w-full">
+      <div className="flex-1 max-w-[90rem] mx-auto px-4 py-12 w-full">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="font-serif text-4xl font-bold mb-2">Transaction History</h1>
