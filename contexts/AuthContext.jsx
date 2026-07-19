@@ -16,11 +16,24 @@ export const AuthProvider = ({ children }) => {
   const [profileLoading, setProfileLoading] = useState(true);
   // MFA gating: when a session is only AAL1 but the user has a verified factor,
   // the login MFA challenge is still outstanding and the session must NOT count
-  // as authenticated. checkedToken tracks which access token the AAL result
-  // applies to, so isAuthenticated never briefly flips true before we've checked.
+  // as authenticated. checkedUserId tracks which user the AAL result applies
+  // to, so isAuthenticated never briefly flips true before the first check for
+  // that user completes. It is deliberately keyed by user — NOT by access
+  // token — because supabase-js refreshes the token whenever the tab regains
+  // focus; gating per token flipped `loading` true on every refocus, which
+  // made the route guards unmount the whole page tree (losing any in-progress
+  // form/modal state, e.g. the admin event editor). A token refresh can't
+  // change the assurance level, and mfaRequired keeps its last value while the
+  // re-check below runs, so skipping the gate for an already-checked user is
+  // safe.
   const [mfaRequired, setMfaRequired] = useState(false);
-  const [checkedToken, setCheckedToken] = useState(null);
+  const [checkedUserId, setCheckedUserId] = useState(null);
   const isMounted = useRef(true);
+  // Which user's profile is currently loaded. Lets repeat auth events for the
+  // same user (token refresh on tab refocus) re-fetch the profile silently in
+  // the background instead of flipping profileLoading true — which would also
+  // unmount every guarded route.
+  const loadedProfileUserRef = useRef(null);
 
   const fetchProfile = async (userId) => {
     if (!userId) return null;
@@ -53,15 +66,33 @@ export const AuthProvider = ({ children }) => {
         if (isMounted.current) setLoading(false);
 
         if (newSession?.user) {
-          if (isMounted.current) setProfileLoading(true);
+          // Only gate the UI behind profileLoading the first time we load this
+          // user's profile. Subsequent events (TOKEN_REFRESHED / SIGNED_IN on
+          // tab refocus) refresh it in the background without unmounting
+          // guarded routes.
+          const isNewUser = loadedProfileUserRef.current !== newSession.user.id;
+          if (isMounted.current && isNewUser) setProfileLoading(true);
           try {
             const p = await fetchProfile(newSession.user.id);
-            if (isMounted.current) { setProfile(p); setProfileLoading(false); clearTimeout(profileTimeout); }
+            if (isMounted.current) {
+              if (p) {
+                loadedProfileUserRef.current = newSession.user.id;
+                setProfile(p);
+              } else if (isNewUser) {
+                // No profile for this user (or first fetch failed) — clear any
+                // previous user's profile. On a background refresh, keep the
+                // last good profile instead of wiping isAdmin over a transient
+                // fetch error (which would bounce admins out of /admin).
+                setProfile(null);
+              }
+              setProfileLoading(false); clearTimeout(profileTimeout);
+            }
           } catch (e) {
             console.error('[AuthContext] fetchProfile failed:', e);
             if (isMounted.current) { setProfileLoading(false); clearTimeout(profileTimeout); }
           }
         } else {
+          loadedProfileUserRef.current = null;
           if (isMounted.current) { setProfile(null); setProfileLoading(false); clearTimeout(profileTimeout); }
         }
       }
@@ -83,6 +114,7 @@ export const AuthProvider = ({ children }) => {
     let cancelled = false;
     fetchProfile(currentUser.id).then(p => {
       if (!cancelled && isMounted.current && p) {
+        loadedProfileUserRef.current = currentUser.id;
         setProfile(p);
         setProfileLoading(false);
       }
@@ -117,13 +149,14 @@ export const AuthProvider = ({ children }) => {
   // (login, refresh, MFA upgrade) so a page reload mid-challenge can't bypass it.
   useEffect(() => {
     const token = session?.access_token ?? null;
-    if (!token) { setMfaRequired(false); setCheckedToken(null); return; }
+    const userId = session?.user?.id ?? null;
+    if (!token) { setMfaRequired(false); setCheckedUserId(null); return; }
     let cancelled = false;
     // Timeout after 5 seconds to prevent indefinite MFA blocking if Supabase is slow
     const mfaTimeout = setTimeout(() => {
       if (!cancelled && isMounted.current) {
         setMfaRequired(false);
-        setCheckedToken(token);
+        setCheckedUserId(userId);
       }
     }, 5000);
     supabase.auth.mfa.getAuthenticatorAssuranceLevel()
@@ -131,20 +164,20 @@ export const AuthProvider = ({ children }) => {
         if (cancelled || !isMounted.current) return;
         clearTimeout(mfaTimeout);
         setMfaRequired(data?.currentLevel === 'aal1' && data?.nextLevel === 'aal2');
-        setCheckedToken(token);
+        setCheckedUserId(userId);
       })
       .catch(() => {
         if (!cancelled && isMounted.current) {
           clearTimeout(mfaTimeout);
           setMfaRequired(false);
-          setCheckedToken(token);
+          setCheckedUserId(userId);
         }
       });
     return () => {
       cancelled = true;
       clearTimeout(mfaTimeout);
     };
-  }, [session?.access_token]);
+  }, [session?.access_token, session?.user?.id]);
 
   const signup = async (email, password, fullName, captchaToken) => {
     const username = email.split('@')[0].replace(/[^a-z0-9_]/gi, '').toLowerCase();
@@ -239,6 +272,8 @@ export const AuthProvider = ({ children }) => {
     setProfile(null);
     setSession(null);
     setMfaRequired(false);
+    loadedProfileUserRef.current = null;
+    setCheckedUserId(null);
     // Fire signOut in background — don't await so a hanging request
     // doesn't block the user from being logged out locally.
     supabase.auth.signOut().catch(e => console.error('[AuthContext] signOut failed:', e));
@@ -374,9 +409,11 @@ export const AuthProvider = ({ children }) => {
     trialActive,
     trialEndsAt,
     trialDaysLeft,
-    // Keep loading until the MFA assurance level for the current token is known,
+    // Keep loading until the MFA assurance level for the current user is known,
     // so ProtectedRoute never flashes protected content before the check lands.
-    loading: loading || (!!session && checkedToken !== session.access_token),
+    // Keyed per user (not per token) so a background token refresh on tab
+    // refocus doesn't flip loading and unmount every guarded route.
+    loading: loading || (!!session && checkedUserId !== session.user?.id),
     profileLoading,
     signup,
     login,
@@ -395,7 +432,10 @@ export const AuthProvider = ({ children }) => {
     refetchProfile: async () => {
       if (session?.user?.id) {
         const p = await fetchProfile(session.user.id);
-        if (isMounted.current) setProfile(p);
+        if (isMounted.current) {
+          if (p) loadedProfileUserRef.current = session.user.id;
+          setProfile(p);
+        }
       }
     },
   };
