@@ -1,0 +1,11 @@
+-- The app treats 'completed' as a first-class terminal order state: admins set
+-- it from the order-management status dropdown (OrderManagementPage), revenue
+-- and analytics queries filter on it (AdminDashboard, AnalyticsReportsPage,
+-- CommissionSettingsPage) and the seller-tier logic counts "completed sales".
+-- But the order_status enum never contained the value, so every write/read hit
+-- Postgres 22P02 "invalid input value for enum order_status: 'completed'" and
+-- silently dropped those orders from the revenue/tier math.
+--
+-- Add the missing value. ADD VALUE IF NOT EXISTS is idempotent and safe to
+-- re-run; it appends to the enum without rewriting existing rows.
+alter type public.order_status add value if not exists 'completed';

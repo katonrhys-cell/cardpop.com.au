@@ -69,13 +69,13 @@ export async function connectOnboard(req, res) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('stripe_connect_account_id, stripe_connect_onboarded, display_name, full_name')
+      .select('stripe_connect_account_id, stripe_connect_onboarded, display_name')
       .eq('id', userId)
       .maybeSingle();
 
     const { accountId } = await ensureSellerConnectAccount(userId, profile?.stripe_connect_account_id, {
       email: req.user.email,
-      displayName: profile?.display_name || profile?.full_name || undefined,
+      displayName: profile?.display_name || undefined,
     });
 
     // v2 hosted onboarding link (replaces v1 accountLinks.create).

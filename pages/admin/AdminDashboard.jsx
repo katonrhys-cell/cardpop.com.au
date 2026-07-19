@@ -110,7 +110,7 @@ const AdminDashboard = () => {
       try {
         let vaultQuery = supabase
           .from('vault_items')
-          .select('*, profiles!vault_items_owner_id_fkey(display_name, full_name)', { count: 'exact' })
+          .select('*, profiles!vault_items_owner_id_fkey(display_name)', { count: 'exact' })
           .order('created_at', { ascending: false })
           .range(0, 19);
 
@@ -325,7 +325,7 @@ const AdminDashboard = () => {
                 vaultProducts.map((vp) => {
                   const path = [nameMap[vp.category_id]].filter(Boolean).join(' > ');
                   const ownerProfile = vp.profiles;
-                  const ownerDisplay = ownerProfile?.display_name || ownerProfile?.full_name || vp.owner_id;
+                  const ownerDisplay = ownerProfile?.display_name || vp.owner_id;
                   return (
                     <TableRow key={vp.id}>
                       <TableCell className="font-bold px-6">{vp.card_name}</TableCell>
