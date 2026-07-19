@@ -17,6 +17,7 @@ import {
   ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 import { useAuth } from '@/contexts/AuthContext';
+import { fetchPokemonCardImage } from '@/utils/pokemonCardImage.js';
 
 // ─── Demo data (replaced by eBay API once integrated) ───────────────────────
 
@@ -133,6 +134,42 @@ const InvestmentSignal = ({ change7d, change30d }) => {
 
 const slugify = (str) =>
   str?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') ?? '';
+
+// Thumbnail for a movers/watchlist row. Prefers a thumbnail already carried on
+// the card (e.g. from live eBay data); otherwise looks up official Pokémon card
+// art from the Pokémon TCG API — the same source the analytics card page uses.
+// Those images come from the API's own CDN, so they cost nothing against our
+// Supabase egress quota. Non-Pokémon cards (and any lookup miss) keep the plain
+// placeholder box.
+const CardThumb = ({ card, className = 'w-10 h-12' }) => {
+  const [src, setSrc] = useState(card.thumbnailUrl || null);
+
+  const isPokemon = !card.collection || /pok[eé]mon/i.test(card.collection);
+
+  useEffect(() => {
+    let cancelled = false;
+    // A thumbnail supplied on the card wins — no need to hit the API.
+    if (card.thumbnailUrl) { setSrc(card.thumbnailUrl); return; }
+    setSrc(null);
+    if (!isPokemon || !card.name) return;
+    fetchPokemonCardImage(card.name, card.set).then(img => {
+      if (!cancelled && img) setSrc(img.small || img.large);
+    });
+    return () => { cancelled = true; };
+  }, [card.thumbnailUrl, card.name, card.set, isPokemon]);
+
+  return src ? (
+    <img
+      src={src}
+      alt={card.name}
+      loading="lazy"
+      className={`${className} object-contain rounded shrink-0 bg-muted/30`}
+      onError={() => setSrc(null)}
+    />
+  ) : (
+    <div className={`${className} rounded bg-muted/30 shrink-0`} />
+  );
+};
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
@@ -279,11 +316,7 @@ const MarketsPage = () => {
       to={cardUrl(card)}
       className="flex items-center gap-3 py-3 px-4 hover:bg-muted/30 rounded-xl transition-colors group"
     >
-      {card.thumbnailUrl ? (
-        <img src={card.thumbnailUrl} alt={card.name} className="w-10 h-12 object-contain rounded shrink-0 bg-muted/30" />
-      ) : (
-        <div className="w-10 h-12 rounded bg-muted/30 shrink-0" />
-      )}
+      <CardThumb card={card} />
       <div className="flex-1 min-w-0">
         <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">{card.name}</p>
         <p className="text-xs text-muted-foreground truncate">{card.set} · {card.collection}</p>
