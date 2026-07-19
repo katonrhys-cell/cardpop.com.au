@@ -87,7 +87,10 @@ jobs:
           # Materialise the rclone config from the secret. base64 keeps the
           # multi-line token JSON intact through the secrets pipeline.
           mkdir -p "$HOME/.config/rclone"
-          echo "${RCLONE_CONFIG_BASE64}" | base64 -d > "$HOME/.config/rclone/rclone.conf"
+          # Strip any whitespace/line-wrapping the secret may carry (some base64
+          # tools wrap at 76 cols) before decoding, so a slightly-formatted secret
+          # still works.
+          printf '%s' "${RCLONE_CONFIG_BASE64}" | tr -d '[:space:]' | base64 -d > "$HOME/.config/rclone/rclone.conf"
 
           # Upload the archive. --drive-chunk-size keeps memory modest for the
           # ~80 MB zip; rclone refreshes the OAuth token automatically.
