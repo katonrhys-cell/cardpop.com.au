@@ -5,7 +5,7 @@ import '@/lib/trustedTypesPolicy.js';
 import React, { Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from '@/App.jsx';
-import { installChunkReloadGuard } from '@/lib/chunkReload.js';
+import { installChunkReloadGuard, dropRecoveredErrors } from '@/lib/chunkReload.js';
 import { installImageCdnFallback } from '@/utils/imageCdnFallback.js';
 import { installWebMcp } from '@/lib/webmcp.js';
 import '@/index.css';
@@ -134,6 +134,11 @@ const initSentry = () => {
         ],
         tracesSampleRate: 0.2,
         environment: import.meta.env.MODE || 'production',
+        // Drop errors the app already auto-recovers from (stale-chunk imports
+        // handled by installChunkReloadGuard) and benign service-worker
+        // lifecycle noise, so the dashboard surfaces real, user-impacting bugs
+        // instead of deploy churn. See lib/chunkReload.js.
+        beforeSend: dropRecoveredErrors,
       });
     })
     .catch(() => { /* monitoring is non-critical — never block the app on it */ });
