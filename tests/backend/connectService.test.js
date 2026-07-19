@@ -7,9 +7,10 @@ const mockStripe = vi.hoisted(() => ({
 }));
 vi.mock('../../src/utils/stripeClient.js', () => ({ default: mockStripe }));
 
-// A minimal supabase double: `from().update().eq()` resolves to { error }, and
-// the resolved error is configurable per test.
-const supabaseState = vi.hoisted(() => ({ updateError: null, lastUpdate: null }));
+// A minimal supabase double: `from().update().eq()` resolves to { error },
+// `from().select().eq().maybeSingle()` resolves to { data: profile } — both
+// configurable per test.
+const supabaseState = vi.hoisted(() => ({ updateError: null, lastUpdate: null, profile: null }));
 vi.mock('../../src/utils/supabaseClient.js', () => {
   const sb = {
     from: () => ({
@@ -17,18 +18,23 @@ vi.mock('../../src/utils/supabaseClient.js', () => {
         supabaseState.lastUpdate = payload;
         return { eq: () => Promise.resolve({ error: supabaseState.updateError }) };
       },
+      select: () => ({
+        eq: () => ({ maybeSingle: () => Promise.resolve({ data: supabaseState.profile, error: null }) }),
+      }),
     }),
   };
   return { supabase: sb, default: sb };
 });
 
-import { ensureSellerConnectAccount } from '../../src/services/connectService.js';
-import { buildSellerAccountParams, isPayoutReady } from '../../src/utils/sellerAccountShape.js';
+import { ensureSellerConnectAccount, getConnectStatus } from '../../src/services/connectService.js';
+import { buildSellerAccountParams, isPayoutReady, payoutAccountName } from '../../src/utils/sellerAccountShape.js';
 
 beforeEach(() => {
   mockStripe.v2.core.accounts.create.mockReset();
+  mockStripe.v2.core.accounts.retrieve.mockReset();
   supabaseState.updateError = null;
   supabaseState.lastUpdate = null;
+  supabaseState.profile = null;
 });
 
 describe('buildSellerAccountParams', () => {
@@ -93,5 +99,72 @@ describe('ensureSellerConnectAccount', () => {
     supabaseState.updateError = { message: 'db down' };
 
     await expect(ensureSellerConnectAccount('user-3', null)).rejects.toThrow(/db down/);
+  });
+});
+
+describe('payoutAccountName', () => {
+  it('prefers the individual given/surname, falls back to the registered business name', () => {
+    expect(payoutAccountName({ identity: { individual: { given_name: 'Maya', surname: 'Chen' } } })).toBe('Maya Chen');
+    expect(payoutAccountName({ identity: { business_details: { registered_name: 'Cardtopia Pty Ltd' } } })).toBe('Cardtopia Pty Ltd');
+    expect(payoutAccountName({ identity: {} })).toBe('');
+    expect(payoutAccountName(null)).toBe('');
+  });
+});
+
+describe('getConnectStatus payout name cross-check', () => {
+  const activeAccount = (identity) => ({
+    configuration: { recipient: { capabilities: { stripe_balance: { stripe_transfers: { status: 'active' } } } } },
+    identity,
+  });
+  const makeRes = () => ({ json: vi.fn(), status: vi.fn().mockReturnThis() });
+
+  it('flags a payout account whose KYC name differs from the profile name', async () => {
+    supabaseState.profile = {
+      stripe_connect_account_id: 'acct_1', stripe_connect_onboarded: true,
+      display_name: 'Maya Chen', legal_name: 'Maya Chen', business_name: null, payout_name_mismatch: false,
+    };
+    mockStripe.v2.core.accounts.retrieve.mockResolvedValue(activeAccount({ individual: { given_name: 'John', surname: 'Smith' } }));
+
+    await getConnectStatus({ user: { id: 'user-1' } }, makeRes());
+
+    expect(mockStripe.v2.core.accounts.retrieve.mock.calls[0][1].include).toContain('identity');
+    expect(supabaseState.lastUpdate).toEqual({ stripe_connect_onboarded: true, payout_name_mismatch: true });
+  });
+
+  it('clears the flag once the names agree again', async () => {
+    supabaseState.profile = {
+      stripe_connect_account_id: 'acct_1', stripe_connect_onboarded: true,
+      display_name: 'Maya Chen', legal_name: 'Maya Chen', business_name: null, payout_name_mismatch: true,
+    };
+    mockStripe.v2.core.accounts.retrieve.mockResolvedValue(activeAccount({ individual: { given_name: 'Maya', surname: 'Chen' } }));
+
+    await getConnectStatus({ user: { id: 'user-1' } }, makeRes());
+
+    expect(supabaseState.lastUpdate).toEqual({ stripe_connect_onboarded: true, payout_name_mismatch: false });
+  });
+
+  it('accepts a payout account registered under the profile business name (sole trader)', async () => {
+    supabaseState.profile = {
+      stripe_connect_account_id: 'acct_1', stripe_connect_onboarded: true,
+      display_name: 'Maya Chen', legal_name: 'Maya Chen', business_name: 'Cardtopia Pty Ltd', payout_name_mismatch: false,
+    };
+    mockStripe.v2.core.accounts.retrieve.mockResolvedValue(activeAccount({ business_details: { registered_name: 'Cardtopia Pty Ltd' } }));
+
+    await getConnectStatus({ user: { id: 'user-1' } }, makeRes());
+
+    // No change → no profile write at all.
+    expect(supabaseState.lastUpdate).toBeNull();
+  });
+
+  it('does not flag while Stripe has no name yet (onboarding incomplete)', async () => {
+    supabaseState.profile = {
+      stripe_connect_account_id: 'acct_1', stripe_connect_onboarded: false,
+      display_name: 'Maya Chen', legal_name: null, business_name: null, payout_name_mismatch: false,
+    };
+    mockStripe.v2.core.accounts.retrieve.mockResolvedValue({ configuration: {}, identity: {} });
+
+    await getConnectStatus({ user: { id: 'user-1' } }, makeRes());
+
+    expect(supabaseState.lastUpdate).toBeNull();
   });
 });

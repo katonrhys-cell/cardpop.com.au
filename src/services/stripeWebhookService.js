@@ -7,6 +7,30 @@ import { markWelcomeDiscountRedeemed, releaseWelcomeDiscount } from './welcomeOf
 import { recordShopOrderReferral } from './partnerService.js';
 import { debitWalletForOrder } from './walletService.js';
 import { subscribeToNewsletter } from '../utils/newsletter.js';
+import { namesMatch } from './identityService.js';
+
+/**
+ * Informational cross-check: does the name the buyer typed at Stripe Checkout
+ * differ from their account name? Stripe does NOT verify customer_details.name,
+ * and paying with a partner's or work card is perfectly normal — so this is
+ * stored on the order for the admin order detail view and never gates anything.
+ * Returns null (unknown) for guests, missing names, or lookup failures.
+ */
+export async function computePayerNameMismatch(buyerId, payerName) {
+  if (!buyerId || !payerName?.trim()) return null;
+  try {
+    const { data: buyer } = await supabase
+      .from('profiles')
+      .select('display_name, legal_name')
+      .eq('id', buyerId)
+      .maybeSingle();
+    const accountName = buyer?.legal_name || buyer?.display_name;
+    if (!accountName) return null;
+    return !namesMatch(accountName, payerName);
+  } catch {
+    return null;
+  }
+}
 
 async function getPlatformSetting(key, defaultValue) {
   const { data } = await supabase
@@ -189,8 +213,10 @@ async function handleCartOrder(existing, session, stripe) {
     ? session.payment_intent
     : (session.payment_intent?.id ?? null);
 
+  const payerNameMismatch = await computePayerNameMismatch(existing.buyer_id, session.customer_details?.name);
+
   const { data: claimed, error: claimErr } = await supabase.from('orders')
-    .update({ status: 'payment_confirmed', stripe_payment_intent_id: cartPaymentIntentId })
+    .update({ status: 'payment_confirmed', stripe_payment_intent_id: cartPaymentIntentId, payer_name_mismatch: payerNameMismatch })
     .eq('id', existing.id)
     .eq('status', 'pending')
     .select('id');
@@ -445,10 +471,13 @@ async function handleSingleItemOrder(session, stripe) {
     ? session.payment_intent
     : (session.payment_intent?.id ?? null);
 
+  const payerNameMismatch = await computePayerNameMismatch(userId, session.customer_details?.name);
+
   const { error: insertError } = await supabase
     .from('orders')
     .insert({
       buyer_id: userId,
+      payer_name_mismatch: payerNameMismatch,
       seller_id: sellerId,
       listing_id: listingId,
       stripe_session_id: session.id,

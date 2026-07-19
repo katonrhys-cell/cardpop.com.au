@@ -53,6 +53,9 @@ const UserDetailPage = () => {
   // backend, and the resolution goes through it too.
   const [identityMismatch, setIdentityMismatch] = useState(null);
   const [reviewSaving, setReviewSaving] = useState(false);
+  // Live "every name Stripe holds for this user" panel (profile vs ID document
+  // vs Connect payout account vs billing customer), computed by the backend.
+  const [stripeNames, setStripeNames] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,6 +67,16 @@ const UserDetailPage = () => {
         if (!cancelled) setIdentityMismatch((mismatches ?? []).find(m => m.id === userId) || null);
       } catch {
         // Non-fatal: the page renders without the review panel.
+      }
+    })();
+    (async () => {
+      try {
+        const res = await apiServerClient.fetch(`/admin/users/${userId}/stripe-names`);
+        if (!res.ok) return;
+        const body = await res.json();
+        if (!cancelled) setStripeNames(body);
+      } catch {
+        // Non-fatal: the page renders without the name-check panel.
       }
     })();
     return () => { cancelled = true; };
@@ -320,8 +333,53 @@ const UserDetailPage = () => {
             </Card>
           )}
 
+          {stripeNames && (stripeNames.names.idDocument || stripeNames.names.payoutAccount || stripeNames.names.billingCustomer) && (
+            <Card className="border-border shadow-sm rounded-2xl overflow-hidden">
+              <CardHeader className="bg-muted/30 border-b border-border">
+                <CardTitle className="text-lg font-serif">Stripe Name Checks</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Source</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead className="text-right">Match</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {[
+                      { label: 'CardPop account', name: stripeNames.names.account, check: undefined },
+                      { label: 'ID document (Stripe Identity)', name: stripeNames.names.idDocument, check: stripeNames.checks.idDocument },
+                      { label: 'Payout account (Stripe Connect KYC)', name: stripeNames.names.payoutAccount, check: stripeNames.checks.payoutAccount },
+                      { label: 'Billing customer (Stripe)', name: stripeNames.names.billingCustomer, check: stripeNames.checks.billingCustomer },
+                    ].filter(row => row.name).map(row => (
+                      <TableRow key={row.label}>
+                        <TableCell className="text-sm text-muted-foreground">{row.label}</TableCell>
+                        <TableCell className="font-medium">{row.name}</TableCell>
+                        <TableCell className="text-right">
+                          {row.check === undefined ? (
+                            <span className="text-xs text-muted-foreground">baseline</span>
+                          ) : row.check === null ? (
+                            <span className="text-xs text-muted-foreground">n/a</span>
+                          ) : row.check ? (
+                            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-200 text-[10px]">Match</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="bg-rose-500/15 text-rose-700 dark:text-rose-400 text-[10px]">
+                              <ShieldAlert className="w-3 h-3 mr-1" /> Mismatch
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+
           <UserStatsCard
-            user={user} 
+            user={user}
             vaultProductsCount={vaultProducts.length}
             ordersBuyerCount={ordersAsBuyer.length}
             ordersSellerCount={ordersAsSeller.length}

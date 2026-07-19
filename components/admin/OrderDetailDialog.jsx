@@ -102,6 +102,19 @@ const OrderDetailDialog = ({ orderId, onClose }) => {
               </div>
             </div>
 
+            {/* Informational only: the payer name at Stripe Checkout isn't
+                verified by Stripe, and paying with a partner's or work card is
+                normal — flagged for context, never used to gate anything. */}
+            {order.payer_name_mismatch === true && (
+              <div className="flex items-start gap-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-amber-800 dark:text-amber-400">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <p className="text-xs leading-relaxed">
+                  The name entered at checkout differs from the buyer's account name. This is often
+                  legitimate (partner's or work card) — for context only.
+                </p>
+              </div>
+            )}
+
             {/* Items */}
             {items.length > 0 && (
               <div className="space-y-1.5">

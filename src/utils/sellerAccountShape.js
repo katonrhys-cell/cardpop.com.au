@@ -50,3 +50,12 @@ export function isPayoutReady(account) {
     ?.capabilities?.stripe_balance?.stripe_transfers?.status;
   return status === 'active';
 }
+
+// The KYC'd legal name on a retrieved v2 account (requires the 'identity'
+// include). Individuals carry given/surname; sole traders and companies carry
+// a registered business name. Empty string when Stripe holds neither yet.
+export function payoutAccountName(account) {
+  const individual = account?.identity?.individual;
+  const personal = [individual?.given_name, individual?.surname].filter(Boolean).join(' ').trim();
+  return personal || account?.identity?.business_details?.registered_name || '';
+}
