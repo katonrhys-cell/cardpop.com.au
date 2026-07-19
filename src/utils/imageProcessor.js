@@ -143,3 +143,14 @@ export async function compressImage(imageBuffer, quality = 80) {
     throw error;
   }
 }
+
+// Small companion grid thumbnail — server-side mirror of the client's
+// utils/compressImage.js createThumbnail (480px longest edge, WebP q70),
+// stored next to the full image under `<path minus ext>.thumb.webp`.
+export async function createThumbnailBuffer(imageBuffer) {
+  const sharp = await getSharp();
+  return sharp(imageBuffer)
+    .resize(480, 480, { fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 70 })
+    .toBuffer();
+}

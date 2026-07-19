@@ -22,7 +22,8 @@ const RemoteCardArt = ({ image, padding, sizes }) => {
 
   const candidates = useMemo(() => {
     const list = [];
-    if (art.src) list.push({ url: art.src, srcSet: art.srcSet || undefined });
+    if (art.thumbSrc) list.push({ url: art.thumbSrc, kind: 'thumb' });
+    if (art.src) list.push({ url: art.src, srcSet: art.srcSet || undefined, kind: 'primary' });
     if (art.fallbackSrc && art.fallbackSrc !== art.src) list.push({ url: art.fallbackSrc });
     if (art.canonicalSrc && art.canonicalSrc !== art.src && art.canonicalSrc !== art.fallbackSrc) {
       list.push({ url: art.canonicalSrc });
@@ -47,7 +48,7 @@ const RemoteCardArt = ({ image, padding, sizes }) => {
       // in utils/imageCdnFallback.js so the two don't fight over src.
       data-managed-image=""
       onError={() => {
-        if (tier === 0) markTransformsUnavailable();
+        if (active?.kind === 'primary') markTransformsUnavailable();
         if (tier < candidates.length - 1) setTier(tier + 1);
       }}
     />

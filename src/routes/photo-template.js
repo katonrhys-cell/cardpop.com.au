@@ -1,7 +1,7 @@
 import express from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import { uploadFiles } from '../middleware/file-upload.js';
-import { createSlabImage, compressImage } from '../utils/imageProcessor.js';
+import { createSlabImage, compressImage, createThumbnailBuffer } from '../utils/imageProcessor.js';
 import supabase from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 
@@ -64,6 +64,23 @@ router.post('/slab-image', authMiddleware, uploadImage, async (req, res) => {
     if (uploadError) {
       logger.error('[PHOTO-TEMPLATE] Upload error:', uploadError);
       return res.status(500).json({ error: 'Failed to upload image' });
+    }
+
+    // Companion grid thumbnail (same basename + .thumb.webp — the convention
+    // utils/imageUrl.js derives). Best-effort: grids fall back to the full
+    // image when the thumb is missing, so never fail the request over it.
+    try {
+      const thumbBuffer = await createThumbnailBuffer(compressedBuffer);
+      const { error: thumbError } = await supabase.storage
+        .from('vault-images')
+        .upload(fileName.replace(/\.webp$/, '.thumb.webp'), thumbBuffer, {
+          contentType: 'image/webp',
+          upsert: true,
+          cacheControl: '31536000'
+        });
+      if (thumbError) logger.warn('[PHOTO-TEMPLATE] Thumbnail upload failed:', thumbError);
+    } catch (thumbErr) {
+      logger.warn('[PHOTO-TEMPLATE] Thumbnail generation failed:', thumbErr);
     }
 
     // Get public URL
