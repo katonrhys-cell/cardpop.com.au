@@ -1,18 +1,23 @@
 # Git backup (off-site repository archive)
 
 `/.github/workflows/git-backup.yml` zips the **entire repository including full
-git history** and uploads the archive off-site to **AWS S3**. It is a
+git history** and uploads the archive off-site to **Google Drive**. It is a
 disaster-recovery net that is independent of GitHub: if the repo is ever
 deleted, corrupted, or GitHub is unavailable, the zip is a complete, restorable
 clone.
+
+Backups upload via [rclone](https://rclone.org) using an OAuth token for the
+Google Workspace account (`admin@cardpop.com.au`), so they land straight in the
+existing Drive **"Website backups"** folder — no Google Cloud project or
+service account required.
 
 ## When it runs
 
 - **Daily** at `15 18 * * *` UTC (≈ 04:15–05:15 in Australia, AEST/AEDT).
 - **On demand** — Actions tab → **Git backup** → **Run workflow**.
 
-The upload fails loudly if the S3 secrets are missing, so a silent no-op backup
-can't hide.
+The upload fails loudly if the rclone secret is missing, so a silent no-op
+backup can't hide.
 
 ## What's in the archive
 
@@ -30,32 +35,77 @@ git status        # it's a real clone — history, branches and tags are intact
 
 ## Configuration
 
-Add these under **Settings → Secrets and variables → Actions**.
+The workflow needs one **secret** (the rclone credentials) and optionally one
+**variable** (the destination folder). Both live under
+**Settings → Secrets and variables → Actions**.
 
-| Secret | Value |
-|---|---|
-| `BACKUP_AWS_ACCESS_KEY_ID` | Access key of an IAM user scoped to `s3:PutObject` on the bucket. |
-| `BACKUP_AWS_SECRET_ACCESS_KEY` | Matching secret key. |
-| `BACKUP_S3_BUCKET` | `bucket` or `bucket/prefix` (e.g. `cardpop-backups/git`). |
-| `BACKUP_AWS_REGION` | *(optional)* Bucket region. Defaults to `ap-southeast-2`. |
+| Name | Kind | Value |
+|---|---|---|
+| `RCLONE_CONFIG_BASE64` | Secret | base64 of a `rclone.conf` defining a remote named `gdrive` with an OAuth token for `admin@cardpop.com.au`. |
+| `GDRIVE_BACKUP_DEST` | Variable *(optional)* | rclone destination as `remote:folder`. Defaults to `gdrive:Website backups`. |
 
-Minimal IAM policy for the backup user:
+### One-time setup: mint the rclone token
 
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [{
-    "Effect": "Allow",
-    "Action": "s3:PutObject",
-    "Resource": "arn:aws:s3:::cardpop-backups/*"
-  }]
-}
-```
+Do this once on your own machine (it opens a browser to authorise Google Drive).
 
-**Retention** — set an S3 **Lifecycle rule** on the bucket/prefix to expire old
-archives (e.g. delete after 90 days) so backups don't accumulate cost.
+1. **Install rclone**: <https://rclone.org/install/> (`brew install rclone`,
+   `winget install Rclone.Rclone`, or `curl https://rclone.org/install.sh | sudo bash`).
+
+2. **Create the remote** — run `rclone config` and answer:
+   - `n` (new remote)
+   - name: **`gdrive`** ← must be exactly this, the workflow references it
+   - storage: `drive` (Google Drive)
+   - `client_id` / `client_secret`: leave **blank** (uses rclone's built-in
+     client — fine for one upload a day)
+   - scope: `1` (full access) or `3` (`drive.file` — only files rclone creates;
+     sufficient and more locked-down)
+   - leave the remaining prompts at their defaults; at "Use auto config?" choose
+     **Yes** and sign in as **admin@cardpop.com.au** in the browser that opens.
+   - `n` (not a Shared Drive) → `y` (keep this remote).
+
+3. **Confirm it works**:
+   ```bash
+   rclone lsd gdrive:                       # lists your Drive folders
+   rclone copy README.md "gdrive:Website backups"   # test upload
+   ```
+
+4. **Base64-encode the config and copy it** (this string is the secret value):
+   ```bash
+   # macOS / Linux
+   base64 -i "$(rclone config file | tail -1)" | tr -d '\n' | pbcopy   # macOS
+   base64 -w0 "$(rclone config file | tail -1)"                        # Linux (prints it)
+   ```
+   `rclone config file` prints the path to `rclone.conf`; the command encodes
+   that file to a single line.
+
+5. **Add it to GitHub**: Settings → Secrets and variables → Actions → **New
+   repository secret**, name `RCLONE_CONFIG_BASE64`, paste the base64 string.
+   (Optional: add a **Variable** `GDRIVE_BACKUP_DEST` if you want a folder other
+   than `Website backups`.)
+
+> **Security note:** the config contains a Drive **refresh token** — treat it
+> like a password. It's stored encrypted as a GitHub secret and only decoded
+> inside the runner. To revoke it later, remove the app under
+> [Google Account → Security → Third-party access](https://myaccount.google.com/connections),
+> then re-run `rclone config` to mint a fresh one.
+
+## Retention
+
+The workflow prunes `cardpop-backup-*.zip` files older than **30 days** from the
+destination folder after each upload (scoped by filename, so nothing else in the
+folder is touched). At ~80 MB per daily zip that caps the folder at ~2.4 GB.
 
 ## Testing it
 
 Run it manually from the Actions tab and watch the log — the upload step prints
-`Uploaded to s3://…`. Then confirm the object exists in your S3 bucket.
+`Uploaded cardpop-backup-….zip to gdrive:Website backups`. Then confirm the zip
+appears in the **Website backups** folder in Google Drive.
+
+## Troubleshooting
+
+- **`RCLONE_CONFIG_BASE64 secret not set`** — the secret is missing or empty.
+- **`couldn't find remote "gdrive"`** — the remote in your `rclone.conf` isn't
+  named `gdrive`; re-run `rclone config` (or rename it) and re-encode.
+- **`Failed to get token` / 401** — the refresh token was revoked or expired
+  (Google expires unused tokens after ~6 months). Re-run `rclone config` to
+  re-authorise and update the secret.

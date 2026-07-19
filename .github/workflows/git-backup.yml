@@ -1,20 +1,26 @@
 name: Git backup
 
 # Zips the entire repository (including full git history) and uploads the
-# archive off-site to AWS S3. This is a disaster-recovery safety net that is
-# independent of GitHub: if the GitHub repo is ever lost, deleted, or
+# archive off-site to Google Drive. This is a disaster-recovery safety net that
+# is independent of GitHub: if the GitHub repo is ever lost, deleted, or
 # corrupted, the zip is a complete, restorable clone.
 #
 # Runs once a day on a schedule and can be triggered on demand from the
 # Actions tab (Run workflow).
 #
-# Required repository secrets (Settings -> Secrets and variables -> Actions):
-#   BACKUP_AWS_ACCESS_KEY_ID      Access key for an IAM user scoped to
-#                                 s3:PutObject on the target bucket/prefix.
-#   BACKUP_AWS_SECRET_ACCESS_KEY  The matching secret access key.
-#   BACKUP_S3_BUCKET              Destination as "bucket" or "bucket/prefix"
-#                                 (e.g. cardpop-backups/git).
-#   BACKUP_AWS_REGION             (optional) Bucket region, default ap-southeast-2.
+# Uploads via rclone using an OAuth refresh token for the Google Workspace
+# account (admin@cardpop.com.au), so backups land straight in the existing
+# Drive "Website backups" folder — no Google Cloud project or service account.
+#
+# Required repository secret (Settings -> Secrets and variables -> Actions):
+#   RCLONE_CONFIG_BASE64   base64 of a rclone.conf that defines a remote named
+#                          `gdrive` (type: drive) with an OAuth token for
+#                          admin@cardpop.com.au. Generate it locally with
+#                          `rclone config` — full walkthrough in docs/git-backup.md.
+#
+# Optional repository variable (Settings -> Secrets and variables -> Actions -> Variables):
+#   GDRIVE_BACKUP_DEST     rclone destination, "remote:folder" form.
+#                          Defaults to "gdrive:Website backups".
 #
 # Full setup walkthrough: docs/git-backup.md
 
@@ -63,19 +69,36 @@ jobs:
           echo "path=/tmp/${name}" >> "$GITHUB_OUTPUT"
           echo "Created ${name} (${size})"
 
-      - name: Upload to AWS S3
+      - name: Upload to Google Drive
         env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.BACKUP_AWS_REGION || 'ap-southeast-2' }}
-          S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          RCLONE_CONFIG_BASE64: ${{ secrets.RCLONE_CONFIG_BASE64 }}
+          DEST: ${{ vars.GDRIVE_BACKUP_DEST || 'gdrive:Website backups' }}
         run: |
           set -euo pipefail
-          if [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${S3_BUCKET}" ]; then
-            echo "::error::S3 secrets not set. Configure BACKUP_AWS_ACCESS_KEY_ID, BACKUP_AWS_SECRET_ACCESS_KEY and BACKUP_S3_BUCKET — see docs/git-backup.md."
+          if [ -z "${RCLONE_CONFIG_BASE64}" ]; then
+            echo "::error::RCLONE_CONFIG_BASE64 secret not set. Configure it — see docs/git-backup.md."
             exit 1
           fi
-          # aws CLI is pre-installed on ubuntu-latest runners.
-          aws s3 cp "${{ steps.archive.outputs.path }}" \
-            "s3://${S3_BUCKET}/${{ steps.archive.outputs.name }}"
-          echo "Uploaded to s3://${S3_BUCKET}/${{ steps.archive.outputs.name }}"
+
+          # Install a current rclone (the distro package lags). The official
+          # installer is the documented, maintained method.
+          curl -fsSL https://rclone.org/install.sh | sudo bash
+
+          # Materialise the rclone config from the secret. base64 keeps the
+          # multi-line token JSON intact through the secrets pipeline.
+          mkdir -p "$HOME/.config/rclone"
+          echo "${RCLONE_CONFIG_BASE64}" | base64 -d > "$HOME/.config/rclone/rclone.conf"
+
+          # Upload the archive. --drive-chunk-size keeps memory modest for the
+          # ~80 MB zip; rclone refreshes the OAuth token automatically.
+          rclone copy "${{ steps.archive.outputs.path }}" "${DEST}" \
+            --drive-chunk-size 16M --stats-one-line -v
+          echo "Uploaded ${{ steps.archive.outputs.name }} to ${DEST}"
+
+          # Retention: prune CardPop backup zips older than 30 days so the Drive
+          # folder doesn't grow without bound. Scoped by filename so anything
+          # else in the folder is left untouched. --drive-use-trash=false frees
+          # the space immediately instead of parking it in Trash for 30 days.
+          rclone delete "${DEST}" \
+            --min-age 30d --include 'cardpop-backup-*.zip' \
+            --drive-use-trash=false -v || true
