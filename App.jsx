@@ -141,6 +141,8 @@ const MarketDetailPage = lazy(() => import('@/pages/markets/MarketDetailPage.jsx
 const AustralianMarketsPage = lazy(() => import('@/pages/AustralianMarketsPage.jsx'));
 const CardPricesHubPage = lazy(() => import('@/pages/prices/CardPricesHubPage.jsx'));
 const CardPriceDetailPage = lazy(() => import('@/pages/prices/CardPriceDetailPage.jsx'));
+const BuyingGuidesPage = lazy(() => import('@/pages/analytics/BuyingGuidesPage.jsx'));
+const BuyingGuideDetailPage = lazy(() => import('@/pages/analytics/BuyingGuideDetailPage.jsx'));
 
 // Partner program
 const PartnersPage = lazy(() => import('@/pages/partners/PartnersPage.jsx'));
@@ -365,6 +367,11 @@ const App = () => {
 
                         {/* Markets & Analytics */}
                         <Route path="/analytics" element={<MarketsPage />} />
+                        {/* Buying Guides — new-release + chase-card editorial. Declared
+                            before the dynamic /analytics/:category routes below; the
+                            static "buying-guides" segment out-ranks the param match. */}
+                        <Route path="/analytics/buying-guides" element={<BuyingGuidesPage />} />
+                        <Route path="/analytics/buying-guides/:slug" element={<BuyingGuideDetailPage />} />
                         {/* SEO-friendly slug path (canonical); the bare query-param
                             form is kept for back-compat and self-redirects to the slug. */}
                         <Route path="/analytics/card/:slug" element={<CardAnalyticsPage />} />
