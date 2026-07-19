@@ -79,24 +79,28 @@ const BuildingYourBusinessPage = () => {
       <section className="relative overflow-hidden bg-brand-charcoal text-white">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-brand-red/40 via-brand-charcoal to-brand-charcoal pointer-events-none" />
         <div className="absolute -top-16 -right-16 w-72 h-72 rounded-full bg-brand-red/10 blur-3xl pointer-events-none" />
-        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
-          <div className="flex items-center gap-2.5 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-brand-red flex items-center justify-center shadow-lg shadow-brand-red/30">
-              <Rocket className="w-5 h-5 text-white" />
+        <div className="relative max-w-[100rem] mx-auto px-4 sm:px-6 py-16 sm:py-20">
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-end">
+            <div>
+              <div className="flex items-center gap-2.5 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-brand-red flex items-center justify-center shadow-lg shadow-brand-red/30">
+                  <Rocket className="w-5 h-5 text-white" />
+                </div>
+                <span className="text-xs font-bold uppercase tracking-widest text-white/50">For sellers &amp; hobby businesses</span>
+              </div>
+              <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight">Building Your Business</h1>
             </div>
-            <span className="text-xs font-bold uppercase tracking-widest text-white/50">For sellers &amp; hobby businesses</span>
+            <p className="text-white/70 text-lg leading-relaxed lg:pb-2">
+              The tools we actually use to run CardPop — and how each one can help you grow your own card business,
+              whether you sell at shows, go live, or move stock online. No single app builds a following.
+              A <span className="text-white font-semibold">multi-pronged approach</span> does — each channel feeding the
+              next until your presence grows on its own.
+            </p>
           </div>
-          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-4">Building Your Business</h1>
-          <p className="text-white/70 text-lg max-w-2xl leading-relaxed">
-            The tools we actually use to run CardPop — and how each one can help you grow your own card business,
-            whether you sell at shows, go live, or move stock online. No single app builds a following.
-            A <span className="text-white font-semibold">multi-pronged approach</span> does — each channel feeding the
-            next until your presence grows on its own.
-          </p>
         </div>
       </section>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-14">
+      <div className="max-w-[100rem] mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-14">
         {/* The approach */}
         <section>
           <h2 className="text-2xl sm:text-3xl font-serif font-bold text-foreground mb-3">Why a multi-pronged approach wins</h2>

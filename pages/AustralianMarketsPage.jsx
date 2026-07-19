@@ -97,7 +97,7 @@ const AustralianMarketsPage = () => {
       {/* Hero Section */}
       <section className="bg-secondary py-16 border-b border-border relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1640499900704-b00dd6a1103a?auto=format&fit=crop&w=1920&q=80')] opacity-5 mix-blend-overlay bg-cover bg-center" />
-        <div className="container mx-auto px-4 max-w-7xl relative z-10">
+        <div className="container mx-auto px-4 max-w-[100rem] relative z-10">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
             <div className="max-w-3xl">
               <h1 className="font-serif text-4xl md:text-6xl font-bold mb-4 text-secondary-foreground tracking-tight">
@@ -123,7 +123,7 @@ const AustralianMarketsPage = () => {
         </div>
       </section>
 
-      <div className="container mx-auto px-4 max-w-7xl py-12 space-y-16">
+      <div className="container mx-auto px-4 max-w-[100rem] py-12 space-y-16">
         
         {error && (
           <div className="bg-destructive/10 text-destructive p-6 rounded-xl border border-destructive/20 font-bold">

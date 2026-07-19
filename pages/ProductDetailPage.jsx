@@ -330,7 +330,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 py-12">
+      <div className="max-w-[100rem] mx-auto px-4 py-12">
         <Skeleton className="h-6 w-32 mb-8 rounded-md" />
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
           <div className="lg:col-span-7">
@@ -401,7 +401,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
 
   return (
     <div className="bg-background min-h-screen">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+      <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
         <SEOHead
           title={`${product.name} | CardPop`}
           description={product.description || `${product.name} — available on CardPop Australia's trading card marketplace.`}

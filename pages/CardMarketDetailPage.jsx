@@ -44,7 +44,7 @@ const CardMarketDetailPage = () => {
       <div className="flex flex-col bg-background font-sans">
         
         <div className="flex-1 py-12 md:py-20">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl space-y-8">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-[100rem] space-y-8">
             
             <Link to="/australian-markets" className="inline-flex items-center text-sm font-bold text-muted-foreground hover:text-primary transition-colors group">
               <ArrowLeft className="w-4 h-4 mr-2 transition-transform group-hover:-translate-x-1" />

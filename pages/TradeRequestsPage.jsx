@@ -120,7 +120,7 @@ const TradeRequestsPage = () => {
         </div>
       </section>
 
-      <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-16 flex-1">
+      <div className="w-full max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-16 flex-1">
       {fetching || loading ? (
         <div className="space-y-6">
           <Skeleton className="h-14 w-full md:w-[400px] rounded-xl" />

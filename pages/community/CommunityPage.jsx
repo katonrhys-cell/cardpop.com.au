@@ -250,7 +250,7 @@ const CommunityPage = () => {
         style={{ clipPath: 'polygon(0 100%, 100% 0, 100% 100%)' }}
       />
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {/* ── Building Your Business promo ── */}
         <Link
           to="/community/building-your-business"

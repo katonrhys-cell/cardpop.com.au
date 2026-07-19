@@ -21,7 +21,7 @@ const DynamicNavigation = ({ categories = [] }) => {
   
   return (
     <div className="w-full bg-card border-b border-border py-4 px-4 sm:px-6 lg:px-8 shadow-sm mb-8 z-10 relative">
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-4 items-center justify-between">
+      <div className="max-w-[100rem] mx-auto flex flex-col md:flex-row gap-4 items-center justify-between">
         
         {/* Breadcrumbs */}
         <nav className="flex items-center text-sm font-medium text-muted-foreground w-full md:w-auto overflow-x-auto whitespace-nowrap scrollbar-hide">
