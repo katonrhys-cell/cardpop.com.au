@@ -373,7 +373,7 @@ const CardAnalyticsPage = () => {
 
       {/* Hero */}
       <section className="bg-card border-b border-border py-10">
-        <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8">
           <Link to="/analytics" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
             <ArrowLeft className="w-4 h-4" /> Back to Analytics
           </Link>
@@ -467,7 +467,7 @@ const CardAnalyticsPage = () => {
         </div>
       </section>
 
-      <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
 
         {/* CardSight AI real pricing panel — shown when cardsight_id is available */}
         {cardsightId && (csData || csLoading) && (

@@ -40,7 +40,7 @@ const CommunityPage = () => {
       {/* Hero Section */}
       <div className="bg-card py-16 relative overflow-hidden border-b border-border shadow-sm">
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1593814681464-eef5af2b0628?auto=format&fit=crop&w=1920&q=80')] opacity-5 mix-blend-overlay bg-cover bg-center" />
-        <div className="max-w-[90rem] mx-auto px-4 relative z-10 flex flex-col md:flex-row items-center justify-between gap-12">
+        <div className="max-w-[100rem] mx-auto px-4 relative z-10 flex flex-col md:flex-row items-center justify-between gap-12">
           <div className="flex-1 text-center md:text-left">
             <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-4 tracking-tight">
               Seller Directory
@@ -57,7 +57,7 @@ const CommunityPage = () => {
       </div>
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 py-16 w-full">
+      <main className="flex-1 max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-16 w-full">
         {error && (
           <div className="bg-card border border-destructive/20 rounded-xl p-6 flex flex-col items-center justify-center text-center mb-12 shadow-sm">
             <AlertCircle className="w-10 h-10 text-destructive mb-3" />

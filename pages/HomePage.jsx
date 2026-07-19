@@ -531,7 +531,7 @@ const HomePage = () => {
 
       {/* ── Stats strip ──────────────────────────────────────────────────── */}
       <section ref={statsRef} className="py-12 border-y border-border bg-card">
-        <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-4">
             {STATS.map((stat) => (
               <StatItem key={stat.label} {...stat} inView={statsInView} />
@@ -542,7 +542,7 @@ const HomePage = () => {
 
       {/* ── Trust strip ──────────────────────────────────────────────────── */}
       <section className="py-10 bg-background border-b border-border">
-        <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {TRUST_SIGNALS.map(({ icon: Icon, title, body }) => (
               <Link
@@ -570,7 +570,7 @@ const HomePage = () => {
 
       {/* ── Category browse ───────────────────────────────────────────────── */}
       <section className="py-16 bg-background">
-        <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-end justify-between mb-8">
             <div>
               <h2 className="text-2xl md:text-3xl font-bold font-serif mb-1">Browse by Category</h2>
@@ -652,7 +652,7 @@ const HomePage = () => {
 
       {/* ── Bento features ───────────────────────────────────────────────── */}
       <section className="py-24 bg-card border-y border-border relative">
-        <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold font-serif mb-4">Built for Serious Collectors</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">Everything you need to manage your collection and make informed trades.</p>
@@ -720,7 +720,7 @@ const HomePage = () => {
 
       {/* ── How it works ─────────────────────────────────────────────────── */}
       <section className="py-24 bg-background">
-        <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold font-serif mb-4">How CardPop Works</h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
@@ -761,7 +761,7 @@ const HomePage = () => {
 
       {/* ── Featured cards ────────────────────────────────────────────────── */}
       <section className="py-24 bg-muted/30 border-t border-border">
-        <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-end justify-between mb-12">
             <div>
               <h2 className="text-3xl font-bold font-serif mb-2">Featured Cards</h2>
@@ -844,7 +844,7 @@ const HomePage = () => {
 
       {/* ── Featured sellers ──────────────────────────────────────────────── */}
       <section className="py-24 bg-background border-t border-border">
-        <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold font-serif mb-4">Trusted Australian Sellers</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">Trade with confidence. Every seller is verified and rated by the CardPop community.</p>

@@ -92,7 +92,7 @@ const SecuritySettingsPage = () => {
       <Helmet><title>Security Settings | Card Pop</title></Helmet>
       
       <div className="flex-1 py-12 bg-muted/20">
-        <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+        <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
           <div>
             <h1 className="text-3xl font-serif font-bold text-foreground mb-2">Security Center</h1>
             <p className="text-muted-foreground">Manage your account security, passwords, and active sessions.</p>

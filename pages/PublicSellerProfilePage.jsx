@@ -113,7 +113,7 @@ const PublicSellerProfilePage = () => {
 
   if (loading) {
     return (
-      <div className="max-w-[90rem] mx-auto px-4 py-12 space-y-8 animate-in fade-in duration-500">
+      <div className="max-w-[100rem] mx-auto px-4 py-12 space-y-8 animate-in fade-in duration-500">
         <Skeleton className="h-64 w-full rounded-[2rem]" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <Skeleton className="h-48 rounded-[2rem]" />
@@ -154,7 +154,7 @@ const PublicSellerProfilePage = () => {
 
       {/* Profile Header Banner */}
       <div className="bg-[hsl(var(--profile-bg))] border-b border-[hsl(var(--section-divider))]">
-        <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12">
+        <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12">
           <BackButton fallback="/marketplace" className="mb-8" />
           <div className="flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
             
@@ -282,7 +282,7 @@ const PublicSellerProfilePage = () => {
         </div>
       </div>
 
-      <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 lg:grid-cols-4 gap-8">
         
         {/* Sidebar Info */}
         <div className="lg:col-span-1 space-y-6">

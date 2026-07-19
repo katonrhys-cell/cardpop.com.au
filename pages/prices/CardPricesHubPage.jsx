@@ -93,7 +93,7 @@ const CardPricesHubPage = () => {
         </div>
       </section>
 
-      <div className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">
+      <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">
         {!category && (
           <nav aria-label="Card categories" className="flex flex-wrap gap-2 justify-center">
             {CATEGORY_ORDER.map((key) => (
