@@ -7,7 +7,8 @@ import { payoutAccountName } from '../utils/sellerAccountShape.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import { requireAal2 } from '../middleware/requireAal2.js';
 import { validateRequestBody, validateRequestParams, validateRequestQuery } from '../middleware/validateRequest.js';
-import { setUserRoleSchema, setUserRoleBodySchema, reviewVerificationSchema, reviewVerificationBodySchema, processRefundSchema, processRefundBodySchema, getDisputesSchema, resolveDisputeSchema, resolveDisputeBodySchema, setUserStatusSchema, setUserStatusBodySchema, identityReviewSchema, identityReviewBodySchema, createBusinessProfileBodySchema, businessProfileIdSchema, updateBusinessProfileBodySchema } from '../schemas/adminSchemas.js';
+import { setUserRoleSchema, setUserRoleBodySchema, reviewVerificationSchema, reviewVerificationBodySchema, processRefundSchema, processRefundBodySchema, getDisputesSchema, resolveDisputeSchema, resolveDisputeBodySchema, setUserStatusSchema, setUserStatusBodySchema, identityReviewSchema, identityReviewBodySchema, createBusinessProfileBodySchema, businessProfileIdSchema, updateBusinessProfileBodySchema, createCardArtBodySchema, cardArtIdSchema } from '../schemas/adminSchemas.js';
+import { cardArtLookupKey } from '../utils/cardImageResolver.js';
 import logger from '../utils/logger.js';
 
 const router = Router();
@@ -578,6 +579,96 @@ router.patch('/business-profiles/:id', validateRequestParams(businessProfileIdSc
   } catch (err) {
     logger.error(`[ADMIN] Failed to update business profile: ${err.message}`);
     res.status(500).json({ error: 'Failed to update business profile' });
+  }
+});
+
+// ─── Card-art overrides: admin-uploaded thumbnails for the analytics/movers ──
+// tables. Covers cards the free card APIs don't (sports) and lets an admin
+// override any card's art. The resolver (src/utils/cardImageResolver.js) reads
+// this table first, keyed by cardArtLookupKey — computed HERE so the write key
+// always matches the read key. Images are uploaded to the public `media` bucket
+// client-side; this endpoint just records the mapping.
+router.get('/card-art', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('card_art_overrides')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json({ cardArt: data || [] });
+  } catch (err) {
+    logger.error(`[ADMIN] Failed to list card art: ${err.message}`);
+    res.status(500).json({ error: 'Failed to load card art' });
+  }
+});
+
+router.post('/card-art', validateRequestBody(createCardArtBodySchema), async (req, res) => {
+  const { name, card_set, collection, image_url, storage_path } = req.body;
+  const lookup_key = cardArtLookupKey(name, card_set, collection);
+
+  try {
+    // Upsert on lookup_key so re-uploading art for the same card replaces it
+    // rather than erroring on the unique index.
+    const { data, error } = await supabase
+      .from('card_art_overrides')
+      .upsert({
+        name: name.trim(),
+        card_set: card_set?.trim() || null,
+        collection: collection?.trim() || null,
+        image_url,
+        storage_path: storage_path || null,
+        lookup_key,
+        created_by: req.user.id,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'lookup_key' })
+      .select()
+      .single();
+    if (error) throw error;
+
+    await supabase.from('audit_logs').insert({
+      user_id: req.user.id,
+      event_type: 'upsert_card_art',
+      description: `Set card art for "${data.name}" (${data.id})`,
+      status: 'success',
+    }).catch(() => {});
+
+    logger.info(`[ADMIN] ${req.user.id} set card art ${data.id} (${lookup_key})`);
+    res.json({ success: true, cardArt: data });
+  } catch (err) {
+    logger.error(`[ADMIN] Failed to save card art: ${err.message}`);
+    res.status(500).json({ error: 'Failed to save card art' });
+  }
+});
+
+router.delete('/card-art/:id', validateRequestParams(cardArtIdSchema), async (req, res) => {
+  const { id } = req.params;
+  try {
+    // Grab the storage path first so we can clean up the object after the row.
+    const { data: row } = await supabase
+      .from('card_art_overrides')
+      .select('storage_path')
+      .eq('id', id)
+      .maybeSingle();
+
+    const { error } = await supabase.from('card_art_overrides').delete().eq('id', id);
+    if (error) throw error;
+
+    if (row?.storage_path) {
+      supabase.storage.from('media').remove([row.storage_path]).catch(() => {});
+    }
+
+    await supabase.from('audit_logs').insert({
+      user_id: req.user.id,
+      event_type: 'delete_card_art',
+      description: `Deleted card art ${id}`,
+      status: 'success',
+    }).catch(() => {});
+
+    logger.info(`[ADMIN] ${req.user.id} deleted card art ${id}`);
+    res.json({ success: true });
+  } catch (err) {
+    logger.error(`[ADMIN] Failed to delete card art: ${err.message}`);
+    res.status(500).json({ error: 'Failed to delete card art' });
   }
 });
 

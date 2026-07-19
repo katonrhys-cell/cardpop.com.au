@@ -6,6 +6,18 @@ const mockCallEbay = vi.hoisted(() => vi.fn());
 vi.mock('../../src/utils/ebayClient.js', () => ({ callEbayApi: mockCallEbay }));
 vi.mock('../../src/utils/logger.js', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
 
+// The resolver checks the card_art_overrides table (via the backend Supabase
+// client) before the free APIs. Mock it: default no override; a test can make
+// mockMaybeSingle return a row to exercise the override path.
+const mockMaybeSingle = vi.hoisted(() => vi.fn(async () => ({ data: null, error: null })));
+vi.mock('../../src/utils/supabaseClient.js', () => ({
+  default: {
+    from: () => ({
+      select: () => ({ eq: () => ({ limit: () => ({ maybeSingle: mockMaybeSingle }) }) }),
+    }),
+  },
+}));
+
 import catalogRouter from '../../src/routes/catalog.js';
 
 function makeApp() {
@@ -22,6 +34,7 @@ const h = { pokemon: [], scryfall: [], yugioh: [] };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockMaybeSingle.mockResolvedValue({ data: null, error: null });
   h.pokemon = []; h.scryfall = []; h.yugioh = [];
   global.fetch = vi.fn((url) => {
     const u = String(url);
@@ -197,6 +210,22 @@ describe('POST /images', () => {
       cards: [{ name: 'Black Lotus ImgMtg', set: 'Alpha', collection: 'Magic: The Gathering' }],
     });
     expect(res.body.results[0].image).toEqual({ small: 'http://s/small.jpg', large: 'http://s/normal.jpg', id: 's5', source: 'scryfall' });
+  });
+
+  it('returns an admin override, ahead of the free APIs, for any collection', async () => {
+    // NBA is covered by no free API — but an override makes it resolve, and the
+    // upstream card APIs are never even queried.
+    mockMaybeSingle.mockResolvedValue({ data: { image_url: 'https://cdn.example/lebron.png' }, error: null });
+    const res = await request(app).post('/images').send({
+      cards: [{ name: 'LeBron James Override', set: '2003-04 Upper Deck', collection: 'NBA' }],
+    });
+    expect(res.body.results[0].image).toEqual({
+      small: 'https://cdn.example/lebron.png',
+      large: 'https://cdn.example/lebron.png',
+      id: 'override:lebron james override|2003-04 upper deck|nba',
+      source: 'override',
+    });
+    expect(global.fetch).not.toHaveBeenCalled(); // no upstream API lookups
   });
 
   it('rewrites allowlisted art onto the card-art CDN when CARD_ART_CDN_HOST is set', async () => {

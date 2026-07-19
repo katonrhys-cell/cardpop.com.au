@@ -213,6 +213,7 @@ const StoreDirectoryAdminPage = lazy(() => import('@/pages/admin/StoreDirectoryA
 const BusinessProfilesManagementPage = lazy(() => import('@/pages/admin/BusinessProfilesManagementPage.jsx'));
 const PartnersManagementPage = lazy(() => import('@/pages/admin/PartnersManagementPage.jsx'));
 const BusinessAffiliateLinksAdminPage = lazy(() => import('@/pages/admin/BusinessAffiliateLinksAdminPage.jsx'));
+const CardArtManagementPage = lazy(() => import('@/pages/admin/CardArtManagementPage.jsx'));
 const ListingsManagementPage = lazy(() => import('@/pages/ListingsManagementPage.jsx'));
 
 // Previously-orphaned pages now wired up
@@ -495,6 +496,7 @@ const App = () => {
                           <Route path="business-profiles" element={<BusinessProfilesManagementPage />} />
                           <Route path="partners" element={<PartnersManagementPage />} />
                           <Route path="building-your-business" element={<BusinessAffiliateLinksAdminPage />} />
+                          <Route path="card-art" element={<CardArtManagementPage />} />
                         </Route>
                         
                         {/* --- CATCH-ALL 404 ROUTE --- */}
