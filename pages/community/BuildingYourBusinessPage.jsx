@@ -16,6 +16,34 @@ const ICON_MAP = {
   Megaphone, TrendingUp, Rocket, Sparkles,
 };
 
+// ─── Brand marks ──────────────────────────────────────────────────────────────
+// Some tools read better as their real logo than a generic lucide glyph. Lucide
+// dropped brand icons and these coloured marks aren't in any icon set, so they're
+// inlined as SVGs (same approach as components/OAuthButtons.jsx). Stripe's mark is
+// a single colour and rides on the card's gradient tile like the lucide icons;
+// Google's is multi-colour and needs a light tile, so it's flagged `light`.
+const StripeMark = ({ className }) => (
+  <svg viewBox="0 0 24 24" fill="#fff" className={className} aria-hidden="true">
+    <path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.594-7.305h.007z" />
+  </svg>
+);
+
+const GoogleMark = ({ className }) => (
+  <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+    <path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.83z" />
+    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+  </svg>
+);
+
+// Brand names an admin can set in the `icon` column. `light` marks need a light
+// tile instead of the coloured gradient (Google's multi-colour G).
+const BRAND_ICONS = {
+  Stripe: { Icon: StripeMark, light: false },
+  Google: { Icon: GoogleMark, light: true },
+};
+
 // The organic-growth story: why using several tools together compounds.
 const PILLARS = [
   {
@@ -160,13 +188,20 @@ const BuildingYourBusinessPage = () => {
           ) : (
             <div className="grid gap-6 md:grid-cols-2">
               {tools.map((tool) => {
+                const brand = BRAND_ICONS[tool.icon];
                 const Icon = ICON_MAP[tool.icon] || Sparkles;
                 return (
                   <article key={tool.id} className="group flex flex-col rounded-2xl border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md">
                     <div className="flex items-start gap-4 mb-4">
-                      <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${tool.accent || 'from-brand-red to-brand-blue'} flex items-center justify-center shrink-0 shadow-sm overflow-hidden`}>
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm overflow-hidden ${
+                        brand?.light
+                          ? 'bg-white ring-1 ring-black/5'
+                          : `bg-gradient-to-br ${tool.accent || 'from-brand-red to-brand-blue'}`
+                      }`}>
                         {tool.logo_url ? (
                           <img src={tool.logo_url} alt={tool.name} className="w-full h-full object-contain p-2" loading="lazy" />
+                        ) : brand ? (
+                          <brand.Icon className="w-7 h-7" />
                         ) : (
                           <Icon className="w-7 h-7 text-white" />
                         )}
