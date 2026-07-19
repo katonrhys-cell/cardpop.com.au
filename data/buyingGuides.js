@@ -59,6 +59,18 @@ export const GUIDE_CATEGORY_META = {
   },
 };
 
+// Maps a guide's `category` to a live price category in lib/cardPrices.js
+// (PRICE_CATEGORIES). This is how guides wire into the existing /prices data:
+// the detail page pulls tracked cards for the mapped category and shows their
+// live AUD snapshots. A null means there's no matching price category yet (e.g.
+// baseball isn't tracked), in which case the live-price module is simply hidden.
+export const GUIDE_PRICE_CATEGORY = {
+  pokemon: 'pokemon',
+  afl: 'afl',
+  basketball: 'basketball',
+  baseball: null,
+};
+
 export const BUYING_GUIDES = [
   // ─── Pokémon TCG — Mega Evolution: Pitch Black ──────────────────────────────
   {
@@ -331,6 +343,7 @@ export const BUYING_GUIDES = [
         subtitle: 'Flagship rookie · base + autograph',
         value: '$40–$400+',
         tier: 'grail',
+        priceRef: 'cooper-flagg-prizm-rookie',
         blurb:
           'The rookie the whole set revolves around. The No. 1 pick’s base RC is the entry point, but his on-card autographs and short-print variations are the true grails driving this release.',
       },
@@ -339,6 +352,7 @@ export const BUYING_GUIDES = [
         subtitle: 'First-ever Spurs autograph',
         value: 'Chase',
         tier: 'grail',
+        priceRef: 'victor-wembanyama-prizm-rookie',
         blurb:
           'A genuine milestone card — Wembanyama’s first-ever autographs in a Spurs jersey are exclusive to this release. Numbered versions are the marquee pull of the entire set.',
       },
@@ -347,6 +361,7 @@ export const BUYING_GUIDES = [
         subtitle: 'Fully-licensed autograph (release-exclusive)',
         value: 'Chase',
         tier: 'grail',
+        priceRef: 'lebron-james-topps-rookie',
         blurb:
           'Fully-licensed LeBron autos can now be chased here for the first time. Scarce, iconic and a case-hit-level pull for the biggest name in the game.',
       },

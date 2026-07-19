@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { COLLECTION_SEO } from '../data/collectionSeo.js';
 import { BLOG_CATEGORIES, BLOG_CATEGORY_MAP } from '../data/blogCategories.js';
-import { BUYING_GUIDES, getBuyingGuide, GUIDE_CATEGORY_META } from '../data/buyingGuides.js';
+import { BUYING_GUIDES, getBuyingGuide, GUIDE_CATEGORY_META, GUIDE_PRICE_CATEGORY } from '../data/buyingGuides.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -1665,7 +1665,7 @@ ${guidesHtml}
   return htmlDoc({ title, description, canonical, jsonLdItems: [breadcrumb, itemList], bodyHtml });
 }
 
-function renderBuyingGuide(slug) {
+async function renderBuyingGuide(supabase, slug) {
   const guide = getBuyingGuide(slug);
   if (!guide) {
     return notFound({
@@ -1675,6 +1675,26 @@ function renderBuyingGuide(slug) {
       bodyHtml: '<main><h1>Buying Guide Not Found</h1><p>This buying guide does not exist on CardPop.</p></main>',
     });
   }
+
+  // Wire into the /prices dataset: pull tracked cards (with their latest
+  // snapshot) for this guide's mapped price category, for the live-price list
+  // and any chase card whose priceRef points at a tracked card.
+  const priceCategory = GUIDE_PRICE_CATEGORY[guide.category];
+  let trackedCards = [];
+  if (priceCategory) {
+    const { data } = await supabase
+      .from('tracked_cards')
+      .select('slug, name, set_name, category, card_price_snapshots(snapshot_date, raw_avg, graded_avg)')
+      .eq('active', true)
+      .eq('category', priceCategory)
+      .order('name')
+      .order('snapshot_date', { referencedTable: 'card_price_snapshots', ascending: false })
+      .limit(1, { referencedTable: 'card_price_snapshots' });
+    trackedCards = (data || []).map((c) => ({ ...c, latest: c.card_price_snapshots?.[0] || null }));
+  }
+  const trackedBySlug = Object.fromEntries(trackedCards.map((c) => [c.slug, c]));
+  const livePriceCards = trackedCards.filter((c) => c.latest).slice(0, 8);
+  const priceCategoryLabel = priceCategory ? PRICE_CATEGORIES[priceCategory] : null;
 
   const canonical = `${BASE_URL}/analytics/buying-guides/${guide.slug}`;
   const label = GUIDE_CATEGORY_META[guide.category]?.label || guide.game;
@@ -1706,9 +1726,27 @@ function renderBuyingGuide(slug) {
   const factsHtml = guide.quickFacts.map((f) => `    <li><strong>${esc(f.label)}:</strong> ${esc(f.value)}</li>`).join('\n');
   const chaseHtml = guide.chaseCards.map((c) => {
     const valueText = /^[$\d]/.test(c.value) ? `${c.value} AUD` : c.value;
-    return `    <li><strong>${esc(c.name)}</strong> — ${esc(c.subtitle)} (${esc(valueText)}). ${esc(c.blurb)}</li>`;
+    const ref = c.priceRef ? trackedBySlug[c.priceRef] : null;
+    let priceLink = '';
+    if (ref) {
+      const raw = audPrice(ref.latest?.raw_avg);
+      const linkText = raw ? `Live market: ${raw} raw` : `Track ${ref.name} prices`;
+      priceLink = ` <a href="${BASE_URL}/prices/${esc(ref.category)}/${esc(ref.slug)}">${esc(linkText)}</a>.`;
+    }
+    return `    <li><strong>${esc(c.name)}</strong> — ${esc(c.subtitle)} (${esc(valueText)}). ${esc(c.blurb)}${priceLink}</li>`;
   }).join('\n');
   const tipsHtml = (guide.collectingTips || []).map((t) => `    <li>${esc(t)}</li>`).join('\n');
+
+  const livePricesHtml = (priceCategoryLabel && livePriceCards.length)
+    ? `  <section>\n  <h2>Live ${esc(priceCategoryLabel)} prices</h2>\n  <p>Real AUD market data for tracked ${esc(priceCategoryLabel)} cards, updated daily.</p>\n  <ul>\n${
+        livePriceCards.map((c) => {
+          const raw = audPrice(c.latest?.raw_avg);
+          const graded = audPrice(c.latest?.graded_avg);
+          const bits = [raw ? `${raw} raw` : null, graded ? `${graded} graded` : null].filter(Boolean).join(' · ');
+          return `    <li><a href="${BASE_URL}/prices/${esc(c.category)}/${esc(c.slug)}">${esc(c.name)}</a>${bits ? ` — ${esc(bits)}` : ''}</li>`;
+        }).join('\n')
+      }\n  </ul>\n  <p><a href="${BASE_URL}/prices/${esc(priceCategory)}">View all ${esc(priceCategoryLabel)} prices</a></p>\n  </section>`
+    : '';
 
   const bodyHtml = `<main>
   <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/analytics">Analytics</a> / <a href="${BASE_URL}/analytics/buying-guides">Buying Guides</a> / ${esc(guide.shortTitle)}</nav>
@@ -1729,6 +1767,7 @@ ${factsHtml}
 ${chaseHtml}
   </ul>
   </section>
+${livePricesHtml}
 ${tipsHtml ? `  <section>\n  <h2>Collector tips</h2>\n  <ul>\n${tipsHtml}\n  </ul>\n  </section>` : ''}
   <nav aria-label="Related"><ul>
     <li><a href="${BASE_URL}/marketplace">Browse the marketplace</a></li>
@@ -2518,7 +2557,7 @@ export default async function handler(req, res) {
 
     const buyingGuideMatch = rawPath.match(/^\/analytics\/buying-guides\/([^/?#]+)/);
     if (buyingGuideMatch) {
-      return sendDoc(res, renderBuyingGuide(decodeURIComponent(buyingGuideMatch[1])));
+      return sendDoc(res, await renderBuyingGuide(supabase, decodeURIComponent(buyingGuideMatch[1])));
     }
 
     if (rawPath === '/prices') {

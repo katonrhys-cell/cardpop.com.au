@@ -1,11 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import {
-  Sparkles, ArrowLeft, ArrowRight, Flame, Calendar, Crown, TrendingUp, Trophy, Lightbulb,
+  Sparkles, ArrowLeft, ArrowRight, Flame, Calendar, Crown, TrendingUp, Trophy, Lightbulb, LineChart,
 } from 'lucide-react';
 import SEOHead from '@/components/SEOHead.jsx';
-import { getBuyingGuide, BUYING_GUIDES, GUIDE_CATEGORY_META } from '@/data/buyingGuides.js';
+import { getBuyingGuide, BUYING_GUIDES, GUIDE_CATEGORY_META, GUIDE_PRICE_CATEGORY } from '@/data/buyingGuides.js';
 import { fetchPokemonCardImage } from '@/utils/pokemonCardImage.js';
+import { fetchTrackedCards, formatAud, PRICE_CATEGORIES } from '@/lib/cardPrices.js';
 
 // Value-chip styling by chase tier.
 const TIER_STYLES = {
@@ -49,7 +50,35 @@ const ChaseArt = ({ pokemonName, set, gradient }) => {
   );
 };
 
-const ChaseCard = ({ card, guide }) => {
+// Inline "live price" line shown on a chase card when it maps to a tracked card
+// in the /prices dataset (card.priceRef → tracked_cards.slug). Links through to
+// the full price page. `tracked` is the tracked card (with its latest snapshot)
+// resolved by the parent, or undefined when there's no match / data isn't in yet.
+const ChasePriceLink = ({ tracked }) => {
+  if (!tracked) return null;
+  const raw = tracked.latest?.raw_avg;
+  const graded = tracked.latest?.graded_avg;
+  const href = `/prices/${tracked.category}/${tracked.slug}`;
+  return (
+    <Link
+      to={href}
+      className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-2.5 py-1.5 text-xs font-semibold text-primary hover:bg-primary/15 transition-colors"
+    >
+      <LineChart className="w-3.5 h-3.5 shrink-0" />
+      {raw != null || graded != null ? (
+        <span>
+          Live market: {formatAud(raw)} raw
+          {graded != null && <> · {formatAud(graded)} graded</>}
+        </span>
+      ) : (
+        <span>Track {tracked.name} prices</span>
+      )}
+      <ArrowRight className="w-3.5 h-3.5 shrink-0" />
+    </Link>
+  );
+};
+
+const ChaseCard = ({ card, guide, tracked }) => {
   const tier = TIER_STYLES[card.tier] || TIER_STYLES.mid;
   const isPokemon = guide.category === 'pokemon';
   return (
@@ -76,6 +105,11 @@ const ChaseCard = ({ card, guide }) => {
             <span className="text-xs font-normal text-muted-foreground"> AUD</span>
           )}
         </p>
+        {tracked && (
+          <div>
+            <ChasePriceLink tracked={tracked} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -85,11 +119,38 @@ const BuyingGuideDetailPage = () => {
   const { slug } = useParams();
   const guide = getBuyingGuide(slug);
 
+  // Live price data: pull the tracked cards for this guide's mapped price
+  // category (null → no matching /prices category, e.g. baseball). The result
+  // powers both the "Live AUD prices" section and the inline price line on any
+  // chase card whose priceRef points at a tracked card. `null` = still loading.
+  const priceCategory = guide ? GUIDE_PRICE_CATEGORY[guide.category] : null;
+  const [tracked, setTracked] = useState(null);
+
+  useEffect(() => {
+    if (!priceCategory) { setTracked([]); return; }
+    let cancelled = false;
+    fetchTrackedCards(priceCategory)
+      .then((cards) => { if (!cancelled) setTracked(cards); })
+      .catch(() => { if (!cancelled) setTracked([]); });
+    return () => { cancelled = true; };
+  }, [priceCategory]);
+
+  // slug → tracked card, for resolving each chase card's priceRef.
+  const trackedBySlug = useMemo(() => {
+    const map = {};
+    for (const c of tracked || []) map[c.slug] = c;
+    return map;
+  }, [tracked]);
+
   if (!guide) return <Navigate to="/analytics/buying-guides" replace />;
 
   const categoryLabel = GUIDE_CATEGORY_META[guide.category]?.label || guide.game;
   const others = BUYING_GUIDES.filter((g) => g.slug !== guide.slug);
   const marketplaceLink = `/marketplace?q=${encodeURIComponent(guide.marketplaceQuery)}`;
+  const priceCategoryMeta = priceCategory ? PRICE_CATEGORIES[priceCategory] : null;
+  // Cards to feature in the live-price section (cap so a big category like
+  // Pokémon doesn't dump 37 rows onto the page).
+  const livePriceCards = (tracked || []).filter((c) => c.latest).slice(0, 8);
 
   const structuredData = {
     '@context': 'https://schema.org',
@@ -163,10 +224,61 @@ const BuyingGuideDetailPage = () => {
             </p>
             <div className="grid gap-4">
               {guide.chaseCards.map((card, i) => (
-                <ChaseCard key={`${card.name}-${i}`} card={card} guide={guide} />
+                <ChaseCard
+                  key={`${card.name}-${i}`}
+                  card={card}
+                  guide={guide}
+                  tracked={card.priceRef ? trackedBySlug[card.priceRef] : undefined}
+                />
               ))}
             </div>
           </section>
+
+          {/* Live prices — wires the guide into the existing /prices dataset.
+              Shown only when the category has tracked cards with snapshots. */}
+          {priceCategoryMeta && livePriceCards.length > 0 && (
+            <section>
+              <div className="flex items-center gap-2 mb-1">
+                <LineChart className="w-5 h-5 text-primary" />
+                <h2 className="text-2xl font-bold">Live {priceCategoryMeta.label} prices</h2>
+              </div>
+              <p className="text-sm text-muted-foreground mb-5">
+                Real AUD market data for tracked {priceCategoryMeta.label} cards, updated daily —
+                handy context while you decide what to chase.
+              </p>
+              <div className="grid sm:grid-cols-2 gap-3">
+                {livePriceCards.map((c) => (
+                  <Link
+                    key={c.slug}
+                    to={`/prices/${c.category}/${c.slug}`}
+                    className="group bg-card border border-border rounded-2xl p-4 hover:border-primary/50 hover:shadow-md transition-all"
+                  >
+                    <div className="font-semibold leading-snug group-hover:text-primary transition-colors truncate">
+                      {c.name}
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate">{c.set_name}</div>
+                    <div className="mt-3 flex items-baseline justify-between gap-2">
+                      <div>
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Raw avg</div>
+                        <div className="text-base font-bold">{formatAud(c.latest?.raw_avg)}</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Graded avg</div>
+                        <div className="text-base font-bold">{formatAud(c.latest?.graded_avg)}</div>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+              <Link
+                to={`/prices/${priceCategory}`}
+                className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline"
+              >
+                View all {priceCategoryMeta.label} prices
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </section>
+          )}
 
           {/* Collecting tips */}
           {guide.collectingTips?.length > 0 && (
