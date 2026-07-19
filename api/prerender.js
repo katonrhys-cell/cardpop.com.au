@@ -1522,6 +1522,27 @@ const STATIC_CONTENT = {
     links: [{ text: 'Community Hub', href: '/community' }, { text: 'Trading Card Events', href: '/events' }, { text: 'Local Traders', href: '/community/local-traders' }],
   },
 
+  '/community/building-your-business': {
+    title: 'Building Your Business | CardPop',
+    description: 'The tools we use and recommend to grow a trading card business in Australia — payments, live selling, email, socials and more. A multi-pronged approach to organically build your presence.',
+    breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Community', path: '/community' }, { name: 'Building Your Business', path: '/community/building-your-business' }],
+    h1: 'Building Your Business',
+    intro: 'The tools we actually use to run CardPop — and how each one can help you grow your own card business, whether you sell at shows, go live, or move stock online. No single app builds a following; a multi-pronged approach does.',
+    sections: [
+      { h2: 'Why a multi-pronged approach wins', paras: ['Every collector you want to reach is somewhere different — scrolling Instagram, watching a live break, hunting a Facebook group, or checking their inbox. Cover more of those places and the same effort reaches more people, and the channels compound: attention in one becomes a sale in another.'] },
+      { h2: 'Payments', paras: ['Stripe powers CardPop checkout and lets any seller take real card payments — Apple Pay, Google Pay and payouts straight to your bank — without a merchant bank.'] },
+      { h2: 'A professional inbox', paras: ['Google Workspace puts you on your own domain with Gmail, Drive, Docs and Sheets — the toolkit that makes a one-person card operation look and run like a real business.'] },
+      { h2: 'Live selling', paras: ['Whatnot is the fastest way to shift volume and build regulars — run auctions and pack breaks to an audience that turns up ready to buy.'] },
+      { h2: 'Social reach', paras: ['A Facebook Page plus Instagram is the free shopfront for a card business — groups, Marketplace, Stories and Reels put your stock in front of local collectors daily.'] },
+      { h2: 'Own your audience with email', paras: ['Kit runs the CardPop newsletter — the one channel we own outright. Capture sign-ups with forms and landing pages, grow reach through the Creator Network, automate with its API, and read the analytics to double down on what sells.'] },
+    ],
+    links: [
+      { text: 'Community Hub', href: '/community' },
+      { text: 'Local Traders', href: '/community/local-traders' },
+      { text: 'Whatnot Shows', href: '/community/whatnot' },
+    ],
+  },
+
   '/australian-markets': {
     title: 'Australian Card Markets | CardPop',
     description: 'Explore trading card markets across Australia. Find local card shops, events and trading communities near you.',

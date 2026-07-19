@@ -176,6 +176,7 @@ const ForumPage = lazy(() => import('@/pages/community/ForumPage.jsx'));
 const ProfilesPage = lazy(() => import('@/pages/community/ProfilesPage.jsx'));
 const LocalTradersPage = lazy(() => import('@/pages/community/LocalTradersPage.jsx'));
 const LocalMapPage = lazy(() => import('@/pages/community/LocalMapPage.jsx'));
+const BuildingYourBusinessPage = lazy(() => import('@/pages/community/BuildingYourBusinessPage.jsx'));
 
 // Admin Dashboard Area
 const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard.jsx'));
@@ -209,6 +210,7 @@ const ChatModerationPage = lazy(() => import('@/pages/admin/ChatModerationPage.j
 const StoreDirectoryAdminPage = lazy(() => import('@/pages/admin/StoreDirectoryAdminPage.jsx'));
 const BusinessProfilesManagementPage = lazy(() => import('@/pages/admin/BusinessProfilesManagementPage.jsx'));
 const PartnersManagementPage = lazy(() => import('@/pages/admin/PartnersManagementPage.jsx'));
+const BusinessAffiliateLinksAdminPage = lazy(() => import('@/pages/admin/BusinessAffiliateLinksAdminPage.jsx'));
 const ListingsManagementPage = lazy(() => import('@/pages/ListingsManagementPage.jsx'));
 
 // Previously-orphaned pages now wired up
@@ -424,6 +426,7 @@ const App = () => {
                         <Route path="/community/events/:eventId" element={<RedirectEventDetail />} />
                         <Route path="/community/discussion/:id" element={<CommunityDiscussionPage />} />
                         <Route path="/community/whatnot" element={<WhatnotShowsPage />} />
+                        <Route path="/community/building-your-business" element={<BuildingYourBusinessPage />} />
                         <Route path="/community/user/:sellerId" element={<SellerProfilePage />} />
                         
                         {/* Search & Misc */}
@@ -484,6 +487,7 @@ const App = () => {
                           <Route path="store-directory" element={<StoreDirectoryAdminPage />} />
                           <Route path="business-profiles" element={<BusinessProfilesManagementPage />} />
                           <Route path="partners" element={<PartnersManagementPage />} />
+                          <Route path="building-your-business" element={<BusinessAffiliateLinksAdminPage />} />
                         </Route>
                         
                         {/* --- CATCH-ALL 404 ROUTE --- */}

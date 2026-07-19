@@ -6,7 +6,7 @@ import {
   ArrowUpRight, Server, Database, HardDrive, CheckCircle2,
   FolderTree, RefreshCw, ArrowRightLeft, Calendar,
   Tags, BarChart3, Building2, Layers, ShieldCheck, Lock, ShoppingCart, Filter, X,
-  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star, Sparkles, LayoutList, Flag, CreditCard, MessagesSquare, Handshake
+  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star, Sparkles, LayoutList, Flag, CreditCard, MessagesSquare, Handshake, Rocket
 } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -263,6 +263,7 @@ const AdminDashboard = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <ManagementBox title="Marketplace" description="Manage marketplace listings." icon={Store} link="/admin/marketplace" />
           <ManagementBox title="Business Profiles" description="Curate retail storefronts shown on the Retailers directory and map." icon={Building2} link="/admin/business-profiles" />
+          <ManagementBox title="Building Your Business" description="Manage affiliate tools shown on the Community business page." icon={Rocket} link="/admin/building-your-business" />
           <ManagementBox title="Category Mapping" description="Map categories to collections." icon={Map} link="/admin/category-mapping" />
           <ManagementBox title="Events Management" description="Create and manage events." icon={Calendar} link="/admin/events" />
           <ManagementBox title="Content Management" description="Edit blog, pages and articles." icon={FileText} link="/admin/content" />
