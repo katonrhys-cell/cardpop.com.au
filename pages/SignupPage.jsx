@@ -42,7 +42,7 @@ const SECURITY_FEATURES = [
 ];
 
 const SignupPage = () => {
-  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [formData, setFormData] = useState({ firstName: '', lastName: '', email: '', password: '', confirmPassword: '' });
   const [newsletterOptIn, setNewsletterOptIn] = useState(true);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -74,12 +74,17 @@ const SignupPage = () => {
 
   const score = Object.values(passwordValidation).filter(Boolean).length;
   const isPasswordValid = score === 5;
-  const isFormValid = formData.name.trim() !== '' && formData.email.trim() !== '' && isPasswordValid && termsAccepted && (!TURNSTILE_ENABLED || Boolean(captchaToken));
+  const passwordsMatch = formData.confirmPassword !== '' && formData.password === formData.confirmPassword;
+  const isFormValid = formData.firstName.trim() !== '' && formData.lastName.trim() !== '' && formData.email.trim() !== '' && isPasswordValid && passwordsMatch && termsAccepted && (!TURNSTILE_ENABLED || Boolean(captchaToken));
 
   const handleAccountSubmit = async (e) => {
     e.preventDefault();
     if (!isPasswordValid) {
       toast.error('Please meet all password requirements to continue.');
+      return;
+    }
+    if (!passwordsMatch) {
+      toast.error('Passwords do not match. Please re-enter them.');
       return;
     }
 
@@ -93,7 +98,8 @@ const SignupPage = () => {
       }
 
       // Turnstile token (when enabled) is verified server-side by Supabase Auth.
-      const result = await signup(formData.email, formData.password, formData.name, captchaToken);
+      const fullName = `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
+      const result = await signup(formData.email, formData.password, fullName, captchaToken);
       const user = result?.user;
       const session = result?.session;
 
@@ -102,7 +108,7 @@ const SignupPage = () => {
         apiServerClient.fetch('/newsletter/subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: formData.email, firstName: formData.name.split(' ')[0] }),
+          body: JSON.stringify({ email: formData.email, firstName: formData.firstName.trim() }),
         });
       }
 
@@ -250,16 +256,34 @@ const SignupPage = () => {
           <div className="order-2 lg:order-none w-full bg-card p-6 sm:p-8 border border-border rounded-2xl shadow-lg lg:col-start-2 lg:row-start-1 lg:row-span-2">
             <form onSubmit={handleAccountSubmit} className="space-y-5">
               <div className="space-y-2">
-                <Label htmlFor="name" className="font-bold text-xs uppercase tracking-wide">Full Name</Label>
-                <Input
-                  id="name"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="bg-background h-12"
-                  placeholder="e.g. Maya Chen"
-                  disabled={loading}
-                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName" className="font-bold text-xs uppercase tracking-wide">First Name</Label>
+                    <Input
+                      id="firstName"
+                      required
+                      value={formData.firstName}
+                      onChange={(e) => setFormData({...formData, firstName: e.target.value})}
+                      className="bg-background h-12"
+                      placeholder="e.g. Maya"
+                      autoComplete="given-name"
+                      disabled={loading}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName" className="font-bold text-xs uppercase tracking-wide">Last Name</Label>
+                    <Input
+                      id="lastName"
+                      required
+                      value={formData.lastName}
+                      onChange={(e) => setFormData({...formData, lastName: e.target.value})}
+                      className="bg-background h-12"
+                      placeholder="e.g. Chen"
+                      autoComplete="family-name"
+                      disabled={loading}
+                    />
+                  </div>
+                </div>
                 <p className="text-xs text-muted-foreground">Must match the identification you provide</p>
               </div>
               <div className="space-y-2">
@@ -276,7 +300,7 @@ const SignupPage = () => {
                 />
               </div>
               <div className="space-y-3 pb-2">
-                <Label htmlFor="password" className="font-bold text-xs uppercase tracking-wide">Master Password</Label>
+                <Label htmlFor="password" className="font-bold text-xs uppercase tracking-wide">Password</Label>
                 <Input
                   id="password"
                   type="password"
@@ -304,6 +328,29 @@ const SignupPage = () => {
                   <ValidationItem met={passwordValidation.number} text="One number" />
                   <ValidationItem met={passwordValidation.special} text="One special character" />
                 </ul>
+              </div>
+              <div className="space-y-2 pb-2">
+                <Label htmlFor="confirmPassword" className="font-bold text-xs uppercase tracking-wide">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  required
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
+                  className="bg-background h-12"
+                  placeholder="Re-enter your password"
+                  autoComplete="new-password"
+                  disabled={loading}
+                />
+                {formData.confirmPassword !== '' && (
+                  passwordsMatch ? (
+                    <p className="flex items-center gap-1.5 text-sm font-medium text-green-600 dark:text-green-500">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" /> Passwords match
+                    </p>
+                  ) : (
+                    <p className="text-sm font-medium text-destructive">Passwords do not match</p>
+                  )
+                )}
               </div>
 
               <label className="flex items-start gap-3 cursor-pointer select-none">
