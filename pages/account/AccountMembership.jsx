@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
@@ -11,16 +11,16 @@ import { BadgeCheck, Clock, Gift, Loader2, Sparkles } from 'lucide-react';
 import { TRIAL_DAYS } from '@/config/subscription.js';
 
 const STATUS_LABEL = {
-  trialing:      { label: 'Free trial active', tone: 'text-brand-red', Icon: Sparkles },
-  active:        { label: 'Membership active', tone: 'text-green-600', Icon: BadgeCheck },
-  grandfathered: { label: 'Membership active', tone: 'text-green-600', Icon: BadgeCheck },
+  trialing:      { label: 'Pro trial active', tone: 'text-brand-red', Icon: Sparkles },
+  active:        { label: 'CardPop Pro active', tone: 'text-green-600', Icon: BadgeCheck },
+  grandfathered: { label: 'CardPop Pro active', tone: 'text-green-600', Icon: BadgeCheck },
   past_due:      { label: 'Payment overdue',   tone: 'text-yellow-600', Icon: Clock },
-  canceled:      { label: 'Membership cancelled', tone: 'text-muted-foreground', Icon: Clock },
-  none:          { label: 'No active membership', tone: 'text-muted-foreground', Icon: Clock },
+  canceled:      { label: 'Pro cancelled', tone: 'text-muted-foreground', Icon: Clock },
+  none:          { label: 'Hobby (free) plan', tone: 'text-muted-foreground', Icon: Clock },
 };
 
 const AccountMembership = () => {
-  const { canSell, subscriptionStatus, trialDaysLeft, refetchProfile } = useAuth();
+  const { isPro, subscriptionStatus, trialDaysLeft, refetchProfile } = useAuth();
   const [params, setParams] = useSearchParams();
   const [activating, setActivating] = useState(false);
   const [welcomeCode, setWelcomeCode] = useState('');
@@ -30,7 +30,7 @@ const AccountMembership = () => {
   // Prefill the welcome-code input with the user's own unredeemed code so
   // arriving from the offer email is one click, not a copy-paste hunt.
   useEffect(() => {
-    if (canSell) return;
+    if (isPro) return;
     let cancelled = false;
     apiServerClient.fetch('/welcome-offer/mine')
       .then(res => (res.ok ? res.json() : null))
@@ -40,7 +40,7 @@ const AccountMembership = () => {
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [canSell]);
+  }, [isPro]);
 
   const handleRedeemWelcomeCode = async (e) => {
     e.preventDefault();
@@ -108,9 +108,11 @@ const AccountMembership = () => {
     <div className="mx-auto max-w-lg px-4 py-10">
       <Helmet><title>Membership | CardPop</title></Helmet>
 
-      <h1 className="font-heading text-2xl font-bold text-foreground">Membership</h1>
+      <h1 className="font-heading text-2xl font-bold text-foreground">CardPop Pro</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Your CardPop membership lets you list and sell cards. Browsing and buying are always free.
+        Buying and selling are free on every plan (selling just needs ID verification). Pro is the
+        optional upgrade that unlocks unlimited listings, your own storefront, a Pro badge and premium
+        tools. <Link to="/pricing" className="text-primary hover:underline">Compare plans →</Link>
       </p>
 
       <div className="mt-6 rounded-card border border-border bg-card p-6">
@@ -125,7 +127,7 @@ const AccountMembership = () => {
         )}
       </div>
 
-      {!canSell && (
+      {!isPro && (
         <>
           <div className="mt-8 rounded-card border border-brand-red/30 bg-brand-red/5 p-6">
             <div className="flex items-center gap-2 font-heading text-lg font-bold text-foreground">
@@ -161,7 +163,7 @@ const AccountMembership = () => {
 
           <div className="mt-8">
             <h2 className="mb-4 font-heading text-lg font-bold text-foreground">
-              Start your {TRIAL_DAYS}-day free trial
+              Start your {TRIAL_DAYS}-day Pro trial
             </h2>
             <StartTrialOptions returnPath="/account/membership" />
           </div>

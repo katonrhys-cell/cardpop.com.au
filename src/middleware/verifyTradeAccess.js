@@ -38,6 +38,54 @@ async function verifyTradeAccess(req, res, next) {
       });
     }
 
+    // Selling/trading gate (matches the DB can_sell() rule): trading requires
+    // BOTH Stripe Identity verification AND a card on file (so the per-trade
+    // fee can always be collected — a trade has no sale proceeds to net it
+    // from). Buying is unaffected (it never hits a /trade route).
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_verified, has_saved_card')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (profile?.is_verified !== true) {
+      logger.warn(`[TRADE_ACCESS] ID-unverified user ${userId} attempted trade: ${req.method} ${req.path}`);
+
+      await supabase.from('audit_logs').insert({
+        user_id: userId,
+        event_type: 'trade_attempt_id_unverified',
+        description: `ID-unverified user attempted: ${req.method} ${req.path}`,
+        ip_address: req.ip || 'unknown',
+        user_agent: req.headers['user-agent'] || 'unknown',
+        status: 'blocked',
+      }).catch(() => {});
+
+      return res.status(403).json({
+        error: 'Identity verification is required to trade',
+        code: 'IDENTITY_NOT_VERIFIED',
+        message: 'Verify your identity (a quick ID + selfie check via Stripe) before trading.',
+      });
+    }
+
+    if (profile?.has_saved_card !== true) {
+      logger.warn(`[TRADE_ACCESS] Card-less user ${userId} attempted trade: ${req.method} ${req.path}`);
+
+      await supabase.from('audit_logs').insert({
+        user_id: userId,
+        event_type: 'trade_attempt_no_card',
+        description: `User without a card on file attempted: ${req.method} ${req.path}`,
+        ip_address: req.ip || 'unknown',
+        user_agent: req.headers['user-agent'] || 'unknown',
+        status: 'blocked',
+      }).catch(() => {});
+
+      return res.status(403).json({
+        error: 'A saved card is required to trade',
+        code: 'CARD_REQUIRED',
+        message: 'Add a card on file before trading. It is never charged until a trade or sale completes.',
+      });
+    }
+
     logger.info(`[TRADE_ACCESS] Verified user ${userId} allowed`);
     next();
   } catch (error) {

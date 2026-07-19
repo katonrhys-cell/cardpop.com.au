@@ -97,6 +97,7 @@ const SecuritySettingsPage = lazy(() => import('@/pages/SecuritySettingsPage.jsx
 const UserBalancePage = lazy(() => import('@/pages/UserBalancePage.jsx'));
 const VerificationSubmissionPage = lazy(() => import('@/pages/VerificationSubmissionPage.jsx'));
 const VerifyIdentityPage = lazy(() => import('@/pages/VerifyIdentityPage.jsx'));
+const OnboardingCardPage = lazy(() => import('@/pages/OnboardingCardPage.jsx'));
 
 // Public Profiles
 const PublicSellerProfilePage = lazy(() => import('@/pages/PublicSellerProfilePage.jsx'));
@@ -234,6 +235,7 @@ const SitemapPage = lazy(() => import('@/pages/SitemapPage.jsx'));
 const AboutPage = lazy(() => import('@/pages/info/AboutPage.jsx'));
 const ContactPage = lazy(() => import('@/pages/info/ContactPage.jsx'));
 const FAQPage = lazy(() => import('@/pages/info/FAQPage.jsx'));
+const PricingPage = lazy(() => import('@/pages/PricingPage.jsx'));
 const PrivacyPolicyPage = lazy(() => import('@/pages/PrivacyPolicyPage.jsx'));
 const ReturnsPage = lazy(() => import('@/pages/info/ReturnsPage.jsx'));
 const ShippingPage = lazy(() => import('@/pages/info/ShippingPage.jsx'));
@@ -327,6 +329,7 @@ const App = () => {
                         <Route path="/profile" element={<ProtectedRoute><UserProfilePage /></ProtectedRoute>} />
                         <Route path="/verify-account" element={<ProtectedRoute><VerificationSubmissionPage /></ProtectedRoute>} />
                         <Route path="/verify-identity" element={<ProtectedRoute><VerifyIdentityPage /></ProtectedRoute>} />
+                        <Route path="/onboarding/card" element={<ProtectedRoute><OnboardingCardPage /></ProtectedRoute>} />
                         <Route path="/security" element={<ProtectedRoute><SecuritySettingsPage /></ProtectedRoute>} />
                         <Route path="/balance" element={<ProtectedRoute><UserBalancePage /></ProtectedRoute>} />
                         
@@ -444,6 +447,7 @@ const App = () => {
                         
                         {/* Info Pages */}
                         <Route path="/about" element={<AboutPage />} />
+                        <Route path="/pricing" element={<PricingPage />} />
                         <Route path="/contact" element={<ContactPage />} />
                         <Route path="/faq" element={<FAQPage />} />
                         <Route path="/privacy" element={<PrivacyPolicyPage />} />

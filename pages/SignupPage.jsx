@@ -187,15 +187,17 @@ const SignupPage = () => {
               Check your email to verify your account and complete your profile.
             </p>
             <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-              Once you sign in, verify your <span className="text-foreground font-bold">ID</span> (a quick photo of
-              your licence or passport, handled securely by Stripe), then start your{' '}
-              <span className="text-foreground font-bold">30-day free trial</span> to list and sell cards — add a
-              card or PayPal to begin, and cancel anytime before the trial ends.
+              Your account is <span className="text-foreground font-bold">free, forever</span> — buy straight away.
+              To list, sell or trade, verify your <span className="text-foreground font-bold">ID</span> (a quick photo
+              of your licence or passport, handled securely by Stripe) and add a{' '}
+              <span className="text-foreground font-bold">card on file</span> — it's never charged until a sale or
+              trade completes. Want unlimited listings, a storefront and premium tools? Upgrade to{' '}
+              <span className="text-foreground font-bold">Pro</span> anytime.
             </p>
             <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
               We've also sent your <span className="text-foreground font-bold">welcome code</span> in a separate
-              email — redeem it on the Membership page to claim your trial, plus take{' '}
-              <span className="text-foreground font-bold">10% off your first order</span> at checkout.
+              email — it gives you <span className="text-foreground font-bold">10% off your first order</span> at
+              checkout and a free trial if you go Pro.
             </p>
             <Button asChild className="w-full h-12 font-bold">
               <Link to="/login">Go to Login</Link>

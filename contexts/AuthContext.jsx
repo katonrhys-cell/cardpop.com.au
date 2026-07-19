@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
 import apiServerClient from '@/lib/apiServerClient.js';
-import { isEntitled } from '@/config/subscription.js';
+import { planFromTier, isProAccount, PLAN_HOBBY } from '@/config/plans.js';
+import { isVerified as isIdVerified } from '@/utils/verification.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 
 const AuthContext = createContext();
@@ -371,17 +372,32 @@ export const AuthProvider = ({ children }) => {
   // so that profile fields can never accidentally shadow it.
   const isVerified = session?.user?.email_confirmed_at != null;
 
-  // ── Selling entitlement (free trial / subscription) ───────────────────────
-  // Mirrors the DB `can_sell()` rule: an active/trialing/grandfathered
-  // subscription, or an unexpired trial window, grants listing/selling access.
-  // This drives UX only; the database RLS policy is the real enforcement.
+  // ── Account plan (Hobby free vs Pro) ──────────────────────────────────────
+  // `subscription_tier` is the plan column ('free' = Hobby, 'pro'+ = Pro); the
+  // Pro subscription lifecycle is mirrored onto `subscription_status`. Both are
+  // consulted so a brief mismatch can't lock a paying member out. UX only — the
+  // real Pro enforcement lives server-side.
   const subscriptionStatus = profile?.subscription_status ?? null;
+  const subscriptionTier = profile?.subscription_tier ?? 'free';
+  const plan = profile ? planFromTier(subscriptionTier) : PLAN_HOBBY;
+  const isPro = isProAccount({ subscriptionTier, subscriptionStatus });
+
+  // Pro free-trial window (drives the "N days left" nudges on the membership UI).
   const trialEndsAt = profile?.trial_ends_at ? new Date(profile.trial_ends_at) : null;
   const trialActive = trialEndsAt != null && trialEndsAt.getTime() > Date.now();
   const trialDaysLeft = trialEndsAt
     ? Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / 86_400_000))
     : null;
-  const canSell = isEntitled(subscriptionStatus) || trialActive;
+
+  // ── Selling / trading entitlement (identity verification + card on file) ───
+  // Mirrors the DB `can_sell()` rule: ANY account — free Hobby included — may
+  // list/sell/trade once it has (1) completed Stripe Identity verification AND
+  // (2) a card on file (so the per-sale/trade fee can always be collected). It
+  // is not gated on a paid subscription. `is_verified` is the identity flag
+  // (distinct from `isVerified` below, which is *email* confirmation).
+  const isIdentityVerified = isIdVerified(profile?.is_verified);
+  const hasSavedCard = profile?.has_saved_card === true;
+  const canSell = isIdentityVerified && hasSavedCard;
 
   // Memoize so the reference is stable across re-renders that don't change the
   // user/profile (e.g. loading/mfaRequired toggles). Consumers that key effects
@@ -403,8 +419,16 @@ export const AuthProvider = ({ children }) => {
     isAdmin,
     isVerified,
     isEmailVerified: isVerified,
-    // Selling entitlement — see the derivation above.
+    // Identity (Stripe Identity) verification — one of the selling/trading gates.
+    isIdentityVerified,
+    // Whether the user has a card on file — the other selling/trading gate.
+    hasSavedCard,
+    // Selling/trading entitlement — see the derivation above (identity + card).
     canSell,
+    // Account plan.
+    plan,               // 'hobby' | 'pro'
+    isPro,
+    subscriptionTier,
     subscriptionStatus,
     trialActive,
     trialEndsAt,

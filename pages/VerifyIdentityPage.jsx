@@ -32,11 +32,12 @@ const VerifyIdentityPage = () => {
   const [searchParams] = useSearchParams();
 
   // Where to send the user once they're done (verified or skipped). A welcome
-  // signup continues to the membership page; otherwise an app-internal `next`
-  // path, defaulting to the account dashboard.
+  // signup continues to the "add a card" onboarding step (which then flows on to
+  // the membership page); otherwise an app-internal `next` path, defaulting to
+  // the account dashboard.
   const rawNext = searchParams.get('next');
   const nextPath = searchParams.get('welcome') === '1'
-    ? '/account/membership?welcome=1'
+    ? '/onboarding/card?welcome=1'
     : (rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/account');
 
   const [status, setStatus] = useState('checking'); // checking | not_started | starting | processing | verified | requires_input

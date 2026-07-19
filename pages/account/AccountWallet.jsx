@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
+import SavePaymentMethod from '@/components/SavePaymentMethod.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import apiServerClient from '@/lib/apiServerClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -168,6 +169,9 @@ const AccountWallet = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Saved cards for buying — encouraged on every plan; never charged until you transact */}
+      <SavePaymentMethod />
 
       {/* Stripe Connect panel */}
       <Card className="shadow-sm border-border overflow-hidden">
