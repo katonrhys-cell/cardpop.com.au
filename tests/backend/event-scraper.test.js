@@ -52,7 +52,7 @@ vi.mock('../../src/utils/supabaseClient.js', () => ({
   },
 }));
 
-import eventScraperRouter, { ssrfSafeLookup } from '../../src/routes/event-scraper.js';
+import eventScraperRouter, { ssrfSafeLookup, validateAndNormalizeEventData } from '../../src/routes/event-scraper.js';
 
 function makeApp() {
   const app = express();
@@ -270,6 +270,34 @@ describe('POST /extract-event-from-content', () => {
 
     expect(res.headers['content-type']).toContain('text/event-stream');
     expect(res.headers['cache-control']).toContain('no-cache');
+  });
+});
+
+// ─── validateAndNormalizeEventData ────────────────────────────────────────────
+
+describe('validateAndNormalizeEventData — accessibility & age restrictions', () => {
+  it('trims and keeps accessibility_info and age_restrictions', () => {
+    const normalized = validateAndNormalizeEventData({
+      title: 'Test',
+      accessibility_info: '  Wheelchair accessible venue  ',
+      age_restrictions: '18+',
+    });
+    expect(normalized.accessibility_info).toBe('Wheelchair accessible venue');
+    expect(normalized.age_restrictions).toBe('18+');
+  });
+
+  it('nulls missing, blank, or non-string values', () => {
+    const missing = validateAndNormalizeEventData({ title: 'Test' });
+    expect(missing.accessibility_info).toBeNull();
+    expect(missing.age_restrictions).toBeNull();
+
+    const invalid = validateAndNormalizeEventData({
+      title: 'Test',
+      accessibility_info: '   ',
+      age_restrictions: 18,
+    });
+    expect(invalid.accessibility_info).toBeNull();
+    expect(invalid.age_restrictions).toBeNull();
   });
 });
 

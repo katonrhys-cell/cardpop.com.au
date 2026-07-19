@@ -43,6 +43,8 @@ const INITIAL_STATE = {
   title: '',
   short_description: '',
   description: '',
+  accessibility_info: '',
+  age_restrictions: '',
   event_type: 'community_event',
   status: 'approved',
   featured_card_games: [],
@@ -145,6 +147,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         title:               scrapedData.title || scrapedData.name || '',
         short_description:   scrapedData.short_description || '',
         description:         scrapedData.description || '',
+        accessibility_info:  scrapedData.accessibility_info || '',
+        age_restrictions:    scrapedData.age_restrictions || '',
         event_type:          scrapedData.event_type || 'community_event',
         status:              'approved',
         featured_card_games: scrapedData.featured_card_games || [],
@@ -195,6 +199,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         title:               event.title || '',
         short_description:   event.short_description || '',
         description:         event.description || '',
+        accessibility_info:  event.accessibility_info || '',
+        age_restrictions:    event.age_restrictions || '',
         event_type:          event.event_type || 'community_event',
         status:              event.status || 'approved',
         featured_card_games: event.featured_card_games || [],
@@ -300,6 +306,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         title:               formData.title.trim(),
         short_description:   formData.short_description.trim() || null,
         description:         formData.description.trim() || null,
+        accessibility_info:  formData.accessibility_info.trim() || null,
+        age_restrictions:    formData.age_restrictions.trim() || null,
         event_type:          formData.event_type,
         // User submissions always enter the review queue — RLS enforces this too
         status:              isUserMode ? 'pending_review' : formData.status,
@@ -446,6 +454,16 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   <div className="sm:col-span-2 space-y-2">
                     <Label htmlFor="description" className="font-bold">Full Description</Label>
                     <Textarea id="description" name="description" value={formData.description} onChange={handleChange} className="bg-background min-h-[140px] rounded-xl resize-y" disabled={loading} />
+                  </div>
+
+                  <div className="sm:col-span-2 space-y-2">
+                    <Label htmlFor="accessibility_info" className="font-bold">Accessibility <span className="text-muted-foreground font-normal text-xs">(optional — shown under "About this event")</span></Label>
+                    <Textarea id="accessibility_info" name="accessibility_info" value={formData.accessibility_info} onChange={handleChange} className="bg-background min-h-[80px] rounded-xl resize-y" placeholder="e.g. Wheelchair accessible venue with step-free entry, accessible parking and toilets" disabled={loading} />
+                  </div>
+
+                  <div className="sm:col-span-2 space-y-2">
+                    <Label htmlFor="age_restrictions" className="font-bold">Age Restrictions <span className="text-muted-foreground font-normal text-xs">(optional — shown under "About this event")</span></Label>
+                    <Input id="age_restrictions" name="age_restrictions" value={formData.age_restrictions} onChange={handleChange} className={inputCls} placeholder="e.g. All ages — under 15s must be accompanied by an adult" disabled={loading} />
                   </div>
 
                   <div className="space-y-2">

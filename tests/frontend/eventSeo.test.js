@@ -113,3 +113,17 @@ describe('buildEventJsonLd offers', () => {
     expect(ld.offers[0]).toMatchObject({ name: 'General admission', price: 0 });
   });
 });
+
+describe('buildEventJsonLd typicalAgeRange', () => {
+  const base = { slug: 'test-show', title: 'Test Show', start_date: '2026-10-01' };
+
+  it('emits typicalAgeRange when the event has age restrictions', () => {
+    const ld = buildEventJsonLd({ ...base, age_restrictions: '18+' });
+    expect(ld.typicalAgeRange).toBe('18+');
+  });
+
+  it('omits typicalAgeRange when age restrictions are not set', () => {
+    const ld = buildEventJsonLd(base);
+    expect(ld).not.toHaveProperty('typicalAgeRange');
+  });
+});

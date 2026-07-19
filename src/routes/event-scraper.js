@@ -172,7 +172,8 @@ function parseAndValidateEventJson(jsonString) {
   return eventData;
 }
 
-function validateAndNormalizeEventData(eventData) {
+// Exported for unit testing (same pattern as ssrfSafeLookup above).
+export function validateAndNormalizeEventData(eventData) {
   if (!eventData.title || typeof eventData.title !== 'string' || !eventData.title.trim()) {
     throw new Error('Event title is required');
   }
@@ -245,6 +246,8 @@ function validateAndNormalizeEventData(eventData) {
     is_free: typeof eventData.is_free === 'boolean' ? eventData.is_free : (entryFee === 0 || entryFee === null),
     capacity,
     registration_required: typeof eventData.registration_required === 'boolean' ? eventData.registration_required : false,
+    accessibility_info: typeof eventData.accessibility_info === 'string' && eventData.accessibility_info.trim() ? eventData.accessibility_info.trim() : null,
+    age_restrictions: typeof eventData.age_restrictions === 'string' && eventData.age_restrictions.trim() ? eventData.age_restrictions.trim() : null,
     image_url: imageUrl,
     seo_title: eventData.seo_title || null,
     seo_description: eventData.seo_description || null,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe } from 'lucide-react';
+import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Accessibility, ShieldAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatEntryFee, eventTypeStyle, youTubeEmbedUrl } from '@/lib/eventSeo.js';
@@ -94,6 +94,28 @@ const EventDetailCard = ({ event }) => {
             <p className="text-muted-foreground leading-relaxed text-lg whitespace-pre-wrap">
               {event.description}
             </p>
+
+            {event.accessibility_info && (
+              <div className="mt-10">
+                <h2 className="font-serif text-2xl font-bold mb-4 flex items-center gap-3">
+                  <Accessibility className="w-6 h-6 text-primary shrink-0" aria-hidden="true" /> Accessibility
+                </h2>
+                <p className="text-muted-foreground leading-relaxed text-lg whitespace-pre-wrap">
+                  {event.accessibility_info}
+                </p>
+              </div>
+            )}
+
+            {event.age_restrictions && (
+              <div className="mt-10">
+                <h2 className="font-serif text-2xl font-bold mb-4 flex items-center gap-3">
+                  <ShieldAlert className="w-6 h-6 text-primary shrink-0" aria-hidden="true" /> Age Restrictions
+                </h2>
+                <p className="text-muted-foreground leading-relaxed text-lg whitespace-pre-wrap">
+                  {event.age_restrictions}
+                </p>
+              </div>
+            )}
 
             {videoEmbedUrl && (
               <div className="mt-10">
