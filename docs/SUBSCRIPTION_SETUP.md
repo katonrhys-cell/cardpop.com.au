@@ -16,8 +16,8 @@ CardPop has two account plans, defined in `config/plans.js`:
 > **Important model note:** the subscription no longer gates *selling*. Selling
 > is gated on **identity verification** (`profiles.is_verified`) **and a card on
 > file** (`profiles.has_saved_card`) via the DB `can_sell()` function — see
-> `supabase/migrations/20260719120000_can_sell_requires_identity_and_reset_plans.sql`
-> and `20260719130000_require_card_on_file_to_sell.sql`. The card flag is
+> `supabase/migrations/20260719150000_can_sell_requires_identity_and_reset_plans.sql`
+> and `20260719160000_require_card_on_file_to_sell.sql`. The card flag is
 > mirrored from Stripe by the save-card webhook and the `/wallet/payment-methods`
 > read.
 > The Stripe/PayPal subscription described below drives the **Pro** tier only,
@@ -46,7 +46,7 @@ feature/limit matrix and the plan-key helpers (`planFromTier`, `isProAccount`).
 `supabase/migrations/20260701000001_add_subscription_trial.sql` adds the
 subscription columns to `profiles`, a `can_sell()` function, and a **restrictive
 RLS policy** on `listings`. The later
-`20260719120000_can_sell_requires_identity_and_reset_plans.sql` migration
+`20260719150000_can_sell_requires_identity_and_reset_plans.sql` migration
 switches `can_sell()` to the **identity** gate and resets legacy grandfathered
 accounts to free Hobby (everyone starts on Hobby; Pro is opt-in).
 
