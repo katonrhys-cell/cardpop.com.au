@@ -225,6 +225,22 @@ The trade-off is deliberate: a working image (served from Supabase, metered
 egress) beats a broken one. Fix the CDN (or clear `VITE_IMAGE_CDN_HOST`) to
 return traffic to the edge.
 
+## Pre-generated grid thumbnails
+
+Card grids render at ~300 px but historically served the full 1600 px upload.
+Since `THUMBNAILS_SINCE` (`utils/imageUrl.js`), every card image upload also
+stores a small companion thumbnail (480 px longest edge, WebP q70) next to the
+full image under a deterministic name: `<path minus ext>.thumb.webp`
+(`thumbStoragePath`). No DB column is needed — upload filenames embed their
+`Date.now()` timestamp, so `getCardImage` knows whether a thumb exists without
+probing and only emits `thumbSrc` for uploads after the cutoff (legacy images
+cost zero extra requests). `CardImage` tries `thumbSrc` first and falls back to
+the full image; a dead thumb URL is remembered per session. Thumbs are
+generated client-side (`createThumbnail` in `utils/compressImage.js`) and
+server-side for the slab-template route (`createThumbnailBuffer` in
+`src/utils/imageProcessor.js`), and are best-effort — a thumb failure never
+fails the upload.
+
 ## Related pieces in this repo
 
 - `cloudflare/image-proxy-worker.js` — the Worker source (Option A).

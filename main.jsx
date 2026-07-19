@@ -98,7 +98,12 @@ Promise.race([
 const registerServiceWorker = () => {
   if ('serviceWorker' in navigator && import.meta.env.PROD) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js').then((reg) => {
+      // The SW file is static, so the image CDN host (a build-time env var)
+      // is handed over via the registration URL — sw.js reads ?cdn=<host> and
+      // routes canonical Supabase storage image fetches through the CDN.
+      const cdnHost = import.meta.env.VITE_IMAGE_CDN_HOST;
+      const swUrl = cdnHost ? `/sw.js?cdn=${encodeURIComponent(cdnHost)}` : '/sw.js';
+      navigator.serviceWorker.register(swUrl).then((reg) => {
         console.log('[SW] Service Worker registered');
         // Check for updates every hour
         setInterval(() => reg.update(), 60 * 60 * 1000);

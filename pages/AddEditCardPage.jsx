@@ -31,7 +31,7 @@ import { useCardsightPricing } from '@/hooks/useCardsightPricing.js';
 import PhotoQualityScore from '@/components/PhotoQualityScore.jsx';
 import PhotoTemplateModal from '@/components/PhotoTemplateModal.jsx';
 import { analyzePhotoQuality } from '@/utils/photoQuality.js';
-import { compressImage } from '@/utils/compressImage.js';
+import { compressImage, createThumbnail } from '@/utils/compressImage.js';
 import { useCardCrop } from '@/hooks/useCardCrop.js';
 import { useCardDescription } from '@/hooks/useCardDescription.js';
 import CardCropPreview from '@/components/CardCropPreview.jsx';
@@ -39,7 +39,7 @@ import CardCornerAdjuster from '@/components/CardCornerAdjuster.jsx';
 import { warpCardWithCorners } from '@/utils/detectCard.js';
 import DisplayStylePicker from '@/components/vault/DisplayStylePicker.jsx';
 import { canUseStyle, normalizeStyle, normalizeTier } from '@/lib/displayStyles.js';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { publicImageUrl, thumbStoragePath } from '@/utils/imageUrl.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -662,6 +662,7 @@ const AddEditCardPage = () => {
           cacheControl: '31536000',
         });
       if (uploadError) throw uploadError;
+      await uploadThumbnail(filePath, compressed);
 
       const { error: updateError } = await supabase
         .from('vault_items')
@@ -679,6 +680,26 @@ const AddEditCardPage = () => {
       toast.error('Failed to upload processed image');
     } finally {
       setIsUploadingTemplate(false);
+    }
+  };
+
+  // Upload the small companion grid thumbnail next to a just-uploaded full
+  // image (same path + `.thumb.webp` — see thumbStoragePath). Best-effort:
+  // grids fall back to the full image if the thumb is missing, so a thumb
+  // failure must never fail the card save.
+  const uploadThumbnail = async (fullPath, sourceFile) => {
+    try {
+      const thumb = await createThumbnail(sourceFile);
+      const { error } = await supabase.storage
+        .from('vault-images')
+        .upload(thumbStoragePath(fullPath), thumb, {
+          upsert: true,
+          contentType: thumb.type || 'image/webp',
+          cacheControl: '31536000',
+        });
+      if (error) console.warn('Thumbnail upload failed (grid will use full image):', error);
+    } catch (err) {
+      console.warn('Thumbnail generation failed (grid will use full image):', err);
     }
   };
 
@@ -828,6 +849,7 @@ const AddEditCardPage = () => {
           .from('vault-images')
           .upload(filePath, compressed, { upsert: true, cacheControl: '31536000' });
         if (uploadError) throw uploadError;
+        await uploadThumbnail(filePath, compressed);
         cardImagePath = filePath;
       }
 
@@ -841,6 +863,7 @@ const AddEditCardPage = () => {
           .from('vault-images')
           .upload(filePath, compressed, { upsert: true, cacheControl: '31536000' });
         if (uploadError) throw uploadError;
+        await uploadThumbnail(filePath, compressed);
         extraImagePaths.push(filePath);
       }
 

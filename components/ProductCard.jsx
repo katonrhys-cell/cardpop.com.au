@@ -21,7 +21,7 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
   const variants = (product.variant || product.cardVariant || '').split(',').map(v => v.trim()).filter(Boolean);
   const isRookie = variants.includes(ROOKIE_VARIANT) || !!(product.is_rookie || product.isRookie);
   const rawImg = product.images?.[0] || product.cardImage?.[0] || product.card_image || product.image_url || null;
-  const { src: imgSrc, srcSet: imgSrcSet, fallbackSrc: imgFallback } = getCardImage(rawImg);
+  const { src: imgSrc, srcSet: imgSrcSet, fallbackSrc: imgFallback, thumbSrc: imgThumb } = getCardImage(rawImg);
   const sellerId = product.seller_id || product.seller || product.owner_id || product.owner || product.user_id;
   const sellerObj = product.expand?.seller_id || product.expand?.seller || product.expand?.owner || product.expand?.user_id;
   const titleSlug = slugify(product.name || product.cardName || product.title || 'card');
@@ -45,6 +45,7 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
             srcSet={imgSrcSet}
             sizes={CARD_GRID_SIZES}
             fallbackSrc={imgFallback}
+            thumbSrc={imgThumb}
             alt={product.name || product.cardName || 'Product Image'}
             displayStyle={product.display_style}
             width="400"

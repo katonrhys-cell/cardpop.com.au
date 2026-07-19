@@ -18,6 +18,7 @@ import { isVerified } from '@/utils/verification.js';
 import { toast } from 'sonner';
 import { useAdmin } from '@/contexts/AdminContext.jsx';
 import { useDebounce } from '@/hooks/useDebounce.js';
+import { toCdnUrl } from '@/utils/imageUrl.js';
 
 const SellersManagementPage = () => {
   const navigate = useNavigate();
@@ -221,7 +222,7 @@ const SellersManagementPage = () => {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
-                          <AvatarImage src={seller.avatar_url || seller.business_logo_url} alt={seller.display_name} />
+                          <AvatarImage src={toCdnUrl(seller.avatar_url || seller.business_logo_url)} alt={seller.display_name} />
                           <AvatarFallback className="text-xs bg-primary/10 text-primary">
                             {getInitials(seller)}
                           </AvatarFallback>
@@ -345,7 +346,7 @@ const SellersManagementPage = () => {
             {sellers.filter(s => s.is_featured_seller).map(seller => (
               <div key={seller.id} className="p-4 rounded-xl bg-muted/30 border border-border hover:border-primary/50 transition-colors">
                 <Avatar className="h-16 w-16 mb-3 mx-auto">
-                  <AvatarImage src={seller.business_logo_url || seller.avatar_url} alt={seller.business_name} />
+                  <AvatarImage src={toCdnUrl(seller.business_logo_url || seller.avatar_url)} alt={seller.business_name} />
                   <AvatarFallback className="text-lg bg-primary/10 text-primary">
                     {getInitials(seller)}
                   </AvatarFallback>

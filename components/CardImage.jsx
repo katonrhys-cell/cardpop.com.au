@@ -12,6 +12,9 @@ import { markTransformsUnavailable } from '@/utils/imageUrl.js';
  * Responsive: pass `srcSet` + `sizes` (built via `getCardImage`) to let the
  * browser fetch a right-sized, auto-WebP image from Supabase. Sources are tried
  * in order and it steps to the next one on load failure:
+ *   0. `thumbSrc` — the pre-generated grid thumbnail (uploads since
+ *      THUMBNAILS_SINCE store one). A failed thumb is remembered for the
+ *      session so it's never probed twice.
  *   1. `src` (+ `srcSet`) — the transformed, CDN-routed image.
  *   2. `fallbackSrc` — the untransformed original (still CDN-routed). Reaching
  *      it flags transforms as unavailable for the session, so we stop retrying
@@ -20,12 +23,17 @@ import { markTransformsUnavailable } from '@/utils/imageUrl.js';
  *      image-CDN outage self-heals instead of showing a broken thumbnail.
  * Only then does it show "No Image".
  */
+
+// Thumbnail URLs that 404'd/errored this session — skipped on later renders so
+// a missing companion thumb costs at most one request per session.
+const failedThumbs = new Set();
 const CardImage = ({
   src,
   srcSet,
   sizes,
   fallbackSrc,
   canonicalSrc,
+  thumbSrc,
   alt = '',
   imgClassName = 'w-full h-full object-cover',
   width,
@@ -48,7 +56,10 @@ const CardImage = ({
   // duplicates keeps the error handler from "advancing" to the same URL (which
   // would loop) when, say, fallbackSrc === src (no CDN configured).
   const candidates = [];
-  if (src) candidates.push({ url: src, srcSet: srcSet || undefined });
+  if (thumbSrc && !failedThumbs.has(thumbSrc)) {
+    candidates.push({ url: thumbSrc, kind: 'thumb' });
+  }
+  if (src) candidates.push({ url: src, srcSet: srcSet || undefined, kind: 'primary' });
   if (fallbackSrc && fallbackSrc !== src) candidates.push({ url: fallbackSrc });
   if (canonicalSrc && canonicalSrc !== src && canonicalSrc !== fallbackSrc) {
     candidates.push({ url: canonicalSrc });
@@ -64,7 +75,7 @@ const CardImage = ({
   useEffect(() => {
     setTier(0);
     setStatus((prev) => (prev === 'loaded' ? 'loaded' : 'loading'));
-  }, [src]);
+  }, [src, thumbSrc]);
 
   const active = candidates[tier];
   const effectiveSrc = active?.url ?? null;
@@ -92,9 +103,12 @@ const CardImage = ({
   }
 
   const handleError = () => {
+    // A dead thumbnail (e.g. a timestamp past the cutoff whose thumb upload
+    // failed) is remembered so later renders skip straight to the full image.
+    if (active?.kind === 'thumb') failedThumbs.add(active.url);
     // Leaving the transformed primary means transforms may be unavailable —
     // flag it so getCardImage stops emitting transform URLs this session.
-    if (tier === 0) markTransformsUnavailable();
+    if (active?.kind === 'primary') markTransformsUnavailable();
     if (tier < candidates.length - 1) {
       setTier(tier + 1);
       setStatus('loading');

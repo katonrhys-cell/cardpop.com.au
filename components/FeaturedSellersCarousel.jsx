@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Star, ShieldCheck, UserCircle2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient.js';
+import { toCdnUrl } from '@/utils/imageUrl.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 
 const FeaturedSellersCarousel = () => {
@@ -86,7 +87,7 @@ const FeaturedSellersCarousel = () => {
             <div className="w-24 h-24 rounded-2xl bg-muted overflow-hidden flex items-center justify-center border-2 border-background shadow-sm group-hover:border-primary/20 transition-colors">
               {seller.avatar_url ? (
                 <img
-                  src={seller.avatar_url}
+                  src={toCdnUrl(seller.avatar_url)}
                   alt={seller.name}
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                   width="96"

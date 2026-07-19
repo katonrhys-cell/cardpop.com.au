@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { toCdnUrl } from '@/utils/imageUrl.js';
 
 // Admin chat moderation / search.
 //
@@ -33,7 +34,7 @@ const initial = (p) => (nameOf(p)[0] || '?').toUpperCase();
 const Avatar = ({ profile }) => (
   <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center overflow-hidden shrink-0 text-[10px] font-bold text-muted-foreground">
     {profile?.avatar_url
-      ? <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+      ? <img src={toCdnUrl(profile.avatar_url)} alt="" className="w-full h-full object-cover" />
       : initial(profile)}
   </div>
 );

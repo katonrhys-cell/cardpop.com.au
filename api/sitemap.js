@@ -79,6 +79,7 @@ const STATIC_PAGES = [
   { loc: '/events/store-events',   lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
   { loc: '/community/local-traders', lastmod: SITE_UPDATED,     freq: 'daily',   pri: '0.7' },
   { loc: '/community/whatnot',     lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.5' },
+  { loc: '/community/building-your-business', lastmod: SITE_UPDATED, freq: 'monthly', pri: '0.6' },
   { loc: '/blog',                  lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' },
   // Blog category hubs — prerendered for bots and linked from the site header.
   ...BLOG_CATEGORIES.map((c) => (

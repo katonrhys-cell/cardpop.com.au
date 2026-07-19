@@ -44,7 +44,7 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
   const vaultItem = listing.vault_item;
   // vault_images stores storage_path; card_image may be a full URL or storage path
   const imgPath = vaultItem?.card_image || vaultItem?.vault_images?.[0]?.storage_path || null;
-  const { src: imgSrc, srcSet: imgSrcSet, fallbackSrc: imgFallback } = getCardImage(imgPath);
+  const { src: imgSrc, srcSet: imgSrcSet, fallbackSrc: imgFallback, thumbSrc: imgThumb } = getCardImage(imgPath);
 
   const rawVariants = vaultItem?.variant
     ? vaultItem.variant.split(',').map(s => s.trim()).filter(Boolean)
@@ -73,6 +73,7 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
           srcSet={imgSrcSet}
           sizes={CARD_GRID_SIZES}
           fallbackSrc={imgFallback}
+          thumbSrc={imgThumb}
           alt={listing.title || 'Listing Image'}
           imgClassName={`w-full h-full object-cover transition-transform duration-500 ${isSold ? 'grayscale-[35%] group-hover:scale-100' : 'group-hover:scale-105'}`}
           width="400"
