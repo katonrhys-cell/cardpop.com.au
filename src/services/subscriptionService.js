@@ -35,7 +35,7 @@ export function mapStripeStatus(stripeStatus) {
 export async function getOrCreateStripeCustomer(userId, email) {
   const { data: profile } = await supabase
     .from('profiles')
-    .select('stripe_customer_id, full_name, display_name')
+    .select('stripe_customer_id, display_name')
     .eq('id', userId)
     .maybeSingle();
 
@@ -43,7 +43,7 @@ export async function getOrCreateStripeCustomer(userId, email) {
 
   const customer = await stripe.customers.create({
     email,
-    name: profile?.display_name || profile?.full_name || undefined,
+    name: profile?.display_name || undefined,
     metadata: { userId },
   });
 
