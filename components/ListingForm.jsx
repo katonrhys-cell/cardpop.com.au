@@ -39,11 +39,11 @@ const ListingForm = ({ product, onSuccess, onCancel }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Selling a NEW listing requires an active trial/subscription. Editing an
-    // existing listing is always allowed. The database RLS policy enforces this
-    // too; this is the friendly client-side guard.
+    // Listing a NEW card requires identity verification (free on every plan).
+    // Editing an existing listing is always allowed. The database RLS policy
+    // enforces this too; this is the friendly client-side guard.
     if (!product && !canSell) {
-      toast('Start your free trial to list cards for sale.');
+      toast('Verify your identity to list cards for sale.');
       return;
     }
 

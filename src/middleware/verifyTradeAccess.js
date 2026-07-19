@@ -38,6 +38,34 @@ async function verifyTradeAccess(req, res, next) {
       });
     }
 
+    // Identity gate: trading (like selling) requires Stripe Identity
+    // verification for Hobby and Pro accounts alike — matching the DB
+    // can_sell() rule. Buying is unaffected (it never hits a /trade route).
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_verified')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (profile?.is_verified !== true) {
+      logger.warn(`[TRADE_ACCESS] ID-unverified user ${userId} attempted trade: ${req.method} ${req.path}`);
+
+      await supabase.from('audit_logs').insert({
+        user_id: userId,
+        event_type: 'trade_attempt_id_unverified',
+        description: `ID-unverified user attempted: ${req.method} ${req.path}`,
+        ip_address: req.ip || 'unknown',
+        user_agent: req.headers['user-agent'] || 'unknown',
+        status: 'blocked',
+      }).catch(() => {});
+
+      return res.status(403).json({
+        error: 'Identity verification is required to trade',
+        code: 'IDENTITY_NOT_VERIFIED',
+        message: 'Verify your identity (a quick ID + selfie check via Stripe) before trading.',
+      });
+    }
+
     logger.info(`[TRADE_ACCESS] Verified user ${userId} allowed`);
     next();
   } catch (error) {

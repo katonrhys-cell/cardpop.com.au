@@ -4,6 +4,9 @@ import logger from '../utils/logger.js';
 import { markTrialRedeemed } from './welcomeOfferService.js';
 import { recordSubscriptionReferral } from './partnerService.js';
 
+/** A subscription status that maps to the paid Pro tier. */
+const isEntitledStatus = (status) => ['trialing', 'active'].includes(status);
+
 /**
  * Subscription / free-trial state management.
  *
@@ -82,11 +85,18 @@ export async function applyStripeSubscription(subscription) {
     ? new Date(subscription.trial_end * 1000).toISOString()
     : null;
 
+  // Drive the account-plan column from the subscription lifecycle: an entitled
+  // membership (trialing/active) IS the Pro tier; anything else drops to Hobby
+  // ('free'). This keeps profiles.subscription_tier — the value the UI and any
+  // quota check read — in lockstep with what the member actually pays for.
+  const tier = isEntitledStatus(status) ? 'pro' : 'free';
+
   const { error } = await supabase
     .from('profiles')
     .update({
       subscription_status:    status,
       subscription_provider:  'stripe',
+      subscription_tier:      tier,
       stripe_customer_id:     customerId,
       stripe_subscription_id: subscription.id,
       trial_ends_at:          trialEndsAt,
@@ -141,6 +151,7 @@ export async function applyPaypalSubscription({ userId, paypalSubscriptionId, st
     .update({
       subscription_status:    status,
       subscription_provider:  'paypal',
+      subscription_tier:      isEntitledStatus(status) ? 'pro' : 'free',
       paypal_subscription_id: paypalSubscriptionId,
       trial_ends_at:          trialEndsAt,
     })

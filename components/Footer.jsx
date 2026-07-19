@@ -91,6 +91,7 @@ const Footer = () => {
                 </>
               )}
               <li><Link to="/community" className="hover:text-primary transition-colors">Community</Link></li>
+              <li><Link to="/pricing" className="hover:text-primary transition-colors">Pricing &amp; Plans</Link></li>
               <li><Link to="/about" className="hover:text-primary transition-colors">About Us</Link></li>
               <li><Link to="/contact" className="hover:text-primary transition-colors">Contact</Link></li>
             </ul>

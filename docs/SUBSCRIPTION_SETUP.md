@@ -1,31 +1,50 @@
-# Free trial & seller membership — setup guide
+# CardPop Pro (Hobby vs Pro) — setup guide
 
-New users get a **30-day free trial** (card or PayPal on file) to list and sell
-cards. Browsing, buying and community features stay free. After the trial the
-membership auto-bills unless cancelled. Everything is config-driven.
+CardPop has two account plans, defined in `config/plans.js`:
+
+- **Hobby** — free, forever. Anyone can browse and buy immediately. To list,
+  sell or trade, a Hobby user completes **Stripe Identity verification**; after
+  that they sell for free and pay only the per-transaction fee. Hobby users are
+  encouraged (never forced) to **save a card on file** for one-tap buying — it's
+  never charged until they actually buy.
+- **Pro** — a paid subscription (**$20 AUD/month**, with a 30-day free trial and
+  a card/PayPal on file). Requires ID verification and a Stripe customer, and
+  unlocks premium features, higher limits, and the Pro badge/storefront. Pro
+  pays the **same** per-transaction fees as Hobby — it's for access, not fees.
+
+> **Important model note:** the subscription no longer gates *selling*. Selling
+> is gated on **identity verification** (`profiles.is_verified`) via the DB
+> `can_sell()` function — see
+> `supabase/migrations/20260719120000_can_sell_requires_identity_and_reset_plans.sql`.
+> The Stripe/PayPal subscription described below drives the **Pro** tier only,
+> mirrored onto `profiles.subscription_status` **and** `profiles.subscription_tier`
+> (`'pro'` when trialing/active, `'free'` otherwise) by the webhook handlers.
 
 ## Where to change the offer
 
-`config/subscription.js` is the single source of truth used by both the frontend
-and backend:
+`config/subscription.js` is the single source of truth for the Pro price/trial,
+used by both the frontend and backend; `config/plans.js` holds the Hobby-vs-Pro
+feature/limit matrix and the plan-key helpers (`planFromTier`, `isProAccount`).
 
 | Setting | Meaning |
 |---|---|
-| `TRIAL_DAYS` | Length of the free trial (default `30`). |
-| `REQUIRE_CARD_AT_SIGNUP` | Require a payment method at registration. |
-| `SUBSCRIPTION_PRICE_AUD` | Price billed after the trial (display + must match Stripe/PayPal). |
+| `TRIAL_DAYS` | Length of the Pro free trial (default `30`). |
+| `REQUIRE_CARD_AT_SIGNUP` | Require a payment method to start the Pro trial. |
+| `SUBSCRIPTION_PRICE_AUD` | Pro price billed after the trial (`20`; must match Stripe/PayPal). |
 | `PAYMENT_PROVIDERS` | Providers offered, e.g. `['stripe', 'paypal']`. |
-| `ENTITLED_STATUSES` | Statuses that grant selling (`trialing`, `active`, `grandfathered`). |
+| `ENTITLED_STATUSES` | Statuses that grant Pro (`trialing`, `active`, `grandfathered`). |
 
 > Changing `TRIAL_DAYS` also requires updating the trial length on the Stripe
 > price / PayPal plan (below), since the provider enforces the actual trial.
 
-## 1. Apply the database migration
+## 1. Apply the database migrations
 
 `supabase/migrations/20260701000001_add_subscription_trial.sql` adds the
 subscription columns to `profiles`, a `can_sell()` function, and a **restrictive
-RLS policy** on `listings` that blocks non-entitled users from inserting
-listings. Existing accounts are grandfathered so they are never interrupted.
+RLS policy** on `listings`. The later
+`20260719120000_can_sell_requires_identity_and_reset_plans.sql` migration
+switches `can_sell()` to the **identity** gate and resets legacy grandfathered
+accounts to free Hobby (everyone starts on Hobby; Pro is opt-in).
 
 ```bash
 supabase db push        # or run the SQL via the Supabase dashboard
@@ -33,8 +52,8 @@ supabase db push        # or run the SQL via the Supabase dashboard
 
 ## 2. Stripe — recurring price with a trial
 
-1. Create a **Product** (e.g. "CardPop Seller Membership") and a **recurring
-   Price** (`$9.99 AUD / month`) in the Stripe dashboard.
+1. Create a **Product** (e.g. "CardPop Pro") and a **recurring Price**
+   (`$20 AUD / month`) in the Stripe dashboard.
 2. Copy the price id (`price_...`) into the env var `STRIPE_SUBSCRIPTION_PRICE_ID`.
    The trial length is applied per-checkout from `TRIAL_DAYS`, so you do **not**
    need to set a trial on the price itself.
@@ -46,7 +65,7 @@ supabase db push        # or run the SQL via the Supabase dashboard
 ## 3. PayPal — subscription plan with a trial
 
 1. Create a **Product** and a **Billing Plan** in PayPal with a 30-day free
-   trial cycle followed by the `$9.99 AUD / month` regular cycle.
+   trial cycle followed by the `$20 AUD / month` regular cycle.
 2. Copy the plan id (`P-...`) into `PAYPAL_SUBSCRIPTION_PLAN_ID`.
 3. Create a **Webhook** pointing at `/api/subscription/paypal/webhook` subscribed
    to `BILLING.SUBSCRIPTION.*` events, and copy its id into `PAYPAL_WEBHOOK_ID`.

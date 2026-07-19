@@ -235,6 +235,7 @@ const SitemapPage = lazy(() => import('@/pages/SitemapPage.jsx'));
 const AboutPage = lazy(() => import('@/pages/info/AboutPage.jsx'));
 const ContactPage = lazy(() => import('@/pages/info/ContactPage.jsx'));
 const FAQPage = lazy(() => import('@/pages/info/FAQPage.jsx'));
+const PricingPage = lazy(() => import('@/pages/PricingPage.jsx'));
 const PrivacyPolicyPage = lazy(() => import('@/pages/PrivacyPolicyPage.jsx'));
 const ReturnsPage = lazy(() => import('@/pages/info/ReturnsPage.jsx'));
 const ShippingPage = lazy(() => import('@/pages/info/ShippingPage.jsx'));
@@ -445,6 +446,7 @@ const App = () => {
                         
                         {/* Info Pages */}
                         <Route path="/about" element={<AboutPage />} />
+                        <Route path="/pricing" element={<PricingPage />} />
                         <Route path="/contact" element={<ContactPage />} />
                         <Route path="/faq" element={<FAQPage />} />
                         <Route path="/privacy" element={<PrivacyPolicyPage />} />

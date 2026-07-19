@@ -7,7 +7,8 @@ import { TRIAL_DAYS, SUBSCRIPTION_PRICE_AUD, PAYMENT_PROVIDERS } from '@/config/
 import { getReferralCode } from '@/lib/referral.js';
 
 /**
- * Payment-method capture that starts the free trial via Stripe or PayPal.
+ * Payment-method capture that starts the CardPop Pro free trial via Stripe or
+ * PayPal.
  *
  * Both providers redirect off-site (Stripe Checkout / PayPal approval) so no
  * card data ever touches CardPop. The card is stored but not charged until the
@@ -64,7 +65,7 @@ const StartTrialOptions = ({ returnPath = '/account/membership' }) => {
           {TRIAL_DAYS} days free, then ${SUBSCRIPTION_PRICE_AUD}/month
         </div>
         <p className="mt-1 text-muted-foreground">
-          Add a payment method to start selling today. You won't be charged until your trial ends,
+          Add a payment method to unlock CardPop Pro. You won't be charged until your trial ends,
           and you can cancel anytime before then.
         </p>
       </div>
@@ -76,7 +77,7 @@ const StartTrialOptions = ({ returnPath = '/account/membership' }) => {
           className="h-12 w-full bg-brand-red font-bold hover:bg-brand-red/90"
         >
           {busy === 'stripe' ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
-          Start trial with card
+          Start Pro trial with card
         </Button>
       )}
 

@@ -1,6 +1,7 @@
 import express from 'express';
 import stripe from '../utils/stripeClient.js';
 import logger from '../utils/logger.js';
+import { supabase } from '../utils/supabaseClient.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { ensureWalletCustomer, getWalletBalanceCents } from '../services/walletService.js';
 
@@ -65,6 +66,77 @@ router.post('/topup', authMiddleware, async (req, res) => {
   } catch (err) {
     logger.error(`[WALLET] /topup error: ${err.message}`);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /save-card ──────────────────────────────────────────────────────────
+// Save a payment method on file WITHOUT charging it. Hobby users are encouraged
+// to do this so checkout is one tap; the card is only ever charged when they
+// actually buy. Uses a Stripe Checkout Session in `setup` mode, so no card data
+// touches CardPop and the flow reuses the same hosted-redirect pattern as
+// top-up / subscription checkout. The saved method is attached to the user's
+// Stripe Customer and used for future purchases.
+
+router.post('/save-card', authMiddleware, async (req, res) => {
+  try {
+    const { successUrl, cancelUrl } = req.body;
+    if (!successUrl || !cancelUrl) {
+      return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
+    }
+
+    const customerId = await ensureWalletCustomer(stripe, req.user.id, { email: req.user.email });
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'setup',
+      payment_method_types: ['card'],
+      customer: customerId,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      metadata: { userId: req.user.id, saveCard: 'true' },
+    });
+
+    if (!session?.url) throw new Error('Stripe returned a session without a URL');
+
+    logger.info(`[WALLET] Save-card session created: ${session.id} (user ${req.user.id})`);
+    res.json({ url: session.url, sessionId: session.id });
+  } catch (err) {
+    logger.error(`[WALLET] /save-card error: ${err.message}`);
+    res.status(500).json({ error: 'Could not start card setup' });
+  }
+});
+
+// ─── GET /payment-methods ─────────────────────────────────────────────────────
+// The saved cards on the user's Stripe Customer (brand / last4 / expiry only —
+// never full numbers). Returns an empty list if they have no customer yet.
+
+router.get('/payment-methods', authMiddleware, async (req, res) => {
+  try {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('stripe_customer_id')
+      .eq('id', req.user.id)
+      .maybeSingle();
+
+    if (!profile?.stripe_customer_id) return res.json({ paymentMethods: [] });
+
+    const methods = await stripe.paymentMethods.list({
+      customer: profile.stripe_customer_id,
+      type: 'card',
+      limit: 10,
+    });
+
+    const paymentMethods = (methods?.data ?? []).map((pm) => ({
+      id:       pm.id,
+      brand:    pm.card?.brand || 'card',
+      last4:    pm.card?.last4 || '••••',
+      expMonth: pm.card?.exp_month || null,
+      expYear:  pm.card?.exp_year || null,
+    }));
+
+    res.json({ paymentMethods });
+  } catch (err) {
+    logger.error(`[WALLET] /payment-methods error: ${err.message}`);
+    res.status(500).json({ error: 'Could not load saved cards' });
   }
 });
 
