@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { buildCardAnalyticsUrl } from '@/utils/cardSlug.js';
@@ -17,7 +17,7 @@ import {
   ResponsiveContainer, ReferenceLine,
 } from 'recharts';
 import { useAuth } from '@/contexts/AuthContext';
-import { fetchPokemonCardImage } from '@/utils/pokemonCardImage.js';
+import { useCardImages } from '@/hooks/useCardImages.js';
 
 // ─── Demo data (replaced by eBay API once integrated) ───────────────────────
 
@@ -135,36 +135,21 @@ const InvestmentSignal = ({ change7d, change30d }) => {
 const slugify = (str) =>
   str?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') ?? '';
 
-// Thumbnail for a movers/watchlist row. Prefers a thumbnail already carried on
-// the card (e.g. from live eBay data); otherwise looks up official Pokémon card
-// art from the Pokémon TCG API — the same source the analytics card page uses.
-// Those images come from the API's own CDN, so they cost nothing against our
-// Supabase egress quota. Non-Pokémon cards (and any lookup miss) keep the plain
-// placeholder box.
-const CardThumb = ({ card, className = 'w-10 h-12' }) => {
-  const [src, setSrc] = useState(card.thumbnailUrl || null);
-
-  const isPokemon = !card.collection || /pok[eé]mon/i.test(card.collection);
-
-  useEffect(() => {
-    let cancelled = false;
-    // A thumbnail supplied on the card wins — no need to hit the API.
-    if (card.thumbnailUrl) { setSrc(card.thumbnailUrl); return; }
-    setSrc(null);
-    if (!isPokemon || !card.name) return;
-    fetchPokemonCardImage(card.name, card.set).then(img => {
-      if (!cancelled && img) setSrc(img.small || img.large);
-    });
-    return () => { cancelled = true; };
-  }, [card.thumbnailUrl, card.name, card.set, isPokemon]);
-
-  return src ? (
+// Thumbnail for a movers/watchlist row. `src` is resolved once, server-side, by
+// the useCardImages hook (which batches the lookup through /catalog/images and
+// caches it across all visitors). Official card art comes from the upstream
+// APIs' own CDNs, so it costs nothing against our Supabase egress quota. A miss
+// (or a non-Pokémon/Magic/Yu-Gi-Oh card the free APIs don't cover) keeps the
+// plain placeholder box.
+const CardThumb = ({ src, alt, className = 'w-10 h-12' }) => {
+  const [failed, setFailed] = useState(false);
+  return src && !failed ? (
     <img
       src={src}
-      alt={card.name}
+      alt={alt}
       loading="lazy"
       className={`${className} object-contain rounded shrink-0 bg-muted/30`}
-      onError={() => setSrc(null)}
+      onError={() => setFailed(true)}
     />
   ) : (
     <div className={`${className} rounded bg-muted/30 shrink-0`} />
@@ -206,7 +191,7 @@ const MarketsPage = () => {
   }, []);
 
   // ── Transform live cards for the movers table ──────────────────────────
-  const liveMoverRows = liveCards
+  const liveMoverRows = useMemo(() => liveCards
     .filter(c => c.avgPrice && c.volume > 0)
     .sort((a, b) => b.volume - a.volume)
     .map(c => ({
@@ -221,7 +206,16 @@ const MarketsPage = () => {
       change: null, // historical data needed for real % — shown as "Live" badge
       isLive: true,
       thumbnailUrl: c.thumbnailUrl || '',
-    }));
+    })), [liveCards]);
+
+  // Resolve official card art for every movers row once, server-side (batched
+  // and cached across visitors via /catalog/images). Rows only ever receive a
+  // ready image URL — no per-visitor upstream lookups. Deduped inside the hook.
+  const moverCards = useMemo(
+    () => [...DEMO_MOVERS.advancers, ...DEMO_MOVERS.decliners, ...DEMO_MOVERS.active, ...liveMoverRows],
+    [liveMoverRows]
+  );
+  const imageFor = useCardImages(moverCards);
 
   // ── Real eBay search ───────────────────────────────────────────────────
   const handleSearch = async (e) => {
@@ -316,7 +310,7 @@ const MarketsPage = () => {
       to={cardUrl(card)}
       className="flex items-center gap-3 py-3 px-4 hover:bg-muted/30 rounded-xl transition-colors group"
     >
-      <CardThumb card={card} />
+      <CardThumb src={imageFor(card)} alt={card.name} />
       <div className="flex-1 min-w-0">
         <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">{card.name}</p>
         <p className="text-xs text-muted-foreground truncate">{card.set} · {card.collection}</p>
