@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { isVerified } from '@/utils/verification.js';
-import { MessageSquare, Users, Store, ExternalLink, ShieldCheck, ChevronLeft, ChevronRight, Instagram } from 'lucide-react';
+import { MessageSquare, Users, Store, ExternalLink, ShieldCheck, ChevronLeft, ChevronRight, Instagram, Rocket, ArrowRight } from 'lucide-react';
 
 import WhatnotIcon from '@/components/WhatnotIcon.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -251,6 +251,26 @@ const CommunityPage = () => {
       />
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        {/* ── Building Your Business promo ── */}
+        <Link
+          to="/community/building-your-business"
+          className="group flex items-center gap-4 sm:gap-5 mb-10 rounded-2xl border border-border bg-gradient-to-br from-brand-red/[0.06] via-card to-brand-blue/[0.06] p-5 sm:p-6 hover:shadow-md hover:-translate-y-0.5 transition-all"
+        >
+          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-rose-500 to-orange-500 flex items-center justify-center shrink-0 shadow-sm">
+            <Rocket className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-lg sm:text-xl font-bold text-foreground">Building Your Business</h2>
+              <Badge variant="secondary" className="text-[10px] uppercase tracking-wide font-bold">Sellers</Badge>
+            </div>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              The tools we use and recommend to grow a card business — payments, live selling, email, socials and more.
+            </p>
+          </div>
+          <ArrowRight className="w-5 h-5 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
+        </Link>
+
         <Tabs defaultValue="forum">
           <TabsList className="w-full mb-8 h-12 overflow-x-auto flex-nowrap">
             <TabsTrigger value="forum" className="flex-1 gap-2">
