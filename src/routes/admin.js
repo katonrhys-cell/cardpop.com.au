@@ -5,7 +5,7 @@ import { payoutSeller } from '../services/payoutService.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import { requireAal2 } from '../middleware/requireAal2.js';
 import { validateRequestBody, validateRequestParams, validateRequestQuery } from '../middleware/validateRequest.js';
-import { setUserRoleSchema, setUserRoleBodySchema, reviewVerificationSchema, reviewVerificationBodySchema, processRefundSchema, processRefundBodySchema, getDisputesSchema, resolveDisputeSchema, resolveDisputeBodySchema, setUserStatusSchema, setUserStatusBodySchema, createBusinessProfileBodySchema, businessProfileIdSchema, updateBusinessProfileBodySchema } from '../schemas/adminSchemas.js';
+import { setUserRoleSchema, setUserRoleBodySchema, reviewVerificationSchema, reviewVerificationBodySchema, processRefundSchema, processRefundBodySchema, getDisputesSchema, resolveDisputeSchema, resolveDisputeBodySchema, setUserStatusSchema, setUserStatusBodySchema, identityReviewSchema, identityReviewBodySchema, createBusinessProfileBodySchema, businessProfileIdSchema, updateBusinessProfileBodySchema } from '../schemas/adminSchemas.js';
 import logger from '../utils/logger.js';
 
 const router = Router();
@@ -115,6 +115,83 @@ router.patch('/users/:userId/status', validateRequestParams(setUserStatusSchema)
   } catch (err) {
     logger.error(`[ADMIN] Failed to update user status: ${err.message}`);
     res.status(500).json({ error: 'Failed to update account status' });
+  }
+});
+
+// ─── Stripe Identity name-mismatch review ─────────────────────────────────────
+// applyIdentitySession routes verified sessions whose document name doesn't
+// match the profile's display name here instead of auto-approving: the profile
+// stays 'pending' with identity_name_mismatch=true. These two endpoints back
+// the admin user management UI — the flag and legal_name are service-role-only
+// columns, so the browser can't read them directly.
+
+// List every profile awaiting a name-mismatch review.
+router.get('/users/identity-mismatches', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, username, display_name, legal_name, verification_status, updated_at')
+      .eq('identity_name_mismatch', true)
+      .order('updated_at', { ascending: true });
+    if (error) throw error;
+    res.json({ mismatches: data ?? [] });
+  } catch (err) {
+    logger.error(`[ADMIN] Failed to list identity mismatches: ${err.message}`);
+    res.status(500).json({ error: 'Failed to load identity mismatches' });
+  }
+});
+
+// Resolve one: approve grants the verified badge despite the differing name;
+// reject marks the verification rejected. Both clear the mismatch flag.
+router.patch('/users/:userId/identity-review', validateRequestParams(identityReviewSchema), validateRequestBody(identityReviewBodySchema), async (req, res) => {
+  const { userId } = req.params;
+  const { decision } = req.body;
+
+  try {
+    const { data: profile, error: readErr } = await supabase
+      .from('profiles')
+      .select('id, identity_name_mismatch')
+      .eq('id', userId)
+      .maybeSingle();
+    if (readErr) throw readErr;
+    if (!profile) return res.status(404).json({ error: 'User not found' });
+    if (!profile.identity_name_mismatch) {
+      return res.status(409).json({ error: 'This user has no identity name mismatch awaiting review' });
+    }
+
+    const update = decision === 'approve'
+      ? { is_verified: true, verification_status: 'approved', identity_name_mismatch: false }
+      : { is_verified: false, verification_status: 'rejected', identity_name_mismatch: false };
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ ...update, updated_at: new Date().toISOString() })
+      .eq('id', userId)
+      .select('id, is_verified, verification_status')
+      .single();
+    if (error) throw error;
+
+    await supabase.from('notifications').insert({
+      user_id: userId,
+      type: decision === 'approve' ? 'identity_verified' : 'identity_rejected',
+      title: decision === 'approve' ? 'Identity verified' : 'Identity verification unsuccessful',
+      body: decision === 'approve'
+        ? 'Our team has reviewed and approved your ID check — your account now shows the Verified badge.'
+        : 'Our team reviewed your ID check and couldn’t verify it because the name on the document doesn’t match your account. Update your profile name to match your ID and try again, or contact support.',
+    }).catch(() => {});
+
+    await supabase.from('audit_logs').insert({
+      user_id: req.user.id,
+      event_type: 'identity_mismatch_review',
+      description: `${decision === 'approve' ? 'Approved' : 'Rejected'} identity name-mismatch review for user ${userId}`,
+      status: 'success',
+    }).catch(() => {});
+
+    logger.info(`[ADMIN] ${req.user.id} ${decision}d identity name-mismatch review for ${userId}`);
+    res.json({ success: true, user: data });
+  } catch (err) {
+    logger.error(`[ADMIN] Failed identity mismatch review: ${err.message}`);
+    res.status(500).json({ error: 'Failed to resolve identity review' });
   }
 });
 

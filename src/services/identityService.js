@@ -22,10 +22,34 @@ const isApproved = (profile) =>
 async function getProfile(userId) {
   const { data } = await supabase
     .from('profiles')
-    .select('stripe_identity_session_id, verification_status, is_verified')
+    .select('stripe_identity_session_id, verification_status, is_verified, display_name, identity_name_mismatch')
     .eq('id', userId)
     .maybeSingle();
   return data;
+}
+
+// Lowercase, strip diacritics, and reduce to space-separated letter tokens so
+// "María O'Brien-Smith" and "Maria O Brien Smith" compare equal.
+const nameTokens = (s) => (s || '')
+  .normalize('NFKD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase()
+  .replace(/[^a-z]+/g, ' ')
+  .trim()
+  .split(' ')
+  .filter(Boolean);
+
+/**
+ * Does the profile name plausibly match the name on the verified document?
+ * Compares first and last tokens only, so middle names on either side don't
+ * fail legitimate users. Anything failing this is routed to manual review,
+ * never auto-rejected.
+ */
+export function namesMatch(profileName, documentName) {
+  const p = nameTokens(profileName);
+  const d = nameTokens(documentName);
+  if (!p.length || !d.length) return false;
+  return p[0] === d[0] && p[p.length - 1] === d[d.length - 1];
 }
 
 /**
@@ -44,9 +68,39 @@ export async function applyIdentitySession(session) {
   if (session.status === 'verified') {
     if (isApproved(profile)) return;
 
-    const fields = { is_verified: true, verification_status: 'approved', updated_at: now };
     const verifiedName = [session.verified_outputs?.first_name, session.verified_outputs?.last_name]
       .filter(Boolean).join(' ').trim();
+
+    // Cross-check the document name against the profile name (set at signup).
+    // A mismatch is routed to manual admin review — the account stays
+    // unverified with identity_name_mismatch flagged so it surfaces in the
+    // admin user management section. Sessions where Stripe extracted no name
+    // have nothing to compare and keep the auto-approve path.
+    if (verifiedName && !namesMatch(profile?.display_name, verifiedName)) {
+      // Already flagged and awaiting review (the status endpoint re-applies
+      // the session on every poll) — don't re-write or re-notify.
+      if (profile?.identity_name_mismatch && profile?.verification_status === 'pending') return;
+      logger.warn(`[IDENTITY] ${userId} name mismatch (session ${session.id}) — routed to manual review`);
+      const { error } = await supabase.from('profiles').update({
+        verification_status: 'pending',
+        identity_name_mismatch: true,
+        legal_name: verifiedName,
+        updated_at: now,
+      }).eq('id', userId);
+      if (error) {
+        logger.error(`[IDENTITY] Failed to flag ${userId} for manual review: ${error.message}`);
+        return;
+      }
+      await supabase.from('notifications').insert({
+        user_id: userId,
+        type: 'identity_review',
+        title: 'Identity check under review',
+        body: 'The name on your ID didn’t match your profile name, so our team is reviewing your verification. No action is needed from you.',
+      }).then(() => {}, () => {});
+      return;
+    }
+
+    const fields = { is_verified: true, verification_status: 'approved', identity_name_mismatch: false, updated_at: now };
     if (verifiedName) fields.legal_name = verifiedName;
 
     const { error } = await supabase.from('profiles').update(fields).eq('id', userId);
