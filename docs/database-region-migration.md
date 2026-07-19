@@ -62,7 +62,7 @@ SUPABASE_URL=https://odoglvswwymyjuwlonkf.supabase.co SUPABASE_SERVICE_ROLE_KEY=
 # to <NEW_REF> with cacheControl '31536000' (see scripts/backfill-image-cache-headers.mjs for the upload pattern)
 ```
 
-Buckets to recreate: `ai-images`, `avatars`, `categories`, `events`, `media`, `vault-images` (public), `verification-docs` (private).
+Buckets to recreate (match names + public/private flags): `avatars`, `events`, `media`, `vault-images` (public), `ai-images`, `verification-docs` (private). Verify the live set first with `supabase.storage.listBuckets()` / the dashboard, since `backup-storage.mjs` discovers them dynamically.
 
 ## 5. Repoint the application — code
 

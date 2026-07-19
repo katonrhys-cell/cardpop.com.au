@@ -6,7 +6,7 @@ CardPop's data lives in three places. Only two of them need backing up:
 |---|---|---|
 | **Application code** | GitHub | Already backed up on every commit — nothing to do. |
 | **Database** (~75 MB, 78 tables) | Supabase Postgres | **The irreplaceable part.** Captured by `supabase db dump`. |
-| **Storage** (~98 MB, 7 buckets) | Supabase Storage | Card images, avatars, etc. Captured by `scripts/backup-storage.mjs`. |
+| **Storage** (~98 MB) | Supabase Storage | Card images, event images, media, etc. Captured by `scripts/backup-storage.mjs` (buckets discovered live). |
 
 Supabase's own automated backups (daily on the paid plans, plus PITR) still exist and are your first line of recovery. This manual backup is a belt-and-braces, off-Supabase copy you control — handy before risky changes and **required as step 1 of a region migration** (see `docs/database-region-migration.md`).
 
@@ -23,15 +23,15 @@ cardpop-backup-<UTC-timestamp>.tar.gz
 └── MANIFEST.txt   # what this archive is + when it was made
 ```
 
-### Sensitive data — `verification-docs`
+### The `verification-docs` bucket
 
-The `verification-docs` bucket holds **customer identity documents** (passport / licence scans). The backup **excludes it by default** so routine backups never drop PII into Google Drive or a laptop. Only include it with a deliberate, secured reason:
+This bucket is **currently empty** — identity verification runs through **Stripe**, so ID documents are never stored in Supabase. The backup still **skips it by default** as a safe guard: if it's ever used to hold something sensitive, a routine backup won't quietly copy PII into Google Drive. To include it anyway:
 
 ```bash
 INCLUDE_SENSITIVE=1 ./scripts/backup-supabase.sh
 ```
 
-If you do, **encrypt the archive** and keep it out of any shared or auto-syncing Drive folder.
+If it ever does hold sensitive data, **encrypt the archive** and keep it out of any shared or auto-syncing Drive folder.
 
 ## Prerequisites (one-time)
 

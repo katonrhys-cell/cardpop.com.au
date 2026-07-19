@@ -2,11 +2,16 @@
 // preserving bucket/path structure. Used by scripts/backup-supabase.sh as the
 // "storage" half of a full manual backup (the DB half is `supabase db dump`).
 //
-// SENSITIVE DATA: the `verification-docs` bucket holds customer identity
-// documents (passport / licence scans). It is EXCLUDED by default so a routine
-// backup never lands PII in Google Drive or a laptop's Downloads folder. Pass
-// --include-sensitive only if you have a specific, secured reason to copy it,
-// and store the result encrypted — never in a shared/synced Drive folder.
+// Buckets are discovered live via listBuckets(), so this always matches what's
+// actually in the project (today: ai-images, avatars, events, media,
+// vault-images, verification-docs).
+//
+// The `verification-docs` bucket is skipped by default. It's currently empty —
+// identity verification is handled by Stripe, so ID documents are never stored
+// in Supabase — but it's kept out of the default set so that IF it is ever used
+// to hold anything sensitive, a routine backup doesn't quietly copy PII into
+// Google Drive. Pass --include-sensitive to include it (and store the archive
+// encrypted if you do).
 //
 // Usage:
 //   SUPABASE_URL=https://<ref>.supabase.co \
@@ -33,24 +38,29 @@ const arg = (flag, fallback = null) => {
 
 const OUT_DIR = arg('--out', './backups/storage');
 const INCLUDE_SENSITIVE = process.argv.includes('--include-sensitive');
-
-// All buckets in the project. verification-docs is sensitive (see header).
-const PUBLIC_BUCKETS = ['ai-images', 'avatars', 'categories', 'events', 'media', 'vault-images'];
-const SENSITIVE_BUCKETS = ['verification-docs'];
-
 const only = arg('--bucket');
-let buckets = only
-  ? [only]
-  : INCLUDE_SENSITIVE
-    ? [...PUBLIC_BUCKETS, ...SENSITIVE_BUCKETS]
-    : PUBLIC_BUCKETS;
 
-if (only && SENSITIVE_BUCKETS.includes(only) && !INCLUDE_SENSITIVE) {
-  console.error(`Refusing to back up sensitive bucket "${only}" without --include-sensitive.`);
-  process.exit(1);
-}
+// Skipped by default unless --include-sensitive (see header).
+const SENSITIVE_BUCKETS = new Set(['verification-docs']);
 
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+
+// Discover buckets rather than hardcoding, so the backup can't drift from
+// reality (new bucket added / one renamed).
+async function resolveBuckets() {
+  if (only) {
+    if (SENSITIVE_BUCKETS.has(only) && !INCLUDE_SENSITIVE) {
+      console.error(`Refusing to back up sensitive bucket "${only}" without --include-sensitive.`);
+      process.exit(1);
+    }
+    return [only];
+  }
+  const { data, error } = await supabase.storage.listBuckets();
+  if (error) throw new Error(`listBuckets: ${error.message}`);
+  return data
+    .map((b) => b.name)
+    .filter((name) => INCLUDE_SENSITIVE || !SENSITIVE_BUCKETS.has(name));
+}
 
 // Storage list() is not recursive — walk folders depth-first.
 async function* walk(bucket, prefix = '') {
@@ -76,6 +86,7 @@ async function* walk(bucket, prefix = '') {
   }
 }
 
+const buckets = await resolveBuckets();
 let total = 0;
 let failed = 0;
 
@@ -103,5 +114,5 @@ for (const bucket of buckets) {
 }
 
 console.log(`\nDone. ${total} object(s) → ${OUT_DIR}${failed ? ` (${failed} failed)` : ''}`);
-if (!INCLUDE_SENSITIVE) console.log('Note: verification-docs (customer ID scans) was skipped by design.');
+if (!INCLUDE_SENSITIVE) console.log('Note: verification-docs skipped by default (empty; --include-sensitive to add).');
 process.exit(failed ? 1 : 0);

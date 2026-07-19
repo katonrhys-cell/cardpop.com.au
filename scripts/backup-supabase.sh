@@ -7,8 +7,9 @@
 #   - roles.sql   database roles (ownership/grants)         via `supabase db dump`
 #   - schema.sql  full schema (tables, RLS, functions, …)   via `supabase db dump`
 #   - data.sql    all row data                              via `supabase db dump`
-#   - storage/    every Storage object except the sensitive verification-docs
-#                 bucket (customer ID scans) — see scripts/backup-storage.mjs
+#   - storage/    every Storage object except the verification-docs bucket
+#                 (currently empty — ID checks run through Stripe, not Supabase;
+#                 skipped by default as a safe guard). See scripts/backup-storage.mjs
 #
 # What it does NOT capture (by design):
 #   - Application code — already fully versioned on GitHub.
@@ -53,7 +54,7 @@ echo "==> Downloading storage objects ..."
 STORAGE_ARGS=(--out "${WORK}/storage")
 if [ "${INCLUDE_SENSITIVE:-0}" = "1" ]; then
   STORAGE_ARGS+=(--include-sensitive)
-  echo "    (including sensitive verification-docs — store this archive ENCRYPTED)"
+  echo "    (including verification-docs — if it holds anything sensitive, store this archive ENCRYPTED)"
 fi
 node scripts/backup-storage.mjs "${STORAGE_ARGS[@]}"
 
@@ -76,6 +77,6 @@ echo
 echo "✅ Backup complete: ${ARCHIVE}"
 echo "   Next: upload it to the 'cardpop.com.au- site backup' folder in Google Drive."
 if [ "${INCLUDE_SENSITIVE:-0}" = "1" ]; then
-  echo "   ⚠  This archive contains customer ID documents — encrypt it and do NOT"
-  echo "      place it in a shared or auto-syncing Drive folder."
+  echo "   ⚠  Includes the verification-docs bucket — if it ever holds sensitive"
+  echo "      data, encrypt this archive and keep it out of a shared/synced folder."
 fi
