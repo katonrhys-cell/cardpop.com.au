@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Search, MoreHorizontal, Shield, ChevronLeft, Users, X, ShieldAlert } from 'lucide-react';
+import { Search, MoreHorizontal, Shield, ChevronLeft, Users, X, ShieldAlert, Landmark } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -27,22 +27,27 @@ const UserManagementPage = () => {
   const [users, setUsers] = useState([]);
   const [userCounts, setUserCounts] = useState({}); // Cache for related data counts
   const [loading, setLoading] = useState(true);
-  // Profiles whose Stripe Identity document name didn't match their profile
-  // name, keyed by user id. The flag lives in a service-role-only column, so
-  // it comes from the admin backend rather than the client Supabase query.
+  // Profiles with a Stripe name mismatch, keyed by user id: identity = the ID
+  // document name differs from the profile name (blocks the badge, needs
+  // review); payout = the Connect payout account's KYC'd name differs
+  // (informational). Both flags live in service-role-only columns, so they
+  // come from the admin backend rather than the client Supabase query.
   const [identityMismatches, setIdentityMismatches] = useState({});
+  const [payoutMismatches, setPayoutMismatches] = useState({});
 
   useEffect(() => {
-    (async () => {
+    const fetchMismatches = async (path, setState) => {
       try {
-        const res = await apiClient.fetch('/admin/users/identity-mismatches');
+        const res = await apiClient.fetch(path);
         if (!res.ok) return;
         const { mismatches } = await res.json();
-        setIdentityMismatches(Object.fromEntries((mismatches ?? []).map(m => [m.id, m])));
+        setState(Object.fromEntries((mismatches ?? []).map(m => [m.id, m])));
       } catch {
         // Non-fatal: the list renders without mismatch badges.
       }
-    })();
+    };
+    fetchMismatches('/admin/users/identity-mismatches', setIdentityMismatches);
+    fetchMismatches('/admin/users/payout-mismatches', setPayoutMismatches);
   }, []);
   
   // Filters & Pagination
@@ -254,6 +259,11 @@ const UserManagementPage = () => {
                             <ShieldAlert className="w-3 h-3 mr-1" /> ID Name Mismatch
                           </Badge>
                         )}
+                        {payoutMismatches[user.id] && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-rose-500/15 text-rose-700 dark:text-rose-400">
+                            <Landmark className="w-3 h-3 mr-1" /> Payout Name Mismatch
+                          </Badge>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="text-center font-medium">
@@ -278,9 +288,9 @@ const UserManagementPage = () => {
                           <DropdownMenuItem className="cursor-pointer" onClick={() => navigate(`/admin/users/${user.id}`)}>
                             View Full Profile
                           </DropdownMenuItem>
-                          {identityMismatches[user.id] && (
+                          {(identityMismatches[user.id] || payoutMismatches[user.id]) && (
                             <DropdownMenuItem className="cursor-pointer text-amber-700 dark:text-amber-500" onClick={() => navigate(`/admin/users/${user.id}`)}>
-                              <ShieldAlert className="w-4 h-4 mr-2" /> Review ID Mismatch
+                              <ShieldAlert className="w-4 h-4 mr-2" /> Review Name Mismatch
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem className="cursor-pointer" onClick={() => handleRoleChange(user.id, !user.is_admin)}>

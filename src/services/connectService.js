@@ -1,7 +1,8 @@
 import stripe from '../utils/stripeClient.js';
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
-import { SELLER_CONFIGURATIONS, buildSellerAccountParams, isPayoutReady } from '../utils/sellerAccountShape.js';
+import { namesMatch } from './identityService.js';
+import { SELLER_CONFIGURATIONS, buildSellerAccountParams, isPayoutReady, payoutAccountName } from '../utils/sellerAccountShape.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Seller accounts run on the Stripe v2 Accounts API (`stripe.v2.core.accounts`).
@@ -104,7 +105,7 @@ export async function getConnectStatus(req, res) {
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('stripe_connect_account_id, stripe_connect_onboarded, wallet_balance_aud')
+      .select('stripe_connect_account_id, stripe_connect_onboarded, wallet_balance_aud, display_name, legal_name, business_name, payout_name_mismatch')
       .eq('id', userId)
       .maybeSingle();
 
@@ -113,14 +114,31 @@ export async function getConnectStatus(req, res) {
     }
 
     const account = await stripe.v2.core.accounts.retrieve(profile.stripe_connect_account_id, {
-      include: ['configuration.recipient', 'requirements'],
+      include: ['configuration.recipient', 'identity', 'requirements'],
     });
     const onboarded = isPayoutReady(account);
 
-    if (onboarded !== profile.stripe_connect_onboarded) {
+    // Cross-check the payout account's KYC'd legal name against the profile's
+    // ID-verified legal_name (display_name before an ID check exists). A
+    // difference means the person receiving the money isn't the person who
+    // verified — flagged for the admin user management section. Informational:
+    // it never blocks payouts, and it self-clears once the names agree.
+    // A sole trader may legitimately onboard Connect under their registered
+    // business name, so the payout name passes if it matches EITHER the
+    // personal name or the profile's business name.
+    const payoutName = payoutAccountName(account);
+    const profileName = profile.legal_name || profile.display_name;
+    const matchesPerson = profileName && namesMatch(profileName, payoutName);
+    const matchesBusiness = profile.business_name && namesMatch(profile.business_name, payoutName);
+    const mismatch = Boolean(onboarded && payoutName && (profileName || profile.business_name) && !matchesPerson && !matchesBusiness);
+
+    if (onboarded !== profile.stripe_connect_onboarded || mismatch !== Boolean(profile.payout_name_mismatch)) {
+      if (mismatch && !profile.payout_name_mismatch) {
+        logger.warn(`[STRIPE CONNECT] Payout name mismatch for user ${userId} (account ${profile.stripe_connect_account_id})`);
+      }
       await supabase
         .from('profiles')
-        .update({ stripe_connect_onboarded: onboarded })
+        .update({ stripe_connect_onboarded: onboarded, payout_name_mismatch: mismatch })
         .eq('id', userId);
     }
 

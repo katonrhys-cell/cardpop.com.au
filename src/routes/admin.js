@@ -2,6 +2,8 @@ import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import stripe from '../utils/stripeClient.js';
 import { payoutSeller } from '../services/payoutService.js';
+import { namesMatch } from '../services/identityService.js';
+import { payoutAccountName } from '../utils/sellerAccountShape.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import { requireAal2 } from '../middleware/requireAal2.js';
 import { validateRequestBody, validateRequestParams, validateRequestQuery } from '../middleware/validateRequest.js';
@@ -138,6 +140,90 @@ router.get('/users/identity-mismatches', async (req, res) => {
   } catch (err) {
     logger.error(`[ADMIN] Failed to list identity mismatches: ${err.message}`);
     res.status(500).json({ error: 'Failed to load identity mismatches' });
+  }
+});
+
+// List every seller whose Connect payout account's KYC'd name doesn't match
+// their profile name (flag maintained by connectService on status sync).
+router.get('/users/payout-mismatches', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, username, display_name, legal_name, business_name, updated_at')
+      .eq('payout_name_mismatch', true)
+      .order('updated_at', { ascending: true });
+    if (error) throw error;
+    res.json({ mismatches: data ?? [] });
+  } catch (err) {
+    logger.error(`[ADMIN] Failed to list payout mismatches: ${err.message}`);
+    res.status(500).json({ error: 'Failed to load payout mismatches' });
+  }
+});
+
+// Live Stripe name panel for one user: every name Stripe holds for them, with
+// match verdicts computed on the spot. Names come from service-role reads and
+// live Stripe retrieves — none of this is client-readable directly.
+router.get('/users/:userId/stripe-names', validateRequestParams(identityReviewSchema), async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const { data: profile, error: readErr } = await supabase
+      .from('profiles')
+      .select('id, display_name, legal_name, business_name, identity_name_mismatch, payout_name_mismatch, stripe_connect_account_id, stripe_customer_id')
+      .eq('id', userId)
+      .maybeSingle();
+    if (readErr) throw readErr;
+    if (!profile) return res.status(404).json({ error: 'User not found' });
+
+    // Connect payout account (sellers only) — KYC'd by Stripe.
+    let payoutName = null;
+    if (profile.stripe_connect_account_id) {
+      try {
+        const account = await stripe.v2.core.accounts.retrieve(profile.stripe_connect_account_id, { include: ['identity'] });
+        payoutName = payoutAccountName(account) || null;
+      } catch (e) {
+        logger.warn(`[ADMIN] stripe-names: could not retrieve Connect account for ${userId}: ${e.message}`);
+      }
+    }
+
+    // Billing customer (created for business/ABN billing with the business
+    // name at the time) — informational, drifts if the business renames.
+    let billingName = null;
+    if (profile.stripe_customer_id) {
+      try {
+        const customer = await stripe.customers.retrieve(profile.stripe_customer_id);
+        billingName = (!customer?.deleted && customer?.name) || null;
+      } catch (e) {
+        logger.warn(`[ADMIN] stripe-names: could not retrieve customer for ${userId}: ${e.message}`);
+      }
+    }
+
+    const profileName = profile.legal_name || profile.display_name || null;
+    res.json({
+      names: {
+        account: profile.display_name || null,
+        idDocument: profile.legal_name || null,
+        payoutAccount: payoutName,
+        billingCustomer: billingName,
+        business: profile.business_name || null,
+      },
+      // true = matches, false = mismatch, null = not comparable (missing data)
+      checks: {
+        idDocument: profile.legal_name && profile.display_name ? namesMatch(profile.display_name, profile.legal_name) : null,
+        payoutAccount: payoutName && profileName
+          ? (namesMatch(profileName, payoutName) || (profile.business_name ? namesMatch(profile.business_name, payoutName) : false))
+          : null,
+        billingCustomer: billingName && (profile.business_name || profileName)
+          ? namesMatch(profile.business_name || profileName, billingName)
+          : null,
+      },
+      flags: {
+        identity_name_mismatch: Boolean(profile.identity_name_mismatch),
+        payout_name_mismatch: Boolean(profile.payout_name_mismatch),
+      },
+    });
+  } catch (err) {
+    logger.error(`[ADMIN] stripe-names failed for ${userId}: ${err.message}`);
+    res.status(500).json({ error: 'Failed to load Stripe name checks' });
   }
 });
 
