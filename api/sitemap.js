@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { COLLECTION_SEO } from '../data/collectionSeo.js';
 import { BLOG_CATEGORIES } from '../data/blogCategories.js';
+import { BUYING_GUIDES } from '../data/buyingGuides.js';
 
 const SUPABASE_URL = 'https://odoglvswwymyjuwlonkf.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kb2dsdnN3d3lteWp1d2xvbmtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3OTQ5NTgsImV4cCI6MjA5NDM3MDk1OH0.R5fwR42iKIEsfx1iA-fjk4YPLCH3mcmoIKkosEy6g1I';
@@ -59,6 +60,7 @@ const STATIC_PAGES = [
   { loc: '/prices/one-piece',      lastmod: TODAY,              freq: 'daily',   pri: '0.8' },
   { loc: '/prices/afl',            lastmod: TODAY,              freq: 'daily',   pri: '0.8' },
   { loc: '/prices/nrl',            lastmod: TODAY,              freq: 'daily',   pri: '0.8' },
+  { loc: '/analytics/buying-guides', lastmod: SITE_UPDATED,     freq: 'weekly',  pri: '0.7' },
   { loc: '/australian-markets',    lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
   { loc: '/insider-trading',       lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.7' },
   { loc: '/grading',               lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' },
@@ -81,6 +83,11 @@ const STATIC_PAGES = [
   // Blog category hubs — prerendered for bots and linked from the site header.
   ...BLOG_CATEGORIES.map((c) => (
     { loc: `/blog/category/${c.slug}`, lastmod: SITE_UPDATED,   freq: 'weekly',  pri: '0.6' }
+  )),
+  // New-release buying guides (Analytics section). Each guide's own `updated`
+  // date is an honest lastmod — refreshing a guide's chase figures bumps it.
+  ...BUYING_GUIDES.map((g) => (
+    { loc: `/analytics/buying-guides/${g.slug}`, lastmod: g.updated || SITE_UPDATED, freq: 'weekly', pri: '0.6' }
   )),
   { loc: '/launch',                lastmod: '2026-07-05', freq: 'monthly', pri: '0.6' },
   { loc: '/about',                 lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },

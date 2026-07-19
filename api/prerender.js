@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { COLLECTION_SEO } from '../data/collectionSeo.js';
 import { BLOG_CATEGORIES, BLOG_CATEGORY_MAP } from '../data/blogCategories.js';
+import { BUYING_GUIDES, getBuyingGuide, GUIDE_CATEGORY_META } from '../data/buyingGuides.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -1620,6 +1621,123 @@ ${[sectionsHtml, faqHtml, linksHtml].filter(Boolean).join('\n')}
   return htmlDoc({ title: cfg.title, description: cfg.description, canonical, jsonLdItems, bodyHtml });
 }
 
+// ── Buying Guides (/analytics/buying-guides) ────────────────────────────────
+// Static, hand-curated new-release + chase-card content sourced from the shared
+// data/buyingGuides.js module (same source the SPA renders from).
+function renderBuyingGuidesHub() {
+  const canonical = `${BASE_URL}/analytics/buying-guides`;
+  const title = 'Trading Card Buying Guides — New Releases & Chase Cards | CardPop';
+  const description = 'What to chase in the newest trading card releases. CardPop buying guides break down the latest Pokémon expansions, AFL Teamcoach and Topps sets — and the chase cards worth hunting.';
+
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'Analytics', item: `${BASE_URL}/analytics` },
+      { '@type': 'ListItem', position: 3, name: 'Buying Guides', item: canonical },
+    ],
+  };
+  const itemList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'CardPop Buying Guides',
+    numberOfItems: BUYING_GUIDES.length,
+    itemListElement: BUYING_GUIDES.map((g, i) => ({
+      '@type': 'ListItem', position: i + 1, url: `${BASE_URL}/analytics/buying-guides/${g.slug}`, name: g.title,
+    })),
+  };
+
+  const guidesHtml = BUYING_GUIDES.map((g) => {
+    const label = GUIDE_CATEGORY_META[g.category]?.label || g.game;
+    return `    <li><a href="${BASE_URL}/analytics/buying-guides/${esc(g.slug)}"><strong>${esc(g.shortTitle)}</strong></a> — ${esc(label)}, released ${esc(g.releaseLabel)}. ${esc(g.summary)}</li>`;
+  }).join('\n');
+
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/analytics">Analytics</a> / Buying Guides</nav>
+  <h1>Trading Card Buying Guides</h1>
+  <p>The newest sets, decoded. CardPop buying guides break down every fresh trading card release — the latest Pokémon expansion, the current AFL Teamcoach range and the newest Topps drop — and call out the chase cards actually worth hunting.</p>
+  <ul>
+${guidesHtml}
+  </ul>
+</main>`;
+
+  return htmlDoc({ title, description, canonical, jsonLdItems: [breadcrumb, itemList], bodyHtml });
+}
+
+function renderBuyingGuide(slug) {
+  const guide = getBuyingGuide(slug);
+  if (!guide) {
+    return notFound({
+      title: 'Buying Guide Not Found | CardPop',
+      description: 'The buying guide you are looking for could not be found on CardPop.',
+      canonical: `${BASE_URL}/analytics/buying-guides/${esc(slug)}`,
+      bodyHtml: '<main><h1>Buying Guide Not Found</h1><p>This buying guide does not exist on CardPop.</p></main>',
+    });
+  }
+
+  const canonical = `${BASE_URL}/analytics/buying-guides/${guide.slug}`;
+  const label = GUIDE_CATEGORY_META[guide.category]?.label || guide.game;
+  const title = `${guide.shortTitle} Buying Guide — Chase Cards to Hunt | CardPop`;
+  const description = guide.summary;
+
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'Analytics', item: `${BASE_URL}/analytics` },
+      { '@type': 'ListItem', position: 3, name: 'Buying Guides', item: `${BASE_URL}/analytics/buying-guides` },
+      { '@type': 'ListItem', position: 4, name: guide.shortTitle, item: canonical },
+    ],
+  };
+  const article = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: `${guide.title} — Buying Guide & Chase Cards`,
+    description: guide.summary,
+    datePublished: guide.releaseDate,
+    dateModified: guide.updated,
+    author: { '@type': 'Organization', name: 'CardPop' },
+    publisher: { '@type': 'Organization', name: 'CardPop' },
+  };
+
+  const overviewHtml = guide.overview.map((p) => `  <p>${esc(p)}</p>`).join('\n');
+  const factsHtml = guide.quickFacts.map((f) => `    <li><strong>${esc(f.label)}:</strong> ${esc(f.value)}</li>`).join('\n');
+  const chaseHtml = guide.chaseCards.map((c) =>
+    `    <li><strong>${esc(c.name)}</strong> — ${esc(c.subtitle)} (${esc(c.value)} AUD). ${esc(c.blurb)}</li>`
+  ).join('\n');
+  const tipsHtml = (guide.collectingTips || []).map((t) => `    <li>${esc(t)}</li>`).join('\n');
+
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/analytics">Analytics</a> / <a href="${BASE_URL}/analytics/buying-guides">Buying Guides</a> / ${esc(guide.shortTitle)}</nav>
+  <h1>${esc(guide.title)}</h1>
+  <p>${esc(guide.tagline)}</p>
+  <p>${esc(label)} · Released ${esc(guide.releaseLabel)}</p>
+  <section>
+  <h2>The set at a glance</h2>
+${overviewHtml}
+  <ul>
+${factsHtml}
+  </ul>
+  </section>
+  <section>
+  <h2>The chase cards</h2>
+  <p>The most valuable and most-hyped cards in the set — the ones collectors are hunting right now.</p>
+  <ul>
+${chaseHtml}
+  </ul>
+  </section>
+${tipsHtml ? `  <section>\n  <h2>Collector tips</h2>\n  <ul>\n${tipsHtml}\n  </ul>\n  </section>` : ''}
+  <nav aria-label="Related"><ul>
+    <li><a href="${BASE_URL}/marketplace">Browse the marketplace</a></li>
+    <li><a href="${BASE_URL}/prices">Check AUD card prices</a></li>
+  </ul></nav>
+</main>`;
+
+  return htmlDoc({ title, description, canonical, jsonLdItems: [breadcrumb, article], bodyHtml });
+}
+
 async function renderBlogIndex(supabase) {
   const canonical = `${BASE_URL}/blog`;
   const title = 'The Parallel Report | CardPop';
@@ -2391,6 +2509,15 @@ export default async function handler(req, res) {
       const id = decodeURIComponent(listingMatch[1]);
       const slug = listingMatch[2] ? decodeURIComponent(listingMatch[2]) : undefined;
       return sendDoc(res, await renderListing(supabase, id, slug));
+    }
+
+    if (rawPath === '/analytics/buying-guides') {
+      return sendDoc(res, renderBuyingGuidesHub());
+    }
+
+    const buyingGuideMatch = rawPath.match(/^\/analytics\/buying-guides\/([^/?#]+)/);
+    if (buyingGuideMatch) {
+      return sendDoc(res, renderBuyingGuide(decodeURIComponent(buyingGuideMatch[1])));
     }
 
     if (rawPath === '/prices') {
