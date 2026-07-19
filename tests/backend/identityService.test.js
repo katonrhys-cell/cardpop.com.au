@@ -31,7 +31,7 @@ vi.mock('../../src/utils/supabaseClient.js', () => {
   return { supabase: sb, default: sb };
 });
 
-import { applyIdentitySession, createIdentitySession, getIdentityStatus } from '../../src/services/identityService.js';
+import { applyIdentitySession, createIdentitySession, getIdentityStatus, namesMatch } from '../../src/services/identityService.js';
 
 const mockRes = () => {
   const res = {};
@@ -48,8 +48,28 @@ beforeEach(() => {
   supabaseState.inserts = [];
 });
 
+describe('namesMatch', () => {
+  it('matches on first and last tokens, ignoring case, middle names, diacritics and punctuation', () => {
+    expect(namesMatch('Maya Chen', 'Maya Chen')).toBe(true);
+    expect(namesMatch('maya chen', 'MAYA CHEN')).toBe(true);
+    expect(namesMatch('Maya Chen', 'Maya Li Chen')).toBe(true);       // middle name on the document
+    expect(namesMatch('Maya Li Chen', 'Maya Chen')).toBe(true);       // middle name on the profile
+    expect(namesMatch('Maya Smith-Jones', 'Maya Smith Jones')).toBe(true);       // hyphenated surname
+    expect(namesMatch('María Núñez', 'Maria Nunez')).toBe(true);      // diacritics stripped
+  });
+
+  it('rejects different names and missing data', () => {
+    expect(namesMatch('Maya Chen', 'Maya Smith')).toBe(false);
+    expect(namesMatch('John Chen', 'Maya Chen')).toBe(false);
+    expect(namesMatch('', 'Maya Chen')).toBe(false);
+    expect(namesMatch(undefined, 'Maya Chen')).toBe(false);
+    expect(namesMatch('Maya Chen', '')).toBe(false);
+  });
+});
+
 describe('applyIdentitySession', () => {
   it('marks the profile approved (with legal name) and notifies on verified', async () => {
+    supabaseState.profile = { display_name: 'Maya Chen' };
     await applyIdentitySession({
       id: 'vs_1',
       status: 'verified',
@@ -61,10 +81,57 @@ describe('applyIdentitySession', () => {
     expect(update.payload.is_verified).toBe(true);
     expect(update.payload.verification_status).toBe('approved');
     expect(update.payload.legal_name).toBe('Maya Chen');
+    expect(update.payload.identity_name_mismatch).toBe(false);
 
     const notif = supabaseState.inserts.find(i => i.table === 'notifications');
     expect(notif.payload.user_id).toBe('user-1');
     expect(notif.payload.type).toBe('identity_verified');
+  });
+
+  it('routes a document/profile name mismatch to manual review instead of approving', async () => {
+    supabaseState.profile = { display_name: 'Maya Smith' };
+    await applyIdentitySession({
+      id: 'vs_1',
+      status: 'verified',
+      metadata: { userId: 'user-1' },
+      verified_outputs: { first_name: 'Maya', last_name: 'Chen' },
+    });
+
+    const update = supabaseState.updates.find(u => u.table === 'profiles');
+    expect(update.payload.is_verified).toBeUndefined();
+    expect(update.payload.verification_status).toBe('pending');
+    expect(update.payload.identity_name_mismatch).toBe(true);
+    expect(update.payload.legal_name).toBe('Maya Chen');
+
+    const notif = supabaseState.inserts.find(i => i.table === 'notifications');
+    expect(notif.payload.type).toBe('identity_review');
+  });
+
+  it('does not re-flag or re-notify a mismatch already awaiting review', async () => {
+    supabaseState.profile = { display_name: 'Maya Smith', verification_status: 'pending', identity_name_mismatch: true };
+    await applyIdentitySession({
+      id: 'vs_1',
+      status: 'verified',
+      metadata: { userId: 'user-1' },
+      verified_outputs: { first_name: 'Maya', last_name: 'Chen' },
+    });
+    expect(supabaseState.updates).toHaveLength(0);
+    expect(supabaseState.inserts).toHaveLength(0);
+  });
+
+  it('still auto-approves when Stripe extracted no name from the document', async () => {
+    supabaseState.profile = { display_name: 'Maya Chen' };
+    await applyIdentitySession({
+      id: 'vs_1',
+      status: 'verified',
+      metadata: { userId: 'user-1' },
+      verified_outputs: {},
+    });
+
+    const update = supabaseState.updates.find(u => u.table === 'profiles');
+    expect(update.payload.is_verified).toBe(true);
+    expect(update.payload.verification_status).toBe('approved');
+    expect(update.payload.legal_name).toBeUndefined();
   });
 
   it('does not re-update or re-notify an already approved profile', async () => {

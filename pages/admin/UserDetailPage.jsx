@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ChevronLeft, Mail, MapPin, Calendar, ShieldAlert, KeyRound, Trash2, CheckCircle2, AlertCircle, User, BadgeCheck, Sparkles, Store } from 'lucide-react';
@@ -47,6 +47,49 @@ const UserDetailPage = () => {
 
   const openAction = (type) => setActionModal({ isOpen: true, type });
   const closeAction = () => { setActionModal({ isOpen: false, type: null }); setResetCaptchaToken(''); setDeleteConfirmText(''); };
+
+  // Stripe Identity name-mismatch review. The mismatch flag and the document's
+  // legal name are service-role-only columns, so both come from the admin
+  // backend, and the resolution goes through it too.
+  const [identityMismatch, setIdentityMismatch] = useState(null);
+  const [reviewSaving, setReviewSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiServerClient.fetch('/admin/users/identity-mismatches');
+        if (!res.ok) return;
+        const { mismatches } = await res.json();
+        if (!cancelled) setIdentityMismatch((mismatches ?? []).find(m => m.id === userId) || null);
+      } catch {
+        // Non-fatal: the page renders without the review panel.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [userId]);
+
+  const resolveIdentityMismatch = async (decision) => {
+    setReviewSaving(true);
+    try {
+      const res = await apiServerClient.fetch(`/admin/users/${userId}/identity-review`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ decision }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to resolve the identity review.');
+      }
+      toast.success(decision === 'approve' ? 'Identity approved — user is now verified.' : 'Identity verification rejected.');
+      setIdentityMismatch(null);
+      refetch?.();
+    } catch (err) {
+      toast.error(err.message || 'Failed to resolve the identity review.');
+    } finally {
+      setReviewSaving(false);
+    }
+  };
 
   // Toggle a sole-trader store flag (verification / promotion). These appear on
   // the public Local Traders directory and will later gate behind subscription tiers.
@@ -238,7 +281,46 @@ const UserDetailPage = () => {
 
         {/* Main Content Area */}
         <div className="lg:col-span-2 space-y-6">
-          <UserStatsCard 
+          {identityMismatch && (
+            <Card className="border-amber-500/40 bg-amber-500/5 shadow-sm rounded-2xl">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg font-serif flex items-center gap-2 text-amber-700 dark:text-amber-500">
+                  <ShieldAlert className="w-5 h-5 shrink-0" /> ID Name Mismatch — Manual Review Required
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  This user passed Stripe Identity's document and selfie checks, but the name on their ID
+                  doesn't match the name on their account. They have not been granted the Verified badge.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-border bg-background p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Account Name</p>
+                    <p className="font-bold text-foreground">{identityMismatch.display_name || '—'}</p>
+                  </div>
+                  <div className="rounded-xl border border-border bg-background p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Name on ID Document</p>
+                    <p className="font-bold text-foreground">{identityMismatch.legal_name || '—'}</p>
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 pt-1">
+                  <Button disabled={reviewSaving} onClick={() => resolveIdentityMismatch('approve')}>
+                    <CheckCircle2 className="w-4 h-4 mr-2" /> Approve Verification
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={reviewSaving}
+                    className="text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => resolveIdentityMismatch('reject')}
+                  >
+                    <ShieldAlert className="w-4 h-4 mr-2" /> Reject Verification
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <UserStatsCard
             user={user} 
             vaultProductsCount={vaultProducts.length}
             ordersBuyerCount={ordersAsBuyer.length}

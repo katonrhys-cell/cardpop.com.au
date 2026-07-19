@@ -56,6 +56,14 @@ export const setUserStatusBodySchema = z.object({
   status: z.enum(['active', 'suspended', 'deleted']),
 });
 
+export const identityReviewSchema = z.object({
+  userId: z.string().min(1, 'User ID is required'),
+});
+
+export const identityReviewBodySchema = z.object({
+  decision: z.enum(['approve', 'reject']),
+});
+
 // business_profiles: an admin-curated directory of physical retail locations
 // (distinct from the self-service profiles.is_sole_trader /dealer storefront).
 const businessProfileFields = {
