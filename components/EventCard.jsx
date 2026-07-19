@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { eventPath, eventTypeLabel, eventTypeStyle, formatEventDate, formatEventTime, formatEventLocation } from '@/lib/eventSeo.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
 
-const EventCard = ({ event, isAdmin, onView, onEdit, onDelete }) => {
+const EventCard = ({ event, isAdmin, onView, onEdit, onDelete, rsvpData }) => {
   const eventTitle = event.title || event.name;
   const formattedDate = formatEventDate(event);
   const formattedTime = formatEventTime(event);
@@ -80,7 +80,7 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete }) => {
       </CardContent>
 
       <CardFooter className="pt-4 border-t border-border flex flex-col gap-3">
-        <EventRsvp event={event} variant="card" />
+        <EventRsvp event={event} variant="card" rsvpData={rsvpData} />
 
         <div className="flex w-full items-center gap-2">
           {onView ? (

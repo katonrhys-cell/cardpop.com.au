@@ -17,16 +17,23 @@ import {
 // lets a signed-in user RSVP as a buyer (attendee) or a vendor.
 //
 // Props:
-//   event   – event record (needs `id`)
-//   variant – 'card' (compact) | 'detail' (full width, default)
-const EventRsvp = ({ event, variant = 'detail', className = '' }) => {
+//   event    – event record (needs `id`)
+//   variant  – 'card' (compact) | 'detail' (full width, default)
+//   rsvpData – optional { counts, myRole } supplied by a parent that has already
+//              batch-loaded counts/roles for a whole list of events. When given,
+//              this control is "managed": it reads from that data instead of
+//              firing its own per-event requests — which is what avoids the
+//              per-card N+1 on the events list (Sentry REACT-FRONT-END-C). Left
+//              undefined (detail modal, related events) it self-fetches as before.
+const EventRsvp = ({ event, variant = 'detail', className = '', rsvpData = null }) => {
   const eventId = event?.id;
+  const managed = rsvpData != null;
   const { currentUser, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  const [counts, setCounts] = useState(emptyCounts);
-  const [myRole, setMyRole] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [counts, setCounts] = useState(() => rsvpData?.counts || emptyCounts());
+  const [myRole, setMyRole] = useState(() => rsvpData?.myRole ?? null);
+  const [loading, setLoading] = useState(!managed);
   const [saving, setSaving] = useState(null); // 'buyer' | 'vendor' | 'cancel'
 
   const load = useCallback(async () => {
@@ -48,7 +55,22 @@ const EventRsvp = ({ event, variant = 'detail', className = '' }) => {
     }
   }, [eventId, isAuthenticated, currentUser?.id]);
 
-  useEffect(() => { load(); }, [load]);
+  // Standalone usage: fetch this one event's data itself.
+  useEffect(() => {
+    if (managed) return;
+    load();
+  }, [managed, load]);
+
+  // Managed usage: mirror the parent's batch-loaded data. The parent passes a
+  // stable (memoised) object, so this only runs when that data actually changes
+  // (initial load, auth resolving) — not on unrelated re-renders — and therefore
+  // doesn't clobber the optimistic updates below.
+  useEffect(() => {
+    if (!managed) return;
+    setCounts(rsvpData.counts || emptyCounts());
+    setMyRole(rsvpData.myRole ?? null);
+    setLoading(false);
+  }, [managed, rsvpData]);
 
   const handleRsvp = async (role) => {
     if (!isAuthenticated) {

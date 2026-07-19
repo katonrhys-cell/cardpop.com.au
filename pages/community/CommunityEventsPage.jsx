@@ -4,6 +4,8 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { CalendarDays, Search, MapPin, SlidersHorizontal, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
+import { useAuth } from '@/contexts/AuthContext.jsx';
+import { fetchRsvpCounts, fetchMyRsvps, emptyCounts } from '@/lib/eventRsvp.js';
 import EventCard from '@/components/EventCard.jsx';
 import EventDetailModal from '@/components/EventDetailModal.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -59,9 +61,16 @@ const ALL_SEO = {
 };
 
 const CommunityEventsPage = ({ defaultType = 'all' }) => {
+  const { currentUser, isAuthenticated } = useAuth();
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // RSVP counts + the current user's roles, batch-loaded for the whole list in a
+  // single request each. Without this each <EventRsvp> fetches its own event on
+  // mount — an N+1 across the grid (Sentry REACT-FRONT-END-C).
+  const [rsvpCounts, setRsvpCounts] = useState({});
+  const [myRsvps, setMyRsvps] = useState({});
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterState, setFilterState] = useState('all');
@@ -102,6 +111,35 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
     fetchEvents();
     return () => { isMounted.current = false; };
   }, []);
+
+  // Batch-load RSVP data for every loaded event at once. Re-runs when the signed-in
+  // user resolves so their own RSVP roles fill in. Each helper issues a single
+  // `.in(event_id, [...])` request, replacing the per-card N+1.
+  useEffect(() => {
+    const ids = events.map(e => e.id).filter(Boolean);
+    if (ids.length === 0) { setRsvpCounts({}); setMyRsvps({}); return undefined; }
+    let cancelled = false;
+    (async () => {
+      const [countsMap, mineMap] = await Promise.all([
+        fetchRsvpCounts(ids).catch(() => ({})),
+        isAuthenticated && currentUser?.id
+          ? fetchMyRsvps(currentUser.id, ids).catch(() => ({}))
+          : Promise.resolve({}),
+      ]);
+      if (!cancelled) { setRsvpCounts(countsMap); setMyRsvps(mineMap); }
+    })();
+    return () => { cancelled = true; };
+  }, [events, isAuthenticated, currentUser?.id]);
+
+  // Stable per-event { counts, myRole } objects so a card's <EventRsvp> only
+  // re-syncs when its data actually changes (not on search/filter re-renders).
+  const rsvpDataById = useMemo(() => {
+    const map = {};
+    for (const e of events) {
+      map[e.id] = { counts: rsvpCounts[e.id] || emptyCounts(), myRole: myRsvps[e.id] ?? null };
+    }
+    return map;
+  }, [events, rsvpCounts, myRsvps]);
 
   const filteredEvents = useMemo(() => {
     return events.filter(e => {
@@ -313,6 +351,7 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
                       key={event.id}
                       event={event}
                       isAdmin={false}
+                      rsvpData={rsvpDataById[event.id]}
                       onView={ev => { setSelectedEvent(ev); setIsDetailOpen(true); }}
                     />
                   ))}
