@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { CalendarDays, ExternalLink, Plus, Tv2, Trash2, Clock, X, Star, ImageIcon } from 'lucide-react';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { publicImageUrl, toCdnUrl } from '@/utils/imageUrl.js';
 
 import WhatnotIcon from '@/components/WhatnotIcon.jsx';
 
@@ -434,7 +434,7 @@ const WhatnotShowsPage = () => {
                   {show.preview_image_url && (
                     <div className="relative">
                       <img
-                        src={show.preview_image_url}
+                        src={toCdnUrl(show.preview_image_url)}
                         alt={show.show_title}
                         className="w-full h-48 object-cover"
                       />

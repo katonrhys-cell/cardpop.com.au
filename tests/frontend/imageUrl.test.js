@@ -28,6 +28,7 @@ import {
   publicImageUrl,
   canonicalStorageUrl,
   parseStorageObjectUrl,
+  cdnifyStorageUrlsInHtml,
   _setCdnHostForTests,
   _setTransformsEnabledForTests,
 } from '@/utils/imageUrl.js';
@@ -259,5 +260,35 @@ describe('parseStorageObjectUrl', () => {
     ).toBeNull();
     expect(parseStorageObjectUrl('user/card.jpg')).toBeNull();
     expect(parseStorageObjectUrl(null)).toBeNull();
+  });
+});
+
+describe('cdnifyStorageUrlsInHtml', () => {
+  const html =
+    '<p>intro</p>' +
+    '<img src="https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/object/public/media/media/1.png" alt="a">' +
+    '<img src="https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/render/image/public/media/media/2.png?width=640" alt="b">' +
+    '<img src="https://elsewhere.example/pic.jpg" alt="c">';
+
+  it('is a no-op when no CDN host is configured', () => {
+    _setCdnHostForTests(null);
+    expect(cdnifyStorageUrlsInHtml(html)).toBe(html);
+  });
+
+  it('rewrites every embedded Supabase storage URL onto the CDN host', () => {
+    _setCdnHostForTests('img.cardpop.com.au');
+    const out = cdnifyStorageUrlsInHtml(html);
+    expect(out).toContain('https://img.cardpop.com.au/storage/v1/object/public/media/media/1.png');
+    expect(out).toContain('https://img.cardpop.com.au/storage/v1/render/image/public/media/media/2.png?width=640');
+    // Non-Supabase URLs and surrounding markup are untouched.
+    expect(out).toContain('https://elsewhere.example/pic.jpg');
+    expect(out).toContain('<p>intro</p>');
+    expect(out).not.toContain('supabase.co');
+  });
+
+  it('passes non-string input through unchanged', () => {
+    _setCdnHostForTests('img.cardpop.com.au');
+    expect(cdnifyStorageUrlsInHtml(null)).toBe(null);
+    expect(cdnifyStorageUrlsInHtml(undefined)).toBe(undefined);
   });
 });

@@ -64,9 +64,15 @@ const publicImageUrl = (pathOrUrl) => {
 // Strip <script>/<style> blocks from admin-authored article HTML before
 // embedding it in the prerendered body. Content is trusted (our own CMS), but
 // removing executable tags keeps the bot-only document inert and well-formed.
+// Storage URLs embedded in the body are also rewritten onto the image CDN, so
+// crawlers fetching body images don't bill Supabase egress (mirrors
+// cdnifyStorageUrlsInHtml in utils/imageUrl.js).
+const STORAGE_URL_IN_HTML_RE =
+  /https?:\/\/[^/"'\s]+\.supabase\.(?:co|in)(\/storage\/v1\/(?:object|render\/image)\/public\/)/g;
 const sanitizeArticleHtml = (html = '') => String(html)
   .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '')
-  .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '');
+  .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
+  .replace(STORAGE_URL_IN_HTML_RE, IMAGE_CDN_ORIGIN ? `${IMAGE_CDN_ORIGIN}$1` : '$&');
 
 // Collapse HTML to a plain-text snippet for meta descriptions.
 const toText = (html = '', max = 300) => {
@@ -196,7 +202,7 @@ async function renderLocalTraders(supabase) {
       name: 'CardPop Trader Stores',
       itemListElement: stores.map((s, i) => {
         const name = s.business_name || s.display_name || s.username || 'Store';
-        const image = absUrl(s.business_logo_url);
+        const image = toCdnUrl(absUrl(s.business_logo_url));
         return {
           '@type': 'ListItem',
           position: i + 1,
@@ -273,7 +279,7 @@ async function renderDealer(supabase, param) {
     : (dealer.rating || 0);
 
   const name = dealer.business_name || dealer.display_name || 'Dealer';
-  const image = absUrl(dealer.business_logo_url || dealer.avatar_url);
+  const image = toCdnUrl(absUrl(dealer.business_logo_url || dealer.avatar_url));
   const location = [dealer.location_suburb, dealer.location_state].filter(Boolean).join(', ');
   const title = `${name} | CardPop Dealer`;
   const description = dealer.business_tagline || dealer.bio || `${name} — trading card dealer on CardPop Australia.`;
@@ -377,7 +383,7 @@ async function renderBlogArticle(supabase, param) {
   const title = article.seo_title || `${article.title} | The Parallel Report`;
   const bodyContent = sanitizeArticleHtml(article.content_html || article.content || '');
   const description = article.seo_description || article.excerpt || toText(bodyContent) || `Read ${article.title} on The Parallel Report — CardPop's trading card blog.`;
-  const image = absUrl(article.featured_image_url);
+  const image = toCdnUrl(absUrl(article.featured_image_url));
   const published = isoDate(article.published_at || article.created_at);
   const modified = isoDate(article.updated_at || article.published_at || article.created_at);
   const author = article.author || 'CardPop Research';

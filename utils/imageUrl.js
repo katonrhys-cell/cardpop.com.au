@@ -105,6 +105,22 @@ export function toCdnUrl(url) {
   return match ? `${cdnOrigin}${match[2]}` : url;
 }
 
+// Matches every Supabase storage public URL inside a blob of HTML, so stored
+// article/content HTML can be rewritten onto the CDN in one pass.
+const SUPABASE_STORAGE_URL_IN_HTML_RE =
+  /https?:\/\/[^/"'\s]+\.supabase\.(?:co|in)(\/storage\/v1\/(?:object|render\/image)\/public\/)/g;
+
+/**
+ * Rewrite every Supabase storage public URL embedded in an HTML string onto
+ * the image CDN. Admin-authored article bodies store canonical Supabase URLs
+ * in their <img> tags; per-call-site helpers can't reach those, so the whole
+ * HTML blob is rewritten just before render. No-op when no CDN is configured.
+ */
+export function cdnifyStorageUrlsInHtml(html) {
+  if (!cdnOrigin || typeof html !== 'string') return html;
+  return html.replace(SUPABASE_STORAGE_URL_IN_HTML_RE, `${cdnOrigin}$1`);
+}
+
 /**
  * Public URL for an image that may be stored as a bucket path or an absolute
  * URL (both shapes exist in the database). Routes through the image CDN when

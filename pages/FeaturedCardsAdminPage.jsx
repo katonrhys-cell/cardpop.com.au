@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
+import { toCdnUrl } from '@/utils/imageUrl.js';
 
 const FeaturedCardsAdminPage = () => {
   const [cards, setCards] = useState([]);
@@ -147,7 +148,7 @@ const FeaturedCardsAdminPage = () => {
                           <div className="w-12 h-16 bg-background rounded-lg flex items-center justify-center shrink-0 overflow-hidden border border-border shadow-sm">
                             {card.image_urls?.[0] ? (
                               <img
-                                src={card.image_urls[0]}
+                                src={toCdnUrl(card.image_urls[0])}
                                 alt={card.card_name || card.cardName}
                                 className="w-full h-full object-cover"
                               />

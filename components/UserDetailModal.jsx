@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { toCdnUrl } from '@/utils/imageUrl.js';
 
 const UserDetailModal = ({ user, isOpen, onClose, onUserUpdate }) => {
   const [isUpdating, setIsUpdating] = useState(false);
@@ -77,7 +78,7 @@ const UserDetailModal = ({ user, isOpen, onClose, onUserUpdate }) => {
             <div className="relative shrink-0">
               {user.avatar ? (
                 <img
-                  src={user.avatar_url || user.avatar}
+                  src={toCdnUrl(user.avatar_url || user.avatar)}
                   alt={user.name || user.email}
                   className="w-24 h-24 rounded-2xl object-cover shadow-sm border border-border"
                 />

@@ -17,7 +17,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { publicImageUrl, toCdnUrl } from '@/utils/imageUrl.js';
+import { compressImage } from '@/utils/compressImage.js';
 
 // Resolve a vault image reference (storage path or full URL) to a usable URL.
 const resolveVaultImage = (raw) => {
@@ -149,9 +150,12 @@ const HeroShowcaseAdminPage = () => {
   const resolveImageUrl = async () => {
     if (tab === 'upload') {
       if (!file) return null;
-      const ext = file.name.split('.').pop().toLowerCase();
+      // Hero images render on the homepage — compress before upload so every
+      // first-view costs a fraction of the egress.
+      const compressed = await compressImage(file);
+      const ext = (compressed.name || file.name).split('.').pop().toLowerCase();
       const path = `hero-showcase/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('media').upload(path, file, { cacheControl: '31536000' });
+      const { error: upErr } = await supabase.storage.from('media').upload(path, compressed, { cacheControl: '31536000' });
       if (upErr) throw upErr;
       return supabase.storage.from('media').getPublicUrl(path).data.publicUrl;
     }
@@ -317,7 +321,7 @@ const HeroShowcaseAdminPage = () => {
               >
                 <div className={`relative aspect-[3/4] bg-gradient-to-br ${accent.gradient}`}>
                   {card.image_url ? (
-                    <img src={card.image_url} alt={card.name} className="absolute inset-0 w-full h-full object-contain p-1.5" />
+                    <img src={toCdnUrl(card.image_url)} alt={card.name} className="absolute inset-0 w-full h-full object-contain p-1.5" />
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center"><ImageOff className="w-6 h-6 text-white/40" /></div>
                   )}

@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import { compressImage } from '@/utils/compressImage.js';
 
 const MediaLibraryPage = () => {
   const { currentUser } = useAuth();
@@ -81,12 +82,15 @@ const MediaLibraryPage = () => {
 
     setIsUploading(true);
     try {
-      const ext = selectedFile.name.split('.').pop().toLowerCase();
+      // Blog/media images are served on every article view — compress before
+      // upload (like listing photos) so each view costs a fraction of the egress.
+      const compressed = await compressImage(selectedFile);
+      const ext = (compressed.name || selectedFile.name).split('.').pop().toLowerCase();
       // Strip any extension the user left on the filename so we don't end up
       // with a doubled extension (e.g. "name.png.png") in the storage path/URL.
       const base = uploadData.filename.trim().replace(/\.[^/.]+$/, '').replace(/\s+/g, '_').replace(/[/\\]/g, '');
       const path = `media/${Date.now()}-${base}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('media').upload(path, selectedFile, { cacheControl: '31536000' });
+      const { error: upErr } = await supabase.storage.from('media').upload(path, compressed, { cacheControl: '31536000' });
       if (upErr) throw upErr;
       const publicUrl = supabase.storage.from('media').getPublicUrl(path).data.publicUrl;
 
