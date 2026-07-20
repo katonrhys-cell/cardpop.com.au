@@ -23,9 +23,36 @@ const STATUS_CONFIG = {
   'Expression of Interest': { label: 'Expression of Interest', className: 'bg-sky-500/10 text-sky-700 border-sky-300 dark:text-sky-400', icon: HandCoins },
   'sold':            { label: 'Sold',             className: 'bg-muted text-muted-foreground border-border', icon: ShoppingCart },
   'Sold':            { label: 'Sold',             className: 'bg-muted text-muted-foreground border-border', icon: ShoppingCart },
+  'archived':        { label: 'Archived',         className: 'bg-muted text-muted-foreground border-border', icon: PackageOpen },
 };
 
 const getStatusConfig = (status) => STATUS_CONFIG[status] ?? { label: status ?? 'Unknown', className: 'bg-muted text-muted-foreground border-border', icon: List };
+
+// Lifecycle state — the actual `listing_status` enum (active | sold | archived).
+const STATUS_OPTIONS = [
+  { value: 'active',   label: 'Active — visible in the marketplace' },
+  { value: 'sold',     label: 'Sold — mark as completed' },
+  { value: 'archived', label: 'Archived — hidden from the marketplace' },
+];
+const VALID_STATUSES = STATUS_OPTIONS.map((o) => o.value);
+
+// Sale mode maps to (listing_type, accepts_trade). "For Sale & Trade" stays a
+// fixed-price listing that also accepts trade offers — see migration
+// 20260630000001_add_accepts_trade_to_listings.
+const SALE_MODES = {
+  'For Sale':         { listing_type: 'fixed', accepts_trade: false },
+  'For Trade':        { listing_type: 'trade', accepts_trade: true },
+  'For Sale & Trade': { listing_type: 'fixed', accepts_trade: true },
+};
+const saleModeOf = (l) => {
+  if (l?.listing_type === 'trade') return 'For Trade';
+  if (l?.accepts_trade) return 'For Sale & Trade';
+  return 'For Sale';
+};
+// Only plain fixed/trade listings can flip between sale and trade here; auctions,
+// vault items and expressions of interest keep their type untouched.
+const SALE_MODE_TYPES = new Set(['fixed', 'trade']);
+const saleModeEditable = (l) => !l?.listing_type || SALE_MODE_TYPES.has(l.listing_type);
 
 // Listings created from the vault only store a vault_item_id reference — the
 // card's name/set/grade live on the joined vault_items row, so read the
@@ -49,7 +76,8 @@ const AccountListings = () => {
   const [error, setError] = useState(null);
 
   const [editListing, setEditListing] = useState(null);
-  const [newStatus, setNewStatus] = useState('');
+  const [newStatus, setNewStatus] = useState('active');
+  const [saleMode, setSaleMode] = useState('For Sale');
   const [acceptsOffers, setAcceptsOffers] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -91,17 +119,29 @@ const AccountListings = () => {
     if (!editListing || !newStatus) return;
     setSaving(true);
     try {
+      // status is the lifecycle enum; sale mode (only for fixed/trade listings)
+      // maps to the listing_type enum + accepts_trade flag. Both are written as
+      // valid values — the previous dialog wrote UI strings ("For Sale") into
+      // the status enum, so every save failed.
+      const payload = { status: newStatus, accepts_offers: acceptsOffers };
+      if (saleModeEditable(editListing)) {
+        const mode = SALE_MODES[saleMode];
+        if (mode) {
+          payload.listing_type = mode.listing_type;
+          payload.accepts_trade = mode.accepts_trade;
+        }
+      }
       const { error } = await supabase
         .from('listings')
-        .update({ status: newStatus, accepts_offers: acceptsOffers })
+        .update(payload)
         .eq('id', editListing.id)
         .eq('seller_id', currentUser.id);
       if (error) throw error;
-      toast.success('Listing status updated');
+      toast.success('Listing updated');
       setEditListing(null);
       fetchRef.current?.();
     } catch (err) {
-      toast.error(err.message || 'Failed to update status');
+      toast.error(err.message || 'Failed to update listing');
     } finally {
       setSaving(false);
     }
@@ -129,7 +169,8 @@ const AccountListings = () => {
 
   const openEdit = (listing) => {
     setEditListing(listing);
-    setNewStatus(listing.status ?? 'For Sale');
+    setNewStatus(VALID_STATUSES.includes(listing.status) ? listing.status : 'active');
+    setSaleMode(saleModeOf(listing));
     setAcceptsOffers(listing.accepts_offers ?? false);
   };
 
@@ -279,23 +320,40 @@ const AccountListings = () => {
       <Dialog open={!!editListing} onOpenChange={() => setEditListing(null)}>
         <DialogContent className="sm:max-w-[400px] rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="font-serif text-xl">Update Listing Status</DialogTitle>
+            <DialogTitle className="font-serif text-xl">Update Listing</DialogTitle>
             <DialogDescription>
-              Change visibility for <span className="font-bold text-foreground">{getCardDetails(editListing).name || 'this listing'}</span>.
+              Change availability and sale options for <span className="font-bold text-foreground">{getCardDetails(editListing).name || 'this listing'}</span>.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
-            <Select value={newStatus} onValueChange={setNewStatus}>
-              <SelectTrigger className="h-12 rounded-xl bg-background">
-                <SelectValue placeholder="Select status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="For Sale">For Sale</SelectItem>
-                <SelectItem value="For Trade">For Trade</SelectItem>
-                <SelectItem value="For Sale & Trade">For Sale &amp; Trade</SelectItem>
-                <SelectItem value="Sold">Sold (mark as completed)</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="space-y-2">
+              <Label className="text-sm font-bold">Status</Label>
+              <Select value={newStatus} onValueChange={setNewStatus}>
+                <SelectTrigger className="h-12 rounded-xl bg-background">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {editListing && saleModeEditable(editListing) && (
+              <div className="space-y-2">
+                <Label className="text-sm font-bold">Sale mode</Label>
+                <Select value={saleMode} onValueChange={setSaleMode}>
+                  <SelectTrigger className="h-12 rounded-xl bg-background">
+                    <SelectValue placeholder="Select sale mode" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="For Sale">For Sale</SelectItem>
+                    <SelectItem value="For Trade">For Trade</SelectItem>
+                    <SelectItem value="For Sale & Trade">For Sale &amp; Trade</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="flex items-center justify-between p-4 bg-muted/50 rounded-xl border border-border">
               <div className="flex items-start gap-3">
                 <Tag className="w-4 h-4 text-primary shrink-0 mt-0.5" />
