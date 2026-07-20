@@ -123,7 +123,7 @@ const AccountWallet = () => {
   const walletBalance = connectStatus?.wallet_balance_aud || 0;
 
   return (
-    <div className="max-w-[100rem] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 space-y-6 animate-in fade-in duration-300">
+    <div className="max-w-[90rem] w-full mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-6 md:py-8 space-y-6 animate-in fade-in duration-300">
       <Helmet><title>Wallet & Payouts | CardPop</title></Helmet>
       <Breadcrumb items={[{ label: 'Account', path: '/account' }, { label: 'Wallet & Payouts' }]} />
 
