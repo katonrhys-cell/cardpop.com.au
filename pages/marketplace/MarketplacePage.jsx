@@ -347,7 +347,7 @@ const MarketplacePage = () => {
         </div>
       </section>
 
-      <section className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 mt-8 w-full flex-1">
+      <section className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 mt-8 w-full flex-1">
 
         <div className="flex flex-col lg:flex-row gap-8">
 

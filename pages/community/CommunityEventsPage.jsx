@@ -224,7 +224,7 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
         </div>
       </section>
 
-      <div className="flex-1 max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full space-y-5">
+      <div className="flex-1 max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-10 w-full space-y-5">
 
         {/* Filter Bar */}
         <div className="bg-card border border-border rounded-2xl p-4 shadow-sm">
@@ -373,7 +373,7 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
 
       {/* SEO content */}
       <section className="border-t border-border bg-card">
-        <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-14 grid gap-10 md:grid-cols-2">
+        <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-14 grid gap-10 md:grid-cols-2">
           <div>
             <h2 className="text-2xl font-bold mb-4">Find a Card Show Near You</h2>
             <p className="text-muted-foreground leading-relaxed mb-4">

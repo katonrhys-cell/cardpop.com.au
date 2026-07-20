@@ -341,7 +341,7 @@ const MarketsPage = () => {
         </div>
       </section>
 
-      <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
+      <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-10 space-y-10">
 
         {/* Search bar */}
         <div className="max-w-2xl mx-auto">

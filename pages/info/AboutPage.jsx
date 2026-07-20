@@ -40,7 +40,7 @@ const AboutPage = () => {
         {/* Brand glow accents */}
         <div className="pointer-events-none absolute -top-24 -right-24 w-96 h-96 rounded-full bg-brand-red/20 blur-3xl" aria-hidden="true" />
         <div className="pointer-events-none absolute -bottom-32 -left-24 w-96 h-96 rounded-full bg-brand-red/10 blur-3xl" aria-hidden="true" />
-        <div className="relative max-w-[100rem] mx-auto grid lg:grid-cols-2 gap-10 lg:gap-16 items-end">
+        <div className="relative max-w-[90rem] mx-auto grid lg:grid-cols-2 gap-10 lg:gap-16 items-end">
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-background/20 bg-background/5 px-4 py-1.5 text-xs font-bold uppercase tracking-wider mb-7">
               <span className="w-2 h-2 rounded-full bg-brand-red" aria-hidden="true" />
@@ -75,7 +75,7 @@ const AboutPage = () => {
 
       {/* ── Founder Story ── */}
       <section className="bg-background px-6 py-24">
-        <div className="max-w-[100rem] mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_420px] gap-12 lg:gap-16 items-start">
+        <div className="max-w-[90rem] mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_420px] gap-12 lg:gap-16 items-start">
           {/* Story */}
           <div>
             <div className="flex items-center gap-3 mb-8">
@@ -150,7 +150,7 @@ const AboutPage = () => {
 
       {/* ── More than a marketplace ── */}
       <section className="bg-secondary/40 px-6 py-20 md:py-24">
-        <div className="max-w-[100rem] mx-auto">
+        <div className="max-w-[90rem] mx-auto">
           <div className="max-w-2xl mb-12">
             <div className="flex items-center gap-3 mb-6">
               <span className="w-10 h-1 rounded-full bg-brand-red" aria-hidden="true" />
@@ -179,7 +179,7 @@ const AboutPage = () => {
 
       {/* ── What We Believe ── */}
       <section className="bg-foreground px-6 py-24">
-        <div className="max-w-[100rem] mx-auto">
+        <div className="max-w-[90rem] mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-background text-3xl font-extrabold mb-3">What we believe</h2>
             <p className="text-background/50 text-sm">

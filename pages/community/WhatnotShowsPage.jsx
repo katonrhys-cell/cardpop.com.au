@@ -215,7 +215,7 @@ const WhatnotShowsPage = () => {
         </div>
       </section>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="max-w-4xl mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-10">
 
         {/* ── Auth banner ── */}
         {isAuthenticated ? (

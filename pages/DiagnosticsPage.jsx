@@ -78,7 +78,7 @@ const DiagnosticsPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans selection:bg-primary selection:text-primary-foreground">
+    <div className="min-h-screen bg-[#0a0a0a] text-slate-50 py-12 px-5 sm:px-8 lg:px-12 xl:px-16 font-sans selection:bg-primary selection:text-primary-foreground">
       <Helmet>
         <title>System Diagnostics | Emergency Console</title>
         <meta name="robots" content="noindex, nofollow" />

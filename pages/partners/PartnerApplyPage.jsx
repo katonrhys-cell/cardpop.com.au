@@ -151,7 +151,7 @@ const PartnerApplyPage = () => {
         canonicalUrl="/partners/apply"
       />
 
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+      <div className="max-w-2xl mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-10 space-y-8">
         <Link to="/partners" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="w-4 h-4" /> About the partner program
         </Link>

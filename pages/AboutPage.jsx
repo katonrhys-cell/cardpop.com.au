@@ -15,7 +15,7 @@ const AboutPage = () => {
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.05),transparent_50%)]" />
         </div>
-        <div className="max-w-[100rem] mx-auto px-4 relative z-10 text-center">
+        <div className="max-w-[90rem] mx-auto px-4 relative z-10 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary mb-6 border border-primary/20">
             <Sparkles className="w-4 h-4" />
             <span className="text-sm font-bold tracking-wide uppercase">Our Story</span>
@@ -31,7 +31,7 @@ const AboutPage = () => {
 
       {/* 2. MISSION STATEMENT */}
       <section className="py-24 bg-background">
-        <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
             <div className="order-2 md:order-1 relative">
               <div className="aspect-square rounded-3xl overflow-hidden bg-card border border-border shadow-sm relative">
@@ -62,7 +62,7 @@ const AboutPage = () => {
 
       {/* 3. HISTORY & TIMELINE */}
       <section className="py-24 bg-card border-y border-border shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <div className="max-w-4xl mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 text-center">
           <div className="w-14 h-14 bg-background rounded-2xl shadow-sm border border-border flex items-center justify-center mx-auto mb-8">
             <History className="w-7 h-7 text-primary" />
           </div>
@@ -106,7 +106,7 @@ const AboutPage = () => {
 
       {/* 4. BRAND IDENTITY */}
       <section className="py-24 bg-background">
-        <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-serif text-foreground mb-4">Our Core Values</h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">The principles that guide every feature we build and every interaction we support.</p>
@@ -143,7 +143,7 @@ const AboutPage = () => {
 
       {/* 5. TEAM SECTION */}
       <section className="py-24 bg-card border-t border-border shadow-sm">
-        <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-serif text-foreground mb-4">Meet the Team</h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">The passionate collectors and technologists behind CardPop.</p>

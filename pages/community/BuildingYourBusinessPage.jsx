@@ -150,7 +150,7 @@ const BuildingYourBusinessPage = () => {
       <section className="relative overflow-hidden bg-brand-charcoal text-white">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-brand-red/40 via-brand-charcoal to-brand-charcoal pointer-events-none" />
         <div className="absolute -top-16 -right-16 w-72 h-72 rounded-full bg-brand-red/10 blur-3xl pointer-events-none" />
-        <div className="relative max-w-[100rem] mx-auto px-4 sm:px-6 py-16 sm:py-20">
+        <div className="relative max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-16 sm:py-20">
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-end">
             <div>
               <div className="flex items-center gap-2.5 mb-4">
@@ -171,7 +171,7 @@ const BuildingYourBusinessPage = () => {
         </div>
       </section>
 
-      <div className="max-w-[100rem] mx-auto px-4 sm:px-6 py-12 sm:py-16 space-y-14">
+      <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-12 sm:py-16 space-y-14">
         {/* The approach */}
         <section>
           <h2 className="text-2xl sm:text-3xl font-serif font-bold text-foreground mb-3">Why a multi-pronged approach wins</h2>

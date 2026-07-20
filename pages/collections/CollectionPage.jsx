@@ -578,7 +578,7 @@ const CollectionPage = () => {
           backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.4'/%3E%3C/svg%3E")`
         }} />
 
-        <div className="relative container mx-auto px-4 sm:px-6 lg:px-8 flex flex-col lg:flex-row items-center gap-10">
+        <div className="relative container mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 flex flex-col lg:flex-row items-center gap-10">
           <div className="flex-1 text-center lg:text-left">
             <Badge
               className="mb-4 text-xs font-bold uppercase tracking-widest px-3 py-1"
@@ -631,7 +631,7 @@ const CollectionPage = () => {
       {/* lg:top-[120px] = desktop: Row 1 (68px) + Row 2 nav (48px) + border (1px) */}
       {eras && eras.length > 0 && (
         <section className="border-b border-border bg-background/95 backdrop-blur-md sticky top-[70px] lg:top-[120px] z-20 shadow-sm">
-          <div className="container mx-auto px-4 sm:px-6">
+          <div className="container mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
             <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide py-3">
 
               {/* All / reset */}
@@ -675,7 +675,7 @@ const CollectionPage = () => {
         </section>
       )}
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-16">
+      <div className="container mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-10 space-y-16">
 
         {/* ── SEO INTRO ───────────────────────────────────────────────────── */}
         {seoIntro && (

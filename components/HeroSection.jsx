@@ -20,7 +20,7 @@ const TRUST = [
 
 const HeroSection = () => {
   return (
-    <section className="relative min-h-[92dvh] flex items-start justify-center pt-10 sm:pt-14 pb-16 px-4 sm:px-6 lg:px-8 overflow-hidden bg-zinc-950">
+    <section className="relative min-h-[92dvh] flex items-start justify-center pt-10 sm:pt-14 pb-16 px-5 sm:px-8 lg:px-12 xl:px-16 overflow-hidden bg-zinc-950">
 
       {/* Stage floor gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-zinc-950 via-[#0f0f14] to-zinc-950 pointer-events-none" />

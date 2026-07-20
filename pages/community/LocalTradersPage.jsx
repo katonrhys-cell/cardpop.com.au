@@ -222,7 +222,7 @@ const LocalTradersPage = () => {
         </div>
       </section>
 
-      <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-10">
 
         {/* Featured Stores (sole-trader dealers) */}
         {stores.length > 0 && (
@@ -556,7 +556,7 @@ const LocalTradersPage = () => {
 
       {/* SEO footer */}
       <section className="border-t border-border bg-muted/30 py-14 mt-10">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <div className="max-w-5xl mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 text-center">
           <h2 className="text-2xl font-bold mb-3">Trade with Confidence, Trade Local</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto text-sm leading-relaxed">
             CardPop's Local Traders directory connects you with personally endorsed sellers in your
