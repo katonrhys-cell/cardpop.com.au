@@ -83,7 +83,12 @@ const AccountWallet = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ returnUrl, refreshUrl }),
       });
-      if (!res.ok) throw new Error('Failed to start Stripe onboarding');
+      if (!res.ok) {
+        // Surface the backend's reason (e.g. Stripe platform setup incomplete)
+        // instead of a generic failure toast.
+        const detail = await res.json().catch(() => null);
+        throw new Error(detail?.error || 'Failed to start Stripe onboarding');
+      }
       const { url } = await res.json();
       window.location.href = url;
     } catch (err) {
@@ -101,7 +106,10 @@ const AccountWallet = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ returnUrl, refreshUrl: returnUrl }),
       });
-      if (!res.ok) throw new Error('Could not open Stripe dashboard');
+      if (!res.ok) {
+        const detail = await res.json().catch(() => null);
+        throw new Error(detail?.error || 'Could not open Stripe dashboard');
+      }
       const { url } = await res.json();
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (err) {
@@ -115,16 +123,16 @@ const AccountWallet = () => {
   const walletBalance = connectStatus?.wallet_balance_aud || 0;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="max-w-[100rem] w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 space-y-6 animate-in fade-in duration-300">
       <Helmet><title>Wallet & Payouts | CardPop</title></Helmet>
       <Breadcrumb items={[{ label: 'Account', path: '/account' }, { label: 'Wallet & Payouts' }]} />
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold font-heading mb-1">Wallet & Payouts</h1>
           <p className="text-muted-foreground">Connect Stripe to receive sale proceeds directly to your bank account.</p>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => { fetchStatus(); fetchSales(); }} className="rounded-xl">
+        <Button variant="ghost" size="icon" onClick={() => { fetchStatus(); fetchSales(); }} className="rounded-xl shrink-0">
           <RefreshCw className="w-4 h-4" />
         </Button>
       </div>

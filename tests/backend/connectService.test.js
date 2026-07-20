@@ -3,7 +3,8 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 // ─── mock the shared stripe + supabase clients before importing the service ────
 
 const mockStripe = vi.hoisted(() => ({
-  v2: { core: { accounts: { create: vi.fn(), retrieve: vi.fn() }, accountLinks: { create: vi.fn() } } },
+  accounts: { create: vi.fn(), retrieve: vi.fn(), createLoginLink: vi.fn() },
+  accountLinks: { create: vi.fn() },
 }));
 vi.mock('../../src/utils/stripeClient.js', () => ({ default: mockStripe }));
 
@@ -30,39 +31,36 @@ import { ensureSellerConnectAccount, getConnectStatus } from '../../src/services
 import { buildSellerAccountParams, isPayoutReady, payoutAccountName } from '../../src/utils/sellerAccountShape.js';
 
 beforeEach(() => {
-  mockStripe.v2.core.accounts.create.mockReset();
-  mockStripe.v2.core.accounts.retrieve.mockReset();
+  mockStripe.accounts.create.mockReset();
+  mockStripe.accounts.retrieve.mockReset();
   supabaseState.updateError = null;
   supabaseState.lastUpdate = null;
   supabaseState.profile = null;
 });
 
 describe('buildSellerAccountParams', () => {
-  it('builds an AU recipient account requesting stripe_transfers', () => {
+  it('builds an AU Express account requesting transfers', () => {
     const params = buildSellerAccountParams('user-1', { email: 'a@b.com', displayName: 'Ada' });
-    expect(params.identity.country).toBe('au');
-    expect(params.configuration.recipient.capabilities.stripe_balance.stripe_transfers.requested).toBe(true);
-    expect(params.defaults.responsibilities.losses_collector).toBe('application');
-    expect(params.defaults.responsibilities.fees_collector).toBe('application');
-    expect(params.dashboard).toBe('express');
-    expect(params.contact_email).toBe('a@b.com');
-    expect(params.display_name).toBe('Ada');
+    expect(params.type).toBe('express');
+    expect(params.country).toBe('AU');
+    expect(params.capabilities.transfers.requested).toBe(true);
+    expect(params.email).toBe('a@b.com');
+    expect(params.business_profile.name).toBe('Ada');
     expect(params.metadata.cardpop_user_id).toBe('user-1');
   });
 
-  it('omits contact_email / display_name when not provided (no undefined keys)', () => {
+  it('omits email / business_profile when not provided (no undefined keys)', () => {
     const params = buildSellerAccountParams('user-2');
-    expect('contact_email' in params).toBe(false);
-    expect('display_name' in params).toBe(false);
+    expect('email' in params).toBe(false);
+    expect('business_profile' in params).toBe(false);
   });
 });
 
 describe('isPayoutReady', () => {
-  it('is true only when the recipient stripe_transfers capability is active', () => {
-    const active = { configuration: { recipient: { capabilities: { stripe_balance: { stripe_transfers: { status: 'active' } } } } } };
-    const pending = { configuration: { recipient: { capabilities: { stripe_balance: { stripe_transfers: { status: 'pending' } } } } } };
-    expect(isPayoutReady(active)).toBe(true);
-    expect(isPayoutReady(pending)).toBe(false);
+  it('is true only when payouts are enabled and the transfers capability is active', () => {
+    expect(isPayoutReady({ payouts_enabled: true, capabilities: { transfers: 'active' } })).toBe(true);
+    expect(isPayoutReady({ payouts_enabled: true, capabilities: { transfers: 'pending' } })).toBe(false);
+    expect(isPayoutReady({ payouts_enabled: false, capabilities: { transfers: 'active' } })).toBe(false);
     expect(isPayoutReady(null)).toBe(false);
     expect(isPayoutReady({})).toBe(false);
   });
@@ -73,19 +71,20 @@ describe('ensureSellerConnectAccount', () => {
     const result = await ensureSellerConnectAccount('user-1', 'acct_existing');
 
     expect(result).toEqual({ accountId: 'acct_existing', created: false });
-    expect(mockStripe.v2.core.accounts.create).not.toHaveBeenCalled();
+    expect(mockStripe.accounts.create).not.toHaveBeenCalled();
     expect(supabaseState.lastUpdate).toBeNull();
   });
 
-  it('creates a v2 recipient account and persists it when none exists', async () => {
-    mockStripe.v2.core.accounts.create.mockResolvedValue({ id: 'acct_new' });
+  it('creates an Express account and persists it when none exists', async () => {
+    mockStripe.accounts.create.mockResolvedValue({ id: 'acct_new' });
 
     const result = await ensureSellerConnectAccount('user-2', null, { email: 'a@b.com', displayName: 'Ada' });
 
     expect(result).toEqual({ accountId: 'acct_new', created: true });
-    const args = mockStripe.v2.core.accounts.create.mock.calls[0][0];
-    expect(args.identity.country).toBe('au');
-    expect(args.configuration.recipient.capabilities.stripe_balance.stripe_transfers.requested).toBe(true);
+    const args = mockStripe.accounts.create.mock.calls[0][0];
+    expect(args.type).toBe('express');
+    expect(args.country).toBe('AU');
+    expect(args.capabilities.transfers.requested).toBe(true);
     expect(args.metadata.cardpop_user_id).toBe('user-2');
     // The new id is written back to the profile, not yet onboarded.
     expect(supabaseState.lastUpdate).toEqual({
@@ -95,7 +94,7 @@ describe('ensureSellerConnectAccount', () => {
   });
 
   it('throws if the account is created but cannot be persisted (avoids silent orphan)', async () => {
-    mockStripe.v2.core.accounts.create.mockResolvedValue({ id: 'acct_orphan' });
+    mockStripe.accounts.create.mockResolvedValue({ id: 'acct_orphan' });
     supabaseState.updateError = { message: 'db down' };
 
     await expect(ensureSellerConnectAccount('user-3', null)).rejects.toThrow(/db down/);
@@ -103,18 +102,20 @@ describe('ensureSellerConnectAccount', () => {
 });
 
 describe('payoutAccountName', () => {
-  it('prefers the individual given/surname, falls back to the registered business name', () => {
-    expect(payoutAccountName({ identity: { individual: { given_name: 'Maya', surname: 'Chen' } } })).toBe('Maya Chen');
-    expect(payoutAccountName({ identity: { business_details: { registered_name: 'Cardtopia Pty Ltd' } } })).toBe('Cardtopia Pty Ltd');
-    expect(payoutAccountName({ identity: {} })).toBe('');
+  it('prefers the individual first/last name, falls back to the company name', () => {
+    expect(payoutAccountName({ individual: { first_name: 'Maya', last_name: 'Chen' } })).toBe('Maya Chen');
+    expect(payoutAccountName({ company: { name: 'Cardtopia Pty Ltd' } })).toBe('Cardtopia Pty Ltd');
+    expect(payoutAccountName({})).toBe('');
     expect(payoutAccountName(null)).toBe('');
   });
 });
 
 describe('getConnectStatus payout name cross-check', () => {
-  const activeAccount = (identity) => ({
-    configuration: { recipient: { capabilities: { stripe_balance: { stripe_transfers: { status: 'active' } } } } },
-    identity,
+  const activeAccount = (fields) => ({
+    payouts_enabled: true,
+    capabilities: { transfers: 'active' },
+    details_submitted: true,
+    ...fields,
   });
   const makeRes = () => ({ json: vi.fn(), status: vi.fn().mockReturnThis() });
 
@@ -123,11 +124,11 @@ describe('getConnectStatus payout name cross-check', () => {
       stripe_connect_account_id: 'acct_1', stripe_connect_onboarded: true,
       display_name: 'Maya Chen', legal_name: 'Maya Chen', business_name: null, payout_name_mismatch: false,
     };
-    mockStripe.v2.core.accounts.retrieve.mockResolvedValue(activeAccount({ individual: { given_name: 'John', surname: 'Smith' } }));
+    mockStripe.accounts.retrieve.mockResolvedValue(activeAccount({ individual: { first_name: 'John', last_name: 'Smith' } }));
 
     await getConnectStatus({ user: { id: 'user-1' } }, makeRes());
 
-    expect(mockStripe.v2.core.accounts.retrieve.mock.calls[0][1].include).toContain('identity');
+    expect(mockStripe.accounts.retrieve).toHaveBeenCalledWith('acct_1');
     expect(supabaseState.lastUpdate).toEqual({ stripe_connect_onboarded: true, payout_name_mismatch: true });
   });
 
@@ -136,7 +137,7 @@ describe('getConnectStatus payout name cross-check', () => {
       stripe_connect_account_id: 'acct_1', stripe_connect_onboarded: true,
       display_name: 'Maya Chen', legal_name: 'Maya Chen', business_name: null, payout_name_mismatch: true,
     };
-    mockStripe.v2.core.accounts.retrieve.mockResolvedValue(activeAccount({ individual: { given_name: 'Maya', surname: 'Chen' } }));
+    mockStripe.accounts.retrieve.mockResolvedValue(activeAccount({ individual: { first_name: 'Maya', last_name: 'Chen' } }));
 
     await getConnectStatus({ user: { id: 'user-1' } }, makeRes());
 
@@ -148,7 +149,7 @@ describe('getConnectStatus payout name cross-check', () => {
       stripe_connect_account_id: 'acct_1', stripe_connect_onboarded: true,
       display_name: 'Maya Chen', legal_name: 'Maya Chen', business_name: 'Cardtopia Pty Ltd', payout_name_mismatch: false,
     };
-    mockStripe.v2.core.accounts.retrieve.mockResolvedValue(activeAccount({ business_details: { registered_name: 'Cardtopia Pty Ltd' } }));
+    mockStripe.accounts.retrieve.mockResolvedValue(activeAccount({ company: { name: 'Cardtopia Pty Ltd' } }));
 
     await getConnectStatus({ user: { id: 'user-1' } }, makeRes());
 
@@ -161,7 +162,7 @@ describe('getConnectStatus payout name cross-check', () => {
       stripe_connect_account_id: 'acct_1', stripe_connect_onboarded: false,
       display_name: 'Maya Chen', legal_name: null, business_name: null, payout_name_mismatch: false,
     };
-    mockStripe.v2.core.accounts.retrieve.mockResolvedValue({ configuration: {}, identity: {} });
+    mockStripe.accounts.retrieve.mockResolvedValue({ payouts_enabled: false, capabilities: {} });
 
     await getConnectStatus({ user: { id: 'user-1' } }, makeRes());
 
