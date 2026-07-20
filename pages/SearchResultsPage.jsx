@@ -45,7 +45,11 @@ const SearchResultsPage = () => {
           .range(from, from + PER_PAGE - 1);
 
         if (query.trim()) {
-          const safeQuery = query.trim().replace(/[%,]/g, '');
+          // Strip characters that break the PostgREST .or() grammar: % (ilike
+          // wildcard), , (condition separator) and () (grouping). Without the
+          // parens, a query like "Charizard (Shadowless)" produced a 400 that
+          // surfaced as a false "No results found".
+          const safeQuery = query.trim().replace(/[%,()]/g, '');
           dbQuery = dbQuery.or(
             `card_name.ilike.%${safeQuery}%,set_name.ilike.%${safeQuery}%`,
             { referencedTable: 'vault_items' }
