@@ -132,13 +132,21 @@ const PartnersManagementPage = () => {
     }
     setPartners(data || []);
 
-    const userIds = [...new Set((data || []).map((p) => p.user_id))];
+    const userIds = [...new Set((data || []).map((p) => p.user_id).filter(Boolean))];
     if (userIds.length) {
-      const { data: profileRows } = await supabase
-        .from('profiles')
-        .select('id, email, display_name')
-        .in('id', userIds);
-      setProfiles(Object.fromEntries((profileRows || []).map((p) => [p.id, p])));
+      // email isn't client-readable on profiles (no column grant — selecting it
+      // would 403 the whole query), so fetch names via the client and emails via
+      // the admin backend, then merge.
+      const [{ data: profileRows }, emailRes] = await Promise.all([
+        supabase.from('profiles').select('id, display_name').in('id', userIds),
+        apiServerClient.fetch('/admin/user-emails', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: userIds }),
+        }).then((r) => (r.ok ? r.json() : { emails: {} })).catch(() => ({ emails: {} })),
+      ]);
+      const emails = emailRes?.emails || {};
+      setProfiles(Object.fromEntries((profileRows || []).map((p) => [p.id, { ...p, email: emails[p.id] || null }])));
     }
 
     const partnerIds = (data || []).filter((p) => p.status === 'approved').map((p) => p.id);

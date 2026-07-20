@@ -34,6 +34,28 @@ router.use(requireAal2);
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
+// ─── Look up user login emails (admin-only) ───────────────────────────────────
+// profiles.email is deliberately not client-readable (no column grant — see
+// 20260715210000), so admin UIs that need to display or act on a user's email
+// (user detail sidebar, partner-applicant list) fetch it here through the
+// service-role client instead of a direct client select that would 403.
+router.post('/user-emails', async (req, res) => {
+  const ids = Array.isArray(req.body?.ids)
+    ? [...new Set(req.body.ids.filter((x) => typeof x === 'string'))].slice(0, 500)
+    : [];
+  if (!ids.length) return res.json({ emails: {} });
+
+  const { data, error } = await supabase.from('profiles').select('id, email').in('id', ids);
+  if (error) {
+    logger.error(`[ADMIN] user-emails lookup failed: ${error.message}`);
+    return res.status(500).json({ error: 'Failed to load user emails' });
+  }
+
+  const emails = {};
+  for (const row of data || []) emails[row.id] = row.email || null;
+  res.json({ emails });
+});
+
 // ─── Set a user's admin flag ──────────────────────────────────────────────────
 router.patch('/users/:userId/role', validateRequestParams(setUserRoleSchema), validateRequestBody(setUserRoleBodySchema), async (req, res) => {
   const { userId } = req.params;
