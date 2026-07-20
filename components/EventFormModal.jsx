@@ -348,15 +348,18 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         seo_keywords:        formData.seo_keywords.length ? formData.seo_keywords : null,
         tags:                formData.tags.length ? formData.tags : null,
         source_url:          formData.source_url.trim() || null,
-        // Organiser FK
-        ...(currentUser?.id && { organiser_id: currentUser.id }),
       };
 
       if (event?.id) {
+        // NB: organiser_id is deliberately NOT in the update payload — editing
+        // an event (incl. an admin fixing a user submission) must not reassign
+        // its owner to the editor.
         const { error } = await supabase.from('events').update(payload).eq('id', event.id);
         if (error) throw error;
         toast.success(isUserMode ? 'Event updated — it will be reviewed before publishing.' : 'Event updated successfully');
       } else {
+        // Organiser FK — set only on create, to the submitting user.
+        if (currentUser?.id) payload.organiser_id = currentUser.id;
         // SEO-friendly slug for the event detail URL; suffix on collision
         payload.slug = `${slugify(formData.title)}-${formData.start_date}`;
         let { data: inserted, error } = await supabase.from('events').insert(payload).select('id').single();

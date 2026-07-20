@@ -54,12 +54,16 @@ const AccountDashboard = () => {
 
       try {
         const [salesRes, revenueRes, listingsRes, vaultRes, tradesRes] = await Promise.all([
+          // "Completed Sales" / "Total Revenue" are seller-side stats, so scope
+          // to seller_id (not buyer OR seller — a user's own purchases aren't
+          // their revenue) and use the real terminal order status 'completed'
+          // ('delivered' is never written anywhere, so this was always 0).
           supabase.from('orders').select('id', { count: 'exact', head: true })
-            .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
-            .eq('status', 'delivered'),
+            .eq('seller_id', currentUser.id)
+            .eq('status', 'completed'),
           supabase.from('orders').select('total_aud')
-            .or(`buyer_id.eq.${currentUser.id},seller_id.eq.${currentUser.id}`)
-            .eq('status', 'delivered'),
+            .eq('seller_id', currentUser.id)
+            .eq('status', 'completed'),
           supabase.from('listings').select('id', { count: 'exact', head: true })
             .eq('seller_id', currentUser.id).eq('status', 'active').neq('listing_type', 'vault'),
           supabase.from('vault_items').select('id', { count: 'exact', head: true })
