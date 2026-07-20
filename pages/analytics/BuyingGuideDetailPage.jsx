@@ -174,7 +174,7 @@ const BuyingGuideDetailPage = () => {
 
       {/* Hero */}
       <section className={`relative bg-gradient-to-br ${guide.gradient} text-white`}>
-        <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-14">
+        <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-14">
           <Link
             to="/analytics/buying-guides"
             className="inline-flex items-center gap-1.5 text-sm font-medium text-white/80 hover:text-white transition-colors mb-6"
@@ -199,7 +199,7 @@ const BuyingGuideDetailPage = () => {
         </div>
       </section>
 
-      <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-10 grid lg:grid-cols-3 gap-10">
+      <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-10 grid lg:grid-cols-3 gap-10">
         {/* Main column */}
         <div className="lg:col-span-2 space-y-10">
           {/* Overview */}

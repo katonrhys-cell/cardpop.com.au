@@ -278,7 +278,7 @@ const BlogArticlePage = () => {
 
   if (loading) {
     return (
-      <div className="container-default max-w-[100rem] mx-auto py-24 space-y-8 min-h-[100dvh]">
+      <div className="container-default max-w-[90rem] mx-auto py-24 space-y-8 min-h-[100dvh]">
         <Skeleton className="h-12 w-3/4 rounded-lg" />
         <Skeleton className="h-6 w-1/4 rounded-md" />
         <Skeleton className="aspect-[21/9] w-full rounded-2xl" />
@@ -538,7 +538,7 @@ const BlogArticlePage = () => {
             ></div>
           </div>
         ) : (
-          <div className="container-default max-w-[100rem] mx-auto">
+          <div className="container-default max-w-[90rem] mx-auto">
             <p className="text-muted-foreground italic">No content available for this article.</p>
           </div>
         )}
@@ -648,7 +648,7 @@ const BlogArticlePage = () => {
         <section className="bg-secondary/30 py-20 border-t border-border">
           <div className="container-default">
             <h2 className="text-3xl font-bold mb-10 text-center">More from Parallel Reports</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-[100rem] mx-auto">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-[90rem] mx-auto">
               {relatedArticles.map((related) => {
                 const relImg = toCdnUrl(related.featured_image_url) || null;
                 const relLink = related.slug ? `/blog/${related.slug}` : `/blog/${related.id}`;

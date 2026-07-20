@@ -213,7 +213,7 @@ const SignupPage = () => {
       <Helmet><title>Join | Card Pop</title><meta name="robots" content="noindex, nofollow" /></Helmet>
 
       <div className="flex-1 py-12 lg:py-20 bg-muted/20">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:grid-rows-[auto_1fr] gap-10 lg:gap-x-16 items-start">
+        <div className="max-w-6xl mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:grid-rows-[auto_1fr] gap-10 lg:gap-x-16 items-start">
 
           {/* ── Heading + vault icon ────────────────────────────────────── */}
           <div className="text-center lg:text-left">

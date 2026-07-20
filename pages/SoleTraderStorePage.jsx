@@ -121,7 +121,7 @@ const SoleTraderStorePage = () => {
   }, [routeParam, navigate]);
 
   if (loading) return (
-    <div className="max-w-[100rem] mx-auto px-4 py-12 space-y-8 animate-in fade-in duration-500">
+    <div className="max-w-[90rem] mx-auto px-4 py-12 space-y-8 animate-in fade-in duration-500">
       <Skeleton className="h-72 w-full rounded-[2rem]" />
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <Skeleton className="h-56 rounded-[2rem]" />
@@ -241,7 +241,7 @@ const SoleTraderStorePage = () => {
 
       {/* ── Hero Banner ─────────────────────────────────────────────────── */}
       <div className="bg-[hsl(var(--profile-bg))] border-b border-[hsl(var(--section-divider))]">
-        <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-12">
+        <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 pt-16 pb-12">
           <BackButton fallback="/marketplace" className="mb-8" />
           <div className="flex flex-col md:flex-row gap-8 items-center md:items-start text-center md:text-left">
 
@@ -361,7 +361,7 @@ const SoleTraderStorePage = () => {
         {/* Trust badge strip */}
         {trustBadges.length > 0 && (
           <div className="border-t border-[hsl(var(--section-divider))]">
-            <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-4">
               <div className="flex flex-wrap justify-center md:justify-start gap-x-8 gap-y-3">
                 {trustBadges.map(({ label, desc, Icon }) => (
                   <div key={label} className="flex items-center gap-2.5" title={desc}>
@@ -376,7 +376,7 @@ const SoleTraderStorePage = () => {
       </div>
 
       {/* ── Body ────────────────────────────────────────────────────────── */}
-      <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-12 grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-12 grid grid-cols-1 lg:grid-cols-4 gap-8">
 
         {/* Sidebar */}
         <div className="lg:col-span-1 space-y-6">
