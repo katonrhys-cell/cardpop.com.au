@@ -1,4 +1,4 @@
-// One-off backfill that pre-creates a Stripe v2 recipient account for every
+// One-off backfill that pre-creates a Stripe Connect Express account for every
 // existing seller who doesn't have one yet.
 //
 // Normally an account is created lazily the first time a seller opens the payout
@@ -11,9 +11,6 @@
 // The account shape is defined in exactly one place —
 // src/utils/sellerAccountShape.js (buildSellerAccountParams) — so this backfill
 // can never drift from the on-demand flow.
-//
-// Assumes a clean cutover to v2 (no pre-existing v1 `acct_…` Express accounts).
-// If live v1 accounts exist, migrate/handle those separately first.
 //
 // Who counts as a "seller": by default, profiles entitled to sell
 // (subscription_status in trialing/active/grandfathered, or an unexpired trial),
@@ -142,8 +139,8 @@ for await (const seller of sellersNeedingAccount()) {
   }
 
   try {
-    // Mirror the on-demand flow exactly (shared v2 recipient-account shape).
-    const account = await stripe.v2.core.accounts.create(
+    // Mirror the on-demand flow exactly (shared Express-account shape).
+    const account = await stripe.accounts.create(
       buildSellerAccountParams(seller.id, {
         email: seller.email || undefined,
         displayName: seller.display_name || seller.full_name || undefined,

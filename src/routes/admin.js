@@ -201,7 +201,7 @@ router.get('/users/:userId/stripe-names', validateRequestParams(identityReviewSc
     let payoutName = null;
     if (profile.stripe_connect_account_id) {
       try {
-        const account = await stripe.v2.core.accounts.retrieve(profile.stripe_connect_account_id, { include: ['identity'] });
+        const account = await stripe.accounts.retrieve(profile.stripe_connect_account_id);
         payoutName = payoutAccountName(account) || null;
       } catch (e) {
         logger.warn(`[ADMIN] stripe-names: could not retrieve Connect account for ${userId}: ${e.message}`);

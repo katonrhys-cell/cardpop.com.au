@@ -53,3 +53,6 @@ supabase/.env
 
 # Local backup artefacts (contain data / PII — never commit)
 /backups/
+
+# Stripe Connect v2 sample — throwaway local demo data
+samples/stripe-connect-v2-demo/.demo-data.json
