@@ -10,6 +10,19 @@
  * @param {string|null} footerNote - Small note below the divider
  * @returns {string} Full HTML email string
  */
+// Escape user-controlled text before it goes into email HTML. Listing titles,
+// event fields, names and ABNs are user/seller-supplied; without this a listing
+// titled `<a href="https://evil…">Click…</a>` renders as a live link in the
+// buyer's receipt and admin notices sent from noreply@cardpop.com.au.
+export function esc(v) {
+  return String(v ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function cpEmail(preheader, titleBand, greeting, bodyHtml, ctaUrl, ctaText, footerNote) {
   const cta = ctaUrl
     ? `<div style="text-align:center;margin:32px 0 0"><a href="${ctaUrl}" style="background:#E63946;color:#FFFFFF;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:700;font-size:15px;display:inline-block;letter-spacing:-0.3px">${ctaText}</a></div>`
@@ -67,7 +80,7 @@ function summaryTable(rows) {
 // ─── Pre-launch welcome (landing-page early-access registration) ──────────────
 
 export function launchWelcomeEmail({ name, hasGuide = false } = {}) {
-  const greeting = name ? `You're on the list, ${name}!` : "You're on the list!";
+  const greeting = name ? `You're on the list, ${esc(name)}!` : "You're on the list!";
   // Only promise the attached guide when one is actually attached (a committed
   // PDF or LAUNCH_WELCOME_PDF_URL); otherwise close without referencing it.
   const closing = hasGuide
@@ -117,7 +130,7 @@ ${codeBlock}
   return cpEmail(
     `Your CardPop welcome gift: ${trialDays} days of selling free + ${discountPct}% off your first order.`,
     'Your Welcome Gift Inside 🎁',
-    `Welcome aboard, ${name}!`,
+    `Welcome aboard, ${esc(name)}!`,
     body,
     'https://cardpop.com.au/account/membership',
     'Redeem My Code',
@@ -135,7 +148,7 @@ const money = (n) => `$${Number(n || 0).toFixed(2)}`;
 function invoiceBlock(invoice, orderId) {
   const rows = (invoice.items || [])
     .map(it => `<tr>
-<td style="padding:8px 0;font-size:14px;color:#374151;border-bottom:1px solid #F3F4F6;">${it.name}${it.quantity > 1 ? ` <span style="color:#9CA3AF;">× ${it.quantity}</span>` : ''}</td>
+<td style="padding:8px 0;font-size:14px;color:#374151;border-bottom:1px solid #F3F4F6;">${esc(it.name)}${it.quantity > 1 ? ` <span style="color:#9CA3AF;">× ${Number(it.quantity)}</span>` : ''}</td>
 <td style="padding:8px 0;font-size:14px;color:#374151;border-bottom:1px solid #F3F4F6;text-align:right;white-space:nowrap;">${money(it.total)} AUD</td>
 </tr>`)
     .join('');
@@ -168,8 +181,8 @@ function businessBlock(invoice) {
   if (!invoice?.abn) return '';
   return `<div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:16px 20px;margin:0 0 24px;">
 <p style="margin:0 0 6px;font-size:11px;color:#9CA3AF;letter-spacing:1.5px;text-transform:uppercase;">Billed to</p>
-${invoice.businessName ? `<p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#111827;">${invoice.businessName}</p>` : ''}
-<p style="margin:0;font-size:14px;color:#374151;">ABN: ${invoice.abn}</p>
+${invoice.businessName ? `<p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#111827;">${esc(invoice.businessName)}</p>` : ''}
+<p style="margin:0;font-size:14px;color:#374151;">ABN: ${esc(invoice.abn)}</p>
 </div>`;
 }
 
@@ -188,12 +201,12 @@ export function orderConfirmedEmail({ buyerName, cardName, itemPrice, total, ord
 ${meta}
 ${businessBlock(invoice)}
 ${invoiceBlock(invoice, orderId)}
-${isTaxInvoice ? `<p style="font-size:13px;color:#6B7280;">This is a tax invoice.${invoice.gst > 0 ? ` Total includes GST of ${money(invoice.gst)} AUD.` : ''} Issued to ABN ${invoice.abn}.</p>` : ''}
+${isTaxInvoice ? `<p style="font-size:13px;color:#6B7280;">This is a tax invoice.${invoice.gst > 0 ? ` Total includes GST of ${money(invoice.gst)} AUD.` : ''} Issued to ABN ${esc(invoice.abn)}.</p>` : ''}
 <p>Check your order details to coordinate delivery with the seller. Enjoy the new addition to your collection!</p>`;
   } else {
     body = `<p>Your purchase has been confirmed. Here's a summary of what you've secured:</p>
 ${summaryTable([
-  ['Item', cardName],
+  ['Item', esc(cardName)],
   ['Item price', `$${Number(itemPrice).toFixed(2)} AUD`],
   ['Total charged', `$${Number(total).toFixed(2)} AUD`, true],
 ])}
@@ -203,7 +216,7 @@ ${summaryTable([
   return cpEmail(
     isTaxInvoice ? 'Your CardPop tax invoice — check the details inside.' : 'Your CardPop purchase is confirmed — check the details inside.',
     isTaxInvoice ? 'Tax Invoice' : 'Purchase Confirmed!',
-    `You did it, ${buyerName}!`,
+    `You did it, ${esc(buyerName)}!`,
     body,
     `https://cardpop.com.au/orders/${orderId}`,
     'View Order',
@@ -219,10 +232,10 @@ ${summaryTable([
 export function orderAdminNoticeEmail({ orderId, buyerName, buyerEmail, total, itemsSummary, sellerName }) {
   const rows = [
     ['Order', `#${String(orderId || '').slice(0, 8).toUpperCase() || '—'}`],
-    ['Items', itemsSummary || '—'],
-    ['Buyer', [buyerName, buyerEmail].filter(Boolean).join(' · ') || '—'],
+    ['Items', esc(itemsSummary) || '—'],
+    ['Buyer', [buyerName, buyerEmail].filter(Boolean).map(esc).join(' · ') || '—'],
   ];
-  if (sellerName) rows.push(['Seller', sellerName]);
+  if (sellerName) rows.push(['Seller', esc(sellerName)]);
   rows.push(['Total', `$${Number(total || 0).toFixed(2)} AUD`, true]);
 
   const body = `<p>A new order was just placed and paid on CardPop.</p>
@@ -245,7 +258,7 @@ ${summaryTable(rows)}
 export function itemSoldEmail({ sellerName, cardName, itemPrice, commissionAud, gstAud, sellerProceeds, orderId }) {
   const body = `<p>Congratulations — your listing sold on CardPop! Here's a breakdown of your sale:</p>
 ${summaryTable([
-  ['Item', cardName],
+  ['Item', esc(cardName)],
   ['Sale value', `$${Number(itemPrice).toFixed(2)} AUD`],
   ['Platform fee', `$${Number(commissionAud).toFixed(2)} AUD`],
   ['GST', `$${Number(gstAud).toFixed(2)} AUD`],
@@ -256,7 +269,7 @@ ${summaryTable([
   return cpEmail(
     'You made a sale on CardPop — great work!',
     'You Made a Sale!',
-    `Well done, ${sellerName}!`,
+    `Well done, ${esc(sellerName)}!`,
     body,
     `https://cardpop.com.au/orders/${orderId}`,
     'View Order',
@@ -276,7 +289,7 @@ ${summaryTable([
   return cpEmail(
     `Your CardPop refund of $${Number(refundAmount).toFixed(2)} AUD is on its way.`,
     'Refund Processed',
-    `Hi ${buyerName},`,
+    `Hi ${esc(buyerName)},`,
     body,
     `https://cardpop.com.au/orders/${orderId}`,
     'View Order',
@@ -296,18 +309,18 @@ export function eventSubmittedEmail({ event }) {
     community_event: 'Community Event',
     lgs_event: 'LGS Event',
   };
-  const location = [event.suburb, event.state].filter(Boolean).join(', ') || '—';
+  const location = [event.suburb, event.state].filter(Boolean).map(esc).join(', ') || '—';
   const startDate = event.start_date
     ? new Date(event.start_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney' })
     : '—';
   const submittedBy = event.organizer_name
-    ? `${event.organizer_name}${event.organizer_email ? ` (${event.organizer_email})` : ''}`
-    : (event.organizer_email || '—');
+    ? `${esc(event.organizer_name)}${event.organizer_email ? ` (${esc(event.organizer_email)})` : ''}`
+    : (esc(event.organizer_email) || '—');
 
   const body = `<p>A community member has submitted a new event for review. It won't appear on the public calendar until you approve it.</p>
 ${summaryTable([
-  ['Event', event.title || 'Untitled'],
-  ['Type', EVENT_TYPE_LABELS[event.event_type] || event.event_type || '—'],
+  ['Event', esc(event.title) || 'Untitled'],
+  ['Type', EVENT_TYPE_LABELS[event.event_type] || esc(event.event_type) || '—'],
   ['Location', location],
   ['Start date', startDate],
   ['Submitted by', submittedBy],
@@ -315,7 +328,7 @@ ${summaryTable([
 <p>Review it in the Events moderation queue to approve, edit, or reject the submission.</p>`;
 
   return cpEmail(
-    `New event pending review: ${event.title || 'Untitled'}`,
+    `New event pending review: ${esc(event.title) || 'Untitled'}`,
     'New Event Submission',
     'A new event needs your review',
     body,
@@ -338,7 +351,7 @@ ${summaryTable([
   return cpEmail(
     'A refund was issued on one of your CardPop sales.',
     'Refund Issued on Your Sale',
-    `Hi ${sellerName},`,
+    `Hi ${esc(sellerName)},`,
     body,
     `https://cardpop.com.au/orders/${orderId}`,
     'View Order',

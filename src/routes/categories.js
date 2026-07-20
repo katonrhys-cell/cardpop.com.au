@@ -65,7 +65,7 @@ router.post('/', authMiddleware, async (req, res) => {
   await supabase.from('audit_logs').insert({
     user_id: req.user.id, event_type: 'category_created',
     description: `Category created: ${name.trim()}`, metadata: { categoryId: category.id },
-  }).catch(() => {});
+  }).then(() => {}, () => {});
 
   logger.info(`Category created: ${category.id} by user ${req.user.id}`);
   res.status(201).json(category);
@@ -95,7 +95,7 @@ router.patch('/:id', authMiddleware, async (req, res) => {
   await supabase.from('audit_logs').insert({
     user_id: req.user.id, event_type: 'category_updated',
     description: `Category updated: ${updated.name}`, metadata: { categoryId: id },
-  }).catch(() => {});
+  }).then(() => {}, () => {});
 
   logger.info(`Category updated: ${id} by user ${req.user.id}`);
   res.json(updated);
@@ -118,7 +118,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
   await supabase.from('audit_logs').insert({
     user_id: req.user.id, event_type: 'category_deleted',
     description: `Category deleted: ${category.name}`, metadata: { categoryId: id },
-  }).catch(() => {});
+  }).then(() => {}, () => {});
 
   logger.info(`Category deleted: ${id} by user ${req.user.id}`);
   res.json({ success: true, message: 'Category deleted' });

@@ -67,7 +67,7 @@ router.post('/', authMiddleware, async (req, res) => {
     user_id: req.user.id, event_type: 'subcategory_created',
     description: `Subcategory created: ${name.trim()} under ${parent.name}`,
     metadata: { subcategoryId: subcategory.id, parentId },
-  }).catch(() => {});
+  }).then(() => {}, () => {});
 
   logger.info(`Subcategory created: ${subcategory.id} under ${parentId} by user ${req.user.id}`);
   res.status(201).json(subcategory);
@@ -102,7 +102,7 @@ router.patch('/:id', authMiddleware, async (req, res) => {
   await supabase.from('audit_logs').insert({
     user_id: req.user.id, event_type: 'subcategory_updated',
     description: `Subcategory updated: ${updated.name}`, metadata: { subcategoryId: id },
-  }).catch(() => {});
+  }).then(() => {}, () => {});
 
   logger.info(`Subcategory updated: ${id} by user ${req.user.id}`);
   res.json(updated);
@@ -124,7 +124,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
   await supabase.from('audit_logs').insert({
     user_id: req.user.id, event_type: 'subcategory_deleted',
     description: `Subcategory deleted: ${sub.name}`, metadata: { subcategoryId: id },
-  }).catch(() => {});
+  }).then(() => {}, () => {});
 
   logger.info(`Subcategory deleted: ${id} by user ${req.user.id}`);
   res.json({ success: true, message: 'Subcategory deleted' });

@@ -76,6 +76,18 @@ const RESIZE_MODES = new Set(['cover', 'contain', 'fill']);
 // download disposition plus a locked-down CSP sandbox stops that. Legitimate
 // <img> embeds are unaffected: browsers render <img> regardless of
 // Content-Disposition, and an SVG loaded through <img> is already non-scripting.
+// decodeURIComponent throws URIError on malformed percent-encodings (e.g.
+// `/…/public/%zz`), which `new URL()` leaves intact in the pathname. An uncaught
+// throw here surfaces as a Cloudflare 1101 error page instead of a clean 404,
+// so decode defensively and treat undecodable keys as "not found".
+function safeDecode(str) {
+  try {
+    return decodeURIComponent(str);
+  } catch {
+    return null;
+  }
+}
+
 function hardenIfSvg(headers) {
   const type = (headers.get('content-type') || '').toLowerCase();
   if (type.includes('svg')) {
@@ -128,7 +140,7 @@ async function serveFromR2(request, url, bucket, ctx) {
       : cached;
   }
 
-  const key = decodeURIComponent(url.pathname.replace(OBJECT_PATH, ''));
+  const key = safeDecode(url.pathname.replace(OBJECT_PATH, ''));
   if (!key) return null;
 
   const object = await bucket.get(key);
@@ -315,7 +327,7 @@ export default {
       originResponse.ok &&
       originResponse.body
     ) {
-      const key = decodeURIComponent(url.pathname.replace(OBJECT_PATH, ''));
+      const key = safeDecode(url.pathname.replace(OBJECT_PATH, ''));
       if (key) {
         const [toClient, toR2] = originResponse.body.tee();
         clientBody = toClient;

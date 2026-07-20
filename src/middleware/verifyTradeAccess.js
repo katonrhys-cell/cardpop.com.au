@@ -29,7 +29,7 @@ async function verifyTradeAccess(req, res, next) {
         ip_address: req.ip || 'unknown',
         user_agent: req.headers['user-agent'] || 'unknown',
         status: 'blocked',
-      }).catch(() => {});
+      }).then(() => {}, () => {});
 
       return res.status(403).json({
         error: 'User must be verified to trade',
@@ -58,7 +58,7 @@ async function verifyTradeAccess(req, res, next) {
         ip_address: req.ip || 'unknown',
         user_agent: req.headers['user-agent'] || 'unknown',
         status: 'blocked',
-      }).catch(() => {});
+      }).then(() => {}, () => {});
 
       return res.status(403).json({
         error: 'Identity verification is required to trade',
@@ -77,7 +77,7 @@ async function verifyTradeAccess(req, res, next) {
         ip_address: req.ip || 'unknown',
         user_agent: req.headers['user-agent'] || 'unknown',
         status: 'blocked',
-      }).catch(() => {});
+      }).then(() => {}, () => {});
 
       return res.status(403).json({
         error: 'A saved card is required to trade',

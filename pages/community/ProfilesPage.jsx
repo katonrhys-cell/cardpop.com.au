@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Users, Search, ShieldCheck, Star, UserPlus, Package } from 'lucide-react';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 
-const FILTERS = ['All', 'Verified', 'Sellers'];
+const FILTERS = ['All', 'Verified'];
 
 const ProfilesPage = () => {
   const { isAuthenticated } = useAuth();

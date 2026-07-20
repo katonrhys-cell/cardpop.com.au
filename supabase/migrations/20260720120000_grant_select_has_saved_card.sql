@@ -1,0 +1,21 @@
+-- Grant client SELECT on profiles.has_saved_card.
+--
+-- 20260715210000_restrict_profiles_sensitive_column_reads.sql revoked the
+-- blanket table-level SELECT on public.profiles from anon/authenticated and
+-- re-granted SELECT only on an explicit allow-list of non-sensitive columns.
+-- 20260719160000_require_card_on_file_to_sell.sql then added the new
+-- `has_saved_card` boolean column — but a newly-added column inherits NO
+-- column privilege, so anon/authenticated cannot read it.
+--
+-- Meanwhile lib/profileColumns.js added `has_saved_card` to
+-- PUBLIC_PROFILE_COLUMNS, so every client `profiles` read now enumerates a
+-- column it isn't granted. PostgREST fails the ENTIRE select with
+-- "permission denied for column has_saved_card" — breaking AuthContext's
+-- profile fetch (so isAdmin/plan/verification state) and every page that reads
+-- PUBLIC_PROFILE_COLUMNS.
+--
+-- has_saved_card is a non-sensitive boolean (mirrors is_verified in
+-- sensitivity) and is used client-side by the selling gate, so grant SELECT on
+-- it to the API roles. Writes stay locked (the profiles UPDATE policy's
+-- WITH CHECK is unaffected; the column is kept in sync by service-role code).
+grant select (has_saved_card) on public.profiles to anon, authenticated;

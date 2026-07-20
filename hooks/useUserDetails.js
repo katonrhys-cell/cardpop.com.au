@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
+import apiServerClient from '@/lib/apiServerClient.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 
 export const useUserDetails = (userId) => {
@@ -44,8 +45,28 @@ export const useUserDetails = (userId) => {
 
       if (!isActive()) return;
 
+      let userRow = profileRes.status === 'fulfilled' ? profileRes.value.data : null;
+      // profiles.email isn't client-readable (no column grant), so fetch it via
+      // the admin-only backend and merge it in — the detail sidebar shows it and
+      // "Send Password Reset" needs it. Best-effort: the page still renders
+      // without an email.
+      if (userRow && !userRow.email) {
+        try {
+          const res = await apiServerClient.fetch('/admin/user-emails', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: [userId] }),
+          });
+          if (res.ok) {
+            const { emails } = await res.json();
+            if (emails?.[userId]) userRow = { ...userRow, email: emails[userId] };
+          }
+        } catch { /* email lookup is best-effort */ }
+      }
+      if (!isActive()) return;
+
       setData({
-        user:           profileRes.status === 'fulfilled' ? profileRes.value.data : null,
+        user:           userRow,
         vaultProducts:  vaultRes.status === 'fulfilled'       ? (vaultRes.value.data ?? [])        : [],
         ordersAsBuyer:  buyerOrdersRes.status === 'fulfilled' ? (buyerOrdersRes.value.data ?? [])  : [],
         ordersAsSeller: sellerOrdersRes.status === 'fulfilled'? (sellerOrdersRes.value.data ?? []) : [],

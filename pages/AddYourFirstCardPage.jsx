@@ -2,8 +2,6 @@ import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { Plus, ShieldCheck, TrendingUp, Layers, Award } from 'lucide-react';
-import Header from '@/components/Header.jsx';
-import Footer from '@/components/Footer.jsx';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,8 +12,6 @@ const AddYourFirstCardPage = () => {
       <Helmet>
         <title>Add Your First Card | Card Pop</title>
       </Helmet>
-      <Header />
-      
       <main className="flex-1 flex items-center justify-center p-4 py-12 md:py-16">
         <div className="max-w-6xl mx-auto w-full grid lg:grid-cols-2 gap-12 items-center">
           
@@ -123,8 +119,6 @@ const AddYourFirstCardPage = () => {
 
         </div>
       </main>
-      
-      <Footer />
     </div>
   );
 };

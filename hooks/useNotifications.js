@@ -59,14 +59,14 @@ export const useNotifications = () => {
   const markRead = useCallback(async (id) => {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
     await supabase.from('notifications').update({ is_read: true, read_at: new Date().toISOString() })
-      .eq('id', id).eq('user_id', currentUser?.id).catch(console.error);
+      .eq('id', id).eq("user_id", currentUser?.id).then(() => {}, console.error);
   }, [currentUser?.id]);
 
   const markAllRead = useCallback(async () => {
     if (!currentUser?.id) return;
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
     await supabase.from('notifications').update({ is_read: true, read_at: new Date().toISOString() })
-      .eq('user_id', currentUser.id).eq('is_read', false).catch(console.error);
+      .eq('user_id', currentUser.id).eq("is_read", false).then(() => {}, console.error);
   }, [currentUser?.id]);
 
   return { notifications, unreadCount, loading, markRead, markAllRead, refetch: () => fetchRef.current?.() };

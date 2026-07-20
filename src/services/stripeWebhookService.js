@@ -96,7 +96,7 @@ async function flagDoubleSale({ listingId, orderId, buyerId }) {
       type: 'order_double_sale',
       title: 'Double-sale needs a refund',
       body: `Listing ${listingId} sold twice (order ${orderId || 'n/a'}). The item was already claimed by an earlier buyer — refund this order.`,
-    }))).catch(() => {});
+    }))).then(() => {}, () => {});
   }
 
   if (buyerId) {
@@ -105,7 +105,7 @@ async function flagDoubleSale({ listingId, orderId, buyerId }) {
       type: 'order_refund_pending',
       title: 'Refund on the way',
       body: 'The item you purchased had already sold to another buyer. Your payment will be refunded in full — no action needed.',
-    }).catch(() => {});
+    }).then(() => {}, () => {});
   }
 }
 
@@ -329,7 +329,7 @@ async function handleCartOrder(existing, session, stripe) {
         type: 'order_oversold',
         title: 'Oversold order needs attention',
         body: `Order ${existing.id} has ${oversoldShopItems.length} shop item(s) that exceeded available stock. Refund or restock.`,
-      }))).catch(() => {});
+      }))).then(() => {}, () => {});
     }
   }
 

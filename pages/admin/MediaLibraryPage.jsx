@@ -119,8 +119,22 @@ const MediaLibraryPage = () => {
     if (!window.confirm("Are you sure you want to delete this image? This action cannot be undone.")) return;
     
     try {
+      const item = media.find(m => m.id === id);
       const { error } = await supabase.from('media_assets').delete().eq('id', id);
       if (error) throw error;
+
+      // Also remove the underlying storage object — deleting only the DB row
+      // orphaned the file in the `media` bucket forever (accruing storage/egress
+      // cost, and the URL kept working). Best-effort: the row is already gone.
+      if (item?.file_url) {
+        const marker = '/storage/v1/object/public/media/';
+        const idx = item.file_url.indexOf(marker);
+        if (idx !== -1) {
+          const key = item.file_url.slice(idx + marker.length).split('?')[0];
+          supabase.storage.from('media').remove([decodeURIComponent(key)]).then(() => {}, () => {});
+        }
+      }
+
       toast.success("Media deleted successfully.");
       setMedia(media.filter(m => m.id !== id));
     } catch (err) {

@@ -592,7 +592,10 @@ const BlogArticlePage = () => {
               {marketplaceCards.map((listing) => {
                 const card = listing.vault_items;
                 const cardImageUrl = resolveCardImage(card?.card_image);
-                const href = listing.slug ? `/marketplace/${listing.slug}` : `/marketplace/listing/${listing.id}`;
+                // Route is /marketplace/:id/:slug? and the detail page fetches by
+                // id, so the id must be the first segment (a bare slug or the
+                // literal "listing" both render "product not found").
+                const href = `/marketplace/${listing.id}${listing.slug ? `/${listing.slug}` : ''}`;
                 return (
                   <Link
                     key={listing.id}

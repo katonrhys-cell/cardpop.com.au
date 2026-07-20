@@ -125,7 +125,7 @@ async function maybeEscalate(target_type, target_id) {
     title: 'Content flagged by multiple users',
     body: `A ${target_type} has reached ${count} independent reports and needs review.`,
   }));
-  await supabase.from('notifications').insert(notifications).catch(() => {});
+  await supabase.from('notifications').insert(notifications).then(() => {}, () => {});
   logger.warn(`[REPORT] Escalated ${target_type}:${target_id} — ${count} distinct reports`);
 }
 

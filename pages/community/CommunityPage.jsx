@@ -291,7 +291,7 @@ const CommunityPage = () => {
           <TabsContent value="forum">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold">Recent Discussions</h2>
-              <Button size="sm">Start a Discussion</Button>
+              <Button asChild size="sm"><Link to="/community/discussion/new">Start a Discussion</Link></Button>
             </div>
             <div className="space-y-4">
               {loadingDiscussions ? (
