@@ -37,6 +37,7 @@ import gradingVerificationRouter from './grading-verification.js';
 import welcomeOfferRouter from './welcome-offer.js';
 import partnersRouter from './partners.js';
 import walletRouter from './wallet.js';
+import refundsRouter from './refunds.js';
 import adminRouter from './admin.js';
 import settingsRouter from './settings.js';
 
@@ -181,6 +182,11 @@ export default () => {
     // Buyer prepaid wallet (Stripe Customer Balance top-up + balance read)
     router.use('/wallet', apiLimiter);
     router.use('/wallet', walletRouter);
+
+    // Buyer-initiated refund requests (server-side so orders/notifications
+    // writes aren't silently RLS-denied like the old client path).
+    router.use('/refunds', apiLimiter);
+    router.use('/refunds', refundsRouter);
 
     // Privileged admin operations (service-role writes gated by authMiddleware +
     // isAdminUser inside the router itself). Was fully built and tested but never

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
+import apiServerClient from '@/lib/apiServerClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -57,38 +58,18 @@ const RefundDialog = ({ order, onClose, onSuccess }) => {
     if (!reason) { toast.error('Please select a reason'); return; }
     setSaving(true);
     try {
-      // Insert refund request
-      const { error } = await supabase.from('refunds').insert({
-        order_id:         order.id,
-        buyer_id:         currentUser.id,
-        seller_id:        order.seller_id,
-        requested_by:     currentUser.id,
-        reason:           reason + (notes ? ` — ${notes}` : ''),
-        refund_type:      'full',
-        item_price_aud:   order.item_price_aud || 0,
-        commission_aud:   order.platform_fee_aud || 0,
-        gst_aud:          order.gst_aud || 0,
-        total_paid_aud:   order.total_aud || 0,
-        retained_fee_aud: retainedFee,
-        refund_amount_aud: refundAmount,
+      // Server-side: the buyer can't write orders.refund_status or the seller
+      // notification under RLS, so the old direct client writes were silently
+      // denied and the request never reached admins. The endpoint validates
+      // order ownership + eligibility and recomputes the amounts.
+      const res = await apiServerClient.fetch('/refunds/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: order.id, reason, notes }),
       });
-      if (error) throw error;
-
-      // Mark order refund_status
-      const { error: refundStatusErr } = await supabase.from('orders').update({
-        refund_status:        'requested',
-        refund_requested_at:  new Date().toISOString(),
-      }).eq('id', order.id).eq('buyer_id', currentUser.id);
-      if (refundStatusErr) throw refundStatusErr;
-
-      // Notify seller
-      if (order.seller_id) {
-        await supabase.from('notifications').insert({
-          user_id:    order.seller_id,
-          type:       'refund_requested',
-          title:      'Refund Request Received',
-          body:       `A buyer has requested a refund on an order. Reason: ${REFUND_REASONS.find(r => r.value === reason)?.label || reason}.`,
-        });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to submit refund request');
       }
 
       toast.success('Refund request submitted. We\'ll review it within 2 business days.');
