@@ -17,7 +17,7 @@ const STEPS = ['Your Profile', 'Legal Details', 'Identity Documents', "You're Al
 const ProfileCompletionPage = () => {
   const { token } = useParams();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, loading } = useAuth();
 
   const [verifying, setVerifying] = useState(true);
   const [verificationError, setVerificationError] = useState(null);
@@ -40,19 +40,21 @@ const ProfileCompletionPage = () => {
   useEffect(() => {
     let cancelled = false;
 
-    const verifyToken = async () => {
+    // Wait for auth to resolve. The wizard writes to the caller's own profile,
+    // so it needs a signed-in, email-verified account — not a standalone token
+    // (nothing in the app issues one). If not signed in, drop the spinner and
+    // let the render show the login prompt; if signed in, confirm the email is
+    // verified via the backend before revealing the form.
+    if (loading) return;
+    if (!currentUser) { setVerifying(false); return; }
+
+    const verifyEmail = async () => {
       try {
-        const response = await apiServerClient.fetch('/verify-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token })
-        });
-
+        const response = await apiServerClient.fetch('/verify-email', { method: 'POST' });
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Invalid or expired token');
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Please verify your email address before completing your profile.');
         }
-
         if (!cancelled) setVerifying(false);
       } catch (err) {
         if (!cancelled) {
@@ -62,14 +64,9 @@ const ProfileCompletionPage = () => {
       }
     };
 
-    if (token) {
-      verifyToken();
-    } else {
-      setVerificationError('No verification token provided.');
-      setVerifying(false);
-    }
+    verifyEmail();
     return () => { cancelled = true; };
-  }, [token]);
+  }, [loading, currentUser]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

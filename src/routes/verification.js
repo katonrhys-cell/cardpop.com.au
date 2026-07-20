@@ -52,6 +52,22 @@ router.post('/send-verification-email', authMiddleware, async (req, res) => {
   res.json({ success: true, message: 'Verification email sent' });
 });
 
+// POST /verify-email — gate the profile-completion wizard on a verified email.
+//
+// The wizard (ProfileCompletionPage) writes to the caller's OWN profile row
+// (RLS-scoped), so the correct gate is email verification of the logged-in
+// account — there is no standalone email-token flow in the app, and nothing
+// issues the URL token the page used to send. Authenticate and check the
+// account's email is confirmed; the client attaches the Bearer token.
+router.post('/verify-email', authMiddleware, async (req, res) => {
+  if (!req.user?.email_confirmed_at) {
+    return res.status(403).json({
+      error: 'Please verify your email address first — check your inbox for the confirmation link.',
+    });
+  }
+  res.json({ verified: true });
+});
+
 // POST /resend-verification
 // Unauthenticated + sends an email → rate-limited per target email to prevent
 // inbox bombing and email-quota abuse.
