@@ -205,8 +205,15 @@ function uploadTimestamp(path) {
   return runs ? Number(runs[runs.length - 1]) : null;
 }
 
-function hasThumbnail(path) {
+function hasThumbnail(path, bucket) {
   if (typeof path !== 'string' || path.endsWith(THUMB_SUFFIX)) return false;
+  // Companion `.thumb.webp` files are only ever written for card uploads in the
+  // vault-images bucket (AddEditCardPage.uploadThumbnail). Other upload sites
+  // (hero showcase / media library → `media`, shop products → `shop-products`,
+  // Whatnot shows) produce timestamped filenames with NO thumb, so inferring
+  // one from the timestamp alone made getCardImage emit a thumbSrc that 404s on
+  // every render. Gate on the bucket that actually has thumbnails.
+  if (bucket !== DEFAULT_BUCKET) return false;
   const ts = uploadTimestamp(path);
   return ts !== null && ts >= THUMBNAILS_SINCE;
 }
@@ -247,7 +254,7 @@ export function getCardImage(pathOrUrl, opts = {}) {
 
   // Companion grid thumbnail (uploads since THUMBNAILS_SINCE) — CDN-routed.
   // Grid components try this first; CardImage falls back to the full image.
-  const thumbSrc = hasThumbnail(effectivePath)
+  const thumbSrc = hasThumbnail(effectivePath, effectiveBucket)
     ? toCdnUrl(
         supabase.storage.from(effectiveBucket).getPublicUrl(thumbStoragePath(effectivePath)).data
           .publicUrl
