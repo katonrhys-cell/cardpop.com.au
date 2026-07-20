@@ -109,20 +109,43 @@ export const AuthProvider = ({ children }) => {
 
   // Safety net: if profile wasn't set by onAuthStateChange (e.g. slow network,
   // swallowed error), fetch it directly whenever currentUser is available and
-  // profile is still null.
+  // profile is still null. Retries with backoff because a single transient
+  // failure — common on flaky mobile connections — would otherwise strand the
+  // session with no profile (isAdmin=false, name falls back to "Collector",
+  // avatar falls back to the generic icon) until a manual page reload. Once a
+  // fetch succeeds the effect stops retrying; each new currentUser resets it.
   useEffect(() => {
     if (!currentUser?.id || profile !== null) return;
     let cancelled = false;
-    fetchProfile(currentUser.id).then(p => {
-      if (!cancelled && isMounted.current && p) {
-        loadedProfileUserRef.current = currentUser.id;
-        setProfile(p);
-        setProfileLoading(false);
-      }
-    }).catch(() => {
-      if (!cancelled && isMounted.current) setProfileLoading(false);
-    });
-    return () => { cancelled = true; };
+    const timers = [];
+    // ~1s, 2s, 4s, 8s, 16s between attempts (6 tries over ~30s total).
+    const MAX_ATTEMPTS = 6;
+
+    const attempt = (n) => {
+      if (cancelled || !isMounted.current) return;
+      fetchProfile(currentUser.id).then(p => {
+        if (cancelled || !isMounted.current) return;
+        if (p) {
+          loadedProfileUserRef.current = currentUser.id;
+          setProfile(p);
+          setProfileLoading(false);
+        } else if (n < MAX_ATTEMPTS - 1) {
+          timers.push(setTimeout(() => attempt(n + 1), 1000 * 2 ** n));
+        } else {
+          setProfileLoading(false);
+        }
+      }).catch(() => {
+        if (cancelled || !isMounted.current) return;
+        if (n < MAX_ATTEMPTS - 1) {
+          timers.push(setTimeout(() => attempt(n + 1), 1000 * 2 ** n));
+        } else {
+          setProfileLoading(false);
+        }
+      });
+    };
+
+    attempt(0);
+    return () => { cancelled = true; timers.forEach(clearTimeout); };
   }, [currentUser?.id, profile]);
 
   // Keep the profile (and therefore isAdmin) fresh while the app is open by

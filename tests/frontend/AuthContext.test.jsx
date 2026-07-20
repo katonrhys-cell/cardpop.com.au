@@ -217,6 +217,35 @@ describe('AuthProvider — session state', () => {
     expect(txt('userName')).toBe('Ada Lovelace');
   });
 
+  it('self-heals when the first profile fetch fails, retrying with backoff (flaky mobile)', async () => {
+    // Regression: a transient profiles read failure on first load left profile
+    // null forever (isAdmin=false, name → "Collector", avatar → generic icon)
+    // because the single safety-net retry never re-ran. The retry now backs off
+    // and keeps trying, so a later success populates the profile without a
+    // manual reload.
+    vi.useFakeTimers();
+    try {
+      h.profileResult = { data: null, error: { message: 'network hiccup' } };
+      renderAuth();
+      await act(async () => { await h.authCallback('SIGNED_IN', SESSION); });
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+      // First fetch failed — no profile yet.
+      expect(txt('isAdmin')).toBe('false');
+
+      // Connectivity returns; the next backed-off retry (~1s) succeeds.
+      h.profileResult = { data: { is_admin: true, full_name: 'Ada Lovelace' }, error: null };
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1100);
+        await Promise.resolve(); await Promise.resolve();
+      });
+
+      expect(txt('isAdmin')).toBe('true');
+      expect(txt('userName')).toBe('Ada Lovelace');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('still gates behind profileLoading when a different user signs in', async () => {
     h.profileResult = { data: { is_admin: true, full_name: 'Ada Lovelace' }, error: null };
     renderAuth();
