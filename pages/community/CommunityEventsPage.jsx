@@ -18,8 +18,17 @@ import { SITE_URL, EVENT_TYPE_LABELS, buildEventListJsonLd } from '@/lib/eventSe
 const AU_STATES = ['NSW', 'VIC', 'QLD', 'SA', 'WA', 'TAS', 'NT', 'ACT'];
 const EVENT_TYPES = Object.entries(EVENT_TYPE_LABELS).map(([value, label]) => ({ value, label }));
 
-const todayStr = new Date().toISOString().split('T')[0];
-const nextYearStr = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+// Local-time YYYY-MM-DD. toISOString() is UTC, so for Australian users (UTC+10/11)
+// it returns *yesterday* between local midnight and ~10-11am — pushing finished
+// events into "today" and the upcoming list. Format from local date parts instead.
+const toLocalDateStr = (d) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+const todayStr = toLocalDateStr(new Date());
+const nextYearStr = toLocalDateStr(new Date(Date.now() + 365 * 24 * 60 * 60 * 1000));
 
 const TYPE_SEO = {
   card_show: {

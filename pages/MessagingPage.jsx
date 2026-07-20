@@ -139,7 +139,7 @@ const MessagingPage = () => {
             });
             scrollToBottom();
             if (record.recipient_id === uid) {
-              supabase.from('messages').update({ status: 'read', read_at: new Date().toISOString() }).eq('id', record.id).eq('recipient_id', uid).catch(() => {});
+              supabase.from('messages').update({ status: 'read', read_at: new Date().toISOString() }).eq('id', record.id).eq("recipient_id", uid).then(() => {}, () => {});
             }
           }
         }

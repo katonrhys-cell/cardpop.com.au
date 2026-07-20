@@ -109,7 +109,7 @@ const SignupPage = () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: formData.email, firstName: formData.firstName.trim() }),
-        });
+        }).catch(() => {});
       }
 
       // Issue the welcome offer (unique code → 30-day trial + 10% off first

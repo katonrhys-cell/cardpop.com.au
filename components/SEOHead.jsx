@@ -23,7 +23,17 @@ const SEOHead = ({ title, description, canonicalUrl, ogImage, ogImageAlt, struct
   const resolvedTitle = title || defaultTitle;
   const resolvedDesc = description || defaultDescription;
 
-  const resolvedOgImage = ogImage || '/og-image.jpg';
+  // Open Graph / Twitter require absolute image URLs — scrapers and Google's
+  // renderer can't resolve a site-relative path like "/og-image.jpg".
+  const absolutizeImage = (img) => {
+    if (!img) return '';
+    try {
+      return new URL(img, SITE_ORIGIN).href;
+    } catch {
+      return '';
+    }
+  };
+  const resolvedOgImage = absolutizeImage(ogImage || '/og-image.jpg');
   const resolvedOgImageAlt = ogImageAlt || resolvedTitle;
 
   return (

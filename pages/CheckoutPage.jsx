@@ -170,9 +170,23 @@ const CheckoutPage = () => {
         ...(useWallet ? { useWalletBalance: true } : (promoCode ? { promoCode } : {})),
       }),
     })
-      .then(res => (res.ok ? res.json() : null))
-      .then(data => {
+      .then(async res => {
+        if (res.ok) return { ok: true, data: await res.json() };
+        // Surface the server's actionable message (409 out of stock, 403 own
+        // listing, 404 no longer available) instead of silently falling back to
+        // a fee-less client subtotal with no explanation.
+        let error = '';
+        try { const body = await res.json(); error = body?.error || body?.message || ''; } catch { /* non-JSON error body */ }
+        return { ok: false, error };
+      })
+      .then(result => {
         if (cancelled) return;
+        if (!result.ok) {
+          setPricing(null);
+          if (result.error) toast.error(result.error);
+          return;
+        }
+        const data = result.data;
         setPricing(data);
         if (data?.promoError) {
           toast.error(data.promoError);

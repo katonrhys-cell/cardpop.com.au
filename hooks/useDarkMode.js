@@ -4,8 +4,13 @@ const STORAGE_KEY = 'cardpop-theme';
 
 export function useDarkMode() {
   const [isDark, setIsDark] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved !== null) return saved === 'dark';
+    // localStorage access throws in some privacy modes (blocked cookies /
+    // old-Safari private mode). Header mounts this on every page, so an
+    // unguarded throw here white-screens the whole app.
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved !== null) return saved === 'dark';
+    } catch { /* fall through to system preference */ }
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
 
@@ -16,7 +21,9 @@ export function useDarkMode() {
     } else {
       root.classList.remove('dark');
     }
-    localStorage.setItem(STORAGE_KEY, isDark ? 'dark' : 'light');
+    try {
+      localStorage.setItem(STORAGE_KEY, isDark ? 'dark' : 'light');
+    } catch { /* persisting the theme is best-effort */ }
   }, [isDark]);
 
   const toggle = () => setIsDark(prev => !prev);

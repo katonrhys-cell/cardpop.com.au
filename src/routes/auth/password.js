@@ -87,7 +87,7 @@ router.post('/reset/request', async (req, res) => {
         description: 'Password reset requested',
         ip_address: req.ip || 'unknown',
         user_agent: req.headers['user-agent'] || 'unknown',
-      }).catch(() => {});
+      }).then(() => {}, () => {});
     }
   }
 
@@ -125,7 +125,7 @@ router.post('/change', authMiddleware, async (req, res) => {
   if (updateError) throw updateError;
 
   // Clear active sessions for security
-  await supabase.from('user_security').update({ active_sessions: [] }).eq('user_id', req.user.id).catch(() => {});
+  await supabase.from('user_security').update({ active_sessions: [] }).eq('user_id', req.user.id).then(() => {}, () => {});
 
   await supabase.from('audit_logs').insert({
     user_id: req.user.id,
@@ -133,7 +133,7 @@ router.post('/change', authMiddleware, async (req, res) => {
     description: 'Password changed successfully',
     ip_address: req.ip || 'unknown',
     user_agent: req.headers['user-agent'] || 'unknown',
-  }).catch(() => {});
+  }).then(() => {}, () => {});
 
   logger.info(`Password changed for user ${req.user.id}`);
   res.json({ success: true, message: 'Password changed successfully' });

@@ -58,7 +58,7 @@ export const useDragDrop = () => {
     await Promise.all(
       itemsWithNewOrder.map(item =>
         supabase.from('categories').update({ sort_order: item.order }).eq('id', item.id)
-          .catch(err => console.warn(`Could not update order for ${item.id}:`, err.message))
+          .then(() => {}, err => console.warn(`Could not update order for ${item.id}:`, err.message))
       )
     );
     return true;

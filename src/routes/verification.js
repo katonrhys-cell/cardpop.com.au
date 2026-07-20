@@ -46,7 +46,7 @@ router.post('/send-verification-email', authMiddleware, async (req, res) => {
     description: 'Email verification link generated',
     ip_address: req.ip || 'unknown',
     user_agent: req.headers['user-agent'] || 'unknown',
-  }).catch(() => {});
+  }).then(() => {}, () => {});
 
   logger.info(`[VERIFICATION] Verification email sent for user ${trimmedUserId}`);
   res.json({ success: true, message: 'Verification email sent' });

@@ -153,7 +153,7 @@ export async function debitWalletForOrder(stripe, customerId, amountCents, descr
         type: 'wallet_over_redemption',
         title: 'Wallet over-redemption detected',
         body: `Customer ${customerId} redeemed $${(amountCents / 100).toFixed(2)} wallet credit with only $${(availableCents / 100).toFixed(2)} available (${description}). Shortfall $${(shortfall / 100).toFixed(2)} — review the customer's orders.`,
-      }))).catch(() => {});
+      }))).then(() => {}, () => {});
     }
   }
 }
@@ -177,5 +177,5 @@ export async function handleWalletTopup(session, stripe) {
     type: 'wallet_topup',
     title: 'Wallet Topped Up',
     body: `$${(amountCents / 100).toFixed(2)} AUD was added to your CardPop wallet.`,
-  }).catch(() => {});
+  }).then(() => {}, () => {});
 }

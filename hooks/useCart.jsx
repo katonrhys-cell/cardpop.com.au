@@ -20,7 +20,11 @@ export const CartProvider = ({ children }) => {
   const [cartItems, setCartItems] = useState(() => {
     try {
       const storedCart = localStorage.getItem(CART_STORAGE_KEY);
-      return storedCart ? JSON.parse(storedCart) : [];
+      const parsed = storedCart ? JSON.parse(storedCart) : [];
+      // Guard against valid-but-non-array JSON ("null", "{}", "0", …): the
+      // whole app is wrapped in CartProvider, so a non-array here would crash
+      // every render via .reduce/.find/.length until storage is cleared.
+      return Array.isArray(parsed) ? parsed : [];
     } catch (error) {
       console.error('Failed to parse cart from local storage:', error);
       return [];
@@ -64,7 +68,8 @@ export const CartProvider = ({ children }) => {
     const handleStorageChange = (e) => {
       if (e.key === CART_STORAGE_KEY) {
         try {
-          setCartItems(e.newValue ? JSON.parse(e.newValue) : []);
+          const parsed = e.newValue ? JSON.parse(e.newValue) : [];
+          setCartItems(Array.isArray(parsed) ? parsed : []);
         } catch (err) {
           console.error('Failed to sync cart across tabs:', err);
         }

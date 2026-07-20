@@ -98,6 +98,23 @@ const networkFirst = async (request) => {
   }
 };
 
+// Helper: Network Only strategy — for authenticated, per-user API responses.
+// These carry a Bearer token the Cache API ignores on match and are marked
+// no-store by the server, so they must never be written to Cache Storage (they
+// would persist after logout and, on a flaky network, be served to a different
+// user from the same device). No cache read on failure either — just a clean
+// offline response.
+const networkOnly = async (request) => {
+  try {
+    return await fetch(request);
+  } catch {
+    return new Response(
+      JSON.stringify({ error: 'Offline', code: 'OFFLINE' }),
+      { status: 503, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+};
+
 // Helper: Cache First strategy
 const cacheFirst = async (request) => {
   const cached = await caches.match(request);
@@ -297,9 +314,10 @@ self.addEventListener('fetch', (event) => {
   // logged-in/logged-out state.
   if (url.origin !== self.location.origin) return;
 
-  // Network First for API calls
+  // Network Only for API calls — never cache per-user, no-store API responses
+  // (caching them leaked one user's data to the next on a shared device).
   if (pathname.startsWith('/api') || pathname.startsWith('/hcgi/api')) {
-    event.respondWith(networkFirst(request));
+    event.respondWith(networkOnly(request));
     return;
   }
 

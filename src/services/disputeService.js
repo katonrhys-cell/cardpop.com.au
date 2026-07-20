@@ -24,7 +24,7 @@ async function notifyAdmins(title, body, extraUserIds = []) {
     await supabase
       .from('notifications')
       .insert(ids.map((user_id) => ({ user_id, type: 'payment_dispute', title, body })))
-      .catch(() => {});
+      .then(() => {}, () => {});
   } catch (e) {
     logger.error(`[STRIPE DISPUTE] notify failed: ${e.message}`);
   }
@@ -55,7 +55,7 @@ export async function handleDisputeCreated(stripe, dispute) {
         reason: dispute.reason,
         status: dispute.status,
         payout_action: 'none',
-      }).catch(() => {});
+      }).then(() => {}, () => {});
       await notifyAdmins('Chargeback opened (no matching order)',
         `A $${amountAud.toFixed(2)} AUD chargeback (dispute ${dispute.id}) has no matching order — investigate.`);
       return;
@@ -77,7 +77,7 @@ export async function handleDisputeCreated(stripe, dispute) {
       reason: dispute.reason,
       status: dispute.status,
       payout_action: payoutAction,
-    }).catch(() => {});
+    }).then(() => {}, () => {});
 
     await notifyAdmins(
       'Chargeback opened',

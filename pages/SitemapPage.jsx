@@ -13,7 +13,7 @@ const SitemapPage = () => {
       try {
         const [vaultRes, shopRes] = await Promise.all([
           supabase.from('vault_items').select('id, card_name').eq('is_public', true).limit(100),
-          supabase.from('listings').select('id, slug, vault_item_id').eq('status', 'active').limit(100),
+          supabase.from('listings').select('id, slug, vault_item_id, vault_item:vault_items(card_name)').eq('status', 'active').limit(100),
         ]);
 
         const combined = [
@@ -21,7 +21,7 @@ const SitemapPage = () => {
           { label: 'Vault', path: '/vault' },
           { label: 'Shop', path: '/shop' },
           ...(vaultRes.data ?? []).map(i => ({ label: i.card_name || 'Vault Item', path: `/product/vault/${i.id}` })),
-          ...(shopRes.data ?? []).map(i => ({ label: i.title || 'Marketplace Listing', path: `/marketplace/${i.id}/${i.slug || 'listing'}` })),
+          ...(shopRes.data ?? []).map(i => ({ label: i.vault_item?.card_name || 'Marketplace Listing', path: `/marketplace/${i.id}/${i.slug || 'listing'}` })),
         ];
         
         setLinks(combined);

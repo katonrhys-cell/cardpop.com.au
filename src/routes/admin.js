@@ -58,7 +58,7 @@ router.patch('/users/:userId/role', validateRequestParams(setUserRoleSchema), va
       event_type: 'update_user_admin',
       description: `Set is_admin=${is_admin} for user ${userId}`,
       status: 'success',
-    }).catch(() => {});
+    }).then(() => {}, () => {});
 
     logger.info(`[ADMIN] ${req.user.id} set is_admin=${is_admin} for ${userId}`);
     res.json({ success: true, user: data });
@@ -111,7 +111,7 @@ router.patch('/users/:userId/status', validateRequestParams(setUserStatusSchema)
       event_type: 'update_user_status',
       description: `Set account status=${status} for user ${userId}`,
       status: 'success',
-    }).catch(() => {});
+    }).then(() => {}, () => {});
 
     logger.info(`[ADMIN] ${req.user.id} set status=${status} for ${userId}`);
     res.json({ success: true, user: data });
@@ -265,14 +265,14 @@ router.patch('/users/:userId/identity-review', validateRequestParams(identityRev
       body: decision === 'approve'
         ? 'Our team has reviewed and approved your ID check — your account now shows the Verified badge.'
         : 'Our team reviewed your ID check and couldn’t verify it because the name on the document doesn’t match your account. Update your profile name to match your ID and try again, or contact support.',
-    }).catch(() => {});
+    }).then(() => {}, () => {});
 
     await supabase.from('audit_logs').insert({
       user_id: req.user.id,
       event_type: 'identity_mismatch_review',
       description: `${decision === 'approve' ? 'Approved' : 'Rejected'} identity name-mismatch review for user ${userId}`,
       status: 'success',
-    }).catch(() => {});
+    }).then(() => {}, () => {});
 
     logger.info(`[ADMIN] ${req.user.id} ${decision}d identity name-mismatch review for ${userId}`);
     res.json({ success: true, user: data });
@@ -334,7 +334,7 @@ router.patch('/verifications/:id', validateRequestParams(reviewVerificationSchem
       admin_id: req.user.id,
       action: info_request ? 'info_requested' : status,
       notes: admin_notes?.trim() || null,
-    }).catch(() => {});
+    }).then(() => {}, () => {});
 
     logger.info(`[ADMIN] ${req.user.id} reviewed verification ${id} → ${info_request ? 'info_requested' : status}`);
     res.json({ success: true, verification: data });
@@ -371,7 +371,7 @@ router.patch('/refunds/:id', validateRequestParams(processRefundSchema), validat
       await supabase.from('notifications').insert({
         user_id: refund.buyer_id, type: 'refund_rejected', title: 'Refund Request Declined',
         body: `Your refund request was not approved. Reason: ${rejection_reason}`,
-      }).catch(() => {});
+      }).then(() => {}, () => {});
       logger.info(`[ADMIN] ${req.user.id} rejected refund ${id}`);
       return res.json({ success: true, status: 'rejected' });
     }
@@ -394,7 +394,7 @@ router.patch('/refunds/:id', validateRequestParams(processRefundSchema), validat
     await supabase.from('notifications').insert({
       user_id: refund.buyer_id, type: 'refund_approved', title: 'Refund Approved',
       body: `Your refund of $${refundAmount.toFixed(2)} AUD has been approved and will be processed shortly.`,
-    }).catch(() => {});
+    }).then(() => {}, () => {});
 
     logger.info(`[ADMIN] ${req.user.id} approved refund ${id} ($${refundAmount})`);
     res.json({ success: true, status: 'approved', refundAmount });
@@ -536,7 +536,7 @@ router.post('/business-profiles', validateRequestBody(createBusinessProfileBodyS
       event_type: 'create_business_profile',
       description: `Created business profile "${data.business_name}" (${data.id}) for user ${owner.id}`,
       status: 'success',
-    }).catch(() => {});
+    }).then(() => {}, () => {});
 
     logger.info(`[ADMIN] ${req.user.id} created business profile ${data.id}`);
     res.json({ success: true, businessProfile: data });
@@ -572,7 +572,7 @@ router.patch('/business-profiles/:id', validateRequestParams(businessProfileIdSc
       event_type: 'update_business_profile',
       description: `Updated business profile ${id}${updates.storefront_status ? ` → ${updates.storefront_status}` : ''}`,
       status: 'success',
-    }).catch(() => {});
+    }).then(() => {}, () => {});
 
     logger.info(`[ADMIN] ${req.user.id} updated business profile ${id}`);
     res.json({ success: true, businessProfile: data });
@@ -630,7 +630,7 @@ router.post('/card-art', validateRequestBody(createCardArtBodySchema), async (re
       event_type: 'upsert_card_art',
       description: `Set card art for "${data.name}" (${data.id})`,
       status: 'success',
-    }).catch(() => {});
+    }).then(() => {}, () => {});
 
     logger.info(`[ADMIN] ${req.user.id} set card art ${data.id} (${lookup_key})`);
     res.json({ success: true, cardArt: data });
@@ -654,7 +654,7 @@ router.delete('/card-art/:id', validateRequestParams(cardArtIdSchema), async (re
     if (error) throw error;
 
     if (row?.storage_path) {
-      supabase.storage.from('media').remove([row.storage_path]).catch(() => {});
+      supabase.storage.from('media').remove([row.storage_path]).then(() => {}, () => {});
     }
 
     await supabase.from('audit_logs').insert({
@@ -662,7 +662,7 @@ router.delete('/card-art/:id', validateRequestParams(cardArtIdSchema), async (re
       event_type: 'delete_card_art',
       description: `Deleted card art ${id}`,
       status: 'success',
-    }).catch(() => {});
+    }).then(() => {}, () => {});
 
     logger.info(`[ADMIN] ${req.user.id} deleted card art ${id}`);
     res.json({ success: true });
