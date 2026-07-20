@@ -137,7 +137,7 @@ const LoginPage = () => {
   const isUnlocked = lockState === 'unlocked' || lockState === 'unlocking';
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-muted/10">
+    <div className="min-h-[80vh] flex items-center justify-center py-12 px-5 sm:px-8 lg:px-12 xl:px-16 bg-muted/10">
       <Helmet>
         <title>Log In | CardPop</title>
         <meta name="robots" content="noindex, nofollow" />

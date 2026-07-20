@@ -227,7 +227,7 @@ const Header = () => {
           : 'bg-background border-b border-border/50'
       }`}
     >
-      <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
 
         {/* ── Row 1: Logo + Search + actions ── */}
         <div className="relative flex items-center py-3 border-b border-border/40">

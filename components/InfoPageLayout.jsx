@@ -27,14 +27,14 @@ const InfoPageLayout = ({ title, description, eyebrow, icon: Icon, children, rel
       </section>
 
       {/* ── Main content ── */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
+      <div className="max-w-4xl mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-12 md:py-16">
         <div className="prose prose-slate dark:prose-invert max-w-none">
           {children}
         </div>
       </div>
 
       {/* ── Contact CTA ── */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-20">
+      <div className="max-w-4xl mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 pb-20">
         <section className="bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 border border-primary/20 rounded-3xl p-10 text-center">
           <MessageCircle className="w-12 h-12 text-primary mx-auto mb-5" />
           <h2 className="text-2xl font-bold mb-3">Still have questions?</h2>

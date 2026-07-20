@@ -118,12 +118,12 @@ const ShopPage = () => {
         </div>
       </section>
 
-      <section className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 pt-12 w-full">
+      <section className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 pt-12 w-full">
         <h2 className="text-2xl font-bold mb-6">Shop by Category</h2>
         <ShopCategoryBrowse />
       </section>
 
-      <section className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
+      <section className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-12 w-full">
         <h2 className="text-2xl font-bold mb-6">All Products</h2>
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-8">
           <div className="relative w-full sm:max-w-md">

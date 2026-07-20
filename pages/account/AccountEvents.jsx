@@ -54,7 +54,7 @@ const AccountEvents = () => {
   const openEdit = (event) => { setEditingEvent(event); setIsModalOpen(true); };
 
   return (
-    <div className="max-w-[100rem] mx-auto px-4 sm:px-6 py-8 w-full space-y-6">
+    <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-8 w-full space-y-6">
       <Helmet><title>My Events | CardPop</title></Helmet>
       <Breadcrumb items={[{ label: 'Account', path: '/account' }, { label: 'My Events' }]} />
 

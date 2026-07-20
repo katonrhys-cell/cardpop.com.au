@@ -114,7 +114,7 @@ const ForumPage = () => {
         </div>
       </section>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <div className="max-w-4xl mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-10">
 
         {/* Search + filter bar */}
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -264,7 +264,7 @@ const ForumPage = () => {
 
       {/* SEO footer */}
       <section className="border-t border-border bg-muted/30 py-14 mt-10">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <div className="max-w-4xl mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 text-center">
           <h2 className="text-2xl font-bold mb-3">Australia's Trading Card Community</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto text-sm leading-relaxed">
             CardPop's community forum connects collectors across Australia to discuss market trends,
