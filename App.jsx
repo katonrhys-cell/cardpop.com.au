@@ -174,6 +174,7 @@ const CommunityPage = lazy(() => import('@/pages/community/CommunityPage.jsx'));
 const CommunityEventsPage = lazy(() => import('@/pages/community/CommunityEventsPage.jsx'));
 const EventDetailPage = lazy(() => import('@/pages/EventDetailPage.jsx'));
 const CommunityDiscussionPage = lazy(() => import('@/pages/community/CommunityDiscussionPage.jsx'));
+const CommunityDiscussionNewPage = lazy(() => import('@/pages/community/CommunityDiscussionNewPage.jsx'));
 const WhatnotShowsPage = lazy(() => import('@/pages/community/WhatnotShowsPage.jsx'));
 const ForumPage = lazy(() => import('@/pages/community/ForumPage.jsx'));
 const ProfilesPage = lazy(() => import('@/pages/community/ProfilesPage.jsx'));
@@ -434,6 +435,7 @@ const App = () => {
                         <Route path="/events/:eventId" element={<EventDetailPage />} />
                         <Route path="/community/events" element={<Navigate to="/events" replace />} />
                         <Route path="/community/events/:eventId" element={<RedirectEventDetail />} />
+                        <Route path="/community/discussion/new" element={<ProtectedRoute><CommunityDiscussionNewPage /></ProtectedRoute>} />
                         <Route path="/community/discussion/:id" element={<CommunityDiscussionPage />} />
                         <Route path="/community/whatnot" element={<WhatnotShowsPage />} />
                         <Route path="/community/building-your-business" element={<BuildingYourBusinessPage />} />

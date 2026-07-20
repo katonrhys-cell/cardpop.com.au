@@ -17,7 +17,7 @@ const CommunityDiscussionPage = () => {
       try {
         const { data, error: fetchError } = await supabase
           .from('posts')
-          .select('*')
+          .select('*, profiles:author_id(display_name, username)')
           .eq('id', id)
           .single();
         if (fetchError) throw fetchError;
@@ -43,8 +43,8 @@ const CommunityDiscussionPage = () => {
       <div className="bg-card border border-border p-8 rounded-3xl mb-8">
         <h1 className="text-3xl font-bold mb-4">{discussion.title}</h1>
         <div className="flex items-center gap-4 text-sm text-muted-foreground mb-8 pb-4 border-b border-border">
-          <span>By User ID: {discussion.author_id}</span>
-          <span>Type: {discussion.post_type}</span>
+          <span>By {discussion.profiles?.display_name || discussion.profiles?.username || 'Collector'}</span>
+          {discussion.category && <span>· {discussion.category}</span>}
         </div>
         <div className="prose prose-slate dark:prose-invert max-w-none">
           <p>{discussion.body || 'No content provided.'}</p>
