@@ -30,7 +30,21 @@ const PasswordResetPage = () => {
   // fires a PASSWORD_RECOVERY event (detectSessionInUrl is enabled). Detect it
   // so we show the "set new password" form instead of the email request form.
   useEffect(() => {
-    if (window.location.hash.includes('type=recovery')) setMode('update');
+    // The recovery link is a full page load, so main.jsx captures the
+    // `type=recovery` hash marker into sessionStorage before Supabase's
+    // detectSessionInUrl clears it — this lazy page mounts too late to read the
+    // hash itself. Consume that flag (and clear it so a later normal visit
+    // doesn't land in update mode). The direct hash check + PASSWORD_RECOVERY
+    // listener remain as fallbacks.
+    let isRecovery = window.location.hash.includes('type=recovery');
+    try {
+      if (sessionStorage.getItem('cardpop_password_recovery') === '1') {
+        isRecovery = true;
+        sessionStorage.removeItem('cardpop_password_recovery');
+      }
+    } catch { /* sessionStorage blocked — fall back to the checks below */ }
+    if (isRecovery) setMode('update');
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') setMode('update');
     });

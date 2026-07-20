@@ -11,6 +11,18 @@ import { installWebMcp } from '@/lib/webmcp.js';
 import '@/index.css';
 import '@/global.css';
 
+// Capture the Supabase password-recovery marker before the client's
+// detectSessionInUrl consumes and clears the URL hash. The reset page is
+// lazy-loaded and mounts after the hash is already gone and PASSWORD_RECOVERY
+// has fired, so it can't read either — stash a flag it picks up on mount. This
+// synchronous read runs before any async step inside the client's initialize()
+// clears the hash (see pages/PasswordResetPage.jsx).
+try {
+  if (window.location.hash.includes('type=recovery')) {
+    sessionStorage.setItem('cardpop_password_recovery', '1');
+  }
+} catch { /* sessionStorage blocked (privacy mode) — the page's own checks still run */ }
+
 // Auto-recover if an out-of-date app shell requests a lazy-chunk hash that no
 // longer exists after a deploy (see lib/chunkReload.js). Installed first so the
 // listeners are in place before any route chunk is imported.
