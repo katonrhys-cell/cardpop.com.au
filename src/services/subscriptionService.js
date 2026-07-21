@@ -2,6 +2,7 @@ import stripe from '../utils/stripeClient.js';
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { markTrialRedeemed } from './welcomeOfferService.js';
+import { isStripeObjectMissing } from '../utils/stripeErrors.js';
 import { recordSubscriptionReferral } from './partnerService.js';
 
 /** A subscription status that maps to the paid Pro tier. */
@@ -42,7 +43,19 @@ export async function getOrCreateStripeCustomer(userId, email) {
     .eq('id', userId)
     .maybeSingle();
 
-  if (profile?.stripe_customer_id) return profile.stripe_customer_id;
+  // Validate a stored id before trusting it — it may be stale (deleted, or
+  // minted on a previous Stripe account before the platform switched). Fall
+  // through and recreate instead of letting checkout fail with
+  // "No such customer".
+  if (profile?.stripe_customer_id) {
+    try {
+      const existing = await stripe.customers.retrieve(profile.stripe_customer_id);
+      if (!existing?.deleted) return profile.stripe_customer_id;
+    } catch (err) {
+      if (!isStripeObjectMissing(err)) throw err;
+    }
+    logger.warn(`[SUBSCRIPTION] Stored Stripe customer ${profile.stripe_customer_id} for user ${userId} no longer exists — recreating`);
+  }
 
   const customer = await stripe.customers.create({
     email,

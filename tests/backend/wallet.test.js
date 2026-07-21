@@ -116,6 +116,20 @@ describe('GET /wallet/balance', () => {
     expect(res.status).toBe(200);
     expect(res.body.balanceAud).toBe(25);
   });
+
+  it('returns 0 when the stored customer id no longer exists (platform switched Stripe accounts)', async () => {
+    state.respond = (ctx) => {
+      if (ctx.table === 'profiles' && ctx.single) return { data: { stripe_customer_id: 'cus_stale' }, error: null };
+      return { data: null, error: null };
+    };
+    mockStripe.customers.retrieve.mockRejectedValueOnce(
+      Object.assign(new Error('No such customer: cus_stale'), { code: 'resource_missing' }),
+    );
+
+    const res = await request(app).get('/wallet/balance');
+    expect(res.status).toBe(200);
+    expect(res.body.balanceAud).toBe(0);
+  });
 });
 
 describe('POST /wallet/topup', () => {
@@ -149,6 +163,31 @@ describe('POST /wallet/topup', () => {
         mode: 'payment',
         metadata: { userId: 'user-123', walletTopup: 'true' },
       }),
+    );
+  });
+
+  it('recreates the customer when the stored id no longer exists (platform switched Stripe accounts)', async () => {
+    let storedId = 'cus_stale';
+    state.respond = (ctx) => {
+      if (ctx.table === 'profiles' && ctx.op === 'update' && ctx.payload?.stripe_customer_id) {
+        storedId = ctx.payload.stripe_customer_id;
+        return { data: null, error: null };
+      }
+      if (ctx.table === 'profiles' && ctx.single) return { data: { stripe_customer_id: storedId }, error: null };
+      return { data: null, error: null };
+    };
+    mockStripe.customers.retrieve.mockRejectedValueOnce(
+      Object.assign(new Error('No such customer: cus_stale'), { code: 'resource_missing' }),
+    );
+    mockStripe.customers.create.mockResolvedValueOnce({ id: 'cus_new' });
+    mockStripe.checkout.sessions.create.mockResolvedValueOnce({ id: 'cs_topup', url: 'https://stripe.test/session' });
+
+    const res = await request(app).post('/wallet/topup').send(validBody);
+
+    expect(res.status).toBe(200);
+    expect(mockStripe.customers.create).toHaveBeenCalled();
+    expect(mockStripe.checkout.sessions.create).toHaveBeenCalledWith(
+      expect.objectContaining({ customer: 'cus_new' }),
     );
   });
 });
