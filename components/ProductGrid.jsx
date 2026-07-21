@@ -3,9 +3,15 @@ import ProductCard from './ProductCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const ProductGrid = ({ items, loading, isVault = true, onAddToCart }) => {
+  // Matches the responsive product grid used on the main Shop and Marketplace
+  // pages so category listings line up with the rest of the site. (The old
+  // `seo-product-grid` class had no CSS rule anywhere, so cards fell back to
+  // block layout and each stretched to the full container width.)
+  const gridClass = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6';
+
   if (loading) {
     return (
-      <div className="seo-product-grid">
+      <div className={gridClass}>
         {[...Array(8)].map((_, i) => (
           <div key={i} className="flex flex-col gap-3 rounded-2xl border border-border p-4 h-[350px]">
             <Skeleton className="w-full h-48 rounded-xl" />
@@ -28,7 +34,7 @@ const ProductGrid = ({ items, loading, isVault = true, onAddToCart }) => {
   }
 
   return (
-    <div className="seo-product-grid">
+    <div className={gridClass}>
       {items.map((item, i) => (
         <ProductCard
           key={item.id}
