@@ -224,6 +224,14 @@ export const AuthProvider = ({ children }) => {
     // this attempt is even allowed before touching Supabase. A network error
     // reaching the check fails open (mirrors the backend's own catch-and-allow
     // behavior); only an explicit 429 lockout blocks sign-in.
+    //
+    // NOTE: this check is TELEMETRY / UX, NOT a security boundary. It runs only
+    // in our own client; the actual credential check below is a direct
+    // client→Supabase call, so an attacker scripting GoTrue never hits it. The
+    // real brute-force/credential-stuffing boundary is Supabase-native: the
+    // Turnstile captchaToken passed below (once CAPTCHA is enabled in the
+    // Supabase dashboard) + Supabase Auth rate limits. See
+    // docs/auth-brute-force-protection.md (audit M2).
     let attemptRes = null;
     try {
       attemptRes = await apiServerClient.fetch('/auth/login/attempt', {
