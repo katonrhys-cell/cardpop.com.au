@@ -10,6 +10,7 @@ import Breadcrumb from '@/components/Breadcrumb.jsx';
 import CategoryFilter from '@/components/CategoryFilter.jsx';
 import ProductGrid from '@/components/ProductGrid.jsx';
 import PaginationControls from '@/components/PaginationControls.jsx';
+import ShopAffiliateSection from '@/components/shop/ShopAffiliateSection.jsx';
 import { useCart } from '@/hooks/useCart.jsx';
 import { toast } from 'sonner';
 
@@ -174,11 +175,13 @@ const ShopCategoryPage = () => {
           
           <ProductGrid items={products} loading={loading || contextLoading} isVault={false} onAddToCart={handleAddToCart} />
           
-          <PaginationControls 
-            currentPage={page} 
-            totalPages={totalPages} 
-            onPageChange={setPage} 
+          <PaginationControls
+            currentPage={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
           />
+
+          <ShopAffiliateSection category={categoryName || null} />
         </div>
       </div>
     </div>

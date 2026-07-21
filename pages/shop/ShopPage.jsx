@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/ProductCard.jsx';
+import ShopAffiliateSection from '@/components/shop/ShopAffiliateSection.jsx';
 import { useCart } from '@/hooks/useCart.jsx';
 import { toast } from 'sonner';
 
@@ -185,6 +186,8 @@ const ShopPage = () => {
             <p className="text-muted-foreground">Try adjusting your search criteria.</p>
           </div>
         )}
+
+        <ShopAffiliateSection title="Recommended for collectors" />
       </section>
     </div>
   );
