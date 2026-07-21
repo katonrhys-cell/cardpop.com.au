@@ -1,5 +1,6 @@
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
+import { isStripeObjectMissing } from '../utils/stripeErrors.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Buyer prepaid wallet / store credit.
@@ -21,7 +22,21 @@ export async function ensureWalletCustomer(stripe, userId, { email, displayName 
     .eq('id', userId)
     .maybeSingle();
   if (error) throw error;
-  if (profile?.stripe_customer_id) return profile.stripe_customer_id;
+
+  // Validate a stored id before trusting it: it may have been minted on a
+  // previous Stripe account (the platform switched accounts) or deleted, in
+  // which case every downstream call would fail with "No such customer".
+  // Self-heal by falling through to create a replacement.
+  const staleId = profile?.stripe_customer_id || null;
+  if (staleId) {
+    try {
+      const existing = await stripe.customers.retrieve(staleId);
+      if (!existing?.deleted) return staleId;
+    } catch (err) {
+      if (!isStripeObjectMissing(err)) throw err;
+    }
+    logger.warn(`[WALLET] Stored Stripe customer ${staleId} for user ${userId} no longer exists — recreating`);
+  }
 
   const customer = await stripe.customers.create({
     email,
@@ -29,11 +44,14 @@ export async function ensureWalletCustomer(stripe, userId, { email, displayName 
     metadata: { userId },
   });
 
-  const { error: updateErr } = await supabase
+  // Guarded write: only replace the exact value we read (null, or the stale
+  // id), so a concurrent call that already persisted a fresh id wins the race.
+  let update = supabase
     .from('profiles')
     .update({ stripe_customer_id: customer.id })
-    .eq('id', userId)
-    .is('stripe_customer_id', null);
+    .eq('id', userId);
+  update = staleId ? update.eq('stripe_customer_id', staleId) : update.is('stripe_customer_id', null);
+  const { error: updateErr } = await update;
 
   if (updateErr) {
     logger.error(`[WALLET] Created Stripe customer ${customer.id} but failed to persist for user ${userId}: ${updateErr.message}`);
@@ -61,7 +79,14 @@ export async function getWalletBalanceCents(stripe, userId) {
     .maybeSingle();
   if (!profile?.stripe_customer_id) return 0;
 
-  const customer = await stripe.customers.retrieve(profile.stripe_customer_id);
+  let customer;
+  try {
+    customer = await stripe.customers.retrieve(profile.stripe_customer_id);
+  } catch (err) {
+    // Stale id (deleted, or from a previous Stripe account) = no credit.
+    if (isStripeObjectMissing(err)) return 0;
+    throw err;
+  }
   if (customer.deleted) return 0;
   return Math.max(0, -(customer.balance || 0));
 }

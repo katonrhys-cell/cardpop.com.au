@@ -1,6 +1,7 @@
 import stripe from '../utils/stripeClient.js';
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
+import { isStripeObjectMissing } from '../utils/stripeErrors.js';
 
 // Stripe Identity document verification.
 //
@@ -196,7 +197,16 @@ export async function getIdentityStatus(req, res) {
     if (isApproved(profile)) return res.json({ status: 'verified' });
     if (!profile?.stripe_identity_session_id) return res.json({ status: 'not_started' });
 
-    const session = await stripe.identity.verificationSessions.retrieve(profile.stripe_identity_session_id);
+    let session;
+    try {
+      session = await stripe.identity.verificationSessions.retrieve(profile.stripe_identity_session_id);
+    } catch (err) {
+      // Stale session id (from a previous Stripe account): the stored
+      // verification outcome on the profile stays authoritative; report
+      // not_started so an unverified user can simply run the check again.
+      if (!isStripeObjectMissing(err)) throw err;
+      return res.json({ status: 'not_started' });
+    }
     await applyIdentitySession(session);
 
     res.json({

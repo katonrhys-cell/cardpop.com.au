@@ -4,6 +4,7 @@ import logger from '../utils/logger.js';
 import { supabase } from '../utils/supabaseClient.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { ensureWalletCustomer, getWalletBalanceCents } from '../services/walletService.js';
+import { isStripeObjectMissing } from '../utils/stripeErrors.js';
 
 const router = express.Router();
 
@@ -119,11 +120,19 @@ router.get('/payment-methods', authMiddleware, async (req, res) => {
 
     if (!profile?.stripe_customer_id) return res.json({ paymentMethods: [] });
 
-    const methods = await stripe.paymentMethods.list({
-      customer: profile.stripe_customer_id,
-      type: 'card',
-      limit: 10,
-    });
+    let methods;
+    try {
+      methods = await stripe.paymentMethods.list({
+        customer: profile.stripe_customer_id,
+        type: 'card',
+        limit: 10,
+      });
+    } catch (err) {
+      // Stale customer id (deleted, or from a previous Stripe account): treat
+      // as "no saved cards" — the next save-card flow recreates the customer.
+      if (!isStripeObjectMissing(err)) throw err;
+      methods = { data: [] };
+    }
 
     const paymentMethods = (methods?.data ?? []).map((pm) => ({
       id:       pm.id,
