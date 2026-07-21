@@ -153,7 +153,7 @@ const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
         <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-border">
           <div className="flex items-center justify-between">
             <span className="font-extrabold text-xl tabular-nums text-foreground">
-              ${(vaultItem.estimated_value_aud || 0).toFixed(2)}
+              ${Number(vaultItem.estimated_value_aud || 0).toFixed(2)}
             </span>
           </div>
           
@@ -180,7 +180,7 @@ const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
                 </div>
                 <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
                   <Star className="w-3 h-3 fill-[hsl(var(--rating-color))] text-[hsl(var(--rating-color))]" />
-                  <span>{sellerObj?.rating ? sellerObj.rating.toFixed(1) : 'New'}</span>
+                  <span>{sellerObj?.rating ? Number(sellerObj.rating).toFixed(1) : 'New'}</span>
                   {sellerObj?.reviews_count > 0 && <span>({sellerObj.reviews_count})</span>}
                 </div>
               </div>
