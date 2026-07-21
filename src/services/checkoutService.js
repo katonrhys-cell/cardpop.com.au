@@ -4,7 +4,7 @@ import logger from '../utils/logger.js';
 import { calculateBreakdown } from './commissionService.js';
 import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
 import { validateWelcomeDiscount, buildWelcomeDiscount, reserveWelcomeDiscount } from './welcomeOfferService.js';
-import { ensureWalletCustomer, getWalletBalanceCents, assertNoOpenWalletCheckout } from './walletService.js';
+import { ensureWalletCustomer, getWalletBalanceCents, assertNoOpenWalletCheckout, reserveWalletCheckout, releaseWalletCheckout } from './walletService.js';
 
 export async function createSingleItemCheckout(req, res) {
   try {
@@ -152,6 +152,10 @@ export async function createSingleItemCheckout(req, res) {
     // The webhook marks it redeemed after payment completes.
     let discounts;
     let walletCustomerId = null;
+    // True while WE own releasing the wallet reservation (i.e. between claiming
+    // it and either handing ownership to the completion/expiry webhook once the
+    // session is created, or releasing it ourselves on an early exit/failure).
+    let walletSlotHeldForCleanup = false;
     if (promoCode) {
       const offer = await validateWelcomeDiscount(userId, promoCode);
       const built = await buildWelcomeDiscount(stripe, offer, Math.round(breakdown.itemPrice * 100));
@@ -169,7 +173,13 @@ export async function createSingleItemCheckout(req, res) {
       // payment actually completes (never pre-emptively, in case checkout is
       // abandoned).
       walletCustomerId = await ensureWalletCustomer(stripe, userId, { email });
-      // Prevent double-spend: refuse a new wallet checkout while one is still open.
+      // Atomically claim this user's single wallet-checkout slot BEFORE reading
+      // the balance, so two concurrent checkouts can't each size a full-balance
+      // coupon (the sub-second race assertNoOpenWalletCheckout can't see).
+      await reserveWalletCheckout(userId);
+      walletSlotHeldForCleanup = true;
+      // Also refuse a new wallet checkout while one is still open in Stripe
+      // (covers a lingering session beyond the reservation TTL).
       await assertNoOpenWalletCheckout(stripe, walletCustomerId);
       const buyerTotalCents = Math.round(buyerTotal * 100);
       const availableCents = await getWalletBalanceCents(stripe, userId);
@@ -188,6 +198,11 @@ export async function createSingleItemCheckout(req, res) {
         discounts = [{ coupon: coupon.id }];
         metadata.walletCents = String(walletCents);
         metadata.discountAud = String(walletCents / 100);
+      } else {
+        // No credit is actually applied (balance too low), so nothing needs
+        // protecting — free the slot now rather than holding it until the TTL.
+        await releaseWalletCheckout(userId);
+        walletSlotHeldForCleanup = false;
       }
     }
 
@@ -210,9 +225,16 @@ export async function createSingleItemCheckout(req, res) {
 
     if (!session?.url) throw new Error('Stripe returned a session without a URL');
 
+    // Session is live — the completion / expiry webhook now owns releasing the
+    // wallet reservation, so the failure path below must not release it.
+    walletSlotHeldForCleanup = false;
+
     logger.info(`[STRIPE] Session created: ${session.id} for listing ${listingId}`);
     res.json({ url: session.url, sessionId: session.id, breakdown });
   } catch (err) {
+    // We claimed the wallet slot but never handed it to a live session — free it
+    // now so a failed attempt doesn't lock the buyer out until the TTL.
+    if (walletSlotHeldForCleanup) await releaseWalletCheckout(userId);
     const code = err.statusCode || 500;
     if (code === 500) logger.error(`[STRIPE] create-checkout error: ${err.message}`);
     res.status(code).json({ error: code === 500 ? 'Something went wrong. Please try again.' : err.message });

@@ -23,7 +23,7 @@ import { processRefund } from '../services/refundService.js';
 import { connectOnboard, getConnectStatus, getDashboardLink } from '../services/connectService.js';
 import { createIdentitySession, getIdentityStatus, applyIdentitySession } from '../services/identityService.js';
 import { applyStripeSubscription } from '../services/subscriptionService.js';
-import { ensureWalletCustomer, getWalletBalanceCents, handleWalletTopup, assertNoOpenWalletCheckout } from '../services/walletService.js';
+import { ensureWalletCustomer, getWalletBalanceCents, handleWalletTopup, assertNoOpenWalletCheckout, reserveWalletCheckout, releaseWalletCheckout } from '../services/walletService.js';
 import { validateShippingAddress } from '../utils/addressValidation.js';
 import { requireEmailVerified } from '../middleware/requireEmailVerified.js';
 import { isValidAbn, normalizeAbn } from '../../utils/abn.js';
@@ -245,6 +245,10 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
     let partnerMeta = {};
     let walletCents = 0;
     let walletCustomerId = null;
+    // True while WE own releasing the wallet reservation (between claiming it and
+    // either handing it to the completion/expiry webhook once the session is
+    // created, or releasing it ourselves on an early exit/failure).
+    let walletSlotHeldForCleanup = false;
     if (!userId) {
       // Guest checkout — promo codes, wallet balance and partner attribution are
       // all account-scoped, so any supplied code is harmlessly ignored.
@@ -281,7 +285,13 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       // payment actually completes (never pre-emptively, in case checkout is
       // abandoned).
       walletCustomerId = await ensureWalletCustomer(stripe, userId, { email });
-      // Prevent double-spend: refuse a new wallet checkout while one is still open.
+      // Atomically claim this user's single wallet-checkout slot BEFORE reading
+      // the balance, so two concurrent checkouts can't each size a full-balance
+      // coupon (the sub-second race assertNoOpenWalletCheckout can't see).
+      await reserveWalletCheckout(userId);
+      walletSlotHeldForCleanup = true;
+      // Also refuse a new wallet checkout while one is still open in Stripe
+      // (covers a lingering session beyond the reservation TTL).
       await assertNoOpenWalletCheckout(stripe, walletCustomerId);
       const availableCents = await getWalletBalanceCents(stripe, userId);
       // Leave at least Stripe's AUD minimum charge (50¢) on the card — a
@@ -296,6 +306,11 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
         });
         discounts = [{ coupon: coupon.id }];
         discountCents = walletCents;
+      } else {
+        // No credit is actually applied — free the slot now rather than holding
+        // it until the TTL.
+        await releaseWalletCheckout(userId);
+        walletSlotHeldForCleanup = false;
       }
     }
 
@@ -404,6 +419,11 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       throw new Error('Could not record the order');
     }
 
+    // Session is live and its pending order recorded — the completion / expiry
+    // webhook now owns releasing the wallet reservation, so the failure path
+    // below must not release it.
+    walletSlotHeldForCleanup = false;
+
     logger.info(`[STRIPE] Cart session created: ${session.id} (${orderLines.length} items, $${grandCents / 100}, ${embedded ? 'embedded' : 'hosted'})`);
     res.json({
       ...(embedded ? { clientSecret: session.client_secret } : { url: session.url }),
@@ -411,6 +431,9 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       total: grandCents / 100,
     });
   } catch (err) {
+    // We claimed the wallet slot but never handed it to a live session — free it
+    // now so a failed attempt doesn't lock the buyer out until the TTL.
+    if (walletSlotHeldForCleanup) await releaseWalletCheckout(userId);
     const code = err.statusCode || 500;
     if (code === 500) logger.error(`[STRIPE] create-cart-checkout error: ${err.message}`);
     res.status(code).json({ error: code === 500 ? 'Something went wrong. Please try again.' : err.message });

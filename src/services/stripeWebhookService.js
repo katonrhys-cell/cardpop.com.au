@@ -5,7 +5,7 @@ import { getAdminNotificationEmail } from '../utils/adminNotificationRecipient.j
 import { payoutSeller } from './payoutService.js';
 import { markWelcomeDiscountRedeemed, releaseWelcomeDiscount } from './welcomeOfferService.js';
 import { recordShopOrderReferral } from './partnerService.js';
-import { debitWalletForOrder } from './walletService.js';
+import { debitWalletForOrder, releaseWalletCheckout } from './walletService.js';
 import { subscribeToNewsletter } from '../utils/newsletter.js';
 import { namesMatch } from './identityService.js';
 
@@ -244,6 +244,8 @@ async function handleCartOrder(existing, session, stripe) {
     if (walletCents > 0 && customerId) {
       await debitWalletForOrder(stripe, customerId, walletCents, `Applied to order ${existing.id}`, `wallet-debit-${session.id}`)
         .catch(e => logger.error(`[WALLET] debit failed for order ${existing.id}: ${e.message}`));
+      // Free the buyer's wallet-checkout slot now the session is done.
+      await releaseWalletCheckout(session.metadata?.userId);
     }
   }
 
@@ -535,6 +537,8 @@ async function handleSingleItemOrder(session, stripe) {
     if (walletCents > 0 && customerId) {
       await debitWalletForOrder(stripe, customerId, walletCents, `Applied to order for session ${session.id}`, `wallet-debit-${session.id}`)
         .catch(e => logger.error(`[WALLET] debit failed for session ${session.id}: ${e.message}`));
+      // Free the buyer's wallet-checkout slot now the session is done.
+      await releaseWalletCheckout(meta.userId);
     }
   }
 
@@ -677,6 +681,11 @@ async function handleCheckoutSessionExpired(session) {
   // the buyer can use it on a later order.
   if (session.metadata?.welcomeOfferId) {
     await releaseWelcomeDiscount(session.metadata.welcomeOfferId);
+  }
+  // Likewise free the wallet-checkout slot so an abandoned wallet checkout
+  // doesn't block the buyer until the reservation TTL lapses.
+  if (Number(session.metadata?.walletCents) > 0) {
+    await releaseWalletCheckout(session.metadata.userId);
   }
   const { data: cancelled } = await supabase
     .from('orders')
