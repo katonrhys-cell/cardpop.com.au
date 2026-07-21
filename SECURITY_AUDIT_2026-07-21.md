@@ -21,15 +21,17 @@ However, this audit found **1 Critical, 1 High, and 8 Medium** issues that warra
 |---|----------|-------|------|--------|
 | C1 | **Critical** | Legacy `pb_data/` PocketBase DB committed — leaks password hashes, auth tokenKeys, emails, addresses | Secrets/PII | **Fixed in tree; history purge + rotation required** |
 | H1 | **High** | Buyer can purchase any listing at a self-chosen price via an unaccepted `pending` offer | Payments | **Fixed** |
-| M1 | Medium | MFA (AAL2) enforced only on `/admin` router — other privileged endpoints bypassable | AuthZ | Open |
-| M2 | Medium | Brute-force login lockout is client-enforced and trivially bypassable | Auth | Open |
-| M3 | Medium | Password change does not revoke other active sessions | Auth | Open |
-| M4 | Medium | Rate limiters use in-memory store — ineffective across serverless instances | DoS | Open |
-| M5 | Medium | 20 MB body limit applied by path prefix *before* auth on event-scraper | DoS | Open |
-| M6 | Medium | Wallet double-spend TOCTOU — sub-second concurrent race still open | Payments | Open |
-| M7 | Medium | Refund-request TOCTOU → potential double Stripe refund | Payments | Open |
-| M8 | Medium | `vault_items.is_featured` self-settable — bypasses admin homepage curation | RLS | Open |
+| M1 | Medium | MFA (AAL2) enforced only on `/admin` router — other privileged endpoints bypassable | AuthZ | **Fixed** |
+| M2 | Medium | Brute-force login lockout is client-enforced and trivially bypassable | Auth | **Documented; enable Supabase CAPTCHA + rate limits (config)** |
+| M3 | Medium | Password change does not revoke other active sessions | Auth | **Fixed** |
+| M4 | Medium | Rate limiters use in-memory store — ineffective across serverless instances | DoS | **Fixed (sensitive limiters)** |
+| M5 | Medium | 20 MB body limit applied by path prefix *before* auth on event-scraper | DoS | **Fixed** |
+| M6 | Medium | Wallet double-spend TOCTOU — sub-second concurrent race still open | Payments | **Fixed** |
+| M7 | Medium | Refund-request TOCTOU → potential double Stripe refund | Payments | **Fixed** |
+| M8 | Medium | `vault_items.is_featured` self-settable — bypasses admin homepage curation | RLS | **Fixed** |
 | L1–L10 | Low/Info | See "Low-severity findings" | Various | Open |
+
+> **Update (all Mediums addressed):** M1, M3–M8 are fixed in code/migrations on this branch; M2's fix is Supabase dashboard configuration (the Turnstile CAPTCHA code is already wired) — see `docs/auth-brute-force-protection.md`. C1 still needs the owner to purge git history and rotate the exposed credentials. Per-item detail below.
 
 ---
 
@@ -177,9 +179,17 @@ The seller never consented to the price. Direct financial loss to sellers / the 
 
 ---
 
-## Remediation applied in this change
+## Remediation applied on this branch
 
 1. **C1** — `pb_data/` removed from git tracking and added to `.gitignore`. *(History purge + credential rotation still required — see C1.)*
 2. **H1** — `checkoutService.js` offer-status gate corrected to require seller consent (`accepted`/`countered`), rejecting un-accepted `pending` offers.
+3. **M1** — new `requireAdmin` composite (auth → admin → `requireAal2`) applied to every privileged endpoint outside `/admin` (partner payout, buyer-protection, reports, seller-ratings, vault base-value, categories/subcategories, market-data, price-history, stores, event-scraper).
+4. **M3** — password change now calls `supabase.auth.admin.signOut(token, 'others')` to revoke all other sessions.
+5. **M4** — security-sensitive limiters (backup-code, login/password advisory, email-triggering, pwned-check, AI) backed by a shared Postgres store (`PgRateLimitStore` + `rate_limit_hit` RPC), fail-open; high-volume limiters stay in-memory behind Cloudflare.
+6. **M5** — global body parser skips the event-scraper router; a router-level auth+admin gate now parses the large body only after authorization.
+7. **M6** — atomic per-user wallet-checkout reservation (`reserve_wallet_checkout` CAS) closes the sub-second race; released at completion/expiry/failure with a TTL safety net.
+8. **M7** — Stripe refund idempotency keyed on `order_id`; partial unique index `refunds_one_active_per_order` prevents a second active refund row.
+9. **M8** — `vault_items_update_access` recreated pinning `is_featured` against owner self-writes.
+10. **M2** — `docs/auth-brute-force-protection.md` + code comment; the real fix (Supabase-native CAPTCHA/rate limits) is dashboard configuration — the Turnstile client code is already wired.
 
-All other findings are documented above with fixes but left for review, as they involve production auth/DB/behavior changes best applied with explicit sign-off.
+**Still requires owner action (out of band):** C1 git-history purge + credential rotation; M2 Supabase dashboard config (Turnstile CAPTCHA + Auth rate limits); L1 leaked-password protection toggle. The Low/Info items (L2–L10) remain open for review.
