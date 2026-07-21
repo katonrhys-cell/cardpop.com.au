@@ -14,9 +14,11 @@ import { ExternalLink, Info, ShoppingBag } from 'lucide-react';
  * the section carries the Amazon Associates disclosure required by the program.
  *
  * Rows are managed in the admin portal (Admin → Shop Affiliate Products).
- *   - `category` prop set  → shows products tagged with that category PLUS
- *                            untagged "general" products (category IS NULL).
- *   - `category` prop unset → shows all published products (the /shop page).
+ * Placement is mutually exclusive, driven by each product's `category`:
+ *   - `category` prop unset (the main /shop page) → shows only untagged
+ *     products (category IS NULL).
+ *   - `category` prop set (a category page) → shows only products tagged
+ *     with that category name.
  */
 const ShopAffiliateSection = ({ category = null, title = 'You might also like', limit = 8 }) => {
   const [products, setProducts] = useState([]);
@@ -36,10 +38,13 @@ const ShopAffiliateSection = ({ category = null, title = 'You might also like', 
           .order('created_at', { ascending: false })
           .limit(limit);
 
-        // On a category page, show products tagged for this category plus the
-        // untagged general ones. On the main shop page (no category), show all.
+        // Mutually exclusive placement: a category page shows only products
+        // tagged for that category; the main shop page (no category) shows only
+        // untagged products.
         if (category) {
-          query = query.or(`category.ilike.%${escapeLike(category)}%,category.is.null`);
+          query = query.ilike('category', `%${escapeLike(category)}%`);
+        } else {
+          query = query.is('category', null);
         }
 
         const { data, error } = await query;

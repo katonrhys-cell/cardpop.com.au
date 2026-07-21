@@ -4,9 +4,9 @@
 -- `network` keeps it open to other affiliate programs later.
 --
 -- These are display-only promo cards: no cart, no Stripe, no inventory. They
--- link straight out to the retailer with a sponsored/nofollow rel. An optional
--- free-text `category` lets a product be scoped to a matching shop category
--- page; rows with a NULL category are "general" and show everywhere.
+-- link straight out to the retailer with a sponsored/nofollow rel. Placement is
+-- mutually exclusive, driven by `category`: a NULL category shows only on the
+-- main /shop page, and a category name shows only on that shop category page.
 --
 -- Public read is limited to published rows; only admins can write.
 

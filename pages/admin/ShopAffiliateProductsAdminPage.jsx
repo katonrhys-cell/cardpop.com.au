@@ -285,7 +285,7 @@ const ShopAffiliateProductsAdminPage = () => {
                           {product.badge && <Badge variant="secondary" className="text-[10px] hidden xl:inline-flex shrink-0">{product.badge}</Badge>}
                         </div>
                       </TableCell>
-                      <TableCell className="hidden md:table-cell text-muted-foreground text-sm">{product.category || <span className="italic opacity-60">All pages</span>}</TableCell>
+                      <TableCell className="hidden md:table-cell text-muted-foreground text-sm">{product.category || <span className="italic opacity-60">Main /shop</span>}</TableCell>
                       <TableCell className="hidden lg:table-cell text-muted-foreground text-sm capitalize">{product.network || 'amazon'}</TableCell>
                       <TableCell className="text-center" onClick={e => e.stopPropagation()}>
                         <button type="button" onClick={() => togglePublished(product)} className="inline-flex">
@@ -374,7 +374,7 @@ const ShopAffiliateProductsAdminPage = () => {
               <div className="space-y-2">
                 <Label htmlFor="category" className="text-sm font-bold">Category <span className="text-muted-foreground font-normal">(optional)</span></Label>
                 <Input id="category" name="category" value={formData.category} onChange={handleInputChange} placeholder="e.g. Card Sleeves" className="h-11 rounded-xl bg-background border-border" />
-                <p className="text-xs text-muted-foreground">Leave blank to show on every shop page. Set it to a shop category name to also feature it on that category page.</p>
+                <p className="text-xs text-muted-foreground">Leave blank to show only on the main /shop page. Set it to a shop category name to show only on that category page.</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="sort_order" className="text-sm font-bold">Sort order</Label>
