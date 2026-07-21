@@ -48,7 +48,14 @@ export async function createSingleItemCheckout(req, res) {
       if (!offer || offer.listing_id !== listingId || offer.buyer_id !== userId) {
         return res.status(400).json({ error: 'Invalid offer' });
       }
-      if (!['pending', 'countered'].includes(offer.status)) {
+      // Only offers the SELLER has consented to may be paid. A 'pending' offer
+      // is the buyer's own un-accepted proposal whose amount_aud the buyer sets
+      // freely (there is no server-side floor, and the tamper trigger only
+      // freezes the amount *after* insert) — allowing it let a buyer purchase
+      // any active listing at a self-chosen price ($1 for a $1000 card) with no
+      // seller consent. The consent-bearing states are 'accepted' (seller
+      // accepted the buyer's amount) and 'countered' (seller proposed a price).
+      if (!['accepted', 'countered'].includes(offer.status)) {
         return res.status(400).json({ error: 'Offer is no longer valid' });
       }
       // A 'countered' offer means the seller proposed a different price —
