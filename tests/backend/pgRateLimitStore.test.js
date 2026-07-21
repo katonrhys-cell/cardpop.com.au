@@ -32,8 +32,8 @@ describe('PgRateLimitStore', () => {
     expect(res.totalHits).toBe(1);
   });
 
-  it('fails OPEN when the RPC throws (e.g. network error)', async () => {
-    mockRpc.mockRejectedValue(new Error('boom'));
+  it('fails OPEN when the RPC returns no usable count (malformed/unavailable)', async () => {
+    mockRpc.mockResolvedValue({ data: [], error: null });
     const store = new PgRateLimitStore('ai');
     const res = await store.increment('user-2');
     expect(res.totalHits).toBe(1);

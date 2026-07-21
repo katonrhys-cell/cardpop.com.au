@@ -7,6 +7,10 @@ import { validateWelcomeDiscount, buildWelcomeDiscount, reserveWelcomeDiscount }
 import { ensureWalletCustomer, getWalletBalanceCents, assertNoOpenWalletCheckout, reserveWalletCheckout, releaseWalletCheckout } from './walletService.js';
 
 export async function createSingleItemCheckout(req, res) {
+  // Declared before the try so the catch block can see them (block-scoped `let`
+  // inside try is not visible in catch).
+  const userId = req.user?.id;
+  let walletSlotHeldForCleanup = false;
   try {
     const {
       listingId,
@@ -19,7 +23,6 @@ export async function createSingleItemCheckout(req, res) {
       useWalletBalance,
     } = req.body;
 
-    const userId = req.user.id;
     const email = req.user.email;
 
     const { data: listing, error: listingErr } = await supabase
@@ -152,10 +155,10 @@ export async function createSingleItemCheckout(req, res) {
     // The webhook marks it redeemed after payment completes.
     let discounts;
     let walletCustomerId = null;
-    // True while WE own releasing the wallet reservation (i.e. between claiming
-    // it and either handing ownership to the completion/expiry webhook once the
-    // session is created, or releasing it ourselves on an early exit/failure).
-    let walletSlotHeldForCleanup = false;
+    // walletSlotHeldForCleanup is declared at the top of the function (so the
+    // catch can see it): true while WE own releasing the wallet reservation —
+    // between claiming it and either handing ownership to the completion/expiry
+    // webhook once the session is created, or releasing it on an early exit.
     if (promoCode) {
       const offer = await validateWelcomeDiscount(userId, promoCode);
       const built = await buildWelcomeDiscount(stripe, offer, Math.round(breakdown.itemPrice * 100));

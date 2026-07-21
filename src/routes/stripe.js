@@ -166,6 +166,10 @@ router.post('/calculate-cart', optionalAuthMiddleware, async (req, res) => {
 });
 
 router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifiedIfAuthed, async (req, res) => {
+  // Declared before the try so the catch block can see them (block-scoped `let`
+  // inside try is not visible in catch). A guest has no user id.
+  const userId = req.user?.id || null;
+  let walletSlotHeldForCleanup = false;
   try {
     const { items, successUrl, cancelUrl, returnUrl, uiMode, shippingAddress, promoCode, useWalletBalance, billingDetails, email: guestEmailInput, subscribeNewsletter } = req.body;
 
@@ -173,7 +177,6 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
     // wallet balance and partner attribution are account-only and are skipped
     // for them. The email they typed at checkout is the receipt address (and,
     // if they opted in, the newsletter address).
-    const userId = req.user?.id || null;
     // Normalize to lowercase: the guest purchase-velocity window queries
     // buyer_email lowercased, so storing a mixed-case address would silently
     // never match — disabling the guest order/spend caps. Email delivery is
@@ -245,10 +248,10 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
     let partnerMeta = {};
     let walletCents = 0;
     let walletCustomerId = null;
-    // True while WE own releasing the wallet reservation (between claiming it and
-    // either handing it to the completion/expiry webhook once the session is
-    // created, or releasing it ourselves on an early exit/failure).
-    let walletSlotHeldForCleanup = false;
+    // walletSlotHeldForCleanup is declared at the top of the handler (so the
+    // catch can see it): true while WE own releasing the wallet reservation —
+    // between claiming it and either handing it to the completion/expiry webhook
+    // once the session is created, or releasing it on an early exit/failure.
     if (!userId) {
       // Guest checkout — promo codes, wallet balance and partner attribution are
       // all account-scoped, so any supplied code is harmlessly ignored.
