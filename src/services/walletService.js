@@ -125,6 +125,38 @@ export async function assertNoOpenWalletCheckout(stripe, customerId) {
   }
 }
 
+/**
+ * Atomically claim the user's single wallet-checkout slot before sizing a wallet
+ * coupon. assertNoOpenWalletCheckout only sees sessions Stripe already lists as
+ * open, so two checkouts created in the same sub-second window both size a
+ * full-balance coupon and over-redeem. This CAS reservation (backed by
+ * reserve_wallet_checkout) serialises concurrent creations — the loser gets a
+ * 409. Released at completion/expiry/on failure; a TTL reclaims a missed
+ * release. Throws a 409-tagged Error when another checkout already holds it.
+ */
+export async function reserveWalletCheckout(userId) {
+  if (!userId) return;
+  const { data, error } = await supabase.rpc('reserve_wallet_checkout', { p_user_id: userId });
+  if (error) {
+    logger.error(`[WALLET] reserve_wallet_checkout failed for user ${userId}: ${error.message}`);
+    throw new Error('Could not start wallet checkout, please try again');
+  }
+  if (data !== true) {
+    const err = new Error(
+      'You already have a wallet-funded checkout in progress. Please complete or cancel it before starting another.',
+    );
+    err.statusCode = 409;
+    throw err;
+  }
+}
+
+/** Release the user's wallet-checkout slot (idempotent, best-effort). */
+export async function releaseWalletCheckout(userId) {
+  if (!userId) return;
+  const { error } = await supabase.rpc('release_wallet_checkout', { p_user_id: userId });
+  if (error) logger.warn(`[WALLET] release_wallet_checkout failed for user ${userId}: ${error.message}`);
+}
+
 /** Adds store credit to a customer's wallet (e.g. after a successful top-up payment). */
 export async function creditWallet(stripe, customerId, amountCents, description, idempotencyKey) {
   if (!(amountCents > 0)) return;

@@ -67,7 +67,9 @@ vi.mock('../../src/utils/supabaseClient.js', () => {
   }
   const sb = {
     from: (t) => makeBuilder(t),
-    rpc: () => Promise.resolve({ data: null, error: null }),
+    // reserve_wallet_checkout returns a boolean "acquired" flag; default to
+    // acquired so wallet-checkout happy paths proceed. Other RPCs return null.
+    rpc: (fn) => Promise.resolve({ data: fn === 'reserve_wallet_checkout' ? true : null, error: null }),
     auth: { getUser: () => Promise.resolve({ data: { user: null }, error: null }) },
   };
   return { supabase: sb, default: sb };

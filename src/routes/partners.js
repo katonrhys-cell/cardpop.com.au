@@ -2,6 +2,7 @@ import express from 'express';
 import stripe from '../utils/stripeClient.js';
 import logger from '../utils/logger.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
+import { requireAdmin } from '../middleware/requireAal2.js';
 import {
   submitPartnerApplication,
   getPartnerDashboard,
@@ -59,7 +60,7 @@ router.post('/click', async (req, res) => {
  * Admin-only: sweep a partner's pending commission into a Stripe Connect
  * transfer to their connected account.
  */
-router.post('/admin/payout', authMiddleware, async (req, res) => {
+router.post('/admin/payout', authMiddleware, requireAdmin, async (req, res) => {
   try {
     if (!(await isAdminUser(req))) {
       return res.status(403).json({ error: 'Admin only' });

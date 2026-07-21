@@ -3,6 +3,7 @@ import supabase from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { escapeLike } from '../utils/escapeLike.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
+import { requireAdmin } from '../middleware/requireAal2.js';
 
 const router = express.Router();
 
@@ -121,7 +122,7 @@ router.post('/submit', async (req, res) => {
  * role after an isAdminUser check so the moderation dashboard can still show the
  * submitter's contact.
  */
-router.get('/admin', authMiddleware, async (req, res) => {
+router.get('/admin', authMiddleware, requireAdmin, async (req, res) => {
   if (!(await isAdminUser(req))) {
     return res.status(403).json({ error: 'Admin access required' });
   }

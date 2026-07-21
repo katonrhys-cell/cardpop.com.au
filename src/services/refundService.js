@@ -68,8 +68,13 @@ export async function processRefund(req, res) {
         payment_intent: paymentIntentId,
         amount: Math.round(refundAmount * 100),
         reason: 'requested_by_customer',
-        metadata: { refundId, retainedFee: String(retainedFee), retentionPct: String(retentionPct) },
-      }, { idempotencyKey: `refund_${refundId}` });
+        metadata: { refundId, orderId: refund.order_id, retainedFee: String(retainedFee), retentionPct: String(retentionPct) },
+        // Key idempotency on the ORDER, not the refund row. If two refund rows
+        // ever exist for one order (a request-side TOCTOU) and both reach here
+        // concurrently, an order-scoped key makes Stripe return the SAME refund
+        // instead of issuing a second one — the buyer can't be refunded twice.
+        // Refunds here are always full-order, so one refund per order is correct.
+      }, { idempotencyKey: `refund_order_${refund.order_id}` });
     } catch (stripeErr) {
       await supabase.from('refunds').update({ status: 'approved' }).eq('id', refundId);
       throw stripeErr;

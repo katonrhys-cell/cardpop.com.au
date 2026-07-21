@@ -12,6 +12,12 @@ vi.mock('../../src/utils/logger.js', () => ({
 }));
 
 let mockUser = { id: 'user-1', app_metadata: {} };
+vi.mock('../../src/middleware/requireAal2.js', () => ({
+  requireAal2: (_req, _res, next) => next(),
+  requireAdmin: (_req, _res, next) => next(),
+  decodeAal: () => 'aal2',
+  default: (_req, _res, next) => next(),
+}));
 vi.mock('../../src/middleware/auth.js', () => ({
   authMiddleware: (req, _res, next) => { req.user = mockUser; next(); },
   optionalAuthMiddleware: (req, _res, next) => { req.user = mockUser; next(); },

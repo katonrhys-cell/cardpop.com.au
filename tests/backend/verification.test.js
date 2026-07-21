@@ -4,15 +4,30 @@ import request from 'supertest';
 
 // ─── mocks ────────────────────────────────────────────────────────────────────
 
-const mockSupabase = vi.hoisted(() => ({
-  from: vi.fn(),
-  auth: {
-    resend: vi.fn(),
-    admin: {
-      getUserById: vi.fn(),
+const mockSupabase = vi.hoisted(() => {
+  // resendVerificationLimiter now uses the Postgres-backed shared store
+  // (PgRateLimitStore → supabase.rpc). Simulate rate_limit_hit with an in-memory
+  // counter so the anti-bombing cap still trips in tests.
+  const rlHits = new Map();
+  return {
+    from: vi.fn(),
+    rpc: async (fn, args) => {
+      if (fn === 'rate_limit_hit') {
+        const n = (rlHits.get(args.p_key) || 0) + 1;
+        rlHits.set(args.p_key, n);
+        return { data: [{ total_hits: n, reset_at: new Date(Date.now() + Number(args.p_window_ms)).toISOString() }], error: null };
+      }
+      if (fn === 'rate_limit_reset') { rlHits.delete(args.p_key); return { data: null, error: null }; }
+      return { data: null, error: null };
     },
-  },
-}));
+    auth: {
+      resend: vi.fn(),
+      admin: {
+        getUserById: vi.fn(),
+      },
+    },
+  };
+});
 
 vi.mock('../../src/utils/supabaseClient.js', () => ({ default: mockSupabase, supabase: mockSupabase }));
 vi.mock('../../src/utils/logger.js', () => ({

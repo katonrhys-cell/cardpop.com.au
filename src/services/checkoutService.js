@@ -4,9 +4,13 @@ import logger from '../utils/logger.js';
 import { calculateBreakdown } from './commissionService.js';
 import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
 import { validateWelcomeDiscount, buildWelcomeDiscount, reserveWelcomeDiscount } from './welcomeOfferService.js';
-import { ensureWalletCustomer, getWalletBalanceCents, assertNoOpenWalletCheckout } from './walletService.js';
+import { ensureWalletCustomer, getWalletBalanceCents, assertNoOpenWalletCheckout, reserveWalletCheckout, releaseWalletCheckout } from './walletService.js';
 
 export async function createSingleItemCheckout(req, res) {
+  // Declared before the try so the catch block can see them (block-scoped `let`
+  // inside try is not visible in catch).
+  const userId = req.user?.id;
+  let walletSlotHeldForCleanup = false;
   try {
     const {
       listingId,
@@ -19,7 +23,6 @@ export async function createSingleItemCheckout(req, res) {
       useWalletBalance,
     } = req.body;
 
-    const userId = req.user.id;
     const email = req.user.email;
 
     const { data: listing, error: listingErr } = await supabase
@@ -48,7 +51,14 @@ export async function createSingleItemCheckout(req, res) {
       if (!offer || offer.listing_id !== listingId || offer.buyer_id !== userId) {
         return res.status(400).json({ error: 'Invalid offer' });
       }
-      if (!['pending', 'countered'].includes(offer.status)) {
+      // Only offers the SELLER has consented to may be paid. A 'pending' offer
+      // is the buyer's own un-accepted proposal whose amount_aud the buyer sets
+      // freely (there is no server-side floor, and the tamper trigger only
+      // freezes the amount *after* insert) — allowing it let a buyer purchase
+      // any active listing at a self-chosen price ($1 for a $1000 card) with no
+      // seller consent. The consent-bearing states are 'accepted' (seller
+      // accepted the buyer's amount) and 'countered' (seller proposed a price).
+      if (!['accepted', 'countered'].includes(offer.status)) {
         return res.status(400).json({ error: 'Offer is no longer valid' });
       }
       // A 'countered' offer means the seller proposed a different price —
@@ -145,6 +155,10 @@ export async function createSingleItemCheckout(req, res) {
     // The webhook marks it redeemed after payment completes.
     let discounts;
     let walletCustomerId = null;
+    // walletSlotHeldForCleanup is declared at the top of the function (so the
+    // catch can see it): true while WE own releasing the wallet reservation —
+    // between claiming it and either handing ownership to the completion/expiry
+    // webhook once the session is created, or releasing it on an early exit.
     if (promoCode) {
       const offer = await validateWelcomeDiscount(userId, promoCode);
       const built = await buildWelcomeDiscount(stripe, offer, Math.round(breakdown.itemPrice * 100));
@@ -162,7 +176,13 @@ export async function createSingleItemCheckout(req, res) {
       // payment actually completes (never pre-emptively, in case checkout is
       // abandoned).
       walletCustomerId = await ensureWalletCustomer(stripe, userId, { email });
-      // Prevent double-spend: refuse a new wallet checkout while one is still open.
+      // Atomically claim this user's single wallet-checkout slot BEFORE reading
+      // the balance, so two concurrent checkouts can't each size a full-balance
+      // coupon (the sub-second race assertNoOpenWalletCheckout can't see).
+      await reserveWalletCheckout(userId);
+      walletSlotHeldForCleanup = true;
+      // Also refuse a new wallet checkout while one is still open in Stripe
+      // (covers a lingering session beyond the reservation TTL).
       await assertNoOpenWalletCheckout(stripe, walletCustomerId);
       const buyerTotalCents = Math.round(buyerTotal * 100);
       const availableCents = await getWalletBalanceCents(stripe, userId);
@@ -181,6 +201,11 @@ export async function createSingleItemCheckout(req, res) {
         discounts = [{ coupon: coupon.id }];
         metadata.walletCents = String(walletCents);
         metadata.discountAud = String(walletCents / 100);
+      } else {
+        // No credit is actually applied (balance too low), so nothing needs
+        // protecting — free the slot now rather than holding it until the TTL.
+        await releaseWalletCheckout(userId);
+        walletSlotHeldForCleanup = false;
       }
     }
 
@@ -203,9 +228,16 @@ export async function createSingleItemCheckout(req, res) {
 
     if (!session?.url) throw new Error('Stripe returned a session without a URL');
 
+    // Session is live — the completion / expiry webhook now owns releasing the
+    // wallet reservation, so the failure path below must not release it.
+    walletSlotHeldForCleanup = false;
+
     logger.info(`[STRIPE] Session created: ${session.id} for listing ${listingId}`);
     res.json({ url: session.url, sessionId: session.id, breakdown });
   } catch (err) {
+    // We claimed the wallet slot but never handed it to a live session — free it
+    // now so a failed attempt doesn't lock the buyer out until the TTL.
+    if (walletSlotHeldForCleanup) await releaseWalletCheckout(userId);
     const code = err.statusCode || 500;
     if (code === 500) logger.error(`[STRIPE] create-checkout error: ${err.message}`);
     res.status(code).json({ error: code === 500 ? 'Something went wrong. Please try again.' : err.message });

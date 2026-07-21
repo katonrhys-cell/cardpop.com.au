@@ -127,6 +127,22 @@ router.post('/change', authMiddleware, async (req, res) => {
   // Clear active sessions for security
   await supabase.from('user_security').update({ active_sessions: [] }).eq('user_id', req.user.id).then(() => {}, () => {});
 
+  // Revoke every OTHER Supabase/GoTrue session for this user. Updating the
+  // password does NOT invalidate existing refresh tokens on its own, so without
+  // this an attacker holding a stolen session would keep refreshing after the
+  // victim changes their password — defeating the main reason to change it.
+  // Scope 'others' keeps the current session (the device the user just used to
+  // change the password) while killing the rest. Best-effort: a failure here
+  // must not fail the already-committed password change.
+  const accessToken = req.headers.authorization?.slice(7);
+  if (accessToken) {
+    await supabase.auth.admin
+      .signOut(accessToken, 'others')
+      .then(() => {}, (err) => {
+        logger.warn(`Failed to revoke other sessions after password change for user ${req.user.id}: ${err?.message || err}`);
+      });
+  }
+
   await supabase.from('audit_logs').insert({
     user_id: req.user.id,
     event_type: 'password_changed',
