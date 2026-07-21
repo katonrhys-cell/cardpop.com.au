@@ -2,6 +2,7 @@ import logger from '../utils/logger.js';
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { authMiddleware, optionalAuthMiddleware, isAdminUser } from '../middleware/auth.js';
+import { requireAdmin } from '../middleware/requireAal2.js';
 import { validateRequestBody, validateRequestParams } from '../middleware/validateRequest.js';
 import { getSellerRatingsSchema, createRatingSchema, updatePerformanceSchema, updatePerformanceBodySchema } from '../schemas/sellerRatingSchemas.js';
 
@@ -149,7 +150,7 @@ async function updateSellerStats(sellerId) {
 }
 
 // Update seller performance metrics — admin only (overwrites profile stats).
-router.put('/:sellerId/performance', authMiddleware, validateRequestParams(updatePerformanceSchema), validateRequestBody(updatePerformanceBodySchema), async (req, res) => {
+router.put('/:sellerId/performance', authMiddleware, requireAdmin, validateRequestParams(updatePerformanceSchema), validateRequestBody(updatePerformanceBodySchema), async (req, res) => {
   try {
     if (!(await isAdminUser(req))) {
       return res.status(403).json({ error: 'Admin access required' });

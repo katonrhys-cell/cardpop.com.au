@@ -8,6 +8,12 @@ const mockGetRate = vi.hoisted(() => vi.fn());
 
 vi.mock('../../src/utils/supabaseClient.js', () => ({ default: mockSupabase, supabase: mockSupabase }));
 vi.mock('../../src/utils/exchangeRates.js', () => ({ getUsdToAudRate: mockGetRate }));
+vi.mock('../../src/middleware/requireAal2.js', () => ({
+  requireAal2: (_req, _res, next) => next(),
+  requireAdmin: (_req, _res, next) => next(),
+  decodeAal: () => 'aal2',
+  default: (_req, _res, next) => next(),
+}));
 vi.mock('../../src/middleware/auth.js', () => ({
   optionalAuthMiddleware: (req, _res, next) => { if (req.headers.authorization) req.user = { id: 'u1' }; next(); },
   isAdminUser: mockIsAdminUser,

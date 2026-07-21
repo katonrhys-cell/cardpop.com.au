@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
+import { requireAdmin } from '../middleware/requireAal2.js';
 import { reportLimiter } from '../middleware/endpoint-rate-limit.js';
 import logger from '../utils/logger.js';
 
@@ -157,7 +158,7 @@ router.get('/', authMiddleware, async (req, res) => {
 });
 
 // ─── Admin: triage a report ───────────────────────────────────────────────────
-router.patch('/:id', authMiddleware, async (req, res) => {
+router.patch('/:id', authMiddleware, requireAdmin, async (req, res) => {
   if (!(await isAdminUser(req))) {
     return res.status(403).json({ error: 'Admin access required' });
   }

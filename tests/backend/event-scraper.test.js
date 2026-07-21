@@ -23,6 +23,12 @@ vi.mock('undici', () => ({
   Agent: class {},
 }));
 
+vi.mock('../../src/middleware/requireAal2.js', () => ({
+  requireAal2: (_req, _res, next) => next(),
+  requireAdmin: (_req, _res, next) => next(),
+  decodeAal: () => 'aal2',
+  default: (_req, _res, next) => next(),
+}));
 vi.mock('../../src/middleware/auth.js', () => ({
   authMiddleware: (req, _res, next) => { req.user = { id: 'user-1', app_metadata: { is_admin: true } }; next(); },
   isAdminUser: async (req) => req.user?.app_metadata?.is_admin === true,

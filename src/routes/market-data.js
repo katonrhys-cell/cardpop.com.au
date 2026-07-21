@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { optionalAuthMiddleware, isAdminUser } from '../middleware/auth.js';
+import { requireAdmin } from '../middleware/requireAal2.js';
 import { validateRequestBody, validateRequestParams, validateRequestQuery } from '../middleware/validateRequest.js';
 import { getMarketDataSchema, recordMarketDataSchema, compareMarketPricesSchema, getTrendingSchema } from '../schemas/marketDataSchemas.js';
 import { getUsdToAudRate } from '../utils/exchangeRates.js';
@@ -69,7 +70,7 @@ router.get('/:cardName', validateRequestParams(getMarketDataSchema), async (req,
 
 // Record market data (for automated imports) — admin only to prevent
 // anyone from injecting arbitrary prices that feed valuations.
-router.post('/', validateRequestBody(recordMarketDataSchema), async (req, res) => {
+router.post('/', requireAdmin, validateRequestBody(recordMarketDataSchema), async (req, res) => {
   try {
     if (!(await isAdminUser(req))) {
       return res.status(403).json({ error: 'Admin access required' });

@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
+import { requireAdmin } from '../middleware/requireAal2.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -43,7 +44,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // POST /categories — create a new root category (admin only)
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authMiddleware, requireAdmin, async (req, res) => {
   if (!(await isAdminUser(req))) return res.status(403).json({ error: 'Admin access required' });
   const { name, slug, description, logo_url, website_url } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'Name is required' });
@@ -72,7 +73,7 @@ router.post('/', authMiddleware, async (req, res) => {
 });
 
 // PATCH /categories/:id — update a category (admin only)
-router.patch('/:id', authMiddleware, async (req, res) => {
+router.patch('/:id', authMiddleware, requireAdmin, async (req, res) => {
   if (!(await isAdminUser(req))) return res.status(403).json({ error: 'Admin access required' });
   const { id } = req.params;
   const { name, slug, description, logo_url, website_url } = req.body;
@@ -102,7 +103,7 @@ router.patch('/:id', authMiddleware, async (req, res) => {
 });
 
 // DELETE /categories/:id — delete a category and its subcategories (admin only)
-router.delete('/:id', authMiddleware, async (req, res) => {
+router.delete('/:id', authMiddleware, requireAdmin, async (req, res) => {
   if (!(await isAdminUser(req))) return res.status(403).json({ error: 'Admin access required' });
   const { id } = req.params;
 

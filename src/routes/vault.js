@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { authMiddleware, optionalAuthMiddleware, isAdminUser } from '../middleware/auth.js';
+import { requireAdmin } from '../middleware/requireAal2.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -140,7 +141,7 @@ router.get('/:id', optionalAuthMiddleware, async (req, res) => {
 });
 
 // PATCH /vault/:id/base-value — admin-only: adjust a card's locked base value
-router.patch('/:id/base-value', authMiddleware, async (req, res) => {
+router.patch('/:id/base-value', authMiddleware, requireAdmin, async (req, res) => {
   const { id } = req.params;
   const { newValue, reason } = req.body;
 

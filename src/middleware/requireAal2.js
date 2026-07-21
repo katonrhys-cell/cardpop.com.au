@@ -1,5 +1,6 @@
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
+import { isAdminUser } from './auth.js';
 
 // Read the `aal` (Authenticator Assurance Level) claim from a Supabase access
 // token WITHOUT verifying the signature. This is safe here because the token has
@@ -70,6 +71,28 @@ export async function requireAal2(req, res, next) {
     logger.error('requireAal2 middleware error:', err);
     return res.status(403).json({ error: 'Could not verify MFA status', code: 'mfa_check_failed' });
   }
+}
+
+// Composite gate for privileged admin actions that live OUTSIDE the /admin
+// router (partner payouts, buyer-protection resolutions, catalogue edits, vault
+// base-value, seller-performance overrides, the event scraper, …). Each of
+// these previously did an inline isAdminUser() check but never enforced MFA, so
+// an attacker with only an admin's password could mint an AAL1 token and call
+// them — the exact bypass requireAal2 closes for /admin. This bundles the three
+// checks in the right order:
+//   1. authenticated  (req.user present — set by authMiddleware/optionalAuth)
+//   2. admin          (isAdminUser)
+//   3. stepped-up MFA (requireAal2 — only bites admins who enrolled MFA)
+// Non-admins get a 403 before any MFA probing. Must run after an auth middleware
+// that may populate req.user. Fails closed.
+export async function requireAdmin(req, res, next) {
+  if (!req.user?.id) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  if (!(await isAdminUser(req))) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  return requireAal2(req, res, next);
 }
 
 export default requireAal2;

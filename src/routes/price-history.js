@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { optionalAuthMiddleware, isAdminUser } from '../middleware/auth.js';
+import { requireAdmin } from '../middleware/requireAal2.js';
 import { escapeLike } from '../utils/escapeLike.js';
 import logger from '../utils/logger.js';
 
@@ -60,7 +61,7 @@ router.get('/:itemId', async (req, res) => {
 
 // Record a price point (for automated tracking) — admin only to prevent
 // anyone from injecting arbitrary prices that feed valuations.
-router.post('/', async (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
   try {
     if (!(await isAdminUser(req))) {
       return res.status(403).json({ error: 'Admin access required' });
