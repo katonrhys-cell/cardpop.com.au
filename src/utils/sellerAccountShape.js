@@ -5,8 +5,7 @@
 // Pure functions only, no imports/side effects, so the ops script can import
 // them without pulling in the DB/Stripe clients.
 //
-// Sellers are classic v1 Express accounts with only the `transfers` capability
-// requested: they receive their sale proceeds via
+// Sellers are classic v1 Express accounts: they receive their sale proceeds via
 // `stripe.transfers.create({ destination })` — the platform charges the buyer
 // and keeps its commission before the transfer. (The earlier iteration of this
 // module targeted the v2 Accounts API, but that API must be explicitly enabled
@@ -15,13 +14,24 @@
 // identical.)
 
 // Build the `stripe.accounts.create` payload for a seller: AU Express account,
-// transfers capability requested, seller's display name as the trading name.
+// card_payments + transfers capabilities requested, seller's display name as
+// the trading name.
+//
+// card_payments is requested alongside transfers even though CardPop's money
+// flow never has the seller charge cards directly: Stripe rejects
+// transfers-WITHOUT-card_payments account creation unless the platform has been
+// specifically approved for it ("Your platform needs approval for accounts to
+// have requested the `transfers` capability without the `card_payments`
+// capability"). The standard pairing needs no approval; the unused capability
+// is harmless. If Stripe support later grants transfers-only approval, dropping
+// card_payments here leans out seller onboarding slightly.
 export function buildSellerAccountParams(userId, { email, displayName } = {}) {
   return {
     type: 'express',
     country: 'AU',
     ...(email ? { email } : {}),
     capabilities: {
+      card_payments: { requested: true },
       transfers: { requested: true },
     },
     ...(displayName ? { business_profile: { name: displayName } } : {}),
