@@ -88,41 +88,84 @@ const ImagePlaceholder = () => (
   </div>
 );
 
-// Resolve a card's poster image + whether it carries a featured video. The
+// Resolve a card's poster image + its featured video descriptor (or null). The
 // featured image is the preferred poster; when absent we fall back to the
 // auto-derived thumbnail of a YouTube featured video (Vimeo has none, so such
-// cards show the placeholder). The article page is where the video actually
-// plays — cards only advertise it with a play badge.
+// cards show the placeholder). Clicking the play badge plays the video inline,
+// right here on the listing, without leaving for the article page.
 const cardMedia = (article) => {
   const video = parseVideoUrl(article.featured_video_url);
   const imageUrl = toCdnUrl(article.featured_image_url) || video?.thumbnailUrl || null;
-  return { imageUrl, hasVideo: !!video };
+  return { imageUrl, video };
 };
 
+// Append autoplay to an embed URL, preserving any existing query (e.g. Vimeo's
+// unlisted `?h=` hash). The viewer has clicked play, so start immediately.
+const withAutoplay = (embedUrl) =>
+  `${embedUrl}${embedUrl.includes('?') ? '&' : '?'}autoplay=1`;
+
 // Play badge overlaid on the poster of any card whose article has a video.
-const PlayBadge = () => (
-  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-    <span className="flex items-center justify-center w-12 h-12 rounded-full bg-black/55 backdrop-blur-sm ring-1 ring-white/25 shadow-lg">
+// It's a real button: clicking it plays the video in place instead of following
+// the card's link to the article. Rendered inside the card's <Link>, so it
+// stops propagation and prevents the default navigation.
+const PlayBadge = ({ onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    aria-label="Play video"
+    className="absolute inset-0 flex items-center justify-center group/play focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+  >
+    <span className="flex items-center justify-center w-12 h-12 rounded-full bg-black/55 backdrop-blur-sm ring-1 ring-white/25 shadow-lg transition-transform group-hover/play:scale-110">
       <Play className="w-5 h-5 text-white fill-white translate-x-[1px]" />
     </span>
-  </div>
+  </button>
 );
+
+// The media area of a blog card: shows the poster (with a play badge when the
+// article has a featured video) and, once the badge is clicked, swaps in an
+// autoplaying embed inline — the video plays on the listing itself. The click
+// is contained so it never triggers the surrounding card link.
+const CardMedia = ({ article, imageUrl, video, aspectClass }) => {
+  const [playing, setPlaying] = useState(false);
+  const handlePlay = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setPlaying(true);
+  };
+  return (
+    <div className={`${aspectClass} bg-muted relative overflow-hidden flex items-center justify-center`}>
+      {playing && video ? (
+        <iframe
+          src={withAutoplay(video.embedUrl)}
+          title={article.title}
+          className="absolute inset-0 w-full h-full"
+          loading="eager"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerPolicy="strict-origin-when-cross-origin"
+          allowFullScreen
+        />
+      ) : (
+        <>
+          {imageUrl
+            ? <img src={imageUrl} alt={article.title} loading="lazy" decoding="async" className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" />
+            : <ImagePlaceholder />
+          }
+          {video && <PlayBadge onClick={handlePlay} />}
+        </>
+      )}
+    </div>
+  );
+};
 
 // Large card for Featured Stories (2-col grid)
 const FeaturedCard = ({ article, showBadge = true }) => {
-  const { imageUrl, hasVideo } = cardMedia(article);
+  const { imageUrl, video } = cardMedia(article);
   return (
     <Link
       to={`/blog/${article.slug || article.id}`}
       className="group relative flex flex-col bg-card border border-border rounded-2xl overflow-visible hover:shadow-lg hover:-translate-y-1 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
-      <div className="aspect-video bg-muted relative overflow-hidden flex items-center justify-center">
-        {imageUrl
-          ? <img src={imageUrl} alt={article.title} loading="lazy" decoding="async" className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" />
-          : <ImagePlaceholder />
-        }
-        {hasVideo && <PlayBadge />}
-      </div>
+      <CardMedia article={article} imageUrl={imageUrl} video={video} aspectClass="aspect-video" />
       {showBadge && <CategoryBadge slug={article.category} />}
       <div className="p-6 flex flex-col flex-1">
         <div className="flex items-center justify-between text-xs text-muted-foreground mb-3">
@@ -149,19 +192,13 @@ const FeaturedCard = ({ article, showBadge = true }) => {
 
 // Standard card for the main articles grid (3-col)
 const ArticleCard = ({ article, showBadge = true }) => {
-  const { imageUrl, hasVideo } = cardMedia(article);
+  const { imageUrl, video } = cardMedia(article);
   return (
     <Link
       to={`/blog/${article.slug || article.id}`}
       className="group relative flex flex-col bg-card border border-border rounded-2xl overflow-visible hover:shadow-lg hover:-translate-y-1 transition-all duration-300 h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
-      <div className="aspect-[16/9] bg-muted relative overflow-hidden flex items-center justify-center">
-        {imageUrl
-          ? <img src={imageUrl} alt={article.title} loading="lazy" decoding="async" className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" />
-          : <ImagePlaceholder />
-        }
-        {hasVideo && <PlayBadge />}
-      </div>
+      <CardMedia article={article} imageUrl={imageUrl} video={video} aspectClass="aspect-[16/9]" />
       {showBadge && <CategoryBadge slug={article.category} />}
       <div className="p-5 flex flex-col flex-1">
         <div className="flex items-center justify-between mb-3 text-xs text-muted-foreground">
