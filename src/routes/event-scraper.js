@@ -8,9 +8,26 @@ import { stream } from '../api/integrated-ai.js';
 import { EventScraperPrompt } from '../constants/prompts.js';
 import supabase from '../utils/supabaseClient.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
+import { LargeBodyLimit } from '../constants/common.js';
 
 const router = express.Router();
 const AI_PROCESSING_TIMEOUT = 60000;
+
+// Every endpoint on this router is admin-only, and one accepts a large pasted
+// body. The global body parser (src/app.js) deliberately does NOT parse JSON
+// for this router, so gate the whole thing here — authenticate, then authorize,
+// and only THEN parse the (possibly 20 MB) body. This guarantees an
+// unauthenticated or non-admin caller is rejected before any large allocation.
+// The per-route authMiddleware / isAdminUser checks below are kept as
+// defence-in-depth.
+router.use(authMiddleware);
+router.use(async (req, res, next) => {
+  if (!(await isAdminUser(req))) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  next();
+});
+router.use(express.json({ limit: LargeBodyLimit }));
 
 const VALID_EVENT_TYPES = ['card_show', 'trade_event', 'lgs_event', 'community_event'];
 const VALID_STATES = ['NSW', 'VIC', 'QLD', 'SA', 'WA', 'TAS', 'ACT', 'NT'];
