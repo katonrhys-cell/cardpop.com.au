@@ -16,75 +16,84 @@ const ICON_MAP = {
   Megaphone, TrendingUp, Rocket, Sparkles,
 };
 
-// ─── Brand marks ──────────────────────────────────────────────────────────────
-// Some tools read better as their real logo than a generic lucide glyph. Lucide
-// dropped brand icons and these coloured marks aren't in any icon set, so they're
-// inlined as SVGs (same approach as components/OAuthButtons.jsx). Single-colour
-// marks take their colour from `currentColor` (driven by BRAND_ICONS.fill);
-// multi-colour marks (Google, Whatnot) carry their own fills.
-const StripeMark = ({ className }) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-    <path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.594-7.305h.007z" />
+// ─── Brand logos ──────────────────────────────────────────────────────────────
+// Each recommended tool shows its real, full logo — the brand mark plus wordmark
+// on the same coloured background the brand uses — rather than a generic lucide
+// glyph. Lucide dropped brand icons and full-logo lockups aren't in any icon set,
+// so they're inlined as SVGs (same approach as components/OAuthButtons.jsx). The
+// marks are exact brand paths; the wordmarks are set in the brand's own colours.
+// Every logo renders into the same uniform rectangular tile (see the tools grid
+// below) and is contained edge-to-edge, so they all sit at one consistent size.
+//
+// Prefer a real image when an admin sets `logo_url` — that overrides the inline
+// lockup and drops into the identical tile.
+const WORDMARK_FONT = "'Helvetica Neue', Helvetica, Arial, sans-serif";
+
+// Stripe — white "stripe" wordmark on Stripe's indigo (#635bff).
+const StripeLogo = ({ className }) => (
+  <svg viewBox="0 0 132 48" className={className} aria-hidden="true">
+    <text x="66" y="37" textAnchor="middle" fontFamily={WORDMARK_FONT} fontWeight="800" fontSize="40" letterSpacing="-2.5" fill="#ffffff">stripe</text>
   </svg>
 );
 
-const GoogleMark = ({ className }) => (
-  <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
-    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
-    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-    <path fill="#FBBC05" d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.83z" />
-    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+// Google Workspace — the multi-colour "Google" wordmark + grey "Workspace".
+const GoogleWorkspaceLogo = ({ className }) => (
+  <svg viewBox="0 0 372 48" className={className} aria-hidden="true">
+    <text y="37" fontFamily={WORDMARK_FONT} fontWeight="500" fontSize="40" letterSpacing="-1">
+      <tspan x="0" fill="#4285F4">G</tspan>
+      <tspan fill="#EA4335">o</tspan>
+      <tspan fill="#FBBC05">o</tspan>
+      <tspan fill="#4285F4">g</tspan>
+      <tspan fill="#34A853">l</tspan>
+      <tspan fill="#EA4335">e</tspan>
+      <tspan dx="16" fill="#5f6368">Workspace</tspan>
+    </text>
   </svg>
 );
 
-// Whatnot's full app mark: a dark squircle with the yellow "w" showing through.
-// Fills the whole tile (BRAND_ICONS.full), so the tile just needs a matching dark bg.
-const WhatnotMark = ({ className }) => (
-  <svg viewBox="0 0 115.16 115.16" className={className} aria-hidden="true">
-    <path fill="#FFE505" d="M115.14,57.57c0,44.51-13.06,57.57-57.57,57.57S0,102.08,0,57.57,13.06,0,57.57,0s57.57,13.06,57.57,57.57" />
-    <path fill="#292527" d="M57.58 0C13.06 0 0 13.06 0 57.58s13.06 57.58 57.58 57.58 57.58-13.06 57.58-57.58S102.1 0 57.58 0ZM89.5 65l-3.35 5.24C79.19 81.12 75.4 84.21 70.81 84.21c-4.85 0-7.49-2.38-13.97-12.87l-3.79-6.13c-.79-1.32-2.2-.75-1.85.75l.66 2.69c2.34 9.47-1.15 15.56-7.01 15.56-4.54 0-8.15-2.51-16-14.41l-3.26-4.94c-4.98-7.54-6.83-11.46-6.83-16.57 0-6.43 4.67-11.68 11.85-11.68 5.51 0 9.03 2.47 12.12 8.5l.79 1.54c.62 1.15 1.67 1.06 2.07 0l.57-1.5c2.2-5.77 5.77-8.55 11.37-8.55s9.34 2.78 11.5 8.55l.57 1.54c.4 1.01 1.54 1.1 2.07 0l.79-1.59c3.04-6.08 6.48-8.5 11.99-8.5 7.18 0 11.9 5.24 11.9 11.68 0 5.11-1.98 9.03-6.87 16.7Z" />
+// Whatnot — the dark squircle mark (yellow "w" showing through the tile) + the
+// black "whatnot" wordmark, on Whatnot yellow.
+const WhatnotLogo = ({ className }) => (
+  <svg viewBox="0 0 214 48" className={className} aria-hidden="true">
+    <g transform="translate(0 2) scale(0.38207)">
+      <path fill="#111111" d="M57.58 0C13.06 0 0 13.06 0 57.58s13.06 57.58 57.58 57.58 57.58-13.06 57.58-57.58S102.1 0 57.58 0ZM89.5 65l-3.35 5.24C79.19 81.12 75.4 84.21 70.81 84.21c-4.85 0-7.49-2.38-13.97-12.87l-3.79-6.13c-.79-1.32-2.2-.75-1.85.75l.66 2.69c2.34 9.47-1.15 15.56-7.01 15.56-4.54 0-8.15-2.51-16-14.41l-3.26-4.94c-4.98-7.54-6.83-11.46-6.83-16.57 0-6.43 4.67-11.68 11.85-11.68 5.51 0 9.03 2.47 12.12 8.5l.79 1.54c.62 1.15 1.67 1.06 2.07 0l.57-1.5c2.2-5.77 5.77-8.55 11.37-8.55s9.34 2.78 11.5 8.55l.57 1.54c.4 1.01 1.54 1.1 2.07 0l.79-1.59c3.04-6.08 6.48-8.5 11.99-8.5 7.18 0 11.9 5.24 11.9 11.68 0 5.11-1.98 9.03-6.87 16.7Z" />
+    </g>
+    <text x="54" y="35" fontFamily={WORDMARK_FONT} fontWeight="800" fontSize="36" letterSpacing="-1.5" fill="#111111">whatnot</text>
   </svg>
 );
 
-const KitMark = ({ className }) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-    <path d="m3.5 11.633-2.434 2.408V8.687a.53.53 0 0 0-.533-.527.53.53 0 0 0-.533.527v6.624a.528.528 0 0 0 .532.526.533.533 0 0 0 .377-.153l2.974-2.939 2.974 2.94a.535.535 0 0 0 .754 0 .522.522 0 0 0 0-.746l-2.974-2.938L7.61 9.06a.522.522 0 0 0 0-.745.538.538 0 0 0-.753 0l-3.344 3.307c-.003 0-.005.003-.007.005l-.007.006v-.001zm8.826 4.206a.53.53 0 0 1-.533-.526V8.688a.53.53 0 0 1 .533-.528.53.53 0 0 1 .533.528v6.624a.53.53 0 0 1-.533.526v.001zm7.257-6.624v6.098c0 .29.238.526.532.526a.53.53 0 0 0 .533-.526V9.215h2.818A.53.53 0 0 0 24 8.688a.53.53 0 0 0-.533-.527h-6.702a.53.53 0 0 0-.533.527.53.53 0 0 0 .533.527h2.819-.001z" />
+// Kit — the black "kit" wordmark on Kit's blue.
+const KitLogo = ({ className }) => (
+  <svg viewBox="0 0 78 48" className={className} aria-hidden="true">
+    <text x="39" y="37" textAnchor="middle" fontFamily={WORDMARK_FONT} fontWeight="800" fontSize="42" letterSpacing="-2" fill="#0a0a0a">kit</text>
   </svg>
 );
 
-const InstagramMark = ({ className }) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-    <path d="M7.0301.084c-1.2768.0602-2.1487.264-2.911.5634-.7888.3075-1.4575.72-2.1228 1.3877-.6652.6677-1.075 1.3368-1.3802 2.127-.2954.7638-.4956 1.6365-.552 2.914-.0564 1.2775-.0689 1.6882-.0626 4.947.0062 3.2586.0206 3.6671.0825 4.9473.061 1.2765.264 2.1482.5635 2.9107.308.7889.72 1.4573 1.388 2.1228.6679.6655 1.3365 1.0743 2.1285 1.38.7632.295 1.6361.4961 2.9134.552 1.2773.056 1.6884.069 4.9462.0627 3.2578-.0062 3.668-.0207 4.9478-.0814 1.28-.0607 2.147-.2652 2.9098-.5633.7889-.3086 1.4578-.72 2.1228-1.3881.665-.6682 1.0745-1.3378 1.3795-2.1284.2957-.7632.4966-1.636.552-2.9124.056-1.2809.0692-1.6898.063-4.948-.0063-3.2583-.021-3.6668-.0817-4.9465-.0607-1.2797-.264-2.1487-.5633-2.9117-.3084-.7889-.72-1.4568-1.3876-2.1228C21.2982 1.33 20.628.9208 19.8378.6165 19.074.321 18.2017.1197 16.9244.0645 15.6471.0093 15.236-.005 11.977.0014 8.718.0076 8.31.0215 7.0301.0839m.1402 21.6932c-1.17-.0509-1.8053-.2453-2.2287-.408-.5606-.216-.96-.4771-1.3819-.895-.422-.4178-.6811-.8186-.9-1.378-.1644-.4234-.3624-1.058-.4171-2.228-.0595-1.2645-.072-1.6442-.079-4.848-.007-3.2037.0053-3.583.0607-4.848.05-1.169.2456-1.805.408-2.2282.216-.5613.4762-.96.895-1.3816.4188-.4217.8184-.6814 1.3783-.9003.423-.1651 1.0575-.3614 2.227-.4171 1.2655-.06 1.6447-.072 4.848-.079 3.2033-.007 3.5835.005 4.8495.0608 1.169.0508 1.8053.2445 2.228.408.5608.216.96.4754 1.3816.895.4217.4194.6816.8176.9005 1.3787.1653.4217.3617 1.056.4169 2.2263.0602 1.2655.0739 1.645.0796 4.848.0058 3.203-.0055 3.5834-.061 4.848-.051 1.17-.245 1.8055-.408 2.2294-.216.5604-.4763.96-.8954 1.3814-.419.4215-.8181.6811-1.3783.9-.4224.1649-1.0577.3617-2.2262.4174-1.2656.0595-1.6448.072-4.8493.079-3.2045.007-3.5825-.006-4.848-.0608M16.953 5.5864A1.44 1.44 0 1 0 18.39 4.144a1.44 1.44 0 0 0-1.437 1.4424M5.8385 12.012c.0067 3.4032 2.7706 6.1557 6.173 6.1493 3.4026-.0065 6.157-2.7701 6.1506-6.1733-.0065-3.4032-2.771-6.1565-6.174-6.1498-3.403.0067-6.156 2.771-6.1496 6.1738M8 12.0077a4 4 0 1 1 4.008 3.9921A3.9996 3.9996 0 0 1 8 12.0077" />
+// Meta — the blue infinity mark (its brand gradient) + the dark "Meta" wordmark.
+const MetaLogo = ({ className }) => (
+  <svg viewBox="0 0 146 48" className={className} aria-hidden="true">
+    <defs>
+      <linearGradient id="cp-meta-gradient" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stopColor="#0064e0" />
+        <stop offset="1" stopColor="#00b2ff" />
+      </linearGradient>
+    </defs>
+    <g transform="translate(0 4) scale(1.5)">
+      <path fill="url(#cp-meta-gradient)" d="M6.915 4.03c-1.968 0-3.683 1.28-4.871 3.113C.704 9.208 0 11.883 0 14.449c0 .706.07 1.369.21 1.973a6.624 6.624 0 0 0 .265.86 5.297 5.297 0 0 0 .371.761c.696 1.159 1.818 1.927 3.593 1.927 1.497 0 2.633-.671 3.965-2.444.76-1.012 1.144-1.626 2.663-4.32l.756-1.339.186-.325c.061.1.121.196.183.3l2.152 3.595c.724 1.21 1.665 2.556 2.47 3.314 1.046.987 1.992 1.22 3.06 1.22 1.075 0 1.876-.355 2.455-.843a3.743 3.743 0 0 0 .81-.973c.542-.939.861-2.127.861-3.745 0-2.72-.681-5.357-2.084-7.45-1.282-1.912-2.957-2.93-4.716-2.93-1.047 0-2.088.467-3.053 1.308-.652.57-1.257 1.29-1.82 2.05-.69-.875-1.335-1.547-1.958-2.056-1.182-.966-2.315-1.303-3.454-1.303zm10.16 2.053c1.147 0 2.188.758 2.992 1.999 1.132 1.748 1.647 4.195 1.647 6.4 0 1.548-.368 2.9-1.839 2.9-.58 0-1.027-.23-1.664-1.004-.496-.601-1.343-1.878-2.832-4.358l-.617-1.028a44.908 44.908 0 0 0-1.255-1.98c.07-.109.141-.224.211-.327 1.12-1.667 2.118-2.602 3.358-2.602zm-10.201.553c1.265 0 2.058.791 2.675 1.446.307.327.737.871 1.234 1.579l-1.02 1.566c-.757 1.163-1.882 3.017-2.837 4.338-1.191 1.649-1.81 1.817-2.486 1.817-.524 0-1.038-.237-1.383-.794-.263-.426-.464-1.13-.464-2.046 0-2.221.63-4.535 1.66-6.088.454-.687.964-1.226 1.533-1.533a2.264 2.264 0 0 1 1.088-.285z" />
+    </g>
+    <text x="46" y="35" fontFamily={WORDMARK_FONT} fontWeight="700" fontSize="36" letterSpacing="-0.5" fill="#1c2b33">Meta</text>
   </svg>
 );
 
-const MetaMark = ({ className }) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-    <path d="M6.915 4.03c-1.968 0-3.683 1.28-4.871 3.113C.704 9.208 0 11.883 0 14.449c0 .706.07 1.369.21 1.973a6.624 6.624 0 0 0 .265.86 5.297 5.297 0 0 0 .371.761c.696 1.159 1.818 1.927 3.593 1.927 1.497 0 2.633-.671 3.965-2.444.76-1.012 1.144-1.626 2.663-4.32l.756-1.339.186-.325c.061.1.121.196.183.3l2.152 3.595c.724 1.21 1.665 2.556 2.47 3.314 1.046.987 1.992 1.22 3.06 1.22 1.075 0 1.876-.355 2.455-.843a3.743 3.743 0 0 0 .81-.973c.542-.939.861-2.127.861-3.745 0-2.72-.681-5.357-2.084-7.45-1.282-1.912-2.957-2.93-4.716-2.93-1.047 0-2.088.467-3.053 1.308-.652.57-1.257 1.29-1.82 2.05-.69-.875-1.335-1.547-1.958-2.056-1.182-.966-2.315-1.303-3.454-1.303zm10.16 2.053c1.147 0 2.188.758 2.992 1.999 1.132 1.748 1.647 4.195 1.647 6.4 0 1.548-.368 2.9-1.839 2.9-.58 0-1.027-.23-1.664-1.004-.496-.601-1.343-1.878-2.832-4.358l-.617-1.028a44.908 44.908 0 0 0-1.255-1.98c.07-.109.141-.224.211-.327 1.12-1.667 2.118-2.602 3.358-2.602zm-10.201.553c1.265 0 2.058.791 2.675 1.446.307.327.737.871 1.234 1.579l-1.02 1.566c-.757 1.163-1.882 3.017-2.837 4.338-1.191 1.649-1.81 1.817-2.486 1.817-.524 0-1.038-.237-1.383-.794-.263-.426-.464-1.13-.464-2.046 0-2.221.63-4.535 1.66-6.088.454-.687.964-1.226 1.533-1.533a2.264 2.264 0 0 1 1.088-.285z" />
-  </svg>
-);
-
-const FacebookMark = ({ className }) => (
-  <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-    <path d="M9.101 23.691v-7.98H6.627v-3.667h2.474v-1.58c0-4.085 1.848-5.978 5.858-5.978.401 0 .955.042 1.468.103a8.68 8.68 0 0 1 1.141.195v3.325a8.623 8.623 0 0 0-.653-.036 26.805 26.805 0 0 0-.733-.009c-.707 0-1.259.096-1.675.309a1.686 1.686 0 0 0-.679.622c-.258.42-.374.995-.374 1.752v1.297h3.919l-.386 2.103-.287 1.564h-3.246v8.245C19.396 23.238 24 18.179 24 12.044c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.628 3.874 10.35 9.101 11.647Z" />
-  </svg>
-);
-
-// Instagram's official gradient — its glyph sits white on top of it.
-const IG_GRADIENT = 'linear-gradient(45deg,#feda75,#fa7e1e,#d62976,#962fbf,#4f5bd5)';
-
-// Brand names an admin can set in the `icon` column. Each carries its own tile
-// background (`bg`, a CSS colour or gradient) and, for single-colour marks, a
-// glyph colour (`fill`). `ring` adds a hairline for light tiles; `full` lets a
-// self-contained mark (Whatnot) fill the tile edge-to-edge.
+// Brand names an admin can set in the `icon` column. Each carries its own full
+// logo (`Logo`) and the tile background (`bg`) the brand uses in the photos.
+// `ring` adds a hairline so a light/white tile still reads as a card.
 const BRAND_ICONS = {
-  Stripe:    { Icon: StripeMark,    bg: 'linear-gradient(135deg,#6366f1,#9333ea)', fill: '#fff' },
-  Google:    { Icon: GoogleMark,    bg: '#ffffff', ring: true },
-  Whatnot:   { Icon: WhatnotMark,   bg: '#292527', full: true },
-  Kit:       { Icon: KitMark,       bg: '#4b9cf5', fill: '#0a0a0a' },
-  Instagram: { Icon: InstagramMark, bg: IG_GRADIENT, fill: '#fff' },
-  Meta:      { Icon: MetaMark,      bg: '#ffffff', fill: '#0467df', ring: true },
-  Facebook:  { Icon: FacebookMark,  bg: '#0866ff', fill: '#fff' },
+  Stripe:   { Logo: StripeLogo,          bg: '#635bff' },
+  Google:   { Logo: GoogleWorkspaceLogo, bg: '#ffffff', ring: true },
+  Whatnot:  { Logo: WhatnotLogo,         bg: '#ffde17' },
+  Kit:      { Logo: KitLogo,             bg: '#4b9cf5' },
+  Meta:     { Logo: MetaLogo,            bg: '#ffffff', ring: true },
 };
 
 // The organic-growth story: why using several tools together compounds.
@@ -217,7 +226,7 @@ const BuildingYourBusinessPage = () => {
               {Array(4).fill(0).map((_, i) => (
                 <div key={i} className="rounded-2xl border border-border bg-card p-6 space-y-4">
                   <div className="flex items-center gap-4">
-                    <Skeleton className="w-14 h-14 rounded-2xl" />
+                    <Skeleton className="h-16 w-44 rounded-2xl" />
                     <div className="space-y-2 flex-1">
                       <Skeleton className="h-5 w-32" />
                       <Skeleton className="h-4 w-48" />
@@ -241,7 +250,7 @@ const BuildingYourBusinessPage = () => {
                   <article key={tool.id} className="group flex flex-col rounded-2xl border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md">
                     <div className="flex items-start gap-4 mb-4">
                       <div
-                        className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm overflow-hidden ${
+                        className={`h-16 w-44 rounded-2xl flex items-center justify-center shrink-0 shadow-sm overflow-hidden px-4 py-2.5 ${
                           brand ? '' : `bg-gradient-to-br ${tool.accent || 'from-brand-red to-brand-blue'}`
                         }`}
                         style={brand ? {
@@ -250,14 +259,11 @@ const BuildingYourBusinessPage = () => {
                         } : undefined}
                       >
                         {tool.logo_url ? (
-                          <img src={tool.logo_url} alt={tool.name} className="w-full h-full object-contain p-2" loading="lazy" />
+                          <img src={tool.logo_url} alt={tool.name} className="max-w-full max-h-full object-contain" loading="lazy" />
                         ) : brand ? (
-                          <brand.Icon
-                            className={brand.full ? 'w-full h-full' : 'w-7 h-7'}
-                            style={brand.fill ? { color: brand.fill } : undefined}
-                          />
+                          <brand.Logo className="max-w-full max-h-full w-auto h-auto" />
                         ) : (
-                          <Icon className="w-7 h-7 text-white" />
+                          <Icon className="w-8 h-8 text-white" />
                         )}
                       </div>
                       <div className="min-w-0">
