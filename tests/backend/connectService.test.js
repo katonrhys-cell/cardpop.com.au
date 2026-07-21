@@ -39,11 +39,14 @@ beforeEach(() => {
 });
 
 describe('buildSellerAccountParams', () => {
-  it('builds an AU Express account requesting transfers', () => {
+  it('builds an AU Express account requesting card_payments + transfers', () => {
     const params = buildSellerAccountParams('user-1', { email: 'a@b.com', displayName: 'Ada' });
     expect(params.type).toBe('express');
     expect(params.country).toBe('AU');
     expect(params.capabilities.transfers.requested).toBe(true);
+    // Requested alongside transfers because transfers-only account creation
+    // requires special platform approval from Stripe.
+    expect(params.capabilities.card_payments.requested).toBe(true);
     expect(params.email).toBe('a@b.com');
     expect(params.business_profile.name).toBe('Ada');
     expect(params.metadata.cardpop_user_id).toBe('user-1');
