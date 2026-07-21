@@ -39,7 +39,7 @@ const computeDiscount = (originalLabel, saleLabel) => {
  *   - `category` prop set (a category page) → shows only products tagged
  *     with that category name.
  */
-const ShopAffiliateSection = ({ category = null, title = 'You might also like', limit = 8 }) => {
+const ShopAffiliateSection = ({ category = null, title = 'Amazon Super Steals', limit = 8 }) => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -91,9 +91,8 @@ const ShopAffiliateSection = ({ category = null, title = 'You might also like', 
         <ShoppingBag className="w-5 h-5 text-primary" />
         <h2 className="text-2xl font-bold">{title}</h2>
       </div>
-      <p className="text-sm text-muted-foreground mb-6 flex items-center gap-1.5">
-        <Info className="w-3.5 h-3.5 shrink-0" />
-        Handpicked products from around the web. As an Amazon Associate CardPop earns from qualifying purchases.
+      <p className="text-sm text-muted-foreground mb-6 max-w-2xl">
+        CardPop scours the deals and reviews listings to find bargains for the trading card community.
       </p>
 
       {loading ? (
@@ -181,6 +180,18 @@ const ShopAffiliateSection = ({ category = null, title = 'You might also like', 
             );
           })}
         </div>
+      )}
+
+      {!loading && (
+        <p className="text-xs text-muted-foreground/80 mt-6 flex items-start gap-1.5 max-w-3xl">
+          <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          <span>
+            CardPop is a participant in the Amazon Services LLC Associates Program, an affiliate
+            advertising program. As an Amazon Associate CardPop earns from qualifying purchases —
+            at no extra cost to you. Prices and availability are accurate as of the time of viewing
+            and are subject to change on Amazon.
+          </span>
+        </p>
       )}
     </section>
   );
