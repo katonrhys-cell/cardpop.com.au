@@ -187,7 +187,7 @@ const ShopPage = () => {
           </div>
         )}
 
-        <ShopAffiliateSection title="Recommended for collectors" />
+        <ShopAffiliateSection />
       </section>
     </div>
   );

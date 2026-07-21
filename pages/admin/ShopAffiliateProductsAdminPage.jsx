@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Plus, Search, Edit, Trash2, ShoppingBag, AlertCircle, RefreshCw, ExternalLink, EyeOff } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, ShoppingBag, AlertCircle, RefreshCw, ExternalLink, EyeOff, Wand2 } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,10 +15,26 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient.js';
+import apiServerClient from '@/lib/apiServerClient.js';
+
+// Mirror the storefront's discount maths so the admin sees the same "% off"
+// the customer will (parses the first number out of each free-text price).
+const parsePrice = (label) => {
+  if (!label) return null;
+  const match = String(label).replace(/,/g, '').match(/\d+(\.\d+)?/);
+  return match ? parseFloat(match[0]) : null;
+};
+const computeDiscount = (originalLabel, saleLabel) => {
+  const original = parsePrice(originalLabel);
+  const sale = parsePrice(saleLabel);
+  if (original == null || sale == null || original <= sale) return null;
+  const pct = Math.round((1 - sale / original) * 100);
+  return pct > 0 ? pct : null;
+};
 
 const EMPTY_FORM = {
-  title: '', description: '', image_url: '', price_label: '',
-  network: 'amazon', affiliate_url: '', cta_label: 'View on Amazon',
+  title: '', description: '', image_url: '', price_label: '', original_price_label: '',
+  network: 'amazon', affiliate_url: '',
   badge: '', category: '', sort_order: 0, is_published: true,
 };
 
@@ -32,6 +48,7 @@ const ShopAffiliateProductsAdminPage = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFetchingMeta, setIsFetchingMeta] = useState(false);
   const [formData, setFormData] = useState(EMPTY_FORM);
 
   const fetchProducts = async (showToast = false) => {
@@ -78,9 +95,9 @@ const ShopAffiliateProductsAdminPage = () => {
       description: product.description || '',
       image_url: product.image_url || '',
       price_label: product.price_label || '',
+      original_price_label: product.original_price_label || '',
       network: product.network || 'amazon',
       affiliate_url: product.affiliate_url || '',
-      cta_label: product.cta_label || 'View on Amazon',
       badge: product.badge || '',
       category: product.category || '',
       sort_order: product.sort_order ?? 0,
@@ -109,6 +126,43 @@ const ShopAffiliateProductsAdminPage = () => {
     }
   };
 
+  // Pre-fill title / image / description from the pasted affiliate link's Open
+  // Graph tags (best effort — Amazon may block the fetch, in which case the
+  // admin just fills the fields by hand). Prices stay manual.
+  const handleFetchDetails = async () => {
+    const url = formData.affiliate_url.trim();
+    if (!url) { toast.error('Paste the affiliate URL first'); return; }
+
+    setIsFetchingMeta(true);
+    try {
+      const res = await apiServerClient.fetch('/admin/affiliate-metadata', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not fetch product details.');
+
+      setFormData(prev => ({
+        ...prev,
+        title: data.title || prev.title,
+        image_url: data.image || prev.image_url,
+        description: data.description || prev.description,
+      }));
+
+      const filled = ['title', 'image', 'description'].filter(k => data[k]);
+      if (filled.length) {
+        toast.success(`Filled ${filled.join(', ')}. Check the details and add a price.`);
+      } else {
+        toast.info('No details found — enter them manually.');
+      }
+    } catch (err) {
+      toast.error(err.message || 'Could not fetch product details.');
+    } finally {
+      setIsFetchingMeta(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.title.trim()) { toast.error('Title is required'); return; }
@@ -120,9 +174,9 @@ const ShopAffiliateProductsAdminPage = () => {
       description: formData.description.trim() || null,
       image_url: formData.image_url.trim() || null,
       price_label: formData.price_label.trim() || null,
+      original_price_label: formData.original_price_label.trim() || null,
       network: formData.network.trim() || 'amazon',
       affiliate_url: formData.affiliate_url.trim(),
-      cta_label: formData.cta_label.trim() || 'View on Amazon',
       badge: formData.badge.trim() || null,
       category: formData.category.trim() || null,
       sort_order: Number.isFinite(Number(formData.sort_order)) ? parseInt(formData.sort_order, 10) : 0,
@@ -174,6 +228,8 @@ const ShopAffiliateProductsAdminPage = () => {
       setIsSubmitting(false);
     }
   };
+
+  const discountPreview = computeDiscount(formData.original_price_label, formData.price_label);
 
   const filtered = products.filter(p =>
     p.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -338,8 +394,17 @@ const ShopAffiliateProductsAdminPage = () => {
 
             <div className="space-y-2">
               <Label htmlFor="affiliate_url" className="text-sm font-bold">Affiliate URL <span className="text-destructive">*</span></Label>
-              <Input id="affiliate_url" name="affiliate_url" type="url" value={formData.affiliate_url} onChange={handleInputChange} placeholder="https://www.amazon.com.au/dp/...?tag=yourtag-22" className="h-11 rounded-xl bg-background border-border" required />
-              <p className="text-xs text-muted-foreground">Paste your full Amazon Associates link including your <code>?tag=</code> tracking ID.</p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Input id="affiliate_url" name="affiliate_url" type="url" value={formData.affiliate_url} onChange={handleInputChange} placeholder="https://www.amazon.com.au/dp/...?tag=yourtag-22" className="h-11 rounded-xl bg-background border-border flex-1" required />
+                <Button type="button" variant="outline" onClick={handleFetchDetails} disabled={isFetchingMeta || !formData.affiliate_url.trim()} className="h-11 rounded-xl font-bold shrink-0">
+                  {isFetchingMeta ? (
+                    <><RefreshCw className="w-4 h-4 mr-2 animate-spin" /> Fetching...</>
+                  ) : (
+                    <><Wand2 className="w-4 h-4 mr-2" /> Fetch details</>
+                  )}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Paste your full Amazon Associates link (including your <code>?tag=</code> tracking ID), then <strong>Fetch details</strong> to auto-fill the title, image and description. Price/RRP stay manual.</p>
             </div>
 
             <div className="space-y-2">
@@ -350,24 +415,29 @@ const ShopAffiliateProductsAdminPage = () => {
 
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="price_label" className="text-sm font-bold">Price label <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Label htmlFor="price_label" className="text-sm font-bold">Sale price <span className="text-muted-foreground font-normal">(optional)</span></Label>
                 <Input id="price_label" name="price_label" value={formData.price_label} onChange={handleInputChange} placeholder="e.g. $29.99 or From $19" className="h-11 rounded-xl bg-background border-border" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="badge" className="text-sm font-bold">Badge <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                <Input id="badge" name="badge" value={formData.badge} onChange={handleInputChange} placeholder="e.g. Best seller" className="h-11 rounded-xl bg-background border-border" />
+                <Label htmlFor="original_price_label" className="text-sm font-bold">RRP <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Input id="original_price_label" name="original_price_label" value={formData.original_price_label} onChange={handleInputChange} placeholder="e.g. $49.99" className="h-11 rounded-xl bg-background border-border" />
               </div>
             </div>
+            {discountPreview != null && (
+              <p className="text-xs text-emerald-600 font-medium -mt-2">
+                Customers will see a <strong>{discountPreview}% OFF</strong> badge (RRP shown struck-through).
+              </p>
+            )}
 
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="network" className="text-sm font-bold">Network</Label>
-                <Input id="network" name="network" value={formData.network} onChange={handleInputChange} placeholder="amazon" className="h-11 rounded-xl bg-background border-border" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="cta_label" className="text-sm font-bold">Button label</Label>
-                <Input id="cta_label" name="cta_label" value={formData.cta_label} onChange={handleInputChange} placeholder="View on Amazon" className="h-11 rounded-xl bg-background border-border" />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="badge" className="text-sm font-bold">Badge <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Input id="badge" name="badge" value={formData.badge} onChange={handleInputChange} placeholder="e.g. Best seller" className="h-11 rounded-xl bg-background border-border" />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="network" className="text-sm font-bold">Network</Label>
+              <Input id="network" name="network" value={formData.network} onChange={handleInputChange} placeholder="amazon" className="h-11 rounded-xl bg-background border-border" />
+              <p className="text-xs text-muted-foreground">Every product shows a <strong>Buy Now</strong> button that opens the affiliate link in a new tab.</p>
             </div>
 
             <div className="grid sm:grid-cols-2 gap-4">

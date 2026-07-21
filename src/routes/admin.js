@@ -694,4 +694,125 @@ router.delete('/card-art/:id', validateRequestParams(cardArtIdSchema), async (re
   }
 });
 
+// ─── Affiliate product metadata scrape (admin-only) ───────────────────────────
+// Convenience for the Shop Affiliate Products admin: paste an affiliate link and
+// pre-fill the title / image / description from the destination page's Open
+// Graph tags, so the admin doesn't retype everything by hand.
+//
+// This is a best-effort helper, NOT a guaranteed data source: Amazon (and
+// others) frequently block automated fetches from datacenter IPs, in which case
+// this returns 502 and the admin fills the fields manually. Prices are
+// deliberately NOT scraped — Amazon's Associates terms restrict displaying
+// non-API prices, and scraped prices go stale.
+//
+// TODO(affiliate): once the Associate account has 3 confirmed qualifying sales,
+// replace this OG scrape with the official Amazon Product Advertising API
+// (PA-API 5.0) — it returns title/image/description AND live, compliant pricing.
+// See the PR that introduced this ("Option B") and docs on PA-API access.
+//
+// SSRF is contained by an allow-list of affiliate hosts: the endpoint will only
+// fetch well-known retail domains, never arbitrary or internal URLs.
+const AFFILIATE_HOST_SUFFIXES = [
+  'amazon.com', 'amazon.com.au', 'amazon.co.uk', 'amazon.ca', 'amazon.de',
+  'amazon.co.jp', 'amazon.in', 'amazon.fr', 'amazon.it', 'amazon.es',
+  'amzn.to', 'amzn.com', 'a.co',
+];
+
+const isAllowedAffiliateHost = (hostname) => {
+  const host = String(hostname || '').toLowerCase();
+  return AFFILIATE_HOST_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`));
+};
+
+// Pull the content of the first matching <meta property/name="..."> tag.
+const metaContent = (html, key) => {
+  // property="og:title" content="..."  OR  content="..." property="og:title"
+  const patterns = [
+    new RegExp(`<meta[^>]+(?:property|name)=["']${key}["'][^>]*content=["']([^"']*)["']`, 'i'),
+    new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]*(?:property|name)=["']${key}["']`, 'i'),
+  ];
+  for (const re of patterns) {
+    const m = html.match(re);
+    if (m && m[1]) return m[1];
+  }
+  return null;
+};
+
+const decodeEntities = (str) =>
+  String(str || '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
+    .trim();
+
+router.post('/affiliate-metadata', async (req, res) => {
+  const rawUrl = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
+
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return res.status(400).json({ error: 'A valid URL is required.' });
+  }
+  if (parsed.protocol !== 'https:') {
+    return res.status(400).json({ error: 'Only https:// links are supported.' });
+  }
+  if (!isAllowedAffiliateHost(parsed.hostname)) {
+    return res.status(400).json({ error: 'Only Amazon affiliate links can be auto-filled right now.' });
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const upstream = await fetch(parsed.toString(), {
+      signal: controller.signal,
+      redirect: 'follow',
+      headers: {
+        // Look like a real browser — Amazon serves a bot page to obvious crawlers.
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'en-AU,en;q=0.9',
+      },
+    });
+    if (!upstream.ok) {
+      return res.status(502).json({ error: `The page could not be read (HTTP ${upstream.status}). Enter the details manually.` });
+    }
+
+    // Cap how much we read so a huge page can't exhaust memory (~512KB is plenty
+    // for the <head> where OG tags live).
+    const buf = await upstream.arrayBuffer();
+    const html = Buffer.from(buf.slice(0, 512 * 1024)).toString('utf8');
+
+    const title = decodeEntities(
+      metaContent(html, 'og:title') ||
+      metaContent(html, 'twitter:title') ||
+      (html.match(/<title[^>]*>([^<]*)<\/title>/i)?.[1]) || ''
+    );
+    const image = decodeEntities(
+      metaContent(html, 'og:image') ||
+      metaContent(html, 'og:image:secure_url') ||
+      metaContent(html, 'twitter:image') ||
+      metaContent(html, 'twitter:image:src') || ''
+    );
+    const description = decodeEntities(
+      metaContent(html, 'og:description') ||
+      metaContent(html, 'twitter:description') ||
+      metaContent(html, 'description') || ''
+    );
+
+    if (!title && !image && !description) {
+      return res.status(502).json({ error: 'No product details found on the page. Enter them manually.' });
+    }
+
+    // Clean up Amazon's title suffixes like " : Amazon.com.au: ..." for a tidier default.
+    const cleanTitle = title.replace(/\s*[:|-]\s*Amazon\.[a-z.]+.*$/i, '').trim() || title;
+
+    return res.json({ title: cleanTitle, image, description });
+  } catch (err) {
+    logger.warn(`[ADMIN] affiliate-metadata fetch failed: ${err.message}`);
+    return res.status(502).json({ error: 'Could not reach the page. Enter the details manually.' });
+  } finally {
+    clearTimeout(timeout);
+  }
+});
+
 export default router;

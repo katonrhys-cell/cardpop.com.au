@@ -2,8 +2,27 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { escapeLike } from '@/src/utils/escapeLike.js';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ExternalLink, Info, ShoppingBag } from 'lucide-react';
+import { Info, ShoppingBag, ShoppingCart } from 'lucide-react';
+
+// Pull the first number out of a free-text price label ("$49.99" → 49.99,
+// "From $19" → 19). Returns null when nothing numeric is present.
+const parsePrice = (label) => {
+  if (!label) return null;
+  const match = String(label).replace(/,/g, '').match(/\d+(\.\d+)?/);
+  return match ? parseFloat(match[0]) : null;
+};
+
+// Whole-number "% off" from RRP → sale, or null when it can't be derived
+// (missing/unparseable values, or the RRP isn't higher than the sale price).
+const computeDiscount = (originalLabel, saleLabel) => {
+  const original = parsePrice(originalLabel);
+  const sale = parsePrice(saleLabel);
+  if (original == null || sale == null || original <= sale) return null;
+  const pct = Math.round((1 - sale / original) * 100);
+  return pct > 0 ? pct : null;
+};
 
 /**
  * Affiliate product strip shown at the bottom of the shop pages.
@@ -20,7 +39,7 @@ import { ExternalLink, Info, ShoppingBag } from 'lucide-react';
  *   - `category` prop set (a category page) → shows only products tagged
  *     with that category name.
  */
-const ShopAffiliateSection = ({ category = null, title = 'You might also like', limit = 8 }) => {
+const ShopAffiliateSection = ({ category = null, title = 'Amazon Super Steals', limit = 8 }) => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -72,9 +91,8 @@ const ShopAffiliateSection = ({ category = null, title = 'You might also like', 
         <ShoppingBag className="w-5 h-5 text-primary" />
         <h2 className="text-2xl font-bold">{title}</h2>
       </div>
-      <p className="text-sm text-muted-foreground mb-6 flex items-center gap-1.5">
-        <Info className="w-3.5 h-3.5 shrink-0" />
-        Handpicked products from around the web. As an Amazon Associate CardPop earns from qualifying purchases.
+      <p className="text-sm text-muted-foreground mb-6 max-w-2xl">
+        CardPop scours the deals and reviews listings to find bargains for the trading card community.
       </p>
 
       {loading ? (
@@ -89,15 +107,20 @@ const ShopAffiliateSection = ({ category = null, title = 'You might also like', 
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
-          {products.map((product) => (
-            <a
+          {products.map((product) => {
+            const discount = computeDiscount(product.original_price_label, product.price_label);
+            return (
+            <div
               key={product.id}
-              href={product.affiliate_url}
-              target="_blank"
-              rel="sponsored nofollow noopener noreferrer"
               className="group flex flex-col h-full bg-card rounded-2xl border border-border overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1"
             >
-              <div className="relative aspect-square bg-white flex items-center justify-center overflow-hidden">
+              <a
+                href={product.affiliate_url}
+                target="_blank"
+                rel="sponsored nofollow noopener noreferrer"
+                className="relative aspect-square bg-white flex items-center justify-center overflow-hidden"
+                aria-label={product.title}
+              >
                 {product.image_url ? (
                   <img
                     src={product.image_url}
@@ -114,28 +137,61 @@ const ShopAffiliateSection = ({ category = null, title = 'You might also like', 
                     {product.badge}
                   </Badge>
                 )}
-              </div>
+                {discount != null && (
+                  <Badge className="absolute top-2 right-2 bg-red-600 text-white border-0 text-[10px] font-bold">
+                    {discount}% OFF
+                  </Badge>
+                )}
+              </a>
 
               <div className="flex flex-col flex-1 p-4">
-                <h3 className="text-sm font-semibold line-clamp-2 mb-1 group-hover:text-primary transition-colors">
-                  {product.title}
-                </h3>
+                <a
+                  href={product.affiliate_url}
+                  target="_blank"
+                  rel="sponsored nofollow noopener noreferrer"
+                  className="mb-1"
+                >
+                  <h3 className="text-sm font-semibold line-clamp-2 group-hover:text-primary transition-colors">
+                    {product.title}
+                  </h3>
+                </a>
                 {product.description && (
                   <p className="text-xs text-muted-foreground line-clamp-2 mb-2">{product.description}</p>
                 )}
-                <div className="mt-auto flex items-center justify-between pt-2">
-                  {product.price_label ? (
-                    <span className="text-base font-bold">{product.price_label}</span>
-                  ) : <span />}
-                  <span className="inline-flex items-center gap-1 text-xs font-bold text-primary">
-                    {product.cta_label || 'View'}
-                    <ExternalLink className="w-3 h-3" />
-                  </span>
-                </div>
+                {(product.price_label || product.original_price_label) && (
+                  <div className="mt-auto flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 pt-2">
+                    {product.price_label && (
+                      <span className="text-base font-bold text-foreground">{product.price_label}</span>
+                    )}
+                    {product.original_price_label && (
+                      <span className="text-xs text-muted-foreground line-through">
+                        RRP {product.original_price_label}
+                      </span>
+                    )}
+                  </div>
+                )}
+                <Button asChild size="sm" className={`w-full rounded-xl font-bold ${(product.price_label || product.original_price_label) ? 'mt-3' : 'mt-auto'}`}>
+                  <a href={product.affiliate_url} target="_blank" rel="sponsored nofollow noopener noreferrer">
+                    <ShoppingCart className="w-4 h-4 mr-2" /> Buy Now
+                  </a>
+                </Button>
               </div>
-            </a>
-          ))}
+            </div>
+            );
+          })}
         </div>
+      )}
+
+      {!loading && (
+        <p className="text-xs text-muted-foreground mt-6 flex items-start gap-1.5 max-w-3xl">
+          <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          <span>
+            CardPop is a participant in the Amazon Services LLC Associates Program, an affiliate
+            advertising program. As an Amazon Associate CardPop earns from qualifying purchases —
+            at no extra cost to you. Prices and availability are accurate as of the time of viewing
+            and are subject to change on Amazon.
+          </span>
+        </p>
       )}
     </section>
   );
