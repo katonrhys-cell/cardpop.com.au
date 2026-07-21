@@ -1,11 +1,21 @@
 import rateLimit from 'express-rate-limit';
 import ipKeyGenerator from '../utils/ipKeyGenerator.js';
 import logger from '../utils/logger.js';
+import PgRateLimitStore from '../utils/pgRateLimitStore.js';
+
+// These limiters guard low-volume, security-sensitive actions (MFA backup-code
+// brute-force, email-triggering resends, HIBP proxy, login/password advisory)
+// where the in-memory default's per-serverless-instance multiplication is a real
+// weakness — back them with a shared Postgres store so the cap is global. The
+// high-volume global/api limiters deliberately stay in-memory (Cloudflare is the
+// authoritative volumetric layer). The store fails open, so a DB outage can
+// never lock users out. See SECURITY_AUDIT_2026-07-21 → M4.
 
 // Login endpoint rate limiter: 5 attempts per 15 minutes
 const loginLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000,
 	max: 5,
+	store: new PgRateLimitStore('login'),
 	message: { error: 'Too many login attempts, please try again later' },
 	standardHeaders: true,
 	legacyHeaders: false,
@@ -28,6 +38,7 @@ const loginLimiter = rateLimit({
 const passwordResetLimiter = rateLimit({
 	windowMs: 60 * 60 * 1000,
 	max: 3,
+	store: new PgRateLimitStore('pwreset'),
 	message: { error: 'Too many password reset requests, please try again later' },
 	standardHeaders: true,
 	legacyHeaders: false,
@@ -82,6 +93,7 @@ const stripeLimiter = rateLimit({
 const backupCodeLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000,
 	max: 5,
+	store: new PgRateLimitStore('backupcode'),
 	standardHeaders: true,
 	legacyHeaders: false,
 	keyGenerator: (req) => req.user?.id || ipKeyGenerator(req),
@@ -100,6 +112,7 @@ const backupCodeLimiter = rateLimit({
 const reportLimiter = rateLimit({
 	windowMs: 60 * 60 * 1000,
 	max: 10,
+	store: new PgRateLimitStore('report'),
 	standardHeaders: true,
 	legacyHeaders: false,
 	keyGenerator: (req) => req.user?.id || ipKeyGenerator(req),
@@ -120,6 +133,7 @@ const reportLimiter = rateLimit({
 const resendVerificationLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000,
 	max: 3,
+	store: new PgRateLimitStore('resendverify'),
 	standardHeaders: true,
 	legacyHeaders: false,
 	keyGenerator: (req) =>
@@ -143,6 +157,7 @@ const resendVerificationLimiter = rateLimit({
 const welcomeOfferIssueLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000,
 	max: 3,
+	store: new PgRateLimitStore('welcomeoffer'),
 	standardHeaders: true,
 	legacyHeaders: false,
 	keyGenerator: (req) =>
@@ -165,6 +180,7 @@ const welcomeOfferIssueLimiter = rateLimit({
 const pwnedCheckLimiter = rateLimit({
 	windowMs: 15 * 60 * 1000,
 	max: 30,
+	store: new PgRateLimitStore('pwned'),
 	standardHeaders: true,
 	legacyHeaders: false,
 	keyGenerator: (req) => ipKeyGenerator(req),

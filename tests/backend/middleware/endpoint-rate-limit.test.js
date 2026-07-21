@@ -6,6 +6,27 @@ vi.mock('../../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
+// The security-sensitive limiters use the Postgres-backed shared store
+// (PgRateLimitStore → supabase.rpc('rate_limit_hit')). Simulate that RPC with an
+// in-memory counter so the limiters trip exactly as they would against the real
+// atomic counter. Tests use a unique key (IP/user) per test, so counters never
+// collide between tests.
+const rlHits = vi.hoisted(() => new Map());
+vi.mock('../../../src/utils/supabaseClient.js', () => ({
+  default: {},
+  supabase: {
+    rpc: async (fn, args) => {
+      if (fn === 'rate_limit_hit') {
+        const n = (rlHits.get(args.p_key) || 0) + 1;
+        rlHits.set(args.p_key, n);
+        return { data: [{ total_hits: n, reset_at: new Date(Date.now() + Number(args.p_window_ms)).toISOString() }], error: null };
+      }
+      if (fn === 'rate_limit_reset') { rlHits.delete(args.p_key); return { data: null, error: null }; }
+      return { data: null, error: null };
+    },
+  },
+}));
+
 import {
   loginLimiter,
   passwordResetLimiter,

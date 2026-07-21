@@ -1,6 +1,7 @@
 import rateLimit from 'express-rate-limit';
 import ipKeyGenerator from '../utils/ipKeyGenerator.js';
 import logger from '../utils/logger.js';
+import PgRateLimitStore from '../utils/pgRateLimitStore.js';
 
 // AI endpoint limiter: 10 requests/min. Keyed on the authenticated user id when
 // available, falling back to the derived client IP for anonymous callers. Every
@@ -13,6 +14,9 @@ import logger from '../utils/logger.js';
 export const integratedAiRateLimit = rateLimit({
 	windowMs: 60 * 1000,
 	max: 10,
+	// Shared store: each AI call is an expensive LLM request, so the per-user cap
+	// must be global across serverless instances, not per-instance. Fails open.
+	store: new PgRateLimitStore('ai'),
 	standardHeaders: true,
 	legacyHeaders: false,
 	message: { error: 'Too many AI requests, please try again later' },
