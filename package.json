@@ -134,6 +134,8 @@
     "vitest-axe": "^0.1.0"
   },
   "overrides": {
-    "protobufjs": "^7.6.5"
+    "protobufjs": "^7.6.5",
+    "brace-expansion": "^1.1.16",
+    "js-yaml": "^4.3.0"
   }
 }
