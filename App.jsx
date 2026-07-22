@@ -98,6 +98,7 @@ const UserBalancePage = lazy(() => import('@/pages/UserBalancePage.jsx'));
 const VerificationSubmissionPage = lazy(() => import('@/pages/VerificationSubmissionPage.jsx'));
 const VerifyIdentityPage = lazy(() => import('@/pages/VerifyIdentityPage.jsx'));
 const OnboardingCardPage = lazy(() => import('@/pages/OnboardingCardPage.jsx'));
+const WelcomePage = lazy(() => import('@/pages/WelcomePage.jsx'));
 
 // Public Profiles
 const PublicSellerProfilePage = lazy(() => import('@/pages/PublicSellerProfilePage.jsx'));
@@ -282,6 +283,9 @@ const App = () => {
                         <Route path="/logout" element={<LogoutPage />} />
                         <Route path="/login" element={<LoginPage />} />
                         <Route path="/signup" element={<SignupPage />} />
+                        {/* Public: receives the Supabase email-confirmation link,
+                            then routes into the ID-verification onboarding chain. */}
+                        <Route path="/welcome" element={<WelcomePage />} />
                         <Route path="/reset-password" element={<PasswordResetPage />} />
                         <Route path="/forgot-password" element={<PasswordResetPage />} />
                         <Route path="/verification-pending" element={<VerificationPendingPage />} />

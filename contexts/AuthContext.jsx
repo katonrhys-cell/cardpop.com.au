@@ -213,6 +213,12 @@ export const AuthProvider = ({ children }) => {
         // Required when Cloudflare Turnstile CAPTCHA is enabled in Supabase.
         // Harmlessly ignored when it isn't.
         captchaToken,
+        // Where Supabase sends the confirmation-email link. /welcome establishes
+        // the session then routes the newly email-verified user into onboarding
+        // (ID verification → add a card → wallet). This URL must be added to
+        // Supabase → Authentication → URL Configuration → Redirect URLs, else
+        // Supabase falls back to the Site URL and the chain isn't entered.
+        emailRedirectTo: `${window.location.origin}/welcome`,
       },
     });
     if (error) throw error;
