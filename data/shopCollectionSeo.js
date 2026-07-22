@@ -82,7 +82,7 @@ export const SHOP_COLLECTION_SEO = {
   },
   grading: {
     slug: 'grading',
-    name: 'Grading Supplies',
+    name: 'Card Grading',
     group: 'Grading',
     title: 'Card Grading Supplies Australia — Submission Kits & Prep Tools | CardPop',
     description:
