@@ -29,6 +29,11 @@ vi.mock('../../src/middleware/auth.js', () => ({
   },
 }));
 const mockMaybeSingle = vi.hoisted(() => vi.fn());
+// The buy-side identity gate (requireIdentityForMarketplacePurchase) reads
+// profiles.is_verified for the authenticated buyer. Default it to a verified
+// buyer so the existing checkout tests exercise the happy path; tests that want
+// an unverified buyer can override this.
+const mockProfileMaybeSingle = vi.hoisted(() => vi.fn());
 
 // Replace only the fulfilment entrypoint so the success-page fallback (and the
 // webhook dispatch) can be asserted directly; every other service export stays
@@ -40,7 +45,7 @@ vi.mock('../../src/services/stripeWebhookService.js', async (importOriginal) => 
 });
 
 vi.mock('../../src/utils/supabaseClient.js', () => {
-  const chain = () => {
+  const chain = (table) => {
     const q = {};
     q.select = () => q;
     q.eq = () => q;
@@ -51,11 +56,13 @@ vi.mock('../../src/utils/supabaseClient.js', () => {
     q.update = () => q;
     q.contains = () => q;
     q.single = () => Promise.resolve({ data: null, error: null });
-    q.maybeSingle = () => mockMaybeSingle();
+    // The identity gate's profiles lookup uses its own mock so it doesn't
+    // consume the generic listing/offer mock the handlers rely on.
+    q.maybeSingle = () => (table === 'profiles' ? mockProfileMaybeSingle() : mockMaybeSingle());
     q.insert = () => Promise.resolve({ data: null, error: null });
     return q;
   };
-  const sb = { from: () => chain(), auth: { getUser: () => Promise.resolve({ data: { user: null }, error: null }) } };
+  const sb = { from: (table) => chain(table), auth: { getUser: () => Promise.resolve({ data: { user: null }, error: null }) } };
   return { supabase: sb, default: sb };
 });
 
@@ -90,6 +97,8 @@ const MOCK_LISTING = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockMaybeSingle.mockResolvedValue({ data: MOCK_LISTING, error: null });
+  // Buyer is identity-verified by default (passes the marketplace buy gate).
+  mockProfileMaybeSingle.mockResolvedValue({ data: { is_verified: true }, error: null });
 });
 
 // ─── POST /create-checkout ────────────────────────────────────────────────────
@@ -459,5 +468,25 @@ describe('POST /create-cart-checkout', () => {
     expect(res.status).toBe(403);
     expect(res.body.code).toBe('EMAIL_NOT_VERIFIED');
     expect(mockStripe.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
+  it('blocks a marketplace listing purchase with 403 when the buyer is not identity-verified', async () => {
+    mockProfileMaybeSingle.mockResolvedValue({ data: { is_verified: false }, error: null });
+    const res = await request(app).post('/create-cart-checkout').send({
+      items: [{ type: 'listing', id: 'l1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b',
+    });
+    expect(res.status).toBe(403);
+    expect(res.body.code).toBe('IDENTITY_NOT_VERIFIED');
+    expect(mockStripe.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
+  it('does NOT apply the identity gate to a shop-only cart', async () => {
+    // Even with an unverified buyer, a CardPop Shop order is not gated on
+    // identity — it proceeds past the gate (and fails later only if pricing does).
+    mockProfileMaybeSingle.mockResolvedValue({ data: { is_verified: false }, error: null });
+    const res = await request(app).post('/create-cart-checkout').send({
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b',
+    });
+    expect(res.body.code).not.toBe('IDENTITY_NOT_VERIFIED');
   });
 });
