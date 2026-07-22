@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
+import Breadcrumb from '@/components/Breadcrumb.jsx';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, SlidersHorizontal, PackageX, Package } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -122,6 +123,10 @@ const ShopSealedBoxesPage = () => {
   return (
     <div className="min-h-screen bg-background pb-20">
       <SEOHead title="Sealed Boxes | CardPop Shop" description="Shop official sealed booster boxes and products. Fast shipping across Australia." />
+
+      <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 pt-6">
+        <Breadcrumb items={[{ label: 'Home', path: '/' }, { label: 'Shop', path: '/shop' }, { label: 'Sealed Boxes' }]} />
+      </div>
 
       {/* Header Section */}
       <section className="bg-secondary border-b border-border py-12 px-5 sm:px-8 lg:px-12 xl:px-16">

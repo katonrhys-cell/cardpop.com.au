@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
+import Breadcrumb from '@/components/Breadcrumb.jsx';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
@@ -77,6 +78,10 @@ const ProfilesPage = () => {
         title="Collector Profiles | CardPop Community"
         description="Browse verified trading card collectors on CardPop. Find fellow hobbyists, traders and sellers across Australia."
       />
+
+      <div className="container-default pt-6">
+        <Breadcrumb items={[{ label: 'Home', path: '/' }, { label: 'Community', path: '/community' }, { label: 'Profiles' }]} />
+      </div>
 
       {/* Hero */}
       <section className="bg-card border-b border-border py-20 text-center">

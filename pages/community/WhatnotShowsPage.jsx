@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
+import Breadcrumb from '@/components/Breadcrumb.jsx';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import { compressImage } from '@/utils/compressImage.js';
@@ -200,6 +201,10 @@ const WhatnotShowsPage = () => {
   return (
     <div className="min-h-screen bg-background">
       <SEOHead title="Whatnot Shows | CardPop Community" description="Find live trading card breaks and auctions from Australian sellers on Whatnot. Watch, bid and win." />
+
+      <div className="container-default pt-6">
+        <Breadcrumb items={[{ label: 'Home', path: '/' }, { label: 'Community', path: '/community' }, { label: 'Whatnot' }]} />
+      </div>
 
       {/* ── Hero ── */}
       <section className="bg-card border-b border-border py-16 text-center">

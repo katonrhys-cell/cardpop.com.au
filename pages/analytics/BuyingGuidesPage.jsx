@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Sparkles, ArrowRight, Flame, Calendar } from 'lucide-react';
 import SEOHead from '@/components/SEOHead.jsx';
+import Breadcrumb from '@/components/Breadcrumb.jsx';
 import { BUYING_GUIDES, GUIDE_CATEGORY_META } from '@/data/buyingGuides.js';
 
 const StatusBadge = ({ status }) => {
@@ -83,6 +84,10 @@ const BuyingGuidesPage = () => {
         canonicalUrl="/analytics/buying-guides"
         structuredData={structuredData}
       />
+
+      <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 pt-6">
+        <Breadcrumb items={[{ label: 'Home', path: '/' }, { label: 'Analytics', path: '/analytics' }, { label: 'Buying Guides' }]} />
+      </div>
 
       <section className="bg-card border-b border-border py-16 text-center">
         <div className="container mx-auto px-4">
