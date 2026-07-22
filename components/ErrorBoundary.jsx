@@ -29,6 +29,13 @@ class ErrorBoundary extends React.Component {
 
   render() {
     if (this.state.hasError) {
+      // A `fallback` prop (including `null`) lets a caller opt out of the
+      // full-screen error card — used to isolate a single list item (e.g. one
+      // malformed card in a grid) so its crash drops just that item instead of
+      // blanking the whole page via a route-level boundary.
+      if (this.props.fallback !== undefined) {
+        return this.props.fallback;
+      }
       return (
         <div className="min-h-[50vh] flex flex-col items-center justify-center p-6 bg-background">
           <div className="bg-card rounded-2xl p-8 max-w-md w-full text-center border border-border shadow-lg">

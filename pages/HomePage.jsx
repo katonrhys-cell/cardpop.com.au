@@ -11,6 +11,7 @@ import VaultListingCard from '@/components/VaultListingCard.jsx';
 import SellerCard from '@/components/SellerCard.jsx';
 import FeaturedSellerCard from '@/components/FeaturedSellerCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
+import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 import { fetchActiveShowcaseCards } from '@/lib/heroShowcase.js';
 
 // NOTE: this page intentionally imports NOTHING from framer-motion. The library
@@ -793,7 +794,12 @@ const HomePage = () => {
                   className={cardsInView ? 'anim-reveal-up' : 'opacity-0'}
                   style={cardsInView ? { animationDelay: `${i * 0.1}s` } : undefined}
                 >
-                  <VaultListingCard vaultItem={card} />
+                  {/* Isolate each card: a single malformed record throwing
+                      during render must not blank the whole grid (and, via the
+                      route-level boundary, the whole homepage). */}
+                  <ErrorBoundary fallback={null}>
+                    <VaultListingCard vaultItem={card} />
+                  </ErrorBoundary>
                 </div>
               ))}
             </div>
@@ -867,7 +873,9 @@ const HomePage = () => {
                   className={sellersInView ? 'anim-reveal-up' : 'opacity-0'}
                   style={sellersInView ? { animationDelay: `${i * 0.1}s` } : undefined}
                 >
-                  <FeaturedSellerCard seller={seller} />
+                  <ErrorBoundary fallback={null}>
+                    <FeaturedSellerCard seller={seller} />
+                  </ErrorBoundary>
                 </div>
               ))}
             </div>

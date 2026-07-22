@@ -28,8 +28,18 @@ const getStatusBadge = (listingType) => {
 
 const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
-  const rawImg = vaultItem.vault_images?.[0]?.storage_path || vaultItem.card_image || vaultItem.vault_images?.[0]?.image_url || vaultItem.image_url || null;
-  const { src: imgSrc, srcSet: imgSrcSet, fallbackSrc: imgFallback, thumbSrc: imgThumb } = getCardImage(rawImg);
+  // Try every place a photo may be stored, in priority order. Featured cards
+  // promoted onto the homepage often have their only photo in `card_image` (a
+  // storage path) with no `vault_images` rows, and some carry extra shots in
+  // the `card_images` array — so fall through all of them before giving up.
+  const rawImg =
+    vaultItem.vault_images?.[0]?.storage_path ||
+    vaultItem.card_image ||
+    vaultItem.card_images?.[0] ||
+    vaultItem.vault_images?.[0]?.image_url ||
+    vaultItem.image_url ||
+    null;
+  const { src: imgSrc, srcSet: imgSrcSet, fallbackSrc: imgFallback, canonicalSrc: imgCanonical, thumbSrc: imgThumb } = getCardImage(rawImg);
   const sellerObj = vaultItem.profiles || vaultItem.owner || vaultItem.seller || vaultItem.expand?.user_id || null;
   const sellerId = vaultItem.user_id || vaultItem.owner_id || sellerObj?.id;
   const titleSlug = slugify(vaultItem.card_name || vaultItem.name || vaultItem.title || 'card');
@@ -62,6 +72,7 @@ const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
           srcSet={imgSrcSet}
           sizes={CARD_GRID_SIZES}
           fallbackSrc={imgFallback}
+          canonicalSrc={imgCanonical}
           thumbSrc={imgThumb}
           alt={vaultItem.card_name || vaultItem.name || 'Vault Image'}
           displayStyle={vaultItem.display_style}

@@ -23,6 +23,7 @@ const CardShowcase = ({
   srcSet,
   sizes,
   fallbackSrc,
+  canonicalSrc,
   thumbSrc,
   alt = '',
   width,
@@ -107,6 +108,7 @@ const CardShowcase = ({
             srcSet={srcSet}
             sizes={sizes}
             fallbackSrc={fallbackSrc}
+            canonicalSrc={canonicalSrc}
             thumbSrc={thumbSrc}
             alt={alt}
             width={width}
