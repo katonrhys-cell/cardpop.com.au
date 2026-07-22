@@ -2,6 +2,7 @@ import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { sendContactMessage } from '../utils/emailService.js';
+import { verifyTurnstileToken } from '../utils/turnstile.js';
 
 const router = Router();
 
@@ -52,6 +53,13 @@ router.post('/', async (req, res) => {
   }
   if (name.length > MAX.name || email.length > MAX.email || subject.length > MAX.subject || message.length > MAX.message) {
     return res.status(400).json({ error: 'One or more fields exceed the maximum allowed length.' });
+  }
+
+  // Cloudflare Turnstile — fail-open until TURNSTILE_SECRET_KEY is set in Vercel,
+  // then enforced. Honeypot + rate limiting still apply regardless.
+  const captcha = await verifyTurnstileToken(req.body?.turnstileToken, req.ip);
+  if (!captcha.success) {
+    return res.status(400).json({ error: 'Captcha verification failed. Please try again.' });
   }
 
   try {
