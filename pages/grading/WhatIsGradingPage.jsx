@@ -1,5 +1,6 @@
 import React from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
+import Breadcrumb from '@/components/Breadcrumb.jsx';
 import { Link } from 'react-router-dom';
 import { BookOpen, ChevronRight, ArrowLeft, ShieldCheck, TrendingUp, Shield, Zap } from 'lucide-react';
 
@@ -32,6 +33,10 @@ const WhatIsGradingPage = () => (
       title="What is Card Grading? | CardPop Grading Hub"
       description="Discover what professional card grading is, how the authentication and encapsulation process works, and why Australian collectors are grading more cards than ever."
     />
+
+    <div className="container-default pt-6">
+      <Breadcrumb items={[{ label: 'Home', path: '/' }, { label: 'Grading', path: '/grading' }, { label: 'What Is Grading' }]} />
+    </div>
 
     <section className="bg-card border-b border-border py-20 text-center">
       <div className="container-default">
