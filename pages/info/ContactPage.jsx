@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
-import { CheckCircle, Send } from 'lucide-react';
+import { CheckCircle, Send, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import InfoPageLayout from '@/components/InfoPageLayout.jsx';
+import apiServerClient from '@/lib/apiServerClient.js';
 
 const validate = ({ name, email, subject, message }) => {
   const errors = {};
@@ -16,34 +17,56 @@ const validate = ({ name, email, subject, message }) => {
   return errors;
 };
 
-const EMPTY = { name: '', email: '', subject: '', message: '' };
+const EMPTY = { name: '', email: '', subject: '', message: '', company: '' };
 
 const ContactPage = () => {
   const [fields, setFields] = useState(EMPTY);
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(false);
-  const [mailtoUrl, setMailtoUrl] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState('');
+
+  // Fallback mailto for the error path, so the visitor is never stranded if the
+  // server send fails.
+  const mailtoUrl = `mailto:support@cardpop.com.au?subject=${encodeURIComponent(`[CardPop] ${fields.subject || ''}`)}` +
+    `&body=${encodeURIComponent(`Name: ${fields.name}\nEmail: ${fields.email}\n\nMessage:\n${fields.message}`)}`;
 
   const update = (key, value) => {
     setFields(prev => ({ ...prev, [key]: value }));
     if (errors[key]) setErrors(prev => ({ ...prev, [key]: undefined }));
+    if (sendError) setSendError('');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const errs = validate(fields);
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
-    const subject = encodeURIComponent(`[CardPop] ${fields.subject}`);
-    const body = encodeURIComponent(
-      `Name: ${fields.name}\nEmail: ${fields.email}\n\nMessage:\n${fields.message}`
-    );
-    const url = `mailto:support@cardpop.com.au?subject=${subject}&body=${body}`;
-    setMailtoUrl(url);
-    // Trigger the user's mail client. This can silently do nothing if no mail
-    // handler is registered, so the confirmation screen offers a manual link
-    // rather than asserting the client definitely opened.
-    window.location.href = url;
-    setSubmitted(true);
+
+    setSending(true);
+    setSendError('');
+    try {
+      const res = await apiServerClient.fetch('/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: fields.name.trim(),
+          email: fields.email.trim(),
+          subject: fields.subject.trim(),
+          message: fields.message.trim(),
+          company: fields.company, // honeypot — real users leave this blank
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSendError(data.error || 'We could not send your message. Please try again.');
+        return;
+      }
+      setSubmitted(true);
+    } catch {
+      setSendError('We could not reach the server. Please check your connection and try again.');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -59,17 +82,15 @@ const ContactPage = () => {
           <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
           </div>
-          <h3 className="text-2xl font-bold mb-3">Message ready to send!</h3>
+          <h3 className="text-2xl font-bold mb-3">Message sent!</h3>
           <p className="text-muted-foreground mb-6">
-            We've tried to open your email app with the message pre-filled. Hit send and we'll get back to you within 1 business day (AEST).
+            Thanks for reaching out — we've received your message and will get back to you within 1 business day (AEST).
           </p>
           <p className="text-sm text-muted-foreground mb-8">
-            Didn't see it open? {mailtoUrl ? (
-              <a href={mailtoUrl} className="text-primary font-semibold hover:underline">Open your email app</a>
-            ) : null} or email us directly at{' '}
+            Prefer email? You can always reach us directly at{' '}
             <a href="mailto:support@cardpop.com.au" className="text-primary font-semibold hover:underline">support@cardpop.com.au</a>.
           </p>
-          <Button variant="outline" onClick={() => { setSubmitted(false); setFields(EMPTY); setMailtoUrl(''); }}>
+          <Button variant="outline" onClick={() => { setSubmitted(false); setFields(EMPTY); setSendError(''); }}>
             Send another message
           </Button>
         </div>
@@ -152,9 +173,33 @@ const ContactPage = () => {
                   {errors.message && <p className="text-destructive text-xs">{errors.message}</p>}
                 </div>
 
-                <Button type="submit" className="w-full">
-                  <Send className="w-4 h-4 mr-2" />
-                  Send Message
+                {/* Honeypot — hidden from real users; bots that fill it are dropped server-side */}
+                <div className="hidden" aria-hidden="true">
+                  <label htmlFor="company">Company</label>
+                  <input
+                    id="company"
+                    name="company"
+                    type="text"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    value={fields.company}
+                    onChange={e => update('company', e.target.value)}
+                  />
+                </div>
+
+                {sendError && (
+                  <p className="text-destructive text-sm" role="alert">
+                    {sendError}{' '}
+                    <a href={mailtoUrl} className="font-semibold underline hover:no-underline">Email us instead</a>.
+                  </p>
+                )}
+
+                <Button type="submit" className="w-full" disabled={sending}>
+                  {sending ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending…</>
+                  ) : (
+                    <><Send className="w-4 h-4 mr-2" /> Send Message</>
+                  )}
                 </Button>
               </form>
             </CardContent>

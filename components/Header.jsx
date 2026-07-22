@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  ShoppingCart, Menu, Shield, MessageSquare, ArrowRightLeft, Sun, Moon,
+  ShoppingCart, Menu, Shield, MessageSquare, ArrowRightLeft, Sun, Moon, Tag,
 } from 'lucide-react';
 import { useDarkMode } from '@/hooks/useDarkMode.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -300,6 +300,16 @@ const Header = () => {
               </div>
             )}
 
+            {/* Sell CTA — the primary marketplace action (list a card). Routes to
+                the add-card flow; ProtectedRoute prompts login for signed-out
+                users. Shown from sm up; on phones it lives in the mobile menu. */}
+            <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex font-bold rounded-xl gap-1.5 shrink-0">
+              <Link to="/vault/add">
+                <Tag className="h-4 w-4" aria-hidden="true" />
+                Sell
+              </Link>
+            </Button>
+
             <Button
               variant="ghost"
               size="icon"
@@ -409,6 +419,15 @@ const Header = () => {
             </Sheet>
 
           </div>
+        </div>
+
+        {/* ── Mobile/tablet search row ──
+            The Row-1 search is centred and desktop-only (hidden lg:flex), so
+            below lg the only way to search was to open the hamburger. Search is
+            the primary discovery path for a marketplace, so surface it inline
+            here on every screen under lg. */}
+        <div className="lg:hidden py-2.5 border-b border-border/40">
+          <SearchBar onSearchChange={handleGlobalSearch} placeholder="Search cards, sets, sellers..." className="max-w-full" />
         </div>
 
         {/* ── Row 2: Nav links (desktop only) ── */}

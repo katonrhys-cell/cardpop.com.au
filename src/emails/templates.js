@@ -338,6 +338,28 @@ ${summaryTable([
   );
 }
 
+// ─── Contact form message (admin/support) ─────────────────────────────────────
+
+export function contactMessageEmail({ name, email, subject, message }) {
+  const body = `<p>A visitor sent a message through the CardPop contact form.</p>
+${summaryTable([
+  ['From', `${esc(name)} (${esc(email)})`],
+  ['Subject', esc(subject)],
+])}
+<div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:20px 24px;margin:24px 0;white-space:pre-wrap;font-size:15px;line-height:1.7;color:#374151;">${esc(message)}</div>
+<p style="font-size:13px;color:#9CA3AF;">Reply directly to this email to respond to ${esc(name)}.</p>`;
+
+  return cpEmail(
+    `New contact message: ${esc(subject)}`,
+    'New Contact Message',
+    'Someone wants to get in touch',
+    body,
+    null,
+    null,
+    'You received this because you are the CardPop support contact.',
+  );
+}
+
 // ─── Refund issued (seller) ───────────────────────────────────────────────────
 
 export function refundIssuedEmail({ sellerName, refundAmount, retainedFee, orderId }) {

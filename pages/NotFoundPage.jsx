@@ -4,28 +4,35 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { FileQuestion, Home, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import SearchBar from '@/components/SearchBar.jsx';
 
 const NotFoundPage = () => {
   return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 text-center bg-background font-sans">
       <SEOHead title="Page Not Found | CardPop" description="The page you're looking for doesn't exist. Return to CardPop and continue browsing." noindex />
-      
+
       <div className="w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-8 shadow-sm">
         <FileQuestion className="w-12 h-12 text-muted-foreground opacity-50" />
       </div>
-      
+
       <h1 className="text-6xl md:text-8xl font-extrabold font-serif mb-4 text-foreground tracking-tight">
         404
       </h1>
-      
+
       <h2 className="text-2xl md:text-3xl font-bold mb-4 text-foreground">
         Page Not Found
       </h2>
-      
-      <p className="text-muted-foreground text-lg max-w-md mx-auto mb-10 leading-relaxed text-balance">
+
+      <p className="text-muted-foreground text-lg max-w-md mx-auto mb-8 leading-relaxed text-balance">
         The page you are looking for might have been removed, had its name changed, or is temporarily unavailable.
       </p>
-      
+
+      {/* Search is the most useful recovery tool on a dead end — offer it before
+          the navigation buttons. Defaults to routing to /search. */}
+      <div className="w-full max-w-md mx-auto mb-8">
+        <SearchBar placeholder="Search cards, sets, sellers..." className="max-w-full" />
+      </div>
+
       <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
         <Button asChild size="lg" className="rounded-xl font-bold px-8 shadow-sm h-14">
           <Link to="/">

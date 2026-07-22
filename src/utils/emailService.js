@@ -12,6 +12,7 @@ import {
   launchWelcomeEmail,
   eventSubmittedEmail,
   orderAdminNoticeEmail,
+  contactMessageEmail,
 } from '../emails/templates.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -30,12 +31,14 @@ function getClient() {
   return _client;
 }
 
-async function send({ to, subject, html, attachments }) {
+async function send({ to, subject, html, attachments, replyTo }) {
   const client = getClient();
   if (!client) return false;
   try {
     const payload = { from: FROM, to, subject, html };
     if (attachments?.length) payload.attachments = attachments;
+    // Let support reply straight to the person who wrote in (contact form).
+    if (replyTo) payload.reply_to = replyTo;
     const { error } = await client.emails.send(payload);
     if (error) {
       logger.error(`[EMAIL] Send failed to ${to}: ${error.message}`);
@@ -144,6 +147,17 @@ export async function sendRefundIssued({ sellerEmail, sellerName, refundAmount, 
     to: sellerEmail,
     subject: 'A refund was issued on your CardPop sale',
     html: refundIssuedEmail({ sellerName, refundAmount, retainedFee, orderId }),
+  });
+}
+
+// Contact-form message from a site visitor, delivered to the support/contact
+// inbox. reply_to is set to the sender so support can respond in one click.
+export async function sendContactMessage({ to, name, email, subject, message }) {
+  return send({
+    to,
+    subject: `New contact message: ${subject}`,
+    html: contactMessageEmail({ name, email, subject, message }),
+    replyTo: email,
   });
 }
 
