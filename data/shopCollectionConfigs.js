@@ -42,7 +42,7 @@ const VISUALS = {
     heroTextDark: false,
     accentHex: '#0D9488',
   },
-  'grading-supplies': {
+  grading: {
     tagline: 'Get Your Cards Submission-Ready',
     heroGradient: 'from-rose-500 via-pink-500 to-pink-700',
     heroTextDark: false,
@@ -72,7 +72,7 @@ export const SHOP_COLLECTION_CONFIGS = Object.fromEntries(
 );
 
 // Resolve a /shop/:groupSlug param (or a friendly alias) onto a config, or null.
-const ALIASES = { grading: 'grading-supplies', protect: 'protection' };
+const ALIASES = { 'grading-supplies': 'grading', protect: 'protection' };
 export const resolveShopCollection = (rawSlug) => {
   if (!rawSlug) return null;
   const s = String(rawSlug).toLowerCase();

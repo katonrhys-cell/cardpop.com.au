@@ -83,7 +83,7 @@ export const SHOP_CATEGORY_GROUPS = [
   },
   {
     label: 'Grading',
-    slug: 'grading-supplies',
+    slug: 'grading',
     Icon: GradedSlabIcon,
     gradient: 'from-rose-500 to-pink-600',
     blurb: 'Prep kits and tools to get cards submission-ready.',

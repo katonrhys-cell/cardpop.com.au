@@ -80,8 +80,8 @@ export const SHOP_COLLECTION_SEO = {
       { name: 'Graded Card Protectors', slug: 'graded-card-protectors' },
     ],
   },
-  'grading-supplies': {
-    slug: 'grading-supplies',
+  grading: {
+    slug: 'grading',
     name: 'Grading Supplies',
     group: 'Grading',
     title: 'Card Grading Supplies Australia — Submission Kits & Prep Tools | CardPop',
@@ -103,12 +103,9 @@ export const SHOP_COLLECTION_SEO = {
 // "grading") onto the canonical shop-collection group slug. Kept dependency-free
 // so both the SPA and the serverless prerender can share it.
 const SHOP_COLLECTION_ALIASES = {
-  grading: 'grading-supplies',
-  'grading-gear': 'grading-supplies',
+  'grading-supplies': 'grading',
+  'grading-gear': 'grading',
   protect: 'protection',
-  storage: 'storage',
-  display: 'display',
-  shipping: 'shipping',
 };
 
 export const resolveShopCollectionSlug = (rawSlug) => {
