@@ -391,8 +391,7 @@ const ShopDropdown = ({ onNavigate }) => {
             className="flex items-center justify-between px-5 py-3.5 border-b border-border hover:bg-muted/60 transition-colors group"
           >
             <div className="min-w-0">
-              <span className="text-sm font-bold text-foreground">Shop All Supplies</span>
-              <p className="text-xs text-muted-foreground mt-0.5 truncate">Sleeves, storage, display, shipping &amp; grading gear</p>
+              <span className="text-sm font-bold text-foreground">Explore All Supplies</span>
             </div>
             <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
           </Link>
