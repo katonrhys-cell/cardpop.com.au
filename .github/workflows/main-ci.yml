@@ -1,9 +1,9 @@
 name: Main CI
 
-# Post-merge quality gate for main: lint + the full test suite + build + bundle
-# budget. Deployment is handled by Vercel's native Git integration (Vercel
-# builds and deploys on every push to main), so this workflow no longer runs
-# `vercel --prod`.
+# Post-merge quality gate for main: lint + the full test suite (with a
+# coverage-threshold gate, floors in vitest.config.js) + build + bundle budget.
+# Deployment is handled by Vercel's native Git integration (Vercel builds and
+# deploys on every push to main), so this workflow no longer runs `vercel --prod`.
 #
 # Removed with the move to Vercel Git deploys: the old `deploy` job that
 # installed the Vercel CLI, assumed an AWS IAM role via OIDC, and read the
@@ -49,8 +49,8 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Test
-        run: npm test
+      - name: Test (with coverage gate)
+        run: npm run test:coverage
 
       - name: Build
         run: npm run build
