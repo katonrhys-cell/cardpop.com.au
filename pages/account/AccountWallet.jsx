@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import SavePaymentMethod from '@/components/SavePaymentMethod.jsx';
+import VerifyIdentityCard from '@/components/VerifyIdentityCard.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import apiServerClient from '@/lib/apiServerClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -178,8 +179,13 @@ const AccountWallet = () => {
         </Card>
       </div>
 
-      {/* Saved cards for buying — encouraged on every plan; never charged until you transact */}
-      <SavePaymentMethod />
+      {/* Prerequisites for transacting — identity verification + a card on file.
+          Both are required before buying, selling or trading (see SellingGate /
+          DB can_sell()); the card is never charged until you actually transact. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <VerifyIdentityCard />
+        <SavePaymentMethod />
+      </div>
 
       {/* Stripe Connect panel */}
       <Card className="shadow-sm border-border overflow-hidden">

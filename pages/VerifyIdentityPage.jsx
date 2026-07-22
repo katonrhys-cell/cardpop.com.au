@@ -4,6 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import { ShieldCheck, IdCard, Camera, Lock, Loader2, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import apiServerClient from '@/lib/apiServerClient.js';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
 
 // Post-signup ID verification step, powered by Stripe Identity.
@@ -45,6 +46,14 @@ const VerifyIdentityPage = () => {
   const pollCount = useRef(0);
   const pollTimer = useRef(null);
 
+  // Refresh the client auth profile the moment verification resolves, so
+  // downstream identity-gated UI (the marketplace checkout gate, the selling
+  // gate, the Verified badge) reflects it without a page reload. Kept in a ref
+  // so it never churns the polling effect's dependencies.
+  const { refetchProfile } = useAuth();
+  const refetchProfileRef = useRef(refetchProfile);
+  refetchProfileRef.current = refetchProfile;
+
   const fetchStatus = useCallback(async () => {
     try {
       const res = await apiServerClient.fetch('/stripe/identity/status');
@@ -80,6 +89,12 @@ const VerifyIdentityPage = () => {
     fetchStatus();
     return () => clearTimeout(pollTimer.current);
   }, [fetchStatus]);
+
+  // Once verified, re-sync auth so gated pages (checkout, selling) update before
+  // the user navigates on via "Continue".
+  useEffect(() => {
+    if (status === 'verified') refetchProfileRef.current?.();
+  }, [status]);
 
   const startVerification = async () => {
     setStatus('starting');

@@ -184,7 +184,8 @@ const SignupPage = () => {
             <h2 className="font-serif text-2xl font-bold mb-4">Check Your Email</h2>
             <p className="text-muted-foreground mb-4 leading-relaxed">
               We've sent a verification link to <span className="text-foreground font-bold">{formData.email}</span>.
-              Check your email to verify your account and complete your profile.
+              Clicking it confirms your email and walks you through the next steps — verifying your ID and
+              adding a card — so you're ready to buy, sell and trade.
             </p>
             <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
               Your account is <span className="text-foreground font-bold">free, forever</span> — buy straight away.

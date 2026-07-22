@@ -393,7 +393,12 @@ describe('signup', () => {
     expect(supabase.auth.signUp).toHaveBeenCalledWith({
       email: 'John.Doe@example.com',
       password: 'pw',
-      options: { data: { full_name: 'John Doe', username: 'johndoe' }, captchaToken: 'captcha-tok' },
+      options: {
+        data: { full_name: 'John Doe', username: 'johndoe' },
+        captchaToken: 'captcha-tok',
+        // The confirmation link returns to /welcome, which drives the onboarding chain.
+        emailRedirectTo: expect.stringMatching(/\/welcome$/),
+      },
     });
   });
 

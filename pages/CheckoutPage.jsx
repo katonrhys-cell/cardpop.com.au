@@ -21,6 +21,7 @@ import BillingAddressForm from '@/components/checkout/BillingAddressForm.jsx';
 import PaymentMethodSelector from '@/components/checkout/PaymentMethodSelector.jsx';
 import OrderReviewSection from '@/components/checkout/OrderReviewSection.jsx';
 import EmbeddedStripeCheckout from '@/components/checkout/EmbeddedStripeCheckout.jsx';
+import MarketplacePurchaseGate from '@/components/checkout/MarketplacePurchaseGate.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import { getReferralCode } from '@/lib/referral.js';
 import { AMAZON_LOCATION_ENABLED } from '@/lib/amazonLocation.js';
@@ -36,7 +37,7 @@ const CheckoutPage = () => {
   const source = searchParams.get('source');
 
   const { cartItems } = useCart();
-  const { currentUser } = useAuth();
+  const { currentUser, isIdentityVerified, profileLoading } = useAuth();
   const [step, setStep] = useState(STEPS.SUMMARY);
   const [initializing, setInitializing] = useState(true);
 
@@ -107,6 +108,14 @@ const CheckoutPage = () => {
   }, [cardId, source, navigate]);
 
   const checkoutItems = directItem ? [directItem] : cartItems;
+
+  // Marketplace (peer-to-peer 'listing') items require an identity-verified
+  // buyer; CardPop Shop items don't. Items default to 'listing' when untyped.
+  // When the order contains a marketplace item and the buyer isn't a verified
+  // account, we gate the whole checkout up front — the server enforces the same
+  // rule (requireIdentityForMarketplacePurchase), so this is UX, not the guard.
+  const hasMarketplaceItem = checkoutItems.some((i) => (i.product?.type || 'listing') === 'listing');
+  const marketplaceBlocked = hasMarketplaceItem && !profileLoading && !(currentUser && isIdentityVerified);
 
   // Flatten cart items into a display-friendly shape for child components
   const flatItems = checkoutItems.map(item => {
@@ -455,9 +464,13 @@ const CheckoutPage = () => {
         </div>
 
         <div className="max-w-2xl mx-auto">
-          {renderStep()}
+          {marketplaceBlocked ? (
+            <MarketplacePurchaseGate returnPath="/checkout" />
+          ) : (
+            renderStep()
+          )}
 
-          {currentUser && step === STEPS.SUMMARY && flatItems.length > 0 && walletBalance > 0 && (
+          {!marketplaceBlocked && currentUser && step === STEPS.SUMMARY && flatItems.length > 0 && walletBalance > 0 && (
             <Card className="border-border shadow-sm mt-4">
               <CardContent className="pt-6">
                 <label className="flex items-center gap-3 text-sm cursor-pointer">
@@ -480,7 +493,7 @@ const CheckoutPage = () => {
             </Card>
           )}
 
-          {currentUser && step === STEPS.SUMMARY && flatItems.length > 0 && (
+          {!marketplaceBlocked && currentUser && step === STEPS.SUMMARY && flatItems.length > 0 && (
             <Card className="border-border shadow-sm mt-4">
               <CardContent className="pt-6">
                 <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">

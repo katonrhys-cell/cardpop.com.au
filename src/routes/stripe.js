@@ -26,6 +26,7 @@ import { applyStripeSubscription } from '../services/subscriptionService.js';
 import { ensureWalletCustomer, getWalletBalanceCents, handleWalletTopup, assertNoOpenWalletCheckout, reserveWalletCheckout, releaseWalletCheckout } from '../services/walletService.js';
 import { validateShippingAddress } from '../utils/addressValidation.js';
 import { requireEmailVerified } from '../middleware/requireEmailVerified.js';
+import { requireIdentityForMarketplacePurchase } from '../middleware/requireIdentityForPurchase.js';
 import { isValidAbn, normalizeAbn } from '../../utils/abn.js';
 
 const router = express.Router();
@@ -72,7 +73,7 @@ router.get('/calculate', authMiddleware, validateRequestQuery(calculateBreakdown
 
 // ─── POST /create-checkout ───────────────────────────────────────────────────
 
-router.post('/create-checkout', authMiddleware, requireEmailVerified, validateRequestBody(createCheckoutSchema), createSingleItemCheckout);
+router.post('/create-checkout', authMiddleware, requireEmailVerified, requireIdentityForMarketplacePurchase, validateRequestBody(createCheckoutSchema), createSingleItemCheckout);
 
 // ─── POST /create-cart-checkout ──────────────────────────────────────────────
 // Multi-item cart checkout. Each item is priced server-side from its source of
@@ -165,7 +166,7 @@ router.post('/calculate-cart', optionalAuthMiddleware, async (req, res) => {
   }
 });
 
-router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifiedIfAuthed, async (req, res) => {
+router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifiedIfAuthed, requireIdentityForMarketplacePurchase, async (req, res) => {
   // Declared before the try so the catch block can see them (block-scoped `let`
   // inside try is not visible in catch). A guest has no user id.
   const userId = req.user?.id || null;

@@ -49,7 +49,7 @@ const AccountPlanBanner = () => {
           >
             <ShieldCheck className="h-5 w-5 shrink-0 text-brand-red" />
             <span className="text-foreground">
-              <span className="font-bold">Verify your ID</span> to unlock selling &amp; trading — free, takes a minute.
+              <span className="font-bold">Verify your ID</span> to buy, sell &amp; trade on the marketplace — free, takes a minute.
             </span>
           </Link>
         )}

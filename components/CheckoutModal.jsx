@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -31,6 +32,9 @@ const CheckoutModal = ({ isOpen, onClose, listingId, transactionType = 'fixed', 
   const [loadingBreakdown, setLoadingBreakdown] = useState(false);
   const [loadingCheckout, setLoadingCheckout] = useState(false);
   const [error, setError] = useState(null);
+  // Set when the buyer must complete Stripe Identity verification before buying
+  // this marketplace listing (server returns 403 code IDENTITY_NOT_VERIFIED).
+  const [identityRequired, setIdentityRequired] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !listingId) return;
@@ -39,6 +43,7 @@ const CheckoutModal = ({ isOpen, onClose, listingId, transactionType = 'fixed', 
     const fetchBreakdown = async () => {
       setLoadingBreakdown(true);
       setError(null);
+      setIdentityRequired(false);
       try {
         const params = new URLSearchParams({ listingId, transactionType });
         const res = await apiClient.fetch(`/stripe/calculate?${params}`);
@@ -76,6 +81,12 @@ const CheckoutModal = ({ isOpen, onClose, listingId, transactionType = 'fixed', 
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
+        // Identity gate: surface an in-modal verify prompt rather than a toast.
+        if (res.status === 403 && body.code === 'IDENTITY_NOT_VERIFIED') {
+          setIdentityRequired(true);
+          setLoadingCheckout(false);
+          return;
+        }
         throw new Error(body.error || 'Failed to start checkout. Please try again.');
       }
       const data = await res.json();
@@ -103,8 +114,26 @@ const CheckoutModal = ({ isOpen, onClose, listingId, transactionType = 'fixed', 
             {cardName}
           </div>
 
+          {identityRequired ? (
+            <div className="flex flex-col items-center rounded-2xl border border-brand-red/20 bg-brand-red/5 px-4 py-6 text-center">
+              <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-red/10">
+                <ShieldCheck className="h-6 w-6 text-brand-red" />
+              </div>
+              <p className="font-heading text-base font-bold text-foreground">Verify your identity to buy</p>
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                Marketplace items are sold by other collectors, so we verify every buyer with a quick
+                ID + selfie check, handled securely by Stripe.
+              </p>
+              <Button asChild className="mt-5 h-11 w-full bg-brand-red font-bold hover:bg-brand-red/90">
+                <Link to={`/verify-identity?next=${encodeURIComponent(window.location.pathname + window.location.search)}`}>
+                  <ShieldCheck className="mr-2 h-4 w-4" /> Verify with Stripe
+                </Link>
+              </Button>
+            </div>
+          ) : null}
+
           {/* Breakdown */}
-          {loadingBreakdown ? (
+          {identityRequired ? null : loadingBreakdown ? (
             <div className="space-y-3">
               {[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-5 w-full rounded-md" />)}
             </div>
@@ -131,13 +160,15 @@ const CheckoutModal = ({ isOpen, onClose, listingId, transactionType = 'fixed', 
           ) : null}
 
           {/* Trust note */}
-          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded-xl p-3">
-            <ShieldCheck className="w-4 h-4 shrink-0 text-primary" />
-            <span>Secured by Stripe. CardPop Buyer Protection applies to this transaction.</span>
-          </div>
+          {!identityRequired && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded-xl p-3">
+              <ShieldCheck className="w-4 h-4 shrink-0 text-primary" />
+              <span>Secured by Stripe. CardPop Buyer Protection applies to this transaction.</span>
+            </div>
+          )}
 
           {/* Refund policy disclosure */}
-          {breakdown && (
+          {!identityRequired && breakdown && (
             <RefundPolicyNote
               variant="full"
               itemPrice={breakdown.itemPrice}
@@ -148,19 +179,21 @@ const CheckoutModal = ({ isOpen, onClose, listingId, transactionType = 'fixed', 
 
         <div className="flex gap-3 pt-2">
           <Button variant="outline" onClick={onClose} className="flex-1 rounded-xl font-bold" disabled={loadingCheckout}>
-            Cancel
+            {identityRequired ? 'Close' : 'Cancel'}
           </Button>
-          <Button
-            onClick={handleConfirmPay}
-            disabled={!breakdown || loadingBreakdown || loadingCheckout}
-            className="flex-1 rounded-xl font-bold h-12"
-          >
-            {loadingCheckout ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Redirecting...</>
-            ) : (
-              <><CreditCard className="w-4 h-4 mr-2" /> Pay ${breakdown?.total?.toFixed(2) ?? '...'}</>
-            )}
-          </Button>
+          {!identityRequired && (
+            <Button
+              onClick={handleConfirmPay}
+              disabled={!breakdown || loadingBreakdown || loadingCheckout}
+              className="flex-1 rounded-xl font-bold h-12"
+            >
+              {loadingCheckout ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Redirecting...</>
+              ) : (
+                <><CreditCard className="w-4 h-4 mr-2" /> Pay ${breakdown?.total?.toFixed(2) ?? '...'}</>
+              )}
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

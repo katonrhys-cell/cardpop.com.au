@@ -17,10 +17,11 @@ const OnboardingCardPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // Continue destination once done/skipped. A welcome signup flows on to the
-  // Pro membership page; otherwise the account dashboard.
+  // Continue destination once done/skipped. A welcome signup lands on the wallet
+  // (its identity + saved-card cards reinforce anything skipped, and the Pro
+  // upsell is a click away via the plan banner); otherwise the account dashboard.
   const isWelcome = searchParams.get('welcome') === '1';
-  const nextPath = isWelcome ? '/account/membership?welcome=1' : '/account';
+  const nextPath = isWelcome ? '/account/wallet' : '/account';
 
   const [status, setStatus] = useState('loading'); // loading | none | saved | starting
   const pollRef = useRef(null);
