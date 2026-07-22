@@ -83,6 +83,9 @@ const ShopSinglesPage = lazy(() => import('@/pages/shop/ShopSinglesPage.jsx'));
 const ShopCategoryPage = lazy(() => import('@/pages/shop/ShopCategoryPage.jsx'));
 // Remounts ShopCategoryPage when the category slug changes so pagination/filters reset
 const ShopCategoryRoute = () => { const { categorySlug } = useParams(); return <ShopCategoryPage key={categorySlug} />; };
+const ShopCollectionPage = lazy(() => import('@/pages/shop/ShopCollectionPage.jsx'));
+// Remounts ShopCollectionPage when the group slug changes so filters/pagination reset
+const ShopCollectionRoute = () => { const { groupSlug } = useParams(); return <ShopCollectionPage key={groupSlug} />; };
 
 // Unified Product Details Route
 const ProductDetailPage = lazy(() => import('@/pages/ProductDetailPage.jsx'));
@@ -323,7 +326,10 @@ const App = () => {
                         <Route path="/shop/sealed-boxes" element={<ShopSealedBoxesPage />} />
                         <Route path="/shop/singles" element={<ShopSinglesPage />} />
                         <Route path="/shop/category/:categorySlug" element={<ShopCategoryRoute />} />
-                        
+                        {/* Supply collection pages (Protection, Storage, Display, Shipping, Grading).
+                            Static /shop/* routes above out-rank this single-segment dynamic route. */}
+                        <Route path="/shop/:groupSlug" element={<ShopCollectionRoute />} />
+
                         {/* Checkout */}
                         {/* Guest checkout: anyone can buy from the shop / marketplace.
                             Account creation is offered after payment on the success page. */}

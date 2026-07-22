@@ -283,6 +283,66 @@ export const HockeyIcon = ({ className }) => (
   </svg>
 );
 
+// ── Shop / accessory category icons ────────────────────────────────────────────
+// Purpose-built, card-themed glyphs for the "Shop" supplies categories, drawn in
+// the same white-on-gradient language as the marketplace icons above so the two
+// menus read as one family (a bare lucide Shield/Frame/Truck looked generic next
+// to the Pokéball, anchor and basketball on the Browse Collections side).
+
+// Protection — a card guarded inside a shield.
+export const CardShieldIcon = ({ className }) => (
+  <svg viewBox="0 0 40 40" fill="none" className={className}>
+    <path d="M20 3 L33 8 V19 C33 28 27.5 34 20 37 C12.5 34 7 28 7 19 V8 Z"
+      fill="rgba(255,255,255,0.15)" stroke="white" strokeWidth="1.8" strokeLinejoin="round"/>
+    <rect x="15" y="12.5" width="10" height="13.5" rx="1.5" fill="rgba(255,255,255,0.28)" stroke="white" strokeWidth="1.4"/>
+    <path d="M16.8 20 L19 22.2 L23.4 16.8" stroke="white" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+  </svg>
+);
+
+// Storage — cards standing upright in an open box.
+export const CardStorageBoxIcon = ({ className }) => (
+  <svg viewBox="0 0 40 40" fill="none" className={className}>
+    <rect x="12.5" y="7"  width="6" height="16" rx="1" fill="white" opacity="0.85"/>
+    <rect x="20"   y="5"  width="6" height="18" rx="1" fill="white" opacity="0.55"/>
+    <path d="M6 20 H34 V31 Q34 34 31 34 H9 Q6 34 6 31 Z"
+      fill="rgba(255,255,255,0.2)" stroke="white" strokeWidth="1.8" strokeLinejoin="round"/>
+    <path d="M6 20 L9.5 15 H30.5 L34 20" fill="rgba(255,255,255,0.1)" stroke="white" strokeWidth="1.6" strokeLinejoin="round"/>
+  </svg>
+);
+
+// Display — a card propped on a stand.
+export const CardStandIcon = ({ className }) => (
+  <svg viewBox="0 0 40 40" fill="none" className={className}>
+    <rect x="12" y="4" width="16" height="22" rx="2" fill="rgba(255,255,255,0.22)" stroke="white" strokeWidth="1.8"/>
+    <circle cx="20" cy="12" r="3.4" fill="white" opacity="0.7"/>
+    <path d="M14 23 L18 17 L21 20 L24 15 L26 23 Z" fill="white" opacity="0.7"/>
+    <path d="M20 26 V32" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
+    <path d="M12.5 35 Q20 29.5 27.5 35" stroke="white" strokeWidth="1.8" fill="none" strokeLinecap="round"/>
+  </svg>
+);
+
+// Shipping — an isometric parcel with a postage label.
+export const ShippingParcelIcon = ({ className }) => (
+  <svg viewBox="0 0 40 40" fill="none" className={className}>
+    <path d="M20 4 L34 11 V27 L20 34 L6 27 V11 Z"
+      fill="rgba(255,255,255,0.15)" stroke="white" strokeWidth="1.8" strokeLinejoin="round"/>
+    <path d="M6 11 L20 18 L34 11" stroke="white" strokeWidth="1.6" fill="none" strokeLinejoin="round"/>
+    <path d="M20 18 V34" stroke="white" strokeWidth="1.6"/>
+    <path d="M13 7.5 L27 14.5" stroke="white" strokeWidth="1.4" opacity="0.55" strokeLinecap="round"/>
+    <rect x="14.5" y="22" width="8" height="6" rx="1" fill="white" opacity="0.85"/>
+  </svg>
+);
+
+// Grading — a slabbed card with a label and a grade star.
+export const GradedSlabIcon = ({ className }) => (
+  <svg viewBox="0 0 40 40" fill="none" className={className}>
+    <rect x="10" y="3.5" width="20" height="33" rx="3" fill="rgba(255,255,255,0.15)" stroke="white" strokeWidth="1.8"/>
+    <rect x="13" y="6.5" width="14" height="5" rx="1" fill="white" opacity="0.8"/>
+    <rect x="13" y="14.5" width="14" height="18.5" rx="1.5" fill="rgba(255,255,255,0.2)" stroke="white" strokeWidth="1.2"/>
+    <path d="M20 17.5 L21.5 20.6 L24.9 21 L22.4 23.3 L23.1 26.6 L20 25 L16.9 26.6 L17.6 23.3 L15.1 21 L18.5 20.6 Z" fill="white"/>
+  </svg>
+);
+
 // ── Category datasets ──────────────────────────────────────────────────────────
 
 export const TCG_CATEGORY_DATA = [

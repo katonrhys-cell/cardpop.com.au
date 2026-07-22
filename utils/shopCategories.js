@@ -8,13 +8,19 @@
 // category is a one-line edit here — the menu, page and admin picker pick it up
 // automatically.
 import {
-  Shield, Archive, Frame, Truck, Award,
+  Frame,
   Layers, Sparkles, Layers2, CreditCard, Magnet, ShieldCheck,
   Box, BookMarked, Files, SeparatorHorizontal,
   PanelTop, Package2, Image,
   ShoppingBag, Mail, PackageOpen, Scissors,
   PackageCheck, Eraser, Hand, Sparkle, Ruler,
 } from 'lucide-react';
+// Purpose-built, card-themed category glyphs — drawn to match the marketplace
+// (Browse Collections) icons so the two menus read as one family instead of the
+// generic lucide Shield/Frame/Truck the parent groups used to show.
+import {
+  CardShieldIcon, CardStorageBoxIcon, CardStandIcon, ShippingParcelIcon, GradedSlabIcon,
+} from '@/components/CategoryIcons.jsx';
 
 // Each leaf item carries its own `Icon` so the "Shop" mega-menu can show a
 // coloured badge beside every entry (matching the "Browse Collections" menu),
@@ -23,7 +29,7 @@ export const SHOP_CATEGORY_GROUPS = [
   {
     label: 'Protection',
     slug: 'protection',
-    Icon: Shield,
+    Icon: CardShieldIcon,
     gradient: 'from-blue-500 to-indigo-600',
     blurb: 'Sleeves, holders and loaders that keep every card safe.',
     items: [
@@ -38,7 +44,7 @@ export const SHOP_CATEGORY_GROUPS = [
   {
     label: 'Storage',
     slug: 'storage',
-    Icon: Archive,
+    Icon: CardStorageBoxIcon,
     gradient: 'from-amber-500 to-orange-500',
     blurb: 'Boxes, binders and pages to organise a growing collection.',
     items: [
@@ -51,7 +57,7 @@ export const SHOP_CATEGORY_GROUPS = [
   {
     label: 'Display',
     slug: 'display',
-    Icon: Frame,
+    Icon: CardStandIcon,
     gradient: 'from-violet-500 to-purple-600',
     blurb: 'Show off your best cards at home or at the shop.',
     items: [
@@ -64,7 +70,7 @@ export const SHOP_CATEGORY_GROUPS = [
   {
     label: 'Shipping',
     slug: 'shipping',
-    Icon: Truck,
+    Icon: ShippingParcelIcon,
     gradient: 'from-emerald-500 to-teal-600',
     blurb: 'Everything you need to post cards safely.',
     items: [
@@ -77,8 +83,8 @@ export const SHOP_CATEGORY_GROUPS = [
   },
   {
     label: 'Grading',
-    slug: 'grading-supplies',
-    Icon: Award,
+    slug: 'grading',
+    Icon: GradedSlabIcon,
     gradient: 'from-rose-500 to-pink-600',
     blurb: 'Prep kits and tools to get cards submission-ready.',
     items: [

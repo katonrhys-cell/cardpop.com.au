@@ -391,8 +391,7 @@ const ShopDropdown = ({ onNavigate }) => {
             className="flex items-center justify-between px-5 py-3.5 border-b border-border hover:bg-muted/60 transition-colors group"
           >
             <div className="min-w-0">
-              <span className="text-sm font-bold text-foreground">Shop All Supplies</span>
-              <p className="text-xs text-muted-foreground mt-0.5 truncate">Sleeves, storage, display, shipping &amp; grading gear</p>
+              <span className="text-sm font-bold text-foreground">Explore All Supplies</span>
             </div>
             <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
           </Link>
@@ -403,13 +402,14 @@ const ShopDropdown = ({ onNavigate }) => {
               {SHOP_CATEGORY_GROUPS.map(group => {
                 const isActive = group.slug === activeSlug;
                 return (
-                  <button
+                  // The parent navigates to the group's supply collection page;
+                  // hovering/focusing still expands its subcategory panel.
+                  <Link
                     key={group.slug}
-                    type="button"
+                    to={`/shop/${group.slug}`}
                     onPointerEnter={() => setActiveSlug(group.slug)}
                     onFocus={() => setActiveSlug(group.slug)}
-                    onClick={() => setActiveSlug(group.slug)}
-                    aria-expanded={isActive}
+                    onClick={() => { setOpen(false); onNavigate?.(); }}
                     className={`w-full flex items-center gap-2.5 px-2 py-2.5 rounded-xl transition-colors text-left ${
                       isActive ? 'bg-muted' : 'hover:bg-muted'
                     }`}
@@ -421,7 +421,7 @@ const ShopDropdown = ({ onNavigate }) => {
                       {group.label}
                     </span>
                     <ChevronRight className={`w-4 h-4 ml-auto shrink-0 transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
-                  </button>
+                  </Link>
                 );
               })}
             </div>
@@ -430,11 +430,18 @@ const ShopDropdown = ({ onNavigate }) => {
                 category is hovered, then the panel expands out */}
             {activeGroup && (
               <div className="flex-1 min-w-0 p-4">
-                <div className="flex items-center gap-2 mb-3 px-1">
-                  <span className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                <Link
+                  to={`/shop/${activeGroup.slug}`}
+                  onClick={() => { setOpen(false); onNavigate?.(); }}
+                  className="flex items-center justify-between gap-2 mb-3 px-1 group/head"
+                >
+                  <span className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground group-hover/head:text-primary transition-colors">
                     {activeGroup.label}
                   </span>
-                </div>
+                  <span className="flex items-center gap-1 text-[11px] font-bold text-primary opacity-0 group-hover/head:opacity-100 transition-opacity">
+                    View all <ArrowRight className="w-3 h-3" />
+                  </span>
+                </Link>
                 <div className="grid grid-cols-2 gap-0.5">
                   {activeGroup.items.map(item => (
                     <Link
@@ -782,12 +789,18 @@ const MobileShopSection = ({ onNavigate }) => {
           </SheetClose>
           {SHOP_CATEGORY_GROUPS.map(group => (
             <div key={group.slug}>
-              <div className="flex items-center gap-2 px-3 pt-1 pb-1">
-                <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md bg-gradient-to-br ${group.gradient} shrink-0`}>
-                  <group.Icon className="w-3 h-3 text-white" />
-                </span>
-                <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">{group.label}</span>
-              </div>
+              <SheetClose asChild>
+                <Link
+                  to={`/shop/${group.slug}`}
+                  onClick={onNavigate}
+                  className="flex items-center gap-2 px-3 pt-1 pb-1 rounded-xl hover:bg-muted transition-colors"
+                >
+                  <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md bg-gradient-to-br ${group.gradient} shrink-0`}>
+                    <group.Icon className="w-3 h-3 text-white" />
+                  </span>
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">{group.label}</span>
+                </Link>
+              </SheetClose>
               <div className="grid grid-cols-2 gap-0.5">
                 {group.items.map(item => (
                   <SheetClose key={item.slug} asChild>

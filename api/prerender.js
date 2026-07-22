@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { COLLECTION_SEO } from '../data/collectionSeo.js';
+import { SHOP_COLLECTION_SEO, resolveShopCollectionSlug } from '../data/shopCollectionSeo.js';
 import { BLOG_CATEGORIES, BLOG_CATEGORY_MAP } from '../data/blogCategories.js';
 import { BUYING_GUIDES, getBuyingGuide, GUIDE_CATEGORY_META, GUIDE_PRICE_CATEGORY } from '../data/buyingGuides.js';
 
@@ -2282,6 +2283,93 @@ ${itemsHtml || '    <li>No active listings right now — check back soon or brow
   return htmlDoc({ title, description, canonical, jsonLdItems, bodyHtml });
 }
 
+// ── Shop supply collection pages (/shop/:groupSlug) ──────────────────────────
+// Overarching accessory-category pages (Protection, Storage, Display, Shipping,
+// Grading) that mirror the marketplace collection pages for SEO.
+async function renderShopCollection(supabase, rawSlug) {
+  const slug = resolveShopCollectionSlug(rawSlug);
+  if (!slug) return null; // Not a known group — let the dispatcher fall through.
+
+  const cfg = SHOP_COLLECTION_SEO[slug];
+  const canonical = `${BASE_URL}/shop/${slug}`;
+  const title = cfg.title || `${cfg.name} | CardPop`;
+  const description = cfg.description || `Shop ${cfg.name} supplies on CardPop Australia.`;
+
+  // Best-effort product sample — match shop_products.category against any leaf
+  // category name in the group. An empty result only trims the list.
+  const orClause = cfg.subs.map((s) => `category.ilike.%${s.name}%`).join(',');
+  const { data } = await supabase
+    .from('shop_products')
+    .select('id, title, price_aud, images, image_url')
+    .eq('status', 'active')
+    .or(orClause)
+    .order('created_at', { ascending: false })
+    .limit(50);
+  const products = data || [];
+
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'Shop', item: `${BASE_URL}/shop` },
+      { '@type': 'ListItem', position: 3, name: cfg.name, item: canonical },
+    ],
+  };
+
+  const collectionPage = {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: title,
+    description,
+    url: canonical,
+  };
+
+  const jsonLdItems = [collectionPage, breadcrumb];
+  if (products.length > 0) {
+    jsonLdItems.push({
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: `${cfg.name} products`,
+      numberOfItems: products.length,
+      itemListElement: products.map((p, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        name: p.title || 'Product',
+        url: `${BASE_URL}/product/shop/${p.id}/${slugify(p.title || 'product')}`,
+      })),
+    });
+  }
+
+  const subsHtml = cfg.subs
+    .map((s) => `    <li><a href="${BASE_URL}/shop/category/${esc(s.slug)}">${esc(s.name)}</a></li>`)
+    .join('\n');
+
+  const productsHtml = products.map((p) => {
+    const name = p.title || 'Product';
+    return `    <li><a href="${BASE_URL}/product/shop/${esc(p.id)}/${esc(slugify(name))}">${esc(name)}</a>`
+      + `${p.price_aud > 0 ? ` — A$${esc(Number(p.price_aud).toFixed(2))}` : ''}</li>`;
+  }).join('\n');
+
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/shop">Shop</a> / ${esc(cfg.name)}</nav>
+  <h1>${esc(cfg.name)} Supplies in Australia</h1>
+  <p>${esc(description)}</p>
+  ${cfg.intro ? `<p>${esc(cfg.intro)}</p>` : ''}
+  <h2>Shop by category</h2>
+  <ul>
+${subsHtml}
+  </ul>
+  <h2>Latest ${esc(cfg.name)} products (${products.length})</h2>
+  <ul>
+${productsHtml || '    <li>No products in stock right now — check back soon or browse all supplies.</li>'}
+  </ul>
+  <p><a href="${BASE_URL}/shop">Browse all card supplies</a></p>
+</main>`;
+
+  return htmlDoc({ title, description, canonical, jsonLdItems, bodyHtml });
+}
+
 async function renderSeller(supabase, param) {
   const canonicalSelf = `${BASE_URL}/seller/${param}`;
   if (!UUID_RE.test(param)) {
@@ -2517,6 +2605,16 @@ export default async function handler(req, res) {
 
     if (LANDINGS[rawPath]) {
       return sendDoc(res, await renderLanding(supabase, rawPath));
+    }
+
+    // Shop supply collection pages: /shop/<group> (single segment). The exact
+    // /shop, /shop/sealed-boxes and /shop/singles landings are handled above;
+    // /shop/category/<slug> has two segments and won't match here. Unknown
+    // single-segment slugs return null and fall through to the SPA shell.
+    const shopCollectionMatch = rawPath.match(/^\/shop\/([^/?#]+)$/);
+    if (shopCollectionMatch) {
+      const doc = await renderShopCollection(supabase, decodeURIComponent(shopCollectionMatch[1]));
+      if (doc) return sendDoc(res, doc);
     }
 
     if (rawPath === '/blog') {
