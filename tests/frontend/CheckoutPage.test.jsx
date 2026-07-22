@@ -9,9 +9,14 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 const mockFetch = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/apiServerClient.js', () => ({ default: { fetch: mockFetch } }));
 
-const h = vi.hoisted(() => ({ cartItems: [] }));
+const h = vi.hoisted(() => ({
+  cartItems: [],
+  // Auth defaults to an identity-verified buyer so the normal checkout flow
+  // renders; the marketplace identity gate is exercised in its own test.
+  auth: { currentUser: { email: 'user@x.com' }, isIdentityVerified: true, profileLoading: false },
+}));
 vi.mock('@/hooks/useCart.jsx', () => ({ useCart: () => ({ cartItems: h.cartItems }) }));
-vi.mock('@/contexts/AuthContext.jsx', () => ({ useAuth: () => ({ currentUser: { email: 'user@x.com' } }) }));
+vi.mock('@/contexts/AuthContext.jsx', () => ({ useAuth: () => h.auth }));
 
 vi.mock('@/lib/supabaseClient.js', () => ({
   supabase: {
@@ -95,6 +100,7 @@ function renderCheckout() {
 beforeEach(() => {
   vi.clearAllMocks();
   h.cartItems = [cartItem('l1', 100)];
+  h.auth = { currentUser: { email: 'user@x.com' }, isIdentityVerified: true, profileLoading: false };
   setFetch();
   // Avoid happy-dom navigation when the success path assigns window.location.href.
   delete window.location;
@@ -153,6 +159,28 @@ describe('CheckoutPage — guards & validation', () => {
     // Continue without filling the address.
     await userEvent.click(screen.getByRole('button', { name: /continue/i }));
     expect(mockToast.error).toHaveBeenCalledWith('Please fill in all shipping address fields.');
+  });
+});
+
+// ─── marketplace identity gate ───────────────────────────────────────────────
+
+describe('CheckoutPage — marketplace identity gate', () => {
+  it('gates a marketplace cart when the buyer is not identity-verified', async () => {
+    h.auth = { currentUser: { email: 'user@x.com' }, isIdentityVerified: false, profileLoading: false };
+    renderCheckout();
+    await waitFor(() =>
+      expect(screen.getByText(/verify your identity to buy on the marketplace/i)).toBeInTheDocument(),
+    );
+    // The order summary / payment flow is not rendered while blocked.
+    expect(screen.queryByText('summary-next')).not.toBeInTheDocument();
+  });
+
+  it('does NOT gate a shop-only cart for an unverified buyer', async () => {
+    h.auth = { currentUser: { email: 'user@x.com' }, isIdentityVerified: false, profileLoading: false };
+    h.cartItems = [{ product: { id: 'p1', type: 'shop', title: 'Booster', price: 10 }, quantity: 1, variant: null }];
+    renderCheckout();
+    await waitFor(() => expect(screen.getByText('summary-next')).toBeInTheDocument());
+    expect(screen.queryByText(/verify your identity to buy on the marketplace/i)).not.toBeInTheDocument();
   });
 });
 
