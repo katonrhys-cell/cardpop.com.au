@@ -44,6 +44,18 @@ export default defineConfig({
         'styles/**',
         '*.config.*',
       ],
+      // Regression floors, NOT targets. Set a few points below the current
+      // aggregate coverage so `npm run test:coverage` (wired into CI) fails only
+      // when a change meaningfully *drops* coverage — new untested code, or a
+      // deleted test. Ratchet these upward as coverage improves; never lower
+      // them to make a red build pass. Current (2026-07): ~53% stmts / 38%
+      // branches / 43% funcs / 57% lines.
+      thresholds: {
+        statements: 48,
+        branches: 33,
+        functions: 38,
+        lines: 50,
+      },
     },
     projects: [
       {
