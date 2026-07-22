@@ -285,17 +285,27 @@ const HomePage = () => {
             const SELECT = '*, owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count), vault_images(*)';
             const LIMIT = 4;
             // Fresh builder per call — a Supabase query builder is single-use.
-            const base = () => supabase.from('vault_items').select(SELECT).eq('is_public', true).neq('listing_type', 'Private');
+            // Backfill uses genuinely-public recent cards.
+            const publicBase = () => supabase.from('vault_items').select(SELECT).eq('is_public', true).neq('listing_type', 'Private');
 
             // Admin-curated picks (Marketplace Management → Featured) come first.
-            const featuredRes = await base().eq('is_featured', true).order('created_at', { ascending: false }).limit(LIMIT);
+            // `is_featured` is admin-only, so it means "show this on the home
+            // page" — surface it regardless of the per-card is_public flag. A
+            // card can be live in the marketplace (active listing) yet have
+            // is_public = false, in which case requiring is_public here made
+            // featuring it save successfully but never appear. Still exclude
+            // Private listings. (Anon visibility is granted by the matching
+            // vault_items_public_featured_select RLS policy.)
+            const featuredRes = await supabase.from('vault_items').select(SELECT)
+              .eq('is_featured', true).neq('listing_type', 'Private')
+              .order('created_at', { ascending: false }).limit(LIMIT);
             if (featuredRes.error) return featuredRes;
             const featured = featuredRes.data ?? [];
             if (featured.length >= LIMIT) return { data: featured.slice(0, LIMIT), error: null };
 
             // Backfill with the most recent cards so the grid is never emptier
             // than before curation existed (empty selection = previous behaviour).
-            const fillRes = await base().order('created_at', { ascending: false }).limit(LIMIT + featured.length);
+            const fillRes = await publicBase().order('created_at', { ascending: false }).limit(LIMIT + featured.length);
             if (fillRes.error) return { data: featured, error: null };
             const seen = new Set(featured.map(c => c.id));
             const backfill = (fillRes.data ?? []).filter(c => !seen.has(c.id));
