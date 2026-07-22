@@ -4,6 +4,7 @@ import { Search, Store, User, Newspaper, CalendarDays, ShoppingBag, ArrowRight, 
 import { supabase } from '@/lib/supabaseClient.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import { sanitizeSearch, tokenizeSearch, rankItems } from '@/utils/searchRanking.js';
 import { slugify } from '@/lib/slugify.js';
 import SEOHead from '@/components/SEOHead.jsx';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
@@ -11,15 +12,32 @@ import SearchBar from '@/components/SearchBar.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 
-// How many hits to pull from each content type. The point of this page is
-// breadth ("did the site have anything?"), so a handful per source beats a deep
-// list of one kind — deep browsing happens on each section's own hub.
+// How many hits to show per content type. The page favours breadth ("did the
+// site have anything?"), so a handful of the *best* matches per source beats a
+// deep list — deep browsing happens on each section's own hub.
 const PER_SOURCE = 8;
+// Pull a wider net from the DB, then rank locally and keep the top PER_SOURCE.
+// Ranking (searchRanking.js) is what makes results accurate; the DB filter only
+// narrows.
+const OVER_FETCH = 30;
 
-// Strip characters that break the PostgREST .or()/.ilike filter grammar: %
-// (ilike wildcard), , (clause separator) and () (grouping). Mirrors the
-// sanitisation in the marketplace and search-suggestions queries.
-const sanitize = (q) => q.trim().replace(/[%,()]/g, ' ').replace(/\s+/g, ' ').trim();
+// Apply an AND-of-tokens filter: each token must appear in at least one of the
+// given fields — "(f1~tokA or f2~tokA) AND (f1~tokB or f2~tokB) …".
+//   • Base table: chained .or() calls are ANDed together (standard supabase-js).
+//   • Embedded resource (referencedTable, e.g. vault_items on a listings query):
+//     chained embedded .or() filters aren't reliably ANDed, so the AND is
+//     encoded as a single `and(or(...),or(...))` tree — `or(and(X,Y))` ≡ AND.
+function applyTokens(query, tokens, fields, referencedTable) {
+  const orGroup = (tok) => fields.map((f) => `${f}.ilike.%${tok}%`).join(',');
+  if (referencedTable) {
+    const value = tokens.length === 1
+      ? orGroup(tokens[0])
+      : `and(${tokens.map((tok) => `or(${orGroup(tok)})`).join(',')})`;
+    return query.or(value, { referencedTable });
+  }
+  for (const tok of tokens) query = query.or(orGroup(tok));
+  return query;
+}
 
 const fmtPrice = (v) => (v || v === 0 ? `$${Number(v).toLocaleString('en-AU')}` : null);
 const fmtDate = (d) => {
@@ -31,28 +49,33 @@ const fmtDate = (d) => {
 
 // ─── Per-source queries ───────────────────────────────────────────────────────
 // Each is independent and fault-tolerant: a failing source resolves to [] via
-// Promise.allSettled below, so one bad query never blanks the whole page.
+// Promise.allSettled below, so one bad query never blanks the whole page. Each
+// returns items carrying _title/_haystack so the caller can rank them.
 
-async function searchListings(safe) {
-  const { data, error } = await supabase
-    .from('listings')
-    .select('*, vault_item:vault_items!inner(*, vault_images(storage_path)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
-    .eq('status', 'active')
-    .neq('listing_type', 'vault')
-    .or(`card_name.ilike.%${safe}%,set_name.ilike.%${safe}%`, { referencedTable: 'vault_items' })
-    .order('created_at', { ascending: false })
-    .limit(PER_SOURCE);
+async function searchListings(tokens) {
+  const { data, error } = await applyTokens(
+    supabase
+      .from('listings')
+      .select('*, vault_item:vault_items!inner(*, vault_images(storage_path)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
+      .eq('status', 'active')
+      .neq('listing_type', 'vault'),
+    tokens, ['card_name', 'set_name'], 'vault_items',
+  ).order('created_at', { ascending: false }).limit(OVER_FETCH);
   if (error) throw error;
-  return data || [];
+  // Spread the listing so MarketplaceListingCard still receives a listing-shaped
+  // object; the extra _title/_haystack props are harmless.
+  return (data || []).map((l) => ({
+    ...l,
+    _title: l.vault_item?.card_name || l.title || '',
+    _haystack: `${l.vault_item?.card_name || ''} ${l.vault_item?.set_name || ''}`,
+  }));
 }
 
-async function searchShop(safe) {
-  const { data, error } = await supabase
-    .from('shop_products')
-    .select('*')
-    .eq('status', 'active')
-    .ilike('title', `%${safe}%`)
-    .limit(PER_SOURCE);
+async function searchShop(tokens) {
+  const { data, error } = await applyTokens(
+    supabase.from('shop_products').select('*').eq('status', 'active'),
+    tokens, ['title'],
+  ).limit(OVER_FETCH);
   if (error) throw error;
   return (data || []).map((p) => ({
     key: `shop-${p.id}`,
@@ -61,15 +84,16 @@ async function searchShop(safe) {
     title: p.title || p.name || 'Product',
     subtitle: 'Official Store',
     meta: fmtPrice(p.price_aud),
+    _title: p.title || p.name || '',
+    _haystack: p.title || p.name || '',
   }));
 }
 
-async function searchSellers(safe) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select(PUBLIC_PROFILE_COLUMNS)
-    .or(`display_name.ilike.%${safe}%,username.ilike.%${safe}%,business_name.ilike.%${safe}%`)
-    .limit(PER_SOURCE);
+async function searchSellers(tokens) {
+  const { data, error } = await applyTokens(
+    supabase.from('profiles').select(PUBLIC_PROFILE_COLUMNS),
+    tokens, ['display_name', 'username', 'business_name'],
+  ).limit(OVER_FETCH);
   if (error) throw error;
   return (data || [])
     .filter((p) => p.is_active !== false && p.is_public !== false && !p.is_deleted)
@@ -80,17 +104,16 @@ async function searchSellers(safe) {
       title: p.business_name || p.display_name || p.username || 'Collector',
       subtitle: p.username ? `@${p.username}` : 'Community member',
       meta: p.is_verified ? 'Verified' : null,
+      _title: p.business_name || p.display_name || p.username || '',
+      _haystack: `${p.display_name || ''} ${p.username || ''} ${p.business_name || ''}`,
     }));
 }
 
-async function searchBlog(safe) {
-  const { data, error } = await supabase
-    .from('blog_articles')
-    .select('*')
-    .eq('is_published', true)
-    .or(`title.ilike.%${safe}%,excerpt.ilike.%${safe}%`)
-    .order('created_at', { ascending: false })
-    .limit(PER_SOURCE);
+async function searchBlog(tokens) {
+  const { data, error } = await applyTokens(
+    supabase.from('blog_articles').select('*').eq('is_published', true),
+    tokens, ['title', 'excerpt'],
+  ).order('created_at', { ascending: false }).limit(OVER_FETCH);
   if (error) throw error;
   return (data || []).map((a) => ({
     key: `blog-${a.id}`,
@@ -99,17 +122,17 @@ async function searchBlog(safe) {
     title: a.title || 'Article',
     subtitle: a.excerpt || 'Read the article',
     meta: a.category || null,
+    _title: a.title || '',
+    _haystack: `${a.title || ''} ${a.excerpt || ''}`,
   }));
 }
 
-async function searchEvents(safe) {
+async function searchEvents(tokens) {
   // events_public is the curated, already-public view (approved events only).
-  const { data, error } = await supabase
-    .from('events_public')
-    .select('*')
-    .or(`title.ilike.%${safe}%,suburb.ilike.%${safe}%`)
-    .order('start_date', { ascending: true })
-    .limit(PER_SOURCE);
+  const { data, error } = await applyTokens(
+    supabase.from('events_public').select('*'),
+    tokens, ['title', 'suburb'],
+  ).order('start_date', { ascending: true }).limit(OVER_FETCH);
   if (error) throw error;
   return (data || []).map((e) => ({
     key: `event-${e.id}`,
@@ -118,6 +141,8 @@ async function searchEvents(safe) {
     title: e.title || 'Event',
     subtitle: [e.suburb, e.state].filter(Boolean).join(', ') || 'Australia',
     meta: fmtDate(e.start_date),
+    _title: e.title || '',
+    _haystack: `${e.title || ''} ${e.suburb || ''} ${e.state || ''}`,
   }));
 }
 
@@ -182,22 +207,25 @@ const SearchResultsPage = () => {
   useEffect(() => {
     let cancelled = false;
     const run = async () => {
-      const safe = sanitize(query);
-      if (safe.length < 2) {
+      const safe = sanitizeSearch(query);
+      const tokens = tokenizeSearch(query);
+      if (safe.length < 2 || tokens.length === 0) {
         setGroups({ listings: [], shop: [], sellers: [], blog: [], events: [] });
         setLoading(false);
         return;
       }
       setLoading(true);
+      const qLower = safe.toLowerCase();
       const [listings, shop, sellers, blog, events] = await Promise.allSettled([
-        searchListings(safe),
-        searchShop(safe),
-        searchSellers(safe),
-        searchBlog(safe),
-        searchEvents(safe),
+        searchListings(tokens),
+        searchShop(tokens),
+        searchSellers(tokens),
+        searchBlog(tokens),
+        searchEvents(tokens),
       ]);
       if (cancelled) return;
-      const val = (r) => (r.status === 'fulfilled' ? r.value : []);
+      // Rank each group by relevance and keep the best matches.
+      const val = (r) => (r.status === 'fulfilled' ? rankItems(r.value, qLower, tokens, PER_SOURCE) : []);
       setGroups({
         listings: val(listings),
         shop: val(shop),
