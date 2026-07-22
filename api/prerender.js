@@ -1593,6 +1593,147 @@ const STATIC_CONTENT = {
     ],
     links: [{ text: 'Australian Card Markets', href: '/australian-markets' }, { text: 'Browse the Marketplace', href: '/marketplace' }, { text: 'Grading Hub', href: '/grading' }],
   },
+
+  '/partners': {
+    title: "Partner Program | CardPop — Earn with Australia's Card Marketplace",
+    description: 'Join the CardPop Retailer Network. Local game stores, creators and community builders earn commission on referred sales with a personal discount code and referral link.',
+    breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Partners', path: '/partners' }],
+    h1: 'Partner with CardPop',
+    intro: 'Local game stores, creators and community builders get a personal code that rewards their audience with discounts — and rewards them with commission on every referred sale.',
+    sections: [
+      { h2: 'One code. Three ways it works for you.', items: [
+        { text: 'Your audience saves — customers who use your code get your negotiated discount on CardPop Shop orders and their first seller-membership payment.' },
+        { text: 'You earn commission — every referred purchase books you a commission, a percentage of the sale, paid straight to your bank via Stripe.' },
+        { text: 'Your link does the work — share cardpop.com.au/?ref=YOURCODE anywhere; we track the click and apply your code automatically at checkout.' },
+      ] },
+      { h2: 'How it works', items: [
+        { text: '1. Apply — tell us about your store or audience and request your preferred code; it takes two minutes.' },
+        { text: '2. Get approved — we review every application personally and set your discount and commission rates when we approve you.' },
+        { text: '3. Share your code — drop your code and referral link in-store, in videos, in your community — anywhere collectors will see it.' },
+        { text: '4. Get paid — track clicks, referred orders and earnings on your partner dashboard; payouts land in your bank via Stripe.' },
+      ] },
+      { h2: 'Built for the people who build the hobby', items: [
+        { text: 'Local game stores — bring your in-store community online, add your store to our directory, promote your events, and earn on every customer you send our way.' },
+        { text: 'Content creators — YouTube, TikTok, Twitch, Whatnot; if you talk cards to an Australian audience, your code turns that reach into revenue.' },
+        { text: 'Community builders — run a club, a Discord, a Facebook group or a card show? Give your members a discount and get rewarded for growing the hobby.' },
+      ] },
+    ],
+    faqs: [
+      { q: 'Who can become a CardPop partner?', a: "Local game stores, content creators, and community builders with an Australian trading-card audience. Every application is reviewed by a human — tell us about your store or audience and we'll take it from there." },
+      { q: 'What do I earn?', a: "A percentage of every referred CardPop Shop order (calculated on the item subtotal after your code's discount) and of the first payment when someone you refer becomes a CardPop seller. Your exact rates are agreed when your application is approved." },
+      { q: 'How do payouts work?', a: "Commission accrues on your partner dashboard as referred orders are paid. Payouts are transferred to your bank account through Stripe — the same rails CardPop sellers are paid on. You'll complete a quick one-time Stripe onboarding from your dashboard." },
+      { q: 'Can I choose my own code?', a: "Yes — request your preferred code on the application (letters, numbers and hyphens, 4–20 characters). We confirm it at approval, tweaking only if it's taken or too close to an existing code." },
+      { q: 'What does my audience get?', a: 'Your code gives them your negotiated percentage off CardPop Shop orders, and off their first month when they join as a seller. The discount is funded by CardPop, never by you.' },
+      { q: 'I run a game store — does this connect to the store directory?', a: "Yes. If your store is already listed on our card-shops directory you can link your listing in the application, and if it isn't we'll happily add it when you're approved." },
+    ],
+    links: [{ text: 'Apply as Partner', href: '/partners/apply' }, { text: 'Card Shop Directory', href: '/card-shops' }],
+  },
+
+  // Keep pricing copy in sync with config/plans.js + config/subscription.js
+  // (Pro price $20/mo AUD, 30-day trial, Hobby cap 25 active listings).
+  '/pricing': {
+    title: 'Pricing — Hobby & Pro | CardPop',
+    description: 'CardPop is free to join. Buy instantly, and sell once your ID is verified — paying only a small fee per sale. Upgrade to Pro for unlimited listings, a storefront and premium tools.',
+    breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Pricing', path: '/pricing' }],
+    h1: 'Simple, fair pricing',
+    intro: 'Joining CardPop is free, forever. Browse and buy right away. To list, sell or trade, just verify your identity — then you only pay a small fee when a sale or trade completes. Go Pro when you want the full seller toolkit.',
+    sections: [
+      { h2: 'Hobby — free forever', paras: ['Free forever — collect, buy and sell casually.'], items: [
+        { text: 'Browse and buy instantly — no membership needed.' },
+        { text: 'List and sell up to 25 cards once your ID is verified.' },
+        { text: 'Pay only a small fee when a sale or trade completes.' },
+        { text: 'Card on file required to sell or trade — never charged until you transact.' },
+        { text: 'Trade with other verified collectors.' },
+        { text: 'Community, wishlists and price tracking.' },
+      ] },
+      { h2: 'Pro — $20/month AUD, 30-day free trial', paras: ['The full CardPop toolkit for serious sellers.'], items: [
+        { text: 'Everything in Hobby, plus:' },
+        { text: 'Unlimited active listings.' },
+        { text: 'Your own branded storefront and store URL.' },
+        { text: 'Pro seller badge for extra buyer trust.' },
+        { text: 'Advanced sales analytics and price insights.' },
+        { text: 'Premium Vault display styles.' },
+        { text: 'Priority placement in search and priority support.' },
+        { text: 'Up to 20 images per listing.' },
+      ] },
+      { h2: 'How it works', items: [
+        { text: "Buy with no membership — anyone can check out. A card on file gives one-tap buying and is required to sell or trade, but it's never charged until you actually transact." },
+        { text: 'Verify to sell & trade — to list, sell or trade on any plan, verify your ID (a quick selfie + document check via Stripe) and keep a card on file.' },
+        { text: 'Fees only when you sell — no listing fees and no monthly cost on Hobby; you pay a small fee only when a sale or trade goes through.' },
+      ] },
+    ],
+    links: [{ text: 'Create a free account', href: '/signup' }, { text: 'Browse the Marketplace', href: '/marketplace' }, { text: 'Trust & Safety', href: '/trust-safety' }],
+  },
+
+  '/photography-standard': {
+    title: 'Photography Standard | CardPop',
+    description: 'The CardPop Photography Standard: equipment recommendations, image requirements, graded card photo rules and quality guidelines for trading card listings.',
+    breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Photography Standard', path: '/photography-standard' }],
+    h1: 'CardPop Photography Standard',
+    intro: 'Photography is part of the CardPop brand. Consistent, high-quality photos build buyer confidence, reduce disputes and make even average cards look professional. Every listing photo is checked against this standard and given a Photo Quality Score when you upload it.',
+    sections: [
+      { h2: 'Equipment levels', paras: ["You don't need expensive gear to meet the standard — a modern phone and window light are enough to start."], items: [
+        { text: 'Beginner ($0 – $100) — modern iPhone or Android, small tripod, white poster board, natural window light.' },
+        { text: 'Recommended ($200 – $500) — iPhone 15/16 Pro or equivalent, overhead phone mount, two LED panels, light diffusion panels.' },
+        { text: 'Professional ($1,000+) — mirrorless camera, macro lens, professional LED lighting, copy stand.' },
+      ] },
+      { h2: 'Image requirements', items: [
+        { text: 'Main listing image — front of the card only, portrait orientation, white background, card fills ~85% of the frame, 1200 × 1680px.' },
+        { text: 'Secondary images — back of card, surface close-up, corner close-up, edge close-up, serial number and autograph close-ups where applicable.' },
+      ] },
+      { h2: 'Graded card standard', paras: ['Graded slabs require four photos. This reduces disputes and makes fake listings far easier to spot.'], items: [
+        { text: 'Image 1 — entire slab, front.' },
+        { text: 'Image 2 — entire slab, back.' },
+        { text: 'Image 3 — label close-up.' },
+        { text: 'Image 4 — angled photo showing the surface.' },
+      ] },
+      { h2: 'Seller upload rules', paras: ["Photos must represent the actual card you're selling."], items: [
+        { text: 'Allowed — original photos of the actual card, multiple angles, natural colour correction.' },
+        { text: 'Not allowed — filters, excessive sharpening, colour manipulation, stock photos.' },
+        { text: 'Listings using stock photos or manipulated images may be removed under our Trust & Safety policy.' },
+      ] },
+      { h2: 'Background standard', items: [
+        { text: 'Raw cards — pure white background.' },
+        { text: 'Graded cards — light grey background.' },
+        { text: 'Premium auctions — CardPop branded background.' },
+      ] },
+      { h2: 'Image quality tiers', items: [
+        { text: 'Minimum — 1200px tall.' },
+        { text: 'Recommended — 2000px+ tall.' },
+        { text: 'Premium — 3000px+ tall.' },
+        { text: 'Higher resolution lets buyers zoom in on corners, edges, surface scratches and centering — the details that decide a sale.' },
+      ] },
+      { h2: 'Photo Quality Score', paras: ['When you upload a listing photo, CardPop automatically checks it and shows a score out of 100.'], items: [
+        { text: 'Resolution — meets the minimum 1200px standard.' },
+        { text: 'Sharpness — blur detection.' },
+        { text: 'Lighting — exposure check.' },
+        { text: 'Glare — blown-highlight detection.' },
+        { text: 'Crop & framing — card fills ~85% of the frame.' },
+      ] },
+      { h2: 'Watermarks', paras: ['Do not watermark the main card image — collectors dislike large visible watermarks. CardPop applies a small logo to gallery images and an invisible digital watermark in image metadata to protect your photos.'] },
+      { h2: 'Coming soon: CardPop Scan Verified', paras: ["We're building automated condition estimation: upload front and back scans and CardPop will detect centering, corner wear, edge wear and surface defects, then display an estimated condition alongside your listing."] },
+    ],
+    links: [{ text: 'Grading Hub', href: '/grading' }, { text: 'Trust & Safety', href: '/trust-safety' }],
+  },
+
+  '/community/map': {
+    title: 'Card Retailer & Event Map Australia | CardPop',
+    description: 'Find trading card retailers, hobby stores, card shows, and community events near you on an interactive map of Australia.',
+    breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Community', path: '/community' }, { name: 'Map', path: '/community/map' }],
+    h1: 'Card Community Map',
+    intro: "Discover local card retailers, hobby stores, shows, and community events across Australia. Enter your location on the interactive map to see what's near you.",
+    sections: [
+      { h2: "What's on the map", items: [
+        { text: 'Retailer / LGS — verified local game and hobby stores across every state.' },
+        { text: 'Card Show — trading card shows and expos with a venue address.' },
+        { text: 'Trade Event — organised trade days and meetups.' },
+        { text: 'Store Event — in-store tournaments, launches and community nights.' },
+        { text: 'Community Event — collector gatherings and hobby events.' },
+      ] },
+      { h2: 'Are you a retailer or event organiser?', paras: ['Get your store or event pinned on this map. Both appear automatically once approved.'] },
+    ],
+    links: [{ text: 'Card Shop Directory', href: '/card-shops' }, { text: 'Upcoming Events', href: '/events' }, { text: 'List Your Store', href: '/card-shops/add' }],
+  },
 };
 
 // Ordered list -> XML/HTML helpers for the static renderer.
@@ -1646,6 +1787,127 @@ ${[sectionsHtml, faqHtml, linksHtml].filter(Boolean).join('\n')}
 </main>`;
 
   return htmlDoc({ title: cfg.title, description: cfg.description, canonical, jsonLdItems, bodyHtml });
+}
+
+// ── Community forum (/community/forum) ───────────────────────────────────────
+// The SPA renders a hero + SEO copy around a live list of discussions from the
+// `posts` table. Mirror that for crawlers: the same headings plus the current
+// discussion titles (a subset of the human view — not cloaking) so the page is
+// substantive rather than an empty shell.
+async function renderForum(supabase) {
+  const canonical = `${BASE_URL}/community/forum`;
+  const title = 'Community Forum | CardPop';
+  const description = 'Join discussions with Australian trading card collectors. Talk market trends, trading, grading and more on CardPop.';
+
+  const { data } = await supabase
+    .from('posts')
+    .select('id, title, body, category, created_at')
+    .eq('post_type', 'text')
+    .order('created_at', { ascending: false })
+    .limit(40);
+  const posts = data || [];
+
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'Community', item: `${BASE_URL}/community` },
+      { '@type': 'ListItem', position: 3, name: 'Community Forum', item: canonical },
+    ],
+  };
+  const itemList = posts.length > 0 ? {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'CardPop Community Discussions',
+    numberOfItems: posts.length,
+    itemListElement: posts.map((p, i) => ({
+      '@type': 'ListItem', position: i + 1, url: `${BASE_URL}/community/discussion/${p.id}`, name: p.title || 'Discussion',
+    })),
+  } : null;
+
+  const itemsHtml = posts.map((p) => {
+    const snippet = p.body ? toText(p.body, 160) : '';
+    return `    <li><a href="${BASE_URL}/community/discussion/${esc(p.id)}"><strong>${esc(p.title || 'Discussion')}</strong></a>`
+      + `${p.category ? ` — ${esc(p.category)}` : ''}${snippet ? `: ${esc(snippet)}` : ''}</li>`;
+  }).join('\n');
+
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/community">Community</a> / Community Forum</nav>
+  <h1>Community Forum</h1>
+  <p>Share insights, ask questions and connect with collectors across Australia. Every collector's voice matters here.</p>
+  <h2>Recent discussions${posts.length ? ` (${posts.length})` : ''}</h2>
+  <ul>
+${itemsHtml || '    <li>No discussions yet — be the first to start a conversation.</li>'}
+  </ul>
+  <section>
+  <h2>Australia's Trading Card Community</h2>
+  <p>CardPop's community forum connects collectors across Australia to discuss market trends, grading, trading, and everything in between. Whether you're a seasoned collector or just starting out, there's a place for you here.</p>
+  </section>
+</main>`;
+
+  return htmlDoc({ title, description, canonical, jsonLdItems: [breadcrumb, ...(itemList ? [itemList] : [])], bodyHtml });
+}
+
+// ── Collector profiles (/community/profiles) ─────────────────────────────────
+// Mirror of the SPA's members directory: hero + SEO copy plus the current
+// public collector profiles (RLS on the anon key already limits rows to public
+// ones; we additionally exclude is_public = false to match renderSeller).
+async function renderProfiles(supabase) {
+  const canonical = `${BASE_URL}/community/profiles`;
+  const title = 'Collector Profiles | CardPop Community';
+  const description = 'Browse verified trading card collectors on CardPop. Find fellow hobbyists, traders and sellers across Australia.';
+
+  const { data } = await supabase
+    .from('profiles')
+    .select('id, display_name, username, bio, is_verified, rating, created_at')
+    .not('is_public', 'is', false)
+    .order('created_at', { ascending: false })
+    .limit(60);
+  const profiles = (data || []).filter((p) => p.display_name || p.username);
+
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'Community', item: `${BASE_URL}/community` },
+      { '@type': 'ListItem', position: 3, name: 'Collector Profiles', item: canonical },
+    ],
+  };
+  const itemList = profiles.length > 0 ? {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'CardPop Collectors',
+    numberOfItems: profiles.length,
+    itemListElement: profiles.map((p, i) => ({
+      '@type': 'ListItem', position: i + 1, url: `${BASE_URL}/community/user/${p.id}`, name: p.display_name || p.username,
+    })),
+  } : null;
+
+  const itemsHtml = profiles.map((p) => {
+    const name = p.display_name || p.username;
+    const bio = p.bio ? toText(p.bio, 140) : '';
+    const badges = [p.is_verified ? 'Verified' : null, p.rating > 0 ? `${Number(p.rating).toFixed(1)}★` : null].filter(Boolean).join(', ');
+    return `    <li><a href="${BASE_URL}/community/user/${esc(p.id)}"><strong>${esc(name)}</strong></a>`
+      + `${badges ? ` (${esc(badges)})` : ''}${bio ? ` — ${esc(bio)}` : ''}</li>`;
+  }).join('\n');
+
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/community">Community</a> / Collector Profiles</nav>
+  <h1>Collector Profiles</h1>
+  <p>Discover verified collectors, seasoned traders and passionate hobbyists building their collections across Australia.</p>
+  <h2>Members${profiles.length ? ` (${profiles.length})` : ''}</h2>
+  <ul>
+${itemsHtml || '    <li>Collectors will appear here once they set up a public profile.</li>'}
+  </ul>
+  <section>
+  <h2>Meet Australia's Collectors</h2>
+  <p>CardPop is home to thousands of Australian trading card collectors. Browse verified profiles, find traders who specialise in your favourite games, and connect with the community.</p>
+  </section>
+</main>`;
+
+  return htmlDoc({ title, description, canonical, jsonLdItems: [breadcrumb, ...(itemList ? [itemList] : [])], bodyHtml });
 }
 
 // ── Buying Guides (/analytics/buying-guides) ────────────────────────────────
@@ -2525,6 +2787,14 @@ export default async function handler(req, res) {
 
     if (STATIC_CONTENT[rawPath]) {
       return sendDoc(res, renderStaticContent(rawPath));
+    }
+
+    if (rawPath === '/community/forum') {
+      return sendDoc(res, await renderForum(supabase));
+    }
+
+    if (rawPath === '/community/profiles') {
+      return sendDoc(res, await renderProfiles(supabase));
     }
 
     if (rawPath === '/events') {
