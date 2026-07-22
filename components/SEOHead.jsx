@@ -3,6 +3,10 @@ import { Helmet } from 'react-helmet-async';
 
 const SEOHead = ({ title, description, canonicalUrl, ogImage, ogImageAlt, structuredData, noindex = false }) => {
   const siteName = "CardPop";
+  // Brand name Google surfaces as the "site name" above search results
+  // (via og:site_name and the WebSite schema in index.html). Kept separate
+  // from siteName so page titles stay "CardPop | …" without doubling up on "Australia".
+  const brandName = "CardPop Australia";
   const SITE_ORIGIN = "https://cardpop.com.au";
   const defaultTitle = `${siteName} | Australia's Trading Card Marketplace`;
   const defaultDescription = "Buy, sell, and trade authenticated trading cards in Australia. Browse Pokemon, Magic, Yu-Gi-Oh and more on CardPop.";
@@ -54,7 +58,7 @@ const SEOHead = ({ title, description, canonicalUrl, ogImage, ogImageAlt, struct
       <meta property="og:title" content={resolvedTitle} />
       <meta property="og:description" content={resolvedDesc} />
       <meta property="og:type" content="website" />
-      <meta property="og:site_name" content={siteName} />
+      <meta property="og:site_name" content={brandName} />
       {resolvedCanonical && <meta property="og:url" content={resolvedCanonical} />}
       {resolvedOgImage && <meta property="og:image" content={resolvedOgImage} />}
       {resolvedOgImage && <meta property="og:image:alt" content={resolvedOgImageAlt} />}
