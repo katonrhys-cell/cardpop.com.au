@@ -208,7 +208,9 @@ const Header = () => {
 
   const handleGlobalSearch = (query) => {
     if (query.trim()) {
-      navigate(`/marketplace?q=${encodeURIComponent(query)}`);
+      // Whole-site search: /search spans marketplace, shop, sellers, guides and
+      // events (not just the marketplace, which is what this used to target).
+      navigate(`/search?q=${encodeURIComponent(query)}`);
       setMobileMenuOpen(false);
     }
   };
