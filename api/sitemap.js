@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { COLLECTION_SEO } from '../data/collectionSeo.js';
+import { SHOP_COLLECTION_SEO } from '../data/shopCollectionSeo.js';
 import { BLOG_CATEGORIES } from '../data/blogCategories.js';
 import { BUYING_GUIDES } from '../data/buyingGuides.js';
 
@@ -51,6 +52,11 @@ const STATIC_PAGES = [
   { loc: '/shop',                  lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.9' },
   { loc: '/shop/sealed-boxes',     lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
   { loc: '/shop/singles',          lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
+  // Shop supply collection pages (Protection, Storage, Display, Shipping,
+  // Grading) — config-driven, one per group in data/shopCollectionSeo.js.
+  ...Object.keys(SHOP_COLLECTION_SEO).map((slug) => (
+    { loc: `/shop/${slug}`,        lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' }
+  )),
   { loc: '/analytics',             lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
   // /prices pages legitimately change every day (fresh price snapshots), so
   // TODAY is an honest lastmod here, unlike the structural pages above.

@@ -59,10 +59,16 @@ const ShopCategoryBrowse = () => {
           >
             <activeGroup.Icon className="w-5 h-5 text-white" />
           </span>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h3 className="font-bold text-lg leading-tight">{activeGroup.label}</h3>
             <p className="text-sm text-muted-foreground">{activeGroup.blurb}</p>
           </div>
+          <Link
+            to={`/shop/${activeGroup.slug}`}
+            className="shrink-0 inline-flex items-center gap-1 text-sm font-bold text-primary hover:underline"
+          >
+            View all <ArrowRight className="w-4 h-4" />
+          </Link>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
