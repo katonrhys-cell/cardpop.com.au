@@ -75,6 +75,7 @@ const Footer = () => {
               <li><Link to="/analytics" className="hover:text-primary transition-colors">Analytics</Link></li>
               <li><Link to="/prices" className="hover:text-primary transition-colors">Card Prices (AUD)</Link></li>
               <li><Link to="/card-shops" className="hover:text-primary transition-colors">Card Shop Directory</Link></li>
+              <li><Link to="/events" className="hover:text-primary transition-colors">Events</Link></li>
               <li><Link to="/grading" className="hover:text-primary transition-colors">Grading Hub</Link></li>
               <li><Link to="/safe-buying" className="hover:text-primary transition-colors">Safe Buying Guide</Link></li>
               <li><Link to="/photography-standard" className="hover:text-primary transition-colors">Photography Guide</Link></li>
@@ -93,21 +94,25 @@ const Footer = () => {
               <li><Link to="/community" className="hover:text-primary transition-colors">Community</Link></li>
               <li><Link to="/pricing" className="hover:text-primary transition-colors">Pricing &amp; Plans</Link></li>
               <li><Link to="/about" className="hover:text-primary transition-colors">About Us</Link></li>
+              <li><Link to="/faq" className="hover:text-primary transition-colors">FAQ &amp; Help</Link></li>
               <li><Link to="/contact" className="hover:text-primary transition-colors">Contact</Link></li>
             </ul>
           </div>
 
           <div>
-            <h4 className="font-bold mb-6 uppercase tracking-wider text-sm">Account & Legal</h4>
+            <h4 className="font-bold mb-6 uppercase tracking-wider text-sm">Support & Legal</h4>
             <ul className="space-y-4 text-sm text-muted-foreground font-medium">
               <li><Link to="/login" className="hover:text-primary transition-colors">Sign In</Link></li>
               <li><Link to="/signup" className="hover:text-primary transition-colors">Create Account</Link></li>
               <li><Link to="/account" className="hover:text-primary transition-colors">My Dashboard</Link></li>
               <li><Link to="/account/profile" className="hover:text-primary transition-colors">Profile Settings</Link></li>
+              <li><Link to="/shipping" className="hover:text-primary transition-colors">Shipping</Link></li>
+              <li><Link to="/returns" className="hover:text-primary transition-colors">Returns & Refunds</Link></li>
               <li><Link to="/terms" className="hover:text-primary transition-colors">Terms of Service</Link></li>
               <li><Link to="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link></li>
               <li><Link to="/data-deletion" className="hover:text-primary transition-colors">Data Deletion</Link></li>
               <li><Link to="/trust-safety" className="hover:text-primary transition-colors">Buyer Protection & Safety</Link></li>
+              <li><Link to="/sitemap" className="hover:text-primary transition-colors">Sitemap</Link></li>
             </ul>
           </div>
         </div>

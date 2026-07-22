@@ -27,6 +27,7 @@ import wishlistRouter from './wishlist.js';
 import recommendationsRouter from './recommendations.js';
 import priceHistoryRouter from './price-history.js';
 import newsletterRouter from './newsletter.js';
+import contactRouter from './contact.js';
 import dataDeletionRouter from './data-deletion.js';
 import marketDataRouter from './market-data.js';
 import pricesRouter from './prices.js';
@@ -164,6 +165,10 @@ export default () => {
     // Newsletter subscription
     router.use('/newsletter', apiLimiter);
     router.use('/newsletter', newsletterRouter);
+
+    // Public contact form → support inbox (Resend)
+    router.use('/contact', apiLimiter);
+    router.use('/contact', contactRouter);
 
     // Meta (Facebook) data deletion request callback + public status lookup.
     // No auth: the callback is called server-to-server by Facebook and is

@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, ArrowRightLeft, Layers, HandCoins, Tag } from 'lucide-react';
+import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import EbayMarketSection from '@/components/EbayMarketSection.jsx';
 import CertificationVerificationSection from '@/components/CertificationVerificationSection.jsx';
@@ -411,6 +412,21 @@ const ProductDetailPage = ({ source: sourceProp }) => {
             // URL form the sitemap and bot prerenderer advertise.
             ? `/marketplace/${id}/${product.slug || slugify(product.name || 'listing')}`
             : `/product/${source}/${id}/${slugify(product.name || 'product')}`}
+        />
+
+        {/* Breadcrumb gives a reliable upward path for visitors who land here
+            directly from search/social (where navigate(-1) would leave the site
+            or do nothing). The Back button stays for in-app grid → detail nav. */}
+        <Breadcrumb
+          items={[
+            { label: 'Home', path: '/' },
+            isShop
+              ? { label: 'Shop', path: '/shop' }
+              : source === 'vault'
+                ? { label: 'My Vault', path: '/vault' }
+                : { label: 'Marketplace', path: '/marketplace' },
+            { label: product.name },
+          ]}
         />
 
         <Button variant="link" className="px-0 mb-8 text-muted-foreground hover:text-primary font-medium" onClick={() => navigate(-1)}>

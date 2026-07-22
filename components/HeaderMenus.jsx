@@ -15,7 +15,7 @@ import {
   Settings, FolderTree, ListOrdered, BarChart3, Store, Shield,
   BookOpen, Globe, Star, Award, TrendingUp, Newspaper, BadgeCheck, Ticket, Handshake,
   Calculator, MapPin, ClipboardList, HelpCircle, MessageSquare,
-  ShoppingBag, LineChart, Info, Sparkles, Rocket,
+  ShoppingBag, LineChart, Info, Sparkles, Rocket, Tag,
 } from 'lucide-react';
 import { TCG_CATEGORY_DATA, SPORTS_CATEGORY_DATA } from '@/components/CategoryIcons.jsx';
 import { SHOP_CATEGORY_GROUPS } from '@/utils/shopCategories.js';
@@ -1170,6 +1170,17 @@ export const MobileNavMenus = ({
             className="max-w-full"
           />
         </div>
+
+        {/* Sell CTA — primary marketplace action, surfaced up top on phones
+            where the header's Sell button is hidden. */}
+        <SheetClose asChild>
+          <Button asChild className="w-full rounded-xl h-12 font-bold mb-4 gap-2">
+            <Link to="/vault/add" onClick={onNavigate}>
+              <Tag className="w-4 h-4" />
+              Sell a Card
+            </Link>
+          </Button>
+        </SheetClose>
 
         {/* Order mirrors the desktop Row-2 nav top-to-bottom: Browse Collections
             leads, then NAV_LINKS in sequence — expandable sections (Blog,
