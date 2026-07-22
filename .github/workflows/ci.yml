@@ -1,8 +1,9 @@
 name: CI
 
-# Runs lint + the full test suite + a production build on every pull request.
-# This is the PR gate — enable it as a required status check in branch
-# protection so a red build can't be merged.
+# Runs lint + the full test suite (with a coverage-threshold gate) + a
+# production build on every pull request. This is the PR gate — enable it as a
+# required status check in branch protection so a red build can't be merged.
+# Coverage floors live in vitest.config.js (test.coverage.thresholds).
 #
 # NOTE: intentionally PR-only. Pushes to main are covered by the equivalent
 # `verify` job in deploy.yml (which then deploys), so running this on main too
@@ -34,8 +35,8 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Test
-        run: npm test
+      - name: Test (with coverage gate)
+        run: npm run test:coverage
 
       - name: Build
         run: npm run build
