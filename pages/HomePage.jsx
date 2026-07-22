@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, CheckCircle2, IdCard, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -30,11 +30,18 @@ import { HOMEPAGE_CATEGORIES } from '@/components/CategoryIcons.jsx';
 // Returns [ref, inView]; inView flips to true once the element scrolls within
 // rootMargin of the viewport and stays true (equivalent to viewport.once).
 const useRevealOnce = (rootMargin = '-60px') => {
-  const ref = useRef(null);
   const [inView, setInView] = useState(false);
+  // Callback ref so the observer (re)attaches whenever the target node mounts —
+  // crucially including grids that mount LATE, after their data loads. The
+  // Featured Cards and Featured Sellers grids only render once `loading` flips
+  // to false; with a plain useRef + mount-only effect, the effect ran on the
+  // first render (when the grid didn't exist yet), bailed, and never re-ran, so
+  // those grids kept their initial `opacity-0` reveal state forever and stayed
+  // invisible — the section looked blank even though the cards had rendered.
+  const [node, setNode] = useState(null);
+  const ref = useCallback((el) => setNode(el), []);
   useEffect(() => {
-    const el = ref.current;
-    if (!el) return undefined;
+    if (!node) return undefined;
     if (typeof IntersectionObserver === 'undefined') {
       setInView(true);
       return undefined;
@@ -45,9 +52,9 @@ const useRevealOnce = (rootMargin = '-60px') => {
         io.disconnect();
       }
     }, { rootMargin });
-    io.observe(el);
+    io.observe(node);
     return () => io.disconnect();
-  }, [rootMargin]);
+  }, [node, rootMargin]);
   return [ref, inView];
 };
 
