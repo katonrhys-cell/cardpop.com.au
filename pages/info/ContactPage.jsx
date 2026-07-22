@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { CheckCircle, Send, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import InfoPageLayout from '@/components/InfoPageLayout.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
+import Turnstile from '@/components/Turnstile.jsx';
+import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
 
 const validate = ({ name, email, subject, message }) => {
   const errors = {};
@@ -25,6 +27,10 @@ const ContactPage = () => {
   const [submitted, setSubmitted] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
+  // Cloudflare Turnstile token (only when a site key is configured). Single-use,
+  // so it's reset after every submit attempt.
+  const [turnstileToken, setTurnstileToken] = useState('');
+  const turnstileRef = useRef(null);
 
   // Fallback mailto for the error path, so the visitor is never stranded if the
   // server send fails.
@@ -54,6 +60,7 @@ const ContactPage = () => {
           subject: fields.subject.trim(),
           message: fields.message.trim(),
           company: fields.company, // honeypot — real users leave this blank
+          turnstileToken,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -66,6 +73,9 @@ const ContactPage = () => {
       setSendError('We could not reach the server. Please check your connection and try again.');
     } finally {
       setSending(false);
+      // Turnstile tokens are single-use — reset for any subsequent attempt.
+      setTurnstileToken('');
+      turnstileRef.current?.reset();
     }
   };
 
@@ -187,6 +197,17 @@ const ContactPage = () => {
                   />
                 </div>
 
+                {/* Spam protection — renders nothing until a Turnstile site key
+                    is configured (VITE_TURNSTILE_SITE_KEY), so the form is
+                    unchanged until you switch it on. */}
+                {TURNSTILE_ENABLED && (
+                  <Turnstile
+                    ref={turnstileRef}
+                    onVerify={setTurnstileToken}
+                    onExpire={() => setTurnstileToken('')}
+                  />
+                )}
+
                 {sendError && (
                   <p className="text-destructive text-sm" role="alert">
                     {sendError}{' '}
@@ -194,7 +215,7 @@ const ContactPage = () => {
                   </p>
                 )}
 
-                <Button type="submit" className="w-full" disabled={sending}>
+                <Button type="submit" className="w-full" disabled={sending || (TURNSTILE_ENABLED && !turnstileToken)}>
                   {sending ? (
                     <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending…</>
                   ) : (
