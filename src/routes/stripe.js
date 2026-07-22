@@ -172,7 +172,7 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
   const userId = req.user?.id || null;
   let walletSlotHeldForCleanup = false;
   try {
-    const { items, successUrl, cancelUrl, returnUrl, uiMode, shippingAddress, promoCode, useWalletBalance, billingDetails, email: guestEmailInput, subscribeNewsletter } = req.body;
+    const { items, successUrl, cancelUrl, returnUrl, uiMode, shippingAddress, promoCode, useWalletBalance, billingDetails, email: guestEmailInput, subscribeNewsletter, saveShippingAddress } = req.body;
 
     // Guest checkout: no account required. A guest has no user id — promo codes,
     // wallet balance and partner attribution are account-only and are skipped
@@ -187,6 +187,8 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       return res.status(400).json({ error: 'A valid email address is required to place an order.' });
     }
     const wantsNewsletter = subscribeNewsletter === true || subscribeNewsletter === 'true';
+    // Only a signed-in buyer has an account to save an address book entry to.
+    const wantsAddressSaved = (saveShippingAddress === true || saveShippingAddress === 'true') && !!userId;
 
     const itemsError = validateCartItems(items);
     if (itemsError) return res.status(400).json({ error: itemsError });
@@ -372,6 +374,7 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
         // still send the receipt and (if opted in) the newsletter subscription.
         ...(userId ? {} : { guestCheckout: 'true', guestEmail: email }),
         ...(wantsNewsletter ? { subscribeNewsletter: 'true' } : {}),
+        ...(wantsAddressSaved ? { saveShippingAddress: 'true' } : {}),
         ...(welcomeOfferId ? { welcomeOfferId } : {}),
         ...partnerMeta,
         ...(walletCents > 0 ? { walletCents: String(walletCents) } : {}),

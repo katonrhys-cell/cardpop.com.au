@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useCart } from '@/hooks/useCart.jsx';
@@ -9,11 +9,13 @@ import { toast } from 'sonner';
 
 // Storage path or absolute URL → CDN-aware public URL.
 const resolveImg = (path) => publicImageUrl(path);
-import { ArrowRight, Loader2, Tag, Wallet } from 'lucide-react';
+import { Loader2, Tag, Wallet, Lock, MapPin, CreditCard, ShoppingBag, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 import OrderSummary from '@/components/checkout/OrderSummary.jsx';
 import ShippingAddressForm from '@/components/checkout/ShippingAddressForm.jsx';
@@ -22,13 +24,32 @@ import PaymentMethodSelector from '@/components/checkout/PaymentMethodSelector.j
 import OrderReviewSection from '@/components/checkout/OrderReviewSection.jsx';
 import EmbeddedStripeCheckout from '@/components/checkout/EmbeddedStripeCheckout.jsx';
 import MarketplacePurchaseGate from '@/components/checkout/MarketplacePurchaseGate.jsx';
+import CheckoutReassurance from '@/components/checkout/CheckoutReassurance.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import { getReferralCode } from '@/lib/referral.js';
 import { AMAZON_LOCATION_ENABLED } from '@/lib/amazonLocation.js';
 import { isValidAbn, normalizeAbn } from '@/utils/abn.js';
+import { fetchSavedAddresses, addressRowToShipping, formatAddressLabel } from '@/lib/savedAddresses.js';
 
-const STEPS = { SUMMARY: 1, SHIPPING: 2, BILLING: 3, PAY: 4 };
-const STEP_LABELS = ['Cart', 'Ship', 'Bill', 'Pay'];
+// Small numbered section wrapper so the single page reads as an ordered flow
+// without a click-through wizard.
+const Section = ({ step, icon: Icon, title, subtitle, children }) => (
+  <Card className="border-border shadow-sm">
+    <CardHeader className="pb-3">
+      <CardTitle className="flex items-center gap-3 text-base">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+          {step}
+        </span>
+        <span className="flex items-center gap-2">
+          {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
+          {title}
+        </span>
+      </CardTitle>
+      {subtitle && <p className="pl-10 text-xs text-muted-foreground">{subtitle}</p>}
+    </CardHeader>
+    <CardContent className="space-y-4">{children}</CardContent>
+  </Card>
+);
 
 const CheckoutPage = () => {
   const navigate = useNavigate();
@@ -38,7 +59,6 @@ const CheckoutPage = () => {
 
   const { cartItems } = useCart();
   const { currentUser, isIdentityVerified, profileLoading } = useAuth();
-  const [step, setStep] = useState(STEPS.SUMMARY);
   const [initializing, setInitializing] = useState(true);
 
   const [directItem, setDirectItem] = useState(null);
@@ -50,6 +70,21 @@ const CheckoutPage = () => {
   // consent). Only surfaced to logged-out shoppers — members already have an
   // account and manage email preferences in their settings.
   const [subscribeNews, setSubscribeNews] = useState(false);
+
+  // Saved-address book (signed-in buyers only). Prefills the form so a returning
+  // buyer doesn't retype their address; the "save" checkbox opts a new address
+  // into the book (persisted server-side after the order is paid).
+  const [savedAddresses, setSavedAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState('');
+  const [saveAddress, setSaveAddress] = useState(true);
+  const prefilledRef = useRef(false);
+
+  // Single-page payment reveal. Everything lives on one page; the buyer commits
+  // to paying with "Review & pay", which validates the details and mounts the
+  // Stripe form — this is the commit point that seeds the Stripe session, so it
+  // isn't recreated on every keystroke while the address is being typed.
+  const [readyToPay, setReadyToPay] = useState(false);
+  const paymentRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,6 +141,35 @@ const CheckoutPage = () => {
     initDirectCheckout();
     return () => { cancelled = true; };
   }, [cardId, source, navigate]);
+
+  // Load the buyer's saved addresses and prefill the default one (once), so a
+  // returning member starts from a filled-in form. Best-effort and guest-safe:
+  // fetchSavedAddresses returns [] when there's no user id.
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    let cancelled = false;
+    fetchSavedAddresses(currentUser.id).then((list) => {
+      if (cancelled || list.length === 0) return;
+      setSavedAddresses(list);
+      if (!prefilledRef.current) {
+        prefilledRef.current = true;
+        const def = list[0];
+        setSelectedAddressId(def.id);
+        setShippingData((prev) => ({ ...addressRowToShipping(def, currentUser.email || prev.email || '') }));
+      }
+    });
+    return () => { cancelled = true; };
+  }, [currentUser?.id, currentUser?.email]);
+
+  const handlePickAddress = (value) => {
+    setSelectedAddressId(value);
+    if (value === '__new') {
+      setShippingData({ email: currentUser?.email || shippingData.email || '' });
+      return;
+    }
+    const row = savedAddresses.find((a) => a.id === value);
+    if (row) setShippingData(addressRowToShipping(row, currentUser?.email || shippingData.email || ''));
+  };
 
   const checkoutItems = directItem ? [directItem] : cartItems;
 
@@ -258,6 +322,16 @@ const CheckoutPage = () => {
     return true;
   };
 
+  const handleReviewAndPay = () => {
+    if (flatItems.length === 0) { toast.error('Your cart is empty!'); return; }
+    if (!validateShipping()) return;
+    if (!validateBilling()) return;
+    setReadyToPay(true);
+    // Scroll the newly-revealed payment form into view (guarded — happy-dom in
+    // tests has no scrollIntoView).
+    setTimeout(() => paymentRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }), 50);
+  };
+
   // Stable request body for the inline Stripe form. It must not change identity
   // on every render — Stripe's EmbeddedCheckoutProvider fetches the client
   // secret once, and a new object would recreate the session. Serialising the
@@ -271,6 +345,9 @@ const CheckoutPage = () => {
   const billingAbn = billingData.isBusiness && isValidAbn(billingData.abn) ? normalizeAbn(billingData.abn) : '';
   const billingBusinessName = billingAbn ? (billingData.businessName || '').trim() : '';
   const contactEmail = (shippingData.email || '').trim();
+  // Signed-in buyers can opt to save this address to their account (persisted
+  // server-side once the order is paid). Guests have no account to save to.
+  const wantsAddressSaved = !!currentUser && saveAddress;
   const checkoutRequestBody = useMemo(() => ({
     items: serverItems,
     // Receipt address — for guests this is the only email on file; the server
@@ -278,10 +355,12 @@ const CheckoutPage = () => {
     email: contactEmail,
     // Guest opt-in to order-updates & news; the webhook subscribes on payment.
     ...(subscribeNews ? { subscribeNewsletter: true } : {}),
+    ...(wantsAddressSaved ? { saveShippingAddress: true } : {}),
     ...(useWallet ? { useWalletBalance: true } : (appliedPromoCode ? { promoCode: appliedPromoCode } : {})),
     shippingAddress: {
       name: shippingName,
       address: shippingData.address || '',
+      address2: shippingData.address2 || '',
       suburb: shippingData.suburb || '',
       state: shippingData.state || '',
       postcode: shippingData.postcode || '',
@@ -292,10 +371,12 @@ const CheckoutPage = () => {
     serverItemsKey,
     contactEmail,
     subscribeNews,
+    wantsAddressSaved,
     useWallet,
     appliedPromoCode,
     shippingName,
     shippingData.address,
+    shippingData.address2,
     shippingData.suburb,
     shippingData.state,
     shippingData.postcode,
@@ -311,234 +392,228 @@ const CheckoutPage = () => {
     );
   }
 
-  const renderStep = () => {
-    switch (step) {
-      case STEPS.SUMMARY:
-        return (
-          <OrderSummary
-            cartItems={flatItems}
-            subtotal={subtotal}
-            serviceFee={serviceFee}
-            gst={gst}
-            shipping={shipping}
-            discount={discount}
-            total={total}
-            onEditCart={() => navigate('/marketplace')}
-            onNext={() => {
-              if (flatItems.length === 0) { toast.error('Your cart is empty!'); return; }
-              setStep(STEPS.SHIPPING);
+  const orderSummary = (
+    <OrderSummary
+      cartItems={flatItems}
+      subtotal={subtotal}
+      serviceFee={serviceFee}
+      gst={gst}
+      shipping={shipping}
+      discount={discount}
+      total={total}
+      onEditCart={() => navigate('/marketplace')}
+    />
+  );
+
+  const promoCard = currentUser && flatItems.length > 0 && (
+    <Card className="border-border shadow-sm">
+      <CardContent className="pt-6">
+        <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
+          <Tag className="h-4 w-4 text-primary" /> Promo code
+        </div>
+        {appliedPromoCode ? (
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-mono tracking-widest">{appliedPromoCode}</span>
+            <span className="text-green-600 font-semibold">−${discount.toFixed(2)} applied</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setPromoCode(''); setPromoInput(''); }}
+            >
+              Remove
+            </Button>
+          </div>
+        ) : (
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (promoInput.trim()) { setUseWallet(false); setPromoCode(promoInput.trim().toUpperCase()); }
+            }}
+          >
+            <Input
+              value={promoInput}
+              onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
+              placeholder="POP-XXXX-XXXX"
+              autoComplete="off"
+              className="font-mono tracking-widest uppercase"
+              aria-label="Promo code"
+              disabled={useWallet}
+            />
+            <Button type="submit" variant="outline" className="shrink-0" disabled={useWallet}>Apply</Button>
+          </form>
+        )}
+        <p className="mt-2 text-xs text-muted-foreground">
+          New here? Your welcome email includes a code for 10% off your first order.
+        </p>
+      </CardContent>
+    </Card>
+  );
+
+  const walletCard = currentUser && flatItems.length > 0 && walletBalance > 0 && (
+    <Card className="border-border shadow-sm">
+      <CardContent className="pt-6">
+        <label className="flex items-center gap-3 text-sm cursor-pointer">
+          <Checkbox
+            checked={useWallet}
+            onCheckedChange={(checked) => {
+              setUseWallet(!!checked);
+              if (checked) { setPromoCode(''); setPromoInput(''); }
             }}
           />
-        );
-
-      case STEPS.SHIPPING:
-        return (
-          <Card className="border-border shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Shipping Address</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <ShippingAddressForm
-                values={shippingData}
-                onChange={setShippingData}
-                showEmail
-              />
-              {!currentUser && (
-                <label className="flex items-start gap-3 rounded-lg border border-border bg-muted/20 p-3 text-sm cursor-pointer">
-                  <Checkbox
-                    className="mt-0.5"
-                    checked={subscribeNews}
-                    onCheckedChange={(checked) => setSubscribeNews(!!checked)}
-                  />
-                  <span className="text-muted-foreground">
-                    Email me order updates and CardPop news. You'll be able to create an
-                    account after payment to track your order.
-                  </span>
-                </label>
-              )}
-              <div className="flex justify-between pt-2">
-                <Button variant="outline" onClick={() => setStep(STEPS.SUMMARY)}>Back</Button>
-                <Button onClick={() => { if (validateShipping()) setStep(STEPS.BILLING); }}>
-                  Continue <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        );
-
-      case STEPS.BILLING:
-        return (
-          <Card className="border-border shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Billing Address</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <BillingAddressForm
-                values={billingData}
-                onChange={setBillingData}
-                shippingAddress={shippingData}
-                sameAsShipping={sameAsShipping}
-                onSameAsShippingChange={setSameAsShipping}
-              />
-              <div className="flex justify-between pt-2">
-                <Button variant="outline" onClick={() => setStep(STEPS.SHIPPING)}>Back</Button>
-                <Button onClick={() => { if (validateBilling()) setStep(STEPS.PAY); }}>
-                  Continue <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        );
-
-      case STEPS.PAY:
-        return (
-          <div className="space-y-4">
-            <OrderReviewSection
-              shippingData={shippingData}
-              billingData={billingData}
-              sameAsShipping={sameAsShipping}
-              items={flatItems}
-              subtotal={subtotal}
-              serviceFee={serviceFee}
-              gst={gst}
-              shipping={shipping}
-              discount={discount}
-              total={total}
-            />
-
-            <Card className="border-border shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Payment</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                <PaymentMethodSelector />
-                <EmbeddedStripeCheckout requestBody={checkoutRequestBody} />
-              </CardContent>
-            </Card>
-
-            <div className="pt-1">
-              <Button variant="outline" onClick={() => setStep(STEPS.BILLING)}>Back</Button>
-            </div>
-          </div>
-        );
-
-      default:
-        return null;
-    }
-  };
+          <span className="flex items-center gap-2 font-semibold text-foreground">
+            <Wallet className="h-4 w-4 text-primary" /> Use wallet balance
+          </span>
+          <span className="ml-auto text-muted-foreground">${walletBalance.toFixed(2)} available</span>
+        </label>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Applies toward this order — can't be combined with a promo code.
+        </p>
+      </CardContent>
+    </Card>
+  );
 
   return (
-    <div className="min-h-screen bg-muted/20 py-12">
+    <div className="min-h-screen bg-muted/20 py-10">
       <Helmet><title>Secure Checkout | Card Pop</title></Helmet>
-      <div className="max-w-4xl mx-auto px-4">
+      <div className="max-w-6xl mx-auto px-4">
 
-        <div className="mb-10">
-          <div className="relative max-w-2xl mx-auto">
-            {/* Connector track — inset to sit between the first and last circle centres (each step occupies 1/N of the width, so the centres are 1/2N in from each edge) */}
-            <div className="absolute top-4 left-[12.5%] right-[12.5%] h-1 -translate-y-1/2 bg-border rounded-full" />
-            <div
-              className="absolute top-4 left-[12.5%] h-1 -translate-y-1/2 bg-primary rounded-full transition-all duration-500"
-              style={{ width: `${((step - 1) / (STEP_LABELS.length - 1)) * 75}%` }}
-            />
-            <div className="relative flex">
-              {STEP_LABELS.map((label, i) => {
-                const idx = i + 1;
-                const active = step >= idx;
-                return (
-                  <div key={label} className="flex flex-1 flex-col items-center gap-2">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-colors duration-300 ${active ? 'bg-primary text-white shadow-md' : 'bg-card text-muted-foreground border-2 border-border'}`}
-                    >
-                      {idx}
-                    </div>
-                    <span
-                      className={`text-xs font-semibold uppercase tracking-wider transition-colors duration-300 ${active ? 'text-primary' : 'text-muted-foreground'}`}
-                    >
-                      {label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+        <header className="mb-8">
+          <h1 className="font-heading text-2xl font-bold text-foreground sm:text-3xl">Secure checkout</h1>
+          <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Lock className="h-3.5 w-3.5" /> Encrypted &amp; processed by Stripe — you never leave this page.
+          </p>
+        </header>
 
-        <div className="max-w-2xl mx-auto">
-          {marketplaceBlocked ? (
+        {marketplaceBlocked ? (
+          <div className="mx-auto max-w-2xl">
             <MarketplacePurchaseGate returnPath="/checkout" />
-          ) : (
-            renderStep()
-          )}
-
-          {!marketplaceBlocked && currentUser && step === STEPS.SUMMARY && flatItems.length > 0 && walletBalance > 0 && (
-            <Card className="border-border shadow-sm mt-4">
-              <CardContent className="pt-6">
-                <label className="flex items-center gap-3 text-sm cursor-pointer">
-                  <Checkbox
-                    checked={useWallet}
-                    onCheckedChange={(checked) => {
-                      setUseWallet(!!checked);
-                      if (checked) { setPromoCode(''); setPromoInput(''); }
-                    }}
-                  />
-                  <span className="flex items-center gap-2 font-semibold text-foreground">
-                    <Wallet className="h-4 w-4 text-primary" /> Use wallet balance
-                  </span>
-                  <span className="ml-auto text-muted-foreground">${walletBalance.toFixed(2)} available</span>
-                </label>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Applies toward this order — can't be combined with a promo code.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {!marketplaceBlocked && currentUser && step === STEPS.SUMMARY && flatItems.length > 0 && (
-            <Card className="border-border shadow-sm mt-4">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
-                  <Tag className="h-4 w-4 text-primary" /> Promo code
-                </div>
-                {appliedPromoCode ? (
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-mono tracking-widest">{appliedPromoCode}</span>
-                    <span className="text-green-600 font-semibold">−${discount.toFixed(2)} applied</span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => { setPromoCode(''); setPromoInput(''); }}
-                    >
-                      Remove
-                    </Button>
+          </div>
+        ) : flatItems.length === 0 ? (
+          <Card className="mx-auto max-w-lg border-border shadow-sm">
+            <CardContent className="flex flex-col items-center px-6 py-12 text-center">
+              <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted">
+                <ShoppingBag className="h-7 w-7 text-muted-foreground" />
+              </div>
+              <h2 className="text-lg font-bold text-foreground">Your cart is empty</h2>
+              <p className="mt-1 max-w-xs text-sm text-muted-foreground">
+                Browse the marketplace to find your next grail — it'll show up here ready to check out.
+              </p>
+              <Button className="mt-6" onClick={() => navigate('/marketplace')}>
+                Browse marketplace <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+            {/* ── Left: details ─────────────────────────────────────────── */}
+            <div className="space-y-6">
+              <Section step={1} icon={MapPin} title="Contact & shipping">
+                {savedAddresses.length > 0 && (
+                  <div className="space-y-1">
+                    <Label>Saved addresses</Label>
+                    <Select value={selectedAddressId} onValueChange={handlePickAddress}>
+                      <SelectTrigger><SelectValue placeholder="Choose a saved address" /></SelectTrigger>
+                      <SelectContent>
+                        {savedAddresses.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>
+                            {a.label ? `${a.label} — ` : ''}{formatAddressLabel(a)}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="__new">Use a new address</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                ) : (
-                  <form
-                    className="flex gap-2"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      if (promoInput.trim()) { setUseWallet(false); setPromoCode(promoInput.trim().toUpperCase()); }
-                    }}
-                  >
-                    <Input
-                      value={promoInput}
-                      onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
-                      placeholder="POP-XXXX-XXXX"
-                      autoComplete="off"
-                      className="font-mono tracking-widest uppercase"
-                      aria-label="Promo code"
-                      disabled={useWallet}
-                    />
-                    <Button type="submit" variant="outline" className="shrink-0" disabled={useWallet}>Apply</Button>
-                  </form>
                 )}
-                <p className="mt-2 text-xs text-muted-foreground">
-                  New here? Your welcome email includes a code for 10% off your first order.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
 
+                <ShippingAddressForm
+                  values={shippingData}
+                  onChange={(next) => {
+                    setShippingData(next);
+                    // Typing a fresh address means it's no longer one of the
+                    // saved picks.
+                    if (selectedAddressId && selectedAddressId !== '__new') setSelectedAddressId('__new');
+                  }}
+                  showEmail
+                />
+
+                {!currentUser && (
+                  <label className="flex items-start gap-3 rounded-lg border border-border bg-muted/20 p-3 text-sm cursor-pointer">
+                    <Checkbox
+                      className="mt-0.5"
+                      checked={subscribeNews}
+                      onCheckedChange={(checked) => setSubscribeNews(!!checked)}
+                    />
+                    <span className="text-muted-foreground">
+                      Email me order updates and CardPop news. You'll be able to create an
+                      account after payment to track your order.
+                    </span>
+                  </label>
+                )}
+
+                {currentUser && (
+                  <label className="flex items-center gap-3 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={saveAddress}
+                      onCheckedChange={(checked) => setSaveAddress(!!checked)}
+                    />
+                    <span className="text-muted-foreground">Save this address to my account for faster checkout next time.</span>
+                  </label>
+                )}
+              </Section>
+
+              <Section step={2} icon={CreditCard} title="Billing">
+                <BillingAddressForm
+                  values={billingData}
+                  onChange={setBillingData}
+                  shippingAddress={shippingData}
+                  sameAsShipping={sameAsShipping}
+                  onSameAsShippingChange={setSameAsShipping}
+                />
+              </Section>
+
+              <div ref={paymentRef}>
+                <Section step={3} icon={Lock} title="Payment">
+                  <PaymentMethodSelector />
+                  {readyToPay ? (
+                    <div className="space-y-4">
+                      <OrderReviewSection
+                        shippingData={shippingData}
+                        billingData={billingData}
+                        sameAsShipping={sameAsShipping}
+                        items={flatItems}
+                        subtotal={subtotal}
+                        serviceFee={serviceFee}
+                        gst={gst}
+                        shipping={shipping}
+                        discount={discount}
+                        total={total}
+                      />
+                      <EmbeddedStripeCheckout requestBody={checkoutRequestBody} />
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <Button size="lg" className="w-full font-semibold" onClick={handleReviewAndPay}>
+                        Review &amp; pay ${Number(total).toFixed(2)}
+                      </Button>
+                      <p className="text-center text-xs text-muted-foreground">
+                        You'll review your order before payment is taken. No charge until you confirm.
+                      </p>
+                    </div>
+                  )}
+                </Section>
+              </div>
+            </div>
+
+            {/* ── Right: sticky summary ─────────────────────────────────── */}
+            <aside className="space-y-4 lg:sticky lg:top-6">
+              {orderSummary}
+              {promoCard}
+              {walletCard}
+              <CheckoutReassurance />
+            </aside>
+          </div>
+        )}
       </div>
     </div>
   );
