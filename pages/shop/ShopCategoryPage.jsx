@@ -4,15 +4,22 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { useCategory } from '@/contexts/CategoryContext.jsx';
 import { getCategoryBySlug, getBreadcrumbs } from '@/utils/categoryUtils.js';
 import { findShopCategory } from '@/utils/shopCategories.js';
-import { generateMetaTitle, generateMetaDescription } from '@/utils/seoUtils.js';
+import { generateMetaTitle, generateMetaDescription, generateBreadcrumbStructuredData } from '@/utils/seoUtils.js';
+import { escapeLike } from '@/src/utils/escapeLike.js';
+import { slugify } from '@/lib/slugify.js';
 import SEOHead from '@/components/SEOHead.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
-import CategoryFilter from '@/components/CategoryFilter.jsx';
 import ProductGrid from '@/components/ProductGrid.jsx';
 import PaginationControls from '@/components/PaginationControls.jsx';
 import ShopAffiliateSection from '@/components/shop/ShopAffiliateSection.jsx';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ShoppingBag, Search, SlidersHorizontal } from 'lucide-react';
 import { useCart } from '@/hooks/useCart.jsx';
 import { toast } from 'sonner';
+
+const SITE_ORIGIN = 'https://cardpop.com.au';
+const PER_PAGE = 16;
 
 const ShopCategoryPage = () => {
   const { categorySlug, subcategorySlug, productTypeSlug } = useParams();
@@ -23,6 +30,7 @@ const ShopCategoryPage = () => {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState('newest');
+  const [searchTerm, setSearchTerm] = useState('');
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const fetchRef = useRef(null);
@@ -36,18 +44,17 @@ const ShopCategoryPage = () => {
   const { category, subcategory, productType } = pathInfo || {};
   const categoryName = shopCategory?.name || subcategory?.name || category?.name;
 
-  // Reset to the first page whenever the category path or sort changes, so we
-  // never land on an out-of-range page showing zero products.
+  // Reset to the first page whenever the category path, sort or search changes,
+  // so we never land on an out-of-range page showing zero products.
   useEffect(() => {
     setPage(1);
-  }, [categorySlug, subcategorySlug, productTypeSlug, sort]);
+  }, [categorySlug, subcategorySlug, productTypeSlug, sort, searchTerm]);
 
   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
       try {
-        const perPage = 16;
-        const from = (page - 1) * perPage;
+        const from = (page - 1) * PER_PAGE;
 
         let query = supabase
           .from('shop_products')
@@ -56,21 +63,22 @@ const ShopCategoryPage = () => {
 
         // shop_products stores a free-text category; match the resolved
         // subcategory/category name against it.
-        if (categoryName) query = query.ilike('category', `%${categoryName}%`);
+        if (categoryName) query = query.ilike('category', `%${escapeLike(categoryName)}%`);
+        if (searchTerm) query = query.ilike('title', `%${escapeLike(searchTerm)}%`);
 
         if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
         else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
         else if (sort === 'oldest') query = query.order('created_at', { ascending: true });
         else query = query.order('created_at', { ascending: false });
 
-        query = query.range(from, from + perPage - 1);
+        query = query.range(from, from + PER_PAGE - 1);
 
         const { data, count, error } = await query;
         if (error) throw error;
 
         setProducts((data || []).map(p => ({ ...p, source: 'shop', type: 'shop' })));
         setTotalItems(count || 0);
-        setTotalPages(Math.ceil((count || 0) / perPage));
+        setTotalPages(Math.ceil((count || 0) / PER_PAGE));
       } catch (error) {
         console.error('Failed to load shop category products:', error);
         toast.error('Failed to load products. Please try again.');
@@ -85,7 +93,7 @@ const ShopCategoryPage = () => {
     }
     // Depend on stable slug strings (not the derived path objects, which get new
     // identities every render and would re-run this effect needlessly).
-  }, [categoryName, page, sort, contextLoading]);
+  }, [categoryName, page, sort, searchTerm, contextLoading]);
 
   useEffect(() => {
     const channel = supabase
@@ -123,6 +131,13 @@ const ShopCategoryPage = () => {
       .catch(e => toast.error(e.message));
   };
 
+  const heroTitle = shopCategory?.name || productType?.name || subcategory?.name || category?.name || 'Shop Products';
+  const heroGroup = shopCategory?.group;
+  const heroDesc = shopCategory?.desc || category?.description || subcategory?.description
+    || `Browse our range of ${heroTitle.toLowerCase()} — sourced, checked and shipped fast across Australia.`;
+  const HeroIcon = shopCategory?.LeafIcon || shopCategory?.Icon || ShoppingBag;
+  const heroGradient = shopCategory?.gradient || 'from-brand-red to-brand-blue';
+
   const breadcrumbs = shopCategory
     ? [
         { label: 'Home', path: '/' },
@@ -130,60 +145,142 @@ const ShopCategoryPage = () => {
         { label: shopCategory.name },
       ]
     : getBreadcrumbs(category, subcategory, productType, '/shop');
+
   const metaTitle = shopCategory
     ? `${shopCategory.name} - CardPop Shop`
-    : generateMetaTitle(category, subcategory, productType) + " - Official Store";
+    : generateMetaTitle(category, subcategory, productType) + ' - Official Store';
   const metaDesc = shopCategory
     ? `Shop ${shopCategory.name.toLowerCase()} and more ${shopCategory.group.toLowerCase()} supplies at CardPop. Fast, tracked shipping across Australia.`
     : generateMetaDescription(category, totalItems);
 
-  return (
-    <div className="container-default section-padding">
-      <SEOHead 
-        title={metaTitle} 
-        description={metaDesc} 
-        canonicalUrl={typeof window !== 'undefined' ? window.location.href : ''} 
-      />
-      
-      <Breadcrumb items={breadcrumbs} />
-      
-      <div className="flex flex-col md:flex-row gap-8">
-        <div className="md:w-56 shrink-0">
-          <CategoryFilter
-            filters={{ sort }}
-            onChange={({ sort: nextSort }) => setSort(nextSort ?? 'newest')}
-          />
-        </div>
-        
-        <div className="flex-1 min-w-0">
-          <div className="mb-8">
-            {shopCategory && (
-              <p className="text-xs font-bold uppercase tracking-widest text-primary mb-1.5">
-                {shopCategory.group}
-              </p>
-            )}
-            <h1 className="text-3xl md:text-4xl font-bold font-heading text-foreground mb-2">
-              {shopCategory?.name || productType?.name || subcategory?.name || category?.name || 'Shop Products'}
-            </h1>
-            {shopCategory?.desc && (
-              <p className="text-muted-foreground text-lg mb-1">{shopCategory.desc}</p>
-            )}
-            <p className="text-muted-foreground text-sm">
-              {totalItems} {totalItems === 1 ? 'product' : 'products'} available
-            </p>
-          </div>
-          
-          <ProductGrid items={products} loading={loading || contextLoading} isVault={false} onAddToCart={handleAddToCart} />
-          
-          <PaginationControls
-            currentPage={page}
-            totalPages={totalPages}
-            onPageChange={setPage}
-          />
+  const canonicalPath = typeof window !== 'undefined' ? window.location.pathname : '';
+  const canonicalUrl = `${SITE_ORIGIN}${canonicalPath}`;
 
-          <ShopAffiliateSection category={categoryName || null} />
+  // Structured data — a BreadcrumbList plus a CollectionPage whose ItemList
+  // exposes the products on this page (name, image, price, link) so Google can
+  // surface the category as a rich product listing.
+  const absoluteImage = (p) => {
+    const raw = p.images?.[0] || p.image_url || p.card_image || null;
+    if (!raw) return undefined;
+    try { return new URL(raw, SITE_ORIGIN).href; } catch { return undefined; }
+  };
+  const breadcrumbSchema = generateBreadcrumbStructuredData(
+    breadcrumbs.map((c) => ({
+      name: c.label,
+      url: c.path ? `${SITE_ORIGIN}${c.path}` : canonicalUrl,
+    }))
+  );
+  const collectionSchema = products.length > 0 ? {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: metaTitle,
+    description: metaDesc,
+    url: canonicalUrl,
+    isPartOf: { '@type': 'WebSite', name: 'CardPop', url: SITE_ORIGIN },
+    mainEntity: {
+      '@type': 'ItemList',
+      numberOfItems: totalItems,
+      itemListElement: products.map((p, i) => {
+        const price = Number(p.price_aud ?? 0);
+        const productSchema = {
+          '@type': 'Product',
+          name: p.title || p.name || 'Trading Card Supply',
+          url: `${SITE_ORIGIN}/product/shop/${p.id}/${slugify(p.title || p.name || 'product')}`,
+          ...(absoluteImage(p) ? { image: absoluteImage(p) } : {}),
+          offers: {
+            '@type': 'Offer',
+            priceCurrency: 'AUD',
+            price: price.toFixed(2),
+            availability: (p.stock_quantity == null || p.stock_quantity > 0)
+              ? 'https://schema.org/InStock'
+              : 'https://schema.org/OutOfStock',
+            url: `${SITE_ORIGIN}/product/shop/${p.id}/${slugify(p.title || p.name || 'product')}`,
+          },
+        };
+        return {
+          '@type': 'ListItem',
+          position: (page - 1) * PER_PAGE + i + 1,
+          item: productSchema,
+        };
+      }),
+    },
+  } : null;
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col font-sans">
+      <SEOHead
+        title={metaTitle}
+        description={metaDesc}
+        canonicalUrl={canonicalUrl}
+        structuredData={[breadcrumbSchema, collectionSchema].filter(Boolean)}
+      />
+
+      {/* Hero — mirrors the main /shop page hero for a consistent, professional look */}
+      <section className="bg-card border-b border-border py-16 md:py-20">
+        <div className="container-default text-center">
+          <div className="flex justify-center mb-6">
+            <Breadcrumb items={breadcrumbs} />
+          </div>
+
+          <span
+            className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br ${heroGradient} shadow-lg mx-auto mb-6`}
+          >
+            <HeroIcon className="w-8 h-8 text-white drop-shadow-sm" />
+          </span>
+
+          {heroGroup && (
+            <p className="text-xs font-bold uppercase tracking-widest text-primary mb-2">
+              {heroGroup}
+            </p>
+          )}
+          <h1 className="text-4xl md:text-5xl font-bold font-heading mb-4">{heroTitle}</h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{heroDesc}</p>
         </div>
-      </div>
+      </section>
+
+      {/* Products */}
+      <section className="container-default py-12 w-full flex-1">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-8">
+          <div className="relative w-full sm:max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              name="shop-category-search"
+              aria-label={`Search ${heroTitle}`}
+              placeholder={`Search ${heroTitle.toLowerCase()}...`}
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="pl-9 h-11 rounded-xl bg-card border-border"
+            />
+          </div>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <p className="hidden sm:block text-sm text-muted-foreground whitespace-nowrap">
+              {totalItems} {totalItems === 1 ? 'product' : 'products'}
+            </p>
+            <Select value={sort} onValueChange={setSort}>
+              <SelectTrigger aria-label="Sort products" className="w-full sm:w-[200px] h-11 rounded-xl bg-card border-border">
+                <SlidersHorizontal className="w-4 h-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Newest Arrivals</SelectItem>
+                <SelectItem value="oldest">Oldest First</SelectItem>
+                <SelectItem value="price_asc">Price: Low to High</SelectItem>
+                <SelectItem value="price_desc">Price: High to Low</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <ProductGrid items={products} loading={loading || contextLoading} isVault={false} onAddToCart={handleAddToCart} />
+
+        <PaginationControls
+          currentPage={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+        />
+
+        <ShopAffiliateSection category={categoryName || null} />
+      </section>
     </div>
   );
 };

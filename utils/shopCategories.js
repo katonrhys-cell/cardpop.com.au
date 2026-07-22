@@ -98,6 +98,12 @@ export const SHOP_CATEGORIES = SHOP_CATEGORY_GROUPS.flatMap((group) =>
     group: group.label,
     groupSlug: group.slug,
     gradient: group.gradient,
+    blurb: group.blurb,
+    // Keep the leaf's own icon (the ...item spread sets it as `Icon`) available
+    // under `LeafIcon` before we overwrite `Icon` with the parent group's icon,
+    // so consumers that want the specific category icon (e.g. the category page
+    // hero) can still reach it while the shared `Icon` stays the group icon.
+    LeafIcon: item.Icon,
     Icon: group.Icon,
   }))
 );
