@@ -80,6 +80,9 @@ const STATIC_PAGES = [
   { loc: '/community/local-traders', lastmod: SITE_UPDATED,     freq: 'daily',   pri: '0.7' },
   { loc: '/community/whatnot',     lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.5' },
   { loc: '/community/building-your-business', lastmod: SITE_UPDATED, freq: 'monthly', pri: '0.6' },
+  { loc: '/community/forum',       lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.6' },
+  { loc: '/community/profiles',    lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.5' },
+  { loc: '/community/map',         lastmod: SITE_UPDATED,       freq: 'monthly', pri: '0.5' },
   { loc: '/blog',                  lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' },
   // Blog category hubs — prerendered for bots and linked from the site header.
   ...BLOG_CATEGORIES.map((c) => (
@@ -92,6 +95,9 @@ const STATIC_PAGES = [
   )),
   { loc: '/launch',                lastmod: '2026-07-05', freq: 'monthly', pri: '0.6' },
   { loc: '/about',                 lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
+  { loc: '/partners',              lastmod: SITE_UPDATED, freq: 'monthly', pri: '0.6' },
+  { loc: '/pricing',               lastmod: SITE_UPDATED, freq: 'monthly', pri: '0.6' },
+  { loc: '/photography-standard',  lastmod: SITE_UPDATED, freq: 'monthly', pri: '0.5' },
   { loc: '/contact',               lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
   { loc: '/faq',                   lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
   { loc: '/conviction-rating',     lastmod: '2026-07-12', freq: 'monthly', pri: '0.5' },
@@ -172,6 +178,27 @@ export default async function handler(req, res) {
           .select('city, updated_at')
           .eq('status', 'approved')
           .limit(500),
+        // Public seller profiles (/seller/:id) — prerendered for crawlers but
+        // previously absent from the sitemap. Sole traders are excluded here:
+        // their canonical is the /dealer store page (already listed above), so
+        // /seller/:id for them is a declared alternate, not a URL to advertise.
+        // is_public IS NOT false and is_sole_trader IS NOT true mirror exactly
+        // what renderSeller() serves (null is_public/is_sole_trader render).
+        supabase
+          .from('profiles')
+          .select('id, updated_at, reviews_count')
+          .not('is_public', 'is', false)
+          .not('is_sole_trader', 'is', true)
+          .order('updated_at', { ascending: false })
+          .limit(1000),
+        // Seller ids that currently have an active listing — the content gate
+        // for the block above, so we only advertise profiles with something to
+        // crawl (or a review history) rather than empty shells.
+        supabase
+          .from('listings')
+          .select('seller_id')
+          .eq('status', 'active')
+          .limit(2000),
       ]),
       new Promise((resolve) => setTimeout(() => resolve(null), DB_BUDGET_MS)),
     ]);
@@ -187,6 +214,16 @@ export default async function handler(req, res) {
     const events = rows(4);
     const trackedCards = rows(5);
     const directoryStores = rows(6);
+    const sellerProfiles = rows(7);
+    // Set of seller ids with at least one active listing — cheap membership
+    // test for the content gate below.
+    const activeSellerIds = new Set((rows(8) || []).map((r) => r.seller_id).filter(Boolean));
+    // A public, non-dealer profile earns a sitemap entry when it has active
+    // listings to show or a review history (aggregateRating) — either way the
+    // prerendered /seller page carries real, indexable content.
+    const publicSellers = sellerProfiles.filter(
+      (p) => activeSellerIds.has(p.id) || Number(p.reviews_count) > 0,
+    );
 
     const parts = [
       '<?xml version="1.0" encoding="UTF-8"?>',
@@ -212,6 +249,14 @@ export default async function handler(req, res) {
       for (const dealer of dealers) {
         const lastmod = (dealer.updated_at || TODAY).split('T')[0];
         parts.push(xmlUrl(`${BASE_URL}/dealer/${dealer.store_slug || dealer.id}`, lastmod, 'weekly', '0.6'));
+      }
+    }
+
+    if (publicSellers.length > 0) {
+      parts.push('', `  <!-- Public seller profiles (${publicSellers.length}) -->`);
+      for (const seller of publicSellers) {
+        const lastmod = (seller.updated_at || TODAY).split('T')[0];
+        parts.push(xmlUrl(`${BASE_URL}/seller/${seller.id}`, lastmod, 'weekly', '0.5'));
       }
     }
 
