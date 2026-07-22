@@ -6,7 +6,7 @@ const SEOHead = ({ title, description, canonicalUrl, ogImage, ogImageAlt, struct
   // Brand name Google surfaces as the "site name" above search results
   // (via og:site_name and the WebSite schema in index.html). Kept separate
   // from siteName so page titles stay "CardPop | …" without doubling up on "Australia".
-  const brandName = "CardPop Australia";
+  const brandName = "CardPop™ Australia";
   const SITE_ORIGIN = "https://cardpop.com.au";
   const defaultTitle = `${siteName} | Australia's Trading Card Marketplace`;
   const defaultDescription = "Buy, sell, and trade authenticated trading cards in Australia. Browse Pokemon, Magic, Yu-Gi-Oh and more on CardPop.";
