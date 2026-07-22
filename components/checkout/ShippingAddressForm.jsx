@@ -156,17 +156,26 @@ const ShippingAddressForm = ({ values = {}, onChange, showEmail = false }) => {
       {showEmail && (
         <div className="space-y-1">
           <Label>Email</Label>
-          <Input type="email" value={values.email ?? ''} onChange={e => update('email', e.target.value)} placeholder="you@example.com" />
+          <Input
+            type="email"
+            value={values.email ?? ''}
+            onChange={e => update('email', e.target.value)}
+            placeholder="you@example.com"
+            autoComplete="email"
+            inputMode="email"
+            autoCapitalize="none"
+            spellCheck={false}
+          />
         </div>
       )}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label>First Name</Label>
-          <Input value={values.firstName ?? ''} onChange={e => update('firstName', e.target.value)} />
+          <Input value={values.firstName ?? ''} onChange={e => update('firstName', e.target.value)} autoComplete="given-name" />
         </div>
         <div className="space-y-1">
           <Label>Last Name</Label>
-          <Input value={values.lastName ?? ''} onChange={e => update('lastName', e.target.value)} />
+          <Input value={values.lastName ?? ''} onChange={e => update('lastName', e.target.value)} autoComplete="family-name" />
         </div>
       </div>
 
@@ -245,7 +254,7 @@ const ShippingAddressForm = ({ values = {}, onChange, showEmail = false }) => {
       {placesActive && (
         <div className="space-y-1">
           <Label>Unit / Apartment <span className="text-muted-foreground font-normal">(optional)</span></Label>
-          <Input value={values.address2 ?? ''} onChange={e => update('address2', e.target.value)} placeholder="Unit 4, Level 2…" />
+          <Input value={values.address2 ?? ''} onChange={e => update('address2', e.target.value)} placeholder="Unit 4, Level 2…" autoComplete="address-line2" />
         </div>
       )}
       <div className="grid grid-cols-2 gap-3">
@@ -255,6 +264,7 @@ const ShippingAddressForm = ({ values = {}, onChange, showEmail = false }) => {
             value={values.suburb ?? ''}
             onChange={e => updateAndInvalidate('suburb', e.target.value)}
             readOnly={placesActive}
+            autoComplete="address-level2"
             className={placesActive ? 'bg-muted/50' : undefined}
           />
         </div>
@@ -275,6 +285,9 @@ const ShippingAddressForm = ({ values = {}, onChange, showEmail = false }) => {
           onChange={e => updateAndInvalidate('postcode', e.target.value)}
           maxLength={4}
           readOnly={placesActive}
+          autoComplete="postal-code"
+          inputMode="numeric"
+          pattern="[0-9]*"
           className={placesActive ? 'w-32 bg-muted/50' : 'w-32'}
         />
       </div>

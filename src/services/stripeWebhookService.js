@@ -157,6 +157,47 @@ async function flagAmountMismatch({ stripe, session, orderId, buyerId, amountCen
 }
 
 /**
+ * Save the buyer's shipping address to their address book so their next
+ * checkout is prefilled. Only runs when the buyer opted in at checkout
+ * (metadata.saveShippingAddress) and for a signed-in buyer (guests have no
+ * account). Best-effort and idempotent: a duplicate of an address they already
+ * have is skipped, and any failure is swallowed — persisting an address must
+ * never turn a fulfilled order into a webhook 500.
+ */
+async function saveBuyerShippingAddress(order) {
+  try {
+    const userId = order?.buyer_id;
+    const line1 = order?.shipping_address?.trim();
+    if (!userId || !line1) return;
+
+    const { data: existing } = await supabase
+      .from('shipping_addresses')
+      .select('id, address_line1, postcode')
+      .eq('user_id', userId);
+
+    const rows = Array.isArray(existing) ? existing : [];
+    const norm = (s) => String(s || '').trim().toLowerCase();
+    const dup = rows.some(r => norm(r.address_line1) === norm(line1) && norm(r.postcode) === norm(order.shipping_postcode));
+    if (dup) return;
+
+    await supabase.from('shipping_addresses').insert({
+      user_id:       userId,
+      label:         'Home',
+      full_name:     order.shipping_name ? String(order.shipping_name).slice(0, 100) : null,
+      address_line1: String(line1).slice(0, 200),
+      suburb:        order.shipping_suburb ? String(order.shipping_suburb).slice(0, 100) : null,
+      state:         order.shipping_state ? String(order.shipping_state).slice(0, 50) : null,
+      postcode:      order.shipping_postcode ? String(order.shipping_postcode).slice(0, 10) : null,
+      country:       'AU',
+      // First saved address becomes the default that prefills next time.
+      is_default:    rows.length === 0,
+    });
+  } catch (e) {
+    logger.warn(`[STRIPE] Could not save shipping address for buyer ${order?.buyer_id || 'n/a'}: ${e.message}`);
+  }
+}
+
+/**
  * Handle checkout.session.completed event
  * Processes both cart orders (pre-created 'pending') and single-item orders
  */
@@ -228,6 +269,12 @@ async function handleCartOrder(existing, session, stripe) {
   if (!claimed || claimed.length === 0) {
     logger.info(`[STRIPE] Cart order ${existing.id} already confirmed concurrently for session ${session.id}, skipping`);
     return;
+  }
+
+  // Buyer opted to save this address to their account — persist it now that the
+  // order is confirmed (best-effort; never blocks fulfilment).
+  if (session.metadata?.saveShippingAddress === 'true') {
+    await saveBuyerShippingAddress(existing);
   }
 
   // (The welcome-offer discount is consumed AFTER the lines are processed —

@@ -32,15 +32,14 @@ vi.mock('@/lib/supabaseClient.js', () => ({
 const mockToast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock('sonner', () => ({ toast: mockToast }));
 
-// Minimal stubs that expose each step's callbacks as plain buttons / values.
+// Minimal stubs that expose each section's values as plain testids.
 vi.mock('@/components/checkout/OrderSummary.jsx', () => ({
-  default: ({ subtotal, total, serviceFee, gst, onNext }) => (
+  default: ({ subtotal, total, serviceFee, gst }) => (
     <div>
       <span data-testid="subtotal">{subtotal}</span>
       <span data-testid="service-fee">{serviceFee}</span>
       <span data-testid="gst">{gst}</span>
       <span data-testid="total">{total}</span>
-      <button onClick={onNext}>summary-next</button>
     </div>
   ),
 }));
@@ -112,13 +111,12 @@ beforeEach(() => {
 describe('CheckoutPage — server pricing', () => {
   it('fetches authoritative pricing and shows the server totals', async () => {
     renderCheckout();
-    await waitFor(() => expect(screen.getByText('summary-next')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('total')).toHaveTextContent('110'));
 
     expect(mockFetch).toHaveBeenCalledWith('/stripe/calculate-cart', expect.objectContaining({ method: 'POST' }));
     const body = JSON.parse(mockFetch.mock.calls.find(([u]) => u === '/stripe/calculate-cart')[1].body);
     expect(body.items).toEqual([{ type: 'listing', id: 'l1', quantity: 1 }]);
 
-    await waitFor(() => expect(screen.getByTestId('total')).toHaveTextContent('110'));
     expect(screen.getByTestId('subtotal')).toHaveTextContent('100');
     expect(screen.getByTestId('service-fee')).toHaveTextContent('8'); // commission, shown separately
     expect(screen.getByTestId('gst')).toHaveTextContent('2'); // GST, shown separately
@@ -131,7 +129,6 @@ describe('CheckoutPage — server pricing', () => {
       return Promise.resolve({ ok: true, json: async () => ({}) });
     });
     renderCheckout();
-    await waitFor(() => expect(screen.getByText('summary-next')).toBeInTheDocument());
     await waitFor(() => expect(screen.getByTestId('total')).toHaveTextContent('100')); // client subtotal
   });
 });
@@ -139,26 +136,22 @@ describe('CheckoutPage — server pricing', () => {
 // ─── guards & validation ─────────────────────────────────────────────────────
 
 describe('CheckoutPage — guards & validation', () => {
-  it('blocks advancing past an empty cart', async () => {
+  it('shows an empty-cart state instead of the checkout form', async () => {
     h.cartItems = [];
     renderCheckout();
-    await waitFor(() => expect(screen.getByText('summary-next')).toBeInTheDocument());
-
-    await userEvent.click(screen.getByText('summary-next'));
-    expect(mockToast.error).toHaveBeenCalledWith('Your cart is empty!');
-    // Still on the summary step (no shipping form yet).
+    await screen.findByText(/your cart is empty/i);
+    // No shipping form / payment when there's nothing to buy.
     expect(screen.queryByText('fill-shipping')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /review & pay/i })).not.toBeInTheDocument();
   });
 
-  it('requires a complete shipping address before continuing', async () => {
+  it('requires a complete shipping address before revealing payment', async () => {
     renderCheckout();
-    await waitFor(() => expect(screen.getByText('summary-next')).toBeInTheDocument());
-
-    await userEvent.click(screen.getByText('summary-next'));
     await screen.findByText('fill-shipping');
-    // Continue without filling the address.
-    await userEvent.click(screen.getByRole('button', { name: /continue/i }));
+    // Try to pay without filling the address.
+    await userEvent.click(screen.getByRole('button', { name: /review & pay/i }));
     expect(mockToast.error).toHaveBeenCalledWith('Please fill in all shipping address fields.');
+    expect(screen.queryByTestId('embedded-checkout')).not.toBeInTheDocument();
   });
 });
 
@@ -172,14 +165,14 @@ describe('CheckoutPage — marketplace identity gate', () => {
       expect(screen.getByText(/verify your identity to buy on the marketplace/i)).toBeInTheDocument(),
     );
     // The order summary / payment flow is not rendered while blocked.
-    expect(screen.queryByText('summary-next')).not.toBeInTheDocument();
+    expect(screen.queryByText('fill-shipping')).not.toBeInTheDocument();
   });
 
   it('does NOT gate a shop-only cart for an unverified buyer', async () => {
     h.auth = { currentUser: { email: 'user@x.com' }, isIdentityVerified: false, profileLoading: false };
     h.cartItems = [{ product: { id: 'p1', type: 'shop', title: 'Booster', price: 10 }, quantity: 1, variant: null }];
     renderCheckout();
-    await waitFor(() => expect(screen.getByText('summary-next')).toBeInTheDocument());
+    await screen.findByText('fill-shipping');
     expect(screen.queryByText(/verify your identity to buy on the marketplace/i)).not.toBeInTheDocument();
   });
 });
@@ -187,20 +180,16 @@ describe('CheckoutPage — marketplace identity gate', () => {
 // ─── full checkout flow ──────────────────────────────────────────────────────
 
 describe('CheckoutPage — checkout flow', () => {
-  async function advanceToPay() {
-    await userEvent.click(screen.getByText('summary-next'));         // → SHIPPING
+  async function reachPayment() {
     await screen.findByText('fill-shipping');
-    await userEvent.click(screen.getByText('fill-shipping'));        // populate address
-    await userEvent.click(screen.getByRole('button', { name: /continue/i })); // → BILLING
-    await screen.findByText('billing-form');
-    await userEvent.click(screen.getByRole('button', { name: /continue/i })); // → PAY
+    await userEvent.click(screen.getByText('fill-shipping'));                    // populate address
+    await userEvent.click(screen.getByRole('button', { name: /review & pay/i })); // reveal payment
     await screen.findByTestId('embedded-checkout');
   }
 
-  it('reaches the inline payment step and passes items + shipping to the Stripe form', async () => {
+  it('reveals the inline payment form and passes items + shipping to Stripe', async () => {
     renderCheckout();
-    await waitFor(() => expect(screen.getByText('summary-next')).toBeInTheDocument());
-    await advanceToPay();
+    await reachPayment();
 
     // The inline Stripe form is mounted with the authoritative order body — no
     // redirect off the page.
@@ -208,5 +197,12 @@ describe('CheckoutPage — checkout flow', () => {
     expect(body.items).toEqual([{ type: 'listing', id: 'l1', quantity: 1 }]);
     expect(body.shippingAddress).toMatchObject({ name: 'Ada L', postcode: '2000', state: 'NSW' });
     expect(window.location.href).toBe('http://localhost/checkout'); // stayed on-page
+  });
+
+  it('flags the address to be saved for a signed-in buyer', async () => {
+    renderCheckout();
+    await reachPayment();
+    const body = JSON.parse(screen.getByTestId('embedded-checkout').textContent);
+    expect(body.saveShippingAddress).toBe(true);
   });
 });

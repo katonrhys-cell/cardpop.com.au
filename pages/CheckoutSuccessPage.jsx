@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { CheckCircle2, Package, ArrowRight, AlertTriangle, Loader2, UserPlus } from 'lucide-react';
+import { CheckCircle2, Package, ArrowRight, AlertTriangle, Loader2, UserPlus, Mail, Truck, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -208,13 +208,33 @@ const CheckoutSuccessPage = () => {
 
         <h1 className="font-serif text-4xl font-bold mb-4">Thank you for your order!</h1>
         <p className="text-lg text-muted-foreground mb-8 max-w-md mx-auto">
-          Your payment was successful and your order is now being processed. A confirmation email has been sent to you.
+          Your payment was successful and your order is now being processed.
+          {sessionData?.customerEmail
+            ? <> A confirmation has been emailed to <span className="font-medium text-foreground">{sessionData.customerEmail}</span>.</>
+            : ' A confirmation email is on its way.'}
         </p>
 
-        <Card className="premium-card p-6 md:p-8 text-left mb-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <Card className="premium-card p-6 md:p-8 text-left mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <h2 className="font-bold text-xl mb-6 border-b border-border pb-4 flex items-center gap-2">
             <Package className="w-5 h-5 text-primary" /> Order Details
           </h2>
+
+          {/* Itemised lines, when Stripe returned them. */}
+          {sessionData?.items?.length > 0 && (
+            <ul className="mb-4 space-y-2 border-b border-border/50 pb-4">
+              {sessionData.items.map((item, i) => (
+                <li key={i} className="flex justify-between gap-3 text-sm">
+                  <span className="text-foreground">
+                    {item.name}
+                    {item.quantity > 1 && <span className="text-muted-foreground"> × {item.quantity}</span>}
+                  </span>
+                  <span className="font-medium text-muted-foreground whitespace-nowrap">
+                    ${((item.unitAmount * (item.quantity || 1)) / 100).toFixed(2)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
 
           <div className="space-y-4 text-sm">
             <div className="flex justify-between border-b border-border/50 pb-2">
@@ -238,20 +258,56 @@ const CheckoutSuccessPage = () => {
           </div>
         </Card>
 
+        {/* What happens next — sets expectations so the buyer isn't left wondering. */}
+        <Card className="premium-card p-6 md:p-8 text-left mb-6">
+          <h2 className="font-bold text-lg mb-5 flex items-center gap-2">What happens next</h2>
+          <ol className="space-y-4">
+            {[
+              { icon: Mail, title: 'Confirmation emailed', body: 'Your receipt and order summary are on their way to your inbox.' },
+              { icon: Package, title: 'Carefully packed', body: 'Your cards are sleeved, protected and packed for safe transit.' },
+              { icon: Truck, title: 'Shipped with tracking', body: "We'll email your tracking number the moment it's on the way." },
+            ].map(({ icon: Icon, title, body }) => (
+              <li key={title} className="flex items-start gap-3">
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                  <Icon className="h-[18px] w-[18px]" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{title}</p>
+                  <p className="text-sm text-muted-foreground">{body}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-5 flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            <ShieldCheck className="h-4 w-4 shrink-0 text-primary" />
+            Covered by CardPop Buyer Protection — if it doesn't arrive as described, you're refunded.
+          </p>
+        </Card>
+
         {/* Guests who just checked out can turn this into a real account. */}
         {!isAuthenticated && sessionData?.customerEmail && (
           <GuestAccountCard email={sessionData.customerEmail} name={sessionData.customerName} />
         )}
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button asChild size="lg" className="rounded-full shadow-lg shadow-primary/20">
-            <Link to="/marketplace">
-              Continue Shopping <ArrowRight className="w-4 h-4 ml-2" />
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="lg" className="rounded-full">
-            <Link to="/vault">View My Vault</Link>
-          </Button>
+          {isAuthenticated ? (
+            <>
+              <Button asChild size="lg" className="rounded-full shadow-lg shadow-primary/20">
+                <Link to="/account/orders">
+                  Track your order <ArrowRight className="w-4 h-4 ml-2" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="lg" className="rounded-full">
+                <Link to="/marketplace">Continue Shopping</Link>
+              </Button>
+            </>
+          ) : (
+            <Button asChild size="lg" className="rounded-full shadow-lg shadow-primary/20">
+              <Link to="/marketplace">
+                Continue Shopping <ArrowRight className="w-4 h-4 ml-2" />
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
     </div>
