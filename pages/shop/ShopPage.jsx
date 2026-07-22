@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import ShopCategoryBrowse from '@/components/ShopCategoryBrowse.jsx';
@@ -19,7 +20,10 @@ const ShopPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [sort, setSort] = useState('created_at_desc');
-  const [searchTerm, setSearchTerm] = useState('');
+  // Seed the search box from ?q so a whole-site search handoff (e.g. the
+  // "Browse all → Shop" link on /search) pre-fills and filters the shop.
+  const [searchParams] = useSearchParams();
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const { addToCart } = useCart();
   const fetchRef = useRef(null);
 
