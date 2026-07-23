@@ -421,7 +421,6 @@ const Header = () => {
             </Sheet>
 
           </div>
-        </div>
 
         {/* ── Mobile/tablet search row ──
             The Row-1 search is centred and desktop-only (hidden lg:flex), so
@@ -442,6 +441,7 @@ const Header = () => {
             </nav>
           </div>
         )}
+      </div>
     </header>
   );
 };
