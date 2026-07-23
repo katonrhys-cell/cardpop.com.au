@@ -10,8 +10,8 @@ import { Button } from '@/components/ui/button';
  * (the `can_sell()` RLS gate on `listings`). Without this warning the listing
  * write is silently denied and the seller believes their card is live.
  *
- * Self-hiding: renders nothing while entitlement is unknown (fail-open, same
- * as SellingGate) or once the user can sell. The step links open in a new tab
+ * Self-hiding: renders nothing while entitlement is unknown (fail-open — the
+ * DB policy is the hard gate) or once the user can sell. The step links open in a new tab
  * on purpose — the listing form has no draft autosave, so navigating away
  * would lose everything the seller has entered. "Check again" refetches the
  * profile so `canSell` picks up steps completed in the other tab.

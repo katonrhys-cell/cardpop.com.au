@@ -117,17 +117,21 @@ describe('MarketplacePage — listing states', () => {
 // ─── search & refresh ─────────────────────────────────────────────────────────
 
 describe('MarketplacePage — search and refresh', () => {
-  it('applies the debounced search term as an ilike filter', async () => {
+  it('applies the debounced search term across card name, set name and number', async () => {
     h.result = { data: [listing('l1', 'Charizard')], error: null };
     renderPage();
     await waitFor(() => expect(screen.getByText('Charizard')).toBeInTheDocument());
 
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText('Search card name...'), 'charizard');
+    await user.type(screen.getByPlaceholderText('Search card, set or number...'), 'charizard');
 
     // Debounced (~400ms) before the effect re-runs the query with the filter.
     await waitFor(
-      () => expect(h.lastCalls).toContainEqual(['ilike', 'vault_item.card_name', '%charizard%']),
+      () => expect(h.lastCalls).toContainEqual([
+        'or',
+        'card_name.ilike."%charizard%",set_name.ilike."%charizard%",card_number.ilike."%charizard%"',
+        { referencedTable: 'vault_item' },
+      ]),
       { timeout: 1500 },
     );
   });
