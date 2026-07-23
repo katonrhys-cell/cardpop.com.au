@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import AccountPlanBanner from '@/components/AccountPlanBanner.jsx';
+import P2PTradingNotice from '@/components/P2PTradingNotice.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 
@@ -211,6 +212,9 @@ const AccountDashboard = () => {
           </div>
         </div>
       )}
+
+      {/* Peer-to-peer trading launch notice (coming late 2026) */}
+      <P2PTradingNotice />
 
       {/* Plan status + next-step nudges (Hobby vs Pro) */}
       <AccountPlanBanner />
