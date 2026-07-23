@@ -4,7 +4,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, ChevronDown, Sparkles, Loader2,
   Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X, Crop,
-  Frame, Wand2, SlidersHorizontal, HandCoins, History,
+  Frame, Wand2, SlidersHorizontal, HandCoins, History, Camera,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
@@ -43,6 +43,7 @@ import { publicImageUrl, thumbStoragePath } from '@/utils/imageUrl.js';
 import SellingRequirementsNotice from '@/components/SellingRequirementsNotice.jsx';
 import { isSellingEntitlementError } from '@/utils/listingErrors.js';
 import { loadListingDraft, saveListingDraft, clearListingDraft, hasMeaningfulContent } from '@/lib/listingDraft.js';
+import { shouldAutoIdentify } from '@/utils/listingFlow.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -549,6 +550,15 @@ const AddEditCardPage = () => {
     clearCrop();
     setAdjusting(null);
     runPhotoQuality(file);
+    // Allow re-picking the same file (change events don't fire otherwise) —
+    // the main dropzone and the mobile take-photo input share this handler.
+    e.target.value = '';
+    // Photo-first flow: identification is the default, not an opt-in button.
+    // Runs at most once per new card (guarded on an empty card name), and the
+    // prefill is non-destructive, so nothing the seller typed is overwritten.
+    if (shouldAutoIdentify({ isEdit, cardName: formData.cardName, isScanning, isIdentifying })) {
+      handleAnalyzeWithAI(file);
+    }
   };
 
   // Apply a cropped image to the given slot ('main' or an extra-photo index).
@@ -598,13 +608,17 @@ const AddEditCardPage = () => {
   };
 
   // ─── Unified AI analysis ──────────────────────────────────────────────────
-  const handleAnalyzeWithAI = async () => {
-    if (!imageFile) return;
+  // `file` is passed explicitly by the auto-run in handleImageChange (the
+  // imageFile state hasn't committed yet at that point); the manual button
+  // omits it and analyzes the current image.
+  const handleAnalyzeWithAI = async (file) => {
+    const frontImage = file instanceof File ? file : imageFile;
+    if (!frontImage) return;
     clearScan();
     clearCardSight();
 
     // 1. Try CardSight catalog identification first (returns result directly)
-    const csResult = await cardSightIdentify(imageFile, formData.collection);
+    const csResult = await cardSightIdentify(frontImage, formData.collection);
 
     // If CardSight service is unavailable, fall through to OCR — don't bail out
     if (csResult?.identified) {
@@ -632,7 +646,7 @@ const AddEditCardPage = () => {
 
     // Pass the front plus any back/extra images so OCR can read set codes and
     // collector numbers that are clearer (or only present) on the back.
-    const ocrResult = await scanCard([imageFile, ...extraFiles.filter(Boolean)].slice(0, 3));
+    const ocrResult = await scanCard([frontImage, ...extraFiles.filter(Boolean)].slice(0, 3));
     if (ocrResult) {
       setFormData(prev => ({
         ...prev,
@@ -1211,6 +1225,22 @@ const AddEditCardPage = () => {
                   />
                 </div>
 
+                {/* Mobile: jump straight to the camera. The dropzone above
+                    still opens the OS picker (library or camera); `capture`
+                    skips the sheet and starts the camera immediately. Hidden
+                    on desktop, where capture is ignored and it would just
+                    duplicate the picker. */}
+                <label className="sm:hidden mt-3 flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background text-sm font-bold hover:bg-muted/50 transition-colors">
+                  <Camera className="w-4 h-4" /> Take a photo
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    capture="environment"
+                    onChange={handleImageChange}
+                    className="sr-only"
+                  />
+                </label>
+
                 {/* Auto-crop (opt-in): button → detecting → preview + confirm */}
                 {imageFile && !(cropCandidate?.key === 'main') && (
                   <div className="mt-3 flex gap-2">
@@ -1367,12 +1397,14 @@ const AddEditCardPage = () => {
                       <Button
                         type="button"
                         variant="secondary"
-                        onClick={handleAnalyzeWithAI}
+                        onClick={() => handleAnalyzeWithAI()}
                         className="w-full bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 border border-emerald-500/20 dark:text-emerald-400"
                       >
                         <Sparkles className="w-4 h-4 mr-2" /> Identify Card
                       </Button>
-                      <p className="text-xs text-center text-muted-foreground">(Recommended)</p>
+                      <p className="text-xs text-center text-muted-foreground">
+                        Runs automatically when you add your first photo — tap to run again.
+                      </p>
                     </div>
                   )}
 
