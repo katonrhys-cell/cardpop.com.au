@@ -57,7 +57,7 @@ const CheckoutPage = () => {
   const [searchParams] = useSearchParams();
   const source = searchParams.get('source');
 
-  const { cartItems } = useCart();
+  const { cartItems, setIsCartOpen } = useCart();
   const { currentUser, isIdentityVerified, profileLoading } = useAuth();
   const [initializing, setInitializing] = useState(true);
 
@@ -405,7 +405,10 @@ const CheckoutPage = () => {
       shipping={shipping}
       discount={discount}
       total={total}
-      onEditCart={() => navigate('/marketplace')}
+      // "Edit Cart" opens the cart drawer (remove items / change quantities)
+      // rather than bouncing to the marketplace. Hidden for the direct Vault
+      // "buy now" flow, which isn't backed by the cart — there's nothing to edit.
+      onEditCart={directItem ? undefined : () => setIsCartOpen(true)}
     />
   );
 
