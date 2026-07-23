@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 /**
  * "Verify with Stripe" — the identity check required before buying, selling or
  * trading. It sits alongside "Add a card on file": together they are the two
- * prerequisites the `SellingGate` / DB `can_sell()` rule enforce.
+ * prerequisites the `SellingRequirementsNotice` / DB `can_sell()` rule enforce.
  *
  * Starting verification creates a hosted Stripe Identity session on the backend
  * (POST /stripe/identity/session) and redirects to Stripe, where the user

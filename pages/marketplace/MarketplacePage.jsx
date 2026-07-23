@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { escapeLike } from '@/src/utils/escapeLike.js';
+import { buildCardSearchOr } from '@/src/utils/cardSearchFilter.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search, RefreshCw, AlertCircle, Users, X, ChevronDown } from 'lucide-react';
@@ -239,7 +240,13 @@ const MarketplacePage = () => {
         if (filterSubset)   query = query.eq('vault_item.subset_id', filterSubset);
 
         if (filterPlayer) query = query.ilike('vault_item.card_name', `%${escapeLike(filterPlayer)}%`);
-        if (debouncedSearch.trim()) query = query.ilike('vault_item.card_name', `%${escapeLike(debouncedSearch.trim())}%`);
+        // Free-text search matches card name, set name and card number (see
+        // CARD_SEARCH_COLUMNS) — set/number are prefilled by the AI identify at
+        // listing time, so "Base Set" or "4/102" finds the card too. The !inner
+        // embed makes this or-filter on vault_item constrain the listings rows.
+        if (debouncedSearch.trim()) {
+          query = query.or(buildCardSearchOr(debouncedSearch), { referencedTable: 'vault_item' });
+        }
         if (debouncedMin && !isNaN(debouncedMin)) query = query.gte('price_aud', Number(debouncedMin));
         if (debouncedMax && !isNaN(debouncedMax)) query = query.lte('price_aud', Number(debouncedMax));
 
@@ -369,7 +376,7 @@ const MarketplacePage = () => {
               <Input
                 name="marketplace-search"
                 aria-label="Search card name"
-                placeholder="Search card name..."
+                placeholder="Search card, set or number..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 className="pl-9 h-10 rounded-xl bg-background border-border"

@@ -103,8 +103,8 @@ marketplace checkout and are reused here.
   mirror the subscription status onto `profiles.subscription_status` /
   `trial_ends_at`.
 - **Gating**: `contexts/AuthContext.jsx` derives `canSell`; the DB `can_sell()`
-  RLS policy is the hard enforcement; `components/SellingGate.jsx` and the guard
-  in `components/ListingForm.jsx` handle the UX.
+  RLS policy is the hard enforcement; `components/SellingRequirementsNotice.jsx`
+  (shown in the add-card form and the vault listing modal) handles the UX.
 
 > To collect the card strictly **during** registration, disable "Confirm email"
 > in Supabase Auth so `signUp()` returns a session. Otherwise the card step

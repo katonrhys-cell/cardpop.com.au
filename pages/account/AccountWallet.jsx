@@ -180,8 +180,9 @@ const AccountWallet = () => {
       </div>
 
       {/* Prerequisites for transacting — identity verification + a card on file.
-          Both are required before buying, selling or trading (see SellingGate /
-          DB can_sell()); the card is never charged until you actually transact. */}
+          Both are required before buying, selling or trading (see
+          SellingRequirementsNotice / DB can_sell()); the card is never charged
+          until you actually transact. */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <VerifyIdentityCard />
         <SavePaymentMethod />
