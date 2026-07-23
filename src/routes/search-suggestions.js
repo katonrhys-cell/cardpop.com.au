@@ -35,11 +35,15 @@ router.get('/', async (req, res) => {
 
     if (cardsError) throw cardsError;
 
-    // Search for product names
-    const { data: products, error: productsError } = await supabase
-      .from('products')
-      .select('title, name')
-      .or(`title.ilike.%${safeQ}%,name.ilike.%${safeQ}%`)
+    // Search active shop product titles. (Was querying a stale `products`
+    // table with a non-existent `name` column, so shop items never surfaced in
+    // suggestions; the real catalogue is `shop_products`, whose only text title
+    // column is `title`.)
+    const { data: shopProducts, error: productsError } = await supabase
+      .from('shop_products')
+      .select('title')
+      .eq('status', 'active')
+      .ilike('title', `%${safeQ}%`)
       .limit(limit)
       .order('title');
 
@@ -47,14 +51,13 @@ router.get('/', async (req, res) => {
 
     // Combine and deduplicate suggestions
     const suggestions = new Set();
-    
+
     cards?.forEach(card => {
       if (card.card_name) suggestions.add(card.card_name);
     });
-    
-    products?.forEach(product => {
+
+    shopProducts?.forEach(product => {
       if (product.title) suggestions.add(product.title);
-      if (product.name) suggestions.add(product.name);
     });
 
     // Add popular card names as fallback if few results

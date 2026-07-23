@@ -15,7 +15,7 @@ import {
   Settings, FolderTree, ListOrdered, BarChart3, Store, Shield,
   BookOpen, Globe, Star, Award, TrendingUp, Newspaper, BadgeCheck, Ticket, Handshake,
   Calculator, MapPin, ClipboardList, HelpCircle, MessageSquare,
-  ShoppingBag, LineChart, Info, Sparkles, Rocket, Tag,
+  ShoppingBag, LineChart, Info, Sparkles, Rocket, Tag, MoreHorizontal,
 } from 'lucide-react';
 import { TCG_CATEGORY_DATA, SPORTS_CATEGORY_DATA } from '@/components/CategoryIcons.jsx';
 import { SHOP_CATEGORY_GROUPS } from '@/utils/shopCategories.js';
@@ -37,8 +37,16 @@ export const NAV_LINKS = [
   { label: 'Community', href: '/community' },
   { label: 'Events', href: '/events' },
   { label: 'Grading', href: '/grading' },
-  { label: 'Pricing', href: '/pricing', icon: Sparkles },
-  { label: 'About', href: '/about', icon: Info },
+];
+
+// Secondary / informational links, grouped under the "More" dropdown so the
+// primary nav stays focused on shopping & discovery. Add future secondary
+// items here and they appear in both the desktop dropdown and mobile section.
+const MORE_ITEMS = [
+  { href: '/card-shops',                       label: 'Card Shop Directory',    desc: 'Find local card shops city by city',   Icon: Store,    gradient: 'from-amber-500 to-orange-500' },
+  { href: '/community/building-your-business', label: 'Building Your Business', desc: 'Tools we use to grow a card business', Icon: Rocket,   gradient: 'from-rose-500 to-orange-500'  },
+  { href: '/pricing',                          label: 'Pricing',                desc: 'Membership plans & seller fees',       Icon: Sparkles, gradient: 'from-amber-500 to-orange-500' },
+  { href: '/about',                            label: 'About',                  desc: 'Our story and mission',                Icon: Info,     gradient: 'from-blue-500 to-indigo-600'  },
 ];
 
 const ADMIN_LINKS = [
@@ -70,10 +78,8 @@ const COMMUNITY_ITEMS = [
   { href: '/community/forum',          label: 'Forum',                 desc: 'Discussions and community posts',        Icon: MessageSquare, gradient: 'from-violet-500 to-purple-600'  },
   { href: '/community/profiles',       label: 'Profiles',              desc: 'Browse collector profiles',              Icon: Users,         gradient: 'from-emerald-500 to-teal-600'   },
   { href: '/community/local-traders',  label: 'Local Traders',         desc: 'Endorsed sellers near you',              Icon: BadgeCheck,    gradient: 'from-blue-500 to-cyan-600'    },
-  { href: '/card-shops',               label: 'Card Shop Directory',   desc: 'Find local card shops city by city',     Icon: Store,         gradient: 'from-amber-500 to-orange-500'  },
   { href: '/community/map',            label: 'Community Map',         desc: 'Stores, shows & traders near you',       Icon: MapPin,        gradient: 'from-blue-500 to-indigo-600'   },
   { href: '/community/whatnot',        label: 'Whatnot',               desc: 'Live buying and selling shows',          Icon: WhatnotIcon,   gradient: 'from-green-500 to-emerald-600', isWhatnot: true },
-  { href: '/community/building-your-business', label: 'Building Your Business', desc: 'Tools we use to grow a card business', Icon: Rocket,     gradient: 'from-rose-500 to-orange-500'   },
 ];
 
 const EVENT_ITEMS = [
@@ -761,6 +767,53 @@ const AnalyticsDropdown = ({ onNavigate }) => {
   );
 };
 
+// ─── More dropdown (secondary/informational links) ────────────────────────────
+const MoreDropdown = ({ onNavigate }) => {
+  const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
+  const location = useLocation();
+  const isMoreActive = MORE_ITEMS.some(i => location.pathname === i.href || location.pathname.startsWith(i.href + '/'));
+
+  return (
+    <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
+      <button
+        onClick={handleTriggerClick}
+        aria-expanded={open}
+        className={`flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
+          open || isMoreActive
+            ? 'bg-primary text-primary-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+        }`}
+      >
+        More
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full right-0 mt-2 w-64 bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+          <div className="p-3 grid gap-0.5">
+            {MORE_ITEMS.map(item => (
+              <Link
+                key={item.href}
+                to={item.href}
+                onClick={() => { setOpen(false); onNavigate?.(); }}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
+              >
+                <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${item.gradient} shrink-0 shadow-sm`}>
+                  <item.Icon className="w-4 h-4 text-white" />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{item.label}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{item.desc}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─── Mobile shop section (expandable) ────────────────────────────────────────
 const MobileShopSection = ({ onNavigate }) => {
   const [open, setOpen] = useState(false);
@@ -1046,6 +1099,43 @@ const MobileAnalyticsSection = ({ onNavigate }) => {
   );
 };
 
+// ─── Mobile more section (expandable) ────────────────────────────────────────
+const MobileMoreSection = ({ onNavigate }) => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-4">
+      <button
+        onClick={() => startTransition(() => setOpen(o => !o))}
+        className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-muted transition-colors mb-0.5"
+      >
+        <span className="text-sm font-bold text-foreground flex items-center gap-2">
+          <MoreHorizontal className="w-4 h-4 text-primary" />
+          More
+        </span>
+        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="flex flex-col gap-0.5 mb-1 pl-2">
+          {MORE_ITEMS.map(item => (
+            <SheetClose key={item.href} asChild>
+              <Link
+                to={item.href}
+                onClick={onNavigate}
+                className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
+              >
+                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${item.gradient} shrink-0`}>
+                  <item.Icon className="w-3.5 h-3.5 text-white" />
+                </span>
+                <span className="text-xs font-semibold text-foreground truncate">{item.label}</span>
+              </Link>
+            </SheetClose>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Plain inline account section — no nested Radix portals inside the Sheet Dialog
 const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout }) => {
   const [expanded, setExpanded] = useState(false);
@@ -1139,6 +1229,7 @@ export const DesktopNavMenus = ({ onNavigate }) => {
           </Link>
         );
       })}
+      <MoreDropdown onNavigate={onNavigate} />
     </>
   );
 };
@@ -1216,6 +1307,7 @@ export const MobileNavMenus = ({
               </SheetClose>
             );
           })}
+          <MobileMoreSection key={`more-${openKey}`} onNavigate={onNavigate} />
         </nav>
 
         {isAdmin && (

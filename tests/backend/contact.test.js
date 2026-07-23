@@ -14,6 +14,13 @@ vi.mock('../../src/utils/supabaseClient.js', () => ({
   default: { from: () => ({ select: () => ({ in: mockIn }) }) },
 }));
 
+// Turnstile verify — default success (matches the fail-open behaviour when no
+// secret is configured); individual tests override it to simulate a failure.
+const mockVerifyTurnstile = vi.hoisted(() => vi.fn());
+vi.mock('../../src/utils/turnstile.js', () => ({
+  verifyTurnstileToken: mockVerifyTurnstile,
+}));
+
 import contactRouter from '../../src/routes/contact.js';
 
 function makeApp() {
@@ -35,6 +42,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockSendContactMessage.mockResolvedValue(true);
   mockIn.mockResolvedValue({ data: [{ key: 'contact_email', value: 'support@cardpop.com.au' }] });
+  mockVerifyTurnstile.mockResolvedValue({ success: true });
 });
 
 // ─── validation ───────────────────────────────────────────────────────────────
@@ -99,6 +107,23 @@ describe('POST /contact — success', () => {
     mockIn.mockResolvedValue({ data: [{ key: 'notification_email', value: 'ops@cardpop.com.au' }] });
     await request(app).post('/').send(VALID);
     expect(mockSendContactMessage.mock.calls[0][0].to).toBe('ops@cardpop.com.au');
+  });
+});
+
+// ─── captcha ───────────────────────────────────────────────────────────────
+
+describe('POST /contact — Turnstile', () => {
+  it('passes the submitted token to the verifier', async () => {
+    await request(app).post('/').send({ ...VALID, turnstileToken: 'tok-123' });
+    expect(mockVerifyTurnstile).toHaveBeenCalledWith('tok-123', expect.anything());
+  });
+
+  it('returns 400 and does not send when captcha verification fails', async () => {
+    mockVerifyTurnstile.mockResolvedValue({ success: false });
+    const res = await request(app).post('/').send({ ...VALID, turnstileToken: 'bad' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/captcha/i);
+    expect(mockSendContactMessage).not.toHaveBeenCalled();
   });
 });
 

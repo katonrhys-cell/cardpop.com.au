@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
+import Breadcrumb from '@/components/Breadcrumb.jsx';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Building2, ArrowLeft, ArrowRight, Award, ShieldCheck, ExternalLink } from 'lucide-react';
@@ -125,6 +126,10 @@ const GradingCompaniesPage = () => {
   return (
     <div className="min-h-screen bg-background">
       <SEOHead title="Grading Companies Australia — PSA, BGS, CGC, ACE | CardPop Grading Hub" description="Compare the best trading card grading companies for Australian collectors. PSA, BGS, CGC, and ACE Grading — turnaround times, AUD pricing, and which service is right for you." />
+
+      <div className="container-default pt-6">
+        <Breadcrumb items={[{ label: 'Home', path: '/' }, { label: 'Grading', path: '/grading' }, { label: 'Grading Companies' }]} />
+      </div>
 
       <section className="bg-card border-b border-border py-20 text-center">
         <div className="container-default">

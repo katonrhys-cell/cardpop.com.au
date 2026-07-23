@@ -1,5 +1,6 @@
 import React from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
+import Breadcrumb from '@/components/Breadcrumb.jsx';
 import { Link } from 'react-router-dom';
 import { BarChart2, ArrowLeft, ArrowRight, ChevronRight } from 'lucide-react';
 
@@ -41,6 +42,10 @@ const GradingScalesPage = () => (
       title="Trading Card Grading Scales 1–10 | CardPop Grading Hub"
       description="Understand the PSA, BGS, CGC and ACE trading card grading scales from 1 to 10. Learn exactly what each grade means and how condition affects your card's resale value in Australia."
     />
+
+    <div className="container-default pt-6">
+      <Breadcrumb items={[{ label: 'Home', path: '/' }, { label: 'Grading', path: '/grading' }, { label: 'Grading Scales' }]} />
+    </div>
 
     <section className="bg-card border-b border-border py-20 text-center">
       <div className="container-default">

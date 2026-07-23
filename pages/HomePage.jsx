@@ -128,15 +128,18 @@ const HOW_IT_WORKS = [
   },
 ];
 
+// Illustrative sample activity — representative of the kinds of trades that
+// happen on CardPop, not a live event log. Rendered without timestamps or a
+// "live" label so it never reads as real-time truth.
 const ACTIVITY_FEED = [
-  { user: '@PokeTrader_SYD',   action: 'sold a PSA 10 Charizard Base Set',    price: '$2,400', time: '2m ago' },
-  { user: '@MTG_Melbourne',    action: 'listed a Dual Land Alpha',             price: '$5,200', time: '5m ago' },
-  { user: '@SportsCardsBris',  action: 'completed a trade — Rookie Gretzky',  price: '$950',   time: '9m ago' },
-  { user: '@PokeFan_Perth',    action: 'sold a Shadowless Blastoise',          price: '$620',   time: '12m ago' },
-  { user: '@CardKing_ADE',     action: 'listed 3× PSA 9 Venusaur',            price: '$1,100', time: '18m ago' },
-  { user: '@YuGiOh_GLD',       action: 'sold a Dark Magician 1st Edition',    price: '$340',   time: '21m ago' },
-  { user: '@LorcanaMaster',    action: 'completed trade — Rare Sorcerers',    price: '$210',   time: '25m ago' },
-  { user: '@BrisbaneBaller',   action: 'sold a 2023 Panini LeBron SSP',       price: '$480',   time: '31m ago' },
+  { user: '@PokeTrader_SYD',   action: 'sold a PSA 10 Charizard Base Set',    price: '$2,400' },
+  { user: '@MTG_Melbourne',    action: 'listed a Dual Land Alpha',             price: '$5,200' },
+  { user: '@SportsCardsBris',  action: 'completed a trade — Rookie Gretzky',  price: '$950'   },
+  { user: '@PokeFan_Perth',    action: 'sold a Shadowless Blastoise',          price: '$620'   },
+  { user: '@CardKing_ADE',     action: 'listed 3× PSA 9 Venusaur',            price: '$1,100' },
+  { user: '@YuGiOh_GLD',       action: 'sold a Dark Magician 1st Edition',    price: '$340'   },
+  { user: '@LorcanaMaster',    action: 'completed trade — Rare Sorcerers',    price: '$210'   },
+  { user: '@BrisbaneBaller',   action: 'sold a 2023 Panini LeBron SSP',       price: '$480'   },
 ];
 
 // ─── Hero floating card shapes ────────────────────────────────────────────────
@@ -537,11 +540,10 @@ const HomePage = () => {
                 key={tickerIdx}
                 className="anim-ticker-in flex items-center gap-2 text-xs"
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
                 <span className="font-bold text-zinc-200">{ACTIVITY_FEED[tickerIdx].user}</span>
                 <span className="text-zinc-500">{ACTIVITY_FEED[tickerIdx].action}</span>
                 <span className="font-black text-yellow-400">{ACTIVITY_FEED[tickerIdx].price}</span>
-                <span className="text-zinc-600">{ACTIVITY_FEED[tickerIdx].time}</span>
               </div>
           </div>
         </div>
@@ -838,8 +840,8 @@ const HomePage = () => {
       <section className="py-14 bg-foreground overflow-hidden">
         <div className="mb-6 text-center">
           <span className="inline-flex items-center gap-2 text-background/60 text-sm font-semibold tracking-widest uppercase">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block" />
-            Live Activity
+            <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
+            Trending on CardPop
           </span>
         </div>
 
@@ -858,7 +860,6 @@ const HomePage = () => {
                 <span className="font-bold text-background/90">{item.user}</span>
                 <span className="text-background/60">{item.action}</span>
                 <span className="font-bold text-primary-foreground bg-primary px-2 py-0.5 rounded-lg">{item.price}</span>
-                <span className="text-background/70 text-xs">{item.time}</span>
               </div>
             ))}
           </div>

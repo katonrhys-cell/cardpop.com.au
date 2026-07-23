@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
+import Breadcrumb from '@/components/Breadcrumb.jsx';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -83,6 +84,10 @@ const ForumPage = () => {
         title="Community Forum | CardPop"
         description="Join discussions with Australian trading card collectors. Talk market trends, trading, grading and more on CardPop."
       />
+
+      <div className="container-default pt-6">
+        <Breadcrumb items={[{ label: 'Home', path: '/' }, { label: 'Community', path: '/community' }, { label: 'Forum' }]} />
+      </div>
 
       {/* Hero */}
       <section className="bg-card border-b border-border py-20 text-center">

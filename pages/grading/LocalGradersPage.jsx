@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
+import Breadcrumb from '@/components/Breadcrumb.jsx';
 import { Link } from 'react-router-dom';
 import { MapPin, Star, ArrowLeft } from 'lucide-react';
 
@@ -149,6 +150,10 @@ const LocalGradersPage = () => (
       description="Ranked Australian card grading services for TCG and sports cards. AUD pricing, no customs, faster turnarounds than PSA or Beckett. Compare CGA, TCG Grading, ARK Grading, ACG, and PCG."
       keywords="local card grading australia, australian card grader, TCG grading australia, sports card grading australia, AFL card grading, NRL card grading, pokemon grading australia, card grading melbourne, CGA grading, ARK grading"
     />
+
+    <div className="container-default pt-6">
+      <Breadcrumb items={[{ label: 'Home', path: '/' }, { label: 'Grading', path: '/grading' }, { label: 'Local Graders' }]} />
+    </div>
 
     {/* Hero */}
     <section className="bg-card border-b border-border py-16 text-center">

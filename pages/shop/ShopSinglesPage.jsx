@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
+import Breadcrumb from '@/components/Breadcrumb.jsx';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, SlidersHorizontal, PackageX, Layers } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -122,6 +123,10 @@ const ShopSinglesPage = () => {
   return (
     <div className="min-h-screen bg-background pb-20">
       <SEOHead title="Singles | CardPop Shop" description="Shop individual trading card singles from the CardPop official store. Find the exact card you need." />
+
+      <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 pt-6">
+        <Breadcrumb items={[{ label: 'Home', path: '/' }, { label: 'Shop', path: '/shop' }, { label: 'Singles' }]} />
+      </div>
 
       {/* Header Section */}
       <section className="bg-amber-900/5 dark:bg-amber-900/10 border-b border-amber-900/10 py-12 px-5 sm:px-8 lg:px-12 xl:px-16">

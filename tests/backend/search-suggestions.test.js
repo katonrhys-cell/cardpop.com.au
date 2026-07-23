@@ -24,7 +24,7 @@ const app = makeApp();
 
 function makeBuilder(result = { data: [], error: null }) {
   const b = {
-    select: vi.fn(() => b), ilike: vi.fn(() => b), or: vi.fn(() => b),
+    select: vi.fn(() => b), ilike: vi.fn(() => b), or: vi.fn(() => b), eq: vi.fn(() => b),
     limit: vi.fn(() => b), order: vi.fn(() => b),
     then: (resolve, reject) => Promise.resolve(result).then(resolve, reject),
   };
@@ -45,10 +45,10 @@ describe('GET / (search suggestions)', () => {
     expect(mockSupabase.from).not.toHaveBeenCalled();
   });
 
-  it('combines and de-duplicates card and product names', async () => {
+  it('combines and de-duplicates card and shop product names', async () => {
     queueFrom(
       makeBuilder({ data: [{ card_name: 'Charizard' }, { card_name: 'Charizard' }], error: null }), // vault_items
-      makeBuilder({ data: [{ title: 'Charizard GX', name: 'Charizard' }], error: null }),            // products
+      makeBuilder({ data: [{ title: 'Charizard GX' }], error: null }),                               // shop_products
       makeBuilder({ data: [], error: null }), // popular fallback (size < 5)
     );
     const res = await request(app).get('/?q=charizard');
@@ -72,7 +72,7 @@ describe('GET / (search suggestions)', () => {
     mockGetDidYouMean.mockReturnValue('Charizard');
     queueFrom(
       makeBuilder({ data: [], error: null }),                       // vault_items
-      makeBuilder({ data: [], error: null }),                       // products
+      makeBuilder({ data: [], error: null }),                       // shop_products
       makeBuilder({ data: [], error: null }),                       // popular fallback
       makeBuilder({ data: [{ card_name: 'Charizard' }], error: null }), // all cards for fuzzy
     );
