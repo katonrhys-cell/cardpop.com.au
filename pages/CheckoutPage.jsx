@@ -474,7 +474,7 @@ const CheckoutPage = () => {
   );
 
   return (
-    <div className="min-h-screen bg-muted/20 py-10">
+    <div className="bg-muted/20 py-10">
       <Helmet><title>Secure Checkout | Card Pop</title></Helmet>
       <div className="max-w-6xl mx-auto px-4">
 
