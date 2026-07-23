@@ -1833,7 +1833,7 @@ const AddEditCardPage = () => {
                       {/* Rookie Card lives in the Card Variant / Finish section above
                           (the "Rookie Card (RC)" chip) — not duplicated here. */}
                       {[
-                        { key: 'isFoil',   label: '🃏 Individual Card (Single)', desc: 'A single individual card' },
+                        { key: 'isFoil',   label: '✨ Foil / Holo', desc: 'Has a foil, holo, or shiny finish' },
                         { key: 'isSealed', label: '📦 Sealed Product', desc: 'Booster, box, or sealed item' },
                       ].map(({ key, label, desc }) => (
                         <button
@@ -1853,7 +1853,7 @@ const AddEditCardPage = () => {
                     </div>
                     <div className="flex gap-3 items-stretch">
                       {[
-                        { key: 'isAuto',      label: '🗂️ Complete Set',  desc: 'A full / complete set' },
+                        { key: 'isAuto',      label: '✍️ Autograph',  desc: 'Signed / autographed card' },
                       ].map(({ key, label, desc }) => (
                         <button
                           key={key}
