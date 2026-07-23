@@ -940,6 +940,28 @@ const AddEditCardPage = () => {
     goToStep(nextIndex);
   };
 
+  const validateFieldOnBlur = (field) => {
+    const message = validateListingField(field, formData, validationCtx);
+    setErrors(prev => {
+      if (!message && !(field in prev)) return prev;
+      const next = { ...prev };
+      if (message) next[field] = message;
+      else delete next[field];
+      return next;
+    });
+  };
+
+  // Once both hierarchy levels are chosen, drop the inline hierarchy error.
+  useEffect(() => {
+    if (selCategoryId && franchiseId) {
+      setErrors(prev => {
+        if (!prev.hierarchy) return prev;
+        const { hierarchy: _hierarchy, ...rest } = prev;
+        return rest;
+      });
+    }
+  }, [selCategoryId, franchiseId]);
+
   // ─── Marketplace listing sync ─────────────────────────────────────────────
   // The marketplace reads exclusively from the `listings` table, so choosing a
   // public listing type here must create/update a matching listings row.
