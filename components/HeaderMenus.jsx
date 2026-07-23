@@ -815,8 +815,23 @@ const MoreDropdown = ({ onNavigate }) => {
 };
 
 // ─── Mobile shop section (expandable) ────────────────────────────────────────
+// Each parent category (Protection, Storage, Display, Shipping, Grading) is its
+// own accordion: the subcategory list stays collapsed until that category is
+// tapped, instead of dumping every group's items on screen at once.
 const MobileShopSection = ({ onNavigate }) => {
   const [open, setOpen] = useState(false);
+  const [openGroups, setOpenGroups] = useState(() => new Set());
+
+  const toggleGroup = (slug) => {
+    startTransition(() => {
+      setOpenGroups(prev => {
+        const next = new Set(prev);
+        if (next.has(slug)) next.delete(slug); else next.add(slug);
+        return next;
+      });
+    });
+  };
+
   return (
     <div className="mb-4">
       <button
@@ -830,7 +845,7 @@ const MobileShopSection = ({ onNavigate }) => {
         <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="flex flex-col gap-2 mb-1 pl-2">
+        <div className="flex flex-col gap-0.5 mb-1 pl-2">
           <SheetClose asChild>
             <Link
               to="/shop"
@@ -840,38 +855,53 @@ const MobileShopSection = ({ onNavigate }) => {
               Shop All Supplies
             </Link>
           </SheetClose>
-          {SHOP_CATEGORY_GROUPS.map(group => (
-            <div key={group.slug}>
-              <SheetClose asChild>
-                <Link
-                  to={`/shop/${group.slug}`}
-                  onClick={onNavigate}
-                  className="flex items-center gap-2 px-3 pt-1 pb-1 rounded-xl hover:bg-muted transition-colors"
+          {SHOP_CATEGORY_GROUPS.map(group => {
+            const groupOpen = openGroups.has(group.slug);
+            return (
+              <div key={group.slug}>
+                <button
+                  onClick={() => toggleGroup(group.slug)}
+                  aria-expanded={groupOpen}
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl hover:bg-muted transition-colors"
                 >
-                  <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md bg-gradient-to-br ${group.gradient} shrink-0`}>
-                    <group.Icon className="w-3 h-3 text-white" />
+                  <span className="flex items-center gap-2">
+                    <span className={`inline-flex items-center justify-center w-5 h-5 rounded-md bg-gradient-to-br ${group.gradient} shrink-0`}>
+                      <group.Icon className="w-3 h-3 text-white" />
+                    </span>
+                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">{group.label}</span>
                   </span>
-                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">{group.label}</span>
-                </Link>
-              </SheetClose>
-              <div className="grid grid-cols-2 gap-0.5">
-                {group.items.map(item => (
-                  <SheetClose key={item.slug} asChild>
-                    <Link
-                      to={`/shop/category/${item.slug}`}
-                      onClick={onNavigate}
-                      className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors text-left"
-                    >
-                      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${group.gradient} shrink-0`}>
-                        <item.Icon className="w-3.5 h-3.5 text-white" />
-                      </span>
-                      <span className="text-xs font-semibold text-foreground truncate">{item.name}</span>
-                    </Link>
-                  </SheetClose>
-                ))}
+                  <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${groupOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {groupOpen && (
+                  <div className="grid grid-cols-2 gap-0.5 mb-1">
+                    <SheetClose asChild>
+                      <Link
+                        to={`/shop/${group.slug}`}
+                        onClick={onNavigate}
+                        className="col-span-2 flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-muted transition-colors text-xs font-semibold text-primary"
+                      >
+                        View all {group.label}
+                      </Link>
+                    </SheetClose>
+                    {group.items.map(item => (
+                      <SheetClose key={item.slug} asChild>
+                        <Link
+                          to={`/shop/category/${item.slug}`}
+                          onClick={onNavigate}
+                          className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors text-left"
+                        >
+                          <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${group.gradient} shrink-0`}>
+                            <item.Icon className="w-3.5 h-3.5 text-white" />
+                          </span>
+                          <span className="text-xs font-semibold text-foreground truncate">{item.name}</span>
+                        </Link>
+                      </SheetClose>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
