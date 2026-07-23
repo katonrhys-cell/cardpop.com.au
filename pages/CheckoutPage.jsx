@@ -610,8 +610,13 @@ const CheckoutPage = () => {
               </div>
             </div>
 
-            {/* ── Right: sticky summary ─────────────────────────────────── */}
-            <aside className="space-y-4 lg:sticky lg:top-6">
+            {/* ── Right: sticky summary ───────────────────────────────────
+                Pinned so the order total & reassurance stay in view while the
+                buyer scrolls the (taller) details column. `top-32` clears the
+                two-row sticky header (~116px) so the card rests just below it
+                instead of sliding underneath; `self-start` keeps the sticky box
+                its own height rather than stretching to the grid row. */}
+            <aside className="space-y-4 lg:sticky lg:top-32 lg:self-start">
               {orderSummary}
               {promoCard}
               {walletCard}
