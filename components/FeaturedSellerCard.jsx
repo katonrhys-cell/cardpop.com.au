@@ -21,10 +21,17 @@ const FeaturedSellerCard = ({ seller }) => {
     ? `${seller.location_suburb}, ${seller.location_state}`
     : seller.location_state || null;
 
+  // Dealers (sole traders) have their own store page resolved by store_slug
+  // (legacy UUID also works); everyone else uses the public seller profile,
+  // which is resolved by profile id.
+  const storePath = seller.is_sole_trader
+    ? `/dealer/${seller.store_slug || seller.id}`
+    : `/seller/${seller.id}`;
+
   const handleCardClick = (e) => {
     // Prevent navigation if the user is selecting text or explicitly clicking a nested link/button
     if (e.target.closest('button') || e.target.closest('a')) return;
-    navigate(`/dealer/${seller.username}`);
+    navigate(storePath);
   };
 
   return (
@@ -90,7 +97,7 @@ const FeaturedSellerCard = ({ seller }) => {
       <Button
         onClick={(e) => {
           e.stopPropagation();
-          navigate(`/dealer/${seller.username}`);
+          navigate(storePath);
         }}
         className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-lg py-2 shadow-sm active:scale-[0.98] transition-transform text-sm mt-auto"
       >
