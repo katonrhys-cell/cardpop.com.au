@@ -230,7 +230,7 @@ const PrivacyPolicyPage = () => {
       {/* Header Section */}
       <section className="bg-card border-b border-border py-16 md:py-24 relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/10 via-background to-background pointer-events-none" />
-        <div className="max-w-4xl mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 relative z-10 text-center">
+        <div className="container-default relative z-10 text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 text-primary mb-6 shadow-inner">
             <Lock className="w-8 h-8" />
           </div>
@@ -250,7 +250,7 @@ const PrivacyPolicyPage = () => {
       </section>
 
       {/* Content Section */}
-      <section className="max-w-4xl mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-16 md:py-24 w-full flex-grow">
+      <section className="container-default py-16 md:py-24 w-full flex-grow">
         <Card className="border-border shadow-lg rounded-[2rem] overflow-hidden bg-card">
           <CardHeader className="bg-muted/30 border-b border-border p-8 md:p-10">
             <CardTitle className="text-2xl font-bold tracking-tight">Data Protection Agreement</CardTitle>
