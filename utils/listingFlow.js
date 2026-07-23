@@ -9,3 +9,22 @@
 //   - never while an analysis is already in flight
 export const shouldAutoIdentify = ({ isEdit, cardName, isScanning, isIdentifying }) =>
   !isEdit && !cardName?.trim() && !isScanning && !isIdentifying;
+
+// Form grading values → the service names the eBay price-estimate endpoint
+// expects in its query. 'raw' (ungraded) and 'other' (unrecognised service)
+// intentionally have no mapping — the lookup then omits grading terms.
+export const GRADING_SERVICE_QUERY = { psa: 'PSA', bgs: 'BGS', cgc: 'CGC', sgc: 'SGC', ace: 'ACE' };
+
+// Build the query object useEbayPriceLookup expects (its shape comes from OCR
+// results) out of manually-typed form fields, so a seller can get a price
+// estimate on demand without ever running an AI identify.
+export const buildPriceLookupQuery = (formData) => {
+  const name = formData?.cardName?.trim();
+  if (!name) return null;
+  return {
+    name,
+    cardSetName: formData.setName?.trim() || undefined,
+    gradingService: GRADING_SERVICE_QUERY[formData.gradingCompany] ?? 'None',
+    gradeScore: formData.grade?.trim() || undefined,
+  };
+};

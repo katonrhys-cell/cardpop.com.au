@@ -5,8 +5,10 @@ export function useCardsightPricing() {
   const [isLoadingCsPrice, setIsLoadingCsPrice] = useState(false);
   const [csPrice, setCsPrice] = useState(null);
 
+  // Both fetchers resolve with the pricing data when found, else null — so
+  // on-demand callers can tell the user "nothing found" instead of silence.
   const fetchPricingById = useCallback(async (cardId, period = '30d') => {
-    if (!cardId) return;
+    if (!cardId) return null;
     setIsLoadingCsPrice(true);
     try {
       const res = await apiServerClient.fetch(
@@ -14,27 +16,36 @@ export function useCardsightPricing() {
       );
       if (!res.ok) throw new Error('Pricing fetch failed');
       const data = await res.json();
-      setCsPrice({ cardId, ...data });
+      const priced = { cardId, ...data };
+      setCsPrice(priced);
+      return priced;
     } catch {
       // non-critical; leave csPrice null
+      return null;
     } finally {
       setIsLoadingCsPrice(false);
     }
   }, []);
 
   const fetchPricingByName = useCallback(async (cardName) => {
-    if (!cardName) return;
+    if (!cardName) return null;
     setIsLoadingCsPrice(true);
     setCsPrice(null);
     try {
       const res = await apiServerClient.fetch(
         `/catalog/pricing?name=${encodeURIComponent(cardName)}`
       );
-      if (!res.ok) return;
+      if (!res.ok) return null;
       const data = await res.json();
-      if (data.count > 0) setCsPrice({ cardId: null, ...data });
+      if (data.count > 0) {
+        const priced = { cardId: null, ...data };
+        setCsPrice(priced);
+        return priced;
+      }
+      return null;
     } catch {
       // non-critical
+      return null;
     } finally {
       setIsLoadingCsPrice(false);
     }
