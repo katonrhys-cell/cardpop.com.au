@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { generateBlogPostingSchema, generateFAQStructuredData, generateBreadcrumbStructuredData } from '@/utils/seoUtils.js';
 import { htmlExcerpt } from '@/utils/htmlExcerpt.js';
-import { publicImageUrl, toCdnUrl, cdnifyStorageUrlsInHtml } from '@/utils/imageUrl.js';
+import { publicImageUrl, toCdnUrl, cdnifyStorageUrlsInHtml, ensureImgAltInHtml } from '@/utils/imageUrl.js';
 import { resolveConviction, CONVICTION_METHODOLOGY_PATH } from '@/utils/convictionRating.js';
 import { BLOG_CATEGORY_MAP } from '@/data/blogCategories.js';
 import { parseVideoUrl } from '@/utils/videoEmbed.js';
@@ -234,8 +234,12 @@ const BlogArticlePage = () => {
         setArticle(res);
         // Article bodies store canonical Supabase URLs in their <img> tags —
         // rewrite them onto the image CDN before render so body images don't
-        // bill Supabase egress on every view.
-        setHtmlContent(cdnifyStorageUrlsInHtml(res.content_html || res.content || ''));
+        // bill Supabase egress on every view. Body images authored without
+        // alt text get the article title as a fallback alt.
+        setHtmlContent(ensureImgAltInHtml(
+          cdnifyStorageUrlsInHtml(res.content_html || res.content || ''),
+          res.title || '',
+        ));
 
         const [relatedRes, cardsRes] = await Promise.all([
           supabase

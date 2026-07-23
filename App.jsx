@@ -18,6 +18,7 @@ import Header from '@/components/Header.jsx';
 // as the page settles, well before the user can scroll to it.
 const Footer = lazy(() => import('@/components/Footer.jsx'));
 import ScrollToTop from '@/components/ScrollToTop.jsx';
+import AnalyticsPageViews from '@/components/AnalyticsPageViews.jsx';
 import ProtectedRoute from '@/components/ProtectedRoute.jsx';
 import ProtectedAdminRoute from '@/components/ProtectedAdminRoute.jsx';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
@@ -264,6 +265,7 @@ const App = () => {
             <CategoryHierarchyProvider>
               <Router>
                 <ScrollToTop />
+                <AnalyticsPageViews />
                 <ReferralCapture />
                 <div className="flex flex-col min-h-screen bg-background text-foreground">
                   <Helmet>

@@ -29,6 +29,7 @@ import {
   canonicalStorageUrl,
   parseStorageObjectUrl,
   cdnifyStorageUrlsInHtml,
+  ensureImgAltInHtml,
   thumbStoragePath,
   _setCdnHostForTests,
   _setTransformsEnabledForTests,
@@ -334,5 +335,30 @@ describe('grid thumbnails (thumbSrc)', () => {
     // it unchanged — assert the thumb path is present and derivation still works.
     const r = getCardImage(`u/${NEW_TS}.jpg`);
     expect(r.thumbSrc).toContain(`${NEW_TS}.thumb.webp`);
+  });
+});
+
+describe('ensureImgAltInHtml', () => {
+  it('adds the fallback alt to imgs without one', () => {
+    const html = '<p>hi</p><img src="/a.jpg"><img src="/b.jpg" />';
+    expect(ensureImgAltInHtml(html, 'My Article')).toBe(
+      '<p>hi</p><img alt="My Article" src="/a.jpg"><img alt="My Article" src="/b.jpg" />'
+    );
+  });
+
+  it('leaves imgs that already have an alt untouched (including alt="")', () => {
+    const html = '<img src="/a.jpg" alt="existing"><img alt="" src="/b.jpg">';
+    expect(ensureImgAltInHtml(html, 'fallback')).toBe(html);
+  });
+
+  it('escapes quotes and angle brackets in the fallback alt', () => {
+    const out = ensureImgAltInHtml('<img src="/a.jpg">', 'He said "hi" & <ran>');
+    expect(out).toBe('<img alt="He said &quot;hi&quot; &amp; &lt;ran>" src="/a.jpg">');
+  });
+
+  it('passes through non-string and empty input unchanged', () => {
+    expect(ensureImgAltInHtml(null, 'x')).toBe(null);
+    expect(ensureImgAltInHtml('', 'x')).toBe('');
+    expect(ensureImgAltInHtml('<p>no images</p>', 'x')).toBe('<p>no images</p>');
   });
 });
