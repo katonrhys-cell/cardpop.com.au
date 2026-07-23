@@ -166,7 +166,7 @@ const UserProfilePage = () => {
 
   if (loading) {
     return (
-      <div className="animate-pulse space-y-8 w-full max-w-4xl mx-auto px-4 py-8">
+      <div className="animate-pulse space-y-8 w-full container-default py-8">
         <div className="h-48 bg-muted rounded-3xl" />
         <div className="h-64 bg-muted rounded-3xl" />
       </div>
@@ -180,7 +180,7 @@ const UserProfilePage = () => {
     : null;
 
   return (
-    <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-8 md:py-16 font-sans">
+    <div className="w-full container-default py-8 md:py-16 font-sans">
       <Helmet><title>Public Profile | CardPop</title></Helmet>
       
       <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">

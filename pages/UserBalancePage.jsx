@@ -75,7 +75,7 @@ const UserBalancePage = () => {
     <div className="flex flex-col bg-background font-sans">
       <Helmet><title>My Wallet | Card Pop</title></Helmet>
 
-      <div className="flex-1 max-w-4xl mx-auto px-4 py-12 w-full">
+      <div className="flex-1 container-default py-12 w-full">
         <h1 className="font-serif text-4xl font-bold mb-8 text-center">Wallet & Balance</h1>
 
         <div className="premium-card p-10 bg-card text-center mb-8 bg-gradient-to-br from-card to-muted/50">

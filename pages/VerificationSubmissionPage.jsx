@@ -217,7 +217,7 @@ const VerificationSubmissionPage = () => {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-12 lg:py-20 font-sans">
+    <div className="container-default py-12 lg:py-20 font-sans">
       <Helmet><title>Account Verification | CardPop</title></Helmet>
       
       <div className="mb-10 text-center">

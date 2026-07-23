@@ -480,7 +480,7 @@ const CheckoutPage = () => {
   return (
     <div className="bg-muted/20 py-10">
       <Helmet><title>Secure Checkout | Card Pop</title></Helmet>
-      <div className="max-w-6xl mx-auto px-4">
+      <div className="container-default">
 
         <header className="mb-8">
           <h1 className="font-heading text-2xl font-bold text-foreground sm:text-3xl">Secure checkout</h1>

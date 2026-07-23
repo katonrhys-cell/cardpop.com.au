@@ -505,7 +505,7 @@ const BlogArticlePage = () => {
 
       <div className="w-full mt-10 mb-24">
         {htmlContent ? (
-          <div className="w-full max-w-4xl mx-auto px-4">
+          <div className="w-full container-default">
             {toc.length >= 3 && (
               <nav aria-label="Table of contents" className="mb-10 rounded-xl border border-border bg-muted/30 p-5">
                 <div className="flex gap-6">
@@ -549,7 +549,7 @@ const BlogArticlePage = () => {
       </div>
 
       {Array.isArray(article.tags) && article.tags.length > 0 && (
-        <div className="w-full max-w-4xl mx-auto px-4 mb-16">
+        <div className="w-full container-default mb-16">
           <div className="flex flex-wrap items-center gap-2 pt-8 border-t border-border">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mr-1">Topics</span>
             {article.tags.map((tag) => (
