@@ -45,6 +45,7 @@ import { isSellingEntitlementError } from '@/utils/listingErrors.js';
 import { loadListingDraft, saveListingDraft, clearListingDraft, hasMeaningfulContent } from '@/lib/listingDraft.js';
 import { shouldAutoIdentify, buildPriceLookupQuery } from '@/utils/listingFlow.js';
 import { validateListingForm, validateListingField } from '@/utils/listingValidation.js';
+import WizardStepper from '@/components/WizardStepper.jsx';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -67,6 +68,18 @@ const LISTING_OPTIONS = [
   { value: 'For Sale & Trade', label: 'Sale & Trade', description: 'Both options open', Icon: Layers,          activeClass: 'border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-400', iconClass: 'text-amber-500' },
   { value: 'Expression of Interest', label: 'Expression of Interest', description: 'Invite offers in a price range', Icon: HandCoins, activeClass: 'border-sky-500 bg-sky-500/10 text-sky-700 dark:text-sky-400', iconClass: 'text-sky-500' },
 ];
+
+// ─── Wizard steps (new cards) ─────────────────────────────────────────────────
+// Each step lists the validation fields (utils/listingValidation.js) that must
+// pass before advancing. Edit mode keeps the classic full form.
+const WIZARD_STEPS = [
+  { key: 'photos',  title: 'Photos',  fields: ['cardImage'] },
+  { key: 'details', title: 'Details', fields: ['hierarchy', 'cardName', 'year'] },
+  { key: 'value',   title: 'Value',   fields: ['estimatedValue'] },
+  { key: 'publish', title: 'List it', fields: ['askingPrice', 'offerMin', 'offerMax', 'tradeValue'] },
+];
+
+const FULL_FORM_PREF_KEY = 'cardpop.listingFormMode';
 
 // ─── Section heading ──────────────────────────────────────────────────────────
 const SectionCard = ({ title, children, className = '' }) => (
@@ -128,6 +141,14 @@ const AddEditCardPage = () => {
   }, [maxExtraSlots]);
   const [errors, setErrors]             = useState({});
   const [isAutoFilled, setIsAutoFilled] = useState(false);
+  // Step-by-step wizard state — new cards only; edit mode always uses the full
+  // form. The mode preference persists so returning sellers keep their choice.
+  const [useFullForm, setUseFullForm] = useState(() => {
+    try { return globalThis.localStorage?.getItem(FULL_FORM_PREF_KEY) === 'full'; } catch { return false; }
+  });
+  const [wizardStep, setWizardStep] = useState(0);
+  const [maxStepReached, setMaxStepReached] = useState(0);
+  const wizardMode = !isEdit && !useFullForm;
   // Hierarchy selection
   const [selCategoryId, setSelCategoryId]     = useState('');
   const [franchiseId, setFranchiseId]         = useState('');
@@ -372,6 +393,9 @@ const AddEditCardPage = () => {
     // saved keep their initial values.
     setFormData(prev => ({ ...prev, ...draftForm }));
     setRestorableDraft(null);
+    // A restored draft has content across the steps — unlock the whole wizard
+    // so the seller can jump straight to wherever they left off.
+    setMaxStepReached(WIZARD_STEPS.length - 1);
     toast.success('Draft restored — add your photos again and you\'re back where you left off.');
   };
 
@@ -879,6 +903,43 @@ const AddEditCardPage = () => {
     }
   }, [selCategoryId, franchiseId]);
 
+  // ─── Wizard navigation ─────────────────────────────────────────────────────
+  const setFormMode = (full) => {
+    setUseFullForm(full);
+    try { globalThis.localStorage?.setItem(FULL_FORM_PREF_KEY, full ? 'full' : 'wizard'); } catch { /* best-effort */ }
+  };
+
+  const goToStep = (index) => {
+    setWizardStep(index);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Advance only when the current step's fields validate — problems surface
+  // inline on the step they belong to instead of piling up at the end.
+  const goNextStep = () => {
+    const stepFields = WIZARD_STEPS[wizardStep].fields;
+    const stepErrors = {};
+    stepFields.forEach((field) => {
+      const message = validateListingField(field, formData, validationCtx);
+      if (message) stepErrors[field] = message;
+    });
+    setErrors(prev => {
+      const next = { ...prev };
+      stepFields.forEach((field) => {
+        if (stepErrors[field]) next[field] = stepErrors[field];
+        else delete next[field];
+      });
+      return next;
+    });
+    if (Object.keys(stepErrors).length > 0) {
+      toast.error('Please fix the highlighted issue before continuing');
+      return;
+    }
+    const nextIndex = Math.min(wizardStep + 1, WIZARD_STEPS.length - 1);
+    setMaxStepReached(m => Math.max(m, nextIndex));
+    goToStep(nextIndex);
+  };
+
   // ─── Marketplace listing sync ─────────────────────────────────────────────
   // The marketplace reads exclusively from the `listings` table, so choosing a
   // public listing type here must create/update a matching listings row.
@@ -1002,6 +1063,12 @@ const AddEditCardPage = () => {
     if (Object.keys(newErrors).length > 0) {
       const count = Object.keys(newErrors).length;
       toast.error(count === 1 ? 'Please fix the highlighted issue' : `Please fix the ${count} highlighted issues`);
+      // In wizard mode jump to the first step with a problem — its fields
+      // would otherwise be invisible on an unmounted step.
+      if (wizardMode) {
+        const badStep = WIZARD_STEPS.findIndex(s => s.fields.some(f => newErrors[f]));
+        if (badStep >= 0 && badStep !== wizardStep) setWizardStep(badStep);
+      }
       // Jump to the first problem — on a long form (especially mobile) the
       // errored field may be far off-screen.
       setTimeout(() => {
@@ -1145,6 +1212,8 @@ const AddEditCardPage = () => {
               clearCrop();
               setAdjusting(null);
               clearScan();
+              setWizardStep(0);
+              setMaxStepReached(0);
               // Keep franchise/manufacturer selected for fast repeat entry
               window.scrollTo(0, 0);
             },
@@ -1167,50 +1236,10 @@ const AddEditCardPage = () => {
 
   const isGraded = formData.gradingCompany !== 'raw';
 
-  return (
-    <div className="bg-muted/30 font-sans">
-      <Helmet><title>{isEdit ? 'Edit Card' : 'Add New Card'} | Card Pop</title></Helmet>
-
-      <div className="max-w-[90rem] mx-auto px-4 py-8 w-full">
-        <nav className="flex items-center text-sm text-muted-foreground mb-6 font-medium">
-          <Link to="/vault" className="hover:text-primary transition-colors">Vault</Link>
-          <ChevronRight className="w-4 h-4 mx-2 opacity-50" />
-          <span className="text-foreground">{isEdit ? 'Edit Card' : 'Add New Card'}</span>
-        </nav>
-
-        {!isEdit && restorableDraft && (
-          <div role="status" className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-sky-400/50 bg-sky-500/5 p-4">
-            <History className="h-5 w-5 shrink-0 text-sky-500" />
-            <div className="min-w-[14rem] flex-1">
-              <p className="text-sm font-bold text-foreground">You have an unfinished listing</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Saved {new Date(restorableDraft.savedAt).toLocaleString()} — restore it to pick up where
-                you left off. Photos aren't kept in drafts, so re-add those.
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button type="button" size="sm" className="h-9 font-bold" onClick={restoreDraft}>
-                Restore
-              </Button>
-              <Button type="button" size="sm" variant="ghost" className="h-9 font-bold text-muted-foreground" onClick={discardDraft}>
-                Discard
-              </Button>
-            </div>
-          </div>
-        )}
-
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="font-serif text-4xl font-bold">{isEdit ? 'Edit Card Details' : 'Add New Card'}</h1>
-          <Button variant="ghost" asChild className="text-muted-foreground">
-            <Link to="/vault"><ArrowLeft className="w-4 h-4 mr-2" /> Back</Link>
-          </Button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid lg:grid-cols-3 gap-6">
-
-            {/* ── Left: Image + AI ── */}
-            <div className="lg:col-span-1 space-y-5">
+  // ─── Section blocks ───────────────────────────────────────────────────────
+  // Each form section is defined once and composed below either as the classic
+  // two-column form (edit mode / full-form preference) or as wizard steps.
+  const photoPanel = (
               <div className="premium-card p-6 bg-card">
                 <div className="flex items-center justify-between mb-4">
                   <Label className="font-bold text-base">
@@ -1556,12 +1585,9 @@ const AddEditCardPage = () => {
                   )}
                 </div>
               </div>
-            </div>
+  );
 
-            {/* ── Right: All form sections ── */}
-            <div className="lg:col-span-2 space-y-5">
-
-              {/* ── 1. Card Identity ── */}
+  const detailsSection = (
               <SectionCard title="Card Details">
                 {isAutoFilled && (
                   <div className="flex items-center text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-md w-fit -mt-2">
@@ -2941,8 +2967,9 @@ const AddEditCardPage = () => {
                   </div>
                 </div>
               </SectionCard>
+  );
 
-              {/* ── 2. Grading ── */}
+  const gradingSection = (
               <SectionCard title="Grading">
                 <div className="space-y-4">
                   <div>
@@ -3016,16 +3043,20 @@ const AddEditCardPage = () => {
                   )}
                 </div>
               </SectionCard>
+  );
 
-              {/* PSA population panel — only shown when we have a CardSight match */}
+  const psaPanel = (
+    <>
               {isEdit && (
                 <div className="premium-card p-6 bg-card space-y-3">
                   <h2 className="font-serif text-xl font-bold border-b border-border pb-3">PSA Population</h2>
                   <PSAPopPanel rawData={psaPopData} />
                 </div>
               )}
+    </>
+  );
 
-              {/* ── 3. Value & Acquisition ── */}
+  const valueSection = (
               <SectionCard title="Value & Acquisition">
                 {/* On-demand price estimate — works from the typed details, no
                     AI identify required. */}
@@ -3263,8 +3294,9 @@ const AddEditCardPage = () => {
                   </div>
                 </div>
               </SectionCard>
+  );
 
-              {/* ── 4. Listing Visibility ── */}
+  const visibilitySection = (
               <SectionCard title="Listing Visibility">
                 <p className="text-sm text-muted-foreground -mt-2">Choose how this card appears to other collectors.</p>
 
@@ -3405,8 +3437,9 @@ const AddEditCardPage = () => {
                   </div>
                 )}
               </SectionCard>
+  );
 
-              {/* ── 5. Display Style ── */}
+  const styleSection = (
               <SectionCard title="Display Style">
                 <p className="text-sm text-muted-foreground -mt-2">
                   Choose how this card is showcased to collectors. Premium styles
@@ -3419,21 +3452,148 @@ const AddEditCardPage = () => {
                   previewSrc={imagePreview}
                 />
               </SectionCard>
+  );
 
+
+  return (
+    <div className="bg-muted/30 font-sans">
+      <Helmet><title>{isEdit ? 'Edit Card' : 'Add New Card'} | Card Pop</title></Helmet>
+
+      <div className="max-w-[90rem] mx-auto px-4 py-8 w-full">
+        <nav className="flex items-center text-sm text-muted-foreground mb-6 font-medium">
+          <Link to="/vault" className="hover:text-primary transition-colors">Vault</Link>
+          <ChevronRight className="w-4 h-4 mx-2 opacity-50" />
+          <span className="text-foreground">{isEdit ? 'Edit Card' : 'Add New Card'}</span>
+        </nav>
+
+        {!isEdit && restorableDraft && (
+          <div role="status" className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-sky-400/50 bg-sky-500/5 p-4">
+            <History className="h-5 w-5 shrink-0 text-sky-500" />
+            <div className="min-w-[14rem] flex-1">
+              <p className="text-sm font-bold text-foreground">You have an unfinished listing</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Saved {new Date(restorableDraft.savedAt).toLocaleString()} — restore it to pick up where
+                you left off. Photos aren't kept in drafts, so re-add those.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" className="h-9 font-bold" onClick={restoreDraft}>
+                Restore
+              </Button>
+              <Button type="button" size="sm" variant="ghost" className="h-9 font-bold text-muted-foreground" onClick={discardDraft}>
+                Discard
+              </Button>
             </div>
           </div>
+        )}
 
-          <div className="flex justify-end gap-4 pt-6 border-t border-border">
-            <Button type="button" variant="outline" className="h-14 px-8 text-lg" asChild>
-              <Link to="/vault">Cancel</Link>
-            </Button>
-            <Button type="submit" disabled={saving} className="h-14 px-10 font-bold text-lg shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
-              {saving
-                ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Saving...</>
-                : <><Save className="w-5 h-5 mr-2" /> {isEdit ? 'Update Card' : 'Save Card'}</>
-              }
-            </Button>
-          </div>
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="font-serif text-4xl font-bold">{isEdit ? 'Edit Card Details' : 'Add New Card'}</h1>
+          <Button variant="ghost" asChild className="text-muted-foreground">
+            <Link to="/vault"><ArrowLeft className="w-4 h-4 mr-2" /> Back</Link>
+          </Button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {wizardMode ? (
+            <>
+              <WizardStepper
+                steps={WIZARD_STEPS}
+                current={wizardStep}
+                maxReached={maxStepReached}
+                onStepSelect={goToStep}
+              />
+              <div className="max-w-2xl mx-auto space-y-5">
+                {wizardStep === 0 && photoPanel}
+                {wizardStep === 1 && (
+                  <>
+                    {(isScanning || isIdentifying) && (
+                      <p role="status" className="text-xs text-muted-foreground flex items-center gap-2">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" /> Identifying your card — details fill in automatically as it finishes.
+                      </p>
+                    )}
+                    {detailsSection}
+                    {gradingSection}
+                  </>
+                )}
+                {wizardStep === 2 && valueSection}
+                {wizardStep === 3 && (
+                  <>
+                    {visibilitySection}
+                    {styleSection}
+                  </>
+                )}
+
+                <div className="flex items-center justify-between gap-4 pt-4 border-t border-border">
+                  {wizardStep === 0 ? (
+                    <Button type="button" variant="outline" className="h-12 px-6" asChild>
+                      <Link to="/vault">Cancel</Link>
+                    </Button>
+                  ) : (
+                    <Button type="button" variant="outline" className="h-12 px-6" onClick={() => goToStep(wizardStep - 1)}>
+                      <ArrowLeft className="w-4 h-4 mr-2" /> Back
+                    </Button>
+                  )}
+                  {wizardStep < WIZARD_STEPS.length - 1 ? (
+                    <Button type="button" onClick={goNextStep} className="h-12 px-8 font-bold">
+                      Next: {WIZARD_STEPS[wizardStep + 1].title} <ChevronRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  ) : (
+                    <Button type="submit" disabled={saving} className="h-12 px-8 font-bold shadow-lg shadow-primary/20">
+                      {saving
+                        ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Saving...</>
+                        : <><Save className="w-5 h-5 mr-2" /> Save Card</>}
+                    </Button>
+                  )}
+                </div>
+
+                <p className="text-center text-xs text-muted-foreground">
+                  Prefer everything on one page?{' '}
+                  <button type="button" className="underline font-medium hover:text-foreground" onClick={() => setFormMode(true)}>
+                    Switch to the full form
+                  </button>
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="grid lg:grid-cols-3 gap-6">
+                {/* ── Left: Image + AI ── */}
+                <div className="lg:col-span-1 space-y-5">{photoPanel}</div>
+
+                {/* ── Right: All form sections ── */}
+                <div className="lg:col-span-2 space-y-5">
+                  {detailsSection}
+                  {gradingSection}
+                  {psaPanel}
+                  {valueSection}
+                  {visibilitySection}
+                  {styleSection}
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-end gap-4 pt-6 border-t border-border">
+                {!isEdit && (
+                  <button
+                    type="button"
+                    className="mr-auto text-xs text-muted-foreground underline font-medium hover:text-foreground"
+                    onClick={() => setFormMode(false)}
+                  >
+                    Switch to the step-by-step wizard
+                  </button>
+                )}
+                <Button type="button" variant="outline" className="h-14 px-8 text-lg" asChild>
+                  <Link to="/vault">Cancel</Link>
+                </Button>
+                <Button type="submit" disabled={saving} className="h-14 px-10 font-bold text-lg shadow-lg shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
+                  {saving
+                    ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Saving...</>
+                    : <><Save className="w-5 h-5 mr-2" /> {isEdit ? 'Update Card' : 'Save Card'}</>
+                  }
+                </Button>
+              </div>
+            </>
+          )}
         </form>
       </div>
 
