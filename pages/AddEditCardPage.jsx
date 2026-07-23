@@ -1339,7 +1339,7 @@ const AddEditCardPage = () => {
                 {/* Extra image slots — count driven by max_images_per_listing */}
                 <div className="mt-4">
                   <p className="text-xs font-semibold text-muted-foreground mb-2">Additional Photos (up to {maxExtraSlots})</p>
-                  <div className="grid grid-cols-5 gap-2">
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                     {extraFiles.map((_, idx) => (
                       <div key={idx} className="aspect-square">
                         {extraPreviews[idx] ? (
@@ -1994,7 +1994,7 @@ const AddEditCardPage = () => {
                         {/* Refractor colour / parallel */}
                         <div className="space-y-2">
                           <Label className="text-xs font-bold text-foreground">Refractor Colour / Parallel</Label>
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                             {[
                               { value: 'standard', label: 'Standard', sub: 'Unnumbered',  dot: 'bg-gradient-to-br from-cyan-300 via-fuchsia-300 to-amber-300' },
                               { value: 'green',    label: 'Green',    sub: 'often /99',   dot: 'bg-green-500' },
@@ -2126,7 +2126,7 @@ const AddEditCardPage = () => {
                         {/* Prizm colour / parallel */}
                         <div className="space-y-2">
                           <Label className="text-xs font-bold text-foreground">Prizm Colour / Parallel</Label>
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                             {[
                               { value: 'silver', label: 'Silver', sub: 'base, unnumbered', dot: 'bg-gradient-to-br from-slate-200 via-slate-400 to-slate-200' },
                               { value: 'rwb',    label: 'Red/White/Blue', sub: 'retail',     dot: 'bg-gradient-to-br from-red-500 via-white to-blue-500 border border-white/40' },

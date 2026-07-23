@@ -221,25 +221,29 @@ const GradingCompaniesPage = () => {
         <div>
           <h2 className="text-2xl font-bold mb-5">Quick Comparison</h2>
           <div className="bg-card border border-border rounded-3xl overflow-hidden">
-            <div className="grid grid-cols-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-muted/50 px-5 py-3 border-b border-border">
-              <span>Company</span>
-              <span>Best For</span>
-              <span>Turnaround</span>
-              <span>AU Pricing</span>
-            </div>
-            {[
-              { co: 'PSA',  for: 'Pokémon, Sports', time: '20–150 days', price: 'From $25 USD' },
-              { co: 'BGS',  for: 'All TCG, Vintage', time: '15–90 days', price: 'From $22 USD' },
-              { co: 'CGC',  for: 'All TCG',          time: '10–60 days', price: 'From $15 USD' },
-              { co: 'ARK',  for: 'AU collectors',    time: 'Local turnaround',  price: 'AUD pricing' },
-            ].map(({ co, for: f, time, price }, i, arr) => (
-              <div key={co} className={`grid grid-cols-4 px-5 py-4 text-sm ${i < arr.length - 1 ? 'border-b border-border/60' : ''} hover:bg-muted/20 transition-colors`}>
-                <span className="font-bold text-primary">{co}</span>
-                <span className="text-muted-foreground">{f}</span>
-                <span className="text-muted-foreground">{time}</span>
-                <span className="text-muted-foreground">{price}</span>
+            <div className="overflow-x-auto">
+              <div className="min-w-[520px]">
+                <div className="grid grid-cols-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-muted/50 px-5 py-3 border-b border-border">
+                  <span>Company</span>
+                  <span>Best For</span>
+                  <span>Turnaround</span>
+                  <span>AU Pricing</span>
+                </div>
+                {[
+                  { co: 'PSA',  for: 'Pokémon, Sports', time: '20–150 days', price: 'From $25 USD' },
+                  { co: 'BGS',  for: 'All TCG, Vintage', time: '15–90 days', price: 'From $22 USD' },
+                  { co: 'CGC',  for: 'All TCG',          time: '10–60 days', price: 'From $15 USD' },
+                  { co: 'ARK',  for: 'AU collectors',    time: 'Local turnaround',  price: 'AUD pricing' },
+                ].map(({ co, for: f, time, price }, i, arr) => (
+                  <div key={co} className={`grid grid-cols-4 px-5 py-4 text-sm ${i < arr.length - 1 ? 'border-b border-border/60' : ''} hover:bg-muted/20 transition-colors`}>
+                    <span className="font-bold text-primary">{co}</span>
+                    <span className="text-muted-foreground">{f}</span>
+                    <span className="text-muted-foreground">{time}</span>
+                    <span className="text-muted-foreground">{price}</span>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
         </div>
 

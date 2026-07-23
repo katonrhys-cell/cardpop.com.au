@@ -556,7 +556,7 @@ const MarketsPage = () => {
             )}
           </div>
           <Tabs defaultValue="advancers" onValueChange={setSelectedTab}>
-            <TabsList className="mb-4">
+            <TabsList className="mb-4 max-w-full justify-start overflow-x-auto scrollbar-hide">
               <TabsTrigger value="advancers" className="gap-1.5">
                 <TrendingUp className="w-4 h-4 text-emerald-500" /> Advancers
               </TabsTrigger>

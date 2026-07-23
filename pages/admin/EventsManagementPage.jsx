@@ -150,6 +150,7 @@ const EventsManagementPage = () => {
               </div>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
               <thead className="text-xs text-muted-foreground uppercase bg-muted/20 border-b border-border">
                 <tr>
@@ -231,6 +232,7 @@ const EventsManagementPage = () => {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>
