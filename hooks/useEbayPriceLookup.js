@@ -7,8 +7,10 @@ export function useEbayPriceLookup() {
   const [priceData, setPriceData] = useState(null);
   const isMounted = useIsMounted();
 
+  // Resolves with the price data when listings were found, else null — so
+  // on-demand callers can tell the user "nothing found" instead of silence.
   const lookupPrice = useCallback(async (scanResult) => {
-    if (!scanResult?.name) return;
+    if (!scanResult?.name) return null;
 
     setIsLookingUp(true);
     setPriceData(null);
@@ -27,6 +29,7 @@ export function useEbayPriceLookup() {
 
       if (isMounted() && data.count > 0) {
         setPriceData(data);
+        return data;
       }
     } catch (err) {
       // Price lookup is optional — fail silently
@@ -34,6 +37,7 @@ export function useEbayPriceLookup() {
     } finally {
       if (isMounted()) setIsLookingUp(false);
     }
+    return null;
   }, [isMounted]);
 
   return {

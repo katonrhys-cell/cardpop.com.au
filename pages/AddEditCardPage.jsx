@@ -43,7 +43,7 @@ import { publicImageUrl, thumbStoragePath } from '@/utils/imageUrl.js';
 import SellingRequirementsNotice from '@/components/SellingRequirementsNotice.jsx';
 import { isSellingEntitlementError } from '@/utils/listingErrors.js';
 import { loadListingDraft, saveListingDraft, clearListingDraft, hasMeaningfulContent } from '@/lib/listingDraft.js';
-import { shouldAutoIdentify } from '@/utils/listingFlow.js';
+import { shouldAutoIdentify, buildPriceLookupQuery } from '@/utils/listingFlow.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -670,6 +670,25 @@ const AddEditCardPage = () => {
       lookupPrice(ocrResult);
       setIsAutoFilled(true);
       // Success/failure feedback is surfaced by useCardOCR itself.
+    }
+  };
+
+  // ─── On-demand price estimate ─────────────────────────────────────────────
+  // Price suggestions used to appear only as a byproduct of the AI identify —
+  // a seller who typed the details manually never saw one. This queries both
+  // sources from whatever is in the form: CardSight sold prices (by catalog id
+  // when an identify matched, else by name) and current eBay asking prices.
+  const handlePriceLookup = async () => {
+    const query = buildPriceLookupQuery(formData);
+    if (!query) return;
+    const [ebayData, csData] = await Promise.all([
+      lookupPrice(query),
+      cardSightResult?.card?.id
+        ? fetchPricingById(cardSightResult.card.id)
+        : fetchPricingByName(query.name),
+    ]);
+    if (!ebayData && !csData) {
+      toast.info('No price data found for this card. Try adding the set name, or check the spelling.');
     }
   };
 
@@ -2992,6 +3011,29 @@ const AddEditCardPage = () => {
 
               {/* ── 3. Value & Acquisition ── */}
               <SectionCard title="Value & Acquisition">
+                {/* On-demand price estimate — works from the typed details, no
+                    AI identify required. */}
+                <div className="flex flex-wrap items-center gap-2 -mt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePriceLookup}
+                    disabled={isLookingUp || isLoadingCsPrice || !formData.cardName?.trim()}
+                    className="gap-1.5 font-bold"
+                  >
+                    {(isLookingUp || isLoadingCsPrice)
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <TrendingUp className="w-3.5 h-3.5" />}
+                    Get price estimate
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    {formData.cardName?.trim()
+                      ? 'Checks recent sold prices and current eBay asking prices for this card.'
+                      : 'Enter a card name first, then get a price estimate.'}
+                  </p>
+                </div>
+
                 {/* Locked base value banner (edit mode only) */}
                 {isEdit && lockedBaseValue !== null && (
                   <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 -mt-1">
@@ -3012,24 +3054,77 @@ const AddEditCardPage = () => {
                     <Shield className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
                     <p className="text-xs text-blue-700">
                       The estimated value you enter will be locked as this card&apos;s <strong>base valuation</strong>. You cannot list or trade the card for less than this amount later.
-                      Use the eBay market data above to set an accurate figure.
+                      Use &quot;Get price estimate&quot; above — recent <strong>sold prices</strong> are the best guide; eBay figures are asking prices, which often run higher.
                     </p>
                   </div>
                 )}
 
-                {/* eBay market price suggestion */}
+                {/* CardSight sold prices — realized sales, the best pricing
+                    guide, so it leads. */}
+                {(isLoadingCsPrice || csPrice) && (
+                  <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                    {isLoadingCsPrice ? (
+                      <p className="text-xs font-medium text-blue-700 dark:text-blue-400 flex items-center gap-2">
+                        <Loader2 className="w-3 h-3 animate-spin" /> Fetching sold prices…
+                      </p>
+                    ) : csPrice && (() => {
+                      const avg = csPrice.avg_price ?? csPrice.average_price ?? csPrice.mean_price;
+                      const min = csPrice.min_price ?? csPrice.minimum_price;
+                      const max = csPrice.max_price ?? csPrice.maximum_price;
+                      const count = csPrice.count ?? csPrice.total_count ?? csPrice.total;
+                      const lastSale = csPrice.last_sale_price ?? csPrice.lastSalePrice;
+                      if (!avg) return null;
+                      return (
+                        <>
+                          <p className="text-xs font-bold text-blue-700 dark:text-blue-400 flex items-center gap-1.5 mb-1">
+                            <Shield className="w-3.5 h-3.5" /> Sold Prices{count ? ` (${count} sales)` : ''}
+                          </p>
+                          <p className="text-[11px] text-blue-700/80 dark:text-blue-400/80 mb-2">
+                            What this card actually sold for recently — the most reliable pricing guide.
+                          </p>
+                          <div className="flex flex-wrap gap-3 text-xs text-blue-800 dark:text-blue-300 mb-3">
+                            <span>Avg: <strong>${Number(avg).toFixed(2)}</strong></span>
+                            {min != null && <span>Low: <strong>${Number(min).toFixed(2)}</strong></span>}
+                            {max != null && <span>High: <strong>${Number(max).toFixed(2)}</strong></span>}
+                            {lastSale != null && <span>Last sold: <strong>${Number(lastSale).toFixed(2)}</strong></span>}
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs border-blue-400 text-blue-700 hover:bg-blue-50 dark:text-blue-400"
+                            onClick={() => {
+                              set('estimatedValue', String(Number(avg).toFixed(2)));
+                              clearCsPrice();
+                              toast.success(`Estimated value set to $${Number(avg).toFixed(2)} AUD from recent sold prices.`);
+                            }}
+                          >
+                            Use sold average (${Number(avg).toFixed(2)})
+                          </Button>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* eBay asking prices — live listings from the Browse API, NOT
+                    sold comps. Labeled honestly: asking prices skew above what
+                    cards actually sell for. */}
                 {(isLookingUp || priceData) && (
                   <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                     {isLookingUp ? (
                       <p className="text-xs font-medium text-emerald-700 flex items-center gap-2">
-                        <Loader2 className="w-3 h-3 animate-spin" /> Looking up eBay market price…
+                        <Loader2 className="w-3 h-3 animate-spin" /> Checking current eBay asking prices…
                       </p>
                     ) : priceData && (
                       <>
-                        <p className="text-xs font-bold text-emerald-700 flex items-center gap-1.5 mb-2">
-                          <TrendingUp className="w-3.5 h-3.5" /> eBay AU Market Data ({priceData.count} recent sales)
+                        <p className="text-xs font-bold text-emerald-700 flex items-center gap-1.5 mb-1">
+                          <TrendingUp className="w-3.5 h-3.5" /> eBay AU Asking Prices ({priceData.count} live listings)
                         </p>
-                        <div className="flex gap-3 text-xs text-emerald-800 mb-3">
+                        <p className="text-[11px] text-emerald-700/80 mb-2">
+                          What sellers are asking right now — not sold prices. Actual sales often close lower.
+                        </p>
+                        <div className="flex flex-wrap gap-3 text-xs text-emerald-800 mb-3">
                           <span>Avg: <strong>${priceData.avgPrice?.toFixed(2)}</strong></span>
                           <span>Low: <strong>${priceData.minPrice?.toFixed(2)}</strong></span>
                           <span>High: <strong>${priceData.maxPrice?.toFixed(2)}</strong></span>
@@ -3042,55 +3137,13 @@ const AddEditCardPage = () => {
                           onClick={() => {
                             set('estimatedValue', String(priceData.avgPrice?.toFixed(2) ?? ''));
                             clearPrice();
-                            toast.success(`Estimated value set to $${priceData.avgPrice?.toFixed(2)} AUD from eBay data.`);
+                            toast.success(`Estimated value set to $${priceData.avgPrice?.toFixed(2)} AUD from current eBay asking prices.`);
                           }}
                         >
-                          Use eBay average (${priceData.avgPrice?.toFixed(2)})
+                          Use asking-price average (${priceData.avgPrice?.toFixed(2)})
                         </Button>
                       </>
                     )}
-                  </div>
-                )}
-
-                {/* CardSight market price */}
-                {(isLoadingCsPrice || csPrice) && (
-                  <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                    {isLoadingCsPrice ? (
-                      <p className="text-xs font-medium text-blue-700 dark:text-blue-400 flex items-center gap-2">
-                        <Loader2 className="w-3 h-3 animate-spin" /> Fetching CardSight pricing…
-                      </p>
-                    ) : csPrice && (() => {
-                      const avg = csPrice.avg_price ?? csPrice.average_price ?? csPrice.mean_price;
-                      const min = csPrice.min_price ?? csPrice.minimum_price;
-                      const max = csPrice.max_price ?? csPrice.maximum_price;
-                      const count = csPrice.count ?? csPrice.total_count ?? csPrice.total;
-                      if (!avg) return null;
-                      return (
-                        <>
-                          <p className="text-xs font-bold text-blue-700 dark:text-blue-400 flex items-center gap-1.5 mb-2">
-                            <Shield className="w-3.5 h-3.5" /> CardSight Market Data{count ? ` (${count} sales)` : ''}
-                          </p>
-                          <div className="flex gap-3 text-xs text-blue-800 dark:text-blue-300 mb-3">
-                            <span>Avg: <strong>${Number(avg).toFixed(2)}</strong></span>
-                            {min != null && <span>Low: <strong>${Number(min).toFixed(2)}</strong></span>}
-                            {max != null && <span>High: <strong>${Number(max).toFixed(2)}</strong></span>}
-                          </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs border-blue-400 text-blue-700 hover:bg-blue-50 dark:text-blue-400"
-                            onClick={() => {
-                              set('estimatedValue', String(Number(avg).toFixed(2)));
-                              clearCsPrice();
-                              toast.success(`Estimated value set to $${Number(avg).toFixed(2)} AUD from CardSight data.`);
-                            }}
-                          >
-                            Use CardSight average (${Number(avg).toFixed(2)})
-                          </Button>
-                        </>
-                      );
-                    })()}
                   </div>
                 )}
 

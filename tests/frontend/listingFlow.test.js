@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { shouldAutoIdentify } from '@/utils/listingFlow.js';
+import { shouldAutoIdentify, buildPriceLookupQuery } from '@/utils/listingFlow.js';
 
 const base = { isEdit: false, cardName: '', isScanning: false, isIdentifying: false };
 
@@ -27,5 +27,40 @@ describe('shouldAutoIdentify', () => {
 
   it('handles a missing card name safely', () => {
     expect(shouldAutoIdentify({ ...base, cardName: undefined })).toBe(true);
+  });
+});
+
+describe('buildPriceLookupQuery', () => {
+  it('requires a card name', () => {
+    expect(buildPriceLookupQuery({ cardName: '' })).toBeNull();
+    expect(buildPriceLookupQuery({ cardName: '   ' })).toBeNull();
+    expect(buildPriceLookupQuery(null)).toBeNull();
+  });
+
+  it('builds a full query from typed fields', () => {
+    expect(
+      buildPriceLookupQuery({
+        cardName: ' Charizard ',
+        setName: 'Base Set',
+        gradingCompany: 'psa',
+        grade: '10',
+      })
+    ).toEqual({
+      name: 'Charizard',
+      cardSetName: 'Base Set',
+      gradingService: 'PSA',
+      gradeScore: '10',
+    });
+  });
+
+  it('omits grading terms for raw and unrecognised services', () => {
+    expect(buildPriceLookupQuery({ cardName: 'Pikachu', gradingCompany: 'raw' }).gradingService).toBe('None');
+    expect(buildPriceLookupQuery({ cardName: 'Pikachu', gradingCompany: 'other' }).gradingService).toBe('None');
+  });
+
+  it('leaves optional fields undefined when blank', () => {
+    const query = buildPriceLookupQuery({ cardName: 'Pikachu', setName: '  ', grade: '' });
+    expect(query.cardSetName).toBeUndefined();
+    expect(query.gradeScore).toBeUndefined();
   });
 });
