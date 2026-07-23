@@ -93,7 +93,7 @@ const STATS = [
 const TRUST_SIGNALS = [
   {
     icon: ShieldCheck,
-    title: 'Secure payments',
+    title: 'Secure Payments',
     body: 'Processed by Stripe on a PCI-DSS checkout — your card details never touch our servers.',
   },
   {
