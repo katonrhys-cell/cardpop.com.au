@@ -57,7 +57,7 @@ const CheckoutPage = () => {
   const [searchParams] = useSearchParams();
   const source = searchParams.get('source');
 
-  const { cartItems } = useCart();
+  const { cartItems, setIsCartOpen } = useCart();
   const { currentUser, isIdentityVerified, profileLoading } = useAuth();
   const [initializing, setInitializing] = useState(true);
 
@@ -405,7 +405,10 @@ const CheckoutPage = () => {
       shipping={shipping}
       discount={discount}
       total={total}
-      onEditCart={() => navigate('/marketplace')}
+      // "Edit Cart" opens the cart drawer (remove items / change quantities)
+      // rather than bouncing to the marketplace. Hidden for the direct Vault
+      // "buy now" flow, which isn't backed by the cart — there's nothing to edit.
+      onEditCart={directItem ? undefined : () => setIsCartOpen(true)}
     />
   );
 
@@ -610,8 +613,13 @@ const CheckoutPage = () => {
               </div>
             </div>
 
-            {/* ── Right: sticky summary ─────────────────────────────────── */}
-            <aside className="space-y-4 lg:sticky lg:top-6">
+            {/* ── Right: sticky summary ───────────────────────────────────
+                Pinned so the order total & reassurance stay in view while the
+                buyer scrolls the (taller) details column. `top-32` clears the
+                two-row sticky header (~116px) so the card rests just below it
+                instead of sliding underneath; `self-start` keeps the sticky box
+                its own height rather than stretching to the grid row. */}
+            <aside className="space-y-4 lg:sticky lg:top-32 lg:self-start">
               {orderSummary}
               {promoCard}
               {walletCard}
