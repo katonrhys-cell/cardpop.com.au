@@ -43,8 +43,10 @@ export const NAV_LINKS = [
 // primary nav stays focused on shopping & discovery. Add future secondary
 // items here and they appear in both the desktop dropdown and mobile section.
 const MORE_ITEMS = [
-  { href: '/pricing', label: 'Pricing', desc: 'Membership plans & seller fees', Icon: Sparkles, gradient: 'from-amber-500 to-orange-500' },
-  { href: '/about',   label: 'About',   desc: 'Our story and mission',          Icon: Info,     gradient: 'from-blue-500 to-indigo-600'  },
+  { href: '/card-shops',                       label: 'Card Shop Directory',    desc: 'Find local card shops city by city',   Icon: Store,    gradient: 'from-amber-500 to-orange-500' },
+  { href: '/community/building-your-business', label: 'Building Your Business', desc: 'Tools we use to grow a card business', Icon: Rocket,   gradient: 'from-rose-500 to-orange-500'  },
+  { href: '/pricing',                          label: 'Pricing',                desc: 'Membership plans & seller fees',       Icon: Sparkles, gradient: 'from-amber-500 to-orange-500' },
+  { href: '/about',                            label: 'About',                  desc: 'Our story and mission',                Icon: Info,     gradient: 'from-blue-500 to-indigo-600'  },
 ];
 
 const ADMIN_LINKS = [
@@ -76,10 +78,8 @@ const COMMUNITY_ITEMS = [
   { href: '/community/forum',          label: 'Forum',                 desc: 'Discussions and community posts',        Icon: MessageSquare, gradient: 'from-violet-500 to-purple-600'  },
   { href: '/community/profiles',       label: 'Profiles',              desc: 'Browse collector profiles',              Icon: Users,         gradient: 'from-emerald-500 to-teal-600'   },
   { href: '/community/local-traders',  label: 'Local Traders',         desc: 'Endorsed sellers near you',              Icon: BadgeCheck,    gradient: 'from-blue-500 to-cyan-600'    },
-  { href: '/card-shops',               label: 'Card Shop Directory',   desc: 'Find local card shops city by city',     Icon: Store,         gradient: 'from-amber-500 to-orange-500'  },
   { href: '/community/map',            label: 'Community Map',         desc: 'Stores, shows & traders near you',       Icon: MapPin,        gradient: 'from-blue-500 to-indigo-600'   },
   { href: '/community/whatnot',        label: 'Whatnot',               desc: 'Live buying and selling shows',          Icon: WhatnotIcon,   gradient: 'from-green-500 to-emerald-600', isWhatnot: true },
-  { href: '/community/building-your-business', label: 'Building Your Business', desc: 'Tools we use to grow a card business', Icon: Rocket,     gradient: 'from-rose-500 to-orange-500'   },
 ];
 
 const EVENT_ITEMS = [
