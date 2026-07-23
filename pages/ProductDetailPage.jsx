@@ -433,19 +433,17 @@ const ProductDetailPage = ({ source: sourceProp }) => {
           <ArrowLeft className="w-4 h-4 mr-1.5" /> Back
         </Button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
+        {/* Desktop: the right column spans two rows, so the cert section (last
+            grid item) lands directly under the image carousel. Mobile: DOM
+            order applies — image, then price/Buy Now/description/eBay, then
+            cert — keeping the buy button above the fold. Row gap is disabled
+            at lg because the cert section brings its own mt-8. */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-x-16 lg:gap-y-0">
           <div className="lg:col-span-6 xl:col-span-7">
             <ProductImageCarousel images={product.images} record={product} />
-            {!isShop && (vi?.cert_number || vi?.certification_number) && (
-              <CertificationVerificationSection
-                certNumber={vi?.cert_number || vi?.certification_number}
-                gradingCompany={vi?.grading_company || 'psa'}
-                grade={vi?.grade}
-              />
-            )}
           </div>
 
-          <div className="lg:col-span-6 xl:col-span-5 flex flex-col">
+          <div className="lg:col-span-6 xl:col-span-5 lg:row-span-2 flex flex-col">
             <div className="flex flex-wrap gap-2 mb-4">
               {isShop ? (
                 <Badge className="bg-primary text-primary-foreground border-none font-bold shadow-sm px-2.5 py-1">
@@ -667,6 +665,19 @@ const ProductDetailPage = ({ source: sourceProp }) => {
               />
             )}
           </div>
+
+          {/* -mt-8 cancels the section's built-in top margin on mobile (the
+              grid gap already separates it); at lg the row gap is 0 so the
+              built-in margin is restored to space it under the carousel. */}
+          {!isShop && (vi?.cert_number || vi?.certification_number) && (
+            <div className="-mt-8 lg:mt-0 lg:col-span-6 xl:col-span-7 lg:col-start-1">
+              <CertificationVerificationSection
+                certNumber={vi?.cert_number || vi?.certification_number}
+                gradingCompany={vi?.grading_company || 'psa'}
+                grade={vi?.grade}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>
