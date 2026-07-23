@@ -4,7 +4,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, ChevronDown, Sparkles, Loader2,
   Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X, Crop,
-  Frame, Wand2, SlidersHorizontal, HandCoins,
+  Frame, Wand2, SlidersHorizontal, HandCoins, History,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
@@ -42,6 +42,7 @@ import { canUseStyle, normalizeStyle, normalizeTier } from '@/lib/displayStyles.
 import { publicImageUrl, thumbStoragePath } from '@/utils/imageUrl.js';
 import SellingRequirementsNotice from '@/components/SellingRequirementsNotice.jsx';
 import { isSellingEntitlementError } from '@/utils/listingErrors.js';
+import { loadListingDraft, saveListingDraft, clearListingDraft, hasMeaningfulContent } from '@/lib/listingDraft.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -216,7 +217,14 @@ const AddEditCardPage = () => {
 
   const [formData, setFormData] = useState(emptyForm);
 
-  const set = (key, val) => setFormData(f => ({ ...f, [key]: val }));
+  // Tracks user-driven edits (via `set`) for the leave-page warning. The edit
+  // load and draft restore write via setFormData directly, so they don't trip it.
+  const formDirtyRef = useRef(false);
+
+  const set = (key, val) => {
+    formDirtyRef.current = true;
+    setFormData(f => ({ ...f, [key]: val }));
+  };
 
   // Derive collection slug for era lookups (uses franchise name stored in formData.collection)
   const collectionSlug = (() => {
@@ -300,6 +308,82 @@ const AddEditCardPage = () => {
     setSubsetOpts([]);
     if (setId) getSubsetsBySet(setId).then(setSubsetOpts);
   }, [setId, getSubsetsBySet]);
+
+  // ─── Draft persistence (new cards only) ───────────────────────────────────
+  // The form is long and has no server-side draft state, so field values and
+  // hierarchy selections are continuously saved to localStorage. Images stay
+  // in memory only (too large for localStorage) — the restore banner and the
+  // beforeunload warning below cover that gap.
+  const [restorableDraft, setRestorableDraft] = useState(null);
+
+  useEffect(() => {
+    if (isEdit || !currentUser?.id) return;
+    const draft = loadListingDraft(currentUser.id);
+    if (draft && hasMeaningfulContent(draft.formData, emptyForm, draft.hierarchy)) {
+      setRestorableDraft(draft);
+    }
+    // emptyForm is a per-render literal of constants — safe to omit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit, currentUser?.id]);
+
+  useEffect(() => {
+    if (isEdit || !currentUser?.id || saving) return;
+    const hierarchy = { selCategoryId, franchiseId, manufacturerId, teamId, setId, parallelId, subsetId };
+    const timer = setTimeout(() => {
+      if (hasMeaningfulContent(formData, emptyForm, hierarchy)) {
+        saveListingDraft(currentUser.id, { formData, hierarchy });
+      } else {
+        // Form emptied (e.g. "Add Another" reset) — drop the stale draft.
+        clearListingDraft(currentUser.id);
+      }
+    }, 800);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [formData, selCategoryId, franchiseId, manufacturerId, teamId, setId, parallelId, subsetId, isEdit, currentUser?.id, saving]);
+
+  const restoreDraft = () => {
+    if (!restorableDraft) return;
+    const { formData: draftForm, hierarchy = {} } = restorableDraft;
+    // Arm the one-shot cascade guards (same mechanism as the edit-mode load):
+    // restoring franchise/set together with parallel/subset in one commit
+    // would otherwise trip the cascade-reset effects and wipe the latter.
+    if (hierarchy.franchiseId) restoredFranchiseRef.current = hierarchy.franchiseId;
+    if (hierarchy.setId) restoredSetRef.current = hierarchy.setId;
+    if (hierarchy.selCategoryId) setSelCategoryId(hierarchy.selCategoryId);
+    if (hierarchy.franchiseId) setFranchiseId(hierarchy.franchiseId);
+    if (hierarchy.manufacturerId) setManufacturerId(hierarchy.manufacturerId);
+    if (hierarchy.teamId) setTeamId(hierarchy.teamId);
+    if (hierarchy.setId) setSetId(hierarchy.setId);
+    if (hierarchy.parallelId) setParallelId(hierarchy.parallelId);
+    if (hierarchy.subsetId) setSubsetId(hierarchy.subsetId);
+    // Merge over the current defaults so fields added after the draft was
+    // saved keep their initial values.
+    setFormData(prev => ({ ...prev, ...draftForm }));
+    setRestorableDraft(null);
+    toast.success('Draft restored — add your photos again and you\'re back where you left off.');
+  };
+
+  const discardDraft = () => {
+    clearListingDraft(currentUser?.id);
+    setRestorableDraft(null);
+  };
+
+  // Warn before refresh/close when in-memory work would be lost: freshly
+  // picked photos exist only in component state (drafts persist fields, not
+  // images), and edit mode has no draft persistence at all.
+  useEffect(() => {
+    const onBeforeUnload = (e) => {
+      if (saving) return;
+      const hasUnsavedImages = !!imageFile || extraFiles.some(Boolean);
+      const editDirty = isEdit && formDirtyRef.current;
+      if (hasUnsavedImages || editDirty) {
+        e.preventDefault();
+        e.returnValue = ''; // required by some browsers to show the prompt
+      }
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [imageFile, extraFiles, isEdit, saving]);
 
   // ─── Load existing card when editing ─────────────────────────────────────
   useEffect(() => {
@@ -999,12 +1083,16 @@ const AddEditCardPage = () => {
       if (isEdit) {
         const { error } = await supabase.from('vault_items').update(payload).eq('id', id).eq('owner_id', currentUser.id);
         if (error) throw error;
+        formDirtyRef.current = false;
         const syncStatus = await syncMarketplaceListing(id);
         showListingOutcome(syncStatus, 'Card updated successfully!');
         navigate('/vault');
       } else {
         const { data: inserted, error } = await supabase.from('vault_items').insert(payload).select('id').single();
         if (error) throw error;
+        formDirtyRef.current = false;
+        clearListingDraft(currentUser.id);
+        setRestorableDraft(null);
         const syncStatus = await syncMarketplaceListing(inserted.id);
         showListingOutcome(syncStatus, 'Card added to your vault!', {
           action: {
@@ -1052,6 +1140,27 @@ const AddEditCardPage = () => {
           <ChevronRight className="w-4 h-4 mx-2 opacity-50" />
           <span className="text-foreground">{isEdit ? 'Edit Card' : 'Add New Card'}</span>
         </nav>
+
+        {!isEdit && restorableDraft && (
+          <div role="status" className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-sky-400/50 bg-sky-500/5 p-4">
+            <History className="h-5 w-5 shrink-0 text-sky-500" />
+            <div className="min-w-[14rem] flex-1">
+              <p className="text-sm font-bold text-foreground">You have an unfinished listing</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Saved {new Date(restorableDraft.savedAt).toLocaleString()} — restore it to pick up where
+                you left off. Photos aren't kept in drafts, so re-add those.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" size="sm" className="h-9 font-bold" onClick={restoreDraft}>
+                Restore
+              </Button>
+              <Button type="button" size="sm" variant="ghost" className="h-9 font-bold text-muted-foreground" onClick={discardDraft}>
+                Discard
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="flex items-center justify-between mb-8">
           <h1 className="font-serif text-4xl font-bold">{isEdit ? 'Edit Card Details' : 'Add New Card'}</h1>
