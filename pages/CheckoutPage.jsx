@@ -229,6 +229,30 @@ const CheckoutPage = () => {
       .catch(() => {});
   }, []);
 
+  // Returning-customer nudge: if a logged-out shopper types an email that already
+  // belongs to a CardPop account, flag the field (cross + sign-in link). Guest
+  // checkout still works — this only offers the faster, account-linked path. The
+  // check is debounced and skipped entirely for signed-in buyers (their email is
+  // their own account by definition).
+  const [emailAccountExists, setEmailAccountExists] = useState(false);
+  useEffect(() => {
+    if (currentUser) { setEmailAccountExists(false); return; }
+    const email = (shippingData.email || '').trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailAccountExists(false); return; }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      apiServerClient.fetch('/auth/email/exists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+        .then(res => (res.ok ? res.json() : null))
+        .then(data => { if (!cancelled && data) setEmailAccountExists(!!data.exists); })
+        .catch(() => {});
+    }, 500);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [shippingData.email, currentUser]);
+
   // Authoritative totals come from the server so the displayed amount always
   // matches what Stripe charges (no fabricated tax).
   const [pricing, setPricing] = useState(null);
@@ -542,6 +566,8 @@ const CheckoutPage = () => {
                     if (selectedAddressId && selectedAddressId !== '__new') setSelectedAddressId('__new');
                   }}
                   showEmail
+                  emailAccountExists={emailAccountExists}
+                  signInReturnPath="/checkout"
                 />
 
                 {!currentUser && (
