@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import SEOHead from '@/components/SEOHead.jsx';
 import { Send, MessageSquare, AlertCircle, Shield, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge.jsx';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 
@@ -282,21 +283,32 @@ const MessagingPage = () => {
   const activeUser = conversations.find(c => c.otherUserId === selectedUserId);
 
   return (
-    <div className="w-full flex flex-col h-[calc(100vh-6rem)]">
-      <Helmet><title>Messaging | Card Pop</title></Helmet>
+    <div className="min-h-screen bg-background flex flex-col">
+      <SEOHead title="Messaging | CardPop" description="Chat with buyers and sellers about your trades and orders on CardPop." />
 
-      <div className="mb-4">
-        <h1 className="font-serif text-3xl font-bold text-foreground">Messages</h1>
-      </div>
+      {/* Hero */}
+      <section className="bg-card border-b border-border py-20 text-center">
+        <div className="container-default">
+          <MessageSquare className="w-12 h-12 text-primary mx-auto mb-6" />
+          <Badge variant="outline" className="mb-4 text-xs font-semibold tracking-widest uppercase border-primary/40 text-primary px-3 py-1">
+            Direct Messages
+          </Badge>
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">Messages</h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Chat with buyers and sellers, coordinate your trades, and keep every conversation in one place.
+          </p>
+        </div>
+      </section>
 
-      <div className="mb-4 flex items-start gap-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+      <div className="w-full max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-10 md:py-16 flex-1 flex flex-col">
+      <div className="mb-8 flex items-start gap-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
         <Shield className="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
         <p>
           <strong>Platform Safety Notice:</strong> Soliciting sales or trades outside CardPop — including via direct bank transfer, third-party payment platforms, or external marketplaces — initiated through this messaging system may result in a permanent ban.
         </p>
       </div>
 
-      <div className="flex-1 bg-card border border-border shadow-sm rounded-3xl overflow-hidden flex flex-col md:flex-row min-h-0">
+      <div className="flex-1 min-h-[32rem] h-[calc(100vh-16rem)] bg-card border border-border shadow-sm rounded-[2rem] overflow-hidden flex flex-col md:flex-row">
         
         {/* Left Sidebar - Conversations */}
         <div className={`w-full md:w-80 lg:w-96 border-r border-border flex flex-col bg-muted/10 ${selectedUserId ? 'hidden md:flex' : 'flex'}`}>
@@ -444,6 +456,7 @@ const MessagingPage = () => {
             </div>
           )}
         </div>
+      </div>
       </div>
     </div>
   );
