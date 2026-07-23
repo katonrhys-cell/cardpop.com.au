@@ -40,6 +40,8 @@ import { warpCardWithCorners } from '@/utils/detectCard.js';
 import DisplayStylePicker from '@/components/vault/DisplayStylePicker.jsx';
 import { canUseStyle, normalizeStyle, normalizeTier } from '@/lib/displayStyles.js';
 import { publicImageUrl, thumbStoragePath } from '@/utils/imageUrl.js';
+import SellingRequirementsNotice from '@/components/SellingRequirementsNotice.jsx';
+import { isSellingEntitlementError } from '@/utils/listingErrors.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -88,7 +90,7 @@ const previewUrlToBlob = async (url) => {
 const AddEditCardPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, isIdentityVerified } = useAuth();
   const { getCategories, getParallelsByFranchise, getSubsetsBySet } = useCategories();
 
   // Subscription tier gates which display styles the user can choose.
@@ -758,6 +760,14 @@ const AddEditCardPage = () => {
   // public listing type here must create/update a matching listings row.
   // Without this the card is only flagged on the vault_items row and never
   // appears in the marketplace. Mirrors the logic in VaultListingModal.
+  //
+  // Returns how the marketplace row actually ended up, so the caller can tell
+  // the seller the truth rather than a blanket success:
+  //   'archived' — card went private
+  //   'listed'   — live on the marketplace now
+  //   'pending'  — saved, but held for admin approval (listing_approval_required)
+  //   'blocked'  — denied by the can_sell() RLS gate (identity/card-on-file missing)
+  //   'error'    — any other failure (the vault card itself is already saved)
   const syncMarketplaceListing = async (cardId) => {
     const isPublic = formData.listingType !== 'private';
     const isSale   = formData.listingType === 'For Sale' || formData.listingType === 'For Sale & Trade';
@@ -766,13 +776,14 @@ const AddEditCardPage = () => {
     try {
       if (!isPublic) {
         // Going private — archive any active listing.
-        await supabase
+        const { error } = await supabase
           .from('listings')
           .update({ status: 'archived' })
           .eq('vault_item_id', cardId)
           .eq('seller_id', currentUser.id)
           .neq('status', 'archived');
-        return;
+        if (error) throw error;
+        return 'archived';
       }
 
       const listingPayload = {
@@ -798,17 +809,61 @@ const AddEditCardPage = () => {
         .neq('status', 'archived')
         .maybeSingle();
 
+      // Read the status back: the enforce_listing_approval trigger may have
+      // downgraded a new 'active' listing to 'pending', and the seller needs
+      // to know their card isn't visible yet.
+      let row, error;
       if (existing) {
-        await supabase
+        ({ data: row, error } = await supabase
           .from('listings')
           .update(listingPayload)
           .eq('id', existing.id)
-          .eq('seller_id', currentUser.id);
+          .eq('seller_id', currentUser.id)
+          .select('status')
+          .single());
       } else {
-        await supabase.from('listings').insert(listingPayload);
+        ({ data: row, error } = await supabase
+          .from('listings')
+          .insert(listingPayload)
+          .select('status')
+          .single());
       }
+      if (error) throw error;
+      return row?.status === 'pending' ? 'pending' : 'listed';
     } catch (err) {
-      toast.error('Card saved, but updating its marketplace listing failed. You can re-list it from your vault.');
+      console.error('Marketplace listing sync failed:', err);
+      return isSellingEntitlementError(err) ? 'blocked' : 'error';
+    }
+  };
+
+  // Turn the sync outcome into an honest toast. `savedMsg` is the base success
+  // message for the vault card itself; `successOpts` (e.g. the "Add Another"
+  // action) only applies when the listing genuinely went live.
+  const showListingOutcome = (syncStatus, savedMsg, successOpts = {}) => {
+    switch (syncStatus) {
+      case 'listed':
+        toast.success(`${savedMsg} Your listing is live on the marketplace.`, successOpts);
+        break;
+      case 'pending':
+        toast.success(`${savedMsg} Your listing is awaiting review and will appear on the marketplace once approved.`, successOpts);
+        break;
+      case 'blocked':
+        toast.warning(
+          `${savedMsg} But it is NOT live yet — selling requires identity verification and a card on file. Finish those, then relist it from your vault.`,
+          {
+            duration: 12000,
+            action: {
+              label: isIdentityVerified ? 'Add a card' : 'Verify identity',
+              onClick: () => navigate(isIdentityVerified ? '/account/wallet' : '/verify-identity'),
+            },
+          }
+        );
+        break;
+      case 'error':
+        toast.warning(`${savedMsg} But updating its marketplace listing failed — you can re-list it from your vault.`, { duration: 10000 });
+        break;
+      default: // 'archived' / private — nothing extra to explain
+        toast.success(savedMsg, successOpts);
     }
   };
 
@@ -944,14 +999,14 @@ const AddEditCardPage = () => {
       if (isEdit) {
         const { error } = await supabase.from('vault_items').update(payload).eq('id', id).eq('owner_id', currentUser.id);
         if (error) throw error;
-        await syncMarketplaceListing(id);
-        toast.success('Card updated successfully!');
+        const syncStatus = await syncMarketplaceListing(id);
+        showListingOutcome(syncStatus, 'Card updated successfully!');
         navigate('/vault');
       } else {
         const { data: inserted, error } = await supabase.from('vault_items').insert(payload).select('id').single();
         if (error) throw error;
-        await syncMarketplaceListing(inserted.id);
-        toast.success('Card added to your vault!', {
+        const syncStatus = await syncMarketplaceListing(inserted.id);
+        showListingOutcome(syncStatus, 'Card added to your vault!', {
           action: {
             label: 'Add Another',
             onClick: () => {
@@ -3033,6 +3088,11 @@ const AddEditCardPage = () => {
                     );
                   })}
                 </div>
+
+                {/* Selling requires identity verification + a card on file (the
+                    can_sell() RLS gate). Warn before submit, not after a silent
+                    failure — the notice self-hides once the user can sell. */}
+                {formData.listingType !== 'private' && <SellingRequirementsNotice />}
 
                 {(formData.listingType === 'For Sale' || formData.listingType === 'For Sale & Trade') && (
                   <div className="space-y-2 pt-3 border-t border-border">
