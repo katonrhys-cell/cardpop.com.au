@@ -34,6 +34,9 @@ const mockMaybeSingle = vi.hoisted(() => vi.fn());
 // buyer so the existing checkout tests exercise the happy path; tests that want
 // an unverified buyer can override this.
 const mockProfileMaybeSingle = vi.hoisted(() => vi.fn());
+// The pending-order insert on the `orders` table — controllable so a test can
+// simulate the missing-column (PGRST204) retry path.
+const mockOrdersInsert = vi.hoisted(() => vi.fn());
 
 // Replace only the fulfilment entrypoint so the success-page fallback (and the
 // webhook dispatch) can be asserted directly; every other service export stays
@@ -59,7 +62,9 @@ vi.mock('../../src/utils/supabaseClient.js', () => {
     // The identity gate's profiles lookup uses its own mock so it doesn't
     // consume the generic listing/offer mock the handlers rely on.
     q.maybeSingle = () => (table === 'profiles' ? mockProfileMaybeSingle() : mockMaybeSingle());
-    q.insert = () => Promise.resolve({ data: null, error: null });
+    q.insert = (payload) => (table === 'orders'
+      ? mockOrdersInsert(payload)
+      : Promise.resolve({ data: null, error: null }));
     return q;
   };
   const sb = { from: (table) => chain(table), auth: { getUser: () => Promise.resolve({ data: { user: null }, error: null }) } };
@@ -99,6 +104,8 @@ beforeEach(() => {
   mockMaybeSingle.mockResolvedValue({ data: MOCK_LISTING, error: null });
   // Buyer is identity-verified by default (passes the marketplace buy gate).
   mockProfileMaybeSingle.mockResolvedValue({ data: { is_verified: true }, error: null });
+  // Pending-order insert succeeds by default.
+  mockOrdersInsert.mockResolvedValue({ data: null, error: null });
 });
 
 // ─── POST /create-checkout ────────────────────────────────────────────────────
@@ -461,6 +468,34 @@ describe('POST /create-cart-checkout', () => {
     // $100 shop item is GST-inclusive (no shipping mocked) → buyer pays $100.
     expect(res.body.total).toBe(100);
     expect(mockStripe.checkout.sessions.create).toHaveBeenCalled();
+  });
+
+  it('retries the order insert without gst_included_aud when the column is missing (PGRST204)', async () => {
+    // Reproduces the production checkout failure: production ran the code that
+    // writes gst_included_aud before its migration reached the DB, so PostgREST
+    // rejected the insert with PGRST204 ("Could not find the 'gst_included_aud'
+    // column ... in the schema cache"). The retry must fire so the buyer isn't
+    // shown "Something went wrong."
+    emailVerifyOff();
+    gstSettings();
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: { id: 'p1', title: 'Booster Box', price_aud: 100, stock_quantity: 5, status: 'active' },
+      error: null,
+    });
+    mockStripe.checkout.sessions.create.mockResolvedValue({ id: 'cs_cart', url: 'https://stripe.com/pay/cs_cart' });
+    mockOrdersInsert
+      .mockResolvedValueOnce({ error: { code: 'PGRST204', message: "Could not find the 'gst_included_aud' column of 'orders' in the schema cache" } })
+      .mockResolvedValueOnce({ error: null });
+
+    const res = await request(app).post('/create-cart-checkout').send({
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b',
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.url).toBe('https://stripe.com/pay/cs_cart');
+    // Inserted twice: the second attempt must drop the missing column.
+    expect(mockOrdersInsert).toHaveBeenCalledTimes(2);
+    expect('gst_included_aud' in mockOrdersInsert.mock.calls[1][0]).toBe(false);
   });
 
   it('blocks checkout with 403 when email verification is required and the buyer is unverified', async () => {

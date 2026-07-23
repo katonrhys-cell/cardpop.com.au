@@ -433,7 +433,16 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
     // redeploy before `supabase db push` runs. If the column isn't there yet,
     // drop it and retry so a shop checkout never fails during that window — the
     // GST is still recoverable from the per-line gst_aud in order_items.
-    if (orderErr?.code === '42703' && 'gst_included_aud' in orderRow) {
+    // PostgREST surfaces a missing column as PGRST204 ("Could not find the
+    // 'gst_included_aud' column ... in the schema cache") — NOT the raw Postgres
+    // 42703 — so match either code (plus the column name in the message as a
+    // final safety net) or the retry never fires and checkout 500s.
+    const missingGstColumn =
+      'gst_included_aud' in orderRow &&
+      (orderErr?.code === 'PGRST204' ||
+        orderErr?.code === '42703' ||
+        /gst_included_aud/.test(orderErr?.message || ''));
+    if (missingGstColumn) {
       logger.warn('[STRIPE] gst_included_aud column not present yet — inserting order without it');
       delete orderRow.gst_included_aud;
       ({ error: orderErr } = await supabase.from('orders').insert(orderRow));
