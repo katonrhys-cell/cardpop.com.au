@@ -39,7 +39,7 @@ const FeaturedSellerCard = ({ seller }) => {
             <img
               src={avatarUrl}
               alt={`${sellerName} logo`}
-              className="w-full h-full rounded-full object-contain p-1.5"
+              className="w-full h-full rounded-full object-cover"
               width="80"
               height="80"
             />
