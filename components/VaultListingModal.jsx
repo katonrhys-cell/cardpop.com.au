@@ -4,6 +4,8 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
 import { Loader2, Lock, ShoppingCart, ArrowRightLeft, Layers, DollarSign, TrendingUp, Tag, RotateCcw, HandCoins } from 'lucide-react';
 import PriceRangeIndicator from '@/components/PriceRangeIndicator.jsx';
+import SellingRequirementsNotice from '@/components/SellingRequirementsNotice.jsx';
+import { isSellingEntitlementError } from '@/utils/listingErrors.js';
 import {
   Dialog,
   DialogContent,
@@ -200,6 +202,7 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
         .eq('id', product.id).eq('owner_id', currentUser.id);
       if (vaultErr) throw vaultErr;
 
+      let listingStatusAfterSave = null;
       if (selected.isPublic) {
         // Upsert a listings row so the card appears in the marketplace
         const listingPayload = {
@@ -230,17 +233,24 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
           .neq('status', 'archived')
           .maybeSingle();
 
+        // Read the status back: the enforce_listing_approval trigger may hold
+        // a new listing at 'pending', and the seller needs to know it isn't
+        // visible on the marketplace yet.
         if (existing) {
-          const { error: updateErr } = await supabase
+          const { data: updated, error: updateErr } = await supabase
             .from('listings')
             .update(listingPayload)
-            .eq('id', existing.id).eq('seller_id', currentUser.id);
+            .eq('id', existing.id).eq('seller_id', currentUser.id)
+            .select('status').single();
           if (updateErr) throw updateErr;
+          listingStatusAfterSave = updated?.status ?? null;
         } else {
-          const { error: insertErr } = await supabase
+          const { data: inserted, error: insertErr } = await supabase
             .from('listings')
-            .insert(listingPayload);
+            .insert(listingPayload)
+            .select('status').single();
           if (insertErr) throw insertErr;
+          listingStatusAfterSave = inserted?.status ?? null;
         }
       } else {
         // Going private — archive any existing listing
@@ -251,12 +261,23 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
         if (archiveErr) throw archiveErr;
       }
 
-      toast.success(`Card updated: ${selected.label}`);
+      if (listingStatusAfterSave === 'pending') {
+        toast.success('Listing submitted — it will appear on the marketplace once approved.', { duration: 8000 });
+      } else {
+        toast.success(`Card updated: ${selected.label}`);
+      }
       onUpdate?.();
       onClose();
     } catch (error) {
       console.error('Listing update error:', error);
-      toast.error(error.message || 'Failed to update listing.');
+      if (isSellingEntitlementError(error)) {
+        toast.error(
+          "Your card can't go live yet — selling requires identity verification and a card on file. Finish those two steps, then try again.",
+          { duration: 10000 }
+        );
+      } else {
+        toast.error(error.message || 'Failed to update listing.');
+      }
     } finally {
       setLoading(false);
     }
@@ -322,6 +343,11 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
               {currentOpt.label}
             </Badge>
           </div>
+
+          {/* Going public is denied by the can_sell() RLS gate until identity
+              verification + card on file are done — warn before the attempt.
+              Self-hides once the user can sell; hidden when going Private. */}
+          {(!selected || selected.isPublic) && <SellingRequirementsNotice />}
 
           {/* Price range indicator */}
           {priceRange && (
