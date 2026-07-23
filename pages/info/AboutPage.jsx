@@ -30,17 +30,21 @@ const BELIEFS = [
   'Collecting should be fun, rewarding and welcoming for everyone.',
 ];
 
+// Matches the Header's inner container exactly so the page content lines up
+// edge-to-edge with the header (same max width + same responsive gutters).
+const CONTAINER = 'max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16';
+
 const AboutPage = () => {
   return (
     <>
       <SEOHead title="About CardPop™ | Australia's Trading Card Marketplace" description="CardPop™ is Australia's home for trading card collectors — recreating the trust, excitement and community of card shows online. Buy, sell, trade, learn and connect." />
 
       {/* ── Hero ── */}
-      <section className="relative overflow-hidden bg-foreground text-background px-6 py-16 md:py-20">
+      <section className="relative overflow-hidden bg-foreground text-background py-16 md:py-20">
         {/* Brand glow accents */}
         <div className="pointer-events-none absolute -top-24 -right-24 w-96 h-96 rounded-full bg-brand-red/20 blur-3xl" aria-hidden="true" />
         <div className="pointer-events-none absolute -bottom-32 -left-24 w-96 h-96 rounded-full bg-brand-red/10 blur-3xl" aria-hidden="true" />
-        <div className="relative max-w-[90rem] mx-auto grid lg:grid-cols-2 gap-10 lg:gap-16 items-end">
+        <div className={`relative ${CONTAINER} grid lg:grid-cols-2 gap-10 lg:gap-16 items-end`}>
           <div>
             <span className="inline-flex items-center gap-2 rounded-full border border-background/20 bg-background/5 px-4 py-1.5 text-xs font-bold uppercase tracking-wider mb-7">
               <span className="w-2 h-2 rounded-full bg-brand-red" aria-hidden="true" />
@@ -74,8 +78,8 @@ const AboutPage = () => {
       </section>
 
       {/* ── Founder Story ── */}
-      <section className="bg-background px-6 py-14 md:py-16">
-        <div className="max-w-[90rem] mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_420px] gap-12 lg:gap-16 items-start">
+      <section className="bg-background py-14 md:py-16">
+        <div className={`${CONTAINER} grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_420px] gap-12 lg:gap-16 items-start`}>
           {/* Story */}
           <div>
             <div className="flex items-center gap-3 mb-8">
@@ -149,9 +153,9 @@ const AboutPage = () => {
       </section>
 
       {/* ── More than a marketplace ── */}
-      <section className="bg-secondary/40 px-6 py-14 md:py-16">
-        <div className="max-w-[90rem] mx-auto">
-          <div className="max-w-2xl mb-10">
+      <section className="bg-secondary/40 py-14 md:py-16">
+        <div className={CONTAINER}>
+          <div className="mb-10">
             <div className="flex items-center gap-3 mb-6">
               <span className="w-10 h-1 rounded-full bg-brand-red" aria-hidden="true" />
               <span className="text-xs font-bold uppercase tracking-wider text-brand-red">More Than A Marketplace</span>
@@ -178,8 +182,8 @@ const AboutPage = () => {
       </section>
 
       {/* ── What We Believe ── */}
-      <section className="bg-foreground px-6 py-14 md:py-16">
-        <div className="max-w-[90rem] mx-auto">
+      <section className="bg-foreground py-14 md:py-16">
+        <div className={CONTAINER}>
           <div className="text-center mb-10">
             <h2 className="text-background text-3xl font-extrabold mb-3">What we believe</h2>
             <p className="text-background/50 text-sm">
@@ -203,14 +207,14 @@ const AboutPage = () => {
       </section>
 
       {/* ── Built in Melbourne ── */}
-      <section className="bg-background px-6 py-14 md:py-16">
-        <div className="max-w-[90rem] mx-auto">
+      <section className="bg-background py-14 md:py-16">
+        <div className={CONTAINER}>
           <div className="flex items-center gap-3 mb-6">
             <span className="w-10 h-1 rounded-full bg-brand-red" aria-hidden="true" />
             <span className="text-xs font-bold uppercase tracking-wider text-brand-red">Built in Melbourne</span>
           </div>
           <h2 className="text-3xl md:text-4xl font-extrabold mb-5">Built for collectors, by a collector</h2>
-          <div className="space-y-5 text-[1.05rem] leading-[1.8] text-muted-foreground max-w-4xl">
+          <div className="space-y-5 text-[1.05rem] leading-[1.8] text-muted-foreground">
             <p>
               CardPop™ was founded in Melbourne by a collector who simply wanted the online
               hobby to feel more like the card shows that inspired it. We're collectors first,
@@ -226,14 +230,14 @@ const AboutPage = () => {
       </section>
 
       {/* ── The Parallel Report ── */}
-      <section className="bg-secondary/40 px-6 py-14 md:py-16">
-        <div className="max-w-[90rem] mx-auto">
+      <section className="bg-secondary/40 py-14 md:py-16">
+        <div className={CONTAINER}>
           <div className="flex items-center gap-3 mb-6">
             <span className="w-10 h-1 rounded-full bg-brand-red" aria-hidden="true" />
             <span className="text-xs font-bold uppercase tracking-wider text-brand-red">The Parallel Report</span>
           </div>
           <h2 className="text-3xl md:text-4xl font-extrabold mb-5">The research behind the report</h2>
-          <div className="space-y-5 text-[1.05rem] leading-[1.8] text-muted-foreground max-w-4xl">
+          <div className="space-y-5 text-[1.05rem] leading-[1.8] text-muted-foreground">
             <p>
               The Parallel Report is CardPop™'s research desk — the market analysis, grading
               guides and investment insights you'll find on our blog. It isn't reheated press
@@ -255,9 +259,9 @@ const AboutPage = () => {
       </section>
 
       {/* ── Vision ── */}
-      <section className="relative overflow-hidden bg-foreground text-background px-6 py-16 md:py-20">
+      <section className="relative overflow-hidden bg-foreground text-background py-16 md:py-20">
         <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[36rem] h-[36rem] rounded-full bg-brand-red/15 blur-3xl" aria-hidden="true" />
-        <div className="relative max-w-[900px] mx-auto text-center">
+        <div className={`relative ${CONTAINER} text-center`}>
           <div className="flex items-center justify-center gap-3 mb-6">
             <span className="w-10 h-1 rounded-full bg-brand-red" aria-hidden="true" />
             <span className="text-xs font-bold uppercase tracking-wider text-brand-red">The Vision</span>
