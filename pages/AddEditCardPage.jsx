@@ -44,6 +44,7 @@ import SellingRequirementsNotice from '@/components/SellingRequirementsNotice.js
 import { isSellingEntitlementError } from '@/utils/listingErrors.js';
 import { loadListingDraft, saveListingDraft, clearListingDraft, hasMeaningfulContent } from '@/lib/listingDraft.js';
 import { shouldAutoIdentify, buildPriceLookupQuery } from '@/utils/listingFlow.js';
+import { validateListingForm, validateListingField } from '@/utils/listingValidation.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -225,6 +226,16 @@ const AddEditCardPage = () => {
   const set = (key, val) => {
     formDirtyRef.current = true;
     setFormData(f => ({ ...f, [key]: val }));
+    // Editing a field clears its inline error (blur re-validates). Changing
+    // the listing type also drops price errors that may no longer apply.
+    setErrors(prev => {
+      const dependents = key === 'listingType' ? ['askingPrice', 'offerMin', 'offerMax', 'tradeValue'] : [];
+      const stale = [key, ...dependents].filter(k => k in prev);
+      if (!stale.length) return prev;
+      const next = { ...prev };
+      stale.forEach(k => delete next[k]);
+      return next;
+    });
   };
 
   // Derive collection slug for era lookups (uses franchise name stored in formData.collection)
@@ -550,6 +561,11 @@ const AddEditCardPage = () => {
     clearCrop();
     setAdjusting(null);
     runPhotoQuality(file);
+    setErrors(prev => {
+      if (!('cardImage' in prev)) return prev;
+      const { cardImage: _cardImage, ...rest } = prev;
+      return rest;
+    });
     // Allow re-picking the same file (change events don't fire otherwise) —
     // the main dropzone and the mobile take-photo input share this handler.
     e.target.value = '';
@@ -828,49 +844,40 @@ const AddEditCardPage = () => {
   };
 
   // ─── Validation ───────────────────────────────────────────────────────────
-  const validateForm = () => {
-    const newErrors = {};
-    if (!formData.cardName?.trim()) newErrors.cardName = 'Card name is required';
-    if (!formData.estimatedValue || parseFloat(formData.estimatedValue) < 0)
-      newErrors.estimatedValue = 'Enter a valid estimated value';
-    const yearVal = formData.year?.trim();
-    if (yearVal) {
-      const match = yearVal.match(/^(\d{4})(?:\/(\d{4}))?$/);
-      if (!match) {
-        newErrors.year = 'Enter a single year (e.g. 2025) or a range (e.g. 2025/2026)';
-      } else {
-        const maxYear = new Date().getFullYear() + 1;
-        const start = parseInt(match[1], 10);
-        const end = match[2] ? parseInt(match[2], 10) : null;
-        if (start < 1900 || start > maxYear) {
-          newErrors.year = `Year must be between 1900 and ${maxYear}`;
-        } else if (end !== null && end !== start + 1) {
-          newErrors.year = 'A season range must be two consecutive years (e.g. 2025/2026)';
-        }
-      }
-    }
-    if (formData.listingType === 'Expression of Interest') {
-      const min = parseFloat(formData.offerMin);
-      const max = parseFloat(formData.offerMax);
-      if (!min || min <= 0) newErrors.offerMin = 'Enter the minimum of the price range you want offers in';
-      if (!max || max <= 0) newErrors.offerMax = 'Enter the maximum of the price range you want offers in';
-      else if (min > 0 && max < min) newErrors.offerMax = 'Must be at least the minimum of the range';
-    }
-    if (formData.listingType === 'For Sale' || formData.listingType === 'For Sale & Trade') {
-      const ap = parseFloat(formData.askingPrice);
-      if (!ap || ap <= 0) newErrors.askingPrice = 'Enter a valid asking price';
-    }
-    if (isEdit && lockedBaseValue !== null) {
-      const ev = parseFloat(formData.estimatedValue) || 0;
-      if (ev < lockedBaseValue)
-        newErrors.estimatedValue = `Cannot be set below the locked base value of $${lockedBaseValue.toFixed(2)}`;
-      const tv = parseFloat(formData.tradeValue) || 0;
-      if (tv > 0 && tv < lockedBaseValue)
-        newErrors.tradeValue = `Trade value cannot be set below the locked base value of $${lockedBaseValue.toFixed(2)}`;
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  // Rules live in utils/listingValidation.js so the same code runs field-by-
+  // field on blur (inline feedback) and across the whole form on submit —
+  // including the image and Category/Franchise checks, so every problem
+  // surfaces in one pass.
+  const validationCtx = {
+    isEdit,
+    lockedBaseValue,
+    selCategoryId,
+    franchiseId,
+    hasImage: !!imageFile,
+    requireImage: !isEdit,
   };
+
+  const validateFieldOnBlur = (field) => {
+    const message = validateListingField(field, formData, validationCtx);
+    setErrors(prev => {
+      if (!message && !(field in prev)) return prev;
+      const next = { ...prev };
+      if (message) next[field] = message;
+      else delete next[field];
+      return next;
+    });
+  };
+
+  // Once both hierarchy levels are chosen, drop the inline hierarchy error.
+  useEffect(() => {
+    if (selCategoryId && franchiseId) {
+      setErrors(prev => {
+        if (!prev.hierarchy) return prev;
+        const { hierarchy: _hierarchy, ...rest } = prev;
+        return rest;
+      });
+    }
+  }, [selCategoryId, franchiseId]);
 
   // ─── Marketplace listing sync ─────────────────────────────────────────────
   // The marketplace reads exclusively from the `listings` table, so choosing a
@@ -987,21 +994,18 @@ const AddEditCardPage = () => {
   // ─── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isEdit && !imageFile) { toast.error('Card image is required'); return; }
-    // Require both Category (e.g. Sports) and Franchise (e.g. NBA). The specific
-    // franchise is what places a card in its collection page (e.g. /collections/nba);
-    // saving with only a broad category leaves the card out of every collection.
-    if (!selCategoryId || !franchiseId) {
-      toast.error('Please choose both a Category and a Franchise (e.g. Sports → NBA) so your card appears in the right collection.');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-    if (!validateForm()) {
-      toast.error('Please fix the errors in the form');
+    // One validation pass covers everything — fields, card image, and the
+    // Category/Franchise hierarchy — so the seller sees all problems at once
+    // instead of fixing one gate only to discover the next on resubmit.
+    const newErrors = validateListingForm(formData, validationCtx);
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) {
+      const count = Object.keys(newErrors).length;
+      toast.error(count === 1 ? 'Please fix the highlighted issue' : `Please fix the ${count} highlighted issues`);
       // Jump to the first problem — on a long form (especially mobile) the
       // errored field may be far off-screen.
       setTimeout(() => {
-        const el = document.querySelector('.border-destructive');
+        const el = document.querySelector('.border-destructive, [data-invalid="true"]');
         if (el) {
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
           el.focus?.();
@@ -1221,7 +1225,7 @@ const AddEditCardPage = () => {
                     Photo guide
                   </Link>
                 </div>
-                <div className="aspect-[3/4] bg-muted/50 rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center relative overflow-hidden group transition-colors hover:border-primary/50 hover:bg-primary/5">
+                <div className={`aspect-[3/4] bg-muted/50 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center relative overflow-hidden group transition-colors hover:border-primary/50 hover:bg-primary/5 ${errors.cardImage ? 'border-destructive' : 'border-border'}`}>
                   {imagePreview ? (
                     <>
                       <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
@@ -1259,6 +1263,10 @@ const AddEditCardPage = () => {
                     className="sr-only"
                   />
                 </label>
+
+                {errors.cardImage && (
+                  <p data-invalid="true" tabIndex={-1} className="text-destructive text-xs mt-2">{errors.cardImage}</p>
+                )}
 
                 {/* Auto-crop (opt-in): button → detecting → preview + confirm */}
                 {imageFile && !(cropCandidate?.key === 'main') && (
@@ -1583,6 +1591,12 @@ const AddEditCardPage = () => {
                     highlighted={isAutoFilled}
                   />
 
+                  {errors.hierarchy && (
+                    <p data-invalid="true" tabIndex={-1} className="md:col-span-2 text-destructive text-xs -mt-2">
+                      {errors.hierarchy}
+                    </p>
+                  )}
+
                   {/* Parallel / Variation — shown once franchise is selected and has parallels */}
                   {parallelOpts.length > 0 && (
                     <div className="md:col-span-2 space-y-2">
@@ -1632,6 +1646,7 @@ const AddEditCardPage = () => {
                       id="cardName"
                       value={formData.cardName}
                       onChange={e => set('cardName', e.target.value)}
+                      onBlur={() => validateFieldOnBlur('cardName')}
                       placeholder="e.g. Charizard"
                       className={`h-11 bg-background ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''} ${errors.cardName ? 'border-destructive' : ''}`}
                     />
@@ -1686,6 +1701,7 @@ const AddEditCardPage = () => {
                       inputMode="numeric"
                       value={formData.year}
                       onChange={e => set('year', e.target.value)}
+                      onBlur={() => validateFieldOnBlur('year')}
                       placeholder={`${new Date().getFullYear()} or ${new Date().getFullYear()}/${new Date().getFullYear() + 1}`}
                       className={`h-11 bg-background ${errors.year ? 'border-destructive' : ''}`}
                     />
@@ -3161,6 +3177,7 @@ const AddEditCardPage = () => {
                         step="0.01"
                         value={formData.estimatedValue}
                         onChange={e => set('estimatedValue', e.target.value)}
+                        onBlur={() => validateFieldOnBlur('estimatedValue')}
                         placeholder="0.00"
                         className={`h-11 pl-8 bg-background tabular-nums ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''} ${errors.estimatedValue ? 'border-destructive' : ''}`}
                       />
@@ -3302,6 +3319,7 @@ const AddEditCardPage = () => {
                         step="0.01"
                         value={formData.askingPrice}
                         onChange={e => set('askingPrice', e.target.value)}
+                        onBlur={() => validateFieldOnBlur('askingPrice')}
                         placeholder="0.00"
                         className={`flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm pl-8 tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${errors.askingPrice ? 'border-destructive' : ''}`}
                       />
@@ -3329,6 +3347,7 @@ const AddEditCardPage = () => {
                         step="0.01"
                         value={formData.tradeValue}
                         onChange={e => set('tradeValue', e.target.value)}
+                        onBlur={() => validateFieldOnBlur('tradeValue')}
                         placeholder="0.00"
                         className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm pl-8 tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       />
@@ -3356,6 +3375,7 @@ const AddEditCardPage = () => {
                           step="0.01"
                           value={formData.offerMin}
                           onChange={e => set('offerMin', e.target.value)}
+                          onBlur={() => validateFieldOnBlur('offerMin')}
                           placeholder="Min"
                           className={`flex h-11 w-full rounded-md border bg-background px-3 py-2 text-sm pl-8 tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${errors.offerMin ? 'border-destructive' : 'border-input'}`}
                         />
@@ -3370,6 +3390,7 @@ const AddEditCardPage = () => {
                           step="0.01"
                           value={formData.offerMax}
                           onChange={e => set('offerMax', e.target.value)}
+                          onBlur={() => validateFieldOnBlur('offerMax')}
                           placeholder="Max"
                           className={`flex h-11 w-full rounded-md border bg-background px-3 py-2 text-sm pl-8 tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${errors.offerMax ? 'border-destructive' : 'border-input'}`}
                         />
