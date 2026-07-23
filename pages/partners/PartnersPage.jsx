@@ -147,7 +147,7 @@ const PartnersPage = () => (
       </div>
     </section>
 
-    <div className="mx-auto max-w-4xl space-y-16 px-4 py-12 sm:px-6 lg:px-8">
+    <div className="container-default space-y-16 py-12">
 
       {/* One code, three jobs */}
       <section>

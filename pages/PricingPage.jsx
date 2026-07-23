@@ -64,7 +64,7 @@ const PricingPage = () => {
   const pro = PLANS[PLAN_PRO];
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+    <div className="container-default py-12">
       <Helmet>
         <title>Pricing — Hobby &amp; Pro | CardPop</title>
         <meta

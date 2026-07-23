@@ -151,7 +151,7 @@ const AccountPartner = () => {
   return (
     <div className="min-h-screen bg-background">
       <Helmet><title>Partner Dashboard | CardPop</title></Helmet>
-      <div className="max-w-4xl mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-10 space-y-8">
+      <div className="container-default py-10 space-y-8">
 
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div>

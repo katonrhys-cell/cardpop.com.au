@@ -109,7 +109,7 @@ const GradingScalePage = () => {
         canonicalUrl={`/grading/scales/${scale}`}
       />
 
-      <div className="max-w-3xl mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-10 space-y-10">
+      <div className="container-default py-10 space-y-10">
 
         {/* Breadcrumb */}
         <nav className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">

@@ -102,7 +102,7 @@ const CardPriceDetailPage = () => {
   if (card === undefined) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="max-w-4xl mx-auto px-4 py-16 space-y-6">
+        <div className="container-default py-16 space-y-6">
           <div className="h-10 w-2/3 bg-card border border-border rounded-xl animate-pulse" />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
@@ -185,7 +185,7 @@ const CardPriceDetailPage = () => {
         structuredData={structuredData}
       />
 
-      <div className="max-w-4xl mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-10 space-y-10">
+      <div className="container-default py-10 space-y-10">
         <BackButton fallback="/prices" />
 
         <header>

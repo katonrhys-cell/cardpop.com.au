@@ -261,7 +261,7 @@ const InsiderTradingPage = () => {
       {/* Admin Section */}
       {isAuthenticated && (
         <section id="admin-section" className="py-16 bg-muted/30 border-t border-border">
-          <div className="max-w-3xl mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
+          <div className="container-default">
             <Card className="border-border shadow-md">
               <CardHeader>
                 <CardTitle className="text-2xl flex items-center gap-2">
