@@ -237,6 +237,10 @@
 
   html {
     scroll-behavior: smooth;
+    /* Safety net: a single stray fixed-width element must not give the whole
+       page a horizontal scrollbar on phones. `clip` (not `hidden`) so no new
+       scroll container is created and position:sticky descendants keep working. */
+    overflow-x: clip;
   }
 }
 

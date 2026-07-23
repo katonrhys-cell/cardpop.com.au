@@ -20,7 +20,7 @@ const AboutPage = () => {
             <Sparkles className="w-4 h-4" />
             <span className="text-sm font-bold tracking-wide uppercase">Our Story</span>
           </div>
-          <h1 className="text-5xl md:text-6xl lg:text-7xl font-serif text-foreground mb-6 max-w-4xl mx-auto leading-tight">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-serif text-foreground mb-6 max-w-4xl mx-auto leading-tight">
             Elevating the Australian Collecting Experience
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto font-medium leading-relaxed">
