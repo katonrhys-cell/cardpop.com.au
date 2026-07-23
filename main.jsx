@@ -8,6 +8,7 @@ import App from '@/App.jsx';
 import { installChunkReloadGuard, dropRecoveredErrors } from '@/lib/chunkReload.js';
 import { installImageCdnFallback } from '@/utils/imageCdnFallback.js';
 import { installWebMcp } from '@/lib/webmcp.js';
+import { GA_MEASUREMENT_ID, installGtag } from '@/lib/analytics.js';
 import '@/index.css';
 import '@/global.css';
 
@@ -159,7 +160,6 @@ const initSentry = () => {
 // Third-party analytics + affiliate tags. These add no first-paint value, so we
 // load them only after the app is interactive — keeping their ~90 kB of parse/
 // execute off the critical path cuts main-thread work and long tasks during load.
-const GA_MEASUREMENT_ID = 'G-NCZ6K9VFF8';
 const loadThirdPartyScripts = () => {
   // Skip in dev and on localhost hosts (local `vite preview`, e2e/CI). On those
   // hosts the analytics/affiliate CDNs are unreachable or proxied to an HTML
@@ -167,13 +167,11 @@ const loadThirdPartyScripts = () => {
   // off a real deployment anyway. Mirrors the analyticsEnabled gate above.
   if (!import.meta.env.PROD || !analyticsEnabled) return;
 
-  // Google Analytics (gtag.js)
+  // Google Analytics (gtag.js). The dataLayer/gtag command queue is installed
+  // at boot (see below) so page_views recorded before this script loads are
+  // replayed in order; this only injects the script itself.
   try {
-    window.dataLayer = window.dataLayer || [];
-    function gtag() { window.dataLayer.push(arguments); }
-    window.gtag = gtag;
-    gtag('js', new Date());
-    gtag('config', GA_MEASUREMENT_ID);
+    installGtag();
     const gtagScript = document.createElement('script');
     gtagScript.async = true;
     gtagScript.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
@@ -209,6 +207,13 @@ const loadThirdPartyScripts = () => {
 };
 
 if (typeof window !== 'undefined') {
+  // Install the GA4 command queue immediately (stub only — no network, ~0 cost)
+  // so the landing page_view and any pre-interaction navigations recorded by
+  // AnalyticsPageViews queue up and replay in order once gtag.js loads below.
+  if (import.meta.env.PROD && analyticsEnabled) {
+    try { installGtag(); } catch { /* analytics is non-critical */ }
+  }
+
   // Register service worker after page load for offline support
   registerServiceWorker();
 

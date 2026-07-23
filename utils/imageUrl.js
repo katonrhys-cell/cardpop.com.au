@@ -122,6 +122,21 @@ export function cdnifyStorageUrlsInHtml(html) {
 }
 
 /**
+ * Give every <img> in an HTML string that has no alt attribute a fallback
+ * alt (for search engines and screen readers). Admin-authored article bodies
+ * are stored as raw HTML, so images added without alt text can't be fixed at
+ * the component layer — patch the blob just before render, like the CDN
+ * rewrite above. Images that already carry an alt (even alt="") are left
+ * untouched.
+ */
+export function ensureImgAltInHtml(html, fallbackAlt = '') {
+  if (typeof html !== 'string' || !html) return html;
+  const safeAlt = String(fallbackAlt).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  return html.replace(/<img\b(?![^>]*\balt\s*=)([^>]*?)(\/?)>/gi,
+    (_m, attrs, selfClose) => `<img alt="${safeAlt}"${attrs}${selfClose}>`);
+}
+
+/**
  * Public URL for an image that may be stored as a bucket path or an absolute
  * URL (both shapes exist in the database). Routes through the image CDN when
  * configured. Use this instead of calling `getPublicUrl` directly at render

@@ -61,4 +61,5 @@ for explicit sign-off rather than changed unilaterally.
 - [ ] Blog posts: confirm `Article` JSON-LD + author/date (BlogArticlePage already emits some).
 - [ ] Generate per-listing OG images (dynamic) for richer social unfurls.
 - [ ] Submit sitemap in Search Console; monitor coverage + Core Web Vitals report.
+      (Step-by-step instructions + GA4 SPA-tracking admin step: `docs/seo-analytics.md`.)
 - [ ] Add `hreflang`/locale if expanding beyond AU.

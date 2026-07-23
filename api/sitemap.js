@@ -72,6 +72,12 @@ const STATIC_PAGES = [
   { loc: '/grading',               lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' },
   { loc: '/grading/what-is-grading', lastmod: SITE_UPDATED,    freq: 'monthly',  pri: '0.7' },
   { loc: '/grading/scales',        lastmod: SITE_UPDATED,       freq: 'monthly',  pri: '0.7' },
+  // Per-company grading scale pages (COMPANY_DATA in GradingScalePage.jsx).
+  // /grading/guide/:scale is an alias of the same page — only the canonical
+  // /grading/scales/:scale URLs are advertised.
+  ...['psa', 'bgs', 'cgc', 'ace'].map((scale) => (
+    { loc: `/grading/scales/${scale}`, lastmod: SITE_UPDATED,   freq: 'monthly',  pri: '0.6' }
+  )),
   { loc: '/grading/companies',     lastmod: SITE_UPDATED,       freq: 'monthly',  pri: '0.7' },
   { loc: '/grading/local-graders', lastmod: SITE_UPDATED,       freq: 'monthly',  pri: '0.7' },
   { loc: '/grading/submission-partners', lastmod: SITE_UPDATED, freq: 'monthly',  pri: '0.7' },
