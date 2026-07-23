@@ -278,7 +278,10 @@ const CheckoutPage = () => {
   // Platform commission and GST are distinct charges (and distinct Stripe line
   // items) — shown as separate "Service fee" and "GST" lines, never merged.
   const serviceFee = pricing ? Number(pricing.commissionAud || 0) : 0;
+  // GST added on top (marketplace listings) vs GST already inside GST-inclusive
+  // shop prices + shipping — the latter is shown as an "includes GST" note.
   const gst = pricing ? Number(pricing.gstAud || 0) : 0;
+  const gstIncluded = pricing ? Number(pricing.includedGstAud || 0) : 0;
   // Flat shipping fee on CardPop Shop items (server-calculated from Platform
   // Settings); 0 when the cart has no shop items or the order ships free.
   const shipping = pricing ? Number(pricing.shippingAud || 0) : 0;
@@ -398,6 +401,7 @@ const CheckoutPage = () => {
       subtotal={subtotal}
       serviceFee={serviceFee}
       gst={gst}
+      gstIncluded={gstIncluded}
       shipping={shipping}
       discount={discount}
       total={total}
@@ -585,6 +589,7 @@ const CheckoutPage = () => {
                         subtotal={subtotal}
                         serviceFee={serviceFee}
                         gst={gst}
+                        gstIncluded={gstIncluded}
                         shipping={shipping}
                         discount={discount}
                         total={total}

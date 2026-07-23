@@ -151,7 +151,10 @@ router.post('/calculate-cart', optionalAuthMiddleware, async (req, res) => {
       items:       priced.orderLines,
       subtotalAud: priced.itemsCents / 100,
       commissionAud: priced.commissionCents / 100,
+      // gstAud is GST added on top (marketplace listings); includedGstAud is the
+      // GST already baked into the GST-inclusive shop prices + shipping.
       gstAud:      priced.gstCents / 100,
+      includedGstAud: priced.includedGstCents / 100,
       shippingAud: priced.shippingCents / 100,
       discountAud: (discountCents + walletAppliedCents) / 100,
       walletBalanceAud: walletBalanceCents / 100,
@@ -232,7 +235,7 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       return res.status(400).json({ error: message, code: 'address_unverified' });
     }
 
-    const { lineItems, orderLines, itemsCents, commissionCents, gstCents, shippingCents, grandCents } = await priceCart(items, userId);
+    const { lineItems, orderLines, itemsCents, commissionCents, gstCents, includedGstCents, shippingCents, grandCents } = await priceCart(items, userId);
 
     // Fraud control: cap order size / frequency for brand-new, unverified buyers.
     const velocity = await checkPurchaseVelocity({ userId, guestEmail: userId ? null : email, orderValueAud: grandCents / 100 });
@@ -389,7 +392,7 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
 
     const s = shippingAddress || {};
     const streetLine = s.address2 ? `${s.address2}, ${s.address || ''}`.trim() : (s.address || '');
-    const { error: orderErr } = await supabase.from('orders').insert({
+    const orderRow = {
       buyer_id:          userId,
       // Only guests carry buyer_email (a registered buyer's email comes from
       // their profile). Keeping it off the registered-buyer insert leaves that
@@ -403,6 +406,10 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       shipping_aud:      shippingCents / 100,
       platform_fee_aud:  (commissionCents + gstCents) / 100,
       gst_aud:           gstCents / 100,
+      // GST already inside the GST-inclusive shop prices + shipping. Kept
+      // separate from gst_aud (which is GST added on top for listings) so the
+      // receipt can show it as an "includes GST" line without double-counting.
+      gst_included_aud:  includedGstCents / 100,
       discount_aud:      discountCents / 100,
       total_aud:         (grandCents - discountCents) / 100,
       transaction_type:  'cart',
@@ -419,7 +426,18 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       // billing_* migration lands. The ABN is also on the session metadata as a
       // fallback record either way.
       ...(business ? { billing_business_name: business.name || null, billing_abn: business.abn } : {}),
-    });
+    };
+
+    let { error: orderErr } = await supabase.from('orders').insert(orderRow);
+    // gst_included_aud lands in the same merge as its migration, but Vercel can
+    // redeploy before `supabase db push` runs. If the column isn't there yet,
+    // drop it and retry so a shop checkout never fails during that window — the
+    // GST is still recoverable from the per-line gst_aud in order_items.
+    if (orderErr?.code === '42703' && 'gst_included_aud' in orderRow) {
+      logger.warn('[STRIPE] gst_included_aud column not present yet — inserting order without it');
+      delete orderRow.gst_included_aud;
+      ({ error: orderErr } = await supabase.from('orders').insert(orderRow));
+    }
 
     if (orderErr) {
       logger.error(`[STRIPE] pending cart order insert failed: ${orderErr.message}`);

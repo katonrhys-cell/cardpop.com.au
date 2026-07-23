@@ -338,7 +338,7 @@ describe('POST /calculate-cart', () => {
     expect(res.status).toBe(400);
   });
 
-  it('prices a shop product with GST only (no commission)', async () => {
+  it('prices a shop product with GST included in the price (no commission)', async () => {
     gstSettings();
     mockMaybeSingle.mockResolvedValueOnce({
       data: { id: 'p1', title: 'Booster Box', price_aud: 100, stock_quantity: 5, status: 'active' },
@@ -346,11 +346,13 @@ describe('POST /calculate-cart', () => {
     });
     const res = await request(app).post('/calculate-cart').send({ items: [{ type: 'shop', id: 'p1', quantity: 2 }] });
     expect(res.status).toBe(200);
+    // $200 GST-inclusive: buyer pays $200, GST ($18.18) is inside it, not added.
     expect(res.body.subtotalAud).toBe(200);
     expect(res.body.commissionAud).toBe(0);
-    expect(res.body.gstAud).toBe(20);
+    expect(res.body.gstAud).toBe(0);            // nothing added on top
+    expect(res.body.includedGstAud).toBe(18.18); // round(20000 × 10/110) / 100
     expect(res.body.shippingAud).toBe(0);
-    expect(res.body.totalAud).toBe(220);
+    expect(res.body.totalAud).toBe(200);
   });
 
   // priceCart reads the two shipping settings AFTER the item loop, so queue them
@@ -370,10 +372,11 @@ describe('POST /calculate-cart', () => {
     shippingSettings(9.95, 100);
     const res = await request(app).post('/calculate-cart').send({ items: [{ type: 'shop', id: 'p1', quantity: 1 }] });
     expect(res.status).toBe(200);
+    // $50 GST-inclusive item + $9.95 shipping = $59.95; GST is inside, not added.
     expect(res.body.subtotalAud).toBe(50);
-    expect(res.body.gstAud).toBe(5);
+    expect(res.body.gstAud).toBe(0);
     expect(res.body.shippingAud).toBe(9.95);
-    expect(res.body.totalAud).toBe(64.95);
+    expect(res.body.totalAud).toBe(59.95);
   });
 
   it('gives free shipping once the shop subtotal reaches the threshold', async () => {
@@ -385,9 +388,10 @@ describe('POST /calculate-cart', () => {
     shippingSettings(9.95, 100);
     const res = await request(app).post('/calculate-cart').send({ items: [{ type: 'shop', id: 'p1', quantity: 2 }] });
     expect(res.status).toBe(200);
+    // $200 GST-inclusive, over the $100 free-shipping threshold → $200 total.
     expect(res.body.subtotalAud).toBe(200);
     expect(res.body.shippingAud).toBe(0);
-    expect(res.body.totalAud).toBe(220);
+    expect(res.body.totalAud).toBe(200);
   });
 });
 
@@ -454,7 +458,8 @@ describe('POST /create-cart-checkout', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.url).toBe('https://stripe.com/pay/cs_cart');
-    expect(res.body.total).toBe(110);
+    // $100 shop item is GST-inclusive (no shipping mocked) → buyer pays $100.
+    expect(res.body.total).toBe(100);
     expect(mockStripe.checkout.sessions.create).toHaveBeenCalled();
   });
 

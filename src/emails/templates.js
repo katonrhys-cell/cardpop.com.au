@@ -159,10 +159,17 @@ function invoiceBlock(invoice, orderId) {
 </tr>`;
 
   // Mirrors the on-page checkout summary: Subtotal → Discount → Service fee → GST → Shipping → Total.
+  // invoice.gst is GST *added* on top (marketplace listings); invoice.gstIncluded
+  // is GST already *inside* GST-inclusive prices (CardPop Shop items + shipping),
+  // shown as a note under the total rather than an added row so the lines still
+  // sum to the amount charged.
   const discountRow = invoice.discount > 0 ? totalsRow('Discount', `−${money(invoice.discount)} AUD`) : '';
   const serviceFeeRow = invoice.serviceFee > 0 ? totalsRow('Service fee', `${money(invoice.serviceFee)} AUD`) : '';
   const gstRow = invoice.gst > 0 ? totalsRow('GST (10%)', `${money(invoice.gst)} AUD`) : '';
   const shippingRow = invoice.shipping > 0 ? totalsRow('Shipping', `${money(invoice.shipping)} AUD`) : '';
+  const includedGstRow = invoice.gstIncluded > 0
+    ? `<tr><td colspan="2" style="padding:6px 0 0;font-size:12px;color:#9CA3AF;text-align:right;">Includes GST of ${money(invoice.gstIncluded)} AUD</td></tr>`
+    : '';
 
   return `<div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:20px 24px;margin:24px 0;">
 <table cellpadding="0" cellspacing="0" border="0" width="100%">
@@ -173,6 +180,7 @@ ${serviceFeeRow}
 ${gstRow}
 ${shippingRow}
 ${totalsRow('Total (AUD)', `${money(invoice.total)} AUD`, true)}
+${includedGstRow}
 </table>
 </div>`;
 }
@@ -201,7 +209,7 @@ export function orderConfirmedEmail({ buyerName, cardName, itemPrice, total, ord
 ${meta}
 ${businessBlock(invoice)}
 ${invoiceBlock(invoice, orderId)}
-${isTaxInvoice ? `<p style="font-size:13px;color:#6B7280;">This is a tax invoice.${invoice.gst > 0 ? ` Total includes GST of ${money(invoice.gst)} AUD.` : ''} Issued to ABN ${esc(invoice.abn)}.</p>` : ''}
+${isTaxInvoice ? (() => { const gstTotal = Number(invoice.gst || 0) + Number(invoice.gstIncluded || 0); return `<p style="font-size:13px;color:#6B7280;">This is a tax invoice.${gstTotal > 0 ? ` Total includes GST of ${money(gstTotal)} AUD.` : ''} Issued to ABN ${esc(invoice.abn)}.</p>`; })() : ''}
 <p>Check your order details to coordinate delivery with the seller. Enjoy the new addition to your collection!</p>`;
   } else {
     body = `<p>Your purchase has been confirmed. Here's a summary of what you've secured:</p>

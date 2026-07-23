@@ -44,7 +44,7 @@ beforeEach(() => {
 });
 
 describe('priceCart — shop items', () => {
-  it('prices a single active shop product with GST', async () => {
+  it('prices a single active shop product with GST included in the price', async () => {
     mockSupabase.from.mockReturnValueOnce(rowBuilder({
       data: { id: 'p1', title: 'Booster Box', price_aud: 100, stock_quantity: 5, status: 'active' },
       error: null,
@@ -52,10 +52,13 @@ describe('priceCart — shop items', () => {
 
     const result = await priceCart([{ type: 'shop', id: 'p1', quantity: 1 }], 'buyer-1');
 
+    // The $100 ticket price is GST-inclusive: the buyer pays exactly $100, and
+    // the $9.09 GST is the tax component already inside it (100 ÷ 11), not added.
     expect(result.itemsCents).toBe(10000);
-    expect(result.gstCents).toBe(1000); // 10% of $100
+    expect(result.gstCents).toBe(0);            // nothing added on top
+    expect(result.includedGstCents).toBe(909);  // round(10000 × 10/110)
     expect(result.commissionCents).toBe(0);
-    expect(result.grandCents).toBe(11000);
+    expect(result.grandCents).toBe(10000);
   });
 
   it('merges duplicate shop lines into one line with summed quantity', async () => {
@@ -105,6 +108,7 @@ describe('priceCart — shop items', () => {
 
     const result = await priceCart([{ type: 'shop', id: 'p1', quantity: 1 }], 'buyer-1');
     expect(result.gstCents).toBe(0);
+    expect(result.includedGstCents).toBe(0);
     expect(result.lineItems.some((l) => l.price_data.product_data.name === 'GST')).toBe(false);
   });
 });
@@ -119,6 +123,10 @@ describe('priceCart — shipping', () => {
 
     const result = await priceCart([{ type: 'shop', id: 'p1', quantity: 1 }], 'buyer-1');
     expect(result.shippingCents).toBe(995);
+    // Shipping is added to the (GST-inclusive) item total; GST is never re-added.
+    expect(result.grandCents).toBe(10995);
+    // Reported GST covers the tax inside both the item ($9.09) and shipping ($0.90).
+    expect(result.includedGstCents).toBe(999);
   });
 
   it('waives shipping once the shop subtotal reaches the free-shipping threshold', async () => {

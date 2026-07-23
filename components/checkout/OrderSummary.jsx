@@ -13,7 +13,7 @@ const LineItem = ({ label, value, bold }) => (
   </div>
 );
 
-const OrderSummary = ({ cartItems = [], subtotal = 0, serviceFee = 0, gst = 0, shipping = 0, discount = 0, total = 0, onEditCart, onNext }) => {
+const OrderSummary = ({ cartItems = [], subtotal = 0, serviceFee = 0, gst = 0, gstIncluded = 0, shipping = 0, discount = 0, total = 0, onEditCart, onNext }) => {
   return (
     <div className="space-y-4">
       <Card className="border-border shadow-sm">
@@ -43,10 +43,18 @@ const OrderSummary = ({ cartItems = [], subtotal = 0, serviceFee = 0, gst = 0, s
             <LineItem label="Subtotal" value={subtotal} />
             {discount > 0 && <LineItem label="Discount" value={-discount} />}
             {serviceFee > 0 && <LineItem label="Service fee" value={serviceFee} />}
-            <LineItem label="GST (10%)" value={gst} />
+            {/* GST added on top (marketplace listings) shows as its own line; GST
+                already inside GST-inclusive shop prices shows as an "includes"
+                note under the total so the figures still sum to what's charged. */}
+            {gst > 0 && <LineItem label="GST (10%)" value={gst} />}
             {shipping > 0 && <LineItem label="Shipping" value={shipping} />}
             <Separator />
             <LineItem label="Total (AUD)" value={total} bold />
+            {gstIncluded > 0 && (
+              <p className="text-right text-xs text-muted-foreground">
+                Includes GST of ${Number(gstIncluded).toFixed(2)}
+              </p>
+            )}
             <BnplMessage amount={total} align="center" className="pt-1.5" />
           </div>
         </CardContent>
