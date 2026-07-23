@@ -47,7 +47,12 @@ const OrderSummary = ({ cartItems = [], subtotal = 0, serviceFee = 0, gst = 0, g
                 already inside GST-inclusive shop prices shows as an "includes"
                 note under the total so the figures still sum to what's charged. */}
             {gst > 0 && <LineItem label="GST (10%)" value={gst} />}
-            {shipping > 0 && <LineItem label="Shipping" value={shipping} />}
+            {/* Shipping always shows so buyers see the cost (or that it's free)
+                on every order — $10 flat on CardPop Shop items, free over $50. */}
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>Shipping</span>
+              <span className="text-foreground">{shipping > 0 ? `$${Number(shipping).toFixed(2)}` : 'Free'}</span>
+            </div>
             <Separator />
             <LineItem label="Total (AUD)" value={total} bold />
             {gstIncluded > 0 && (
