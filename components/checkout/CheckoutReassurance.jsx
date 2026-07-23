@@ -8,10 +8,10 @@ import { ShieldCheck, Truck, RotateCcw, Lock } from 'lucide-react';
  * "you're protected" signals in view right where the buyer commits to paying.
  */
 const ITEMS = [
-  { icon: ShieldCheck, title: 'Buyer protection', body: 'Every order is covered — if it doesn’t arrive as described, you’re refunded.' },
-  { icon: Lock, title: 'Secure payment', body: 'Encrypted and processed by Stripe. Your card details never touch our servers.' },
-  { icon: Truck, title: 'Tracked delivery', body: 'Sent with tracking so you always know where your cards are.' },
-  { icon: RotateCcw, title: 'Easy returns', body: 'Change of mind or an issue? Our support team sorts it fast.' },
+  { icon: ShieldCheck, title: 'Buyer Protection', body: 'Every order is covered — if it doesn’t arrive as described, you’re refunded.' },
+  { icon: Lock, title: 'Secure Payment', body: 'Encrypted and processed by Stripe. Your card details never touch our servers.' },
+  { icon: Truck, title: 'Tracked Delivery', body: 'Sent with tracking so you always know where your cards are.' },
+  { icon: RotateCcw, title: 'Easy Returns', body: 'Change of mind or an issue? Our support team sorts it fast.' },
 ];
 
 const CheckoutReassurance = () => (
