@@ -12,7 +12,13 @@ export async function priceCart(items, userId) {
   const orderLines = [];
   let itemsCents = 0;
   let commissionCents = 0;
+  // GST that is ADDED on top of the item price (marketplace listings). This is
+  // the only GST that increases the grand total and gets its own Stripe line.
   let gstCents = 0;
+  // GST that is already BAKED INTO a GST-inclusive price (CardPop Shop items and
+  // the shipping fee — Australian consumer prices are quoted GST-inclusive). It
+  // is reported for the tax invoice but never re-added to the total.
+  let includedGstCents = 0;
   // Only CardPop Shop items (platform-owned stock) attract the flat shipping
   // fee — marketplace listings ship seller-arranged. Tracked separately so both
   // the fee and the free-shipping threshold key off the shop-item subtotal.
@@ -49,13 +55,16 @@ export async function priceCart(items, userId) {
       if (!product || product.status !== 'active') throw httpError(404, 'A shop product in your cart is unavailable');
       if (product.stock_quantity < quantity) throw httpError(409, `Not enough stock for ${product.title}`);
 
+      // The advertised shop price is GST-inclusive, so the buyer pays exactly
+      // the ticket price — the GST is the tax component already inside it
+      // (price × rate ÷ (100 + rate)), not an amount added on top.
       const unitCents = Math.round(Number(product.price_aud) * 100);
       const lineCents = unitCents * quantity;
-      const lineGstCents = gstEnabled ? Math.round(lineCents * (gstRate / 100)) : 0;
+      const lineGstCents = gstEnabled ? Math.round(lineCents * gstRate / (100 + gstRate)) : 0;
 
       itemsCents += lineCents;
       shopItemsCents += lineCents;
-      gstCents += lineGstCents;
+      includedGstCents += lineGstCents;
 
       lineItems.push({
         price_data: { currency: 'aud', product_data: { name: product.title }, unit_amount: unitCents },
@@ -114,10 +123,18 @@ export async function priceCart(items, userId) {
     const qualifiesForFree = freeThresholdCents > 0 && shopItemsCents >= freeThresholdCents;
     shippingCents = qualifiesForFree ? 0 : shipRateCents;
   }
+  // The shipping fee is GST-inclusive too, so its tax component is part of the
+  // reported GST (not an extra charge) — mirrors how the item prices are treated.
+  if (gstEnabled && shippingCents > 0) {
+    includedGstCents += Math.round(shippingCents * gstRate / (100 + gstRate));
+  }
 
   if (commissionCents > 0) {
     lineItems.push({ price_data: { currency: 'aud', product_data: { name: 'Platform Fee' }, unit_amount: commissionCents }, quantity: 1 });
   }
+  // Only the additive (marketplace) GST becomes its own line — shop-item GST is
+  // already inside each product's unit_amount, so charging it again would
+  // double-bill the buyer.
   if (gstCents > 0) {
     lineItems.push({ price_data: { currency: 'aud', product_data: { name: 'GST' }, unit_amount: gstCents }, quantity: 1 });
   }
@@ -125,5 +142,5 @@ export async function priceCart(items, userId) {
     lineItems.push({ price_data: { currency: 'aud', product_data: { name: 'Shipping' }, unit_amount: shippingCents }, quantity: 1 });
   }
 
-  return { lineItems, orderLines, itemsCents, commissionCents, gstCents, shippingCents, grandCents: itemsCents + commissionCents + gstCents + shippingCents };
+  return { lineItems, orderLines, itemsCents, commissionCents, gstCents, includedGstCents, shippingCents, grandCents: itemsCents + commissionCents + gstCents + shippingCents };
 }

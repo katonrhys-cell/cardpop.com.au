@@ -205,9 +205,10 @@ const ShoppingCart = () => {
                   <span className="tabular-nums">{getCartTotal()}</span>
                 </div>
                 <div className="flex justify-between text-muted-foreground text-sm">
-                  <span>Shipping & Taxes</span>
+                  <span>Shipping</span>
                   <span>Calculated at checkout</span>
                 </div>
+                <p className="text-xs text-muted-foreground">Prices include GST.</p>
                 <Separator className="my-2" />
                 <div className="flex justify-between items-end">
                   <span className="font-bold text-lg text-foreground">Total</span>
