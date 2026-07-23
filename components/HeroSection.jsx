@@ -81,18 +81,18 @@ const HeroSection = () => {
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[4.25rem] font-bold font-serif tracking-normal text-balance mb-6 leading-[1.2] text-white">
-            The Card Show{' '}
+            Sell Your Trading Cards to{' '}
             <br className="hidden sm:block" />
             <span
               className="text-transparent bg-clip-text"
               style={{ backgroundImage: 'linear-gradient(90deg, #fbbf24 0%, #f87171 45%, #a78bfa 100%)' }}
             >
-              That Never Closes
+              Buyers Across Australia
             </span>
           </h1>
 
           <p className="text-base md:text-lg text-zinc-400 max-w-lg mb-10 leading-relaxed text-balance mx-auto lg:mx-0">
-            Pokémon&nbsp;·&nbsp;MTG&nbsp;·&nbsp;Sports&nbsp;·&nbsp;More — buy, sell and trade with verified Australian collectors. Real prices, AUD only, buyer protection on every order.
+            CardPop is Australia's marketplace for Pokémon, MTG, sports cards and more. List your collection in minutes, reach thousands of verified collectors, and get paid securely in AUD — with buyer protection on every order.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-10">
@@ -107,8 +107,8 @@ const HeroSection = () => {
                 border: 'none',
               }}
             >
-              <Link to="/marketplace">
-                Browse the Show <ArrowRight className="ml-2 w-5 h-5" aria-hidden="true" />
+              <Link to="/signup">
+                Start Selling — It's Free <ArrowRight className="ml-2 w-5 h-5" aria-hidden="true" />
               </Link>
             </Button>
             <Button
@@ -122,8 +122,8 @@ const HeroSection = () => {
                 color: '#e4e4e7',
               }}
             >
-              <Link to="/signup">
-                Open Your Vault
+              <Link to="/marketplace">
+                Browse the Marketplace
               </Link>
             </Button>
           </div>
