@@ -193,4 +193,25 @@ const pwnedCheckLimiter = rateLimit({
 	},
 });
 
-export { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, backupCodeLimiter, reportLimiter, resendVerificationLimiter, welcomeOfferIssueLimiter, pwnedCheckLimiter };
+// Email-existence check limiter: 20 per minute per IP. Powers the guest-checkout
+// "you already have an account" nudge, which deliberately reveals account
+// existence — cap it tightly enough to blunt scripted enumeration (Cloudflare +
+// the global apiLimiter sit in front) while leaving ample room for a shopper
+// correcting a typo. Keyed by IP; fails open like the others.
+const emailCheckLimiter = rateLimit({
+	windowMs: 60 * 1000,
+	max: 20,
+	store: new PgRateLimitStore('emailcheck'),
+	standardHeaders: true,
+	legacyHeaders: false,
+	keyGenerator: (req) => ipKeyGenerator(req),
+	handler: (req, res) => {
+		logger.warn(`[RATE_LIMIT] Email-existence check limit exceeded for IP: ${ipKeyGenerator(req)}`);
+		res.status(429).json({
+			error: 'Too many requests, please try again later',
+			retryAfter: req.rateLimit.resetTime,
+		});
+	},
+});
+
+export { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, backupCodeLimiter, reportLimiter, resendVerificationLimiter, welcomeOfferIssueLimiter, pwnedCheckLimiter, emailCheckLimiter };

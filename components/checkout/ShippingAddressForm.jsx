@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Loader2, MapPin, Search } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { CheckCircle2, Loader2, MapPin, Search, XCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,7 +14,7 @@ import {
 const AU_STATES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'];
 const DEBOUNCE_MS = 250;
 
-const ShippingAddressForm = ({ values = {}, onChange, showEmail = false }) => {
+const ShippingAddressForm = ({ values = {}, onChange, showEmail = false, emailAccountExists = false, signInReturnPath = '/checkout' }) => {
   const update = (key, value) => onChange?.({ ...values, [key]: value });
 
   // Keep the latest values/onChange reachable from async callbacks without
@@ -156,16 +157,38 @@ const ShippingAddressForm = ({ values = {}, onChange, showEmail = false }) => {
       {showEmail && (
         <div className="space-y-1">
           <Label>Email</Label>
-          <Input
-            type="email"
-            value={values.email ?? ''}
-            onChange={e => update('email', e.target.value)}
-            placeholder="you@example.com"
-            autoComplete="email"
-            inputMode="email"
-            autoCapitalize="none"
-            spellCheck={false}
-          />
+          <div className="relative">
+            <Input
+              type="email"
+              value={values.email ?? ''}
+              onChange={e => update('email', e.target.value)}
+              placeholder="you@example.com"
+              autoComplete="email"
+              inputMode="email"
+              autoCapitalize="none"
+              spellCheck={false}
+              aria-invalid={emailAccountExists || undefined}
+              className={cn(emailAccountExists && 'border-destructive pr-9 focus-visible:ring-destructive')}
+            />
+            {emailAccountExists && (
+              <XCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-destructive" />
+            )}
+          </div>
+          {/* This email already belongs to a CardPop account — nudge the shopper
+              to sign in (guest checkout still works, but signing in links the
+              order to their account). */}
+          {emailAccountExists && (
+            <p className="text-xs text-muted-foreground">
+              You already have an account with this email.{' '}
+              <Link
+                to="/login"
+                state={{ from: { pathname: signInReturnPath } }}
+                className="font-semibold text-primary underline underline-offset-2"
+              >
+                Sign in
+              </Link>
+            </p>
+          )}
         </div>
       )}
       <div className="grid grid-cols-2 gap-3">
