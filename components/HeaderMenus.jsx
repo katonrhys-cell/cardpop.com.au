@@ -789,7 +789,7 @@ const MoreDropdown = ({ onNavigate }) => {
       </button>
 
       {open && (
-        <div className="absolute top-full right-0 mt-2 w-64 bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+        <div className="absolute top-full right-0 mt-2 w-72 bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
           <div className="p-3 grid gap-0.5">
             {MORE_ITEMS.map(item => (
               <Link
