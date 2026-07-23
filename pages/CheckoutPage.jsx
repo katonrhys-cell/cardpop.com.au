@@ -409,7 +409,7 @@ const CheckoutPage = () => {
     <Card className="border-border shadow-sm">
       <CardContent className="pt-6">
         <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
-          <Tag className="h-4 w-4 text-primary" /> Promo code
+          <Tag className="h-4 w-4 text-primary" /> Promo Code
         </div>
         {appliedPromoCode ? (
           <div className="flex items-center justify-between text-sm">
@@ -594,7 +594,7 @@ const CheckoutPage = () => {
                   ) : (
                     <div className="space-y-3">
                       <Button size="lg" className="w-full font-semibold" onClick={handleReviewAndPay}>
-                        Review &amp; pay ${Number(total).toFixed(2)}
+                        Review &amp; Pay ${Number(total).toFixed(2)}
                       </Button>
                       <p className="text-center text-xs text-muted-foreground">
                         You'll review your order before payment is taken. No charge until you confirm.
