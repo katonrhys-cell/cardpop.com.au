@@ -6,6 +6,7 @@ import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, Check
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
+import { VAULT_ITEM_CARD_COLUMNS, VAULT_IMAGE_CARD_COLUMNS } from '@/lib/listingCardColumns.js';
 import { cachedQuery } from '@/lib/queryCache.js';
 import VaultListingCard from '@/components/VaultListingCard.jsx';
 import SellerCard from '@/components/SellerCard.jsx';
@@ -292,7 +293,7 @@ const HomePage = () => {
             // vault_items has more than one FK to profiles, so the embed must use
             // the explicit constraint-name hint (!vault_items_owner_id_fkey) —
             // the bare !owner_id hint returns a PostgREST 400.
-            const SELECT = '*, owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count), vault_images(*)';
+            const SELECT = `${VAULT_ITEM_CARD_COLUMNS}, owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count), vault_images(${VAULT_IMAGE_CARD_COLUMNS})`;
             const LIMIT = 4;
             // Fresh builder per call — a Supabase query builder is single-use.
             // Backfill uses genuinely-public recent cards.

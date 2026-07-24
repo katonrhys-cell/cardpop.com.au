@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Star, MapPin, Calendar, Package, MessageSquare, CalendarDays, Store, Users, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
+import { VAULT_ITEM_CARD_SELECT } from '@/lib/listingCardColumns.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { fetchUserEvents } from '@/lib/eventRsvp.js';
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,7 +38,7 @@ const SellerProfilePage = () => {
 
         const { data: items } = await supabase
           .from('vault_items')
-          .select('*, vault_images(*)')
+          .select(VAULT_ITEM_CARD_SELECT)
           .eq('owner_id', sellerId)
           .neq('listing_type', 'Private')
           .eq('is_public', true)

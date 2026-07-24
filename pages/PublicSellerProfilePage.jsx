@@ -4,6 +4,7 @@ import { useParams, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import BackButton from '@/components/BackButton.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { LISTING_CARD_VAULT_EMBED, VAULT_ITEM_CARD_SELECT } from '@/lib/listingCardColumns.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { Star, ShieldCheck, MapPin, Calendar, ExternalLink, ShieldAlert, Package, MessageSquare, Flag } from 'lucide-react';
 import ReportModal from '@/components/ReportModal.jsx';
@@ -49,7 +50,7 @@ const PublicSellerProfilePage = () => {
         // Fetch Marketplace listings (with full vault_item and seller data)
         const { data: marketplaceData } = await supabase
           .from('listings')
-          .select('*, vault_item:vault_items(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
+          .select(`*, ${LISTING_CARD_VAULT_EMBED}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
           .eq('seller_id', userId)
           .eq('status', 'active')
           .order('created_at', { ascending: false })
@@ -59,7 +60,7 @@ const PublicSellerProfilePage = () => {
         const listedVaultIds = new Set((marketplaceData || []).map(l => l.vault_item_id).filter(Boolean));
         const { data: vaultData } = await supabase
           .from('vault_items')
-          .select('*, vault_images(*), owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
+          .select(`${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
           .eq('owner_id', userId)
           .eq('is_public', true)
           .neq('listing_type', 'Private')

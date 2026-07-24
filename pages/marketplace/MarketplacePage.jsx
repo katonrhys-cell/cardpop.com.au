@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { LISTING_CARD_VAULT_EMBED_INNER } from '@/lib/listingCardColumns.js';
 import { escapeLike } from '@/src/utils/escapeLike.js';
 import { buildCardSearchOr } from '@/src/utils/cardSearchFilter.js';
 import { useCategories } from '@/hooks/useCategories.js';
@@ -217,7 +218,7 @@ const MarketplacePage = () => {
       try {
         let query = supabase
           .from('listings')
-          .select('*, vault_item:vault_items!inner(*, vault_images(storage_path)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)', { count: 'exact' })
+          .select(`*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`, { count: 'exact' })
           // Show sold items too (badged "Sold") — they stay on the marketplace
           // until an admin archives them. Only 'archived' is hidden here.
           .in('status', ['active', 'sold'])

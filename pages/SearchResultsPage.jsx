@@ -3,6 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { Search, Store, User, Newspaper, CalendarDays, ShoppingBag, ArrowRight, ImageOff } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
+import { LISTING_CARD_VAULT_EMBED_INNER } from '@/lib/listingCardColumns.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import { sanitizeSearch, tokenizeSearch, rankItems } from '@/utils/searchRanking.js';
 import { slugify } from '@/lib/slugify.js';
@@ -56,7 +57,7 @@ async function searchListings(tokens) {
   const { data, error } = await applyTokens(
     supabase
       .from('listings')
-      .select('*, vault_item:vault_items!inner(*, vault_images(storage_path)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
+      .select(`*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
       .eq('status', 'active')
       .neq('listing_type', 'vault'),
     tokens, ['card_name', 'set_name'], 'vault_items',
@@ -111,7 +112,9 @@ async function searchSellers(tokens) {
 
 async function searchBlog(tokens) {
   const { data, error } = await applyTokens(
-    supabase.from('blog_articles').select('*').eq('is_published', true),
+    supabase.from('blog_articles')
+      .select('id,slug,title,excerpt,featured_image_url,category,created_at')
+      .eq('is_published', true),
     tokens, ['title', 'excerpt'],
   ).order('created_at', { ascending: false }).limit(OVER_FETCH);
   if (error) throw error;

@@ -13,11 +13,6 @@ create index if not exists idx_listings_status_created
 create index if not exists idx_listings_status_price
   on public.listings (status, price_aud);
 
--- Category browse (pages/CategoryPage.jsx): leading-wildcard
--- ILIKE '%name%' on listings.category can only be served by a trigram index.
-create index if not exists idx_listings_category_trgm
-  on public.listings using gin (category gin_trgm_ops);
-
 -- Shop category filtering (ShopCategoryPage / ShopCollectionPage):
 -- same ILIKE pattern on shop_products.category.
 create index if not exists idx_shop_products_category_trgm

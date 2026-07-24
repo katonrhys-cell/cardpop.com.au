@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/lib/supabaseClient.js';
+import { VAULT_ITEM_CARD_SELECT, LISTING_CARD_VAULT_EMBED_INNER } from '@/lib/listingCardColumns.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
@@ -359,7 +360,7 @@ const CollectionPage = () => {
         const [pinned, autoRes] = await Promise.all([
           fetchPinnedSectionItems(slug, 'new_releases'),
           supabase.from('vault_items')
-            .select('*, vault_images(*)')
+            .select(VAULT_ITEM_CARD_SELECT)
             .or(`category_id.eq.${categoryId},franchise_id.eq.${categoryId}`)
             .eq('is_public', true)
             .order('created_at', { ascending: false })
@@ -388,7 +389,7 @@ const CollectionPage = () => {
       try {
         const [pinned, autoRes] = await Promise.all([
           fetchPinnedSectionItems(slug, 'graded'),
-          supabase.from('vault_items').select('*, vault_images(*)')
+          supabase.from('vault_items').select(VAULT_ITEM_CARD_SELECT)
             .or(`category_id.eq.${categoryId},franchise_id.eq.${categoryId}`)
             .eq('is_public', true)
             .not('grade', 'is', null)
@@ -419,7 +420,7 @@ const CollectionPage = () => {
       try {
         const [pinned, autoRes] = await Promise.all([
           fetchPinnedSectionItems(slug, 'trending'),
-          supabase.from('vault_items').select('*, vault_images(*)')
+          supabase.from('vault_items').select(VAULT_ITEM_CARD_SELECT)
             .or(`category_id.eq.${categoryId},franchise_id.eq.${categoryId}`)
             .eq('is_public', true)
             .gt('estimated_value_aud', 0)
@@ -446,14 +447,14 @@ const CollectionPage = () => {
     const loadHolyGrail = async () => {
       try {
         let query = supabase.from('vault_items')
-          .select(`*, vault_images(*), owner:profiles!vault_items_owner_id_fkey(${PUBLIC_PROFILE_COLUMNS})`)
+          .select(`${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(${PUBLIC_PROFILE_COLUMNS})`)
           .eq('is_public', true)
           .gt('estimated_value_aud', 0)
           .order('estimated_value_aud', { ascending: false })
           .limit(6);
         if (categoryId) query = query.or(`category_id.eq.${categoryId},franchise_id.eq.${categoryId}`);
         const [pinned, { data: featured }] = await Promise.all([
-          fetchPinnedSectionItems(slug, 'holy_grail', `*, vault_images(*), owner:profiles!vault_items_owner_id_fkey(${PUBLIC_PROFILE_COLUMNS})`),
+          fetchPinnedSectionItems(slug, 'holy_grail', `${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(${PUBLIC_PROFILE_COLUMNS})`),
           query,
         ]);
         if (cancelled) return;
@@ -491,7 +492,7 @@ const CollectionPage = () => {
       // the resolved collection id against EITHER column.
       let q = supabase.from('listings')
         .select(
-          `*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(display_name, username, avatar_url, is_verified)`,
+          `*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(display_name, username, avatar_url, is_verified)`,
           { count: 'exact' }
         )
         .eq('status', 'active')
@@ -503,7 +504,7 @@ const CollectionPage = () => {
       // on a substring rather than exact equality.
       if (activeEra) q = q.ilike('vault_items.set_name', `%${activeEra}%`);
       if (filterCondition) q = q.eq('vault_items.condition', filterCondition);
-      if (filterVariant) q = q.contains('vault_items.cardVariants', [filterVariant]);
+      if (filterVariant) q = q.ilike('vault_items.variant', `%${filterVariant}%`);
 
       if (filterType === 'For Sale') {
         q = q.in('listing_type', ['fixed', 'auction']);
