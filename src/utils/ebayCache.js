@@ -1,4 +1,5 @@
 import logger from './logger.js';
+import { sharedCacheGet, sharedCacheSet } from './sharedCache.js';
 
 const cache = new Map();
 const CACHE_TTL = parseInt(process.env.EBAY_CACHE_TTL || '3600', 10) * 1000;
@@ -42,4 +43,24 @@ function clear() {
   logger.debug('Cache cleared');
 }
 
-export { set, get, clear };
+// Two-tier variants: in-memory L1 (this Map) + the cross-instance api_cache
+// table (L2). On Vercel each serverless instance has its own Map, so the L1
+// hit rate is low on its own — the shared layer makes results visible across
+// instances. L2 failures behave like misses (sharedCache is fail-open).
+async function getTiered(key) {
+  const memory = get(key);
+  if (memory !== null) return memory;
+  const shared = await sharedCacheGet(`ebay:${key}`);
+  if (shared !== null) {
+    set(key, shared); // hydrate L1 for this instance
+    logger.debug(`Cache HIT (shared): ${key}`);
+  }
+  return shared;
+}
+
+async function setTiered(key, value) {
+  set(key, value);
+  await sharedCacheSet(`ebay:${key}`, value, CACHE_TTL);
+}
+
+export { set, get, clear, getTiered, setTiered };

@@ -1,4 +1,7 @@
 import logger from './logger.js';
+import { sharedCacheGet, sharedCacheSet } from './sharedCache.js';
+
+const FX_CACHE_KEY = 'fx:usd_aud';
 
 // In-memory cache for exchange rates
 let exchangeRateCache = {
@@ -26,6 +29,16 @@ async function getUsdToAudRate() {
     return exchangeRateCache.usdToAud;
   }
 
+  // Cross-instance layer: on Vercel each serverless instance has its own
+  // module memory, so without this every fresh instance re-hit the FX API.
+  const shared = await sharedCacheGet(FX_CACHE_KEY);
+  if (typeof shared === 'number' && shared > 0) {
+    exchangeRateCache.usdToAud = shared;
+    exchangeRateCache.lastUpdated = now;
+    logger.debug('[EXCHANGE_RATES] Returning shared-cache USD→AUD rate');
+    return shared;
+  }
+
   try {
     logger.info('[EXCHANGE_RATES] Fetching fresh USD→AUD rate');
 
@@ -49,9 +62,10 @@ async function getUsdToAudRate() {
       return getFallbackRate();
     }
 
-    // Cache the rate
+    // Cache the rate (in-process + cross-instance)
     exchangeRateCache.usdToAud = rate;
     exchangeRateCache.lastUpdated = now;
+    await sharedCacheSet(FX_CACHE_KEY, rate, exchangeRateCache.cacheExpiry);
 
     logger.info(`[EXCHANGE_RATES] Fetched USD→AUD rate: ${rate.toFixed(4)}`);
     return rate;

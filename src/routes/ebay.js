@@ -32,7 +32,14 @@ router.get('/search', async (req, res) => {
 
   logger.info(`[EBAY_SEARCH] Searching for: "${query}", limit: ${limitNum}`);
 
+  // Highest-volume eBay path — cache per normalized query so repeat lookups
+  // (the same card viewed by many visitors) don't burn Browse API quota.
+  const cacheKey = `search:${query.toLowerCase()}:${limitNum}`;
+
   try {
+    const cached = await ebayCache.getTiered(cacheKey);
+    if (cached) return res.json(cached);
+
     const params = new URLSearchParams({
       q: query,
       filter: 'buyingOptions:{AUCTION|FIXED_PRICE},itemLocationCountry:AU',
@@ -55,6 +62,7 @@ router.get('/search', async (req, res) => {
       thumbnailUrl:   item.image?.imageUrl || '',
     }));
 
+    await ebayCache.setTiered(cacheKey, listings);
     res.json(listings);
   } catch (error) {
     logger.error(`[EBAY_SEARCH] Error: ${error.message}`);
@@ -93,7 +101,13 @@ router.get('/price-estimate', async (req, res) => {
 
   logger.info(`[EBAY_PRICE_ESTIMATE] Query: "${query}"`);
 
+  // Two upstream Browse calls (AU + US) per request — cache per query.
+  const cacheKey = `price-estimate:${query.toLowerCase()}`;
+
   try {
+    const cached = await ebayCache.getTiered(cacheKey);
+    if (cached) return res.json(cached);
+
     // Fetch from both eBay AU and eBay US in parallel
     const [auResult, usResult] = await Promise.allSettled([
       // eBay.com.au (Australian listings)
@@ -224,7 +238,7 @@ router.get('/price-estimate', async (req, res) => {
 
     logger.info(`[EBAY_PRICE_ESTIMATE] ${baseCards.length} base cards, ${gradedCards.length} graded, avg AUD: $${avgPrice}`);
 
-    res.json({
+    const estimate = {
       count: allPrices.length,
       avgPrice,
       minPrice: allPrices.length > 0 ? Math.min(...allPrices) : 0,
@@ -234,7 +248,9 @@ router.get('/price-estimate', async (req, res) => {
       baseCount: baseCardPrices.length,
       gradedCount: gradedCardPrices.length,
       exchangeRate: USD_TO_AUD,
-    });
+    };
+    await ebayCache.setTiered(cacheKey, estimate);
+    res.json(estimate);
   } catch (error) {
     logger.error(`[EBAY_PRICE_ESTIMATE] Error: ${error.message}`);
     res.status(502).json({ error: 'eBay API unavailable. Please try again later.' });
@@ -392,7 +408,7 @@ router.get('/statistics', async (req, res) => {
  */
 router.get('/popular-cards', async (req, res) => {
   const CACHE_KEY = 'popular-cards';
-  const cached = ebayCache.get(CACHE_KEY);
+  const cached = await ebayCache.getTiered(CACHE_KEY);
   if (cached) {
     logger.info('[POPULAR_CARDS] Returning cached result');
     return res.json(cached);
@@ -453,7 +469,7 @@ router.get('/popular-cards', async (req, res) => {
     // Don't cache a total outage — every card failed means one transient eBay
     // hiccup would otherwise serve null prices for the full cache TTL.
     if (results.some(r => r.status === 'fulfilled')) {
-      ebayCache.set(CACHE_KEY, output);
+      await ebayCache.setTiered(CACHE_KEY, output);
     } else {
       logger.warn('[POPULAR_CARDS] Every card failed — result not cached');
     }
