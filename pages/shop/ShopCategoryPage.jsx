@@ -58,7 +58,7 @@ const ShopCategoryPage = () => {
 
         let query = supabase
           .from('shop_products')
-          .select('*', { count: 'exact' })
+          .select('*', { count: 'estimated' })
           .eq('status', 'active');
 
         // shop_products stores a free-text category; match the resolved

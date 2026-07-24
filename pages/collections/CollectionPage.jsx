@@ -493,7 +493,7 @@ const CollectionPage = () => {
       let q = supabase.from('listings')
         .select(
           `*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(display_name, username, avatar_url, is_verified)`,
-          { count: 'exact' }
+          { count: 'estimated' }
         )
         .eq('status', 'active')
         .or(`category_id.eq.${categoryId},franchise_id.eq.${categoryId}`, { referencedTable: 'vault_items' })

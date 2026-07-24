@@ -70,7 +70,7 @@ const PublicSellerProfilePage = () => {
         // Fetch Reviews
         const { data: reviewsData, count: reviewsCount } = await supabase
           .from('reviews')
-          .select('*', { count: 'exact' })
+          .select('*', { count: 'estimated' })
           .eq('recipient_id', userId);
 
         if (!isMounted) return;

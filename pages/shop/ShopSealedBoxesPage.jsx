@@ -34,7 +34,7 @@ const ShopSealedBoxesPage = () => {
       try {
         let query = supabase
           .from('shop_products')
-          .select('*', { count: 'exact' })
+          .select('*', { count: 'estimated' })
           .eq('status', 'active')
           .eq('product_type', 'sealed')
           .limit(48);

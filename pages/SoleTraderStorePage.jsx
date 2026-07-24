@@ -92,7 +92,7 @@ const SoleTraderStorePage = () => {
             .eq('owner_id', resolvedId).eq('is_public', true).neq('listing_type', 'Private')
             .order('created_at', { ascending: false }).limit(24),
           supabase.from('reviews')
-            .select('*', { count: 'exact' })
+            .select('*', { count: 'estimated' })
             .eq('recipient_id', resolvedId),
         ]);
 
