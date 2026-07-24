@@ -127,6 +127,12 @@ const cartValue = {
 };
 vi.mock('@/hooks/useCart.jsx', () => ({ useCart: () => cartValue, CartProvider: passthrough }));
 
+const watchlistValue = {
+  isWatchlisted: () => false, toggle: asyncFn(), count: 0, loading: false,
+};
+vi.mock('@/hooks/useWatchlist.js', () => ({ useWatchlist: () => watchlistValue }));
+vi.mock('@/contexts/WatchlistContext.jsx', () => ({ WatchlistContext: {}, WatchlistProvider: passthrough }));
+
 const arr = async () => [];
 const categoriesValue = {
   loading: false, error: null,

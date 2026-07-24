@@ -24,6 +24,10 @@ const authState = vi.hoisted(() => ({ currentUser: { id: 'u1' }, isAuthenticated
 vi.mock('@/contexts/AuthContext.jsx', () => ({ useAuth: () => authState }));
 
 import { useWatchlist } from '@/hooks/useWatchlist.js';
+import { WatchlistProvider } from '@/contexts/WatchlistContext.jsx';
+
+// The hook now reads app-wide state from WatchlistProvider.
+const wrapper = ({ children }) => <WatchlistProvider>{children}</WatchlistProvider>;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -37,7 +41,7 @@ beforeEach(() => {
 describe('useWatchlist', () => {
   it('loads the user\'s watchlisted ids', async () => {
     h.fetchData = [{ listing_id: 'l1' }, { listing_id: 'l2' }];
-    const { result } = renderHook(() => useWatchlist());
+    const { result } = renderHook(() => useWatchlist(), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.count).toBe(2);
     expect(result.current.isWatchlisted('l1')).toBe(true);
@@ -47,14 +51,14 @@ describe('useWatchlist', () => {
   it('is empty for an unauthenticated user', async () => {
     authState.isAuthenticated = false;
     authState.currentUser = null;
-    const { result } = renderHook(() => useWatchlist());
+    const { result } = renderHook(() => useWatchlist(), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.count).toBe(0);
   });
 
   it('adds a listing via insert when toggled on', async () => {
     h.fetchData = [];
-    const { result } = renderHook(() => useWatchlist());
+    const { result } = renderHook(() => useWatchlist(), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     let returned;
@@ -66,7 +70,7 @@ describe('useWatchlist', () => {
 
   it('removes a listing via delete when toggled off', async () => {
     h.fetchData = [{ listing_id: 'l1' }];
-    const { result } = renderHook(() => useWatchlist());
+    const { result } = renderHook(() => useWatchlist(), { wrapper });
     await waitFor(() => expect(result.current.isWatchlisted('l1')).toBe(true));
 
     let returned;
@@ -80,7 +84,7 @@ describe('useWatchlist', () => {
   it('reports failure and the prior state when the write fails', async () => {
     h.fetchData = [];
     h.insertError = new Error('write failed');
-    const { result } = renderHook(() => useWatchlist());
+    const { result } = renderHook(() => useWatchlist(), { wrapper });
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     let returned;
@@ -91,7 +95,7 @@ describe('useWatchlist', () => {
 
   it('toggle is a no-op without a user', async () => {
     authState.currentUser = null;
-    const { result } = renderHook(() => useWatchlist());
+    const { result } = renderHook(() => useWatchlist(), { wrapper });
     let returned;
     await act(async () => { returned = await result.current.toggle('l1'); });
     expect(returned).toEqual({ success: false, watchlisted: false });
