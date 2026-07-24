@@ -34,7 +34,7 @@ const ShopSinglesPage = () => {
       try {
         let query = supabase
           .from('shop_products')
-          .select('*', { count: 'exact' })
+          .select('*', { count: 'estimated' })
           .eq('status', 'active')
           .eq('product_type', 'single')
           .limit(48);

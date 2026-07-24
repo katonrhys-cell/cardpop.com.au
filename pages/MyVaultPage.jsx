@@ -56,7 +56,7 @@ const MyVaultPage = () => {
     try {
       let query = supabase
         .from('vault_items')
-        .select('*', { count: 'exact' })
+        .select('*', { count: 'estimated' })
         .eq('owner_id', currentUser.id)
         .order('created_at', { ascending: false })
         .range(page * VAULT_PAGE_SIZE, page * VAULT_PAGE_SIZE + VAULT_PAGE_SIZE - 1);

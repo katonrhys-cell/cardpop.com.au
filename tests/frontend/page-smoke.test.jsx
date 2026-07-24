@@ -127,6 +127,12 @@ const cartValue = {
 };
 vi.mock('@/hooks/useCart.jsx', () => ({ useCart: () => cartValue, CartProvider: passthrough }));
 
+const watchlistValue = {
+  isWatchlisted: () => false, toggle: asyncFn(), count: 0, loading: false,
+};
+vi.mock('@/hooks/useWatchlist.js', () => ({ useWatchlist: () => watchlistValue }));
+vi.mock('@/contexts/WatchlistContext.jsx', () => ({ WatchlistContext: {}, WatchlistProvider: passthrough }));
+
 const arr = async () => [];
 const categoriesValue = {
   loading: false, error: null,
@@ -231,7 +237,6 @@ function renderPage(Page) {
 const NEEDS_FIXTURE = new Set([
   'AustralianMarketsPage.jsx', // indexes statsData.totalSalesVolume from a populated stats payload
   'CardMarketDetailPage.jsx',  // detail page keyed by a route :slug + card payload
-  'CategoryPage.jsx',          // reads a :categorySlug route param (slug.replace(...))
 ]);
 
 describe('every page module imports and exports a component', () => {

@@ -9,6 +9,7 @@ import { AuthProvider } from '@/contexts/AuthContext.jsx';
 import { AdminProvider } from '@/contexts/AdminContext.jsx';
 import { CartProvider } from '@/hooks/useCart.jsx';
 import { CategoryHierarchyProvider } from '@/contexts/CategoryContext.jsx';
+import { WatchlistProvider } from '@/contexts/WatchlistContext.jsx';
 import { PlatformSettingsProvider } from '@/contexts/PlatformSettingsContext.jsx';
 
 // Layouts & Core Components
@@ -225,9 +226,6 @@ const ListingsManagementPage = lazy(() => import('@/pages/ListingsManagementPage
 
 // Previously-orphaned pages now wired up
 const SalesHistoryPage = lazy(() => import('@/pages/SalesHistoryPage.jsx'));
-const CategoryPage = lazy(() => import('@/pages/CategoryPage.jsx'));
-// Remounts CategoryPage when the category changes so pagination/sort reset
-const CategoryRoute = () => { const { categoryId } = useParams(); return <CategoryPage key={categoryId} />; };
 const PublicCollectionsPage = lazy(() => import('@/pages/PublicCollectionsPage.jsx'));
 const CardMarketDetailPage = lazy(() => import('@/pages/CardMarketDetailPage.jsx'));
 const AddYourFirstCardPage = lazy(() => import('@/pages/AddYourFirstCardPage.jsx'));
@@ -263,6 +261,7 @@ const App = () => {
         <AdminProvider>
           <CartProvider>
             <CategoryHierarchyProvider>
+            <WatchlistProvider>
               <Router>
                 <ScrollToTop />
                 <AnalyticsPageViews />
@@ -414,7 +413,10 @@ const App = () => {
                         <Route path="/card-shops/add" element={<AddStorePage />} />
                         <Route path="/card-shops/:city" element={<CardShopsCityPage />} />
                         <Route path="/card-market/:cardId" element={<CardMarketDetailPage />} />
-                        <Route path="/category/:categoryId" element={<CategoryRoute />} />
+                        {/* Legacy route: the old CategoryPage queried a listings.category
+                            column that doesn't exist, so it always rendered empty — the
+                            marketplace's category filters are the real browse surface. */}
+                        <Route path="/category/:categoryId" element={<Navigate to="/marketplace" replace />} />
                         
                         {/* Grading */}
                         <Route path="/grading" element={<GradingPage />} />
@@ -532,6 +534,7 @@ const App = () => {
                   <Toaster position="bottom-right" richColors closeButton />
                 </div>
               </Router>
+            </WatchlistProvider>
             </CategoryHierarchyProvider>
           </CartProvider>
         </AdminProvider>

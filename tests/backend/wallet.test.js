@@ -19,7 +19,9 @@ const mockStripe = vi.hoisted(() => ({
   webhooks: { constructEvent: vi.fn() },
 }));
 
-vi.mock('stripe', () => ({ default: vi.fn(function () { return mockStripe; }) }));
+// stripeClient lazy-requires the SDK via createRequire (see src/utils/stripeClient.js),
+// which bypasses ESM module mocks — so mock the client module itself.
+vi.mock('../../src/utils/stripeClient.js', () => ({ default: mockStripe }));
 
 vi.mock('../../src/middleware/auth.js', () => ({
   authMiddleware: (req, _res, next) => {

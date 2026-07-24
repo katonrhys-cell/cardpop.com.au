@@ -17,7 +17,9 @@ const mockStripe = vi.hoisted(() => ({
   refunds: { create: vi.fn() },
 }));
 
-vi.mock('stripe', () => ({ default: vi.fn(function () { return mockStripe; }) }));
+// stripeClient lazy-requires the SDK via createRequire (see src/utils/stripeClient.js),
+// which bypasses ESM module mocks — so mock the client module itself.
+vi.mock('../../src/utils/stripeClient.js', () => ({ default: mockStripe }));
 
 // Don't send real emails on the happy paths.
 vi.mock('../../src/utils/emailService.js', () => ({

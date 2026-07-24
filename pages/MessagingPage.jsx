@@ -118,39 +118,84 @@ const MessagingPage = () => {
   const selectedUserIdRef = useRef(selectedUserId);
   useEffect(() => { selectedUserIdRef.current = selectedUserId; }, [selectedUserId]);
 
+  // Merge one message into the conversation list in place. Previously every
+  // realtime event, sent message and thread-open refetched the entire
+  // conversation scan (200 messages + a profiles .in() query) — a busy thread
+  // re-ran it once per message.
+  const lastConvAppliedRef = useRef(null);
+  const applyMessageToConversations = useCallback((record, { suppressUnread = false } = {}) => {
+    const uid = currentUser?.id;
+    if (!uid || !record || lastConvAppliedRef.current === record.id) return;
+    lastConvAppliedRef.current = record.id;
+    const otherId = record.sender_id === uid ? record.recipient_id : record.sender_id;
+    let isNewConversation = false;
+    setConversations(prev => {
+      const existing = prev.find(c => c.otherUserId === otherId);
+      isNewConversation = !existing;
+      const unreadDelta =
+        record.recipient_id === uid && !record.read_at && !suppressUnread ? 1 : 0;
+      const updated = {
+        otherUserId: otherId,
+        otherUserName: existing?.otherUserName ?? 'Loading...',
+        avatar: existing?.avatar ?? null,
+        lastMessage: record.body,
+        timestamp: record.created_at,
+        unreadCount: (existing?.unreadCount ?? 0) + unreadDelta,
+      };
+      return [updated, ...prev.filter(c => c.otherUserId !== otherId)];
+    });
+    // First message from someone new — fetch just their profile for the label.
+    if (isNewConversation) {
+      supabase.from('profiles').select('id, display_name, avatar_url').eq('id', otherId).single()
+        .then(({ data }) => {
+          if (data && isMounted.current) {
+            setConversations(prev => prev.map(c => c.otherUserId === otherId
+              ? { ...c, otherUserName: data.display_name || 'Anonymous', avatar: data.avatar_url || null }
+              : c));
+          }
+        }, () => {});
+    }
+  }, [currentUser?.id]);
+
   // Real-time subscription — created once per user (not per conversation switch),
   // with a stable channel name, so incoming messages aren't missed during the
-  // unsubscribe/resubscribe gap.
+  // unsubscribe/resubscribe gap. Two server-side-filtered bindings (recipient +
+  // sender) replace the old unfiltered all-INSERTs listener, so this client is
+  // only woken for its own rows.
   useEffect(() => {
     if (!currentUser?.id) return;
     const uid = currentUser.id;
 
-    const channel = supabase.channel(`messaging-page-${uid}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
-        if (!isMounted.current) return;
-        const record = payload.new;
-        const isRelevant = record.sender_id === uid || record.recipient_id === uid;
-        if (isRelevant) {
-          fetchConversations();
-          const selectedUserId = selectedUserIdRef.current;
-          if (selectedUserId && (record.sender_id === selectedUserId || record.recipient_id === selectedUserId)) {
-            setMessages(prev => {
-              if (prev.some(m => m.id === record.id)) return prev;
-              return [...prev, record];
-            });
-            scrollToBottom();
-            if (record.recipient_id === uid) {
-              supabase.from('messages').update({ status: 'read', read_at: new Date().toISOString() }).eq('id', record.id).eq("recipient_id", uid).then(() => {}, () => {});
-            }
-          }
+    const handleIncoming = (record) => {
+      if (!isMounted.current || !record) return;
+      const selectedUserId = selectedUserIdRef.current;
+      const inOpenThread = !!selectedUserId &&
+        (record.sender_id === selectedUserId || record.recipient_id === selectedUserId);
+      if (inOpenThread) {
+        setMessages(prev => {
+          if (prev.some(m => m.id === record.id)) return prev;
+          return [...prev, record];
+        });
+        scrollToBottom();
+        if (record.recipient_id === uid) {
+          supabase.from('messages').update({ status: 'read', read_at: new Date().toISOString() }).eq('id', record.id).eq("recipient_id", uid).then(() => {}, () => {});
         }
-      })
+      }
+      // A message landing in the open thread is read immediately — don't count it.
+      applyMessageToConversations(record, { suppressUnread: inOpenThread && record.recipient_id === uid });
+    };
+
+    const channel = supabase.channel(`messaging-page-${uid}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `recipient_id=eq.${uid}` },
+        payload => handleIncoming(payload.new))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `sender_id=eq.${uid}` },
+        payload => handleIncoming(payload.new))
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, applyMessageToConversations]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -231,7 +276,11 @@ const MessagingPage = () => {
       const unreadIds = (msgs || []).filter(m => m.recipient_id === currentUser.id && !m.read_at).map(m => m.id);
       if (unreadIds.length > 0) {
         await supabase.from('messages').update({ status: 'read', read_at: new Date().toISOString() }).in('id', unreadIds).eq('recipient_id', currentUser.id);
-        fetchConversations();
+        // The rows are now read — reflect it locally rather than re-running
+        // the full conversation scan.
+        if (isMounted.current) {
+          setConversations(prev => prev.map(c => c.otherUserId === otherId ? { ...c, unreadCount: 0 } : c));
+        }
       }
 
     } catch (error) {
@@ -271,7 +320,7 @@ const MessagingPage = () => {
         return [...prev, created];
       });
       scrollToBottom();
-      fetchConversations();
+      applyMessageToConversations(created);
     } catch (error) {
       toast.error('Failed to send message');
       setNewMessage(content); // restore on fail

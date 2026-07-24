@@ -1,5 +1,10 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
+// sharedCache hits the real Supabase client (network) — stub it out.
+vi.mock('../../../src/utils/sharedCache.js', () => ({
+  sharedCacheGet: vi.fn(async () => null),
+  sharedCacheSet: vi.fn(async () => {}),
+}));
 vi.mock('../../../src/utils/logger.js', () => ({
   default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));

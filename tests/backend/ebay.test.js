@@ -19,11 +19,22 @@ const {
   mockGetCardDetails: vi.fn().mockResolvedValue({}),
   mockGetSalesData: vi.fn().mockResolvedValue({ sales: [] }),
   mockGetStatistics: vi.fn().mockResolvedValue({}),
-  mockEbayCache: { get: vi.fn().mockReturnValue(null), set: vi.fn(), clear: vi.fn() },
+  mockEbayCache: {
+    get: vi.fn().mockReturnValue(null),
+    set: vi.fn(),
+    clear: vi.fn(),
+    getTiered: vi.fn().mockResolvedValue(null),
+    setTiered: vi.fn().mockResolvedValue(undefined),
+  },
   mockLogger: { default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } },
   mockPopularCards: [{ name: 'Charizard', set: 'Base Set' }],
 }));
 
+// sharedCache hits the real Supabase client (network) — stub it out.
+vi.mock('../../src/utils/sharedCache.js', () => ({
+  sharedCacheGet: vi.fn(async () => null),
+  sharedCacheSet: vi.fn(async () => {}),
+}));
 vi.mock('../../src/utils/ebayClient.js', () => ({ callEbayApi: mockCallEbayApi }));
 vi.mock('../../src/utils/ebayMarketData.js', () => ({
   getMarketData: mockGetMarketData,

@@ -180,7 +180,7 @@ const ShopCollectionPage = () => {
     try {
       let q = supabase
         .from('shop_products')
-        .select('*', { count: 'exact' })
+        .select('*', { count: 'estimated' })
         .eq('status', 'active');
 
       // A selected pill narrows to one leaf category; otherwise match the group.

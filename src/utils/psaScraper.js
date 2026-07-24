@@ -1,4 +1,3 @@
-import { load } from 'cheerio';
 import logger from './logger.js';
 import { convertUsdToAud, getExchangeRateInfo } from './exchangeRates.js';
 
@@ -33,6 +32,9 @@ async function fetchPSACertification(certNumber) {
     }
 
     const html = await response.text();
+    // cheerio is only needed on this rare scrape fallback — a top-level
+    // import put its whole parse tree on every serverless cold start.
+    const { load } = await import('cheerio');
     const $ = load(html);
 
     // Extract data from PSA page

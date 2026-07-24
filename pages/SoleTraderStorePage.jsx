@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import BackButton from '@/components/BackButton.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { LISTING_CARD_VAULT_EMBED, VAULT_ITEM_CARD_SELECT } from '@/lib/listingCardColumns.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import {
   Star, ShieldCheck, MapPin, Calendar, ExternalLink, ShieldAlert,
@@ -83,15 +84,15 @@ const SoleTraderStorePage = () => {
         const resolvedId = profile.id;
         const [marketplaceRes, vaultRes, reviewsRes] = await Promise.all([
           supabase.from('listings')
-            .select('*, vault_item:vault_items(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
+            .select(`*, ${LISTING_CARD_VAULT_EMBED}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
             .eq('seller_id', resolvedId).eq('status', 'active')
             .order('created_at', { ascending: false }).limit(24),
           supabase.from('vault_items')
-            .select('*, vault_images(*), owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)')
+            .select(`${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
             .eq('owner_id', resolvedId).eq('is_public', true).neq('listing_type', 'Private')
             .order('created_at', { ascending: false }).limit(24),
           supabase.from('reviews')
-            .select('*', { count: 'exact' })
+            .select('*', { count: 'estimated' })
             .eq('recipient_id', resolvedId),
         ]);
 

@@ -18,6 +18,7 @@
 
 import logger from './logger.js';
 import supabase from './supabaseClient.js';
+import { sharedCacheGet, sharedCacheSet } from './sharedCache.js';
 
 const FETCH_TIMEOUT_MS = 8000;
 
@@ -271,6 +272,17 @@ export async function resolveCardImage({ name, set, collection } = {}) {
   const cached = cacheGet(key);
   if (cached !== undefined) return withCardArtCdn(cached);
 
+  // Cross-instance layer (api_cache table): per-instance memory starts empty
+  // on Vercel, so without this every new instance re-hit the rate-limited
+  // upstream card APIs for art another instance had already resolved. Values
+  // are wrapped as { v } so a cached negative ({ v: null }) is distinct from
+  // a cache miss (null).
+  const shared = await sharedCacheGet(`cardart:${key}`);
+  if (shared && typeof shared === 'object' && 'v' in shared) {
+    cacheSet(key, shared.v, shared.v ? CACHE_TTL_MS : NEGATIVE_TTL_MS);
+    return withCardArtCdn(shared.v);
+  }
+
   const parsed = parseCard(rawName);
   if (!parsed.name) {
     cacheSet(key, null, NEGATIVE_TTL_MS);
@@ -286,6 +298,7 @@ export async function resolveCardImage({ name, set, collection } = {}) {
       else if (api === 'yugioh') result = await resolveYugioh(parsed.name);
       if (result) {
         cacheSet(key, result, CACHE_TTL_MS); // cache canonical upstream URLs
+        await sharedCacheSet(`cardart:${key}`, { v: result }, CACHE_TTL_MS);
         return withCardArtCdn(result);
       }
     } catch (err) {
@@ -300,7 +313,10 @@ export async function resolveCardImage({ name, set, collection } = {}) {
   // Only cache a negative when every upstream was actually reachable and simply
   // had no match. Caching a null after a transient failure would blank this
   // card's art until the TTL expired, so leave it uncached to retry next time.
-  if (!transient) cacheSet(key, null, NEGATIVE_TTL_MS);
+  if (!transient) {
+    cacheSet(key, null, NEGATIVE_TTL_MS);
+    await sharedCacheSet(`cardart:${key}`, { v: null }, NEGATIVE_TTL_MS);
+  }
   return null;
 }
 

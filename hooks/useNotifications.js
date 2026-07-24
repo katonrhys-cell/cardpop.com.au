@@ -43,13 +43,24 @@ export const useNotifications = () => {
     fetchRef.current = run;
     run();
 
+    // Apply realtime payloads to local state instead of refetching all 50
+    // rows per event — markAllRead updates N rows, which fires N UPDATE
+    // events; refetching per event turned one click into N full re-reads.
     const channel = supabase
       .channel(`notifications-${uid}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${uid}` },
-        () => fetchRef.current?.()
+        (payload) => {
+          if (cancelled || !payload.new) return;
+          setNotifications(prev => prev.some(n => n.id === payload.new.id)
+            ? prev
+            : [payload.new, ...prev].slice(0, 50));
+        }
       )
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'notifications', filter: `user_id=eq.${uid}` },
-        () => fetchRef.current?.()
+        (payload) => {
+          if (cancelled || !payload.new) return;
+          setNotifications(prev => prev.map(n => n.id === payload.new.id ? { ...n, ...payload.new } : n));
+        }
       )
       .subscribe();
 

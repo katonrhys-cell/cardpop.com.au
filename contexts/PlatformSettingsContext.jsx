@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import apiServerClient from '@/lib/apiServerClient.js';
 
 // Runtime platform settings (feature flags, maintenance switch, listing-form
@@ -32,8 +32,11 @@ export const PlatformSettingsProvider = ({ children }) => {
     return () => { cancelled = true; };
   }, []);
 
+  // Memoized so provider re-renders don't hand consumers a fresh reference.
+  const value = useMemo(() => ({ settings, loading }), [settings, loading]);
+
   return (
-    <PlatformSettingsContext.Provider value={{ settings, loading }}>
+    <PlatformSettingsContext.Provider value={value}>
       {children}
     </PlatformSettingsContext.Provider>
   );

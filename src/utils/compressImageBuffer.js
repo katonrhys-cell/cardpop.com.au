@@ -1,5 +1,22 @@
-import sharp from 'sharp';
 import logger from './logger.js';
+
+// sharp is loaded lazily, mirroring getSharp() in imageProcessor.js: it's a
+// native module whose binary loads at import time, and this file is reached
+// from routes/index.js — a top-level import would put sharp on EVERY cold
+// start of the serverless function (and a binary-load failure would crash the
+// whole app rather than just image handling).
+let _sharpPromise = null;
+function getSharp() {
+  if (!_sharpPromise) {
+    _sharpPromise = import('sharp')
+      .then(mod => mod.default ?? mod)
+      .catch(err => {
+        _sharpPromise = null; // let a later call retry
+        throw err;
+      });
+  }
+  return _sharpPromise;
+}
 
 // Server-side counterpart to utils/compressImage.js (which is browser/canvas based).
 // Used for images that reach the backend as Buffers — e.g. AI/OCR scan uploads,
@@ -31,6 +48,7 @@ export async function compressImageBuffer(buffer, mimetype, options = {}) {
   }
 
   try {
+    const sharp = await getSharp();
     const pipeline = sharp(buffer, { failOn: 'none' })
       .rotate() // bake in EXIF orientation
       .resize({ width: maxEdge, height: maxEdge, fit: 'inside', withoutEnlargement: true });
