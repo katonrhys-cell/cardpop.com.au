@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -185,17 +185,22 @@ const MarketplacePage = () => {
     (filterSet ? getSubsetsBySet(filterSet) : getAllSubsets()).then(setSubsetOpts);
   }, [filterSet, getSubsetsBySet, getAllSubsets]);
 
-  // Group sets by series when scoped to a franchise; by franchise when unscoped
-  const groupedSets = setOpts.reduce((acc, s) => {
-    const g = (filterFranchise ? s.series : allNames[s.category_id]) || 'Other';
-    if (!acc[g]) acc[g] = [];
-    acc[g].push(s);
-    return acc;
-  }, {});
-  const seriesGroups = Object.entries(groupedSets).sort(([a], [b]) => a.localeCompare(b));
+  // Group sets by series when scoped to a franchise; by franchise when unscoped.
+  // Memoized: these run over the FULL unscoped option lists, and this
+  // component re-renders on every search keystroke — without memoization the
+  // grouping/sorting re-ran per keypress.
+  const seriesGroups = useMemo(() => {
+    const groupedSets = setOpts.reduce((acc, s) => {
+      const g = (filterFranchise ? s.series : allNames[s.category_id]) || 'Other';
+      if (!acc[g]) acc[g] = [];
+      acc[g].push(s);
+      return acc;
+    }, {});
+    return Object.entries(groupedSets).sort(([a], [b]) => a.localeCompare(b));
+  }, [setOpts, filterFranchise, allNames]);
 
   // Group an unscoped option list by its franchise name for readability
-  const groupByFranchise = (opts) => {
+  const groupByFranchise = useCallback((opts) => {
     const acc = {};
     opts.forEach(o => {
       const g = allNames[o.franchise_id] || 'Other';
@@ -203,7 +208,10 @@ const MarketplacePage = () => {
       acc[g].push(o);
     });
     return Object.entries(acc).sort(([a], [b]) => a.localeCompare(b));
-  };
+  }, [allNames]);
+  const mfrGroups      = useMemo(() => groupByFranchise(mfrOpts),      [groupByFranchise, mfrOpts]);
+  const teamGroups     = useMemo(() => groupByFranchise(teamOpts),     [groupByFranchise, teamOpts]);
+  const parallelGroups = useMemo(() => groupByFranchise(parallelOpts), [groupByFranchise, parallelOpts]);
 
   // Map the "Any …" sentinel back to an empty filter value
   const clearable = (setter) => (v) => setter(v === ANY ? '' : v);
@@ -334,7 +342,12 @@ const MarketplacePage = () => {
     return parts.length ? `Filtering by: ${parts.join(' › ')}` : null;
   };
 
-  const breadcrumbText = getBreadcrumb();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- getBreadcrumb reads only the deps listed
+  const breadcrumbText = useMemo(() => getBreadcrumb(), [
+    setOpts, mfrOpts, teamOpts, franchiseOpts, parallelOpts, subsetOpts, catNames,
+    filterSet, filterMfr, filterTeam, filterFranchise, filterCat, filterParallel,
+    filterSubset, filterPlayer,
+  ]);
   const hasActiveFilters = filterCat || filterFranchise || filterMfr || filterTeam || filterSet || filterParallel || filterSubset || filterPlayer || filterMode !== 'All' || filterRookie || search || minPrice || maxPrice;
 
   return (
@@ -472,7 +485,7 @@ const MarketplacePage = () => {
                   <SelectItem value={ANY}>Any manufacturer</SelectItem>
                   {filterFranchise
                     ? mfrOpts.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)
-                    : <GroupedSelectItems groups={groupByFranchise(mfrOpts)} />}
+                    : <GroupedSelectItems groups={mfrGroups} />}
                 </SelectContent>
               </Select>
 
@@ -485,7 +498,7 @@ const MarketplacePage = () => {
                   <SelectItem value={ANY}>Any team</SelectItem>
                   {filterFranchise
                     ? teamOpts.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)
-                    : <GroupedSelectItems groups={groupByFranchise(teamOpts)} />}
+                    : <GroupedSelectItems groups={teamGroups} />}
                 </SelectContent>
               </Select>
 
@@ -522,7 +535,7 @@ const MarketplacePage = () => {
                         </SelectItem>
                       ))
                     : <GroupedSelectItems
-                        groups={groupByFranchise(parallelOpts)}
+                        groups={parallelGroups}
                         getItemLabel={p => `${p.name}${p.print_run ? ` /${p.print_run}` : ''}`}
                       />}
                 </SelectContent>

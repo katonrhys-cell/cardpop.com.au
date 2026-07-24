@@ -222,7 +222,7 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
             >
               <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
                 {sellerObj?.avatar_url ? (
-                  <img src={toCdnUrl(sellerObj.avatar_url)} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" width="32" height="32" decoding="async" />
+                  <img src={toCdnUrl(sellerObj.avatar_url)} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" width="32" height="32" loading="lazy" decoding="async" />
                 ) : (
                   (sellerObj?.display_name || sellerObj?.username || 'S')[0].toUpperCase()
                 )}

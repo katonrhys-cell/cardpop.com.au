@@ -444,11 +444,72 @@ export const AuthProvider = ({ children }) => {
     [currentUser, profile],
   );
 
-  const value = {
+  // The auth functions above are re-created each render (they close over the
+  // latest state). Handing them to consumers through a ref + once-created
+  // wrappers gives them a PERMANENTLY stable identity without ever calling a
+  // stale closure — which lets `value` below memoize on data fields alone.
+  const fnsRef = useRef({});
+  fnsRef.current = {
+    signup,
+    login,
+    logout,
+    verifyMFACode,
+    enrollTOTP,
+    confirmTOTP,
+    unenrollTOTP,
+    listMFAFactors,
+    resendVerificationEmail,
+    resetPassword,
+    updatePassword,
+    refetchProfile: async () => {
+      if (session?.user?.id) {
+        const p = await fetchProfile(session.user.id);
+        if (isMounted.current) {
+          if (p) loadedProfileUserRef.current = session.user.id;
+          setProfile(p);
+        }
+      }
+    },
+  };
+  const stableFns = useMemo(() => {
+    const wrap = (name) => (...args) => fnsRef.current[name](...args);
+    return {
+      signup: wrap('signup'),
+      login: wrap('login'),
+      logout: wrap('logout'),
+      requestOTP:   async () => { throw new Error('OTP auth not supported — use email/password.'); },
+      requestMFA:   async () => { throw new Error('Use Supabase MFA.'); },
+      loginWithOTP: async () => { throw new Error('Use Supabase MFA.'); },
+      verifyMFACode: wrap('verifyMFACode'),
+      enrollTOTP: wrap('enrollTOTP'),
+      confirmTOTP: wrap('confirmTOTP'),
+      unenrollTOTP: wrap('unenrollTOTP'),
+      listMFAFactors: wrap('listMFAFactors'),
+      resendVerificationEmail: wrap('resendVerificationEmail'),
+      resetPassword: wrap('resetPassword'),
+      updatePassword: wrap('updatePassword'),
+      refetchProfile: wrap('refetchProfile'),
+    };
+  }, []);
+
+  // Keep loading until the MFA assurance level for the current user is known,
+  // so ProtectedRoute never flashes protected content before the check lands.
+  // Keyed per user (not per token) so a background token refresh on tab
+  // refocus doesn't flip loading and unmount every guarded route.
+  const effectiveLoading = loading || (!!session && checkedUserId !== session.user?.id);
+
+  // Memoized so a AuthProvider re-render that changes nothing consumers read
+  // (e.g. the token-refresh listener firing on tab refocus with the same
+  // session object) doesn't hand every useAuth() consumer a fresh reference
+  // and re-render the whole tree. trialEndsAt is a derived Date (new identity
+  // each render) — its dep is covered by `profile`; the derived primitives
+  // (trialActive/trialDaysLeft) dep directly so an in-session flip still
+  // propagates.
+  const value = useMemo(() => ({
     currentUser: mergedUser,
     profile,
     session,
-    authToken:       session?.access_token ?? null,
+    authToken: session?.access_token ?? null,
     // A session with an outstanding MFA challenge (AAL1 while a verified factor
     // exists) does not count as authenticated.
     isAuthenticated: !!session && !mfaRequired,
@@ -470,36 +531,16 @@ export const AuthProvider = ({ children }) => {
     trialActive,
     trialEndsAt,
     trialDaysLeft,
-    // Keep loading until the MFA assurance level for the current user is known,
-    // so ProtectedRoute never flashes protected content before the check lands.
-    // Keyed per user (not per token) so a background token refresh on tab
-    // refocus doesn't flip loading and unmount every guarded route.
-    loading: loading || (!!session && checkedUserId !== session.user?.id),
+    loading: effectiveLoading,
     profileLoading,
-    signup,
-    login,
-    logout,
-    requestOTP:             async () => { throw new Error('OTP auth not supported — use email/password.'); },
-    requestMFA:             async () => { throw new Error('Use Supabase MFA.'); },
-    loginWithOTP:           async () => { throw new Error('Use Supabase MFA.'); },
-    verifyMFACode,
-    enrollTOTP,
-    confirmTOTP,
-    unenrollTOTP,
-    listMFAFactors,
-    resendVerificationEmail,
-    resetPassword,
-    updatePassword,
-    refetchProfile: async () => {
-      if (session?.user?.id) {
-        const p = await fetchProfile(session.user.id);
-        if (isMounted.current) {
-          if (p) loadedProfileUserRef.current = session.user.id;
-          setProfile(p);
-        }
-      }
-    },
-  };
+    ...stableFns,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [
+    mergedUser, profile, session, mfaRequired, isAdmin, isVerified,
+    isIdentityVerified, hasSavedCard, canSell, plan, isPro, subscriptionTier,
+    subscriptionStatus, trialActive, trialDaysLeft, effectiveLoading,
+    profileLoading, stableFns,
+  ]);
 
   return (
     <AuthContext.Provider value={value}>
