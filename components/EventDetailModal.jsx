@@ -26,7 +26,7 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
           <DialogDescription>Full details for {eventTitle}</DialogDescription>
         </DialogHeader>
 
-        <div className="relative h-72 w-full bg-muted flex items-center justify-center overflow-hidden shrink-0">
+        <div className="relative h-72 w-full bg-muted flex items-center justify-center overflow-hidden shrink-0 mt-8 rounded-t-lg">
           {imageUrl ? (
             <img src={imageUrl} alt={eventTitle} className="object-contain w-full h-full" />
           ) : (
