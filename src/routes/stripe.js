@@ -4,6 +4,7 @@ import stripe from '../utils/stripeClient.js';
 import logger from '../utils/logger.js';
 import { supabase } from '../utils/supabaseClient.js';
 import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
+import { requireAdmin } from '../middleware/requireAal2.js';
 import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
 import { handleDisputeCreated, handleDisputeClosed } from '../services/disputeService.js';
 import { calculateBreakdown } from '../services/commissionService.js';
@@ -689,7 +690,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 // Admin-only: processes an approved refund request against Stripe.
 // Calculates retained fee server-side; never trusts client-supplied amounts.
 
-router.post('/refund', authMiddleware, validateRequestBody(processRefundSchema), processRefund);
+router.post('/refund', authMiddleware, requireAdmin, validateRequestBody(processRefundSchema), processRefund);
 
 // ─── Identity verification (Stripe Identity, embedded in signup) ─────────────
 
