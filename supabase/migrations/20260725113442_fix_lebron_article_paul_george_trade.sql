@@ -44,6 +44,7 @@ insert into public.blog_articles (
   <span class="section-label">Key Takeaways</span>
   <ul>
     <li>Philadelphia already has a ready-made contending core in Joel Embiid, Tyrese Maxey and Jaylen Brown &mdash; LeBron wouldn&rsquo;t have to carry the offence alone</li>
+    <li>Newly acquired Jaylen Brown may be the biggest drawcard of all &mdash; a Finals MVP two-way wing in his prime who takes the hardest assignments off LeBron&rsquo;s shoulders</li>
     <li>Tyrese Maxey is a near-perfect running mate for a playmaking LeBron: speed, transition scoring and off-ball shooting</li>
     <li>LeBron has elevated elite big men better than almost anyone &mdash; a pairing with Embiid could be one of the league&rsquo;s toughest matchups</li>
     <li>Health, salary-cap gymnastics and timing are the three obstacles standing in the way</li>
@@ -93,6 +94,20 @@ insert into public.blog_articles (
 </div>
 
 <p>Few backcourt partners in the NBA seem as naturally compatible with LeBron&rsquo;s style. Maxey thrives on the exact reads &mdash; drive-and-kick, early offence, catch-and-shoot &mdash; that LeBron has generated for role players his entire career.</p>
+
+<h2 id="brown">Jaylen Brown Is the Drawcard</h2>
+
+<p>If one player makes Philadelphia genuinely tempting for LeBron, it&rsquo;s Jaylen Brown. The Sixers&rsquo; July blockbuster didn&rsquo;t just replace Paul George &mdash; it swapped an injury-hit veteran for a 2024 Finals MVP squarely in his prime, and in doing so it changed the calculus of the entire destination.</p>
+
+<div class="not-prose bg-muted/40 border border-border rounded-xl p-5 my-6">
+  <ul class="space-y-1.5 text-sm text-muted-foreground list-disc list-inside">
+    <li>An elite two-way wing who takes the toughest perimeter assignment every night &mdash; the exact burden a 41-year-old LeBron shouldn&rsquo;t be carrying</li>
+    <li>A proven big-game scorer who has already closed out an NBA Finals</li>
+    <li>Durability and physicality that hold up deep into the playoffs, when it matters most</li>
+  </ul>
+</div>
+
+<p>Every late-career LeBron team has needed a second star who can win the hardest matchup on both ends. Brown is precisely that profile &mdash; and unlike most of LeBron&rsquo;s past co-stars, he arrives with a championship and a Finals MVP already on his resume. For a player choosing his final chapter, joining a wing of Brown&rsquo;s calibre isn&rsquo;t a compromise. It&rsquo;s the pitch.</p>
 
 <h2 id="embiid">Joel Embiid Could Finally Have the Playmaker He&rsquo;s Needed</h2>
 
@@ -210,7 +225,7 @@ $article$,
   'Could LeBron James finish his legendary NBA career with the Philadelphia 76ers? CardPop analyzes why the Sixers may be the perfect dark horse destination, the odds of it happening, and what it could mean for collectors.',
   3,
   'impact',
-  7,
+  8,
   $faqs$[
     {
       "question": "Is LeBron James actually going to sign with the Philadelphia 76ers?",
