@@ -23,6 +23,19 @@ describe('grading-verification route registration', () => {
   });
 });
 
+// Guards against the reports router silently not being wired into
+// routes/index.js (it was fully implemented but never mounted, so every
+// content-report submission and the admin moderation queue 404'd). An
+// unauthenticated POST should reach the router's own authMiddleware (401),
+// not the app-level "Route not found" 404.
+describe('reports route registration', () => {
+  it('is mounted (auth 401, not a catch-all 404)', async () => {
+    const res = await request(app).post('/reports').send({});
+    expect(res.status).not.toBe(404);
+    expect(res.body.error).not.toBe('Route not found');
+  });
+});
+
 describe('request body size limit', () => {
   const bigJson = { blob: 'x'.repeat(300 * 1024) }; // ~300 KB > 256 KB default
 

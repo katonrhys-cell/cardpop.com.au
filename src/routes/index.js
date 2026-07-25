@@ -41,6 +41,7 @@ import walletRouter from './wallet.js';
 import refundsRouter from './refunds.js';
 import adminRouter from './admin.js';
 import settingsRouter from './settings.js';
+import reportsRouter from './reports.js';
 
 const router = Router();
 
@@ -203,6 +204,12 @@ export default () => {
     // limits). No auth — read by every client, including logged-out visitors.
     router.use('/settings', apiLimiter);
     router.use('/settings', settingsRouter);
+
+    // Content reports: POST / (user submits a scam/counterfeit report),
+    // GET / + PATCH /:id (admin triage). The router carries its own
+    // authMiddleware / requireAdmin / reportLimiter.
+    router.use('/reports', apiLimiter);
+    router.use('/reports', reportsRouter);
 
     // Trade routes with email verification middleware
     // Apply auth middleware first, then trade access verification
