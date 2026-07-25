@@ -6,22 +6,28 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 
 const ModerationPanel = ({ listing, onUpdate }) => {
-  const [notes, setNotes] = useState(listing?.moderationNotes || '');
+  const [notes, setNotes] = useState(listing?.flag_reason || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Moderation acts on the `listings` row: `flagged`/`flag_reason` hold the
+  // moderation state, and archiving removes the listing from the marketplace.
+  const persist = async (updatedData) => {
+    const { data: updated, error } = await supabase
+      .from('listings')
+      .update(updatedData)
+      .eq('id', listing.id)
+      .select('*, vault_item:vault_items(card_name, set_name, card_image, card_images, category_id, condition, grade)')
+      .single();
+    if (error || !updated) throw (error || new Error('No row updated'));
+    return updated;
+  };
 
   const handleSaveNotes = async () => {
     if (!listing?.id) return;
     setIsSubmitting(true);
     try {
-      const { data: updated, error } = await supabase
-        .from('set_cards')
-        .update({ moderationNotes: notes })
-        .eq('id', listing.id)
-        .select()
-        .single();
-      if (error || !updated) throw (error || new Error('No row updated'));
-
-      toast.success('Moderation notes updated successfully');
+      const updated = await persist({ flagged: true, flag_reason: notes || null });
+      toast.success('Listing flagged for moderation');
       if (onUpdate) onUpdate(updated);
     } catch (error) {
       console.error('Failed to update notes:', error);
@@ -34,27 +40,21 @@ const ModerationPanel = ({ listing, onUpdate }) => {
   const handleQuickAction = async (action) => {
     if (!listing?.id) return;
     setIsSubmitting(true);
-    
+
     try {
       let updatedData = {};
       let msg = '';
-      
+
       if (action === 'suspend') {
-        updatedData = { stockQuantity: 0, moderationNotes: `[SUSPENDED] ${notes}` };
-        msg = 'Listing suspended (stock set to 0)';
+        updatedData = { status: 'archived' };
+        msg = 'Listing suspended (removed from marketplace)';
       } else if (action === 'clear') {
-        updatedData = { moderationNotes: '' };
+        updatedData = { flagged: false, flag_reason: null };
         setNotes('');
-        msg = 'Moderation notes cleared';
+        msg = 'Moderation flag cleared';
       }
 
-      const { data: updated, error } = await supabase
-        .from('set_cards')
-        .update(updatedData)
-        .eq('id', listing.id)
-        .select()
-        .single();
-      if (error || !updated) throw (error || new Error('No row updated'));
+      const updated = await persist(updatedData);
       toast.success(msg);
       if (onUpdate) onUpdate(updated);
     } catch (error) {
@@ -78,28 +78,28 @@ const ModerationPanel = ({ listing, onUpdate }) => {
       </div>
 
       <div className="space-y-3">
-        <label className="text-sm font-medium">Moderation Notes / Audit Trail</label>
-        <Textarea 
-          placeholder="Add internal notes, violation details, or review comments..."
+        <label className="text-sm font-medium">Flag Reason / Audit Trail</label>
+        <Textarea
+          placeholder="Add violation details or review comments — saving flags the listing..."
           className="min-h-[150px] resize-none bg-background text-foreground"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
         />
         <div className="flex gap-3 justify-end mt-4">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => handleQuickAction('clear')}
-            disabled={isSubmitting || !notes}
+            disabled={isSubmitting || (!listing?.flagged && !notes)}
           >
-            Clear Notes
+            Clear Flag
           </Button>
-          <Button 
+          <Button
             onClick={handleSaveNotes}
-            disabled={isSubmitting || notes === listing?.moderationNotes}
+            disabled={isSubmitting || (listing?.flagged && notes === (listing?.flag_reason || ''))}
             className="gap-2"
           >
             {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-            Save Notes
+            Flag Listing
           </Button>
         </div>
       </div>
@@ -107,14 +107,14 @@ const ModerationPanel = ({ listing, onUpdate }) => {
       <div className="border-t border-border pt-6">
         <h4 className="text-sm font-medium mb-3">Quick Actions</h4>
         <div className="flex flex-wrap gap-3">
-          <Button 
-            variant="destructive" 
+          <Button
+            variant="destructive"
             onClick={() => handleQuickAction('suspend')}
-            disabled={isSubmitting || listing?.stockQuantity === 0}
+            disabled={isSubmitting || listing?.status === 'archived'}
             className="gap-2"
           >
             <AlertCircle className="w-4 h-4" />
-            Suspend (Set Out of Stock)
+            Suspend (remove from marketplace)
           </Button>
         </div>
       </div>
