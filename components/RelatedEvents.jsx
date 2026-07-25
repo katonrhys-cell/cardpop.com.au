@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
 import EventCard from '@/components/EventCard.jsx';
+import { toLocalDateStr } from '@/lib/eventSeo.js';
 
 const RelatedEvents = ({ currentEventId, currentState }) => {
   const [relatedEvents, setRelatedEvents] = useState([]);
@@ -10,7 +11,7 @@ const RelatedEvents = ({ currentEventId, currentState }) => {
 
     const fetchRelated = async () => {
       try {
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = toLocalDateStr(new Date());
         let query = supabase
           .from('events_public')
           .select('*')

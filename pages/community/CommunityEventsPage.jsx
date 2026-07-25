@@ -13,20 +13,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { SITE_URL, EVENT_TYPE_LABELS, buildEventListJsonLd } from '@/lib/eventSeo.js';
+import { SITE_URL, EVENT_TYPE_LABELS, buildEventListJsonLd, parseDate, toLocalDateStr } from '@/lib/eventSeo.js';
 
 const AU_STATES = ['NSW', 'VIC', 'QLD', 'SA', 'WA', 'TAS', 'NT', 'ACT'];
 const EVENT_TYPES = Object.entries(EVENT_TYPE_LABELS).map(([value, label]) => ({ value, label }));
 
-// Local-time YYYY-MM-DD. toISOString() is UTC, so for Australian users (UTC+10/11)
-// it returns *yesterday* between local midnight and ~10-11am — pushing finished
-// events into "today" and the upcoming list. Format from local date parts instead.
-const toLocalDateStr = (d) => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-};
 const todayStr = toLocalDateStr(new Date());
 const nextYearStr = toLocalDateStr(new Date(Date.now() + 365 * 24 * 60 * 60 * 1000));
 
@@ -162,8 +153,8 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
       const matchState = filterState === 'all' || e.state === filterState;
       const matchType = filterType === 'all' || e.event_type === filterType;
 
-      const eventDate = e.start_date ? new Date(e.start_date) : null;
-      const matchStart = !startDate || !eventDate || eventDate >= new Date(startDate);
+      const eventDate = e.start_date ? parseDate(e.start_date) : null;
+      const matchStart = !startDate || !eventDate || eventDate >= parseDate(startDate);
       const matchEnd = !endDate || !eventDate || eventDate <= new Date(endDate + 'T23:59:59');
 
       return matchSearch && matchState && matchType && matchStart && matchEnd;
@@ -173,7 +164,8 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
   const groupedEvents = useMemo(() => {
     const groups = {};
     filteredEvents.forEach(event => {
-      const key = event.start_date ? format(new Date(event.start_date), 'MMMM yyyy') : 'Date TBA';
+      const parsed = event.start_date ? parseDate(event.start_date) : null;
+      const key = parsed ? format(parsed, 'MMMM yyyy') : 'Date TBA';
       if (!groups[key]) groups[key] = [];
       groups[key].push(event);
     });

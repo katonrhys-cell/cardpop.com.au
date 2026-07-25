@@ -75,17 +75,20 @@ const EventScraperPanel = ({ isOpen, onClose, onSaved }) => {
           if (trimmedLine.startsWith('data:')) {
             const dataStr = trimmedLine.substring(5).trim();
             if (!dataStr) continue;
-            
+
+            // Parse in its own try/catch so a genuine server error event isn't
+            // swallowed by the "skip non-JSON line" catch — otherwise the admin
+            // only ever sees the generic "no data extracted" message instead of
+            // the real validation/stream error the backend sent.
+            let data;
             try {
-              const data = JSON.parse(dataStr);
-              if (data.error) {
-                throw new Error(data.error);
-              }
-              if (data.success && data.eventData) {
-                extractedData = data.eventData;
-              }
-            } catch (err) {
-              // Silently skip non-JSON SSE lines (e.g. [DONE] from the AI proxy)
+              data = JSON.parse(dataStr);
+            } catch {
+              continue; // non-JSON SSE line (e.g. [DONE] from the AI proxy)
+            }
+            if (data.error) throw new Error(data.error);
+            if (data.success && data.eventData) {
+              extractedData = data.eventData;
             }
           }
         }
