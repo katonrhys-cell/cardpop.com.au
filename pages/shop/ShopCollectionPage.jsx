@@ -102,6 +102,10 @@ const ShopCollectionPage = () => {
   const [productsError, setProductsError] = useState(null);
   const [page, setPage] = useState(1);
   const [totalProducts, setTotalProducts] = useState(0);
+  // Whether the last page came back full — the trap-proof "is there more?" signal.
+  // totalProducts is an estimate (count: 'estimated') and can't gate Load More
+  // without leaving a stuck button (over-estimate) or hiding rows (under-estimate).
+  const [hasMore, setHasMore] = useState(false);
   const [sort, setSort] = useState('newest');
   const [seoExpanded, setSeoExpanded] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -201,6 +205,7 @@ const ShopCollectionPage = () => {
       const mapped = (data || []).map((p) => ({ ...p, source: 'shop', type: 'shop' }));
       setProducts(nextPage === 1 ? mapped : (prev) => [...prev, ...mapped]);
       setTotalProducts(count || 0);
+      setHasMore(mapped.length === PER_PAGE);
       setPage(nextPage);
     } catch {
       if (isCurrent()) setProductsError('Failed to load products. Please try again.');
@@ -490,7 +495,7 @@ const ShopCollectionPage = () => {
                 onAddToCart={handleAddToCart}
               />
 
-              {products.length < totalProducts && (
+              {hasMore && (
                 <div className="flex justify-center mt-10">
                   <Button
                     variant="outline"

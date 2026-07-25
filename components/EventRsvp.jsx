@@ -75,7 +75,7 @@ const EventRsvp = ({ event, variant = 'detail', className = '', rsvpData = null 
   const handleRsvp = async (role) => {
     if (!isAuthenticated) {
       toast('Sign in to RSVP', { description: 'Create a free account to register for this event.' });
-      navigate('/login', { state: { from: window.location.pathname } });
+      navigate('/login', { state: { from: { pathname: window.location.pathname } } });
       return;
     }
     if (saving) return;

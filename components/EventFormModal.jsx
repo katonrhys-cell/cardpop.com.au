@@ -142,6 +142,10 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
   useEffect(() => {
     if (!isOpen) return;
 
+    // Guards the async scraped-image fetch below: if the modal closes or the
+    // form is reset before it resolves, we must not resurrect the image.
+    let cancelled = false;
+
     if (scrapedData) {
       setFormData({
         ...INITIAL_STATE,
@@ -185,7 +189,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       if (scrapedData.image_url || scrapedData.imageUrl) {
         const imgUrl = scrapedData.image_url || scrapedData.imageUrl;
         fetch(imgUrl).then(r => r.ok ? r.blob() : null).then(blob => {
-          if (!blob) return;
+          if (cancelled || !blob) return;
           const ext = blob.type.split('/')[1] || 'jpg';
           const file = new File([blob], `scraped-event.${ext}`, { type: blob.type });
           setImageFile(file);
@@ -246,6 +250,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
 
     setImageFile(null);
     setRemoveExistingImage(false);
+
+    return () => { cancelled = true; };
   }, [isOpen, event, scrapedData]);
 
   const set = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));

@@ -335,7 +335,11 @@ const MyVaultPage = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {cards.map(renderCard)}
           </div>
-          {totalCount > VAULT_PAGE_SIZE && (
+          {/* totalCount is an estimate (count: 'estimated'), so drive next/prev
+              off whether the current page came back full rather than off exact
+              page math — otherwise an over/under-estimate traps users on empty
+              pages or hides real ones. The estimate is shown as ~approximate. */}
+          {(page > 0 || cards.length === VAULT_PAGE_SIZE) && (
             <div className="flex items-center justify-center gap-4 mt-12">
               <Button
                 variant="outline"
@@ -346,12 +350,13 @@ const MyVaultPage = () => {
                 Previous
               </Button>
               <span className="text-sm font-medium text-muted-foreground tabular-nums">
-                Page {page + 1} of {Math.ceil(totalCount / VAULT_PAGE_SIZE)}
+                Page {page + 1}
+                {totalCount > 0 && ` of ~${Math.max(Math.ceil(totalCount / VAULT_PAGE_SIZE), page + 1)}`}
               </span>
               <Button
                 variant="outline"
                 className="rounded-xl font-bold"
-                disabled={(page + 1) * VAULT_PAGE_SIZE >= totalCount}
+                disabled={cards.length < VAULT_PAGE_SIZE}
                 onClick={() => { setPage(p => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
               >
                 Next

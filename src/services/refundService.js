@@ -111,7 +111,10 @@ export async function processRefund(req, res) {
         const walletCents = parseInt(session.metadata?.walletCents || '0', 10) || 0;
         const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
         if (walletCents > 0 && customerId) {
-          await creditWallet(stripe, customerId, walletCents, `Refund for order ${refund.order_id}`, `wallet-refund-${refundId}`);
+          // Order-scoped idempotency key, matching the card refund above: even
+          // if two refund rows for one order both reach here, the wallet credit
+          // can only be granted once.
+          await creditWallet(stripe, customerId, walletCents, `Refund for order ${refund.order_id}`, `wallet-refund-order-${refund.order_id}`);
           logger.info(`[STRIPE] Restored $${(walletCents / 100).toFixed(2)} wallet credit to customer ${customerId} for refunded order ${refund.order_id}`);
           if (refund.buyer_id) {
             await supabase.from('notifications').insert({
@@ -173,6 +176,8 @@ export async function processRefund(req, res) {
     res.json({ success: true, stripeRefundId: stripeRefund.id, refundAmount, retainedFee });
   } catch (err) {
     logger.error(`[STRIPE] /refund error: ${err.message}`);
-    res.status(500).json({ error: err.message });
+    // Fail closed like the rest of the payment handlers — raw Stripe/DB error
+    // strings stay in the server logs, never in the response body.
+    res.status(500).json({ error: 'Failed to process refund' });
   }
 }

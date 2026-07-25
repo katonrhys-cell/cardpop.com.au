@@ -14,8 +14,11 @@ export const reviewVerificationSchema = z.object({
 
 export const reviewVerificationBodySchema = z.object({
   status: z.enum(['approved', 'rejected', 'suspended', 'revoked', 'info_requested']).optional(),
-  admin_notes: z.string().max(1000, 'Admin notes must be 1000 characters or less').optional(),
-  additional_info_requested: z.string().max(1000, 'Info request must be 1000 characters or less').optional(),
+  // Notes are optional in the UI and sent as `notes.trim() || null`, so the
+  // schema must accept null (z .optional() alone rejects null → 400 whenever an
+  // admin approves/rejects without typing a note).
+  admin_notes: z.string().max(1000, 'Admin notes must be 1000 characters or less').optional().nullable(),
+  additional_info_requested: z.string().max(1000, 'Info request must be 1000 characters or less').optional().nullable(),
   info_request: z.boolean().optional(),
 }).refine(
   (data) => data.info_request || data.status,
@@ -36,7 +39,9 @@ export const processRefundBodySchema = z.object({
 );
 
 export const getDisputesSchema = z.object({
-  status: z.enum(['open', 'all']).optional(),
+  // The admin filter offers the resolved terminal statuses too, and the handler
+  // already branches on them — the enum must allow them or the query 400s.
+  status: z.enum(['open', 'all', 'resolved_released', 'resolved_kept']).optional(),
 });
 
 export const resolveDisputeSchema = z.object({
@@ -45,7 +50,8 @@ export const resolveDisputeSchema = z.object({
 
 export const resolveDisputeBodySchema = z.object({
   action: z.enum(['release', 'keep_frozen']),
-  resolution_notes: z.string().max(1000, 'Resolution notes must be 1000 characters or less').optional(),
+  // Sent as `notes.trim() || null` and labelled optional in the UI — accept null.
+  resolution_notes: z.string().max(1000, 'Resolution notes must be 1000 characters or less').optional().nullable(),
 });
 
 export const setUserStatusSchema = z.object({

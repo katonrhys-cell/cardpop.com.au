@@ -220,18 +220,27 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
           // the marketplace "Make Offer" filter picks it up.
           price_min_aud: selected.needsRange ? Number(rangeMin) : null,
           price_max_aud: selected.needsRange ? Number(rangeMax) : null,
-          ...(selected.needsRange ? { accepts_offers: true } : {}),
+          // Always write the flag (like accepts_trade) — a conditional spread
+          // left accepts_offers=true behind when an EOI listing was switched to
+          // For Sale/Trade, so it kept showing under the marketplace "Make Offer"
+          // filter and accepted offers the seller never opted into.
+          accepts_offers: !!selected.needsRange,
           trade_wants: selected.needsTrade ? (tradeWants.trim() || null) : null,
           listed_at: new Date().toISOString(),
         };
 
-        // Check if an active/non-archived listing already exists for this vault item
-        const { data: existing } = await supabase
+        // Check if an active/non-archived listing already exists for this vault item.
+        // Must check the error: maybeSingle() errors when >1 non-archived row
+        // exists, and a transient failure also yields data=undefined — either
+        // would otherwise fall through to the INSERT branch and create a second
+        // live listing for the same card.
+        const { data: existing, error: existingErr } = await supabase
           .from('listings')
           .select('id')
           .eq('vault_item_id', product.id)
           .neq('status', 'archived')
           .maybeSingle();
+        if (existingErr) throw existingErr;
 
         // Read the status back: the enforce_listing_approval trigger may hold
         // a new listing at 'pending', and the seller needs to know it isn't

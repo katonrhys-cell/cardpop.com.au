@@ -490,13 +490,19 @@ const CollectionPage = () => {
       // franchise_id and the broad group (e.g. Sports) in category_id, while
       // older rows stored the specific id directly in category_id — so match
       // the resolved collection id against EITHER column.
+      // When a subcategory is chosen, narrow the match to it (subcategories are
+      // more specific children of the collection); otherwise match the whole
+      // collection. Both use the same dual-column convention as the add-card
+      // flow (specific id in franchise_id, broad group in category_id).
+      const catMatch = filterSub || categoryId;
+
       let q = supabase.from('listings')
         .select(
           `*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(display_name, username, avatar_url, is_verified)`,
           { count: 'estimated' }
         )
         .eq('status', 'active')
-        .or(`category_id.eq.${categoryId},franchise_id.eq.${categoryId}`, { referencedTable: 'vault_items' })
+        .or(`category_id.eq.${catMatch},franchise_id.eq.${catMatch}`, { referencedTable: 'vault_items' })
         .range(from, from + perPage - 1);
 
       // Era pills carry a short label (e.g. "Topps Chrome") while real set
@@ -530,7 +536,7 @@ const CollectionPage = () => {
     } finally {
       if (isCurrent()) setListingsLoading(false);
     }
-  }, [categoryId, activeEra, filterType, filterCondition, filterVariant, filterSort]);
+  }, [categoryId, activeEra, filterType, filterCondition, filterVariant, filterSort, filterSub]);
 
   useEffect(() => {
     if (categoryId) fetchListings(1);

@@ -3,8 +3,12 @@ import { Plus, Search, Filter, ArrowUpDown, Loader2, MoreHorizontal } from 'luci
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCategories } from '@/hooks/useCategories.js';
-import { formatCurrency } from '@/utils/formatCurrency.js';
 import { toast } from 'sonner';
+
+// listings.price_aud is stored in whole dollars (not cents). The shared
+// utils/formatCurrency helper expects cents + a currency descriptor and returns
+// "" without one, so admin price columns use this plain AUD formatter instead.
+const formatAud = (dollars) => `$${(Number(dollars) || 0).toFixed(2)}`;
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,7 +61,7 @@ const ListingsManagementPage = () => {
       // card name / image / category.
       let query = supabase
         .from('listings')
-        .select('*, vault_item:vault_items!inner(card_name, set_name, card_image, card_images, category_id)', { count: 'exact' })
+        .select('*, vault_item:vault_items!inner(card_name, set_name, card_image, card_images, category_id, condition, grade)', { count: 'exact' })
         .range((page - 1) * 20, page * 20 - 1)
         .order(sortColumn, { ascending });
 
@@ -73,7 +77,7 @@ const ListingsManagementPage = () => {
       setTotalItems(count ?? 0);
 
       if (page === 1) {
-        const { data: allData } = await supabase.from('listings').select('*').order('created_at', { ascending: false }).limit(200);
+        const { data: allData } = await supabase.from('listings').select('*, vault_item:vault_items(card_name, card_image, card_images)').order('created_at', { ascending: false }).limit(200);
         setAllListingsForAnalytics(allData ?? []);
       }
     } catch (error) {
@@ -344,7 +348,7 @@ const ListingsManagementPage = () => {
                         )}
                       </TableCell>
                       <TableCell className="text-right font-medium">
-                        {formatCurrency((listing.price_aud || 0) * 100)}
+                        {formatAud(listing.price_aud)}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>

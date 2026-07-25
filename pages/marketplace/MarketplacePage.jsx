@@ -672,7 +672,12 @@ const MarketplacePage = () => {
                 <MarketplaceListingCard key={`${listing.source}-${listing.id}`} listing={listing} priority={i < 2} />
               ))}
             </div>
-            {totalCount > PAGE_SIZE && (
+            {/* totalCount is an estimate (count: 'estimated'), so it can't drive
+                exact page math without trapping users on empty pages (over-estimate)
+                or hiding real pages (under-estimate). Drive next/prev off whether
+                the current page came back full instead, and show the estimate only
+                as an approximate label. */}
+            {(page > 0 || listings.length === PAGE_SIZE) && (
               <div className="flex items-center justify-center gap-4 mt-12">
                 <Button
                   variant="outline"
@@ -683,12 +688,13 @@ const MarketplacePage = () => {
                   Previous
                 </Button>
                 <span className="text-sm font-medium text-muted-foreground tabular-nums">
-                  Page {page + 1} of {Math.ceil(totalCount / PAGE_SIZE)}
+                  Page {page + 1}
+                  {totalCount > 0 && ` of ~${Math.max(Math.ceil(totalCount / PAGE_SIZE), page + 1)}`}
                 </span>
                 <Button
                   variant="outline"
                   className="rounded-xl font-bold"
-                  disabled={(page + 1) * PAGE_SIZE >= totalCount}
+                  disabled={listings.length < PAGE_SIZE}
                   onClick={() => { setPage(p => p + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 >
                   Next
