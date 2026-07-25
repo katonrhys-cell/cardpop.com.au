@@ -56,9 +56,13 @@ const ShopCategoryPage = () => {
       try {
         const from = (page - 1) * PER_PAGE;
 
+        // Exact count: this page renders numbered page buttons (PaginationControls),
+        // which need an accurate total — an estimated count would render buttons for
+        // empty pages or hide real ones. The active shop catalogue per category is
+        // small, so the exact count is inexpensive.
         let query = supabase
           .from('shop_products')
-          .select('*', { count: 'estimated' })
+          .select('*', { count: 'exact' })
           .eq('status', 'active');
 
         // shop_products stores a free-text category; match the resolved
