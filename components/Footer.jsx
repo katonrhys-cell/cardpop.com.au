@@ -72,7 +72,7 @@ const Footer = () => {
               {settings.enable_marketplace !== false && (
                 <li><Link to="/marketplace" className="hover:text-primary transition-colors">Marketplace</Link></li>
               )}
-              <li><Link to="/analytics" className="hover:text-primary transition-colors">Analytics</Link></li>
+              <li><Link to="/analytics" className="hover:text-primary transition-colors">Prices &amp; Analytics</Link></li>
               <li><Link to="/prices" className="hover:text-primary transition-colors">Card Prices (AUD)</Link></li>
               <li><Link to="/card-shops" className="hover:text-primary transition-colors">Card Shop Directory</Link></li>
               <li><Link to="/events" className="hover:text-primary transition-colors">Events</Link></li>

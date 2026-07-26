@@ -37,6 +37,8 @@ vi.mock('@/lib/supabaseClient.js', () => {
 });
 
 vi.mock('@/components/SEOHead.jsx', () => ({ default: () => null }));
+// Anonymous visitor — saved searches stay hidden
+vi.mock('@/contexts/AuthContext.jsx', () => ({ useAuth: () => ({ currentUser: null }) }));
 vi.mock('@/components/MarketplaceListingCard.jsx', () => ({
   default: ({ listing }) => <div data-testid="listing">{listing.vault_item?.card_name ?? listing.id}</div>,
 }));

@@ -15,7 +15,10 @@ const PUBLIC_SETTINGS = {
   site_name: 'CardPop',
   maintenance_mode: false,
   enable_marketplace: true,
-  enable_trading: true,
+  // Trading defaults OFF: the propose-trade flow isn't built yet, so every
+  // trade surface stays hidden until an admin explicitly switches it on
+  // (Admin → Settings). Flip this default back to true once trading ships.
+  enable_trading: false,
   enable_blog: true,
   max_images_per_listing: 10,
   listing_approval_required: false,

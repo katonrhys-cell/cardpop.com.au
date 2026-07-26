@@ -144,7 +144,9 @@ const InsiderTradingPage = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-background font-sans">
-      <SEOHead title="Insider Trading | CardPop" description="Get insider market intelligence and trading insights for Australian trading card collectors." />
+      {/* Formerly titled "Insider Trading" — renamed: the page is a partner
+          retailer deals directory, and the old name reads as securities fraud. */}
+      <SEOHead title="Partner Deals | CardPop" description="Shop with CardPop's trusted partner retailers and support the platform — deals on trading cards and accessories for Australian collectors." />
 
       {/* Hero Section */}
       <div className="bg-secondary py-16 relative overflow-hidden">
@@ -154,7 +156,7 @@ const InsiderTradingPage = () => {
             <Store className="w-8 h-8 text-primary" />
           </div>
           <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 tracking-tight">
-            Insider Trading
+            Partner Deals
           </h1>
           <p className="text-secondary-foreground/80 text-lg md:text-xl max-w-2xl text-balance">
             Support Card Pop Australia by shopping with our trusted affiliate partners. Get the best deals on premium trading cards and accessories.

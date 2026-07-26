@@ -14,6 +14,7 @@ import { fetchPokemonCardImage } from '@/utils/pokemonCardImage.js';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -169,6 +170,8 @@ const CardAnalyticsPage = () => {
   const [searchParams] = useSearchParams();
   const { slug }      = useParams();
   const navigate      = useNavigate();
+  const { settings }  = usePlatformSettings();
+  const tradingEnabled = settings.enable_trading !== false;
   // Fallback identity parsed from the slug — used only when a crawler or shared
   // link hits the canonical URL with no query params. In-app navigation always
   // passes exact name/set via the query string.
@@ -693,11 +696,13 @@ const CardAnalyticsPage = () => {
           </div>
         </div>
 
-        {/* Tabs: Buy Now / Trade / Sold History / Similar */}
+        {/* Tabs: Buy Now / Trade (flag-gated) / Sold History / Similar */}
         <Tabs defaultValue="buy">
-          <TabsList className="grid grid-cols-2 gap-1 w-full mb-6 h-auto p-1 sm:grid-cols-4 sm:h-12">
+          <TabsList className={`grid grid-cols-2 gap-1 w-full mb-6 h-auto p-1 sm:h-12 ${tradingEnabled ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
             <TabsTrigger value="buy"     className="min-w-0 gap-1.5 py-2 text-xs sm:text-sm"><ShoppingCart className="w-4 h-4 shrink-0" /> <span className="truncate">Buy Now</span></TabsTrigger>
-            <TabsTrigger value="trade"   className="min-w-0 gap-1.5 py-2 text-xs sm:text-sm"><RefreshCw className="w-4 h-4 shrink-0" /> <span className="truncate">For Trade</span></TabsTrigger>
+            {tradingEnabled && (
+              <TabsTrigger value="trade" className="min-w-0 gap-1.5 py-2 text-xs sm:text-sm"><RefreshCw className="w-4 h-4 shrink-0" /> <span className="truncate">For Trade</span></TabsTrigger>
+            )}
             <TabsTrigger value="sold"    className="min-w-0 gap-1.5 py-2 text-xs sm:text-sm"><Clock className="w-4 h-4 shrink-0" /> <span className="truncate">Sold History</span></TabsTrigger>
             <TabsTrigger value="similar" className="min-w-0 gap-1.5 py-2 text-xs sm:text-sm"><Star className="w-4 h-4 shrink-0" /> <span className="truncate">Similar Cards</span></TabsTrigger>
           </TabsList>

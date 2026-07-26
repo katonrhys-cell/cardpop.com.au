@@ -343,10 +343,10 @@ const Header = () => {
                   // Matches the VaultDropdown's h-10 w-10 circular avatar button
                   <div className="h-10 w-10 rounded-full bg-muted animate-pulse" aria-hidden="true" />
                 ) : (
-                  // Matches Login (xl only) + Join Vault button exact widths
+                  // Matches Login + Sign up button exact widths
                   <div className="flex items-center gap-2" aria-hidden="true">
-                    <div className="h-9 w-[57px] rounded-xl bg-muted animate-pulse hidden xl:block" />
-                    <div className="h-9 w-[84px] rounded-xl bg-muted animate-pulse" />
+                    <div className="h-9 w-[57px] rounded-xl bg-muted animate-pulse" />
+                    <div className="h-9 w-[74px] rounded-xl bg-muted animate-pulse" />
                   </div>
                 )
               ) : isAuthenticated ? (
@@ -355,11 +355,14 @@ const Header = () => {
                 </Suspense>
               ) : (
                 <>
-                  <Button asChild variant="ghost" size="sm" className="font-bold hidden xl:inline-flex rounded-xl">
+                  {/* Login visible whenever this auth cluster is (md+) — it was
+                      xl-only, leaving returning users on md–lg screens with no
+                      way in except the signup button. */}
+                  <Button asChild variant="ghost" size="sm" className="font-bold rounded-xl">
                     <Link to="/login">Login</Link>
                   </Button>
                   <Button asChild size="sm" className="font-bold rounded-xl shadow-sm tracking-wide">
-                    <Link to="/signup">Join Vault</Link>
+                    <Link to="/signup">Sign up</Link>
                   </Button>
                 </>
               )}

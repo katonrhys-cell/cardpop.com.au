@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, CheckCircle2, IdCard, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, IdCard, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
@@ -14,6 +14,7 @@ import FeaturedSellerCard from '@/components/FeaturedSellerCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 import { fetchActiveShowcaseCards } from '@/lib/heroShowcase.js';
+import RecentlyViewed from '@/components/RecentlyViewed.jsx';
 
 // NOTE: this page intentionally imports NOTHING from framer-motion. The library
 // costs ~110 kB of JS and ~1.5 s of main-thread execution on a mid-range phone
@@ -84,13 +85,6 @@ const useCountUp = (end, inView, isDecimal = false) => {
 
 
 // ─── Static data ──────────────────────────────────────────────────────────────
-const STATS = [
-  { value: 12400, suffix: '+', label: 'Cards Listed' },
-  { value: 850,   suffix: '+', label: 'Verified Sellers' },
-  { value: 3200,  suffix: '+', label: 'Trades Completed' },
-  { value: 4.9,   suffix: '★', label: 'Average Rating', isDecimal: true },
-];
-
 const TRUST_SIGNALS = [
   {
     icon: ShieldCheck,
@@ -127,20 +121,6 @@ const HOW_IT_WORKS = [
     title: 'Trade Safely',
     desc: 'Pay securely through Stripe and shop with our 14-day Buyer Protection — a full refund if your item never arrives or isn\'t as described.',
   },
-];
-
-// Illustrative sample activity — representative of the kinds of trades that
-// happen on CardPop, not a live event log. Rendered without timestamps or a
-// "live" label so it never reads as real-time truth.
-const ACTIVITY_FEED = [
-  { user: '@PokeTrader_SYD',   action: 'sold a PSA 10 Charizard Base Set',    price: '$2,400' },
-  { user: '@MTG_Melbourne',    action: 'listed a Dual Land Alpha',             price: '$5,200' },
-  { user: '@SportsCardsBris',  action: 'completed a trade — Rookie Gretzky',  price: '$950'   },
-  { user: '@PokeFan_Perth',    action: 'sold a Shadowless Blastoise',          price: '$620'   },
-  { user: '@CardKing_ADE',     action: 'listed 3× PSA 9 Venusaur',            price: '$1,100' },
-  { user: '@YuGiOh_GLD',       action: 'sold a Dark Magician 1st Edition',    price: '$340'   },
-  { user: '@LorcanaMaster',    action: 'completed trade — Rare Sorcerers',    price: '$210'   },
-  { user: '@BrisbaneBaller',   action: 'sold a 2023 Panini LeBron SSP',       price: '$480'   },
 ];
 
 // ─── Hero floating card shapes ────────────────────────────────────────────────
@@ -221,6 +201,9 @@ const HomePage = () => {
   const [featuredSellers, setFeaturedSellers] = useState([]);
   const [loading, setLoading]                 = useState(true);
   const [heroCards, setHeroCards]             = useState(HERO_CARDS);
+  // Real platform counts — null until loaded; the strip renders nothing rather
+  // than invented numbers if the query fails or the counts are still small.
+  const [platformStats, setPlatformStats]     = useState(null);
 
   const DESK_VISIBLE = 8;
   const total = CATEGORIES.length;
@@ -258,11 +241,15 @@ const HomePage = () => {
     else if (deskPos < 0)  { setDeskInstant(true); setDeskPos(p => p + total); }
   };
 
-  const [tickerIdx, setTickerIdx] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setTickerIdx(i => (i + 1) % ACTIVITY_FEED.length), 4000);
-    return () => clearInterval(id);
-  }, []);
+  // Stats strip entries — only metrics that have real, non-zero counts.
+  const statItems = platformStats
+    ? [
+        { value: platformStats.listings,   label: 'Live Listings' },
+        { value: platformStats.vaultCards, label: 'Cards in Member Vaults' },
+        { value: platformStats.sellers,    label: 'Verified Members' },
+        { value: platformStats.events,     label: 'Events Listed' },
+      ].filter((s) => s.value > 0)
+    : [];
 
   const [statsRef, statsInView] = useRevealOnce('-80px');
   const [categoriesRef, categoriesInView] = useRevealOnce('0px');
@@ -329,6 +316,31 @@ const HomePage = () => {
             5 * 60 * 1000
           ),
         ]);
+
+        // Real platform counts for the stats strip (cheap head-count queries,
+        // RLS-scoped so anon sees only what's public anyway). Best-effort: a
+        // failure just leaves the strip hidden.
+        cachedQuery('homepage_stats', async () => {
+          const [listings, sellers, vaultCards, events] = await Promise.all([
+            supabase.from('listings').select('id', { count: 'exact', head: true }).eq('status', 'active'),
+            supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('is_verified', true),
+            supabase.from('vault_items').select('id', { count: 'exact', head: true }),
+            supabase.from('events_public').select('id', { count: 'exact', head: true }),
+          ]);
+          const error = listings.error || sellers.error || vaultCards.error || events.error;
+          if (error) return { data: null, error };
+          return {
+            data: {
+              listings: listings.count || 0,
+              sellers: sellers.count || 0,
+              vaultCards: vaultCards.count || 0,
+              events: events.count || 0,
+            },
+            error: null,
+          };
+        }, 5 * 60 * 1000)
+          .then((res) => { if (isMounted && res?.data) setPlatformStats(res.data); })
+          .catch(() => { /* strip stays hidden */ });
 
         // Supabase resolves with { data, error } instead of throwing — an
         // unlogged error here renders the empty state with no trace, which
@@ -533,33 +545,22 @@ const HomePage = () => {
           </div>
         </div>
 
-        {/* ── Live price ticker strip at hero bottom ── */}
-        <div className="absolute bottom-0 left-0 right-0 overflow-hidden border-t" style={{ borderColor: 'rgba(255,255,255,0.07)', background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(12px)' }}>
-          <div className="py-2.5 px-6 flex items-center justify-center" style={{ height: '32px' }}>
-            {/* Keyed remount replays the CSS enter animation on every rotation */}
-              <div
-                key={tickerIdx}
-                className="anim-ticker-in flex items-center gap-2 text-xs"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
-                <span className="font-bold text-zinc-200">{ACTIVITY_FEED[tickerIdx].user}</span>
-                <span className="text-zinc-500">{ACTIVITY_FEED[tickerIdx].action}</span>
-                <span className="font-black text-yellow-400">{ACTIVITY_FEED[tickerIdx].price}</span>
-              </div>
-          </div>
-        </div>
       </section>
 
-      {/* ── Stats strip ──────────────────────────────────────────────────── */}
-      <section ref={statsRef} className="py-12 border-y border-border bg-card">
-        <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-4">
-            {STATS.map((stat) => (
-              <StatItem key={stat.label} {...stat} inView={statsInView} />
-            ))}
+      {/* ── Stats strip — real counts only ───────────────────────────────────
+          Renders nothing until the counts load, and skips any metric that is
+          still zero: honest numbers or no numbers. */}
+      {statItems.length >= 2 && (
+        <section ref={statsRef} className="py-12 border-y border-border bg-card">
+          <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
+            <div className={`grid grid-cols-2 gap-8 md:gap-4 ${statItems.length >= 4 ? 'md:grid-cols-4' : statItems.length === 3 ? 'md:grid-cols-3' : ''}`}>
+              {statItems.map((stat) => (
+                <StatItem key={stat.label} {...stat} inView={statsInView} />
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ── Trust strip ──────────────────────────────────────────────────── */}
       <section className="py-10 bg-background border-b border-border">
@@ -837,36 +838,6 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* ── Community activity marquee ────────────────────────────────────── */}
-      <section className="py-14 bg-foreground overflow-hidden">
-        <div className="mb-6 text-center">
-          <span className="inline-flex items-center gap-2 text-background/60 text-sm font-semibold tracking-widest uppercase">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
-            Trending on CardPop
-          </span>
-        </div>
-
-        {/* Marquee wrapper — CSS animation via inline style */}
-        <div className="relative">
-          <div
-            className="flex gap-4 w-max"
-            style={{ animation: 'marquee 40s linear infinite' }}
-          >
-            {[...ACTIVITY_FEED, ...ACTIVITY_FEED].map((item, i) => (
-              <div
-                key={i}
-                className="flex-shrink-0 flex items-center gap-3 px-5 py-3 rounded-2xl bg-background/[0.07] border border-background/10 text-sm"
-              >
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                <span className="font-bold text-background/90">{item.user}</span>
-                <span className="text-background/60">{item.action}</span>
-                <span className="font-bold text-primary-foreground bg-primary px-2 py-0.5 rounded-lg">{item.price}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ── Featured sellers ──────────────────────────────────────────────── */}
       <section className="py-24 bg-background border-t border-border">
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
@@ -903,6 +874,13 @@ const HomePage = () => {
               <p className="text-muted-foreground font-medium">Seller profiles are currently being updated.</p>
             </div>
           )}
+        </div>
+      </section>
+
+      {/* ── Recently viewed (renders nothing until the visitor has viewed cards) ── */}
+      <section className="py-10 bg-background">
+        <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
+          <RecentlyViewed />
         </div>
       </section>
     </div>

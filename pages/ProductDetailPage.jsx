@@ -9,6 +9,7 @@ import { canViewVaultProduct } from '@/utils/vaultSecurityUtils.js';
 import { slugify } from '@/lib/slugify.js';
 import { isVerified } from '@/utils/verification.js';
 import { useCart } from '@/hooks/useCart.jsx';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,6 +18,9 @@ import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, Arro
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import EbayMarketSection from '@/components/EbayMarketSection.jsx';
+import MarketPriceAnchor from '@/components/MarketPriceAnchor.jsx';
+import { addToRecentlyViewed } from '@/utils/recentlyViewed.js';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 import CertificationVerificationSection from '@/components/CertificationVerificationSection.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
 import BnplMessage from '@/components/BnplMessage.jsx';
@@ -44,6 +48,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
   const navigate = useNavigate();
   const { addToCart, setIsCartOpen } = useCart();
   const { currentUser, isAdmin, loading: authLoading } = useAuth();
+  const { settings } = usePlatformSettings();
   
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -58,6 +63,20 @@ const ProductDetailPage = ({ source: sourceProp }) => {
   // so the effect keys on projections that stay constant for marketplace/shop
   // views and only change for vault views when the answer could change.
   const vaultAuthPending = source === 'vault' && authLoading;
+
+  // Record the view for the "Recently viewed" strips (localStorage only).
+  useEffect(() => {
+    if (!product?.id) return;
+    addToRecentlyViewed({
+      id: product.id,
+      title: product.name,
+      image: publicImageUrl(product.images?.[0]),
+      price: product.price,
+      type: source,
+      url: window.location.pathname,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per loaded product
+  }, [product?.id]);
   const vaultViewerId = source === 'vault' ? currentUser?.id ?? null : null;
   const vaultIsAdmin = source === 'vault' ? isAdmin : false;
 
@@ -325,8 +344,18 @@ const ProductDetailPage = ({ source: sourceProp }) => {
       .catch(e => toast.error(e.message));
   };
 
-  const handleSecondaryAction = (action) => {
-    toast(`Coming soon: ${action}`);
+  // Trading v0: a trade is arranged over messages. Opens (or starts) a
+  // conversation with the seller, pre-filled so the buyer doesn't face a blank
+  // box. Only rendered when the enable_trading platform flag is on — the flag
+  // stays off until trading is a real feature, so this is never a dead end.
+  const handleRequestTrade = () => {
+    if (!seller?.id) return;
+    navigate('/messaging', {
+      state: {
+        recipientId: seller.id,
+        prefill: `Hi! I'm interested in trading for your "${product.name}" — ${window.location.origin}${window.location.pathname}. What are you looking for?`,
+      },
+    });
   };
 
   if (loading) {
@@ -542,6 +571,19 @@ const ProductDetailPage = ({ source: sourceProp }) => {
                     {isShop && <span className="text-sm font-medium text-muted-foreground pb-1">+ Shipping</span>}
                   </div>
                   <BnplMessage amount={product.price} className="mt-2" />
+                  {/* Market context beside the price — the number buyers actually
+                      decide on. Links down to the full eBay market section. */}
+                  {!isShop && (
+                    <div>
+                      <MarketPriceAnchor
+                        cardName={product.name}
+                        cardSet={vi?.set_name || product.set}
+                        gradingService={vi?.grading_company}
+                        gradeScore={vi?.grade}
+                        listingPrice={product.price}
+                      />
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -625,11 +667,23 @@ const ProductDetailPage = ({ source: sourceProp }) => {
                   </Button>
                 )}
 
-                {product.listing_type === 'For Trade' || product.listing_type === 'For Sale & Trade' ? (
-                  <Button size="lg" variant={product.listing_type === 'For Sale & Trade' ? 'outline' : 'default'} className="w-full h-14 rounded-xl font-bold text-lg" onClick={() => handleSecondaryAction('Propose Trade')}>
+                {settings.enable_trading !== false &&
+                 (product.listing_type === 'For Trade' || product.listing_type === 'For Sale & Trade') &&
+                 seller?.id && seller.id !== currentUser?.id ? (
+                  <Button size="lg" variant={product.listing_type === 'For Sale & Trade' ? 'outline' : 'default'} className="w-full h-14 rounded-xl font-bold text-lg" onClick={handleRequestTrade}>
                     <ArrowRightLeft className="w-5 h-5 mr-2" /> Request Trade
                   </Button>
                 ) : null}
+
+                {/* Trade-only listing while trading is switched off: without
+                    this the action area would be empty. */}
+                {settings.enable_trading === false && product.listing_type === 'For Trade' && !canOffer && (
+                  <div className="text-center p-4 rounded-xl bg-muted/50 border border-border">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      This card is listed for trade. Trading is not available yet — check back soon.
+                    </p>
+                  </div>
+                )}
 
                 {product.listing_type === 'Private' && (
                   <Button size="lg" variant="secondary" className="w-full h-14 rounded-xl font-bold text-lg" disabled>

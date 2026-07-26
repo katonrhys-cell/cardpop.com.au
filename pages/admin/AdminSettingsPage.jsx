@@ -26,7 +26,8 @@ const DEFAULT_SETTINGS = {
   require_mfa_admins: false,
   email_verification_required: true,
   enable_marketplace: true,
-  enable_trading: true,
+  // Off until the propose-trade flow ships (mirrors src/routes/settings.js)
+  enable_trading: false,
   enable_blog: true,
   banned_words: '',
 };
