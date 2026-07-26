@@ -133,3 +133,33 @@ Listings show the seller's asking price in isolation. You have eBay pricing infr
 | 9 | Saved searches + alerts, recently viewed | M | Retention engine |
 
 Items 1, 2 and 4 are a week of work combined and would change what the site *feels* like more than any redesign.
+
+---
+
+## Progress (updated 2026-07-26)
+
+All nine items above have been implemented on this branch — see the commit
+history for details. Notable discoveries along the way:
+
+- **Payouts (item 3) were already largely built** since the June audit (Connect
+  onboarding, per-sale transfers, wallet fallback, reversals). The real gap was
+  that a wallet balance accrued *before* connecting Stripe was stranded forever;
+  a claim RPC + `/stripe/connect/withdraw` + a wallet "Transfer to my bank"
+  button now close that loop.
+- **Search autosuggest (item 7) already existed** end-to-end, but its backfill
+  query referenced a non-existent column (silently failing on every request)
+  and the zero-result search page never surfaced the fuzzy correction.
+- **Recently-viewed (item 9) existed as orphaned code** — utility and component
+  were written but nothing ever recorded a view or rendered the strip.
+
+Known follow-ups, in rough priority order:
+
+1. **Saved-search email alerts** — the `saved_searches` table stores the query;
+   a cron that diffs new listings against saved params and sends via Resend is
+   the retention play.
+2. **Build the propose-trade flow** and flip the `enable_trading` default back
+   to true (server + client + admin defaults, one line each).
+3. **Merge Shop and Marketplace** into a single Buy surface (IA change deferred
+   — the nav consolidation reduced the confusion but didn't remove the split).
+4. **Post-listing success screen** with the public URL and share links (item 9
+   of the original P2 list).
