@@ -13,7 +13,7 @@ import {
   ArrowRightLeft, LayoutDashboard, Package, Users, Calendar, FileText, Building2,
   Layers, CheckCircle, Sun, Moon, ChevronDown, ChevronRight, ArrowRight, Layers2, User, LogOut,
   Settings, FolderTree, ListOrdered, BarChart3, Store, Shield,
-  BookOpen, Globe, Star, Award, TrendingUp, Newspaper, BadgeCheck, Ticket, Handshake,
+  BookOpen, Award, TrendingUp, BadgeCheck, Ticket, Handshake,
   Calculator, MapPin, ClipboardList, HelpCircle, MessageSquare,
   ShoppingBag, LineChart, Info, Sparkles, Rocket, Tag, MoreHorizontal,
 } from 'lucide-react';
@@ -30,12 +30,13 @@ import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 export const NAV_LINKS = [
   // `icon` (where present) matches the lucide icon in that page's own hero/heading,
   // so the mobile menu's flat links carry the same visual cue as the page they open.
+  // Five top-level sections. Blog and Events fold into the Community dropdown —
+  // seven-plus entries buried the three jobs visitors actually come for
+  // (buy, sell, check prices) among content links.
   { label: 'Shop', href: '/shop', icon: ShoppingBag },
   { label: 'Marketplace', href: '/marketplace', icon: Users },
-  { label: 'Analytics', href: '/analytics', icon: LineChart },
-  { label: 'Blog', href: '/blog' },
+  { label: 'Prices', href: '/analytics', icon: LineChart },
   { label: 'Community', href: '/community' },
-  { label: 'Events', href: '/events' },
   { label: 'Grading', href: '/grading' },
 ];
 
@@ -63,15 +64,6 @@ const ADMIN_LINKS = [
   { label: 'Content', href: '/admin/content', icon: FileText },
   { label: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
   { label: 'Settings', href: '/admin/settings', icon: Settings },
-];
-
-const BLOG_CATEGORIES = [
-  { slug: 'australia-focus',  label: 'Australia Focus',   desc: 'Local TCG market and events',         Icon: Globe,     gradient: 'from-green-500 to-emerald-600' },
-  { slug: 'beginner-guides',  label: 'Beginner Guides',   desc: 'Guides for new collectors',           Icon: BookOpen,  gradient: 'from-blue-500 to-indigo-600'   },
-  { slug: 'card-spotlight',   label: 'Card Spotlight',    desc: 'Deep dives into iconic cards',         Icon: Star,      gradient: 'from-yellow-500 to-orange-500' },
-  { slug: 'grading-guides',   label: 'Grading Hub',       desc: 'Grading standards and preparation',   Icon: Award,     gradient: 'from-purple-500 to-violet-600' },
-  { slug: 'investing-value',  label: 'Investing & Value', desc: 'Investment strategies and valuation', Icon: TrendingUp, gradient: 'from-rose-500 to-pink-600'    },
-  { slug: 'news-releases',    label: 'News & Releases',   desc: 'Latest TCG releases and industry news', Icon: Newspaper, gradient: 'from-cyan-500 to-sky-600'  },
 ];
 
 const COMMUNITY_ITEMS = [
@@ -474,69 +466,16 @@ const ShopDropdown = ({ onNavigate }) => {
   );
 };
 
-// ─── Blog mega-dropdown ───────────────────────────────────────────────────────
-const BlogDropdown = ({ onNavigate }) => {
-  const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
-  const location = useLocation();
-  const isBlogActive = location.pathname.startsWith('/blog');
-
-  return (
-    <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
-      <button
-        onClick={handleTriggerClick}
-        aria-expanded={open}
-        className={`flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
-          open || isBlogActive
-            ? 'bg-primary text-primary-foreground shadow-sm'
-            : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-        }`}
-      >
-        Blog
-        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
-      </button>
-
-      {open && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-72 bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
-          <Link
-            to="/blog"
-            onClick={() => { setOpen(false); onNavigate?.(); }}
-            className="flex items-center justify-between px-5 py-3.5 border-b border-border hover:bg-muted/60 transition-colors group"
-          >
-            <div>
-              <span className="text-sm font-bold text-foreground">The Parallel Report</span>
-              <p className="text-xs text-muted-foreground mt-0.5">All articles and stories</p>
-            </div>
-            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
-          </Link>
-          <div className="p-3 grid gap-0.5">
-            {BLOG_CATEGORIES.map(cat => (
-              <Link
-                key={cat.slug}
-                to={`/blog/category/${cat.slug}`}
-                onClick={() => { setOpen(false); onNavigate?.(); }}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
-              >
-                <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${cat.gradient} shrink-0 shadow-sm`}>
-                  <cat.Icon className="w-4 h-4 text-white" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{cat.label}</p>
-                  <p className="text-[11px] text-muted-foreground truncate">{cat.desc}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
 // ─── Community mega-dropdown ──────────────────────────────────────────────────
+// Also hosts Events and the blog ("The Parallel Report") since the top-level
+// nav was consolidated to five sections.
 const CommunityDropdown = ({ onNavigate }) => {
   const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
   const location = useLocation();
-  const isCommunityActive = location.pathname.startsWith('/community');
+  const { settings } = usePlatformSettings();
+  const isCommunityActive = location.pathname.startsWith('/community')
+    || location.pathname.startsWith('/events')
+    || location.pathname.startsWith('/blog');
 
   return (
     <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
@@ -554,7 +493,7 @@ const CommunityDropdown = ({ onNavigate }) => {
       </button>
 
       {open && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-72 bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-[34rem] bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
           <Link
             to="/community"
             onClick={() => { setOpen(false); onNavigate?.(); }}
@@ -566,84 +505,73 @@ const CommunityDropdown = ({ onNavigate }) => {
             </div>
             <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
           </Link>
-          <div className="p-3 grid gap-0.5">
-            {COMMUNITY_ITEMS.map(item => (
-              <Link
-                key={item.label}
-                to={item.href}
-                onClick={() => { setOpen(false); onNavigate?.(); }}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
-              >
-                <span
-                  className={`inline-flex items-center justify-center w-7 h-7 rounded-lg shrink-0 shadow-sm overflow-hidden ${item.isWhatnot ? 'bg-black' : (item.label === 'Local Traders' ? '' : `bg-gradient-to-br ${item.gradient}`)}`}
-                  style={item.label === 'Local Traders' ? { backgroundImage: `linear-gradient(to bottom right, hsl(var(--verified-badge)), hsl(199 95% 35%))` } : {}}
+          <div className="p-3 grid grid-cols-2 gap-x-3">
+            <div className="grid gap-0.5 content-start">
+              <p className="px-3 pt-1 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Community</p>
+              {COMMUNITY_ITEMS.map(item => (
+                <Link
+                  key={item.label}
+                  to={item.href}
+                  onClick={() => { setOpen(false); onNavigate?.(); }}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
                 >
-                  <item.Icon className="w-4 h-4 text-white" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{item.label}</p>
-                  <p className="text-[11px] text-muted-foreground truncate">{item.desc}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ─── Events dropdown ──────────────────────────────────────────────────────────
-const EventsDropdown = ({ onNavigate }) => {
-  const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
-  const location = useLocation();
-  const isEventsActive = location.pathname.startsWith('/events');
-
-  return (
-    <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
-      <button
-        onClick={handleTriggerClick}
-        aria-expanded={open}
-        className={`flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
-          open || isEventsActive
-            ? 'bg-primary text-primary-foreground shadow-sm'
-            : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-        }`}
-      >
-        Events
-        <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
-      </button>
-
-      {open && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-72 bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
-          <Link
-            to="/events"
-            onClick={() => { setOpen(false); onNavigate?.(); }}
-            className="flex items-center justify-between px-5 py-3.5 border-b border-border hover:bg-muted/60 transition-colors group"
-          >
-            <div>
-              <span className="text-sm font-bold text-foreground">All Events</span>
-              <p className="text-xs text-muted-foreground mt-0.5">Full Australian event calendar</p>
+                  <span
+                    className={`inline-flex items-center justify-center w-7 h-7 rounded-lg shrink-0 shadow-sm overflow-hidden ${item.isWhatnot ? 'bg-black' : (item.label === 'Local Traders' ? '' : `bg-gradient-to-br ${item.gradient}`)}`}
+                    style={item.label === 'Local Traders' ? { backgroundImage: `linear-gradient(to bottom right, hsl(var(--verified-badge)), hsl(199 95% 35%))` } : {}}
+                  >
+                    <item.Icon className="w-4 h-4 text-white" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{item.label}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{item.desc}</p>
+                  </div>
+                </Link>
+              ))}
             </div>
-            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
-          </Link>
-          <div className="p-3 grid gap-0.5">
-            {EVENT_ITEMS.map(item => (
+            <div className="grid gap-0.5 content-start">
+              <p className="px-3 pt-1 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Events</p>
+              {EVENT_ITEMS.map(item => (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  onClick={() => { setOpen(false); onNavigate?.(); }}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
+                >
+                  <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${item.gradient} shrink-0 shadow-sm`}>
+                    <item.Icon className="w-4 h-4 text-white" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{item.label}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{item.desc}</p>
+                  </div>
+                </Link>
+              ))}
               <Link
-                key={item.href}
-                to={item.href}
+                to="/events"
                 onClick={() => { setOpen(false); onNavigate?.(); }}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
+                className="px-3 py-2 text-[13px] font-semibold text-primary hover:underline"
               >
-                <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${item.gradient} shrink-0 shadow-sm`}>
-                  <item.Icon className="w-4 h-4 text-white" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{item.label}</p>
-                  <p className="text-[11px] text-muted-foreground truncate">{item.desc}</p>
-                </div>
+                Full event calendar →
               </Link>
-            ))}
+              {settings.enable_blog !== false && (
+                <>
+                  <p className="px-3 pt-2 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Reads</p>
+                  <Link
+                    to="/blog"
+                    onClick={() => { setOpen(false); onNavigate?.(); }}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
+                  >
+                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 shrink-0 shadow-sm">
+                      <BookOpen className="w-4 h-4 text-white" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">The Parallel Report</p>
+                      <p className="text-[11px] text-muted-foreground truncate">Guides, news and card stories</p>
+                    </div>
+                  </Link>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -726,7 +654,7 @@ const AnalyticsDropdown = ({ onNavigate }) => {
             : 'text-muted-foreground hover:text-foreground hover:bg-muted'
         }`}
       >
-        Analytics
+        Prices
         <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
 
@@ -738,8 +666,8 @@ const AnalyticsDropdown = ({ onNavigate }) => {
             className="flex items-center justify-between px-5 py-3.5 border-b border-border hover:bg-muted/60 transition-colors group"
           >
             <div>
-              <span className="text-sm font-bold text-foreground">Analytics Hub</span>
-              <p className="text-xs text-muted-foreground mt-0.5">Track the trading card market</p>
+              <span className="text-sm font-bold text-foreground">Prices & Market Data</span>
+              <p className="text-xs text-muted-foreground mt-0.5">What cards are worth, tracked in AUD</p>
             </div>
             <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
           </Link>
@@ -908,98 +836,6 @@ const MobileShopSection = ({ onNavigate }) => {
   );
 };
 
-// ─── Mobile blog section (expandable) ────────────────────────────────────────
-const MobileBlogSection = ({ onNavigate }) => {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="mb-4">
-      <button
-        onClick={() => startTransition(() => setOpen(o => !o))}
-        className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-muted transition-colors mb-0.5"
-      >
-        <span className="text-sm font-bold text-foreground flex items-center gap-2">
-          <BookOpen className="w-4 h-4 text-primary" />
-          The Parallel Report
-        </span>
-        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-      {open && (
-        <div className="flex flex-col gap-0.5 mb-1 pl-2">
-          <SheetClose asChild>
-            <Link
-              to="/blog"
-              onClick={onNavigate}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-semibold text-muted-foreground"
-            >
-              All Articles
-            </Link>
-          </SheetClose>
-          {BLOG_CATEGORIES.map(cat => (
-            <SheetClose key={cat.slug} asChild>
-              <Link
-                to={`/blog/category/${cat.slug}`}
-                onClick={onNavigate}
-                className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
-              >
-                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${cat.gradient} shrink-0`}>
-                  <cat.Icon className="w-3.5 h-3.5 text-white" />
-                </span>
-                <span className="text-xs font-semibold text-foreground truncate">{cat.label}</span>
-              </Link>
-            </SheetClose>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ─── Mobile events section (expandable) ──────────────────────────────────────
-const MobileEventsSection = ({ onNavigate }) => {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="mb-4">
-      <button
-        onClick={() => startTransition(() => setOpen(o => !o))}
-        className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-muted transition-colors mb-0.5"
-      >
-        <span className="text-sm font-bold text-foreground flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-primary" />
-          Events
-        </span>
-        <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
-      {open && (
-        <div className="flex flex-col gap-0.5 mb-1 pl-2">
-          <SheetClose asChild>
-            <Link
-              to="/events"
-              onClick={onNavigate}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-semibold text-muted-foreground"
-            >
-              All Events
-            </Link>
-          </SheetClose>
-          {EVENT_ITEMS.map(item => (
-            <SheetClose key={item.href} asChild>
-              <Link
-                to={item.href}
-                onClick={onNavigate}
-                className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
-              >
-                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${item.gradient} shrink-0`}>
-                  <item.Icon className="w-3.5 h-3.5 text-white" />
-                </span>
-                <span className="text-xs font-semibold text-foreground truncate">{item.label}</span>
-              </Link>
-            </SheetClose>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
-
 // ─── Mobile community section (expandable) ───────────────────────────────────
 const MobileCommunitySection = ({ onNavigate }) => {
   const [open, setOpen] = useState(false);
@@ -1040,6 +876,44 @@ const MobileCommunitySection = ({ onNavigate }) => {
               </Link>
             </SheetClose>
           ))}
+          {/* Events + blog live under Community now that the nav is five sections */}
+          <p className="px-4 pt-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Events</p>
+          <SheetClose asChild>
+            <Link
+              to="/events"
+              onClick={onNavigate}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-semibold text-muted-foreground"
+            >
+              All Events
+            </Link>
+          </SheetClose>
+          {EVENT_ITEMS.map(item => (
+            <SheetClose key={item.href} asChild>
+              <Link
+                to={item.href}
+                onClick={onNavigate}
+                className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
+              >
+                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${item.gradient} shrink-0`}>
+                  <item.Icon className="w-3.5 h-3.5 text-white" />
+                </span>
+                <span className="text-xs font-semibold text-foreground truncate">{item.label}</span>
+              </Link>
+            </SheetClose>
+          ))}
+          <p className="px-4 pt-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Reads</p>
+          <SheetClose asChild>
+            <Link
+              to="/blog"
+              onClick={onNavigate}
+              className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
+            >
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 shrink-0">
+                <BookOpen className="w-3.5 h-3.5 text-white" />
+              </span>
+              <span className="text-xs font-semibold text-foreground truncate">The Parallel Report</span>
+            </Link>
+          </SheetClose>
         </div>
       )}
     </div>
@@ -1103,7 +977,7 @@ const MobileAnalyticsSection = ({ onNavigate }) => {
       >
         <span className="text-sm font-bold text-foreground flex items-center gap-2">
           <LineChart className="w-4 h-4 text-primary" />
-          Analytics
+          Prices
         </span>
         <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -1241,10 +1115,8 @@ export const DesktopNavMenus = ({ onNavigate }) => {
       <BrowseDropdown onNavigate={onNavigate} />
       {NAV_LINKS.map((link) => {
         if (link.label === 'Shop') return <ShopDropdown key="shop" onNavigate={onNavigate} />;
-        if (link.label === 'Analytics') return <AnalyticsDropdown key="analytics" onNavigate={onNavigate} />;
-        if (link.label === 'Blog') return settings.enable_blog === false ? null : <BlogDropdown key="blog" onNavigate={onNavigate} />;
+        if (link.label === 'Prices') return <AnalyticsDropdown key="prices" onNavigate={onNavigate} />;
         if (link.label === 'Community') return <CommunityDropdown key="community" onNavigate={onNavigate} />;
-        if (link.label === 'Events') return <EventsDropdown key="events" onNavigate={onNavigate} />;
         if (link.label === 'Grading') return <GradingDropdown key="grading" onNavigate={onNavigate} />;
         if (link.label === 'Marketplace' && settings.enable_marketplace === false) return null;
         const isActive = isNavLinkActive(link, location.pathname);
@@ -1307,8 +1179,8 @@ export const MobileNavMenus = ({
         </SheetClose>
 
         {/* Order mirrors the desktop Row-2 nav top-to-bottom: Browse Collections
-            leads, then NAV_LINKS in sequence — expandable sections (Blog,
-            Community, Events, Grading) and flat links interleaved so the mobile
+            leads, then NAV_LINKS in sequence — expandable sections (Prices,
+            Community, Grading) and flat links interleaved so the mobile
             menu reads in the same order as the desktop bar reads left-to-right.
             key={openKey} resets accordion state each time the menu opens. */}
         <nav className="flex flex-col mb-6">
@@ -1316,10 +1188,8 @@ export const MobileNavMenus = ({
 
           {NAV_LINKS.map((link) => {
             if (link.label === 'Shop') return <MobileShopSection key={`shop-${openKey}`} onNavigate={onNavigate} />;
-            if (link.label === 'Analytics') return <MobileAnalyticsSection key={`analytics-${openKey}`} onNavigate={onNavigate} />;
-            if (link.label === 'Blog') return <MobileBlogSection key={`blog-${openKey}`} onNavigate={onNavigate} />;
+            if (link.label === 'Prices') return <MobileAnalyticsSection key={`prices-${openKey}`} onNavigate={onNavigate} />;
             if (link.label === 'Community') return <MobileCommunitySection key={`community-${openKey}`} onNavigate={onNavigate} />;
-            if (link.label === 'Events') return <MobileEventsSection key={`events-${openKey}`} onNavigate={onNavigate} />;
             if (link.label === 'Grading') return <MobileGradingSection key={`grading-${openKey}`} onNavigate={onNavigate} />;
             const isActive = isNavLinkActive(link, location.pathname);
             const Icon = link.icon;
@@ -1422,7 +1292,7 @@ export const MobileNavMenus = ({
           <div className="flex flex-col gap-3">
             <SheetClose asChild>
               <Button asChild variant="default" className="w-full rounded-xl h-12 font-bold tracking-wide text-base shadow-sm">
-                <Link to="/signup">Join Vault</Link>
+                <Link to="/signup">Sign Up — It's Free</Link>
               </Button>
             </SheetClose>
             <SheetClose asChild>

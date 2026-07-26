@@ -1565,10 +1565,10 @@ const STATIC_CONTENT = {
   },
 
   '/insider-trading': {
-    title: 'Insider Trading | CardPop',
-    description: 'Get insider market intelligence and trading insights for Australian trading card collectors.',
-    breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Insider Trading', path: '/insider-trading' }],
-    h1: 'Insider Trading',
+    title: 'Partner Deals | CardPop',
+    description: 'Shop with CardPop\'s trusted partner retailers and support the platform — deals on trading cards and accessories for Australian collectors.',
+    breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Partner Deals', path: '/insider-trading' }],
+    h1: 'Partner Deals',
     intro: 'Support CardPop Australia by shopping with our trusted affiliate partners. Get the best deals on premium trading cards and accessories from retailers vetted by the CardPop team.',
     sections: [
       { h2: 'Trusted partner retailers', paras: ['Browse curated affiliate partners offering premium trading cards, sealed product and accessories to Australian collectors.'] },
