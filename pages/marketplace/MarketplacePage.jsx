@@ -5,12 +5,17 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { LISTING_CARD_VAULT_EMBED_INNER } from '@/lib/listingCardColumns.js';
 import { escapeLike } from '@/src/utils/escapeLike.js';
-import { buildCardSearchOr } from '@/src/utils/cardSearchFilter.js';
+import { buildCardSearchOr, buildVariantOr } from '@/src/utils/cardSearchFilter.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import { FilterChip, CheckRow, RadioRow } from '@/components/FilterChip.jsx';
+import {
+  CARD_LANGUAGES, GRADERS, GRADE_VALUES, CONDITIONS, FEATURES, TCG_RARITIES, PRICE_PRESETS,
+} from '@/lib/cardFilters.js';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, RefreshCw, AlertCircle, Users, X, Bookmark } from 'lucide-react';
+import { Search, RefreshCw, AlertCircle, Users, X, Bookmark, SlidersHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -82,7 +87,27 @@ const MarketplacePage = () => {
 
   const [sort, setSort] = useState(() => qp('sort', 'created_at_desc'));
   const [filterMode, setFilterMode] = useState(() => qp('mode', 'All'));
-  const [filterRookie, setFilterRookie] = useState(() => qp('rookie') === '1');
+
+  // ── Attribute facets (the pill bar) ────────────────────────────────────────
+  // Multi-selects are comma-joined in the URL. Vocabulary comes from
+  // lib/cardFilters.js, which the add-card form also reads, so a facet can
+  // never offer a value sellers have no way to enter.
+  const csv = (key) => { const v = qp(key); return v ? v.split(',').filter(Boolean) : []; };
+
+  const [filterGraded, setFilterGraded]         = useState(() => qp('graded'));   // '' | graded | raw
+  const [filterGraders, setFilterGraders]       = useState(() => csv('grader'));
+  const [filterGrades, setFilterGrades]         = useState(() => csv('grade'));
+  const [filterConditions, setFilterConditions] = useState(() => csv('cond'));
+  const [filterLanguages, setFilterLanguages]   = useState(() => csv('lang'));
+  const [filterRarities, setFilterRarities]     = useState(() => csv('rarity'));
+  // Rookie used to be its own `rookie=1` param and sidebar checkbox; it's now
+  // one of the FEATURES entries. Legacy param still read so older saved
+  // searches and shared links keep working.
+  const [filterFeatures, setFilterFeatures]     = useState(() => {
+    const feats = csv('feat');
+    if (qp('rookie') === '1' && !feats.includes('rookie')) feats.push('rookie');
+    return feats;
+  });
 
   // 6-level hierarchy filters
   const {
@@ -266,18 +291,23 @@ const MarketplacePage = () => {
       ? SPORTS_NAME_RE.test(allNames[selectedFranchise.parent_id] || catNames[selectedFranchise.parent_id] || '')
       : false);
 
-  // Leaving the sports context clears sports-only filters so an invisible
-  // team/player/rookie filter can't silently empty the results. Only runs once
-  // the name/option data needed to JUDGE the context has loaded — otherwise a
-  // URL-seeded sports view would be wiped during the initial fetch.
+  // Switching context clears the facets that only exist on the other side, so
+  // an invisible filter can't silently empty the results. Only runs once the
+  // name/option data needed to JUDGE the context has loaded — otherwise a
+  // URL-seeded view would be wiped during the initial fetch.
   useEffect(() => {
-    if (sportsContext) return;
     if (!filterCat && !filterFranchise) return; // unscoped browse: nothing to judge
     if (filterCat && !catNames[filterCat]) return;            // names not loaded yet
     if (filterFranchise && !selectedFranchise) return;        // options not loaded yet
-    setFilterTeam(''); setFilterPlayer(''); setFilterRookie(false);
-     
-  }, [sportsContext, filterCat, filterFranchise, catNames, selectedFranchise]);
+    const drop = sportsContext ? 'tcg' : 'sports';
+    const dropKeys = FEATURES.filter((f) => f.context === drop).map((f) => f.key);
+    setFilterFeatures((prev) => (prev.some((k) => dropKeys.includes(k))
+      ? prev.filter((k) => !dropKeys.includes(k))
+      : prev));
+    if (!sportsContext) { setFilterTeam(''); setFilterPlayer(''); }
+    else if (filterRarities.length) setFilterRarities([]); // rarity is a TCG facet
+
+  }, [sportsContext, filterCat, filterFranchise, catNames, selectedFranchise, filterRarities.length]);
 
   // Sports facets stay hidden on the unscoped default view — it serves the
   // widest audience — and appear once a sports category/franchise is chosen.
@@ -351,7 +381,18 @@ const MarketplacePage = () => {
     setFilterMfr(get('mfr')); setFilterTeam(get('team')); setFilterSet(get('set'));
     setFilterParallel(get('parallel')); setFilterSubset(get('subset'));
     setFilterPlayer(get('player'));
-    setFilterRookie(get('rookie') === '1');
+    const list = (k) => (get(k) ? get(k).split(',').filter(Boolean) : []);
+    setFilterGraded(get('graded'));
+    setFilterGraders(list('grader'));
+    setFilterGrades(list('grade'));
+    setFilterConditions(list('cond'));
+    setFilterLanguages(list('lang'));
+    setFilterRarities(list('rarity'));
+    setFilterFeatures(() => {
+      const feats = list('feat');
+      if (get('rookie') === '1' && !feats.includes('rookie')) feats.push('rookie');
+      return feats;
+    });
     setMinPrice(get('min')); setDebouncedMin(get('min'));
     setMaxPrice(get('max')); setDebouncedMax(get('max'));
     setPage(0);
@@ -391,13 +432,56 @@ const MarketplacePage = () => {
         if (filterSubset)   query = query.eq('vault_item.subset_id', filterSubset);
 
         if (filterPlayer) query = query.ilike('vault_item.card_name', `%${escapeLike(filterPlayer)}%`);
+
+        // ── Attribute facets ──
+        // Graded vs raw. 'raw' matches the sentinel exactly rather than
+        // "not graded" so this never needs an or() (see the note below on why
+        // embedded or() calls can't be chained).
+        if (filterGraded === 'graded')   query = query.neq('vault_item.grading_company', 'raw');
+        else if (filterGraded === 'raw') query = query.eq('vault_item.grading_company', 'raw');
+
+        if (filterGraders.length)    query = query.in('vault_item.grading_company', filterGraders);
+        if (filterGrades.length)     query = query.in('vault_item.grade', filterGrades);
+        if (filterConditions.length) query = query.in('vault_item.condition', filterConditions);
+        if (filterLanguages.length)  query = query.in('vault_item.language', filterLanguages);
+
+        // Column-backed feature flags
+        for (const key of filterFeatures) {
+          const f = FEATURES.find((x) => x.key === key);
+          if (!f?.column) continue;
+          query = f.kind === 'not_null'
+            ? query.not(`vault_item.${f.column}`, 'is', null)
+            : query.eq(`vault_item.${f.column}`, true);
+        }
+
+        // Every filter that needs an OR *on the embed* has to go into a single
+        // .or() call: chained embedded .or() filters aren't reliably ANDed by
+        // PostgREST. Collect the groups and encode the AND as one
+        // `and(or(...),or(...))` tree (same trick as SearchResultsPage).
+        //
         // Free-text search matches card name, set name and card number (see
         // CARD_SEARCH_COLUMNS) — set/number are prefilled by the AI identify at
-        // listing time, so "Base Set" or "4/102" finds the card too. The !inner
-        // embed makes this or-filter on vault_item constrain the listings rows.
-        if (debouncedSearch.trim()) {
-          query = query.or(buildCardSearchOr(debouncedSearch), { referencedTable: 'vault_item' });
+        // listing time, so "Base Set" or "4/102" finds the card too. Rarity and
+        // the variant-backed features match the `variant` taxonomy text, which
+        // is why they need no columns of their own.
+        const orGroups = [];
+        if (debouncedSearch.trim()) orGroups.push(buildCardSearchOr(debouncedSearch));
+        if (filterRarities.length)  orGroups.push(buildVariantOr(filterRarities));
+        for (const key of filterFeatures) {
+          const f = FEATURES.find((x) => x.key === key);
+          if (!f) continue;
+          if (f.variantAny) orGroups.push(buildVariantOr(f.variantAny));
+          else if (f.variant) orGroups.push(buildVariantOr([f.variant]));
         }
+        if (orGroups.length === 1) {
+          query = query.or(orGroups[0], { referencedTable: 'vault_item' });
+        } else if (orGroups.length > 1) {
+          query = query.or(
+            `and(${orGroups.map((g) => `or(${g})`).join(',')})`,
+            { referencedTable: 'vault_item' },
+          );
+        }
+
         if (debouncedMin && !isNaN(debouncedMin)) query = query.gte('price_aud', Number(debouncedMin));
         if (debouncedMax && !isNaN(debouncedMax)) query = query.lte('price_aud', Number(debouncedMax));
 
@@ -405,9 +489,6 @@ const MarketplacePage = () => {
         else if (filterMode === 'BuyNow') query = query.eq('listing_type', 'fixed');
         else if (filterMode === 'ForTrade') query = query.eq('accepts_trade', true);
         else if (filterMode === 'MakeOffer') query = query.eq('accepts_offers', true);
-
-        // is_rookie is derived from the "Rookie Card (RC)" variant chip on the add-card form
-        if (filterRookie) query = query.eq('vault_item.is_rookie', true);
 
         if (sort === 'price_asc')  query = query.order('price_aud', { ascending: true });
         else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
@@ -430,7 +511,7 @@ const MarketplacePage = () => {
     fetchRef.current = run;
     run();
     return () => { cancelled = true; };
-  }, [page, sort, filterMode, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, filterPlayer, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
+  }, [page, sort, filterMode, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, filterPlayer, debouncedSearch, debouncedMin, debouncedMax, filterGraded, filterGraders, filterGrades, filterConditions, filterLanguages, filterRarities, filterFeatures]);
 
   // Reset to the first page whenever the filters/sort change so the user never
   // lands on an out-of-range page (the stale-fetch is cancelled by the guard).
@@ -439,7 +520,7 @@ const MarketplacePage = () => {
   useEffect(() => {
     if (pageResetInit.current) { pageResetInit.current = false; return; }
     setPage(0);
-  }, [sort, filterMode, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, filterPlayer, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
+  }, [sort, filterMode, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, filterPlayer, debouncedSearch, debouncedMin, debouncedMax, filterGraded, filterGraders, filterGrades, filterConditions, filterLanguages, filterRarities, filterFeatures]);
 
   // Mirror the full filter state into the URL (replace, no history spam) so
   // refresh and shared links reproduce the exact view. lastWrittenParamsRef
@@ -457,7 +538,13 @@ const MarketplacePage = () => {
     if (filterParallel) params.parallel = filterParallel;
     if (filterSubset) params.subset = filterSubset;
     if (filterPlayer) params.player = filterPlayer;
-    if (filterRookie) params.rookie = '1';
+    if (filterGraded) params.graded = filterGraded;
+    if (filterGraders.length) params.grader = filterGraders.join(',');
+    if (filterGrades.length) params.grade = filterGrades.join(',');
+    if (filterConditions.length) params.cond = filterConditions.join(',');
+    if (filterLanguages.length) params.lang = filterLanguages.join(',');
+    if (filterRarities.length) params.rarity = filterRarities.join(',');
+    if (filterFeatures.length) params.feat = filterFeatures.join(',');
     if (debouncedMin) params.min = debouncedMin;
     if (debouncedMax) params.max = debouncedMax;
     if (page > 0) params.page = String(page + 1);
@@ -466,7 +553,7 @@ const MarketplacePage = () => {
       lastWrittenParamsRef.current = next;
       setSearchParams(params, { replace: true });
     }
-  }, [debouncedSearch, filterMode, sort, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, filterPlayer, filterRookie, debouncedMin, debouncedMax, page, setSearchParams]);
+  }, [debouncedSearch, filterMode, sort, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, filterPlayer, filterGraded, filterGraders, filterGrades, filterConditions, filterLanguages, filterRarities, filterFeatures, debouncedMin, debouncedMax, page, setSearchParams]);
 
   // Realtime subscription to vault_items changes to refresh listings.
   // The subscription is unfiltered (any user's vault edit fires it), so
@@ -497,12 +584,17 @@ const MarketplacePage = () => {
   const clearFilters = () => {
     setFilterCat(''); setFilterFranchise(''); setFilterMfr(''); setFilterTeam(''); setFilterSet('');
     setFilterParallel(''); setFilterSubset(''); setFilterPlayer('');
-    setFilterMode('All'); setFilterRookie(false);
+    setFilterMode('All');
+    setFilterGraded(''); setFilterGraders([]); setFilterGrades([]); setFilterConditions([]);
+    setFilterLanguages([]); setFilterRarities([]); setFilterFeatures([]);
     setSearch(''); setMinPrice(''); setMaxPrice('');
   };
 
+  // Remove one value from a multi-select facet
+  const dropFrom = (setter) => (value) => setter((prev) => prev.filter((v) => v !== value));
+
   // Each active filter renders as a removable chip above the grid, so any one
-  // can be cleared without hunting for its dropdown in the sidebar.
+  // can be cleared without reopening the dropdown it came from.
   const activeChips = useMemo(() => {
     const chips = [];
     const add = (label, clear) => { if (label) chips.push({ label, clear }); };
@@ -514,15 +606,286 @@ const MarketplacePage = () => {
     add(parallelOpts.find(p => p.id === filterParallel)?.name, () => setFilterParallel(''));
     add(subsetOpts.find(s => s.id === filterSubset)?.name, () => setFilterSubset(''));
     add(POPULAR_PLAYERS.find(p => p.term === filterPlayer)?.label, () => setFilterPlayer(''));
-    if (filterRookie) add('Rookie Card', () => setFilterRookie(false));
+    if (filterGraded === 'graded') add('Graded', () => setFilterGraded(''));
+    if (filterGraded === 'raw') add('Raw (ungraded)', () => setFilterGraded(''));
+    filterGraders.forEach(g => add(GRADERS.find(x => x.value === g)?.label || g, () => dropFrom(setFilterGraders)(g)));
+    filterGrades.forEach(g => add(`Grade ${g}`, () => dropFrom(setFilterGrades)(g)));
+    filterConditions.forEach(c => add(CONDITIONS.find(x => x.value === c)?.label || c, () => dropFrom(setFilterConditions)(c)));
+    filterLanguages.forEach(l => add(l, () => dropFrom(setFilterLanguages)(l)));
+    filterRarities.forEach(r => add(r, () => dropFrom(setFilterRarities)(r)));
+    filterFeatures.forEach(f => add(FEATURES.find(x => x.key === f)?.label || f, () => dropFrom(setFilterFeatures)(f)));
     return chips;
-     
+
   }, [
     setOpts, mfrOpts, teamOpts, franchiseOpts, parallelOpts, subsetOpts, catNames,
     filterSet, filterMfr, filterTeam, filterFranchise, filterCat, filterParallel,
-    filterSubset, filterPlayer, filterRookie,
+    filterSubset, filterPlayer, filterGraded, filterGraders, filterGrades,
+    filterConditions, filterLanguages, filterRarities, filterFeatures,
   ]);
-  const hasActiveFilters = filterCat || filterFranchise || filterMfr || filterTeam || filterSet || filterParallel || filterSubset || filterPlayer || filterMode !== 'All' || filterRookie || search || minPrice || maxPrice;
+  const hasActiveFilters = Boolean(
+    filterCat || filterFranchise || filterMfr || filterTeam || filterSet || filterParallel ||
+    filterSubset || filterPlayer || filterMode !== 'All' || filterGraded ||
+    filterGraders.length || filterGrades.length || filterConditions.length ||
+    filterLanguages.length || filterRarities.length || filterFeatures.length ||
+    search || minPrice || maxPrice
+  );
+
+  // Feature options relevant to what's being browsed — sports-only features
+  // (rookie, refractor) hidden from TCG browsers and vice versa.
+  const visibleFeatures = FEATURES.filter(
+    (f) => !f.context || (f.context === 'sports' ? sportsContext : !sportsContext)
+  );
+
+  // Everything that doesn't fit a pill: the free-text box, price range, the
+  // six-level category cascade and saved searches. Lives in the All Filters
+  // sheet so the bar stays scannable.
+  const allFiltersPanel = (
+    <div className="space-y-4">
+    {/* The sheet header already titles this panel, so only the reset lives here */}
+    {hasActiveFilters && (
+      <Button variant="ghost" size="sm" onClick={clearFilters} className="rounded-xl text-muted-foreground hover:text-foreground h-8 px-2 -mt-1">
+        <X className="w-4 h-4 mr-1" /> Clear all filters
+      </Button>
+    )}
+
+    {/* Save the current view / re-apply saved ones (signed-in only) */}
+    {currentUser && hasActiveFilters && (
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={saveCurrentSearch}
+        disabled={savingSearch}
+        className="w-full rounded-xl font-bold gap-1.5"
+      >
+        <Bookmark className="w-4 h-4" /> Save this search
+      </Button>
+    )}
+    {currentUser && savedSearches.length > 0 && (
+      <div>
+        <span className="block text-xs font-semibold text-muted-foreground mb-1.5">Saved searches</span>
+        <ul className="space-y-1">
+          {savedSearches.map((s) => (
+            <li key={s.id} className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => applySavedSearch(s.params)}
+                className="flex-1 min-w-0 truncate text-left text-sm font-medium text-foreground hover:text-primary px-2 py-1.5 rounded-lg hover:bg-muted transition-colors"
+                title={s.name}
+              >
+                {s.name}
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteSavedSearch(s.id)}
+                aria-label={`Delete saved search ${s.name}`}
+                className="shrink-0 p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
+
+    {/* No search box here — it lives inline in the filter bar, which stays
+        visible while this sheet is open. */}
+
+    {/* Price range */}
+    <div>
+      <label htmlFor="marketplace-min-price" className="block text-xs font-semibold text-muted-foreground mb-1.5">Price range</label>
+      <div className="flex items-center gap-2">
+        <Input
+          type="number"
+          id="marketplace-min-price"
+          name="marketplace-min-price"
+          aria-label="Minimum price"
+          placeholder="Min $"
+          value={minPrice}
+          onChange={e => setMinPrice(e.target.value)}
+          className="flex-1 h-10 rounded-xl bg-background border-border"
+        />
+        <span className="text-muted-foreground text-sm font-medium">–</span>
+        <Input
+          type="number"
+          name="marketplace-max-price"
+          aria-label="Maximum price"
+          placeholder="Max $"
+          value={maxPrice}
+          onChange={e => setMaxPrice(e.target.value)}
+          className="flex-1 h-10 rounded-xl bg-background border-border"
+        />
+      </div>
+    </div>
+
+    {/* Popular players — sports context only */}
+    {showSportsFacets && (
+      <div>
+        <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Popular players</label>
+        <Select value={filterPlayer} onValueChange={clearable(setFilterPlayer)}>
+          <SelectTrigger aria-label="Filter by player" className="w-full bg-background border-border rounded-xl font-medium">
+            <SelectValue placeholder="Player" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ANY}>Any player</SelectItem>
+            {POPULAR_PLAYERS.map(p => (
+              <SelectItem key={p.term} value={p.term}>{p.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    )}
+
+    {/* Category cascade — every level is always open and selectable;
+        picking a parent just narrows the options below it */}
+    <div className="space-y-3 pt-1">
+      <label htmlFor="marketplace-category" className="block text-xs font-semibold text-muted-foreground">Browse by category</label>
+      {/* Category */}
+      <Select value={filterCat} onValueChange={clearable(setFilterCat)}>
+        <SelectTrigger id="marketplace-category" aria-label="Filter by category" className="w-full bg-background border-border rounded-xl font-medium">
+          <SelectValue placeholder="Category" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ANY}>Any category</SelectItem>
+          {catOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+        </SelectContent>
+      </Select>
+
+      {/* Franchise */}
+      <Select value={filterFranchise} onValueChange={clearable(setFilterFranchise)}>
+        <SelectTrigger aria-label="Filter by franchise" className="w-full bg-background border-border rounded-xl font-medium">
+          <SelectValue placeholder="Franchise" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ANY}>Any franchise</SelectItem>
+          {filterCat
+            ? franchiseOpts.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)
+            : <GroupedSelectItems groups={(() => {
+                const acc = {};
+                franchiseOpts.forEach(f => {
+                  const g = catNames[f.parent_id] || 'Other';
+                  if (!acc[g]) acc[g] = [];
+                  acc[g].push(f);
+                });
+                return Object.entries(acc).sort(([a], [b]) => a.localeCompare(b));
+              })()} />}
+        </SelectContent>
+      </Select>
+
+      {/* Manufacturer */}
+      <Select value={filterMfr} onValueChange={clearable(setFilterMfr)}>
+        <SelectTrigger aria-label="Filter by manufacturer" className="w-full bg-background border-border rounded-xl font-medium">
+          <SelectValue placeholder="Manufacturer" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ANY}>Any manufacturer</SelectItem>
+          {filterFranchise
+            ? mfrOpts.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)
+            : <GroupedSelectItems groups={mfrGroups} />}
+        </SelectContent>
+      </Select>
+
+      {/* Team — sports context only */}
+      {showSportsFacets && (
+        <Select value={filterTeam} onValueChange={clearable(setFilterTeam)}>
+          <SelectTrigger aria-label="Filter by team" className="w-full bg-background border-border rounded-xl font-medium">
+            <SelectValue placeholder="Team" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ANY}>Any team</SelectItem>
+            {filterFranchise
+              ? teamOpts.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)
+              : <GroupedSelectItems groups={teamGroups} />}
+          </SelectContent>
+        </Select>
+      )}
+
+      {/* Set / Release */}
+      <Select value={filterSet} onValueChange={clearable(setFilterSet)}>
+        <SelectTrigger aria-label="Filter by set or release" className="w-full bg-background border-border rounded-xl font-medium">
+          <SelectValue placeholder="Set / Release" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ANY}>Any set</SelectItem>
+          {seriesGroups.map(([series, items], gi) => (
+            <SelectGroup key={series}>
+              {gi > 0 && <SelectSeparator />}
+              <SelectLabel>{series}</SelectLabel>
+              {items.map(s => (
+                <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+              ))}
+            </SelectGroup>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {/* Parallel / Variation */}
+      <Select value={filterParallel} onValueChange={clearable(setFilterParallel)}>
+        <SelectTrigger aria-label="Filter by parallel or variation" className="w-full bg-background border-border rounded-xl font-medium">
+          <SelectValue placeholder="Parallel / Variation" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ANY}>Any parallel</SelectItem>
+          {filterFranchise
+            ? parallelOpts.map(p => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}{p.print_run ? ` /${p.print_run}` : ''}
+                </SelectItem>
+              ))
+            : <GroupedSelectItems
+                groups={parallelGroups}
+                getItemLabel={p => `${p.name}${p.print_run ? ` /${p.print_run}` : ''}`}
+              />}
+        </SelectContent>
+      </Select>
+
+      {/* Subset / Insert */}
+      <Select value={filterSubset} onValueChange={clearable(setFilterSubset)}>
+        <SelectTrigger aria-label="Filter by subset or insert" className="w-full bg-background border-border rounded-xl font-medium">
+          <SelectValue placeholder="Subset / Insert" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ANY}>Any subset</SelectItem>
+          {filterSet
+            ? subsetOpts.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)
+            : <GroupedSelectItems groups={(() => {
+                const acc = {};
+                subsetOpts.forEach(s => {
+                  const g = s.set?.name || 'Other';
+                  if (!acc[g]) acc[g] = [];
+                  acc[g].push(s);
+                });
+                return Object.entries(acc).sort(([a], [b]) => a.localeCompare(b));
+              })()} />}
+        </SelectContent>
+      </Select>
+    </div>
+
+    {/* Card attributes — same set the Features pill offers, repeated here so
+        the sheet is a complete view of every filter. */}
+    <div className="pt-1">
+      <span className="block text-xs font-semibold text-muted-foreground mb-2">Card attributes</span>
+      <div className="space-y-0.5">
+        {visibleFeatures.map((f) => (
+          <label
+            key={f.key}
+            htmlFor={`marketplace-feat-${f.key}`}
+            className="flex items-center gap-2.5 cursor-pointer rounded-xl px-3 py-2 font-medium text-sm hover:bg-muted/50 transition-colors"
+          >
+            <Checkbox
+              id={`marketplace-feat-${f.key}`}
+              checked={filterFeatures.includes(f.key)}
+              onCheckedChange={(v) => setFilterFeatures((prev) =>
+                v === true ? [...prev, f.key] : prev.filter((k) => k !== f.key))}
+            />
+            {f.key === 'rookie' && <RookieJerseyIcon className="w-4 h-4 shrink-0" />}
+            {f.label}
+          </label>
+        ))}
+      </div>
+    </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans pb-20">
@@ -544,265 +907,153 @@ const MarketplacePage = () => {
 
       <section className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 mt-8 w-full flex-1">
 
-        <div className="flex flex-col lg:flex-row gap-8">
+        <div className="flex flex-col gap-8">
 
-        {/* Left sidebar: Search + category filters */}
-        <aside className="w-full lg:w-72 lg:shrink-0 lg:sticky lg:top-24 lg:self-start">
-          <div className="bg-muted/30 border border-border p-4 rounded-2xl space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Search &amp; Filter</h2>
-              {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={clearFilters} className="rounded-xl text-muted-foreground hover:text-foreground h-8 px-2">
-                  <X className="w-4 h-4 mr-1" /> Clear
-                </Button>
-              )}
-            </div>
+        <div className="min-w-0">
 
-            {/* Save the current view / re-apply saved ones (signed-in only) */}
-            {currentUser && hasActiveFilters && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={saveCurrentSearch}
-                disabled={savingSearch}
-                className="w-full rounded-xl font-bold gap-1.5"
-              >
-                <Bookmark className="w-4 h-4" /> Save this search
-              </Button>
-            )}
-            {currentUser && savedSearches.length > 0 && (
-              <div>
-                <span className="block text-xs font-semibold text-muted-foreground mb-1.5">Saved searches</span>
-                <ul className="space-y-1">
-                  {savedSearches.map((s) => (
-                    <li key={s.id} className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => applySavedSearch(s.params)}
-                        className="flex-1 min-w-0 truncate text-left text-sm font-medium text-foreground hover:text-primary px-2 py-1.5 rounded-lg hover:bg-muted transition-colors"
-                        title={s.name}
-                      >
-                        {s.name}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => deleteSavedSearch(s.id)}
-                        aria-label={`Delete saved search ${s.name}`}
-                        className="shrink-0 p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Search */}
-            <div className="relative">
+        {/* ── Filter bar ──────────────────────────────────────────────────────
+            Horizontal pill dropdowns instead of a tall sidebar: the facets a
+            card buyer reaches for stay one click away and visible, and the bar
+            scrolls sideways on phones rather than pushing the grid down a
+            screen. Facet vocabulary is shared with the add-card form
+            (lib/cardFilters.js) so every option can actually be matched. */}
+        <div className="mb-6 flex items-start gap-2">
+          {/* Scrolls sideways on phones; wraps to a second row on desktop, where
+              11 controls don't fit one line. Radix popovers portal to <body>,
+              so the scroll container never clips them. */}
+          <div className="flex-1 min-w-0 flex items-center md:flex-wrap gap-2 overflow-x-auto md:overflow-visible pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {/* Quick text search stays inline — it's the most-used control */}
+            <div className="relative shrink-0 w-56">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
               <Input
-                name="marketplace-search"
+                name="marketplace-search-bar"
                 aria-label="Search card name"
-                placeholder="Search card, set or number..."
+                placeholder="Search cards..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="pl-9 h-10 rounded-xl bg-background border-border"
+                className="pl-9 h-10 rounded-full bg-background border-border"
               />
             </div>
 
-            {/* Price range */}
-            <div>
-              <label htmlFor="marketplace-min-price" className="block text-xs font-semibold text-muted-foreground mb-1.5">Price range</label>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="number"
-                  id="marketplace-min-price"
-                  name="marketplace-min-price"
-                  aria-label="Minimum price"
-                  placeholder="Min $"
-                  value={minPrice}
-                  onChange={e => setMinPrice(e.target.value)}
-                  className="flex-1 h-10 rounded-xl bg-background border-border"
-                />
-                <span className="text-muted-foreground text-sm font-medium">–</span>
-                <Input
-                  type="number"
-                  name="marketplace-max-price"
-                  aria-label="Maximum price"
-                  placeholder="Max $"
-                  value={maxPrice}
-                  onChange={e => setMaxPrice(e.target.value)}
-                  className="flex-1 h-10 rounded-xl bg-background border-border"
-                />
-              </div>
-            </div>
+            <FilterChip label="Graded" active={Boolean(filterGraded)}>
+              <RadioRow value="" label="Any" current={filterGraded} onChange={setFilterGraded} />
+              <RadioRow value="graded" label="Graded only" current={filterGraded} onChange={setFilterGraded} />
+              <RadioRow value="raw" label="Raw (ungraded)" current={filterGraded} onChange={setFilterGraded} />
+            </FilterChip>
 
-            {/* Popular players — sports context only */}
-            {showSportsFacets && (
-              <div>
-                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Popular players</label>
-                <Select value={filterPlayer} onValueChange={clearable(setFilterPlayer)}>
-                  <SelectTrigger aria-label="Filter by player" className="w-full bg-background border-border rounded-xl font-medium">
-                    <SelectValue placeholder="Player" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ANY}>Any player</SelectItem>
-                    {POPULAR_PLAYERS.map(p => (
-                      <SelectItem key={p.term} value={p.term}>{p.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <FilterChip label="Grader" count={filterGraders.length}>
+              {GRADERS.map((g) => (
+                <CheckRow key={g.value} value={g.value} label={g.label} values={filterGraders} onChange={setFilterGraders} />
+              ))}
+            </FilterChip>
+
+            <FilterChip label="Grade" count={filterGrades.length}>
+              {GRADE_VALUES.map((g) => (
+                <CheckRow key={g} value={g} label={g} values={filterGrades} onChange={setFilterGrades} />
+              ))}
+            </FilterChip>
+
+            <FilterChip label="Condition" count={filterConditions.length}>
+              {CONDITIONS.map((c) => (
+                <CheckRow key={c.value} value={c.value} label={c.label} values={filterConditions} onChange={setFilterConditions} />
+              ))}
+            </FilterChip>
+
+            <FilterChip label="Language" count={filterLanguages.length}>
+              {CARD_LANGUAGES.map((l) => (
+                <CheckRow key={l} value={l} label={l} values={filterLanguages} onChange={setFilterLanguages} />
+              ))}
+            </FilterChip>
+
+            {/* Rarity is a TCG concept — sports parallels live under Parallel */}
+            {!sportsContext && (
+              <FilterChip label="Rarity" count={filterRarities.length}>
+                {TCG_RARITIES.map((r) => (
+                  <CheckRow key={r} value={r} label={r} values={filterRarities} onChange={setFilterRarities} />
+                ))}
+              </FilterChip>
             )}
 
-            {/* Category cascade — every level is always open and selectable;
-                picking a parent just narrows the options below it */}
-            <div className="space-y-3 pt-1">
-              <label htmlFor="marketplace-category" className="block text-xs font-semibold text-muted-foreground">Browse by category</label>
-              {/* Category */}
-              <Select value={filterCat} onValueChange={clearable(setFilterCat)}>
-                <SelectTrigger id="marketplace-category" aria-label="Filter by category" className="w-full bg-background border-border rounded-xl font-medium">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ANY}>Any category</SelectItem>
-                  {catOpts.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            <FilterChip label="Features" count={filterFeatures.length}>
+              {visibleFeatures.map((f) => (
+                <CheckRow key={f.key} value={f.key} label={f.label} values={filterFeatures} onChange={setFilterFeatures} />
+              ))}
+            </FilterChip>
 
-              {/* Franchise */}
-              <Select value={filterFranchise} onValueChange={clearable(setFilterFranchise)}>
-                <SelectTrigger aria-label="Filter by franchise" className="w-full bg-background border-border rounded-xl font-medium">
-                  <SelectValue placeholder="Franchise" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ANY}>Any franchise</SelectItem>
-                  {filterCat
-                    ? franchiseOpts.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)
-                    : <GroupedSelectItems groups={(() => {
-                        const acc = {};
-                        franchiseOpts.forEach(f => {
-                          const g = catNames[f.parent_id] || 'Other';
-                          if (!acc[g]) acc[g] = [];
-                          acc[g].push(f);
-                        });
-                        return Object.entries(acc).sort(([a], [b]) => a.localeCompare(b));
-                      })()} />}
-                </SelectContent>
-              </Select>
-
-              {/* Manufacturer */}
-              <Select value={filterMfr} onValueChange={clearable(setFilterMfr)}>
-                <SelectTrigger aria-label="Filter by manufacturer" className="w-full bg-background border-border rounded-xl font-medium">
-                  <SelectValue placeholder="Manufacturer" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ANY}>Any manufacturer</SelectItem>
-                  {filterFranchise
-                    ? mfrOpts.map(m => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)
-                    : <GroupedSelectItems groups={mfrGroups} />}
-                </SelectContent>
-              </Select>
-
-              {/* Team — sports context only */}
-              {showSportsFacets && (
-                <Select value={filterTeam} onValueChange={clearable(setFilterTeam)}>
-                  <SelectTrigger aria-label="Filter by team" className="w-full bg-background border-border rounded-xl font-medium">
-                    <SelectValue placeholder="Team" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ANY}>Any team</SelectItem>
-                    {filterFranchise
-                      ? teamOpts.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)
-                      : <GroupedSelectItems groups={teamGroups} />}
-                  </SelectContent>
-                </Select>
-              )}
-
-              {/* Set / Release */}
-              <Select value={filterSet} onValueChange={clearable(setFilterSet)}>
-                <SelectTrigger aria-label="Filter by set or release" className="w-full bg-background border-border rounded-xl font-medium">
-                  <SelectValue placeholder="Set / Release" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ANY}>Any set</SelectItem>
-                  {seriesGroups.map(([series, items], gi) => (
-                    <SelectGroup key={series}>
-                      {gi > 0 && <SelectSeparator />}
-                      <SelectLabel>{series}</SelectLabel>
-                      {items.map(s => (
-                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Parallel / Variation */}
-              <Select value={filterParallel} onValueChange={clearable(setFilterParallel)}>
-                <SelectTrigger aria-label="Filter by parallel or variation" className="w-full bg-background border-border rounded-xl font-medium">
-                  <SelectValue placeholder="Parallel / Variation" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ANY}>Any parallel</SelectItem>
-                  {filterFranchise
-                    ? parallelOpts.map(p => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.name}{p.print_run ? ` /${p.print_run}` : ''}
-                        </SelectItem>
-                      ))
-                    : <GroupedSelectItems
-                        groups={parallelGroups}
-                        getItemLabel={p => `${p.name}${p.print_run ? ` /${p.print_run}` : ''}`}
-                      />}
-                </SelectContent>
-              </Select>
-
-              {/* Subset / Insert */}
-              <Select value={filterSubset} onValueChange={clearable(setFilterSubset)}>
-                <SelectTrigger aria-label="Filter by subset or insert" className="w-full bg-background border-border rounded-xl font-medium">
-                  <SelectValue placeholder="Subset / Insert" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ANY}>Any subset</SelectItem>
-                  {filterSet
-                    ? subsetOpts.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)
-                    : <GroupedSelectItems groups={(() => {
-                        const acc = {};
-                        subsetOpts.forEach(s => {
-                          const g = s.set?.name || 'Other';
-                          if (!acc[g]) acc[g] = [];
-                          acc[g].push(s);
-                        });
-                        return Object.entries(acc).sort(([a], [b]) => a.localeCompare(b));
-                      })()} />}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Card attributes — rookie is a sports concept */}
-            {showSportsFacets && (
-              <div className="pt-1">
-                <span className="block text-xs font-semibold text-muted-foreground mb-2">Card attributes</span>
-                <label
-                  htmlFor="marketplace-rookie"
-                  className="flex items-center gap-2.5 cursor-pointer rounded-xl border border-border bg-background px-3 py-2.5 font-medium text-sm hover:bg-muted/50 transition-colors"
-                >
-                  <Checkbox
-                    id="marketplace-rookie"
-                    checked={filterRookie}
-                    onCheckedChange={v => setFilterRookie(v === true)}
+            <FilterChip label="Price" active={Boolean(minPrice || maxPrice)} contentClassName="w-72">
+              {PRICE_PRESETS.map((p) => (
+                <RadioRow
+                  key={p.label}
+                  value={`${p.min}-${p.max}`}
+                  label={p.label}
+                  current={`${minPrice}-${maxPrice}`}
+                  onChange={() => { setMinPrice(p.min); setMaxPrice(p.max); }}
+                />
+              ))}
+              <div className="mt-2 border-t border-border pt-3 px-1">
+                <span className="block text-xs font-semibold text-muted-foreground mb-1.5">Custom range (AUD)</span>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number" aria-label="Minimum price" placeholder="Min $"
+                    value={minPrice} onChange={e => setMinPrice(e.target.value)}
+                    className="h-9 rounded-xl bg-background border-border"
                   />
-                  <RookieJerseyIcon className="w-4 h-4 shrink-0" /> Rookie Card
-                </label>
+                  <span className="text-muted-foreground text-sm">–</span>
+                  <Input
+                    type="number" aria-label="Maximum price" placeholder="Max $"
+                    value={maxPrice} onChange={e => setMaxPrice(e.target.value)}
+                    className="h-9 rounded-xl bg-background border-border"
+                  />
+                </div>
               </div>
-            )}
-          </div>
-        </aside>
+            </FilterChip>
 
-        {/* Main content: listing type toggles + sort + grid */}
-        <div className="flex-1 min-w-0">
+            <FilterChip label="Buying Format" active={filterMode !== 'All'}>
+              <RadioRow value="All" label="All listings" current={filterMode} onChange={setFilterMode} />
+              <RadioRow value="BuyNow" label="Buy Now" current={filterMode} onChange={setFilterMode} />
+              <RadioRow value="Auction" label="Auction" current={filterMode} onChange={setFilterMode} />
+              <RadioRow value="MakeOffer" label="Accepts offers" current={filterMode} onChange={setFilterMode} />
+              {settings.enable_trading !== false && (
+                <RadioRow value="ForTrade" label="For trade" current={filterMode} onChange={setFilterMode} />
+              )}
+            </FilterChip>
+
+            {/* Everything else: category cascade, price, saved searches */}
+            <Sheet>
+              <SheetTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border bg-background px-4 py-2 text-sm font-bold whitespace-nowrap transition-colors hover:border-muted-foreground/50 hover:bg-muted/50"
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+                  All Filters
+                </button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[90vw] sm:w-[420px] overflow-y-auto">
+                <SheetHeader className="mb-4 text-left">
+                  <SheetTitle>All filters</SheetTitle>
+                </SheetHeader>
+                {allFiltersPanel}
+              </SheetContent>
+            </Sheet>
+          </div>
+
+          <div className="hidden md:flex items-center gap-2 shrink-0">
+            <Button variant="ghost" size="icon" aria-label="Refresh listings" onClick={() => fetchRef.current?.(true)} disabled={loading} className="rounded-full h-10 w-10 bg-muted/50 hover:bg-muted">
+              <RefreshCw className={`w-4 h-4 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+            <Select value={sort} onValueChange={setSort}>
+              <SelectTrigger aria-label="Sort listings" className="w-[170px] h-10 rounded-full bg-background border-border font-medium">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                <SelectItem value="created_at_desc">Newest Listings</SelectItem>
+                <SelectItem value="price_asc">Price: Low to High</SelectItem>
+                <SelectItem value="price_desc">Price: High to Low</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
         {activeChips.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 mb-6">
@@ -829,54 +1080,34 @@ const MarketplacePage = () => {
           </div>
         )}
 
-        {/* Listing type + sort row */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-6 border-b border-border">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant={filterMode === 'All' ? 'default' : 'outline'}
-              className={`rounded-full px-5 font-bold ${filterMode === 'All' ? 'text-white shadow-md' : 'font-medium bg-background hover:bg-primary hover:text-white'}`}
-              onClick={() => setFilterMode('All')}
-            >
-              All Listings
-            </Button>
-            <Button
-              variant="outline"
-              className={`rounded-full px-5 font-bold ${filterMode === 'Auction' ? 'bg-brand-charcoal hover:bg-brand-charcoal/90 text-white shadow-md border-none' : 'bg-background hover:bg-brand-charcoal hover:text-white hover:border-brand-charcoal'}`}
-              onClick={() => setFilterMode('Auction')}
-            >
-              Auction
-            </Button>
-            <Button
-              variant="outline"
-              className={`rounded-full px-5 font-bold ${filterMode === 'BuyNow' ? 'bg-[hsl(var(--vault-sale))] hover:bg-[hsl(var(--vault-sale))]/90 text-white shadow-md border-none' : 'bg-background hover:bg-[hsl(var(--vault-sale))] hover:text-white hover:border-[hsl(var(--vault-sale))]'}`}
-              onClick={() => setFilterMode('BuyNow')}
-            >
-              Buy Now
-            </Button>
-            <Button
-              variant="outline"
-              className={`rounded-full px-5 font-bold ${filterMode === 'MakeOffer' ? 'bg-amber-700 hover:bg-amber-800 text-white shadow-md border-none' : 'bg-background hover:bg-amber-700 hover:text-white hover:border-amber-700'}`}
-              onClick={() => setFilterMode('MakeOffer')}
-            >
-              Make an Offer
-            </Button>
-            {settings.enable_trading !== false && (
+        {/* Result count + save-search, plus the sort control on phones (it sits
+            in the filter bar from md up) */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8 pb-5 border-b border-border">
+          <div className="flex items-center gap-3">
+            <p className="text-sm font-semibold text-muted-foreground">
+              {loading
+                ? 'Loading listings…'
+                : <><span className="tabular-nums text-foreground">{totalCount.toLocaleString('en-AU')}</span> {totalCount === 1 ? 'listing' : 'listings'}</>}
+            </p>
+            {currentUser && hasActiveFilters && (
               <Button
                 variant="outline"
-                className={`rounded-full px-5 font-bold ${filterMode === 'ForTrade' ? 'bg-[hsl(var(--vault-trade))] hover:bg-[hsl(var(--vault-trade))]/90 text-white shadow-md border-none' : 'bg-background hover:bg-[hsl(var(--vault-trade))] hover:text-white hover:border-[hsl(var(--vault-trade))]'}`}
-                onClick={() => setFilterMode('ForTrade')}
+                size="sm"
+                onClick={saveCurrentSearch}
+                disabled={savingSearch}
+                className="rounded-full font-bold gap-1.5 h-8"
               >
-                For Trade
+                <Bookmark className="w-3.5 h-3.5" /> Save search
               </Button>
             )}
           </div>
 
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" aria-label="Refresh listings" onClick={() => fetchRef.current?.(true)} disabled={loading} className="rounded-full h-10 w-10 shrink-0 bg-muted/50 hover:bg-muted">
+          <div className="flex md:hidden items-center gap-2">
+            <Button variant="ghost" size="icon" aria-label="Refresh listings" onClick={() => fetchRef.current?.(true)} disabled={loading} className="rounded-full h-9 w-9 shrink-0 bg-muted/50 hover:bg-muted">
               <RefreshCw className={`w-4 h-4 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
             </Button>
             <Select value={sort} onValueChange={setSort}>
-              <SelectTrigger aria-label="Sort listings" className="w-[180px] h-10 rounded-xl bg-background border-border font-medium">
+              <SelectTrigger aria-label="Sort listings" className="flex-1 h-9 rounded-full bg-background border-border font-medium">
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent className="rounded-xl">
