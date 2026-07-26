@@ -206,6 +206,9 @@ const SearchResultsPage = () => {
 
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState({ listings: [], shop: [], sellers: [], blog: [], events: [] });
+  // Fuzzy fallback for zero-result queries ("Charzard" → "Charizard"),
+  // served by the suggestions endpoint's did-you-mean matcher.
+  const [didYouMean, setDidYouMean] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -229,14 +232,25 @@ const SearchResultsPage = () => {
       if (cancelled) return;
       // Rank each group by relevance and keep the best matches.
       const val = (r) => (r.status === 'fulfilled' ? rankItems(r.value, qLower, tokens, PER_SOURCE) : []);
-      setGroups({
+      const ranked = {
         listings: val(listings),
         shop: val(shop),
         sellers: val(sellers),
         blog: val(blog),
         events: val(events),
-      });
+      };
+      setGroups(ranked);
       setLoading(false);
+
+      // Nothing matched → ask the suggestions endpoint for a fuzzy correction
+      setDidYouMean(null);
+      if (Object.values(ranked).every((g) => g.length === 0)) {
+        try {
+          const res = await fetch(`/api/search-suggestions?q=${encodeURIComponent(safe)}&limit=1`);
+          const data = await res.json();
+          if (!cancelled && data?.didYouMean) setDidYouMean(data.didYouMean);
+        } catch { /* fuzzy fallback is best-effort */ }
+      }
     };
     run();
     return () => { cancelled = true; };
@@ -290,6 +304,15 @@ const SearchResultsPage = () => {
               ? <>We couldn't find anything matching "{query}" across the marketplace, shop, sellers, guides or events. Try a different spelling or a broader term.</>
               : 'Enter a search above to look across the whole site.'}
           </p>
+          {didYouMean && (
+            <button
+              type="button"
+              onClick={() => setSearchParams({ q: didYouMean })}
+              className="mt-4 text-primary font-bold hover:underline"
+            >
+              Did you mean “{didYouMean}”?
+            </button>
+          )}
         </div>
       ) : (
         <>

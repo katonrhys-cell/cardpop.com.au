@@ -49,44 +49,49 @@ router.get('/', async (req, res) => {
 
     if (productsError) throw productsError;
 
-    // Combine and deduplicate suggestions
-    const suggestions = new Set();
+    // Combine and deduplicate suggestions (case-insensitively, keeping the
+    // first-seen casing — otherwise "Charizard" and "charizard" both appear).
+    const suggestions = new Map();
+    const addSuggestion = (name) => {
+      if (!name) return;
+      const key = name.toLowerCase();
+      if (!suggestions.has(key)) suggestions.set(key, name);
+    };
 
-    cards?.forEach(card => {
-      if (card.card_name) suggestions.add(card.card_name);
-    });
+    cards?.forEach(card => addSuggestion(card.card_name));
+    shopProducts?.forEach(product => addSuggestion(product.title));
 
-    shopProducts?.forEach(product => {
-      if (product.title) suggestions.add(product.title);
-    });
-
-    // Add popular card names as fallback if few results
+    // Backfill with recent card names if few results. (This query previously
+    // ordered by a non-existent `created` column, so it errored and was
+    // silently skipped on every request.)
     if (suggestions.size < 5) {
       const { data: popularCards, error: popularError } = await supabase
         .from('vault_items')
         .select('card_name')
-        .order('created', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(10);
 
       if (!popularError && popularCards) {
         popularCards.forEach(card => {
           if (card.card_name && card.card_name.toLowerCase().includes(q.toLowerCase())) {
-            suggestions.add(card.card_name);
+            addSuggestion(card.card_name);
           }
         });
       }
     }
 
-    const suggestionsArray = Array.from(suggestions).slice(0, limit);
-    
+    const suggestionsArray = Array.from(suggestions.values()).slice(0, limit);
+
     // Add fuzzy matching for "Did you mean?" if no exact matches
     let didYouMean = null;
     if (suggestionsArray.length === 0) {
-      // Get all card names for fuzzy matching
+      // Recent card names as the fuzzy pool — wide enough to catch common
+      // misspellings without pulling the whole table.
       const { data: allCards, error: allCardsError } = await supabase
         .from('vault_items')
         .select('card_name')
-        .limit(100);
+        .order('created_at', { ascending: false })
+        .limit(500);
 
       if (!allCardsError && allCards) {
         const allCardNames = allCards.map(card => card.card_name).filter(Boolean);
