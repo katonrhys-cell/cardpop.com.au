@@ -59,14 +59,28 @@ const MarketplacePage = () => {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [page, setPage] = useState(0);
+  // 1-based ?page= in the URL, 0-based in state (declared before useSearchParams,
+  // so it reads location directly)
+  const [page, setPage] = useState(() => {
+    try {
+      const p = parseInt(new URLSearchParams(window.location.search).get('page') || '1', 10);
+      return Number.isFinite(p) && p > 1 ? p - 1 : 0;
+    } catch { return 0; }
+  });
   const [totalCount, setTotalCount] = useState(0);
   const PAGE_SIZE = 24;
 
   const { settings } = usePlatformSettings();
-  const [sort, setSort] = useState('created_at_desc');
-  const [filterMode, setFilterMode] = useState('All');
-  const [filterRookie, setFilterRookie] = useState(false);
+
+  // ALL filter state is mirrored in the URL (see the writer effect below), so a
+  // filtered view survives refresh and can be shared. Seed every filter from
+  // the query string on mount.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const qp = (key, fallback = '') => searchParams.get(key) ?? fallback;
+
+  const [sort, setSort] = useState(() => qp('sort', 'created_at_desc'));
+  const [filterMode, setFilterMode] = useState(() => qp('mode', 'All'));
+  const [filterRookie, setFilterRookie] = useState(() => qp('rookie') === '1');
 
   // 6-level hierarchy filters
   const {
@@ -86,14 +100,14 @@ const MarketplacePage = () => {
     buildNameMap,
   } = useCategories();
 
-  const [filterCat, setFilterCat]           = useState('');
-  const [filterFranchise, setFilterFranchise] = useState('');
-  const [filterMfr, setFilterMfr]           = useState('');
-  const [filterTeam, setFilterTeam]         = useState('');
-  const [filterSet, setFilterSet]           = useState('');
-  const [filterParallel, setFilterParallel] = useState('');
-  const [filterSubset, setFilterSubset]     = useState('');
-  const [filterPlayer, setFilterPlayer]     = useState('');
+  const [filterCat, setFilterCat]             = useState(() => qp('cat'));
+  const [filterFranchise, setFilterFranchise] = useState(() => qp('franchise'));
+  const [filterMfr, setFilterMfr]             = useState(() => qp('mfr'));
+  const [filterTeam, setFilterTeam]           = useState(() => qp('team'));
+  const [filterSet, setFilterSet]             = useState(() => qp('set'));
+  const [filterParallel, setFilterParallel]   = useState(() => qp('parallel'));
+  const [filterSubset, setFilterSubset]       = useState(() => qp('subset'));
+  const [filterPlayer, setFilterPlayer]       = useState(() => qp('player'));
 
   const [catOpts, setCatOpts]             = useState([]);
   const [franchiseOpts, setFranchiseOpts] = useState([]);
@@ -111,20 +125,24 @@ const MarketplacePage = () => {
   // Search and price. The global header search navigates to /marketplace?q=…,
   // so seed the search state from the URL param (both states, so the initial
   // fetch already carries the query instead of firing once unfiltered).
-  const [searchParams] = useSearchParams();
   const urlQuery = searchParams.get('q') || '';
   const [search, setSearch]     = useState(urlQuery);
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
+  const [minPrice, setMinPrice] = useState(() => qp('min'));
+  const [maxPrice, setMaxPrice] = useState(() => qp('max'));
   const [debouncedSearch, setDebouncedSearch] = useState(urlQuery);
-  const [debouncedMin, setDebouncedMin]       = useState('');
-  const [debouncedMax, setDebouncedMax]       = useState('');
+  const [debouncedMin, setDebouncedMin]       = useState(() => qp('min'));
+  const [debouncedMax, setDebouncedMax]       = useState(() => qp('max'));
 
   const fetchRef = useRef(null);
+  // Query string this component itself last wrote — distinguishes our own URL
+  // mirroring from an external navigation (header search) so the read effect
+  // below never clobbers in-flight typing with a stale ?q=.
+  const lastWrittenParamsRef = useRef(null);
 
   // Apply ?q= changes made while already on this page (a new header search
   // just updates the param — no remount).
   useEffect(() => {
+    if (searchParams.toString() === lastWrittenParamsRef.current) return;
     const q = searchParams.get('q');
     if (q !== null) setSearch(q);
   }, [searchParams]);
@@ -151,16 +169,26 @@ const MarketplacePage = () => {
     buildNameMap().then(setAllNames);
   }, [getRootCategories, buildNameMap]);
 
+  // The cascade effects below reset child filters when their parent CHANGES —
+  // but each also fires once on mount, where resetting would clobber the
+  // child filters just seeded from the URL. Each skips its first run.
+  const catCascadeInit = useRef(true);
+  const franchiseCascadeInit = useRef(true);
+  const setCascadeInit = useRef(true);
+  const subsetCascadeInit = useRef(true);
+
   // Franchise options: scoped to the selected category, otherwise all franchises.
   // Every level stays selectable even when its parent hasn't been chosen.
   useEffect(() => {
-    setFilterFranchise('');
+    if (catCascadeInit.current) catCascadeInit.current = false;
+    else setFilterFranchise('');
     (filterCat ? getFranchisesByCategory(filterCat) : getAllFranchises()).then(setFranchiseOpts);
   }, [filterCat, getFranchisesByCategory, getAllFranchises]);
 
   // Manufacturer / team / parallel options: scoped to franchise, otherwise all
   useEffect(() => {
-    setFilterMfr(''); setFilterTeam(''); setFilterParallel('');
+    if (franchiseCascadeInit.current) franchiseCascadeInit.current = false;
+    else { setFilterMfr(''); setFilterTeam(''); setFilterParallel(''); }
     if (filterFranchise) {
       getManufacturersByFranchise(filterFranchise).then(setMfrOpts);
       getTeamsByFranchise(filterFranchise).then(setTeamOpts);
@@ -174,7 +202,8 @@ const MarketplacePage = () => {
 
   // Set options: scoped to franchise (and refined by manufacturer), otherwise all
   useEffect(() => {
-    setFilterSet('');
+    if (setCascadeInit.current) setCascadeInit.current = false;
+    else setFilterSet('');
     (filterFranchise
       ? getSetsByFranchiseAndManufacturer(filterFranchise, filterMfr || '')
       : getAllSets(filterMfr || '')
@@ -183,7 +212,8 @@ const MarketplacePage = () => {
 
   // Subset options: scoped to the selected set, otherwise all
   useEffect(() => {
-    setFilterSubset('');
+    if (subsetCascadeInit.current) subsetCascadeInit.current = false;
+    else setFilterSubset('');
     (filterSet ? getSubsetsBySet(filterSet) : getAllSubsets()).then(setSubsetOpts);
   }, [filterSet, getSubsetsBySet, getAllSubsets]);
 
@@ -217,6 +247,36 @@ const MarketplacePage = () => {
 
   // Map the "Any …" sentinel back to an empty filter value
   const clearable = (setter) => (v) => setter(v === ANY ? '' : v);
+
+  // Sports-only facets (team, player, rookie) only make sense in a sports
+  // context — a Pokémon collector should never be offered "Team" or an
+  // NBA-players quick filter. Sports context = the selected root category is
+  // Sports, or the selected franchise belongs to it. Deliberately anchored
+  // (^sports) so "Non-Sport Cards" doesn't match.
+  const SPORTS_NAME_RE = /^sports?\b/i;
+  const selectedFranchise = franchiseOpts.find((f) => f.id === filterFranchise);
+  const sportsContext =
+    SPORTS_NAME_RE.test(catNames[filterCat] || '') ||
+    (selectedFranchise
+      ? SPORTS_NAME_RE.test(allNames[selectedFranchise.parent_id] || catNames[selectedFranchise.parent_id] || '')
+      : false);
+
+  // Leaving the sports context clears sports-only filters so an invisible
+  // team/player/rookie filter can't silently empty the results. Only runs once
+  // the name/option data needed to JUDGE the context has loaded — otherwise a
+  // URL-seeded sports view would be wiped during the initial fetch.
+  useEffect(() => {
+    if (sportsContext) return;
+    if (!filterCat && !filterFranchise) return; // unscoped browse: nothing to judge
+    if (filterCat && !catNames[filterCat]) return;            // names not loaded yet
+    if (filterFranchise && !selectedFranchise) return;        // options not loaded yet
+    setFilterTeam(''); setFilterPlayer(''); setFilterRookie(false);
+     
+  }, [sportsContext, filterCat, filterFranchise, catNames, selectedFranchise]);
+
+  // Sports facets stay hidden on the unscoped default view — it serves the
+  // widest audience — and appear once a sports category/franchise is chosen.
+  const showSportsFacets = sportsContext;
 
   // Main listings fetch
   useEffect(() => {
@@ -294,9 +354,39 @@ const MarketplacePage = () => {
 
   // Reset to the first page whenever the filters/sort change so the user never
   // lands on an out-of-range page (the stale-fetch is cancelled by the guard).
+  // Skips the mount run so a URL-seeded ?page= isn't immediately zeroed.
+  const pageResetInit = useRef(true);
   useEffect(() => {
+    if (pageResetInit.current) { pageResetInit.current = false; return; }
     setPage(0);
   }, [sort, filterMode, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, filterPlayer, debouncedSearch, debouncedMin, debouncedMax, filterRookie]);
+
+  // Mirror the full filter state into the URL (replace, no history spam) so
+  // refresh and shared links reproduce the exact view. lastWrittenParamsRef
+  // lets the ?q= reader distinguish our own writes from external navigation.
+  useEffect(() => {
+    const params = {};
+    if (debouncedSearch) params.q = debouncedSearch;
+    if (filterMode !== 'All') params.mode = filterMode;
+    if (sort !== 'created_at_desc') params.sort = sort;
+    if (filterCat) params.cat = filterCat;
+    if (filterFranchise) params.franchise = filterFranchise;
+    if (filterMfr) params.mfr = filterMfr;
+    if (filterTeam) params.team = filterTeam;
+    if (filterSet) params.set = filterSet;
+    if (filterParallel) params.parallel = filterParallel;
+    if (filterSubset) params.subset = filterSubset;
+    if (filterPlayer) params.player = filterPlayer;
+    if (filterRookie) params.rookie = '1';
+    if (debouncedMin) params.min = debouncedMin;
+    if (debouncedMax) params.max = debouncedMax;
+    if (page > 0) params.page = String(page + 1);
+    const next = new URLSearchParams(params).toString();
+    if (next !== window.location.search.replace(/^\?/, '')) {
+      lastWrittenParamsRef.current = next;
+      setSearchParams(params, { replace: true });
+    }
+  }, [debouncedSearch, filterMode, sort, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, filterPlayer, filterRookie, debouncedMin, debouncedMax, page, setSearchParams]);
 
   // Realtime subscription to vault_items changes to refresh listings.
   // The subscription is unfiltered (any user's vault edit fires it), so
@@ -331,24 +421,26 @@ const MarketplacePage = () => {
     setSearch(''); setMinPrice(''); setMaxPrice('');
   };
 
-  const getBreadcrumb = () => {
-    const setName      = setOpts.find(s => s.id === filterSet)?.name;
-    const mfrName      = mfrOpts.find(m => m.id === filterMfr)?.name;
-    const teamName     = teamOpts.find(t => t.id === filterTeam)?.name;
-    const frName       = franchiseOpts.find(f => f.id === filterFranchise)?.name;
-    const catName      = catNames[filterCat];
-    const parallelName = parallelOpts.find(p => p.id === filterParallel)?.name;
-    const subsetName   = subsetOpts.find(s => s.id === filterSubset)?.name;
-    const playerName   = POPULAR_PLAYERS.find(p => p.term === filterPlayer)?.label;
-    const parts = [catName, frName, teamName, mfrName, setName, parallelName, subsetName, playerName].filter(Boolean);
-    return parts.length ? `Filtering by: ${parts.join(' › ')}` : null;
-  };
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- getBreadcrumb reads only the deps listed
-  const breadcrumbText = useMemo(() => getBreadcrumb(), [
+  // Each active filter renders as a removable chip above the grid, so any one
+  // can be cleared without hunting for its dropdown in the sidebar.
+  const activeChips = useMemo(() => {
+    const chips = [];
+    const add = (label, clear) => { if (label) chips.push({ label, clear }); };
+    add(catNames[filterCat] && filterCat ? catNames[filterCat] : null, () => setFilterCat(''));
+    add(franchiseOpts.find(f => f.id === filterFranchise)?.name, () => setFilterFranchise(''));
+    add(teamOpts.find(t => t.id === filterTeam)?.name, () => setFilterTeam(''));
+    add(mfrOpts.find(m => m.id === filterMfr)?.name, () => setFilterMfr(''));
+    add(setOpts.find(s => s.id === filterSet)?.name, () => setFilterSet(''));
+    add(parallelOpts.find(p => p.id === filterParallel)?.name, () => setFilterParallel(''));
+    add(subsetOpts.find(s => s.id === filterSubset)?.name, () => setFilterSubset(''));
+    add(POPULAR_PLAYERS.find(p => p.term === filterPlayer)?.label, () => setFilterPlayer(''));
+    if (filterRookie) add('Rookie Card', () => setFilterRookie(false));
+    return chips;
+     
+  }, [
     setOpts, mfrOpts, teamOpts, franchiseOpts, parallelOpts, subsetOpts, catNames,
     filterSet, filterMfr, filterTeam, filterFranchise, filterCat, filterParallel,
-    filterSubset, filterPlayer,
+    filterSubset, filterPlayer, filterRookie,
   ]);
   const hasActiveFilters = filterCat || filterFranchise || filterMfr || filterTeam || filterSet || filterParallel || filterSubset || filterPlayer || filterMode !== 'All' || filterRookie || search || minPrice || maxPrice;
 
@@ -426,21 +518,23 @@ const MarketplacePage = () => {
               </div>
             </div>
 
-            {/* Popular players */}
-            <div>
-              <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Popular players</label>
-              <Select value={filterPlayer} onValueChange={clearable(setFilterPlayer)}>
-                <SelectTrigger aria-label="Filter by player" className="w-full bg-background border-border rounded-xl font-medium">
-                  <SelectValue placeholder="Player" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ANY}>Any player</SelectItem>
-                  {POPULAR_PLAYERS.map(p => (
-                    <SelectItem key={p.term} value={p.term}>{p.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Popular players — sports context only */}
+            {showSportsFacets && (
+              <div>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Popular players</label>
+                <Select value={filterPlayer} onValueChange={clearable(setFilterPlayer)}>
+                  <SelectTrigger aria-label="Filter by player" className="w-full bg-background border-border rounded-xl font-medium">
+                    <SelectValue placeholder="Player" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ANY}>Any player</SelectItem>
+                    {POPULAR_PLAYERS.map(p => (
+                      <SelectItem key={p.term} value={p.term}>{p.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Category cascade — every level is always open and selectable;
                 picking a parent just narrows the options below it */}
@@ -491,18 +585,20 @@ const MarketplacePage = () => {
                 </SelectContent>
               </Select>
 
-              {/* Team */}
-              <Select value={filterTeam} onValueChange={clearable(setFilterTeam)}>
-                <SelectTrigger aria-label="Filter by team" className="w-full bg-background border-border rounded-xl font-medium">
-                  <SelectValue placeholder="Team" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={ANY}>Any team</SelectItem>
-                  {filterFranchise
-                    ? teamOpts.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)
-                    : <GroupedSelectItems groups={teamGroups} />}
-                </SelectContent>
-              </Select>
+              {/* Team — sports context only */}
+              {showSportsFacets && (
+                <Select value={filterTeam} onValueChange={clearable(setFilterTeam)}>
+                  <SelectTrigger aria-label="Filter by team" className="w-full bg-background border-border rounded-xl font-medium">
+                    <SelectValue placeholder="Team" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ANY}>Any team</SelectItem>
+                    {filterFranchise
+                      ? teamOpts.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)
+                      : <GroupedSelectItems groups={teamGroups} />}
+                  </SelectContent>
+                </Select>
+              )}
 
               {/* Set / Release */}
               <Select value={filterSet} onValueChange={clearable(setFilterSet)}>
@@ -565,31 +661,52 @@ const MarketplacePage = () => {
               </Select>
             </div>
 
-            {/* Card attributes */}
-            <div className="pt-1">
-              <span className="block text-xs font-semibold text-muted-foreground mb-2">Card attributes</span>
-              <label
-                htmlFor="marketplace-rookie"
-                className="flex items-center gap-2.5 cursor-pointer rounded-xl border border-border bg-background px-3 py-2.5 font-medium text-sm hover:bg-muted/50 transition-colors"
-              >
-                <Checkbox
-                  id="marketplace-rookie"
-                  checked={filterRookie}
-                  onCheckedChange={v => setFilterRookie(v === true)}
-                />
-                <RookieJerseyIcon className="w-4 h-4 shrink-0" /> Rookie Card
-              </label>
-            </div>
+            {/* Card attributes — rookie is a sports concept */}
+            {showSportsFacets && (
+              <div className="pt-1">
+                <span className="block text-xs font-semibold text-muted-foreground mb-2">Card attributes</span>
+                <label
+                  htmlFor="marketplace-rookie"
+                  className="flex items-center gap-2.5 cursor-pointer rounded-xl border border-border bg-background px-3 py-2.5 font-medium text-sm hover:bg-muted/50 transition-colors"
+                >
+                  <Checkbox
+                    id="marketplace-rookie"
+                    checked={filterRookie}
+                    onCheckedChange={v => setFilterRookie(v === true)}
+                  />
+                  <RookieJerseyIcon className="w-4 h-4 shrink-0" /> Rookie Card
+                </label>
+              </div>
+            )}
           </div>
         </aside>
 
         {/* Main content: listing type toggles + sort + grid */}
         <div className="flex-1 min-w-0">
 
-        {breadcrumbText && (
-          <p className="text-sm font-bold text-primary mb-6 bg-primary/5 inline-block px-3 py-1 rounded-md">
-            {breadcrumbText}
-          </p>
+        {activeChips.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 mb-6">
+            <span className="text-xs font-semibold text-muted-foreground">Filtering by:</span>
+            {activeChips.map((chip) => (
+              <button
+                key={chip.label}
+                type="button"
+                onClick={chip.clear}
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 text-primary text-sm font-bold pl-3 pr-2 py-1 hover:bg-primary/20 transition-colors"
+                aria-label={`Remove filter ${chip.label}`}
+              >
+                {chip.label}
+                <X className="w-3.5 h-3.5" aria-hidden="true" />
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-xs font-semibold text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+            >
+              Clear all
+            </button>
+          </div>
         )}
 
         {/* Listing type + sort row */}
