@@ -15,6 +15,7 @@ import cardOcrRouter from './card-ocr.js';
 import cardDescriptionRouter from './card-description.js';
 import gradeEstimatorRouter from './grade-estimator.js';
 import eventScraperRouter from './event-scraper.js';
+import eventScanRouter from './event-scan.js';
 import eventsRouter from './events.js';
 import categoriesRouter from './categories.js';
 import subcategoriesRouter from './subcategories.js';
@@ -72,6 +73,11 @@ export default () => {
     // Event scraper routes with API rate limiting
     router.use('/event-scraper', apiLimiter);
     router.use('/event-scraper', eventScraperRouter);
+
+    // Nightly event scanner — admin management of its source list. Triggering a
+    // scan lives on its own 300s function at /cron/event-scan, not here.
+    router.use('/event-scan', apiLimiter);
+    router.use('/event-scan', eventScanRouter);
 
     // Event submission notifications (admin heads-up on user-submitted events)
     router.use('/events', apiLimiter);

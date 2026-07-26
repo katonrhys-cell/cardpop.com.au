@@ -1,8 +1,5 @@
 import 'dotenv/config';
-import dns from 'dns/promises';
-import net from 'net';
 import express from 'express';
-import { Agent, fetch as undiciFetch } from 'undici';
 import logger from '../utils/logger.js';
 import { stream } from '../api/integrated-ai.js';
 import { EventScraperPrompt } from '../constants/prompts.js';
@@ -10,6 +7,22 @@ import supabase from '../utils/supabaseClient.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import { requireAdmin } from '../middleware/requireAal2.js';
 import { LargeBodyLimit } from '../constants/common.js';
+import {
+  fetchWebpageContent,
+  extractTextFromHtml,
+  isFetchableHttpUrl,
+  ssrfSafeLookup,
+} from '../utils/safeFetch.js';
+import {
+  parseAndValidateEventJson,
+  validateAndNormalizeEventData,
+} from '../utils/eventData.js';
+
+// The SSRF guard (src/utils/safeFetch.js) and the extracted-event validator
+// (src/utils/eventData.js) live in utils so the nightly event scanner uses the
+// exact same code paths as this admin panel. Both are re-exported here because
+// their unit tests address them through this module.
+export { ssrfSafeLookup, validateAndNormalizeEventData };
 
 const router = express.Router();
 const AI_PROCESSING_TIMEOUT = 60000;
@@ -24,251 +37,6 @@ const AI_PROCESSING_TIMEOUT = 60000;
 router.use(authMiddleware);
 router.use(requireAdmin);
 router.use(express.json({ limit: LargeBodyLimit }));
-
-const VALID_EVENT_TYPES = ['card_show', 'trade_event', 'lgs_event', 'community_event'];
-const VALID_STATES = ['NSW', 'VIC', 'QLD', 'SA', 'WA', 'TAS', 'ACT', 'NT'];
-
-function isValidUrl(url) {
-  try {
-    new URL(url);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** True if an IP literal is in a private / loopback / link-local / reserved range. */
-function isPrivateIp(ip) {
-  if (net.isIPv4(ip)) {
-    const [a, b] = ip.split('.').map(Number);
-    if (a === 10 || a === 127 || a === 0) return true;            // private / loopback / this-host
-    if (a === 169 && b === 254) return true;                       // link-local (incl. cloud metadata 169.254.169.254)
-    if (a === 172 && b >= 16 && b <= 31) return true;              // private
-    if (a === 192 && b === 168) return true;                       // private
-    if (a === 100 && b >= 64 && b <= 127) return true;             // CGNAT
-    return false;
-  }
-  const lower = ip.toLowerCase();
-  if (lower === '::1' || lower === '::') return true;              // loopback / unspecified
-  if (lower.startsWith('fc') || lower.startsWith('fd')) return true; // unique-local
-  if (lower.startsWith('fe80')) return true;                       // link-local
-  if (lower.startsWith('::ffff:')) return isPrivateIp(lower.slice(7)); // IPv4-mapped
-  return false;
-}
-
-/**
- * Reject direct IP-literal or localhost hosts up front. Cheap and
- * deterministic — no DNS involved, so it can't be raced. Hostnames that go
- * through actual DNS resolution are protected separately by ssrfSafeLookup
- * below, which pins the connection to the address it validates.
- */
-function assertNotLiteralPrivateAddress(url) {
-  const { hostname } = new URL(url);
-  if (net.isIP(hostname)) {
-    if (isPrivateIp(hostname)) throw new Error('Blocked: private address');
-    return;
-  }
-  if (hostname.toLowerCase() === 'localhost') throw new Error('Blocked: localhost');
-}
-
-/**
- * Custom DNS lookup used by the dispatcher below. A prior implementation
- * resolved the hostname once to validate it, then let fetch() re-resolve the
- * same hostname independently for the actual connection — a DNS-rebinding
- * attacker (short-TTL record) could pass the check with a public IP and
- * connect to a private one (e.g. cloud metadata 169.254.169.254) moments
- * later. Running the check *as* the lookup that undici connects with closes
- * that window: whatever address is validated here is the exact address the
- * socket connects to.
- */
-export function ssrfSafeLookup(hostname, options, callback) {
-  const opts = typeof options === 'function' ? {} : options;
-  const cb = typeof options === 'function' ? options : callback;
-  dns.lookup(hostname, { ...opts, all: true })
-    .then((addresses) => {
-      if (!addresses.length) return cb(new Error(`Blocked: ${hostname} has no DNS records`));
-      if (addresses.some((a) => isPrivateIp(a.address))) {
-        return cb(new Error(`Blocked: ${hostname} resolves to a private address`));
-      }
-      if (opts.all) return cb(null, addresses);
-      const { address, family } = addresses[0];
-      return cb(null, address, family);
-    })
-    .catch(cb);
-}
-
-const ssrfSafeDispatcher = new Agent({ connect: { lookup: ssrfSafeLookup } });
-
-async function fetchWebpageContent(url) {
-  logger.info(`[EVENT_SCRAPER] Fetching content from URL: ${url}`);
-
-  // SSRF guard: literal IP/localhost checked here; DNS-resolved hostnames are
-  // pinned to their validated address via ssrfSafeDispatcher below.
-  assertNotLiteralPrivateAddress(url);
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-  try {
-    const response = await undiciFetch(url, {
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-      },
-      dispatcher: ssrfSafeDispatcher,
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch webpage: ${response.status} ${response.statusText}`);
-    }
-
-    const content = await response.text();
-    logger.info(`[EVENT_SCRAPER] Successfully fetched ${content.length} bytes from ${url}`);
-    return content;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    if (error.name === 'AbortError') {
-      throw new Error('Fetch request timed out');
-    }
-    throw error;
-  }
-}
-
-function extractTextFromHtml(html) {
-  let text = html.replace(/<script[^>]*>.*?<\/script>/gi, '');
-  text = text.replace(/<style[^>]*>.*?<\/style>/gi, '');
-  text = text.replace(/<[^>]+>/g, ' ');
-  text = text
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&amp;/g, '&');
-  text = text.replace(/\s+/g, ' ').trim();
-  if (text.length > 8000) {
-    text = text.substring(0, 8000) + '...';
-  }
-  return text;
-}
-
-function parseAndValidateEventJson(jsonString) {
-  if (!jsonString || typeof jsonString !== 'string') {
-    throw new Error('AI response is not a valid string');
-  }
-
-  let trimmed = jsonString.trim();
-  if (trimmed.startsWith('```json')) trimmed = trimmed.substring(7);
-  else if (trimmed.startsWith('```')) trimmed = trimmed.substring(3);
-  if (trimmed.endsWith('```')) trimmed = trimmed.substring(0, trimmed.length - 3);
-  trimmed = trimmed.trim();
-
-  let eventData;
-  try {
-    eventData = JSON.parse(trimmed);
-  } catch (parseError) {
-    throw new Error(`Failed to parse AI response as JSON: ${parseError.message}`);
-  }
-
-  if (!eventData.title || typeof eventData.title !== 'string' || !eventData.title.trim()) {
-    throw new Error('Event data must have a title field');
-  }
-
-  return eventData;
-}
-
-// Exported for unit testing (same pattern as ssrfSafeLookup above).
-export function validateAndNormalizeEventData(eventData) {
-  if (!eventData.title || typeof eventData.title !== 'string' || !eventData.title.trim()) {
-    throw new Error('Event title is required');
-  }
-
-  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-  const timeRegex = /^\d{2}:\d{2}$/;
-
-  const startDate = typeof eventData.start_date === 'string' && dateRegex.test(eventData.start_date)
-    ? eventData.start_date : null;
-  const endDate = typeof eventData.end_date === 'string' && dateRegex.test(eventData.end_date)
-    ? eventData.end_date : null;
-  const startTime = typeof eventData.start_time === 'string' && timeRegex.test(eventData.start_time)
-    ? eventData.start_time : null;
-  const endTime = typeof eventData.end_time === 'string' && timeRegex.test(eventData.end_time)
-    ? eventData.end_time : null;
-
-  const entryFee = (eventData.entry_fee_aud !== null && eventData.entry_fee_aud !== undefined)
-    ? (isNaN(Number(eventData.entry_fee_aud)) ? null : Number(eventData.entry_fee_aud))
-    : null;
-
-  const presaleFee = (eventData.presale_fee_aud !== null && eventData.presale_fee_aud !== undefined)
-    ? (isNaN(Number(eventData.presale_fee_aud)) ? null : Number(eventData.presale_fee_aud))
-    : null;
-
-  const capacity = (eventData.capacity !== null && eventData.capacity !== undefined)
-    ? (isNaN(parseInt(eventData.capacity, 10)) ? null : parseInt(eventData.capacity, 10))
-    : null;
-
-  const imageUrl = eventData.image_url && isValidUrl(eventData.image_url) ? eventData.image_url : null;
-  const websiteUrl = eventData.website_url && isValidUrl(eventData.website_url) ? eventData.website_url : null;
-  const ticketUrl = eventData.ticket_url && isValidUrl(eventData.ticket_url) ? eventData.ticket_url : null;
-
-  const eventType = VALID_EVENT_TYPES.includes(eventData.event_type) ? eventData.event_type : null;
-  const state = VALID_STATES.includes(eventData.state) ? eventData.state : null;
-
-  const featuredCardGames = Array.isArray(eventData.featured_card_games) && eventData.featured_card_games.length > 0
-    ? eventData.featured_card_games.filter(g => typeof g === 'string' && g.trim())
-    : null;
-
-  const seoKeywords = Array.isArray(eventData.seo_keywords) && eventData.seo_keywords.length > 0
-    ? eventData.seo_keywords.filter(k => typeof k === 'string' && k.trim())
-    : null;
-
-  const tags = Array.isArray(eventData.tags) && eventData.tags.length > 0
-    ? eventData.tags.filter(t => typeof t === 'string' && t.trim())
-    : null;
-
-  return {
-    title: eventData.title.trim(),
-    short_description: eventData.short_description || null,
-    description: eventData.description || null,
-    event_type: eventType,
-    featured_card_games: featuredCardGames,
-    venue_name: eventData.venue_name || null,
-    address: eventData.address || null,
-    suburb: eventData.suburb || null,
-    state,
-    postcode: eventData.postcode || null,
-    start_date: startDate,
-    end_date: endDate,
-    start_time: startTime,
-    end_time: endTime,
-    organizer_name: eventData.organizer_name || null,
-    organizer_email: eventData.organizer_email || null,
-    organizer_phone: eventData.organizer_phone || null,
-    website_url: websiteUrl,
-    ticket_url: ticketUrl,
-    entry_fee_aud: entryFee,
-    presale_fee_aud: presaleFee,
-    is_free: typeof eventData.is_free === 'boolean' ? eventData.is_free : (entryFee === 0 || entryFee === null),
-    capacity,
-    registration_required: typeof eventData.registration_required === 'boolean' ? eventData.registration_required : false,
-    accessibility_info: typeof eventData.accessibility_info === 'string' && eventData.accessibility_info.trim() ? eventData.accessibility_info.trim() : null,
-    age_restrictions: typeof eventData.age_restrictions === 'string' && eventData.age_restrictions.trim() ? eventData.age_restrictions.trim() : null,
-    image_url: imageUrl,
-    seo_title: eventData.seo_title || null,
-    seo_description: eventData.seo_description || null,
-    seo_keywords: seoKeywords,
-    tags,
-    source_url: eventData.source_url || null,
-  };
-}
 
 function formatSSEEvent(data) {
   try {
@@ -293,12 +61,12 @@ router.post('/scrape-event-url', authMiddleware, async (req, res) => {
   }
 
   const trimmedUrl = url.trim();
-  if (!isValidUrl(trimmedUrl) || (!trimmedUrl.startsWith('http://') && !trimmedUrl.startsWith('https://'))) {
+  if (!isFetchableHttpUrl(trimmedUrl)) {
     return res.status(400).json({ error: 'Invalid URL format. Please provide a valid HTTP/HTTPS URL.' });
   }
 
   try {
-    const htmlContent = await fetchWebpageContent(trimmedUrl);
+    const htmlContent = await fetchWebpageContent(trimmedUrl, { logPrefix: 'EVENT_SCRAPER' });
     const textContent = extractTextFromHtml(htmlContent);
     res.json({ success: true, content: textContent });
   } catch (err) {
