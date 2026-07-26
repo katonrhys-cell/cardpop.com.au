@@ -18,6 +18,7 @@ import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, Arro
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import EbayMarketSection from '@/components/EbayMarketSection.jsx';
+import MarketPriceAnchor from '@/components/MarketPriceAnchor.jsx';
 import CertificationVerificationSection from '@/components/CertificationVerificationSection.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
 import BnplMessage from '@/components/BnplMessage.jsx';
@@ -554,6 +555,19 @@ const ProductDetailPage = ({ source: sourceProp }) => {
                     {isShop && <span className="text-sm font-medium text-muted-foreground pb-1">+ Shipping</span>}
                   </div>
                   <BnplMessage amount={product.price} className="mt-2" />
+                  {/* Market context beside the price — the number buyers actually
+                      decide on. Links down to the full eBay market section. */}
+                  {!isShop && (
+                    <div>
+                      <MarketPriceAnchor
+                        cardName={product.name}
+                        cardSet={vi?.set_name || product.set}
+                        gradingService={vi?.grading_company}
+                        gradeScore={vi?.grade}
+                        listingPrice={product.price}
+                      />
+                    </div>
+                  )}
                 </>
               )}
             </div>
