@@ -21,7 +21,7 @@ import {
   buildPartnerDiscount,
 } from '../services/partnerService.js';
 import { processRefund } from '../services/refundService.js';
-import { connectOnboard, getConnectStatus, getDashboardLink } from '../services/connectService.js';
+import { connectOnboard, getConnectStatus, getDashboardLink, withdrawHeldBalance } from '../services/connectService.js';
 import { createIdentitySession, getIdentityStatus, applyIdentitySession } from '../services/identityService.js';
 import { applyStripeSubscription } from '../services/subscriptionService.js';
 import { ensureWalletCustomer, getWalletBalanceCents, handleWalletTopup, assertNoOpenWalletCheckout, reserveWalletCheckout, releaseWalletCheckout } from '../services/walletService.js';
@@ -738,6 +738,11 @@ router.get('/connect/status', authMiddleware, getConnectStatus);
 // ─── POST /connect/dashboard-link ────────────────────────────────────────────
 
 router.post('/connect/dashboard-link', authMiddleware, getDashboardLink);
+
+// ─── POST /connect/withdraw ──────────────────────────────────────────────────
+// Pays a held wallet balance out to the seller's connected Stripe account.
+
+router.post('/connect/withdraw', authMiddleware, withdrawHeldBalance);
 
 export default router;
 

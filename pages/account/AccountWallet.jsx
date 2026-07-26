@@ -29,6 +29,7 @@ const AccountWallet = () => {
   const [sales, setSales] = useState([]);
   const [loadingSales, setLoadingSales] = useState(true);
   const [connecting, setConnecting] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
   const [openingDashboard, setOpeningDashboard] = useState(false);
 
   const fetchStatus = useCallback(async () => {
@@ -120,6 +121,23 @@ const AccountWallet = () => {
     }
   };
 
+  // Pay the held wallet balance out to the connected Stripe account. Only
+  // offered once onboarded — before that, the balance simply accrues.
+  const handleWithdraw = async () => {
+    setWithdrawing(true);
+    try {
+      const res = await apiServerClient.fetch('/stripe/connect/withdraw', { method: 'POST' });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error || 'Withdrawal failed');
+      toast.success(`$${Number(data.transferred_aud).toFixed(2)} on its way to your bank via Stripe.`);
+      fetchStatus();
+    } catch (err) {
+      toast.error(err.message || 'Withdrawal failed.');
+    } finally {
+      setWithdrawing(false);
+    }
+  };
+
   const totalEarned = sales.reduce((s, o) => s + (Number(o.seller_proceeds_aud) || 0), 0);
   const walletBalance = connectStatus?.wallet_balance_aud || 0;
 
@@ -146,7 +164,24 @@ const AccountWallet = () => {
             {loadingStatus ? <Skeleton className="h-9 w-24 bg-white/20" /> : (
               <div className="text-3xl font-extrabold tabular-nums">${walletBalance.toFixed(2)}</div>
             )}
-            <p className="text-xs text-primary-foreground/60 mt-1">Proceeds held until Stripe is connected</p>
+            {!loadingStatus && connectStatus?.onboarded && walletBalance > 0 ? (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleWithdraw}
+                disabled={withdrawing}
+                className="mt-2 gap-1.5 rounded-lg font-bold"
+              >
+                {withdrawing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Banknote className="w-3.5 h-3.5" />}
+                Transfer to my bank
+              </Button>
+            ) : (
+              <p className="text-xs text-primary-foreground/60 mt-1">
+                {connectStatus?.onboarded
+                  ? 'New proceeds are paid to your bank automatically'
+                  : 'Proceeds held until Stripe is connected'}
+              </p>
+            )}
           </CardContent>
         </Card>
 

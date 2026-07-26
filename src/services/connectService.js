@@ -145,6 +145,70 @@ export async function getConnectStatus(req, res) {
   }
 }
 
+// Pay out a held wallet balance to the seller's connected Stripe account.
+//
+// Proceeds land in profiles.wallet_balance_aud whenever a sale completes while
+// the seller isn't Connect-onboarded (payoutService's fallback). Without this
+// endpoint that money was stranded: the wallet UI said "held until Stripe is
+// connected" but nothing ever released it. Claims the balance atomically
+// (claim_wallet_balance RPC — safe against a concurrent sale credit), then
+// transfers it; if the transfer fails the claimed amount is re-credited.
+export async function withdrawHeldBalance(req, res) {
+  try {
+    const userId = req.user.id;
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('stripe_connect_account_id, wallet_balance_aud')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (!profile?.stripe_connect_account_id) {
+      return res.status(400).json({ error: 'Connect a Stripe account first' });
+    }
+    if (!(Number(profile.wallet_balance_aud) > 0)) {
+      return res.status(400).json({ error: 'No held balance to withdraw' });
+    }
+
+    // Re-check payout readiness against Stripe, not the cached flag — a
+    // transfer to a non-ready account fails after we've already claimed.
+    const account = await stripe.accounts.retrieve(profile.stripe_connect_account_id);
+    if (!isPayoutReady(account)) {
+      return res.status(400).json({ error: 'Your Stripe account isn’t ready for payouts yet — finish onboarding first' });
+    }
+
+    const { data: claimed, error: claimErr } = await supabase.rpc('claim_wallet_balance', { p_user: userId });
+    if (claimErr) throw new Error(`claim failed: ${claimErr.message}`);
+    const amount = Number(claimed) || 0;
+    if (amount <= 0) {
+      return res.status(400).json({ error: 'No held balance to withdraw' });
+    }
+
+    try {
+      const transfer = await stripe.transfers.create({
+        amount: Math.round(amount * 100),
+        currency: 'aud',
+        destination: profile.stripe_connect_account_id,
+        metadata: { type: 'wallet_withdrawal', user_id: userId },
+      });
+      logger.info(`[STRIPE CONNECT] Wallet withdrawal ${transfer.id}: $${amount} AUD → ${profile.stripe_connect_account_id} (user ${userId})`);
+      return res.json({ transferred_aud: amount, transferId: transfer.id });
+    } catch (transferErr) {
+      // Compensate: the balance was claimed but the money never moved.
+      const { error: restoreErr } = await supabase.rpc('increment_wallet_balance', { p_user: userId, p_delta: amount });
+      if (restoreErr) {
+        logger.error(`[STRIPE CONNECT] CRITICAL: withdrawal transfer failed AND restore failed for user ${userId} ($${amount}): ${transferErr.message} / ${restoreErr.message}`);
+      } else {
+        logger.error(`[STRIPE CONNECT] Withdrawal transfer failed for user ${userId} ($${amount} restored to wallet): ${transferErr.message}`);
+      }
+      return res.status(502).json({ error: 'Transfer failed — your balance is untouched. Please try again shortly.' });
+    }
+  } catch (err) {
+    logger.error(`[STRIPE CONNECT] /connect/withdraw error: ${err.message}`);
+    res.status(500).json({ error: err.message });
+  }
+}
+
 export async function getDashboardLink(req, res) {
   try {
     const userId = req.user.id;
