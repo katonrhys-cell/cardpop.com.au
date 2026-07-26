@@ -599,11 +599,41 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           // the payment method to the Customer automatically — there's no order
           // or charge. Mirror the fact that they now have a card on file onto
           // the profile so the selling/trading gate (can_sell) opens.
-          const savedUserId = session.metadata?.userId;
-          if (savedUserId) {
-            await supabase.from('profiles').update({ has_saved_card: true }).eq('id', savedUserId);
+          const sessionCustomerId =
+            typeof session.customer === 'string' ? session.customer : session.customer?.id;
+          let savedUserId = session.metadata?.userId;
+          if (!savedUserId && sessionCustomerId) {
+            // A setup session minted outside /wallet/save-card may lack metadata;
+            // the Customer created by ensureWalletCustomer carries its owner.
+            const customer = await stripe.customers.retrieve(sessionCustomerId).catch(() => null);
+            if (customer && !customer.deleted) savedUserId = customer.metadata?.userId || null;
           }
-          logger.info(`[STRIPE] Card-setup session ${session.id} completed — payment method saved`);
+          if (!savedUserId) {
+            logger.error(`[STRIPE] Card-setup session ${session.id} completed but no userId is resolvable — has_saved_card not mirrored`);
+          } else {
+            // Also repoint the profile at the Customer the card was attached to:
+            // if the stored id has drifted (Stripe account switch, racing
+            // customer creates), the /wallet/payment-methods self-heal would
+            // read the wrong Customer, find no cards, and flip the flag back off.
+            const payload = { has_saved_card: true };
+            if (sessionCustomerId) payload.stripe_customer_id = sessionCustomerId;
+            const { data: mirrored, error: mirrorErr } = await supabase
+              .from('profiles')
+              .update(payload)
+              .eq('id', savedUserId)
+              .select('id')
+              .maybeSingle();
+            if (mirrorErr) {
+              // A 500 leaves the event unrecorded so Stripe redelivers, instead
+              // of the seller being silently locked out of listing.
+              throw new Error(`has_saved_card mirror failed for user ${savedUserId}: ${mirrorErr.message}`);
+            }
+            if (!mirrored) {
+              logger.error(`[STRIPE] Card-setup session ${session.id}: profile ${savedUserId} not found — has_saved_card not mirrored`);
+            } else {
+              logger.info(`[STRIPE] Card-setup session ${session.id} completed — payment method saved (user ${savedUserId})`);
+            }
+          }
         } else if (session.metadata?.walletTopup === 'true') {
           await handleWalletTopup(session, stripe);
         } else if (session.mode === 'subscription' || session.metadata?.kind === 'subscription') {
