@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar, MapPin, Clock, Info, Ticket, ExternalLink, Accessibility, ShieldAlert } from 'lucide-react';
 import { eventPath, eventTypeLabel, formatEventDate, formatEventTime, formatEventLocation } from '@/lib/eventSeo.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
+import AddToCalendarButton from '@/components/AddToCalendarButton.jsx';
 
 const EventDetailModal = ({ isOpen, onClose, event }) => {
   if (!event) return null;
@@ -120,6 +121,7 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
 
         <DialogFooter className="p-4 bg-muted/20 border-t border-border flex flex-col-reverse sm:flex-row sm:justify-end gap-2 shrink-0">
           <Button variant="outline" onClick={onClose}>Close</Button>
+          <AddToCalendarButton event={event} className="w-full sm:w-auto h-9" />
           {ticketLink && (
             <Button variant="secondary" asChild>
               <a href={ticketLink} target="_blank" rel="noopener noreferrer">
