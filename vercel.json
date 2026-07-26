@@ -16,6 +16,9 @@
     },
     "api/blog-generate.js": {
       "maxDuration": 300
+    },
+    "api/event-scan.js": {
+      "maxDuration": 300
     }
   },
   "crons": [
@@ -26,6 +29,10 @@
     {
       "path": "/cron/blog-generate",
       "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/cron/event-scan",
+      "schedule": "0 17 * * *"
     }
   ],
   "redirects": [
@@ -320,6 +327,10 @@
     {
       "source": "/cron/blog-generate",
       "destination": "/api/blog-generate"
+    },
+    {
+      "source": "/cron/event-scan",
+      "destination": "/api/event-scan"
     },
     {
       "source": "/hcgi/api/:path*",

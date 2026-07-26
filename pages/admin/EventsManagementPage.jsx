@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Wand2, Star } from 'lucide-react';
+import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Wand2, Star, Radar } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -10,6 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import EventScraperPanel from '@/components/EventScraperPanel.jsx';
+import EventScanPanel from '@/components/EventScanPanel.jsx';
 import EventFormModal from '@/components/EventFormModal.jsx';
 import { toCdnUrl } from '@/utils/imageUrl.js';
 
@@ -30,11 +31,20 @@ const STATUS_LABELS = {
 const fmtLocation = (ev) =>
   [ev.venue_name, ev.suburb, ev.state].filter(Boolean).join(', ') || 'Location TBA';
 
+// Two views over the same list: everything, or just what the nightly scan found
+// and hasn't been reviewed yet — which is the queue an admin actually works.
+const FILTERS = {
+  all: () => true,
+  discovered: (ev) => ev.auto_discovered && ev.status === 'pending_review',
+};
+
 const EventsManagementPage = () => {
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isScraperOpen, setIsScraperOpen] = useState(false);
+  const [isScanOpen, setIsScanOpen] = useState(false);
+  const [filter, setFilter] = useState('all');
   const [editingEvent, setEditingEvent] = useState(null);
   const [scrapedData, setScrapedData] = useState(null);
 
@@ -112,6 +122,9 @@ const EventsManagementPage = () => {
     }
   };
 
+  const discoveredCount = events.filter(FILTERS.discovered).length;
+  const visibleEvents = events.filter(FILTERS[filter]);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <Helmet><title>Manage Events | Admin Portal</title></Helmet>
@@ -121,6 +134,12 @@ const EventsManagementPage = () => {
         title="Event Management"
         subtitle="Create, update, and manage community events."
       >
+        <Button onClick={() => setIsScanOpen(true)} variant="outline" className="font-bold rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
+          <Radar className="w-4 h-4 mr-2" /> Automated Scan
+          {discoveredCount > 0 && (
+            <span className="ml-2 rounded-full bg-brand-red px-1.5 text-xs font-bold leading-5">{discoveredCount}</span>
+          )}
+        </Button>
         <Button onClick={() => setIsScraperOpen(true)} variant="outline" className="font-bold rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
           <Wand2 className="w-4 h-4 mr-2" /> AI Event Scraper
         </Button>
@@ -129,17 +148,42 @@ const EventsManagementPage = () => {
         </Button>
       </AdminPageHeader>
 
+      {discoveredCount > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant={filter === 'all' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilter('all')}
+            className="rounded-lg font-bold"
+          >
+            All events ({events.length})
+          </Button>
+          <Button
+            variant={filter === 'discovered' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilter('discovered')}
+            className="rounded-lg font-bold"
+          >
+            <Radar className="w-3.5 h-3.5 mr-1.5" /> Found by scan ({discoveredCount})
+          </Button>
+        </div>
+      )}
+
       <div className="bg-card border border-border rounded-3xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           {isLoading ? (
             <div className="p-6 space-y-4">
               {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl bg-background" />)}
             </div>
-          ) : events.length === 0 ? (
+          ) : visibleEvents.length === 0 ? (
             <div className="text-center py-20 px-4">
               <Calendar className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
               <h3 className="text-xl font-bold mb-2 text-foreground">No events found</h3>
-              <p className="text-muted-foreground mb-6">You haven't created any events yet.</p>
+              <p className="text-muted-foreground mb-6">
+                {filter === 'discovered'
+                  ? 'The scan has nothing waiting for review.'
+                  : "You haven't created any events yet."}
+              </p>
               <div className="flex justify-center gap-3">
                 <Button onClick={() => setIsScraperOpen(true)} variant="outline" className="rounded-xl font-bold">
                   <Wand2 className="w-4 h-4 mr-2" /> Scrape from URL
@@ -161,7 +205,7 @@ const EventsManagementPage = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {events.map((event) => (
+                {visibleEvents.map((event) => (
                   <tr key={event.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-4">
@@ -176,6 +220,12 @@ const EventsManagementPage = () => {
                           <div className="flex items-center gap-2">
                             <p className="font-bold text-foreground text-base leading-tight truncate">{event.title}</p>
                             {event.is_featured && <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />}
+                            {event.auto_discovered && (
+                              <Radar
+                                className="w-3.5 h-3.5 text-brand-blue shrink-0"
+                                aria-label="Found by the automated scan"
+                              />
+                            )}
                           </div>
                           {event.short_description && (
                             <p className="text-muted-foreground text-xs mt-0.5 line-clamp-1">{event.short_description}</p>
@@ -249,6 +299,12 @@ const EventsManagementPage = () => {
         isOpen={isScraperOpen}
         onClose={() => setIsScraperOpen(false)}
         onSaved={handleScraperSuccess}
+      />
+
+      <EventScanPanel
+        isOpen={isScanOpen}
+        onClose={() => setIsScanOpen(false)}
+        onScanFinished={fetchEvents}
       />
     </div>
   );
