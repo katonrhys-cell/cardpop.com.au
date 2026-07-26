@@ -7,6 +7,7 @@ import { LISTING_CARD_VAULT_EMBED_INNER } from '@/lib/listingCardColumns.js';
 import { escapeLike } from '@/src/utils/escapeLike.js';
 import { buildCardSearchOr } from '@/src/utils/cardSearchFilter.js';
 import { useCategories } from '@/hooks/useCategories.js';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Search, RefreshCw, AlertCircle, Users, X, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -62,6 +63,7 @@ const MarketplacePage = () => {
   const [totalCount, setTotalCount] = useState(0);
   const PAGE_SIZE = 24;
 
+  const { settings } = usePlatformSettings();
   const [sort, setSort] = useState('created_at_desc');
   const [filterMode, setFilterMode] = useState('All');
   const [filterRookie, setFilterRookie] = useState(false);
@@ -621,13 +623,15 @@ const MarketplacePage = () => {
             >
               Make an Offer
             </Button>
-            <Button
-              variant="outline"
-              className={`rounded-full px-5 font-bold ${filterMode === 'ForTrade' ? 'bg-[hsl(var(--vault-trade))] hover:bg-[hsl(var(--vault-trade))]/90 text-white shadow-md border-none' : 'bg-background hover:bg-[hsl(var(--vault-trade))] hover:text-white hover:border-[hsl(var(--vault-trade))]'}`}
-              onClick={() => setFilterMode('ForTrade')}
-            >
-              For Trade
-            </Button>
+            {settings.enable_trading !== false && (
+              <Button
+                variant="outline"
+                className={`rounded-full px-5 font-bold ${filterMode === 'ForTrade' ? 'bg-[hsl(var(--vault-trade))] hover:bg-[hsl(var(--vault-trade))]/90 text-white shadow-md border-none' : 'bg-background hover:bg-[hsl(var(--vault-trade))] hover:text-white hover:border-[hsl(var(--vault-trade))]'}`}
+                onClick={() => setFilterMode('ForTrade')}
+              >
+                For Trade
+              </Button>
+            )}
           </div>
 
           <div className="flex items-center gap-3">

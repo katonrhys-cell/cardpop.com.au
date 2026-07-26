@@ -9,6 +9,7 @@ import { canViewVaultProduct } from '@/utils/vaultSecurityUtils.js';
 import { slugify } from '@/lib/slugify.js';
 import { isVerified } from '@/utils/verification.js';
 import { useCart } from '@/hooks/useCart.jsx';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -44,6 +45,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
   const navigate = useNavigate();
   const { addToCart, setIsCartOpen } = useCart();
   const { currentUser, isAdmin, loading: authLoading } = useAuth();
+  const { settings } = usePlatformSettings();
   
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -325,8 +327,18 @@ const ProductDetailPage = ({ source: sourceProp }) => {
       .catch(e => toast.error(e.message));
   };
 
-  const handleSecondaryAction = (action) => {
-    toast(`Coming soon: ${action}`);
+  // Trading v0: a trade is arranged over messages. Opens (or starts) a
+  // conversation with the seller, pre-filled so the buyer doesn't face a blank
+  // box. Only rendered when the enable_trading platform flag is on — the flag
+  // stays off until trading is a real feature, so this is never a dead end.
+  const handleRequestTrade = () => {
+    if (!seller?.id) return;
+    navigate('/messaging', {
+      state: {
+        recipientId: seller.id,
+        prefill: `Hi! I'm interested in trading for your "${product.name}" — ${window.location.origin}${window.location.pathname}. What are you looking for?`,
+      },
+    });
   };
 
   if (loading) {
@@ -625,11 +637,23 @@ const ProductDetailPage = ({ source: sourceProp }) => {
                   </Button>
                 )}
 
-                {product.listing_type === 'For Trade' || product.listing_type === 'For Sale & Trade' ? (
-                  <Button size="lg" variant={product.listing_type === 'For Sale & Trade' ? 'outline' : 'default'} className="w-full h-14 rounded-xl font-bold text-lg" onClick={() => handleSecondaryAction('Propose Trade')}>
+                {settings.enable_trading !== false &&
+                 (product.listing_type === 'For Trade' || product.listing_type === 'For Sale & Trade') &&
+                 seller?.id && seller.id !== currentUser?.id ? (
+                  <Button size="lg" variant={product.listing_type === 'For Sale & Trade' ? 'outline' : 'default'} className="w-full h-14 rounded-xl font-bold text-lg" onClick={handleRequestTrade}>
                     <ArrowRightLeft className="w-5 h-5 mr-2" /> Request Trade
                   </Button>
                 ) : null}
+
+                {/* Trade-only listing while trading is switched off: without
+                    this the action area would be empty. */}
+                {settings.enable_trading === false && product.listing_type === 'For Trade' && !canOffer && (
+                  <div className="text-center p-4 rounded-xl bg-muted/50 border border-border">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      This card is listed for trade. Trading is not available yet — check back soon.
+                    </p>
+                  </div>
+                )}
 
                 {product.listing_type === 'Private' && (
                   <Button size="lg" variant="secondary" className="w-full h-14 rounded-xl font-bold text-lg" disabled>

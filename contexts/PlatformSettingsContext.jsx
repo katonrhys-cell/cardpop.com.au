@@ -10,7 +10,9 @@ const DEFAULTS = {
   site_name: 'CardPop',
   maintenance_mode: false,
   enable_marketplace: true,
-  enable_trading: true,
+  // Off until the propose-trade flow exists (mirrors src/routes/settings.js) —
+  // fail-open would flash dead trade UI while the settings fetch is in flight.
+  enable_trading: false,
   enable_blog: true,
   max_images_per_listing: 10,
   listing_approval_required: false,

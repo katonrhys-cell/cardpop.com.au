@@ -3296,12 +3296,21 @@ const AddEditCardPage = () => {
               </SectionCard>
   );
 
+  // Trade listing types only exist while the enable_trading flag is on. A card
+  // already saved with a trade type keeps its option visible in edit mode so
+  // the form can't silently rewrite it.
+  const visibleListingOptions = LISTING_OPTIONS.filter(({ value }) => {
+    const isTradeType = value === 'For Trade' || value === 'For Sale & Trade';
+    if (!isTradeType) return true;
+    return platformSettings.enable_trading !== false || formData.listingType === value;
+  });
+
   const visibilitySection = (
               <SectionCard title="Listing Visibility">
                 <p className="text-sm text-muted-foreground -mt-2">Choose how this card appears to other collectors.</p>
 
                 <div className="grid grid-cols-2 gap-3">
-                  {LISTING_OPTIONS.map(({ value, label, description, Icon, activeClass, iconClass }) => {
+                  {visibleListingOptions.map(({ value, label, description, Icon, activeClass, iconClass }) => {
                     const isActive = formData.listingType === value;
                     return (
                       <button

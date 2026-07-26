@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { toast } from 'sonner';
 import { Loader2, Lock, ShoppingCart, ArrowRightLeft, Layers, DollarSign, TrendingUp, Tag, RotateCcw, HandCoins } from 'lucide-react';
 import PriceRangeIndicator from '@/components/PriceRangeIndicator.jsx';
@@ -75,6 +76,11 @@ const OPTIONS = [
 
 const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
   const { currentUser } = useAuth();
+  const { settings } = usePlatformSettings();
+  // Trade listing choices only exist while the enable_trading flag is on
+  const visibleOptions = OPTIONS.filter(
+    (opt) => !opt.needsTrade || settings.enable_trading !== false
+  );
   const [selected, setSelected] = useState(null);
   const [price, setPrice] = useState('');
   const [rangeMin, setRangeMin] = useState('');
@@ -377,7 +383,7 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
 
 
           <div className="space-y-2">
-            {OPTIONS.map((opt) => {
+            {visibleOptions.map((opt) => {
               const Icon = opt.icon;
               const isActive = selected?.key === opt.key;
               return (

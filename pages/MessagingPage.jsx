@@ -105,12 +105,43 @@ const MessagingPage = () => {
     return () => { isMounted.current = false; };
   }, [currentUser]);
 
-  // Handle incoming state (starting new chat)
+  // Handle incoming state (starting new chat). Pages link here with
+  // { state: { recipientId, prefill } } — e.g. "Request Trade" on a listing.
+  // If no conversation with that user exists yet, seed a stub entry from their
+  // profile so the thread opens and the first message can be sent.
+  const startedRecipientRef = useRef(null);
   useEffect(() => {
-    if (location.state?.recipientId && conversations.length > 0) {
-      setSelectedUserId(location.state.recipientId);
+    const recipientId = location.state?.recipientId;
+    if (!recipientId || !currentUser || loading) return;
+    if (startedRecipientRef.current === recipientId) return;
+    startedRecipientRef.current = recipientId;
+
+    if (location.state?.prefill) setNewMessage(location.state.prefill);
+
+    if (conversations.some(c => c.otherUserId === recipientId)) {
+      setSelectedUserId(recipientId);
+      return;
     }
-  }, [location.state, conversations.length]);
+    let cancelled = false;
+    (async () => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, display_name, avatar_url')
+        .eq('id', recipientId)
+        .maybeSingle();
+      if (cancelled || !profile) return;
+      setConversations(prev => prev.some(c => c.otherUserId === recipientId) ? prev : [{
+        otherUserId: profile.id,
+        otherUserName: profile.display_name || 'Anonymous',
+        avatar: profile.avatar_url || null,
+        lastMessage: '',
+        timestamp: new Date().toISOString(),
+        unreadCount: 0,
+      }, ...prev]);
+      setSelectedUserId(recipientId);
+    })();
+    return () => { cancelled = true; };
+  }, [location.state, currentUser, loading, conversations]);
 
   // Keep the latest selected conversation in a ref so the realtime handler can
   // read it without the subscription depending on (and thus recreating on)

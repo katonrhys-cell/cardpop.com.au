@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import AccountPlanBanner from '@/components/AccountPlanBanner.jsx';
 import P2PTradingNotice from '@/components/P2PTradingNotice.jsx';
@@ -18,6 +19,7 @@ import { toast } from 'sonner';
 
 const AccountDashboard = () => {
   const { currentUser } = useAuth();
+  const { settings } = usePlatformSettings();
 
   const [stats, setStats] = useState({
     salesCount: 0, revenue: 0, listingsCount: 0, vaultItemsCount: 0, pendingTrades: 0
@@ -280,20 +282,22 @@ const AccountDashboard = () => {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm border-border hover:border-primary/30 transition-colors bg-card h-full flex flex-col">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Pending Trades</CardTitle>
-            <ArrowRightLeft className="w-4 h-4 text-purple-500" />
-          </CardHeader>
-          <CardContent className="flex-1 flex flex-col justify-end">
-            {statsLoading ? <Skeleton className="h-8 w-16" /> : (
-              <div className="text-2xl font-extrabold tabular-nums tracking-tight text-foreground">{stats.pendingTrades}</div>
-            )}
-            <Link to="/trade-requests" className="text-xs font-bold text-primary hover:underline mt-2 inline-block">
-              Review requests &rarr;
-            </Link>
-          </CardContent>
-        </Card>
+        {settings.enable_trading !== false && (
+          <Card className="shadow-sm border-border hover:border-primary/30 transition-colors bg-card h-full flex flex-col">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Pending Trades</CardTitle>
+              <ArrowRightLeft className="w-4 h-4 text-purple-500" />
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col justify-end">
+              {statsLoading ? <Skeleton className="h-8 w-16" /> : (
+                <div className="text-2xl font-extrabold tabular-nums tracking-tight text-foreground">{stats.pendingTrades}</div>
+              )}
+              <Link to="/trade-requests" className="text-xs font-bold text-primary hover:underline mt-2 inline-block">
+                Review requests &rarr;
+              </Link>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="shadow-sm border-border hover:border-primary/30 transition-colors bg-card h-full flex flex-col">
           <CardHeader className="flex flex-row items-center justify-between pb-2">

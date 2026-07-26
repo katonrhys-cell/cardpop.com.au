@@ -1169,6 +1169,7 @@ const MobileMoreSection = ({ onNavigate }) => {
 // Plain inline account section — no nested Radix portals inside the Sheet Dialog
 const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout }) => {
   const [expanded, setExpanded] = useState(false);
+  const { settings } = usePlatformSettings();
   if (!currentUser) return null;
   return (
     <div className="w-full">
@@ -1201,11 +1202,13 @@ const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout })
               <Package className="w-4 h-4" /> My Vault
             </Link>
           </SheetClose>
-          <SheetClose asChild>
-            <Link to="/trade-requests" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
-              <ArrowRightLeft className="w-4 h-4" /> Trade Requests
-            </Link>
-          </SheetClose>
+          {settings.enable_trading !== false && (
+            <SheetClose asChild>
+              <Link to="/trade-requests" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
+                <ArrowRightLeft className="w-4 h-4" /> Trade Requests
+              </Link>
+            </SheetClose>
+          )}
           <SheetClose asChild>
             <Link to="/account/events" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
               <Calendar className="w-4 h-4" /> My Events
@@ -1373,15 +1376,28 @@ export const MobileNavMenus = ({
                 </Link>
               </Button>
             </SheetClose>
-            <SheetClose asChild>
-              <Button asChild variant="outline" className="w-full justify-center rounded-xl h-12 font-bold">
-                <Link to="/trade-requests" className="flex items-center gap-2 text-xs px-1">
-                  <ArrowRightLeft className="w-4 h-4" />
-                  Trades
-                  {tradeCount > 0 && <Badge className="ml-1 bg-accent text-accent-foreground px-1">{tradeCount}</Badge>}
-                </Link>
-              </Button>
-            </SheetClose>
+            {settings.enable_trading !== false ? (
+              <SheetClose asChild>
+                <Button asChild variant="outline" className="w-full justify-center rounded-xl h-12 font-bold">
+                  <Link to="/trade-requests" className="flex items-center gap-2 text-xs px-1">
+                    <ArrowRightLeft className="w-4 h-4" />
+                    Trades
+                    {tradeCount > 0 && <Badge className="ml-1 bg-accent text-accent-foreground px-1">{tradeCount}</Badge>}
+                  </Link>
+                </Button>
+              </SheetClose>
+            ) : (
+              // Trading hidden: give the slot to Messages, which on phones
+              // otherwise only exists deep in the account section.
+              <SheetClose asChild>
+                <Button asChild variant="outline" className="w-full justify-center rounded-xl h-12 font-bold">
+                  <Link to="/messaging" className="flex items-center gap-2 text-xs px-1">
+                    <MessageSquare className="w-4 h-4" />
+                    Messages
+                  </Link>
+                </Button>
+              </SheetClose>
+            )}
           </div>
         )}
       </div>
