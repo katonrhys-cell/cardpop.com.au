@@ -26,4 +26,20 @@ export const buildCardSearchOr = (rawTerm) => {
   return CARD_SEARCH_COLUMNS.map((col) => `${col}.ilike.${quoted}`).join(',');
 };
 
+/**
+ * Build a PostgREST `or=` group matching vault_items.variant against any of
+ * the given variant strings (comma-joined text column, so substring ilike).
+ * Same quoting rules as buildCardSearchOr — values may contain apostrophes
+ * ("Collector's Rare") or slashes.
+ *
+ * @param {string[]} values variant taxonomy strings (lib/cardVariants.js)
+ * @returns {string} e.g. `variant.ilike."%Secret Rare%",variant.ilike."%Holo%"`
+ */
+export const buildVariantOr = (values) =>
+  values.map((v) => {
+    const pattern = `%${escapeLike(String(v).trim())}%`;
+    const quoted = `"${pattern.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+    return `variant.ilike.${quoted}`;
+  }).join(',');
+
 export default buildCardSearchOr;

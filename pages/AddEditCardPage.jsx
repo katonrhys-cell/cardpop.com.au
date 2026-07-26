@@ -46,6 +46,7 @@ import { loadListingDraft, saveListingDraft, clearListingDraft, hasMeaningfulCon
 import { shouldAutoIdentify, buildPriceLookupQuery } from '@/utils/listingFlow.js';
 import { validateListingForm, validateListingField } from '@/utils/listingValidation.js';
 import WizardStepper from '@/components/WizardStepper.jsx';
+import { CARD_LANGUAGES } from '@/lib/cardFilters.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -224,6 +225,9 @@ const AddEditCardPage = () => {
     certNumber:     '',
     // Condition & value
     condition:      'near_mint',
+    // Printed language — a first-class TCG marketplace facet (English vs
+    // Japanese printings price very differently)
+    language:       'English',
     estimatedValue: '',
     purchasePrice:  '',
     acquiredDate:   '',
@@ -506,6 +510,9 @@ const AddEditCardPage = () => {
           grade:          card.grade          || '',
           certNumber:     card.cert_number    || '',
           condition:      card.condition      || 'near_mint',
+          // '' (not the English default) for older cards saved before the
+          // column existed — editing must not silently mislabel them.
+          language:       card.language       || '',
           estimatedValue: card.estimated_value_aud != null ? String(card.estimated_value_aud) : '',
           purchasePrice:  card.purchase_price_aud != null ? String(card.purchase_price_aud) : '',
           acquiredDate:   card.acquired_date  || '',
@@ -1157,6 +1164,7 @@ const AddEditCardPage = () => {
         grade:               isGraded ? (formData.grade?.trim() || null) : null,
         cert_number:         isGraded ? (formData.certNumber?.trim() || null) : null,
         condition:           formData.condition,
+        language:            formData.language || null,
         estimated_value_aud: parseFloat(formData.estimatedValue) || 0,
         purchase_price_aud:  parseFloat(formData.purchasePrice)  || null,
         acquired_date:       formData.acquiredDate || null,
@@ -1184,15 +1192,31 @@ const AddEditCardPage = () => {
       if (cardImagePath) payload.card_image = cardImagePath;
       if (extraImagePaths.length) payload.card_images = extraImagePaths;
 
+      // `language` is a newly added column. Vercel's deploy and the Supabase
+      // migration workflow run independently on merge, so for a brief window
+      // the new frontend can be live against a schema that lacks it. Rather
+      // than fail the seller's listing, drop the field and retry once.
+      // (PGRST204 = "Could not find the 'x' column ... in the schema cache".)
+      const isMissingLanguageColumn = (err) =>
+        err && (err.code === 'PGRST204' || /schema cache/i.test(err.message || '')) &&
+        /language/i.test(err.message || '');
+      const withoutLanguage = () => { const { language, ...rest } = payload; return rest; };
+
       if (isEdit) {
-        const { error } = await supabase.from('vault_items').update(payload).eq('id', id).eq('owner_id', currentUser.id);
+        let { error } = await supabase.from('vault_items').update(payload).eq('id', id).eq('owner_id', currentUser.id);
+        if (isMissingLanguageColumn(error)) {
+          ({ error } = await supabase.from('vault_items').update(withoutLanguage()).eq('id', id).eq('owner_id', currentUser.id));
+        }
         if (error) throw error;
         formDirtyRef.current = false;
         const syncStatus = await syncMarketplaceListing(id);
         showListingOutcome(syncStatus, 'Card updated successfully!');
         navigate('/vault');
       } else {
-        const { data: inserted, error } = await supabase.from('vault_items').insert(payload).select('id').single();
+        let { data: inserted, error } = await supabase.from('vault_items').insert(payload).select('id').single();
+        if (isMissingLanguageColumn(error)) {
+          ({ data: inserted, error } = await supabase.from('vault_items').insert(withoutLanguage()).select('id').single());
+        }
         if (error) throw error;
         formDirtyRef.current = false;
         clearListingDraft(currentUser.id);
@@ -1822,6 +1846,23 @@ const AddEditCardPage = () => {
                         <SelectItem value="light_played">Light Played</SelectItem>
                         <SelectItem value="played">Played</SelectItem>
                         <SelectItem value="poor">Poor</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Language — buyers filter on this, so it's captured at
+                      listing time rather than guessed later */}
+                  <div className="space-y-2">
+                    <Label className="font-bold">Language</Label>
+                    <Select value={formData.language || '__unset__'} onValueChange={v => set('language', v === '__unset__' ? '' : v)}>
+                      <SelectTrigger className="h-11 bg-background">
+                        <SelectValue placeholder="Language" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__unset__">Not specified</SelectItem>
+                        {CARD_LANGUAGES.map((lang) => (
+                          <SelectItem key={lang} value={lang}>{lang}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
