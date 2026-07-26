@@ -118,17 +118,17 @@ describe('Header mobile hamburger menu — consecutive navigations', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(document.body.style.pointerEvents).not.toBe('none');
 
-    // Second selection: open hamburger again, tap "Marketplace"
+    // Second selection: open hamburger again, tap "View All Listings" under Marketplace
     await user.click(screen.getByRole('button', { name: /open menu/i }));
     const dialog2 = await screen.findByRole('dialog');
-    await user.click(await within(dialog2).findByRole('link', { name: 'Marketplace' }));
+    await user.click(await within(dialog2).findByRole('link', { name: 'View All Listings' }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/marketplace'));
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(document.body.style.pointerEvents).not.toBe('none');
   });
 
-  it('navigates twice in a row through the Browse Collections accordion', async () => {
+  it('navigates twice in a row through the Marketplace accordion', async () => {
     const user = userEvent.setup();
     renderHeader();
 
@@ -153,22 +153,22 @@ describe('Header mobile hamburger menu — consecutive navigations', () => {
 // ─── Desktop nav dropdowns ────────────────────────────────────────────────────
 
 describe('Header desktop dropdowns — consecutive navigations', () => {
-  it('Browse Collections dropdown (mouse hover) navigates twice in a row', async () => {
+  it('Marketplace dropdown (mouse hover) navigates twice in a row', async () => {
     const user = userEvent.setup();
     renderHeader();
 
     // The Row-2 nav is lazy; wait for the trigger before interacting.
-    await user.hover(await screen.findByRole('button', { name: /browse collections/i }));
+    await user.hover(await screen.findByRole('button', { name: /marketplace/i }));
     await user.click(await screen.findByRole('link', { name: 'Pokémon' }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/collections/pokemon'));
 
     await user.unhover(screen.getByTestId('current-path'));
-    await user.hover(await screen.findByRole('button', { name: /browse collections/i }));
+    await user.hover(await screen.findByRole('button', { name: /marketplace/i }));
     await user.click(await screen.findByRole('link', { name: 'NBA' }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/collections/nba'));
   });
 
-  it('Community dropdown (mouse hover) then a plain nav link both navigate', async () => {
+  it('Community dropdown (mouse hover) then the Marketplace dropdown link both navigate', async () => {
     const user = userEvent.setup();
     renderHeader();
 
@@ -176,8 +176,10 @@ describe('Header desktop dropdowns — consecutive navigations', () => {
     await user.click(await screen.findByRole('link', { name: /forum/i }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/community/forum'));
 
-    // Marketplace is a plain top-level nav link (Grading is now a dropdown).
-    await user.click(await screen.findByRole('link', { name: 'Marketplace' }));
+    // Marketplace is now a mega-dropdown (formerly "Browse Collections");
+    // its "View All Listings" row is the direct link to /marketplace.
+    await user.hover(await screen.findByRole('button', { name: /marketplace/i }));
+    await user.click(await screen.findByRole('link', { name: 'View All Listings' }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/marketplace'));
   });
 
@@ -187,7 +189,7 @@ describe('Header desktop dropdowns — consecutive navigations', () => {
 
     // user.click moves the mouse onto the trigger first, so the hover handler
     // opens the menu and the click must not immediately close it again.
-    await user.click(await screen.findByRole('button', { name: /browse collections/i }));
+    await user.click(await screen.findByRole('button', { name: /marketplace/i }));
     expect(await screen.findByRole('link', { name: 'Pokémon' })).toBeInTheDocument();
   });
 
@@ -195,7 +197,7 @@ describe('Header desktop dropdowns — consecutive navigations', () => {
     const user = userEvent.setup();
     renderHeader();
 
-    await user.pointer({ keys: '[TouchA]', target: await screen.findByRole('button', { name: /browse collections/i }) });
+    await user.pointer({ keys: '[TouchA]', target: await screen.findByRole('button', { name: /marketplace/i }) });
     const pokemonLink = await screen.findByRole('link', { name: 'Pokémon' });
     await user.pointer({ keys: '[TouchA]', target: pokemonLink });
     await user.click(pokemonLink);
