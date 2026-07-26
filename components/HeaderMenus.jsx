@@ -34,7 +34,6 @@ export const NAV_LINKS = [
   // seven-plus entries buried the three jobs visitors actually come for
   // (buy, sell, check prices) among content links.
   { label: 'Shop', href: '/shop', icon: ShoppingBag },
-  { label: 'Marketplace', href: '/marketplace', icon: Users },
   { label: 'Prices', href: '/analytics', icon: LineChart },
   { label: 'Community', href: '/community' },
   { label: 'Grading', href: '/grading' },
@@ -135,8 +134,18 @@ const MobileBrowseSection = ({ onNavigate }) => {
   return (
     <div className="mb-4">
       <p className="px-1 text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground mb-2">
-        Browse Collections
+        Marketplace
       </p>
+
+      <SheetClose asChild>
+        <Link
+          to="/marketplace"
+          onClick={onNavigate}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-semibold text-muted-foreground"
+        >
+          View All Listings
+        </Link>
+      </SheetClose>
 
       {/* TCG accordion */}
       <button
@@ -250,7 +259,7 @@ const useHoverDropdown = () => {
   return { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick };
 };
 
-// ─── Browse Collections mega-dropdown ─────────────────────────────────────────
+// ─── Marketplace mega-dropdown ────────────────────────────────────────────────
 const BrowseDropdown = ({ onNavigate }) => {
   const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
 
@@ -271,7 +280,7 @@ const BrowseDropdown = ({ onNavigate }) => {
             : 'text-muted-foreground hover:text-foreground hover:bg-muted'
         }`}
       >
-        Browse Collections
+        Marketplace
         <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
 
@@ -1112,13 +1121,12 @@ export const DesktopNavMenus = ({ onNavigate }) => {
   const { settings } = usePlatformSettings();
   return (
     <>
-      <BrowseDropdown onNavigate={onNavigate} />
+      {settings.enable_marketplace !== false && <BrowseDropdown onNavigate={onNavigate} />}
       {NAV_LINKS.map((link) => {
         if (link.label === 'Shop') return <ShopDropdown key="shop" onNavigate={onNavigate} />;
         if (link.label === 'Prices') return <AnalyticsDropdown key="prices" onNavigate={onNavigate} />;
         if (link.label === 'Community') return <CommunityDropdown key="community" onNavigate={onNavigate} />;
         if (link.label === 'Grading') return <GradingDropdown key="grading" onNavigate={onNavigate} />;
-        if (link.label === 'Marketplace' && settings.enable_marketplace === false) return null;
         const isActive = isNavLinkActive(link, location.pathname);
         return (
           <Link
@@ -1178,13 +1186,13 @@ export const MobileNavMenus = ({
           </Button>
         </SheetClose>
 
-        {/* Order mirrors the desktop Row-2 nav top-to-bottom: Browse Collections
+        {/* Order mirrors the desktop Row-2 nav top-to-bottom: Marketplace
             leads, then NAV_LINKS in sequence — expandable sections (Prices,
             Community, Grading) and flat links interleaved so the mobile
             menu reads in the same order as the desktop bar reads left-to-right.
             key={openKey} resets accordion state each time the menu opens. */}
         <nav className="flex flex-col mb-6">
-          <MobileBrowseSection key={openKey} onNavigate={onNavigate} />
+          {settings.enable_marketplace !== false && <MobileBrowseSection key={openKey} onNavigate={onNavigate} />}
 
           {NAV_LINKS.map((link) => {
             if (link.label === 'Shop') return <MobileShopSection key={`shop-${openKey}`} onNavigate={onNavigate} />;
