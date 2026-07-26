@@ -19,6 +19,8 @@ import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import EbayMarketSection from '@/components/EbayMarketSection.jsx';
 import MarketPriceAnchor from '@/components/MarketPriceAnchor.jsx';
+import { addToRecentlyViewed } from '@/utils/recentlyViewed.js';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 import CertificationVerificationSection from '@/components/CertificationVerificationSection.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
 import BnplMessage from '@/components/BnplMessage.jsx';
@@ -61,6 +63,20 @@ const ProductDetailPage = ({ source: sourceProp }) => {
   // so the effect keys on projections that stay constant for marketplace/shop
   // views and only change for vault views when the answer could change.
   const vaultAuthPending = source === 'vault' && authLoading;
+
+  // Record the view for the "Recently viewed" strips (localStorage only).
+  useEffect(() => {
+    if (!product?.id) return;
+    addToRecentlyViewed({
+      id: product.id,
+      title: product.name,
+      image: publicImageUrl(product.images?.[0]),
+      price: product.price,
+      type: source,
+      url: window.location.pathname,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per loaded product
+  }, [product?.id]);
   const vaultViewerId = source === 'vault' ? currentUser?.id ?? null : null;
   const vaultIsAdmin = source === 'vault' ? isAdmin : false;
 

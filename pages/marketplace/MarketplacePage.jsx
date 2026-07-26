@@ -8,8 +8,9 @@ import { escapeLike } from '@/src/utils/escapeLike.js';
 import { buildCardSearchOr } from '@/src/utils/cardSearchFilter.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
+import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, RefreshCw, AlertCircle, Users, X, ChevronDown } from 'lucide-react';
+import { Search, RefreshCw, AlertCircle, Users, X, Bookmark } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -71,6 +72,7 @@ const MarketplacePage = () => {
   const PAGE_SIZE = 24;
 
   const { settings } = usePlatformSettings();
+  const { currentUser } = useAuth();
 
   // ALL filter state is mirrored in the URL (see the writer effect below), so a
   // filtered view survives refresh and can be shared. Seed every filter from
@@ -172,23 +174,26 @@ const MarketplacePage = () => {
   // The cascade effects below reset child filters when their parent CHANGES —
   // but each also fires once on mount, where resetting would clobber the
   // child filters just seeded from the URL. Each skips its first run.
+  // applyingSavedRef suppresses the resets for the single commit in which a
+  // saved search re-seeds parent AND children together.
   const catCascadeInit = useRef(true);
   const franchiseCascadeInit = useRef(true);
   const setCascadeInit = useRef(true);
   const subsetCascadeInit = useRef(true);
+  const applyingSavedRef = useRef(false);
 
   // Franchise options: scoped to the selected category, otherwise all franchises.
   // Every level stays selectable even when its parent hasn't been chosen.
   useEffect(() => {
     if (catCascadeInit.current) catCascadeInit.current = false;
-    else setFilterFranchise('');
+    else if (!applyingSavedRef.current) setFilterFranchise('');
     (filterCat ? getFranchisesByCategory(filterCat) : getAllFranchises()).then(setFranchiseOpts);
   }, [filterCat, getFranchisesByCategory, getAllFranchises]);
 
   // Manufacturer / team / parallel options: scoped to franchise, otherwise all
   useEffect(() => {
     if (franchiseCascadeInit.current) franchiseCascadeInit.current = false;
-    else { setFilterMfr(''); setFilterTeam(''); setFilterParallel(''); }
+    else if (!applyingSavedRef.current) { setFilterMfr(''); setFilterTeam(''); setFilterParallel(''); }
     if (filterFranchise) {
       getManufacturersByFranchise(filterFranchise).then(setMfrOpts);
       getTeamsByFranchise(filterFranchise).then(setTeamOpts);
@@ -203,7 +208,7 @@ const MarketplacePage = () => {
   // Set options: scoped to franchise (and refined by manufacturer), otherwise all
   useEffect(() => {
     if (setCascadeInit.current) setCascadeInit.current = false;
-    else setFilterSet('');
+    else if (!applyingSavedRef.current) setFilterSet('');
     (filterFranchise
       ? getSetsByFranchiseAndManufacturer(filterFranchise, filterMfr || '')
       : getAllSets(filterMfr || '')
@@ -213,7 +218,7 @@ const MarketplacePage = () => {
   // Subset options: scoped to the selected set, otherwise all
   useEffect(() => {
     if (subsetCascadeInit.current) subsetCascadeInit.current = false;
-    else setFilterSubset('');
+    else if (!applyingSavedRef.current) setFilterSubset('');
     (filterSet ? getSubsetsBySet(filterSet) : getAllSubsets()).then(setSubsetOpts);
   }, [filterSet, getSubsetsBySet, getAllSubsets]);
 
@@ -277,6 +282,81 @@ const MarketplacePage = () => {
   // Sports facets stay hidden on the unscoped default view — it serves the
   // widest audience — and appear once a sports category/franchise is chosen.
   const showSportsFacets = sportsContext;
+
+  // ── Saved searches ──────────────────────────────────────────────────────────
+  // A saved search is the marketplace's own URL query string plus a label —
+  // saving captures the current view, applying re-seeds the filter state.
+  const [savedSearches, setSavedSearches] = useState([]);
+  const [savingSearch, setSavingSearch] = useState(false);
+
+  useEffect(() => {
+    if (!currentUser) { setSavedSearches([]); return; }
+    let cancelled = false;
+    supabase
+      .from('saved_searches')
+      .select('id, name, params')
+      .order('created_at', { ascending: false })
+      .limit(10)
+      .then(({ data }) => { if (!cancelled) setSavedSearches(data || []); });
+    return () => { cancelled = true; };
+  }, [currentUser]);
+
+  const saveCurrentSearch = async () => {
+    const params = window.location.search.replace(/^\?/, '');
+    if (!params) return;
+    const label = [
+      debouncedSearch && `"${debouncedSearch}"`,
+      ...activeChips.map((c) => c.label),
+      (debouncedMin || debouncedMax) && `$${debouncedMin || '0'}–${debouncedMax || '∞'}`,
+    ].filter(Boolean).join(' · ') || 'Marketplace search';
+    setSavingSearch(true);
+    try {
+      const { data, error: insertError } = await supabase
+        .from('saved_searches')
+        .insert({ user_id: currentUser.id, name: label.slice(0, 120), params })
+        .select('id, name, params')
+        .single();
+      if (insertError) {
+        if (insertError.code === '23505') toast('You’ve already saved this search.');
+        else throw insertError;
+      } else {
+        setSavedSearches((prev) => [data, ...prev].slice(0, 10));
+        toast.success('Search saved — find it in the sidebar any time.');
+      }
+    } catch {
+      toast.error('Could not save this search.');
+    } finally {
+      setSavingSearch(false);
+    }
+  };
+
+  const deleteSavedSearch = async (id) => {
+    setSavedSearches((prev) => prev.filter((s) => s.id !== id));
+    await supabase.from('saved_searches').delete().eq('id', id);
+  };
+
+  // Re-seed every filter from a saved query string (the component doesn't
+  // remount on an in-place URL change, so states are set directly). All setters
+  // batch into one commit; applyingSavedRef makes the cascade effects skip
+  // their child-resets for that commit so the applied children survive.
+  const applySavedSearch = (paramsString) => {
+    const p = new URLSearchParams(paramsString);
+    const get = (k, d = '') => p.get(k) ?? d;
+    applyingSavedRef.current = true;
+    setSearch(get('q')); setDebouncedSearch(get('q'));
+    setFilterMode(get('mode', 'All'));
+    setSort(get('sort', 'created_at_desc'));
+    setFilterCat(get('cat'));
+    setFilterFranchise(get('franchise'));
+    setFilterMfr(get('mfr')); setFilterTeam(get('team')); setFilterSet(get('set'));
+    setFilterParallel(get('parallel')); setFilterSubset(get('subset'));
+    setFilterPlayer(get('player'));
+    setFilterRookie(get('rookie') === '1');
+    setMinPrice(get('min')); setDebouncedMin(get('min'));
+    setMaxPrice(get('max')); setDebouncedMax(get('max'));
+    setPage(0);
+    setTimeout(() => { applyingSavedRef.current = false; }, 0);
+  };
 
   // Main listings fetch
   useEffect(() => {
@@ -477,6 +557,46 @@ const MarketplacePage = () => {
                 </Button>
               )}
             </div>
+
+            {/* Save the current view / re-apply saved ones (signed-in only) */}
+            {currentUser && hasActiveFilters && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={saveCurrentSearch}
+                disabled={savingSearch}
+                className="w-full rounded-xl font-bold gap-1.5"
+              >
+                <Bookmark className="w-4 h-4" /> Save this search
+              </Button>
+            )}
+            {currentUser && savedSearches.length > 0 && (
+              <div>
+                <span className="block text-xs font-semibold text-muted-foreground mb-1.5">Saved searches</span>
+                <ul className="space-y-1">
+                  {savedSearches.map((s) => (
+                    <li key={s.id} className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => applySavedSearch(s.params)}
+                        className="flex-1 min-w-0 truncate text-left text-sm font-medium text-foreground hover:text-primary px-2 py-1.5 rounded-lg hover:bg-muted transition-colors"
+                        title={s.name}
+                      >
+                        {s.name}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteSavedSearch(s.id)}
+                        aria-label={`Delete saved search ${s.name}`}
+                        className="shrink-0 p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             {/* Search */}
             <div className="relative">

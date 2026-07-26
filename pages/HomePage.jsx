@@ -14,6 +14,7 @@ import FeaturedSellerCard from '@/components/FeaturedSellerCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 import { fetchActiveShowcaseCards } from '@/lib/heroShowcase.js';
+import RecentlyViewed from '@/components/RecentlyViewed.jsx';
 
 // NOTE: this page intentionally imports NOTHING from framer-motion. The library
 // costs ~110 kB of JS and ~1.5 s of main-thread execution on a mid-range phone
@@ -873,6 +874,13 @@ const HomePage = () => {
               <p className="text-muted-foreground font-medium">Seller profiles are currently being updated.</p>
             </div>
           )}
+        </div>
+      </section>
+
+      {/* ── Recently viewed (renders nothing until the visitor has viewed cards) ── */}
+      <section className="py-10 bg-background">
+        <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
+          <RecentlyViewed />
         </div>
       </section>
     </div>
