@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { callEbayApi } from '../utils/ebayClient.js';
 import { resolveCardImage } from '../utils/cardImageResolver.js';
+import { queryOracle, isOracleConfigured } from '../utils/oracleClient.js';
+import { escapeLike } from '../utils/escapeLike.js';
 import logger from '../utils/logger.js';
 
 const router = Router();
@@ -61,13 +63,44 @@ async function searchYugioh(q, take) {
 	}));
 }
 
+// Our own Oracle-hosted catalogue (docs/oracle-catalogue.md) — covers cards the
+// free APIs don't (e.g. sports) and anything catalogued in-house. Queried
+// alongside whichever free API(s) match the collection; returns [] rather than
+// throwing when unconfigured or unreachable, same fail-soft contract as the
+// free-API adapters above.
+async function searchOracle(q, take) {
+	if (!isOracleConfigured()) return [];
+	try {
+		const rows = await queryOracle(
+			`SELECT id, card_name, set_name, card_number, rarity, image_url_front
+			 FROM card_catalogue
+			 WHERE UPPER(card_name) LIKE UPPER(:pattern) ESCAPE '\\'
+			 FETCH FIRST :take ROWS ONLY`,
+			{ pattern: `%${escapeLike(q)}%`, take: Math.min(take, 50) }
+		);
+		return rows.map(r => ({
+			id: String(r.ID),
+			name: r.CARD_NAME,
+			setName: r.SET_NAME ?? null,
+			year: null,
+			cardNumber: r.CARD_NUMBER ?? null,
+			rarity: r.RARITY ?? null,
+			imageUrl: r.IMAGE_URL_FRONT ?? null,
+			source: 'oracle-catalogue',
+		}));
+	} catch (err) {
+		logger.warn(`[CATALOG_ORACLE] ${err.message}`);
+		return [];
+	}
+}
+
 function resolveApis(collection) {
 	const col = (collection || '').toLowerCase();
-	if (col === 'pokemon') return ['pokemon'];
-	if (col === 'magic' || col === 'magic: the gathering' || col === 'mtg') return ['scryfall'];
-	if (col === 'yu-gi-oh' || col === 'yugioh') return ['yugioh'];
-	// No collection specified — try all three
-	return ['pokemon', 'scryfall', 'yugioh'];
+	if (col === 'pokemon') return ['pokemon', 'oracle'];
+	if (col === 'magic' || col === 'magic: the gathering' || col === 'mtg') return ['scryfall', 'oracle'];
+	if (col === 'yu-gi-oh' || col === 'yugioh') return ['yugioh', 'oracle'];
+	// No collection specified — try everything, including our own catalogue
+	return ['pokemon', 'scryfall', 'yugioh', 'oracle'];
 }
 
 async function runSearches(apis, q, take) {
@@ -75,6 +108,7 @@ async function runSearches(apis, q, take) {
 		if (api === 'pokemon') return searchPokemon(q, take).catch(() => []);
 		if (api === 'scryfall') return searchScryfall(q, take).catch(() => []);
 		if (api === 'yugioh')   return searchYugioh(q, take).catch(() => []);
+		if (api === 'oracle')   return searchOracle(q, take).catch(() => []);
 		return Promise.resolve([]);
 	});
 	const results = await Promise.all(tasks);
@@ -242,6 +276,60 @@ router.post('/images', async (req, res) => {
 	} catch (err) {
 		logger.warn(`[CATALOG_IMAGES] ${err.message}`);
 		res.status(502).json({ error: 'Image resolution failed' });
+	}
+});
+
+// ── POST /catalog/match ───────────────────────────────────────────────────────
+// OCR match verification: given the fields a card scan (src/routes/card-ocr.js)
+// extracted, look up candidates in the Oracle catalogue so the scan result can
+// be confirmed against a canonical record instead of trusted as-is. Scored
+// rather than a single best guess — the caller decides what confidence to act on.
+// Body: { name (required), set?, cardNumber? }
+router.post('/match', async (req, res) => {
+	const { name, set, cardNumber } = req.body || {};
+	if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
+
+	if (!isOracleConfigured()) {
+		return res.status(503).json({ error: 'Card catalogue is not configured', candidates: [] });
+	}
+
+	try {
+		const rows = await queryOracle(
+			`SELECT id, card_name, set_name, card_number, rarity, image_url_front,
+			        CASE
+			          WHEN UPPER(card_number) = UPPER(:cardNumber) AND UPPER(set_name) = UPPER(:setName) THEN 100
+			          WHEN UPPER(card_name) = UPPER(:name) AND UPPER(set_name) = UPPER(:setName) THEN 90
+			          WHEN UPPER(card_name) = UPPER(:name) THEN 70
+			          ELSE 40
+			        END AS match_score
+			 FROM card_catalogue
+			 WHERE UPPER(card_name) LIKE UPPER(:pattern) ESCAPE '\\'
+			    OR UPPER(card_number) = UPPER(:cardNumber)
+			 ORDER BY match_score DESC
+			 FETCH FIRST 5 ROWS ONLY`,
+			{
+				name: name.trim(),
+				setName: set?.trim() || '',
+				cardNumber: cardNumber?.trim() || '',
+				pattern: `%${escapeLike(name.trim())}%`,
+			}
+		);
+
+		const candidates = rows.map(r => ({
+			id: String(r.ID),
+			name: r.CARD_NAME,
+			setName: r.SET_NAME ?? null,
+			cardNumber: r.CARD_NUMBER ?? null,
+			rarity: r.RARITY ?? null,
+			imageUrl: r.IMAGE_URL_FRONT ?? null,
+			matchScore: r.MATCH_SCORE,
+			source: 'oracle-catalogue',
+		}));
+
+		res.json({ candidates });
+	} catch (err) {
+		logger.warn(`[CATALOG_MATCH] ${err.message}`);
+		res.status(502).json({ error: 'Catalogue match failed', candidates: [] });
 	}
 });
 

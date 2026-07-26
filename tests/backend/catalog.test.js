@@ -6,6 +6,16 @@ const mockCallEbay = vi.hoisted(() => vi.fn());
 vi.mock('../../src/utils/ebayClient.js', () => ({ callEbayApi: mockCallEbay }));
 vi.mock('../../src/utils/logger.js', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } }));
 
+// Oracle catalogue: default "not configured" (isOracleConfigured -> false) so
+// existing free-API tests are unaffected; individual tests flip it on to
+// exercise the Oracle-backed paths.
+const mockIsOracleConfigured = vi.hoisted(() => vi.fn(() => false));
+const mockQueryOracle = vi.hoisted(() => vi.fn());
+vi.mock('../../src/utils/oracleClient.js', () => ({
+  isOracleConfigured: mockIsOracleConfigured,
+  queryOracle: mockQueryOracle,
+}));
+
 // The resolver checks the card_art_overrides table (via the backend Supabase
 // client) before the free APIs. Mock it: default no override; a test can make
 // mockMaybeSingle return a row to exercise the override path.
@@ -35,6 +45,8 @@ const h = { pokemon: [], scryfall: [], yugioh: [] };
 beforeEach(() => {
   vi.clearAllMocks();
   mockMaybeSingle.mockResolvedValue({ data: null, error: null });
+  mockIsOracleConfigured.mockReturnValue(false);
+  mockQueryOracle.mockReset();
   h.pokemon = []; h.scryfall = []; h.yugioh = [];
   global.fetch = vi.fn((url) => {
     const u = String(url);
@@ -246,5 +258,77 @@ describe('POST /images', () => {
     } finally {
       delete process.env.CARD_ART_CDN_HOST;
     }
+  });
+});
+
+// ─── GET /search — Oracle catalogue adapter ────────────────────────────────────
+
+describe('GET /search with the Oracle catalogue', () => {
+  it('is skipped entirely when Oracle is not configured', async () => {
+    const res = await request(app).get('/search?q=charizard&collection=pokemon');
+    expect(res.status).toBe(200);
+    expect(mockQueryOracle).not.toHaveBeenCalled();
+  });
+
+  it('merges Oracle results alongside the free-API results', async () => {
+    mockIsOracleConfigured.mockReturnValue(true);
+    mockQueryOracle.mockResolvedValue([{
+      ID: 1, CARD_NAME: 'Charizard', SET_NAME: 'Base Set', CARD_NUMBER: '4',
+      RARITY: 'Rare Holo', IMAGE_URL_FRONT: 'https://cdn/charizard.png',
+    }]);
+    h.pokemon = [{ id: 'p1', name: 'Charizard', set: { name: 'Base' }, number: '4' }];
+
+    const res = await request(app).get('/search?q=charizard&collection=pokemon');
+    expect(res.body.results.map(r => r.source).sort()).toEqual(['oracle-catalogue', 'pokemon-tcg']);
+    expect(res.body.results.find(r => r.source === 'oracle-catalogue')).toEqual({
+      id: '1', name: 'Charizard', setName: 'Base Set', year: null, cardNumber: '4',
+      rarity: 'Rare Holo', imageUrl: 'https://cdn/charizard.png', source: 'oracle-catalogue',
+    });
+  });
+
+  it('returns no Oracle results (fails soft) when the query throws', async () => {
+    mockIsOracleConfigured.mockReturnValue(true);
+    mockQueryOracle.mockRejectedValue(new Error('ORA-12541: TNS:no listener'));
+    const res = await request(app).get('/search?q=x&collection=pokemon');
+    expect(res.status).toBe(200);
+    expect(res.body.results).toEqual([]);
+  });
+});
+
+// ─── POST /match ────────────────────────────────────────────────────────────────
+
+describe('POST /match', () => {
+  it('returns 400 without a name', async () => {
+    const res = await request(app).post('/match').send({});
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 503 when Oracle is not configured', async () => {
+    const res = await request(app).post('/match').send({ name: 'Charizard' });
+    expect(res.status).toBe(503);
+    expect(res.body.candidates).toEqual([]);
+  });
+
+  it('returns scored candidates from the catalogue', async () => {
+    mockIsOracleConfigured.mockReturnValue(true);
+    mockQueryOracle.mockResolvedValue([{
+      ID: 1, CARD_NAME: 'Charizard', SET_NAME: 'Base Set', CARD_NUMBER: '4',
+      RARITY: 'Rare Holo', IMAGE_URL_FRONT: 'https://cdn/charizard.png', MATCH_SCORE: 100,
+    }]);
+
+    const res = await request(app).post('/match').send({ name: 'Charizard', set: 'Base Set', cardNumber: '4' });
+    expect(res.status).toBe(200);
+    expect(res.body.candidates).toEqual([{
+      id: '1', name: 'Charizard', setName: 'Base Set', cardNumber: '4',
+      rarity: 'Rare Holo', imageUrl: 'https://cdn/charizard.png', matchScore: 100, source: 'oracle-catalogue',
+    }]);
+  });
+
+  it('returns 502 when the Oracle query fails', async () => {
+    mockIsOracleConfigured.mockReturnValue(true);
+    mockQueryOracle.mockRejectedValue(new Error('connection lost'));
+    const res = await request(app).post('/match').send({ name: 'Charizard' });
+    expect(res.status).toBe(502);
+    expect(res.body.candidates).toEqual([]);
   });
 });
