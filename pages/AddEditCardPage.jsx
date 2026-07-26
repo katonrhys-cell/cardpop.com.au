@@ -3506,6 +3506,10 @@ const AddEditCardPage = () => {
         <form onSubmit={handleSubmit} className="space-y-6">
           {wizardMode ? (
             <>
+              {/* Selling gates surfaced up-front (step 1), not sprung on the
+                  seller after they've built the whole listing. Self-hides once
+                  the account can sell. */}
+              {wizardStep === 0 && <SellingRequirementsNotice className="max-w-2xl mx-auto" />}
               <WizardStepper
                 steps={WIZARD_STEPS}
                 current={wizardStep}

@@ -14,7 +14,7 @@ function renderAt() {
       <Routes>
         <Route path="/welcome" element={<WelcomePage />} />
         <Route path="/verify-identity" element={<div>verify-identity-page</div>} />
-        <Route path="/account/wallet" element={<div>wallet-page</div>} />
+        <Route path="/account" element={<div>account-page</div>} />
         <Route path="/login" element={<div>login-page</div>} />
       </Routes>
     </MemoryRouter>,
@@ -27,16 +27,19 @@ beforeEach(() => {
 });
 
 describe('WelcomePage', () => {
-  it('routes a freshly confirmed, unverified user into the ID-verification chain', async () => {
+  it('offers a freshly confirmed user the browse / add-card / sell fork instead of forcing ID verification', async () => {
     h.auth = { isAuthenticated: true, isIdentityVerified: false, loading: false };
     renderAt();
-    await waitFor(() => expect(screen.getByText('verify-identity-page')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/welcome to CardPop/i)).toBeInTheDocument());
+    expect(screen.getByText('Browse cards').closest('a')).toHaveAttribute('href', '/marketplace');
+    expect(screen.getByText('Add your first card').closest('a')).toHaveAttribute('href', '/vault/add');
+    expect(screen.getByText('Set up selling').closest('a')).toHaveAttribute('href', '/verify-identity?welcome=1');
   });
 
-  it('sends an already ID-verified user straight to the wallet', async () => {
+  it('sends an already ID-verified user straight to their dashboard', async () => {
     h.auth = { isAuthenticated: true, isIdentityVerified: true, loading: false };
     renderAt();
-    await waitFor(() => expect(screen.getByText('wallet-page')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('account-page')).toBeInTheDocument());
   });
 
   it('shows a spinner while the session is still being established', () => {
