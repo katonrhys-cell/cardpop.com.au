@@ -42,6 +42,7 @@ import refundsRouter from './refunds.js';
 import adminRouter from './admin.js';
 import settingsRouter from './settings.js';
 import reportsRouter from './reports.js';
+import blogRouter from './blog.js';
 
 const router = Router();
 
@@ -210,6 +211,13 @@ export default () => {
     // authMiddleware / requireAdmin / reportLimiter.
     router.use('/reports', apiLimiter);
     router.use('/reports', reportsRouter);
+
+    // Blog article topic queue — admin only (the router applies
+    // authMiddleware + isAdminUser to every route inside it). The scheduled
+    // generation entrypoint is NOT here: it's api/blog-generate.js, reached
+    // via the /cron/blog-generate rewrite with a CRON_SECRET bearer.
+    router.use('/blog', apiLimiter);
+    router.use('/blog', blogRouter);
 
     // Trade routes with email verification middleware
     // Apply auth middleware first, then trade access verification
