@@ -18,7 +18,7 @@ const SellerCard = ({ seller }) => {
     ? new Date(seller.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
     : 'Unknown';
 
-  const avatarUrl = seller.avatar_url || null;
+  const avatarUrl = seller.business_logo_url || seller.avatar_url || null;
   const sellerName = seller.display_name || seller.name || 'Anonymous Seller';
   const location = seller.location_suburb && seller.location_state
     ? `${seller.location_suburb}, ${seller.location_state}`
@@ -38,15 +38,17 @@ const SellerCard = ({ seller }) => {
       {/* Avatar */}
       <div className="shrink-0 relative mb-4">
         {avatarUrl ? (
-          <img
-            src={avatarUrl}
-            alt={`${sellerName} avatar`}
-            className="w-20 h-20 rounded-full object-cover ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all"
-            width="80"
-            height="80"
-          />
+          <div className="w-20 h-20 rounded-2xl bg-black flex items-center justify-center overflow-hidden ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all">
+            <img
+              src={avatarUrl}
+              alt={`${sellerName} avatar`}
+              className="w-full h-full rounded-2xl object-cover"
+              width="80"
+              height="80"
+            />
+          </div>
         ) : (
-          <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all">
+          <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all">
             <User className="w-8 h-8 text-muted-foreground" />
           </div>
         )}
