@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, LogOut, Settings, Package, ArrowRightLeft, ShieldAlert, LayoutDashboard, CheckCircle2, CalendarDays } from 'lucide-react';
+import { User, LogOut, Settings, Package, ArrowRightLeft, ShieldAlert, LayoutDashboard, CheckCircle2, CalendarDays, Tv2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { Button } from '@/components/ui/button';
@@ -147,6 +147,12 @@ const VaultDropdown = ({ isMobile = false }) => {
           <Link to="/account/events" className="flex items-center w-full">
             <CalendarDays className="mr-2 h-4 w-4" />
             <span>My Events</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="cursor-pointer py-2.5">
+          <Link to="/account/shows" className="flex items-center w-full">
+            <Tv2 className="mr-2 h-4 w-4" />
+            <span>My Shows</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild className="cursor-pointer py-2.5">

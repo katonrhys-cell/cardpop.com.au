@@ -15,7 +15,7 @@ import {
   Settings, FolderTree, ListOrdered, BarChart3, Store, Shield,
   BookOpen, Award, TrendingUp, BadgeCheck, Ticket, Handshake,
   Calculator, MapPin, ClipboardList, HelpCircle, MessageSquare,
-  ShoppingBag, LineChart, Info, Sparkles, Rocket, Tag, MoreHorizontal,
+  ShoppingBag, LineChart, Info, Sparkles, Rocket, Tag, MoreHorizontal, Tv2,
 } from 'lucide-react';
 import { TCG_CATEGORY_DATA, SPORTS_CATEGORY_DATA } from '@/components/CategoryIcons.jsx';
 import { SHOP_CATEGORY_GROUPS } from '@/utils/shopCategories.js';
@@ -60,6 +60,7 @@ const ADMIN_LINKS = [
   { label: 'Product Lines', href: '/admin/product-lines', icon: Layers },
   { label: 'Marketplace', href: '/admin/marketplace', icon: Store },
   { label: 'Events', href: '/admin/events', icon: Calendar },
+  { label: 'Whatnot Shows', href: '/admin/whatnot-shows', icon: Tv2 },
   { label: 'Content', href: '/admin/content', icon: FileText },
   { label: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
   { label: 'Settings', href: '/admin/settings', icon: Settings },
@@ -1114,6 +1115,11 @@ const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout })
           <SheetClose asChild>
             <Link to="/account/events" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
               <Calendar className="w-4 h-4" /> My Events
+            </Link>
+          </SheetClose>
+          <SheetClose asChild>
+            <Link to="/account/shows" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
+              <Tv2 className="w-4 h-4" /> My Shows
             </Link>
           </SheetClose>
           <SheetClose asChild>

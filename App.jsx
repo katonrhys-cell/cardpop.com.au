@@ -125,6 +125,7 @@ const AccountSecurity = lazy(() => import('@/pages/account/AccountSecurity.jsx')
 const AccountSellerTier = lazy(() => import('@/pages/account/AccountSellerTier.jsx'));
 const AccountOrders = lazy(() => import('@/pages/account/AccountOrders.jsx'));
 const AccountEvents = lazy(() => import('@/pages/account/AccountEvents.jsx'));
+const AccountShows = lazy(() => import('@/pages/account/AccountShows.jsx'));
 const AccountSoleTrader = lazy(() => import('@/pages/account/AccountSoleTrader.jsx'));
 const AccountMembership = lazy(() => import('@/pages/account/AccountMembership.jsx'));
 const SoleTraderStorePage = lazy(() => import('@/pages/SoleTraderStorePage.jsx'));
@@ -197,6 +198,7 @@ const SellersManagementPage = lazy(() => import('@/pages/admin/SellersManagement
 const OrderManagementPage = lazy(() => import('@/pages/admin/OrderManagementPage.jsx'));
 const AdminSettingsPage = lazy(() => import('@/pages/admin/AdminSettingsPage.jsx'));
 const EventsAdminPage = lazy(() => import('@/pages/admin/EventsManagementPage.jsx'));
+const WhatnotShowsAdminPage = lazy(() => import('@/pages/admin/WhatnotShowsAdminPage.jsx'));
 const ContentManagementPage = lazy(() => import('@/pages/admin/ContentManagementPage.jsx'));
 const SystemDiagnosticsPage = lazy(() => import('@/pages/admin/SystemDiagnosticsPage.jsx'));
 const AnalyticsPage = lazy(() => import('@/pages/admin/AnalyticsPage.jsx'));
@@ -365,6 +367,7 @@ const App = () => {
                         <Route path="/account/seller-tier" element={<ProtectedRoute><AccountSellerTier /></ProtectedRoute>} />
                         <Route path="/account/orders" element={<ProtectedRoute><AccountOrders /></ProtectedRoute>} />
                         <Route path="/account/events" element={<ProtectedRoute><AccountEvents /></ProtectedRoute>} />
+                        <Route path="/account/shows" element={<ProtectedRoute><AccountShows /></ProtectedRoute>} />
                         <Route path="/account/sole-trader" element={<ProtectedRoute><AccountSoleTrader /></ProtectedRoute>} />
                         <Route path="/account/membership" element={<ProtectedRoute><AccountMembership /></ProtectedRoute>} />
                         <Route path="/account/partner" element={<ProtectedRoute><AccountPartner /></ProtectedRoute>} />
@@ -484,6 +487,7 @@ const App = () => {
                         <Route path="/admin" element={<ProtectedAdminRoute><AdminLayout /></ProtectedAdminRoute>}>
                           <Route index element={<AdminDashboard />} />
                           <Route path="events" element={<EventsAdminPage />} />
+                          <Route path="whatnot-shows" element={<WhatnotShowsAdminPage />} />
                           <Route path="products" element={<ProductManagementPage />} />
                           <Route path="users" element={<UserManagementPage />} />
                           <Route path="users/:userId" element={<UserDetailPage />} />
