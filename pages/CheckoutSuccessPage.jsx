@@ -10,6 +10,7 @@ import { useCart } from '@/hooks/useCart.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
 import { Card } from '@/components/ui/card';
+import { GooglePayMark } from '@/components/checkout/PaymentMethodSelector.jsx';
 import Turnstile from '@/components/Turnstile.jsx';
 import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
 
@@ -249,6 +250,14 @@ const CheckoutSuccessPage = () => {
               <div className="flex justify-between border-b border-border/50 pb-2">
                 <span className="text-muted-foreground">Total Paid</span>
                 <span className="font-bold text-primary">${(sessionData.amountTotal / 100).toFixed(2)}</span>
+              </div>
+            )}
+            {/* Google Pay brand guidelines ask confirmation pages to indicate when the
+                buyer paid with Google Pay specifically, with the mark. */}
+            {sessionData?.walletType === 'google_pay' && (
+              <div className="flex items-center justify-between border-b border-border/50 pb-2">
+                <span className="text-muted-foreground">Paid with</span>
+                <GooglePayMark />
               </div>
             )}
             <div className="flex justify-between pb-2">

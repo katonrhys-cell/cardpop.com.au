@@ -55,6 +55,44 @@ cart drawer, and the checkout summary.
 Keep this in sync with the Stripe Dashboard: if Afterpay is disabled in Stripe,
 set `VITE_ENABLE_BNPL=false` so we don't advertise an option buyers can't pick.
 
+## Google Pay brand guidelines
+
+Google publishes brand guidelines for how Google Pay may be shown
+(developers.google.com/pay/api/web/guides/brand-guidelines). Three different
+things on CardPop are covered by them:
+
+1. **The actual "Buy with Google Pay" button** — rendered by Stripe itself
+   inside `EmbeddedStripeCheckout.jsx`'s iframe when Google Pay is enabled in
+   the Stripe Dashboard (see the table above). Stripe is a certified Google
+   Pay processor and draws Google's own button asset there, so this is
+   already fully compliant with no code on our side to maintain.
+2. **The small "we accept…" trust row** — `GooglePayMark` in
+   `PaymentMethodSelector.jsx`, shown before the buyer ever reaches Stripe.
+   Uses Google's actual four-color "G" logo path data (verified against the
+   official reference asset) next to "Pay" in the specified neutral gray —
+   not a spelled-out colored wordmark like the first version of this file
+   had. The "Pay" text is still our own typesetting (Product Sans isn't
+   freely distributable), a disclosed, minor gap from the pixel-exact asset.
+
+3. **Confirmation page and receipt labeling.** The guidelines' "Put it all
+   together" section asks that confirmation pages and email receipts
+   *indicate when the buyer paid with Google Pay specifically*, not just
+   "paid successfully." Implemented: `stripeWebhookService.js` resolves the
+   wallet actually used (`resolveWalletType` — Stripe represents Google
+   Pay/Apple Pay as `payment_method.type === 'card'` with `card.wallet.type`
+   set, there's no separate `'google_pay'` method type) and stores it on
+   `orders.payment_wallet_type` (migration
+   `20260728111312_orders_payment_wallet_type.sql`, nullable, with a
+   missing-column fallback for the deploy/migration race — same pattern as
+   `gst_included_aud`). `/stripe/session/:id` also resolves it live from
+   Stripe (`payment_intent.payment_method` expand) as `walletType` in its
+   response, independent of whether the column has landed yet.
+   `CheckoutSuccessPage.jsx` shows the `GooglePayMark` next to "Paid with"
+   when `walletType === 'google_pay'`; `orderConfirmedEmail` adds a plain-text
+   "Paid with Google Pay" line (no embedded logo — most mail clients block
+   remote/inline images by default, so an image there would often just be a
+   broken box).
+
 ## Possible follow-up: one-tap Express Checkout button
 
 A Shop-Pay-style **express button on the cart / product page** (tap Apple Pay /
