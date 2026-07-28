@@ -130,14 +130,20 @@ const HeroCardShowcase = ({ cards = [] }) => {
   // Y-offset of the active card's shelf row — later rows sit further down the
   // cabinet, so the flying card must originate lower the further down it is.
   const shelfY = SHELF_Y + activeRow * SHELF_ROW_STEP;
+  // Each extra shelf row grows the cabinet symmetrically about the stage's
+  // fixed centre (top-1/2 -translate-y-1/2), so the shelf's bottom edge only
+  // descends by half of the added row height — the landing/settle/hold spot
+  // for the flying card must shift down by the same amount, or a second row
+  // ends up landing almost on top of it instead of on the stand below.
+  const landingShift = Math.max(0, shelfRows.length - 1) * SHELF_ROW_STEP / 2;
 
   // Keyframe timeline for the flying card. Shared `times` keeps every track
   // in lock-step across the 6 stages.
-  //                stage:  shelf  select  forward  land   settle  hold   exit
+  //                stage:  shelf  select  forward             land                 settle               hold                 exit
   const times = [0, 0.08, 0.42, 0.54, 0.62, 0.92, 1];
   const flyKeyframes = {
     x:       [sx, sx, 0, 0, 0, 0, 0],
-    y:       [shelfY, shelfY - 24, -28, 86, 66, 66, 60],
+    y:       [shelfY, shelfY - 24, -28 + landingShift, 86 + landingShift, 66 + landingShift, 66 + landingShift, 60 + landingShift],
     scale:   [0.42, 0.48, 0.8, 1.05, 1, 1, 0.98],
     opacity: [0, 1, 1, 1, 1, 1, 0],
     rotateZ: [-3, -2, 2, -1, 0, 0, 0],
@@ -234,12 +240,12 @@ const HeroCardShowcase = ({ cards = [] }) => {
           }}
           initial={
             prefersReduced
-              ? { opacity: 1, x: 0, y: 60, scale: 1, rotateZ: 0 }
+              ? { opacity: 1, x: 0, y: 60 + landingShift, scale: 1, rotateZ: 0 }
               : { opacity: 0, x: sx, y: shelfY, scale: 0.42, rotateZ: -3 }
           }
           animate={
             prefersReduced
-              ? { opacity: 1, x: 0, y: 60, scale: 1, rotateZ: 0 }
+              ? { opacity: 1, x: 0, y: 60 + landingShift, scale: 1, rotateZ: 0 }
               : flyKeyframes
           }
           transition={
