@@ -28,22 +28,9 @@
 --    `is_active` flag so an admin takedown can't be undone by the member
 --    toggling their own listing back on.
 
--- 0. Table (no-op in production; present so a fresh DB matches) ---------------
-create table if not exists public.whatnot_shows (
-  id                  uuid primary key default uuid_generate_v4(),
-  user_id             uuid not null,
-  seller_name         text not null,
-  show_title          text not null,
-  description         text,
-  show_date           timestamptz not null,
-  whatnot_url         text,
-  whatnot_channel_url text,
-  preview_image_url   text,
-  is_active           boolean not null default true,
-  created_at          timestamptz not null default now(),
-  updated_at          timestamptz not null default now()
-);
-
+-- 0. Make sure RLS is on ------------------------------------------------------
+-- The table itself is declared in 20260708035638_cleet_whatnot_link_and_shows.sql,
+-- the first migration that touches it.
 alter table public.whatnot_shows enable row level security;
 
 -- 1. Re-point user_id at public.profiles -------------------------------------
@@ -103,12 +90,16 @@ create policy "whatnot_shows_select_access" on public.whatnot_shows
   );
 
 -- Owners keep full control of their own listings; admins can act on any row.
+-- Each policy drops both the old dashboard-era name and the new one, so the
+-- migration stays re-runnable (a second pass has already renamed them).
 drop policy if exists "Users can insert their own shows" on public.whatnot_shows;
+drop policy if exists "whatnot_shows_insert_access" on public.whatnot_shows;
 create policy "whatnot_shows_insert_access" on public.whatnot_shows
   as permissive for insert to public
   with check ((select auth.uid()) = user_id);
 
 drop policy if exists "Users can update their own shows" on public.whatnot_shows;
+drop policy if exists "whatnot_shows_update_access" on public.whatnot_shows;
 create policy "whatnot_shows_update_access" on public.whatnot_shows
   as permissive for update to public
   using (
@@ -120,6 +111,7 @@ create policy "whatnot_shows_update_access" on public.whatnot_shows
   );
 
 drop policy if exists "Users can delete their own shows" on public.whatnot_shows;
+drop policy if exists "whatnot_shows_delete_access" on public.whatnot_shows;
 create policy "whatnot_shows_delete_access" on public.whatnot_shows
   as permissive for delete to public
   using (
