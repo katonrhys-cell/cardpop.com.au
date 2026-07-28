@@ -116,9 +116,7 @@ const EventDetailCard = ({ event }) => {
               {event.description}
             </p>
 
-            <div className="my-10">
-              <InArticleAd />
-            </div>
+            <InArticleAd className="my-10" />
 
             {event.accessibility_info && (
               <div className="mt-10">
