@@ -89,6 +89,13 @@ const CYCLE_MS = 6500;
 const SHELF_SLOT = 80; // 68px card + 12px gap
 const SHELF_Y = -150;
 
+// Bookshelf layout: once there are more than five cards, wrap the shelf
+// display into additional rows (max five per row) stacked beneath the first,
+// like shelves in a cabinet, instead of squeezing every card into one
+// ever-widening row.
+const SHELF_ROW_SIZE = 5;
+const SHELF_ROW_STEP = 125; // vertical distance between stacked shelf rows
+
 const HeroCardShowcase = ({ cards = [] }) => {
   const prefersReduced = useReducedMotion();
   const [active, setActive] = useState(0);
@@ -104,68 +111,98 @@ const HeroCardShowcase = ({ cards = [] }) => {
     return () => clearInterval(id);
   }, [prefersReduced, count]);
 
+  const shelfRows = useMemo(() => {
+    const out = [];
+    for (let i = 0; i < cards.length; i += SHELF_ROW_SIZE) out.push(cards.slice(i, i + SHELF_ROW_SIZE));
+    return out;
+  }, [cards]);
+
   if (count === 0) return null;
 
   const activeCard = cards[active];
+  const activeRow = Math.floor(active / SHELF_ROW_SIZE);
+  const activeCol = active % SHELF_ROW_SIZE;
+  const activeRowLen = shelfRows[activeRow]?.length || 1;
   // X-offset (from stage centre) of the active card's shelf slot, so the flying
-  // card lifts out of the right spot regardless of how many cards are on show.
-  const sx = (active - (count - 1) / 2) * SHELF_SLOT;
+  // card lifts out of the right spot regardless of how many cards are on show
+  // — centred within its own row, not the full card count.
+  const sx = (activeCol - (activeRowLen - 1) / 2) * SHELF_SLOT;
+  // Y-offset of the active card's shelf row — later rows sit further down the
+  // cabinet, so the flying card must originate lower the further down it is.
+  const shelfY = SHELF_Y + activeRow * SHELF_ROW_STEP;
+  // Each extra shelf row grows the cabinet symmetrically about the stage's
+  // fixed centre (top-1/2 -translate-y-1/2), so the shelf's bottom edge only
+  // descends by half of the added row height — the landing/settle/hold spot
+  // for the flying card must shift down by the same amount, or a second row
+  // ends up landing almost on top of it instead of on the stand below.
+  const landingShift = Math.max(0, shelfRows.length - 1) * SHELF_ROW_STEP / 2;
 
   // Keyframe timeline for the flying card. Shared `times` keeps every track
   // in lock-step across the 6 stages.
-  //                stage:  shelf  select  forward  land   settle  hold   exit
+  //                stage:  shelf  select  forward             land                 settle               hold                 exit
   const times = [0, 0.08, 0.42, 0.54, 0.62, 0.92, 1];
   const flyKeyframes = {
     x:       [sx, sx, 0, 0, 0, 0, 0],
-    y:       [SHELF_Y, SHELF_Y - 24, -28, 86, 66, 66, 60],
+    y:       [shelfY, shelfY - 24, -28 + landingShift, 86 + landingShift, 66 + landingShift, 66 + landingShift, 60 + landingShift],
     scale:   [0.42, 0.48, 0.8, 1.05, 1, 1, 0.98],
     opacity: [0, 1, 1, 1, 1, 1, 0],
     rotateZ: [-3, -2, 2, -1, 0, 0, 0],
   };
 
+  // Extra vertical room for each additional shelf row beyond the first, so
+  // the cabinet can grow into a bookshelf without cramping the flying-card
+  // stage or the stand below it.
+  const stageHeight = 460 + Math.max(0, shelfRows.length - 1) * SHELF_ROW_STEP;
+
   return (
     <div
       aria-hidden="true"
-      className="absolute right-[1%] xl:right-[4%] top-1/2 -translate-y-1/2 hidden lg:block w-[540px] h-[460px] pointer-events-none select-none"
+      className="absolute right-[1%] xl:right-[4%] top-1/2 -translate-y-1/2 hidden lg:block w-[540px] pointer-events-none select-none"
+      style={{ height: stageHeight }}
     >
-      {/* ── Background cabinet / shelf ── */}
+      {/* ── Background cabinet / shelf(-ves) — a bookshelf of up to 5 cards per row ── */}
       <div className="absolute left-1/2 -translate-x-1/2 top-2 w-[460px]">
-        {/* Cards resting on the shelf */}
-        <div className="relative flex items-end justify-center gap-3 px-4">
-          {cards.map((card, i) => {
-            const isOut = !prefersReduced && i === active;
-            return (
-              <div key={i} className="relative w-[68px] h-[94px] flex-shrink-0">
-                {/* Empty-slot glow shown while this card is "in flight" */}
-                {isOut && (
-                  <div
-                    className="absolute inset-0 rounded-md border border-yellow-400/30"
-                    style={{ animation: 'hero-shelf-shimmer 2s ease-in-out infinite' }}
-                  />
-                )}
-                <div
-                  className={`absolute inset-0 rounded-md overflow-hidden bg-gradient-to-br ${card.gradient} border ${card.borderColor} transition-opacity duration-500`}
-                  style={{
-                    opacity: isOut ? 0.12 : 0.9,
-                    boxShadow: '0 8px 16px -6px rgba(0,0,0,0.7), inset 0 0 0 1px rgba(255,255,255,0.05)',
-                  }}
-                >
-                  <CardArt image={card.image} padding="p-0.5" sizes="68px" />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        {shelfRows.map((row, rowIndex) => (
+          <div key={rowIndex} className={rowIndex > 0 ? 'mt-3.5' : undefined}>
+            {/* Cards resting on this shelf */}
+            <div className="relative flex items-end justify-center gap-3 px-4">
+              {row.map((card, colIndex) => {
+                const i = rowIndex * SHELF_ROW_SIZE + colIndex;
+                const isOut = !prefersReduced && i === active;
+                return (
+                  <div key={i} className="relative w-[68px] h-[94px] flex-shrink-0">
+                    {/* Empty-slot glow shown while this card is "in flight" */}
+                    {isOut && (
+                      <div
+                        className="absolute inset-0 rounded-md border border-yellow-400/30"
+                        style={{ animation: 'hero-shelf-shimmer 2s ease-in-out infinite' }}
+                      />
+                    )}
+                    <div
+                      className={`absolute inset-0 rounded-md overflow-hidden bg-gradient-to-br ${card.gradient} border ${card.borderColor} transition-opacity duration-500`}
+                      style={{
+                        opacity: isOut ? 0.12 : 0.9,
+                        boxShadow: '0 8px 16px -6px rgba(0,0,0,0.7), inset 0 0 0 1px rgba(255,255,255,0.05)',
+                      }}
+                    >
+                      <CardArt image={card.image} padding="p-0.5" sizes="68px" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
 
-        {/* Shelf ledge */}
-        <div
-          className="mx-auto mt-1 h-3 w-[440px] rounded-sm"
-          style={{
-            background: 'linear-gradient(180deg, rgba(120,90,50,0.55) 0%, rgba(40,28,16,0.9) 100%)',
-            boxShadow: '0 10px 22px -8px rgba(0,0,0,0.9)',
-          }}
-        />
-        <div className="mx-auto h-px w-[440px] bg-white/10" />
+            {/* Shelf ledge */}
+            <div
+              className="mx-auto mt-1 h-3 w-[440px] rounded-sm"
+              style={{
+                background: 'linear-gradient(180deg, rgba(120,90,50,0.55) 0%, rgba(40,28,16,0.9) 100%)',
+                boxShadow: '0 10px 22px -8px rgba(0,0,0,0.9)',
+              }}
+            />
+            <div className="mx-auto h-px w-[440px] bg-white/10" />
+          </div>
+        ))}
       </div>
 
       {/* ── Spotlight beam onto the stand (rises as the card settles) ── */}
@@ -203,12 +240,12 @@ const HeroCardShowcase = ({ cards = [] }) => {
           }}
           initial={
             prefersReduced
-              ? { opacity: 1, x: 0, y: 60, scale: 1, rotateZ: 0 }
-              : { opacity: 0, x: sx, y: SHELF_Y, scale: 0.42, rotateZ: -3 }
+              ? { opacity: 1, x: 0, y: 60 + landingShift, scale: 1, rotateZ: 0 }
+              : { opacity: 0, x: sx, y: shelfY, scale: 0.42, rotateZ: -3 }
           }
           animate={
             prefersReduced
-              ? { opacity: 1, x: 0, y: 60, scale: 1, rotateZ: 0 }
+              ? { opacity: 1, x: 0, y: 60 + landingShift, scale: 1, rotateZ: 0 }
               : flyKeyframes
           }
           transition={
