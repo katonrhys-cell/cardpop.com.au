@@ -248,11 +248,11 @@ const SoleTraderStorePage = () => {
 
             {/* Logo */}
             <div className="shrink-0 relative">
-              <div className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-muted border-4 border-card shadow-xl flex items-center justify-center overflow-hidden">
+              <div className="w-32 h-32 md:w-40 md:h-40 rounded-2xl bg-black border-4 border-card shadow-xl flex items-center justify-center overflow-hidden">
                 {logoUrl ? (
-                  <img src={logoUrl} alt={displayName} className="w-full h-full object-cover" />
+                  <img src={logoUrl} alt={displayName} className="w-full h-full rounded-2xl object-cover" />
                 ) : (
-                  <span className="text-5xl font-bold text-muted-foreground">
+                  <span className="text-5xl font-bold text-white">
                     {displayName.charAt(0).toUpperCase()}
                   </span>
                 )}
