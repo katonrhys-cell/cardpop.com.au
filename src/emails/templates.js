@@ -194,8 +194,18 @@ ${invoice.businessName ? `<p style="margin:0 0 2px;font-size:15px;font-weight:70
 </div>`;
 }
 
-export function orderConfirmedEmail({ buyerName, cardName, itemPrice, total, orderId, invoice }) {
+// Google's brand guidelines only cover their own wallet by name; other
+// values resolveWalletType() can return (e.g. 'link') get no special label.
+const WALLET_LABELS = { google_pay: 'Google Pay', apple_pay: 'Apple Pay' };
+
+export function orderConfirmedEmail({ buyerName, cardName, itemPrice, total, orderId, invoice, paymentWalletType }) {
   const isTaxInvoice = Boolean(invoice?.abn);
+  // Per Google Pay brand guidelines ("Put it all together"), receipts should
+  // indicate when the buyer paid with Google Pay specifically. Plain text —
+  // most mail clients block remote/inline images by default, so a logo here
+  // would often just be a broken box.
+  const walletLabel = WALLET_LABELS[paymentWalletType];
+  const paidWithLine = walletLabel ? `<p style="margin:0 0 20px;font-size:13px;color:#6B7280;">Paid with <strong style="color:#111827;">${esc(walletLabel)}</strong>.</p>` : '';
 
   // Rich itemised invoice when the checkout captured full pricing; otherwise
   // fall back to the original single-line summary (single-item purchases).
@@ -207,12 +217,14 @@ export function orderConfirmedEmail({ buyerName, cardName, itemPrice, total, ord
     const meta = `<p style="margin:0 0 20px;font-size:13px;color:#6B7280;">Invoice <strong style="color:#111827;">#${String(orderId).slice(0, 8).toUpperCase()}</strong>${orderDate ? ` &middot; ${orderDate}` : ''}</p>`;
     body = `<p>Your purchase has been confirmed. Here's your ${isTaxInvoice ? 'tax invoice' : 'receipt'}:</p>
 ${meta}
+${paidWithLine}
 ${businessBlock(invoice)}
 ${invoiceBlock(invoice, orderId)}
 ${isTaxInvoice ? (() => { const gstTotal = Number(invoice.gst || 0) + Number(invoice.gstIncluded || 0); return `<p style="font-size:13px;color:#6B7280;">This is a tax invoice.${gstTotal > 0 ? ` Total includes GST of ${money(gstTotal)} AUD.` : ''} Issued to ABN ${esc(invoice.abn)}.</p>`; })() : ''}
 <p>Check your order details to coordinate delivery with the seller. Enjoy the new addition to your collection!</p>`;
   } else {
     body = `<p>Your purchase has been confirmed. Here's a summary of what you've secured:</p>
+${paidWithLine}
 ${summaryTable([
   ['Item', esc(cardName)],
   ['Item price', `$${Number(itemPrice).toFixed(2)} AUD`],

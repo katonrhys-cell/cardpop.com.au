@@ -76,7 +76,7 @@ const ApplePayMark = () => (
 // <image>/inline <path> from that file when available. The clear space this
 // badge gets from its parent (`Badge`) already exceeds the required 0.5x
 // cap-height-of-"G" minimum on every side.
-const GooglePayMark = () => (
+export const GooglePayMark = () => (
   <svg viewBox="0 0 52 20" height="18" role="img" aria-hidden="true">
     <text x="0" y="15" fontFamily="Roboto, 'Google Sans', Arial, sans-serif" fontWeight="500" fontSize="12">
       <tspan fill="#4285F4">G</tspan><tspan fill="#EA4335">o</tspan><tspan fill="#FBBC05">o</tspan><tspan fill="#4285F4">g</tspan><tspan fill="#34A853">l</tspan><tspan fill="#EA4335">e</tspan>

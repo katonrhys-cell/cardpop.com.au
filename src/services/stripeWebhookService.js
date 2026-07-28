@@ -32,6 +32,29 @@ export async function computePayerNameMismatch(buyerId, payerName) {
   }
 }
 
+/**
+ * Which wallet actually paid (Google Pay / Apple Pay / Stripe Link), if any.
+ * Stripe has no distinct 'google_pay' payment_method type — wallet payments
+ * come back as type 'card' with card.wallet.type set. Surfaced so the
+ * confirmation page and receipt email can say "Paid with Google Pay" per
+ * Google's brand guidelines, instead of just "payment successful". Best-
+ * effort: a lookup failure must never block order fulfilment.
+ */
+async function resolveWalletType(stripe, paymentIntentId) {
+  if (!paymentIntentId) return null;
+  try {
+    const pi = await stripe.paymentIntents.retrieve(paymentIntentId, { expand: ['payment_method'] });
+    const pm = pi.payment_method;
+    if (!pm || typeof pm === 'string') return null;
+    if (pm.type === 'card' && pm.card?.wallet?.type) return pm.card.wallet.type;
+    if (pm.type === 'link') return 'link';
+    return null;
+  } catch (e) {
+    logger.warn(`[STRIPE] Could not resolve wallet type for payment intent ${paymentIntentId}: ${e.message}`);
+    return null;
+  }
+}
+
 async function getPlatformSetting(key, defaultValue) {
   const { data } = await supabase
     .from('platform_settings')
@@ -267,12 +290,26 @@ async function handleCartOrder(existing, session, stripe) {
     : (session.payment_intent?.id ?? null);
 
   const payerNameMismatch = await computePayerNameMismatch(existing.buyer_id, session.customer_details?.name);
+  const walletType = await resolveWalletType(stripe, cartPaymentIntentId);
 
-  const { data: claimed, error: claimErr } = await supabase.from('orders')
-    .update({ status: 'payment_confirmed', stripe_payment_intent_id: cartPaymentIntentId, payer_name_mismatch: payerNameMismatch })
+  let { data: claimed, error: claimErr } = await supabase.from('orders')
+    .update({ status: 'payment_confirmed', stripe_payment_intent_id: cartPaymentIntentId, payer_name_mismatch: payerNameMismatch, payment_wallet_type: walletType })
     .eq('id', existing.id)
     .eq('status', 'pending')
     .select('id');
+
+  // payment_wallet_type lands with its migration, but a redeploy can briefly
+  // race ahead of `supabase db push` — same window handled for
+  // gst_included_aud below. Drop it and retry rather than failing the confirm.
+  const missingWalletColumn =
+    claimErr?.code === 'PGRST204' || claimErr?.code === '42703' || /payment_wallet_type/.test(claimErr?.message || '');
+  if (missingWalletColumn) {
+    ({ data: claimed, error: claimErr } = await supabase.from('orders')
+      .update({ status: 'payment_confirmed', stripe_payment_intent_id: cartPaymentIntentId, payer_name_mismatch: payerNameMismatch })
+      .eq('id', existing.id)
+      .eq('status', 'pending')
+      .select('id'));
+  }
 
   // Throw on a real error so Stripe retries; only treat a genuine empty result
   // (no error, zero rows) as "already confirmed by a concurrent delivery".
@@ -446,6 +483,7 @@ async function handleCartOrder(existing, session, stripe) {
       itemPrice: Number(existing.item_price_aud ?? amountCents2 / 100),
       total: amountCents2 / 100,
       orderId: existing.id,
+      paymentWalletType: walletType,
       invoice: {
         items: invoiceItems,
         subtotal: Number(existing.item_price_aud ?? 0),
@@ -541,34 +579,47 @@ async function handleSingleItemOrder(session, stripe) {
     : (session.payment_intent?.id ?? null);
 
   const payerNameMismatch = await computePayerNameMismatch(userId, session.customer_details?.name);
+  const walletType = await resolveWalletType(stripe, paymentIntentId);
 
-  const { error: insertError } = await supabase
-    .from('orders')
-    .insert({
-      buyer_id: userId,
-      payer_name_mismatch: payerNameMismatch,
-      seller_id: sellerId,
-      listing_id: listingId,
-      stripe_session_id: session.id,
-      stripe_payment_intent_id: paymentIntentId,
-      total_aud: amountCents / 100,
-      item_price_aud: itemPrice,
-      shipping_aud: 0,
-      discount_aud: discountAud,
-      platform_fee_aud: commissionAud + gstAud,
-      commission_pct: commissionPct,
-      gst_aud: gstAud,
-      seller_proceeds_aud: sellerProceeds,
-      transaction_type: transactionType,
-      commission_config_id: configId || null,
-      status: 'payment_confirmed',
-      buyer_protection: true,
-      shipping_name: meta.shippingName || session.customer_details?.name || null,
-      shipping_address: meta.shippingAddress || session.shipping_details?.address?.line1 || null,
-      shipping_suburb: meta.shippingSuburb || session.shipping_details?.address?.city || null,
-      shipping_state: meta.shippingState || session.shipping_details?.address?.state || null,
-      shipping_postcode: meta.shippingPostcode || session.shipping_details?.address?.postal_code || null,
-    });
+  const orderInsert = {
+    buyer_id: userId,
+    payer_name_mismatch: payerNameMismatch,
+    payment_wallet_type: walletType,
+    seller_id: sellerId,
+    listing_id: listingId,
+    stripe_session_id: session.id,
+    stripe_payment_intent_id: paymentIntentId,
+    total_aud: amountCents / 100,
+    item_price_aud: itemPrice,
+    shipping_aud: 0,
+    discount_aud: discountAud,
+    platform_fee_aud: commissionAud + gstAud,
+    commission_pct: commissionPct,
+    gst_aud: gstAud,
+    seller_proceeds_aud: sellerProceeds,
+    transaction_type: transactionType,
+    commission_config_id: configId || null,
+    status: 'payment_confirmed',
+    buyer_protection: true,
+    shipping_name: meta.shippingName || session.customer_details?.name || null,
+    shipping_address: meta.shippingAddress || session.shipping_details?.address?.line1 || null,
+    shipping_suburb: meta.shippingSuburb || session.shipping_details?.address?.city || null,
+    shipping_state: meta.shippingState || session.shipping_details?.address?.state || null,
+    shipping_postcode: meta.shippingPostcode || session.shipping_details?.address?.postal_code || null,
+  };
+
+  let { error: insertError } = await supabase.from('orders').insert(orderInsert);
+
+  // payment_wallet_type lands with its migration, but a redeploy can briefly
+  // race ahead of `supabase db push` — same window handled for
+  // gst_included_aud in the cart checkout path. Drop it and retry rather than
+  // rejecting an otherwise-good order.
+  const missingWalletColumn =
+    insertError?.code === 'PGRST204' || insertError?.code === '42703' || /payment_wallet_type/.test(insertError?.message || '');
+  if (missingWalletColumn) {
+    delete orderInsert.payment_wallet_type;
+    ({ error: insertError } = await supabase.from('orders').insert(orderInsert));
+  }
 
   if (insertError) {
     if (insertError.code === '23505') {
@@ -670,6 +721,7 @@ async function handleSingleItemOrder(session, stripe) {
       itemPrice,
       total: amountCents / 100,
       orderId,
+      paymentWalletType: walletType,
       // Itemised breakdown so the receipt shows the same service-fee + GST
       // commission structure the buyer saw at checkout.
       invoice: {

@@ -483,7 +483,11 @@ router.get('/session/:sessionId', optionalAuthMiddleware, async (req, res) => {
     if (!sessionId?.trim()) return res.status(400).json({ error: 'sessionId is required' });
 
     const session = await stripe.checkout.sessions.retrieve(sessionId, {
-      expand: ['line_items'],
+      // payment_intent.payment_method lets us tell the buyer which wallet
+      // they paid with (Google Pay / Apple Pay / Link) — Stripe has no
+      // separate 'google_pay' payment method type, it's
+      // payment_method.card.wallet.type on an otherwise-ordinary card method.
+      expand: ['line_items', 'payment_intent.payment_method'],
     });
 
     if (!session) return res.status(404).json({ error: 'Checkout session not found' });
@@ -526,12 +530,20 @@ router.get('/session/:sessionId', optionalAuthMiddleware, async (req, res) => {
       currency:   item.price?.currency || 'aud',
     }));
 
+    const paymentMethod = session.payment_intent && typeof session.payment_intent === 'object'
+      ? session.payment_intent.payment_method
+      : null;
+    const walletType = paymentMethod && typeof paymentMethod === 'object'
+      ? (paymentMethod.type === 'card' ? paymentMethod.card?.wallet?.type ?? null : (paymentMethod.type === 'link' ? 'link' : null))
+      : null;
+
     res.json({
       id:            session.id,
       status:        session.payment_status,
       amountTotal:   session.amount_total,
       customerEmail: session.customer_details?.email,
       customerName:  session.customer_details?.name || null,
+      walletType,
       items,
     });
   } catch (err) {

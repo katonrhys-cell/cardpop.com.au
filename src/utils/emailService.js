@@ -107,12 +107,12 @@ export async function sendWelcomeOffer({ to, name, code, trialDays, discountPct,
   });
 }
 
-export async function sendOrderConfirmed({ buyerEmail, buyerName, cardName, itemPrice, total, orderId, invoice }) {
+export async function sendOrderConfirmed({ buyerEmail, buyerName, cardName, itemPrice, total, orderId, invoice, paymentWalletType }) {
   const isTaxInvoice = Boolean(invoice?.abn);
   await send({
     to: buyerEmail,
     subject: isTaxInvoice ? 'Your CardPop tax invoice & order confirmation' : 'Your CardPop purchase is confirmed!',
-    html: orderConfirmedEmail({ buyerName, cardName, itemPrice, total, orderId, invoice }),
+    html: orderConfirmedEmail({ buyerName, cardName, itemPrice, total, orderId, invoice, paymentWalletType }),
   });
 }
 
