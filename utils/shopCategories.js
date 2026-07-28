@@ -25,6 +25,11 @@ import {
 // Each leaf item carries its own `Icon` so the "Shop" mega-menu can show a
 // coloured badge beside every entry (matching the "Browse Collections" menu),
 // while the badge colour stays the parent group's gradient.
+//
+// `blurb` is the full sentence the /shop landing and collection pages show;
+// `navDesc` is the trimmed one-liner the Shop mega-menu puts under each parent
+// category, so the menu reads like every other dropdown (label + short
+// narrative) without wrapping onto a second line.
 export const SHOP_CATEGORY_GROUPS = [
   {
     label: 'Protection',
@@ -32,6 +37,7 @@ export const SHOP_CATEGORY_GROUPS = [
     Icon: CardShieldIcon,
     gradient: 'from-blue-500 to-indigo-600',
     blurb: 'Sleeves, holders and loaders that keep every card safe.',
+    navDesc: 'Sleeves, holders and loaders',
     items: [
       { name: 'Penny Sleeves',       slug: 'penny-sleeves',       Icon: Layers,      desc: 'Soft inner sleeves for everyday storage' },
       { name: 'Premium Sleeves',     slug: 'premium-sleeves',     Icon: Sparkles,    desc: 'Matte and gloss deck-style sleeves' },
@@ -47,6 +53,7 @@ export const SHOP_CATEGORY_GROUPS = [
     Icon: CardStorageBoxIcon,
     gradient: 'from-amber-500 to-orange-500',
     blurb: 'Boxes, binders and pages to organise a growing collection.',
+    navDesc: 'Boxes, binders and pages',
     items: [
       { name: 'Storage Boxes', slug: 'storage-boxes', Icon: Box,                 desc: 'Cardboard and plastic bulk card boxes' },
       { name: 'Binders',       slug: 'binders',       Icon: BookMarked,          desc: 'Zip and premium collector binders' },
@@ -60,6 +67,7 @@ export const SHOP_CATEGORY_GROUPS = [
     Icon: CardStandIcon,
     gradient: 'from-violet-500 to-purple-600',
     blurb: 'Show off your best cards at home or at the shop.',
+    navDesc: 'Stands, cases and frames',
     items: [
       { name: 'Acrylic Stands', slug: 'acrylic-stands', Icon: PanelTop, desc: 'Desktop stands for raw and graded cards' },
       { name: 'Display Cases',  slug: 'display-cases',  Icon: Package2, desc: 'UV acrylic cases and slab displays' },
@@ -73,6 +81,7 @@ export const SHOP_CATEGORY_GROUPS = [
     Icon: ShippingParcelIcon,
     gradient: 'from-emerald-500 to-teal-600',
     blurb: 'Everything you need to post cards safely.',
+    navDesc: 'Mailers, bags and tape',
     items: [
       { name: 'Team Bags',              slug: 'team-bags',              Icon: ShoppingBag, desc: 'Resealable outer bags for sleeved cards' },
       { name: 'Bubble Mailers',         slug: 'bubble-mailers',         Icon: Mail,        desc: 'Padded mailers in assorted sizes' },
@@ -87,6 +96,7 @@ export const SHOP_CATEGORY_GROUPS = [
     Icon: GradedSlabIcon,
     gradient: 'from-rose-500 to-pink-600',
     blurb: 'Prep kits and tools to get cards submission-ready.',
+    navDesc: 'Prep kits and cleaning tools',
     items: [
       { name: 'Submission Kits',  slug: 'submission-kits',  Icon: PackageCheck, desc: 'Complete CardPop grading prep kits' },
       { name: 'Cleaning Cloths',  slug: 'cleaning-cloths',  Icon: Eraser,       desc: 'Anti-static cloths for surface prep' },

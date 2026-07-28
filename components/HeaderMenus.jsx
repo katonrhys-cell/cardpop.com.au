@@ -169,7 +169,7 @@ const MobileBrowseSection = ({ onNavigate }) => {
                 <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${cat.gradient} shrink-0`}>
                   <cat.Icon className="w-3.5 h-3.5" />
                 </span>
-                <span className="text-xs font-semibold text-foreground truncate">{cat.name}</span>
+                <span className="text-xs font-semibold text-foreground leading-tight">{cat.name}</span>
               </button>
             </SheetClose>
           ))}
@@ -198,7 +198,7 @@ const MobileBrowseSection = ({ onNavigate }) => {
                 <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${cat.gradient} shrink-0`}>
                   <cat.Icon className="w-3.5 h-3.5" />
                 </span>
-                <span className="text-xs font-semibold text-foreground truncate">{cat.name}</span>
+                <span className="text-xs font-semibold text-foreground leading-tight">{cat.name}</span>
               </button>
             </SheetClose>
           ))}
@@ -284,9 +284,12 @@ const BrowseDropdown = ({ onNavigate }) => {
         <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
 
-      {/* Panel */}
+      {/* Panel. The two sections are deliberately uneven: TCG names run long
+          ("Magic: The Gathering", "Disney Lorcana") while every sport is an
+          acronym or a single word, so the games column gets the extra width
+          instead of ellipsising the names. */}
       {open && (
-        <div className="absolute top-full left-0 mt-2 w-[580px] bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
+        <div className="absolute top-full left-0 mt-2 w-[700px] max-w-[calc(100vw-3rem)] bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden">
           {/* View all row */}
           <Link
             to="/marketplace"
@@ -298,7 +301,7 @@ const BrowseDropdown = ({ onNavigate }) => {
           </Link>
 
           {/* Two columns */}
-          <div className="grid grid-cols-2 divide-x divide-border">
+          <div className="grid grid-cols-[1.5fr_1fr] divide-x divide-border">
             {/* Trading Card Games */}
             <div className="p-4">
               <div className="flex items-center gap-2 mb-3 px-1">
@@ -316,7 +319,7 @@ const BrowseDropdown = ({ onNavigate }) => {
                     className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-muted transition-colors group"
                   >
                     <CategoryBadge gradient={cat.gradient} Icon={cat.Icon} />
-                    <span className="text-[13px] font-medium text-foreground group-hover:text-primary transition-colors truncate">
+                    <span className="text-[13px] font-medium text-foreground group-hover:text-primary transition-colors leading-tight">
                       {cat.name}
                     </span>
                   </Link>
@@ -341,7 +344,7 @@ const BrowseDropdown = ({ onNavigate }) => {
                     className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-muted transition-colors group"
                   >
                     <CategoryBadge gradient={cat.gradient} Icon={cat.Icon} />
-                    <span className="text-[13px] font-medium text-foreground group-hover:text-primary transition-colors truncate">
+                    <span className="text-[13px] font-medium text-foreground group-hover:text-primary transition-colors leading-tight">
                       {cat.name}
                     </span>
                   </Link>
@@ -360,6 +363,11 @@ const BrowseDropdown = ({ onNavigate }) => {
 // down the left with their icon badges; hovering (or focusing) one reveals its
 // subcategories in the panel to the right. Leaf items carry the same coloured
 // icon badge used across the other menus.
+//
+// Every entry — parents on the left, subcategories on the right — shows a short
+// narrative under its label, matching the Prices / Community / Grading menus.
+// The subcategory panel is a single column for that reason: two columns of
+// label+desc would squeeze both onto an ellipsis.
 const ShopDropdown = ({ onNavigate }) => {
   const { open, setOpen, ref, handlePointerEnter, handlePointerLeave, handleTriggerClick } = useHoverDropdown();
   const location = useLocation();
@@ -391,7 +399,7 @@ const ShopDropdown = ({ onNavigate }) => {
       </button>
 
       {open && (
-        <div className={`absolute top-full left-0 mt-2 max-w-[calc(100vw-3rem)] bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden transition-[width] duration-300 ease-out ${activeGroup ? 'w-[620px]' : 'w-[236px]'}`}>
+        <div className={`absolute top-full left-0 mt-2 max-w-[calc(100vw-3rem)] bg-card border border-border rounded-2xl shadow-2xl z-50 overflow-hidden transition-[width] duration-300 ease-out ${activeGroup ? 'w-[664px]' : 'w-[292px]'}`}>
           <Link
             to="/shop"
             onClick={() => { setOpen(false); onNavigate?.(); }}
@@ -399,13 +407,14 @@ const ShopDropdown = ({ onNavigate }) => {
           >
             <div className="min-w-0">
               <span className="text-sm font-bold text-foreground">Explore All Supplies</span>
+              <p className="text-xs text-muted-foreground mt-0.5">Protect, store and display your collection</p>
             </div>
             <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
           </Link>
 
           <div className="flex">
             {/* Parent categories — hover/focus opens the panel on the right */}
-            <div className={`w-[236px] shrink-0 p-3 ${activeGroup ? 'border-r border-border' : ''}`}>
+            <div className={`w-[292px] shrink-0 p-3 ${activeGroup ? 'border-r border-border' : ''}`}>
               {SHOP_CATEGORY_GROUPS.map(group => {
                 const isActive = group.slug === activeSlug;
                 return (
@@ -417,16 +426,19 @@ const ShopDropdown = ({ onNavigate }) => {
                     onPointerEnter={() => setActiveSlug(group.slug)}
                     onFocus={() => setActiveSlug(group.slug)}
                     onClick={() => { setOpen(false); onNavigate?.(); }}
-                    className={`w-full flex items-center gap-2.5 px-2 py-2.5 rounded-xl transition-colors text-left ${
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-left ${
                       isActive ? 'bg-muted' : 'hover:bg-muted'
                     }`}
                   >
                     <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${group.gradient} shrink-0 shadow-sm`}>
                       <group.Icon className="w-4 h-4 text-white" />
                     </span>
-                    <span className={`text-[13px] font-medium transition-colors truncate ${isActive ? 'text-primary' : 'text-foreground'}`}>
-                      {group.label}
-                    </span>
+                    <div className="min-w-0">
+                      <p className={`text-[13px] font-semibold transition-colors ${isActive ? 'text-primary' : 'text-foreground'}`}>
+                        {group.label}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground truncate">{group.navDesc}</p>
+                    </div>
                     <ChevronRight className={`w-4 h-4 ml-auto shrink-0 transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
                   </Link>
                 );
@@ -436,11 +448,11 @@ const ShopDropdown = ({ onNavigate }) => {
             {/* Subcategories of the hovered category — absent until a
                 category is hovered, then the panel expands out */}
             {activeGroup && (
-              <div className="flex-1 min-w-0 p-4">
+              <div className="flex-1 min-w-0 p-3">
                 <Link
                   to={`/shop/${activeGroup.slug}`}
                   onClick={() => { setOpen(false); onNavigate?.(); }}
-                  className="flex items-center justify-between gap-2 mb-3 px-1 group/head"
+                  className="flex items-center justify-between gap-2 mb-1.5 px-3 pt-1 group/head"
                 >
                   <span className="text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground group-hover/head:text-primary transition-colors">
                     {activeGroup.label}
@@ -449,20 +461,21 @@ const ShopDropdown = ({ onNavigate }) => {
                     View all <ArrowRight className="w-3 h-3" />
                   </span>
                 </Link>
-                <div className="grid grid-cols-2 gap-0.5">
+                <div className="grid gap-0.5">
                   {activeGroup.items.map(item => (
                     <Link
                       key={item.slug}
                       to={`/shop/category/${item.slug}`}
                       onClick={() => { setOpen(false); onNavigate?.(); }}
-                      className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-muted transition-colors group"
+                      className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-muted transition-colors group"
                     >
                       <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${activeGroup.gradient} shrink-0 shadow-sm`}>
                         <item.Icon className="w-4 h-4 text-white" />
                       </span>
-                      <span className="text-[13px] font-medium text-foreground group-hover:text-primary transition-colors truncate">
-                        {item.name}
-                      </span>
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{item.name}</p>
+                        <p className="text-[11px] text-muted-foreground truncate">{item.desc}</p>
+                      </div>
                     </Link>
                   ))}
                 </div>
@@ -799,23 +812,26 @@ const MobileShopSection = ({ onNavigate }) => {
                 <button
                   onClick={() => toggleGroup(group.slug)}
                   aria-expanded={groupOpen}
-                  className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl hover:bg-muted transition-colors"
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl hover:bg-muted transition-colors text-left"
                 >
-                  <span className="flex items-center gap-2">
+                  <span className="flex items-center gap-2 min-w-0">
                     <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${group.gradient} shrink-0`}>
                       <group.Icon className="w-3.5 h-3.5 text-white" />
                     </span>
-                    <span className="text-xs font-semibold text-foreground truncate">{group.label}</span>
+                    <span className="min-w-0">
+                      <span className="block text-xs font-semibold text-foreground truncate">{group.label}</span>
+                      <span className="block text-[11px] text-muted-foreground truncate">{group.navDesc}</span>
+                    </span>
                   </span>
-                  <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${groupOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground shrink-0 transition-transform ${groupOpen ? 'rotate-180' : ''}`} />
                 </button>
                 {groupOpen && (
-                  <div className="grid grid-cols-2 gap-0.5 mb-1">
+                  <div className="grid gap-0.5 mb-1">
                     <SheetClose asChild>
                       <Link
                         to={`/shop/${group.slug}`}
                         onClick={onNavigate}
-                        className="col-span-2 flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-muted transition-colors text-xs font-semibold text-primary"
+                        className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-muted transition-colors text-xs font-semibold text-primary"
                       >
                         View all {group.label}
                       </Link>
@@ -825,12 +841,15 @@ const MobileShopSection = ({ onNavigate }) => {
                         <Link
                           to={`/shop/category/${item.slug}`}
                           onClick={onNavigate}
-                          className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors text-left"
+                          className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-muted transition-colors text-left"
                         >
                           <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${group.gradient} shrink-0`}>
                             <item.Icon className="w-3.5 h-3.5 text-white" />
                           </span>
-                          <span className="text-xs font-semibold text-foreground truncate">{item.name}</span>
+                          <span className="min-w-0">
+                            <span className="block text-xs font-semibold text-foreground truncate">{item.name}</span>
+                            <span className="block text-[11px] text-muted-foreground truncate">{item.desc}</span>
+                          </span>
                         </Link>
                       </SheetClose>
                     ))}
