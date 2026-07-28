@@ -246,7 +246,7 @@ const HomePage = () => {
     ? [
         { value: platformStats.listings,   label: 'Live Listings' },
         { value: platformStats.vaultCards, label: 'Cards in Member Vaults' },
-        { value: platformStats.sellers,    label: 'Verified Members' },
+        { value: platformStats.sellers,    label: 'Active Members' },
         { value: platformStats.events,     label: 'Events Listed' },
       ].filter((s) => s.value > 0)
     : [];
@@ -323,7 +323,7 @@ const HomePage = () => {
         cachedQuery('homepage_stats', async () => {
           const [listings, sellers, vaultCards, events] = await Promise.all([
             supabase.from('listings').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-            supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('is_verified', true),
+            supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('is_active', true),
             supabase.from('vault_items').select('id', { count: 'exact', head: true }),
             supabase.from('events_public').select('id', { count: 'exact', head: true }),
           ]);
