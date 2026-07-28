@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { formatEntryFee, eventTypeStyle, youTubeEmbedUrl, facebookEmbedUrl } from '@/lib/eventSeo.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
 import AddToCalendarButton from '@/components/AddToCalendarButton.jsx';
+import InArticleAd from '@/components/InArticleAd.jsx';
 import { toast } from 'sonner';
 
 const EventDetailCard = ({ event }) => {
@@ -114,6 +115,10 @@ const EventDetailCard = ({ event }) => {
             <p className="text-muted-foreground leading-relaxed text-lg whitespace-pre-wrap">
               {event.description}
             </p>
+
+            <div className="my-10">
+              <InArticleAd />
+            </div>
 
             {event.accessibility_info && (
               <div className="mt-10">
