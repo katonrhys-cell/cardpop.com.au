@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { Shield, Smartphone, CheckCircle2, Loader2, KeyRound, Copy, Check } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import Breadcrumb from '@/components/Breadcrumb.jsx';
+import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
@@ -184,18 +183,12 @@ const AccountSecurity = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <Helmet>
-        <title>Security Settings | CardPop</title>
-      </Helmet>
-
-      <Breadcrumb items={[{ label: 'Account', path: '/account' }, { label: 'Security' }]} />
-
-      <div>
-        <h1 className="text-3xl font-bold font-heading mb-2">Security Settings</h1>
-        <p className="text-muted-foreground">Manage your password and account security.</p>
-      </div>
-
+    <AccountPageShell
+      documentTitle="Security Settings | CardPop"
+      breadcrumb={[{ label: 'Account', path: '/account' }, { label: 'Security' }]}
+      title="Security Settings"
+      description="Manage your password and account security."
+    >
       {/* Password */}
       <Card className="shadow-sm">
         <CardHeader>
@@ -279,7 +272,7 @@ const AccountSecurity = () => {
           )}
         </CardContent>
       </Card>
-    </div>
+    </AccountPageShell>
   );
 };
 

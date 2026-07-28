@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { List, Plus, RefreshCw, AlertCircle, Trash2, Edit, PackageOpen, ShoppingCart, ArrowRightLeft, Layers, Tag, HandCoins } from 'lucide-react';
-import Breadcrumb from '@/components/Breadcrumb.jsx';
+import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -175,30 +174,24 @@ const AccountListings = () => {
   };
 
   return (
-    <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-6 md:py-8 space-y-6 animate-in fade-in duration-300">
-      <Helmet>
-        <title>My Listings | CardPop</title>
-      </Helmet>
-
-      <Breadcrumb items={[{ label: 'Account', path: '/account' }, { label: 'Listings' }]} />
-
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold font-heading mb-2">My Listings</h1>
-          <p className="text-muted-foreground">Manage your active items for sale or trade.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => fetchRef.current?.()} disabled={loading} className="rounded-xl h-10 px-4">
+    <AccountPageShell
+      documentTitle="My Listings | CardPop"
+      breadcrumb={[{ label: 'Account', path: '/account' }, { label: 'Listings' }]}
+      title="My Listings"
+      description="Manage your active items for sale or trade."
+      actions={
+        <>
+          <Button variant="outline" size="sm" onClick={() => fetchRef.current?.()} disabled={loading} className="rounded-xl shadow-sm h-10 px-4 font-bold">
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </Button>
-          <Button asChild className="rounded-xl h-10 px-4 font-bold">
+          <Button asChild size="sm" className="rounded-xl shadow-sm h-10 px-4 font-bold">
             <Link to="/vault/add">
               <Plus className="w-4 h-4 mr-2" /> Add Card
             </Link>
           </Button>
-        </div>
-      </div>
-
+        </>
+      }
+    >
       {error && (
         <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-xl flex items-start gap-3">
           <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
@@ -395,7 +388,7 @@ const AccountListings = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AccountPageShell>
   );
 };
 

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Plus, Package, ImageOff, Lock, ShoppingCart, ArrowRightLeft,
@@ -10,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import Breadcrumb from '@/components/Breadcrumb.jsx';
+import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
@@ -223,25 +222,19 @@ const AccountVault = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <Helmet><title>My Vault | CardPop</title></Helmet>
-
-      <Breadcrumb items={[{ label: 'Account', path: '/account' }, { label: 'My Vault' }]} />
-
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold font-heading mb-2">My Vault</h1>
-          <p className="text-muted-foreground">
-            {loading ? 'Loading your collection…' : `${totalCount} card${totalCount !== 1 ? 's' : ''} in your vault`}
-          </p>
-        </div>
-        <Button asChild>
+    <AccountPageShell
+      documentTitle="My Vault | CardPop"
+      breadcrumb={[{ label: 'Account', path: '/account' }, { label: 'My Vault' }]}
+      title="My Vault"
+      description={loading ? 'Loading your collection…' : `${totalCount} card${totalCount !== 1 ? 's' : ''} in your vault`}
+      actions={
+        <Button asChild size="sm" className="rounded-xl shadow-sm h-10 px-4 font-bold">
           <Link to="/vault/add" className="gap-2">
             <Plus className="w-4 h-4" /> Add Card
           </Link>
         </Button>
-      </div>
-
+      }
+    >
       {/* Collection filter */}
       <div className="flex flex-wrap items-center gap-3">
         <Select value={filterCollection} onValueChange={changeFilter}>
@@ -325,7 +318,7 @@ const AccountVault = () => {
         product={listingModal.card}
         onUpdate={fetchVault}
       />
-    </div>
+    </AccountPageShell>
   );
 };
 

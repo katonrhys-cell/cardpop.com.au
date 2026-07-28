@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { Tag, CheckCircle2, XCircle, Undo2, Clock, Loader2, RefreshCw, DollarSign } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -10,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import Breadcrumb from '@/components/Breadcrumb.jsx';
+import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 
@@ -325,18 +324,12 @@ const AccountOffers = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <Helmet>
-        <title>Offers | CardPop</title>
-      </Helmet>
-
-      <Breadcrumb items={[{ label: 'Account', path: '/account' }, { label: 'Offers' }]} />
-
-      <div>
-        <h1 className="text-3xl font-bold font-heading mb-2">Offers</h1>
-        <p className="text-muted-foreground">Manage offers you've sent and received.</p>
-      </div>
-
+    <AccountPageShell
+      documentTitle="Offers | CardPop"
+      breadcrumb={[{ label: 'Account', path: '/account' }, { label: 'Offers' }]}
+      title="Offers"
+      description="Manage offers you've sent and received."
+    >
       <Tabs defaultValue="received" className="w-full">
         <TabsList className="mb-6">
           <TabsTrigger value="received" className="gap-2">
@@ -412,7 +405,7 @@ const AccountOffers = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AccountPageShell>
   );
 };
 

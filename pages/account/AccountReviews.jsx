@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { Star, ShieldCheck, RefreshCw } from 'lucide-react';
-import Breadcrumb from '@/components/Breadcrumb.jsx';
+import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { isVerified } from '@/utils/verification.js';
 import { toCdnUrl } from '@/utils/imageUrl.js';
 import { Badge } from '@/components/ui/badge';
@@ -123,20 +122,17 @@ const AccountReviews = () => {
   const count = profile?.reviews_count || 0;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <Helmet><title>Reviews | CardPop</title></Helmet>
-      <Breadcrumb items={[{ label: 'Account', path: '/account' }, { label: 'Reviews' }]} />
-
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold font-heading mb-1">Reviews</h1>
-          <p className="text-muted-foreground">Your buyer and seller feedback.</p>
-        </div>
-        <Button variant="outline" onClick={() => fetchRef.current?.()} disabled={loading} className="rounded-xl h-10 px-4">
+    <AccountPageShell
+      documentTitle="Reviews | CardPop"
+      breadcrumb={[{ label: 'Account', path: '/account' }, { label: 'Reviews' }]}
+      title="Reviews"
+      description="Your buyer and seller feedback."
+      actions={
+        <Button variant="outline" size="sm" onClick={() => fetchRef.current?.()} disabled={loading} className="rounded-xl shadow-sm h-10 px-4 font-bold">
           <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
         </Button>
-      </div>
-
+      }
+    >
       {/* Rating summary */}
       {(avg || count > 0) && (
         <div className="bg-card border border-border rounded-2xl p-6 flex items-center gap-6">
@@ -189,7 +185,7 @@ const AccountReviews = () => {
           )}
         </TabsContent>
       </Tabs>
-    </div>
+    </AccountPageShell>
   );
 };
 

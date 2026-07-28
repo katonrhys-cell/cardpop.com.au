@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
+import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -93,29 +93,42 @@ const AccountPartner = () => {
       .catch(() => toast.error('Could not copy — long-press to copy manually.'));
   };
 
+  // Every branch below renders inside AccountPageShell so the partner page keeps
+  // the same width, gutters and heading treatment as the rest of /account —
+  // these states used to be `min-h-screen` centred panels with their own <h1>.
+  const shellProps = {
+    documentTitle: 'Partner Dashboard | CardPop',
+    breadcrumb: [{ label: 'Account', path: '/account' }, { label: 'Partner' }],
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
+      <AccountPageShell {...shellProps} title="Partner Dashboard">
+        <div className="flex items-center justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </AccountPageShell>
     );
   }
 
   // Not applied yet → point at the program.
   if (!partner) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-4">
-        <Helmet><title>Partner Dashboard | CardPop</title></Helmet>
-        <div className="bg-card border border-border rounded-3xl p-10 text-center max-w-lg">
+      <AccountPageShell
+        {...shellProps}
+        title="Partner Dashboard"
+        description="Earn commission on referred sales as a CardPop partner."
+      >
+        <div className="bg-card border border-border rounded-3xl p-10 text-center">
           <Handshake className="w-10 h-10 text-primary mx-auto mb-4" />
-          <h1 className="text-2xl font-bold mb-3">Become a CardPop partner</h1>
-          <p className="text-muted-foreground mb-6">
+          <h2 className="text-xl font-bold mb-3">Become a CardPop partner</h2>
+          <p className="text-muted-foreground mb-6 max-w-lg mx-auto">
             Local game stores, creators and community builders earn commission on referred
             sales with their own discount code and referral link.
           </p>
           <Button asChild><Link to="/partners">Learn more & apply</Link></Button>
         </div>
-      </div>
+      </AccountPageShell>
     );
   }
 
@@ -123,14 +136,17 @@ const AccountPartner = () => {
     const pending = partner.status === 'pending';
     const Icon = pending ? Clock : XCircle;
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-4">
-        <Helmet><title>Partner Dashboard | CardPop</title></Helmet>
-        <div className="bg-card border border-border rounded-3xl p-10 text-center max-w-lg">
+      <AccountPageShell
+        {...shellProps}
+        title="Partner Dashboard"
+        description={partner.business_name}
+      >
+        <div className="bg-card border border-border rounded-3xl p-10 text-center">
           <Icon className="w-10 h-10 text-primary mx-auto mb-4" />
-          <h1 className="text-2xl font-bold mb-3">
+          <h2 className="text-xl font-bold mb-3">
             {pending ? 'Application under review' : 'Application not approved'}
-          </h1>
-          <p className="text-muted-foreground mb-6">
+          </h2>
+          <p className="text-muted-foreground mb-6 max-w-lg mx-auto">
             {pending
               ? `Thanks ${partner.business_name} — we review every application personally. Your code and rates will appear here once you're approved.`
               : 'Your application wasn’t approved this time. If your store or audience has grown since, get in touch and we’ll take another look.'}
@@ -139,7 +155,7 @@ const AccountPartner = () => {
             About the partner program →
           </Link>
         </div>
-      </div>
+      </AccountPageShell>
     );
   }
 
@@ -149,127 +165,125 @@ const AccountPartner = () => {
   const onboarded = connectStatus?.onboarded;
 
   return (
-    <div className="min-h-screen bg-background">
-      <Helmet><title>Partner Dashboard | CardPop</title></Helmet>
-      <div className="container-default py-10 space-y-8">
-
-        <header className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Handshake className="w-7 h-7 text-primary" /> Partner Dashboard
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              {partner.business_name} · <BadgeCheck className="inline w-4 h-4 text-green-600 -mt-0.5" /> Approved partner
-            </p>
+    <AccountPageShell
+      {...shellProps}
+      title={
+        <span className="flex items-center gap-2">
+          <Handshake className="w-7 h-7 text-primary" /> Partner Dashboard
+        </span>
+      }
+      description={
+        <>
+          {partner.business_name} · <BadgeCheck className="inline w-4 h-4 text-green-600 -mt-0.5" /> Approved partner
+        </>
+      }
+      actions={
+        <Badge variant="secondary" className="text-sm">
+          {Number(partner.discount_pct)}% customer discount · {Number(partner.commission_pct)}% commission
+        </Badge>
+      }
+    >
+      {/* Code + link */}
+      <Card className="border-border shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Link2 className="h-4 w-4" /> Your code & referral link
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <code className="rounded-xl border border-border bg-muted/40 px-4 py-2 font-mono text-lg tracking-widest">
+              {partner.code}
+            </code>
+            <Button variant="outline" size="sm" onClick={() => copy(partner.code, 'Code')}>
+              <Copy className="w-4 h-4 mr-1.5" /> Copy code
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => copy(referralLink, 'Referral link')}>
+              <Copy className="w-4 h-4 mr-1.5" /> Copy link
+            </Button>
           </div>
-          <Badge variant="secondary" className="text-sm">
-            {Number(partner.discount_pct)}% customer discount · {Number(partner.commission_pct)}% commission
-          </Badge>
-        </header>
+          <p className="text-xs text-muted-foreground break-all">{referralLink}</p>
+          <p className="text-sm text-muted-foreground">
+            Customers using your code get {Number(partner.discount_pct)}% off CardPop Shop orders
+            {partner.free_shipping ? ' plus free shipping' : ''}, and you earn{' '}
+            {Number(partner.commission_pct)}% of each referred sale.
+          </p>
+        </CardContent>
+      </Card>
 
-        {/* Code + link */}
-        <Card className="border-border shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Link2 className="h-4 w-4" /> Your code & referral link
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <code className="rounded-xl border border-border bg-muted/40 px-4 py-2 font-mono text-lg tracking-widest">
-                {partner.code}
-              </code>
-              <Button variant="outline" size="sm" onClick={() => copy(partner.code, 'Code')}>
-                <Copy className="w-4 h-4 mr-1.5" /> Copy code
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => copy(referralLink, 'Referral link')}>
-                <Copy className="w-4 h-4 mr-1.5" /> Copy link
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground break-all">{referralLink}</p>
+      {/* Stats */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <StatTile icon={MousePointerClick} label="Link clicks" value={stats.clicks ?? 0} />
+        <StatTile icon={ShoppingBag} label="Referred orders" value={stats.referredOrders ?? 0} />
+        <StatTile icon={Clock} label="Pending earnings" value={aud(stats.pendingCents)} />
+        <StatTile icon={Banknote} label="Paid out" value={aud(stats.paidCents)} />
+      </div>
+
+      {/* Payout onboarding */}
+      <Card className="border-border shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Banknote className="h-4 w-4" /> Payouts
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {onboarded ? (
             <p className="text-sm text-muted-foreground">
-              Customers using your code get {Number(partner.discount_pct)}% off CardPop Shop orders
-              {partner.free_shipping ? ' plus free shipping' : ''}, and you earn{' '}
-              {Number(partner.commission_pct)}% of each referred sale.
+              <BadgeCheck className="inline w-4 h-4 text-green-600 -mt-0.5" /> Your bank account is
+              connected via Stripe. Pending commission is transferred to you in payout sweeps.
             </p>
-          </CardContent>
-        </Card>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <StatTile icon={MousePointerClick} label="Link clicks" value={stats.clicks ?? 0} />
-          <StatTile icon={ShoppingBag} label="Referred orders" value={stats.referredOrders ?? 0} />
-          <StatTile icon={Clock} label="Pending earnings" value={aud(stats.pendingCents)} />
-          <StatTile icon={Banknote} label="Paid out" value={aud(stats.paidCents)} />
-        </div>
-
-        {/* Payout onboarding */}
-        <Card className="border-border shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Banknote className="h-4 w-4" /> Payouts
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {onboarded ? (
+          ) : (
+            <>
               <p className="text-sm text-muted-foreground">
-                <BadgeCheck className="inline w-4 h-4 text-green-600 -mt-0.5" /> Your bank account is
-                connected via Stripe. Pending commission is transferred to you in payout sweeps.
+                Connect your bank account through Stripe (one-time, a few minutes) so we can
+                transfer your commission. Earnings keep accruing either way.
               </p>
-            ) : (
-              <>
-                <p className="text-sm text-muted-foreground">
-                  Connect your bank account through Stripe (one-time, a few minutes) so we can
-                  transfer your commission. Earnings keep accruing either way.
-                </p>
-                <Button onClick={handleConnect} disabled={connecting}>
-                  {connecting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Store className="w-4 h-4 mr-2" />}
-                  Set up payouts with Stripe
-                </Button>
-              </>
-            )}
-          </CardContent>
-        </Card>
+              <Button onClick={handleConnect} disabled={connecting}>
+                {connecting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Store className="w-4 h-4 mr-2" />}
+                Set up payouts with Stripe
+              </Button>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* Ledger */}
-        <Card className="border-border shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <ShoppingBag className="h-4 w-4" /> Referred purchases
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {referrals.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">
-                No referred purchases yet — share your link and code to get started.
-              </p>
-            ) : (
-              <div className="divide-y divide-border">
-                {referrals.map((r) => {
-                  const badge = STATUS_BADGE[r.status] || STATUS_BADGE.pending;
-                  return (
-                    <div key={r.id} className="flex items-center justify-between gap-3 py-3 text-sm">
-                      <div>
-                        <div className="font-medium">{KIND_LABEL[r.kind] || r.kind}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {new Date(r.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
-                          {' · '}sale {aud(r.sale_amount_cents)}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-semibold">{aud(r.commission_cents)}</span>
-                        <Badge variant={badge.variant}>{badge.label}</Badge>
+      {/* Ledger */}
+      <Card className="border-border shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <ShoppingBag className="h-4 w-4" /> Referred purchases
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {referrals.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              No referred purchases yet — share your link and code to get started.
+            </p>
+          ) : (
+            <div className="divide-y divide-border">
+              {referrals.map((r) => {
+                const badge = STATUS_BADGE[r.status] || STATUS_BADGE.pending;
+                return (
+                  <div key={r.id} className="flex items-center justify-between gap-3 py-3 text-sm">
+                    <div>
+                      <div className="font-medium">{KIND_LABEL[r.kind] || r.kind}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(r.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {' · '}sale {aud(r.sale_amount_cents)}
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-      </div>
-    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-semibold">{aud(r.commission_cents)}</span>
+                      <Badge variant={badge.variant}>{badge.label}</Badge>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </AccountPageShell>
   );
 };
 

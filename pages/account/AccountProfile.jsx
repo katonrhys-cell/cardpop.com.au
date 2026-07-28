@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { Save, Upload, Trash2, Eye, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { compressImage } from '@/utils/compressImage.js';
@@ -13,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import Breadcrumb from '@/components/Breadcrumb.jsx';
+import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 const AccountProfile = () => {
@@ -134,23 +133,15 @@ const AccountProfile = () => {
   const isUserVerified = isVerified(currentUser?.is_verified) || currentUser?.verified;
 
   return (
-    <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-6 md:py-8 space-y-8 animate-in fade-in duration-300">
-      <Helmet>
-        <title>Public Profile | CardPop</title>
-      </Helmet>
-
-      <Breadcrumb items={[{ label: 'Account', path: '/account' }, { label: 'Public Profile' }]} />
-
-      {/* ── Page heading ──────────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-        <div>
-          <h1 className="text-3xl font-bold font-serif mb-2 tracking-tight text-foreground">Public Profile</h1>
-          <p className="text-muted-foreground text-lg font-medium">Manage how you appear to the community.</p>
-        </div>
-
+    <AccountPageShell
+      documentTitle="Public Profile | CardPop"
+      breadcrumb={[{ label: 'Account', path: '/account' }, { label: 'Public Profile' }]}
+      title="Public Profile"
+      description="Manage how you appear to the community."
+      actions={
         <Dialog>
           <DialogTrigger asChild>
-            <Button variant="outline" size="sm" className="rounded-xl font-bold shadow-sm h-10 px-4 self-start sm:self-auto">
+            <Button variant="outline" size="sm" className="rounded-xl font-bold shadow-sm h-10 px-4">
               <Eye className="w-4 h-4 mr-2" /> Preview Profile
             </Button>
           </DialogTrigger>
@@ -195,8 +186,8 @@ const AccountProfile = () => {
             </div>
           </DialogContent>
         </Dialog>
-      </div>
-
+      }
+    >
       {/* ── Profile form ──────────────────────────────────────────────────── */}
       <form onSubmit={handleSubmit}>
         <Card className="shadow-sm overflow-hidden">
@@ -375,7 +366,7 @@ const AccountProfile = () => {
 
         </Card>
       </form>
-    </div>
+    </AccountPageShell>
   );
 };
 

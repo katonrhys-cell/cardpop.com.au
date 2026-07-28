@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { Save, Upload, Trash2, Store, ExternalLink, Building2, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { compressImage } from '@/utils/compressImage.js';
@@ -13,7 +12,7 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import Breadcrumb from '@/components/Breadcrumb.jsx';
+import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { Link } from 'react-router-dom';
 
 const CATEGORIES = [
@@ -190,27 +189,21 @@ const AccountSoleTrader = () => {
   const currentLogoUrl = logoPreview ?? (removeLogo ? null : existingLogoUrl);
 
   return (
-    <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-6 md:py-8 space-y-8 animate-in fade-in duration-300">
-      <Helmet><title>Sole Trader Account | CardPop</title></Helmet>
-
-      <Breadcrumb items={[{ label: 'Account', path: '/account' }, { label: 'Sole Trader' }]} />
-
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold font-serif mb-2 tracking-tight text-foreground">Sole Trader Account</h1>
-          <p className="text-muted-foreground text-base font-medium">
-            Register your business on CardPop and get a Verified Dealer profile with a dedicated store page.
-          </p>
-        </div>
-        {isSoleTrader && currentUser?.id && (
-          <Button asChild variant="outline" size="sm" className="rounded-xl font-bold self-start">
+    <AccountPageShell
+      documentTitle="Sole Trader Account | CardPop"
+      breadcrumb={[{ label: 'Account', path: '/account' }, { label: 'Sole Trader' }]}
+      title="Sole Trader Account"
+      description="Register your business on CardPop and get a Verified Dealer profile with a dedicated store page."
+      actions={
+        isSoleTrader && currentUser?.id ? (
+          <Button asChild variant="outline" size="sm" className="rounded-xl shadow-sm h-10 px-4 font-bold">
             <Link to={`/dealer/${storeSlug || currentUser.id}`} target="_blank">
               <ExternalLink className="w-4 h-4 mr-2" /> View My Store
             </Link>
           </Button>
-        )}
-      </div>
-
+        ) : null
+      }
+    >
       <form onSubmit={handleSubmit} className="space-y-6">
 
         {/* Enable toggle */}
@@ -385,7 +378,7 @@ const AccountSoleTrader = () => {
         )}
 
       </form>
-    </div>
+    </AccountPageShell>
   );
 };
 

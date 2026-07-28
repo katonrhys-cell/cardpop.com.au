@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { Bell, Save } from 'lucide-react';
-import Breadcrumb from '@/components/Breadcrumb.jsx';
+import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -117,20 +116,17 @@ const AccountNotificationSettings = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <Helmet><title>Notification Settings | CardPop</title></Helmet>
-      <Breadcrumb items={[{ label: 'Account', path: '/account' }, { label: 'Notifications', path: '/account/notifications' }, { label: 'Settings' }]} />
-
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold font-heading mb-1">Notification Settings</h1>
-          <p className="text-muted-foreground">Control which notifications you receive.</p>
-        </div>
-        <Button onClick={save} disabled={saving || loading} className="rounded-xl gap-2">
+    <AccountPageShell
+      documentTitle="Notification Settings | CardPop"
+      breadcrumb={[{ label: 'Account', path: '/account' }, { label: 'Notifications', path: '/account/notifications' }, { label: 'Settings' }]}
+      title="Notification Settings"
+      description="Control which notifications you receive."
+      actions={
+        <Button size="sm" onClick={save} disabled={saving || loading} className="rounded-xl shadow-sm h-10 px-4 font-bold gap-2">
           <Save className="w-4 h-4" /> {saving ? 'Saving…' : 'Save Changes'}
         </Button>
-      </div>
-
+      }
+    >
       {loading ? (
         <div className="bg-card border border-border rounded-2xl p-8 text-center text-muted-foreground">Loading…</div>
       ) : (
@@ -162,7 +158,7 @@ const AccountNotificationSettings = () => {
           ))}
         </div>
       )}
-    </div>
+    </AccountPageShell>
   );
 };
 

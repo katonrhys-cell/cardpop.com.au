@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { Heart, ExternalLink, RefreshCw, Clock, Tag, Trash2 } from 'lucide-react';
-import Breadcrumb from '@/components/Breadcrumb.jsx';
+import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -259,23 +258,17 @@ const AccountWatchlist = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <Helmet><title>Watchlist | CardPop</title></Helmet>
-
-      <Breadcrumb items={[{ label: 'Account', path: '/account' }, { label: 'Watchlist' }]} />
-
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold font-heading mb-1">Watchlist</h1>
-          <p className="text-muted-foreground">
-            {loading ? 'Loading…' : `${entries.length} saved listing${entries.length !== 1 ? 's' : ''}`}
-          </p>
-        </div>
-        <Button variant="outline" onClick={() => fetchRef.current?.()} disabled={loading} className="rounded-xl h-10 px-4">
+    <AccountPageShell
+      documentTitle="Watchlist | CardPop"
+      breadcrumb={[{ label: 'Account', path: '/account' }, { label: 'Watchlist' }]}
+      title="Watchlist"
+      description={loading ? 'Loading…' : `${entries.length} saved listing${entries.length !== 1 ? 's' : ''}`}
+      actions={
+        <Button variant="outline" size="sm" onClick={() => fetchRef.current?.()} disabled={loading} className="rounded-xl shadow-sm h-10 px-4 font-bold">
           <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
         </Button>
-      </div>
-
+      }
+    >
       {error && (
         <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-xl text-sm font-medium">
           {error}
@@ -315,7 +308,7 @@ const AccountWatchlist = () => {
           ))}
         </div>
       )}
-    </div>
+    </AccountPageShell>
   );
 };
 
