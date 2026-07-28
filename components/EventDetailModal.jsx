@@ -119,17 +119,18 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
           )}
         </div>
 
-        <DialogFooter className="p-4 bg-muted/20 border-t border-border flex flex-col-reverse sm:flex-row sm:justify-end gap-2 shrink-0">
-          <Button variant="outline" onClick={onClose}>Close</Button>
-          <AddToCalendarButton event={event} className="w-full sm:w-auto h-9" />
+        {/* Equal-width columns so every action reads as the same size — the
+            dialog's own X is the only way out, so there's no Close button. */}
+        <DialogFooter className="p-4 bg-muted/20 border-t border-border grid grid-cols-1 sm:grid-flow-col sm:auto-cols-fr gap-2 sm:space-x-0 shrink-0">
+          <AddToCalendarButton event={event} className="h-11 font-semibold" />
           {ticketLink && (
-            <Button variant="secondary" asChild>
+            <Button variant="secondary" className="w-full h-11 font-semibold" asChild>
               <a href={ticketLink} target="_blank" rel="noopener noreferrer">
                 <Ticket className="w-4 h-4 mr-2" /> Tickets & Info
               </a>
             </Button>
           )}
-          <Button asChild onClick={onClose}>
+          <Button className="w-full h-11 font-semibold" asChild onClick={onClose}>
             <Link to={eventPath(event)}>
               <ExternalLink className="w-4 h-4 mr-2" /> Full Event Page
             </Link>

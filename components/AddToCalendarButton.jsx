@@ -1,6 +1,7 @@
 import React from 'react';
 import { CalendarPlus, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -62,7 +63,7 @@ const AddToCalendarButton = ({ event, className = '' }) => {
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
-          className={`w-full h-12 border-border hover:bg-muted font-bold ${className}`}
+          className={cn('w-full h-12 border-border hover:bg-muted font-bold', className)}
         >
           <CalendarPlus className="w-5 h-5 mr-2" /> Add to My Calendar
         </Button>
