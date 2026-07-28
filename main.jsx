@@ -118,8 +118,19 @@ const registerServiceWorker = () => {
       const swUrl = cdnHost ? `/sw.js?cdn=${encodeURIComponent(cdnHost)}` : '/sw.js';
       navigator.serviceWorker.register(swUrl).then((reg) => {
         console.log('[SW] Service Worker registered');
-        // Check for updates every hour
-        setInterval(() => reg.update(), 60 * 60 * 1000);
+        // Check for updates every hour. reg.update() rejects on any transient
+        // network failure (offline laptop, dropped connection, CDN hiccup) with
+        // "An unknown error occurred when fetching the script" — harmless, since
+        // the already-installed worker keeps serving. Without this catch the
+        // rejection is unhandled and Sentry's onunhandledrejection handler
+        // reports it as a production error. Skip the check outright when the
+        // browser knows it's offline.
+        setInterval(() => {
+          if (navigator.onLine === false) return;
+          reg.update().catch((err) => {
+            console.warn('[SW] Service Worker update check failed:', err);
+          });
+        }, 60 * 60 * 1000);
       }).catch((err) => {
         console.warn('[SW] Service Worker registration failed:', err);
       });
