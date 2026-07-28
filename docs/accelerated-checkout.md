@@ -55,6 +55,40 @@ cart drawer, and the checkout summary.
 Keep this in sync with the Stripe Dashboard: if Afterpay is disabled in Stripe,
 set `VITE_ENABLE_BNPL=false` so we don't advertise an option buyers can't pick.
 
+## Google Pay brand guidelines
+
+Google publishes brand guidelines for how Google Pay may be shown
+(developers.google.com/pay/api/web/guides/brand-guidelines). Two different
+things on CardPop are covered by them:
+
+1. **The actual "Buy with Google Pay" button** — rendered by Stripe itself
+   inside `EmbeddedStripeCheckout.jsx`'s iframe when Google Pay is enabled in
+   the Stripe Dashboard (see the table above). Stripe is a certified Google
+   Pay processor and draws Google's own button asset there, so this is
+   already fully compliant with no code on our side to maintain.
+2. **The small "we accept…" trust row** — `GooglePayMark` in
+   `PaymentMethodSelector.jsx`, shown before the buyer ever reaches Stripe.
+   This is a hand-built recreation, not Google's literal provided asset: the
+   letter colors and full "Google Pay" wording match the guidelines exactly,
+   but the guidelines call for using Google's own SVG rather than a
+   recreation. Swapping in the real file needs a one-time manual download
+   from the brand guidelines page (gated behind a click-through agreement) —
+   see the comment above `GooglePayMark` for exactly what to replace.
+
+**Not yet built — a real follow-up, not just decoration:** the guidelines'
+"Put it all together" section also asks that confirmation pages and email
+receipts *indicate when the buyer paid with Google Pay specifically* (with
+the mark), not just "paid successfully." CardPop doesn't currently capture
+which wallet was used — Stripe represents Google Pay/Apple Pay payments as
+`payment_method.type === 'card'` with `card.wallet.type` set to
+`google_pay`/`apple_pay`, so surfacing this needs: expanding the payment
+method on `checkout.session.completed`, a new nullable column on `orders`
+(migration), passing it through `/stripe/session/:id`, and a small
+conditional block in `CheckoutSuccessPage.jsx` and the `sendOrderConfirmed`
+email template. Left out here deliberately since it touches the webhook /
+schema / email pipeline — flagging it as a scoped, low-risk next step rather
+than doing it silently.
+
 ## Possible follow-up: one-tap Express Checkout button
 
 A Shop-Pay-style **express button on the cart / product page** (tap Apple Pay /

@@ -65,12 +65,23 @@ const ApplePayMark = () => (
   </svg>
 );
 
+// Per Google Pay brand guidelines (developers.google.com/pay/api/web/guides/
+// brand-guidelines): "Google Pay" is always spelled out in full and left
+// untranslated, and the wordmark's letter colors are fixed (#4285F4/#EA4335/
+// #FBBC05/#4285F4/#34A853/#EA4335 for G-o-o-g-l-e, "Pay" in #5F6368) — both
+// followed here. The guidelines call for using Google's own provided asset
+// rather than a recreation; that asset must be downloaded from the brand
+// guidelines page (gated behind Google's usage-agreement click-through) and
+// dropped in as a static SVG — swap the two <text> nodes below for an
+// <image>/inline <path> from that file when available. The clear space this
+// badge gets from its parent (`Badge`) already exceeds the required 0.5x
+// cap-height-of-"G" minimum on every side.
 const GooglePayMark = () => (
   <svg viewBox="0 0 52 20" height="18" role="img" aria-hidden="true">
-    <text x="0" y="15" fontFamily="Arial, sans-serif" fontWeight="500" fontSize="12">
+    <text x="0" y="15" fontFamily="Roboto, 'Google Sans', Arial, sans-serif" fontWeight="500" fontSize="12">
       <tspan fill="#4285F4">G</tspan><tspan fill="#EA4335">o</tspan><tspan fill="#FBBC05">o</tspan><tspan fill="#4285F4">g</tspan><tspan fill="#34A853">l</tspan><tspan fill="#EA4335">e</tspan>
     </text>
-    <text x="38" y="15" fontFamily="Arial, sans-serif" fontWeight="600" fontSize="12" fill="#5F6368">Pay</text>
+    <text x="38" y="15" fontFamily="Roboto, 'Google Sans', Arial, sans-serif" fontWeight="500" fontSize="12" fill="#5F6368">Pay</text>
   </svg>
 );
 
