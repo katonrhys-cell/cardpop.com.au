@@ -65,23 +65,24 @@ const ApplePayMark = () => (
   </svg>
 );
 
-// Per Google Pay brand guidelines (developers.google.com/pay/api/web/guides/
-// brand-guidelines): "Google Pay" is always spelled out in full and left
-// untranslated, and the wordmark's letter colors are fixed (#4285F4/#EA4335/
-// #FBBC05/#4285F4/#34A853/#EA4335 for G-o-o-g-l-e, "Pay" in #5F6368) — both
-// followed here. The guidelines call for using Google's own provided asset
-// rather than a recreation; that asset must be downloaded from the brand
-// guidelines page (gated behind Google's usage-agreement click-through) and
-// dropped in as a static SVG — swap the two <text> nodes below for an
-// <image>/inline <path> from that file when available. The clear space this
-// badge gets from its parent (`Badge`) already exceeds the required 0.5x
-// cap-height-of-"G" minimum on every side.
+// Google Pay acceptance mark: Google's actual "G" logo (the same unaltered
+// path data Google publishes for its identity/sign-in mark and uses in the
+// Google Pay button — verified against the reference asset) next to "Pay" in
+// the specified neutral dark gray (#3C4043), per developers.google.com/pay/
+// api/web/guides/brand-guidelines. Unlike the earlier version of this file,
+// this does not spell out a colored "Google" wordmark — Google's real mark
+// is the four-color "G" glyph, not a letter-by-letter recreation. The clear
+// space this badge gets from its parent (`Badge`) already exceeds the
+// required 0.5x cap-height-of-"G" minimum on every side.
 export const GooglePayMark = () => (
-  <svg viewBox="0 0 52 20" height="18" role="img" aria-hidden="true">
-    <text x="0" y="15" fontFamily="Roboto, 'Google Sans', Arial, sans-serif" fontWeight="500" fontSize="12">
-      <tspan fill="#4285F4">G</tspan><tspan fill="#EA4335">o</tspan><tspan fill="#FBBC05">o</tspan><tspan fill="#4285F4">g</tspan><tspan fill="#34A853">l</tspan><tspan fill="#EA4335">e</tspan>
-    </text>
-    <text x="38" y="15" fontFamily="Roboto, 'Google Sans', Arial, sans-serif" fontWeight="500" fontSize="12" fill="#5F6368">Pay</text>
+  <svg viewBox="0 0 46 20" height="18" role="img" aria-hidden="true">
+    <g transform="translate(0 1)">
+      <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z" />
+      <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" />
+      <path fill="#FBBC05" d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.348 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" />
+      <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 6.29C4.672 4.163 6.656 3.58 9 3.58z" />
+    </g>
+    <text x="23" y="15" fontFamily="Roboto, 'Google Sans', Arial, sans-serif" fontWeight="500" fontSize="13" fill="#3C4043">Pay</text>
   </svg>
 );
 

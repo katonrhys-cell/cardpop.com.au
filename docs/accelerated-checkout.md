@@ -68,12 +68,11 @@ things on CardPop are covered by them:
    already fully compliant with no code on our side to maintain.
 2. **The small "we accept…" trust row** — `GooglePayMark` in
    `PaymentMethodSelector.jsx`, shown before the buyer ever reaches Stripe.
-   This is a hand-built recreation, not Google's literal provided asset: the
-   letter colors and full "Google Pay" wording match the guidelines exactly,
-   but the guidelines call for using Google's own SVG rather than a
-   recreation. Swapping in the real file needs a one-time manual download
-   from the brand guidelines page (gated behind a click-through agreement) —
-   see the comment above `GooglePayMark` for exactly what to replace.
+   Uses Google's actual four-color "G" logo path data (verified against the
+   official reference asset) next to "Pay" in the specified neutral gray —
+   not a spelled-out colored wordmark like the first version of this file
+   had. The "Pay" text is still our own typesetting (Product Sans isn't
+   freely distributable), a disclosed, minor gap from the pixel-exact asset.
 
 3. **Confirmation page and receipt labeling.** The guidelines' "Put it all
    together" section asks that confirmation pages and email receipts
