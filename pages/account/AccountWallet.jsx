@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Helmet } from 'react-helmet-async';
 import {
   Wallet, ExternalLink, CheckCircle2, Clock, AlertCircle,
   ArrowDownLeft, Loader2, RefreshCw, TrendingUp, Banknote,
@@ -8,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import Breadcrumb from '@/components/Breadcrumb.jsx';
+import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import SavePaymentMethod from '@/components/SavePaymentMethod.jsx';
 import VerifyIdentityCard from '@/components/VerifyIdentityCard.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -142,19 +141,17 @@ const AccountWallet = () => {
   const walletBalance = connectStatus?.wallet_balance_aud || 0;
 
   return (
-    <div className="max-w-[90rem] w-full mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-6 md:py-8 space-y-6 animate-in fade-in duration-300">
-      <Helmet><title>Wallet & Payouts | CardPop</title></Helmet>
-      <Breadcrumb items={[{ label: 'Account', path: '/account' }, { label: 'Wallet & Payouts' }]} />
-
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold font-heading mb-1">Wallet & Payouts</h1>
-          <p className="text-muted-foreground">Connect Stripe to receive sale proceeds directly to your bank account.</p>
-        </div>
-        <Button variant="ghost" size="icon" onClick={() => { fetchStatus(); fetchSales(); }} className="rounded-xl shrink-0">
-          <RefreshCw className="w-4 h-4" />
+    <AccountPageShell
+      documentTitle="Wallet & Payouts | CardPop"
+      breadcrumb={[{ label: 'Account', path: '/account' }, { label: 'Wallet & Payouts' }]}
+      title="Wallet & Payouts"
+      description="Connect Stripe to receive sale proceeds directly to your bank account."
+      actions={
+        <Button variant="outline" size="sm" onClick={() => { fetchStatus(); fetchSales(); }} className="rounded-xl shadow-sm h-10 px-4 font-bold">
+          <RefreshCw className="w-4 h-4 mr-2" /> Refresh
         </Button>
-      </div>
+      }
+    >
 
       {/* Balance cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -347,7 +344,7 @@ const AccountWallet = () => {
           </table>
         </div>
       </Card>
-    </div>
+    </AccountPageShell>
   );
 };
 

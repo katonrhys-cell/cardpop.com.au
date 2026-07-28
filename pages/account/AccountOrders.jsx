@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import apiServerClient from '@/lib/apiServerClient.js';
@@ -14,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { ShoppingBag, RotateCcw, Info, AlertCircle, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, differenceInDays } from 'date-fns';
-import Breadcrumb from '@/components/Breadcrumb.jsx';
+import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 
 const REFUND_REASONS = [
   { value: 'item_not_received',      label: 'Item not received' },
@@ -283,15 +282,12 @@ const AccountOrders = () => {
       : orders.filter(o => o.status === statusFilter);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
-      <Helmet><title>My Orders | CardPop</title></Helmet>
-      <Breadcrumb items={[{ label: 'Account', path: '/account' }, { label: 'Orders' }]} />
-
-      <div>
-        <h1 className="text-3xl font-bold font-heading mb-1">My Orders</h1>
-        <p className="text-muted-foreground">Your purchase history and refund requests.</p>
-      </div>
-
+    <AccountPageShell
+      documentTitle="My Orders | CardPop"
+      breadcrumb={[{ label: 'Account', path: '/account' }, { label: 'Orders' }]}
+      title="My Orders"
+      description="Your purchase history and refund requests."
+    >
       {/* Refund policy summary */}
       <div className="bg-blue-500/5 border border-blue-400/20 rounded-2xl p-4 flex gap-3 text-sm">
         <Info className="w-4 h-4 shrink-0 mt-0.5 text-blue-600" />
@@ -353,7 +349,7 @@ const AccountOrders = () => {
           onSuccess={fetchOrders}
         />
       )}
-    </div>
+    </AccountPageShell>
   );
 };
 

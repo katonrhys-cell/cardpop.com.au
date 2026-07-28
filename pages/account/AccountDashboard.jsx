@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { Package, List, ArrowRightLeft, DollarSign, ArrowRight, AlertCircle, RefreshCw, PackageOpen, Award } from 'lucide-react';
 import SellerTierBadge from '@/components/SellerTierBadge.jsx';
@@ -11,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
-import Breadcrumb from '@/components/Breadcrumb.jsx';
+import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import AccountPlanBanner from '@/components/AccountPlanBanner.jsx';
 import P2PTradingNotice from '@/components/P2PTradingNotice.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -181,30 +180,24 @@ const AccountDashboard = () => {
   }).format(stats.revenue);
 
   return (
-    <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-6 md:py-8 space-y-8 animate-in fade-in duration-300">
-      <Helmet>
-        <title>Account Dashboard | CardPop</title>
-      </Helmet>
-
-      <Breadcrumb items={[{ label: 'Account', path: '/account' }, { label: 'Dashboard' }]} />
-
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-        <div>
-          <h1 className="text-3xl font-bold font-serif mb-2 tracking-tight text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground text-lg font-medium">Welcome back! Here's your live account overview.</p>
-        </div>
+    <AccountPageShell
+      documentTitle="Account Dashboard | CardPop"
+      breadcrumb={[{ label: 'Account', path: '/account' }, { label: 'Dashboard' }]}
+      title="Dashboard"
+      description="Welcome back! Here's your live account overview."
+      actions={
         <Button
           variant="outline"
           size="sm"
           onClick={handleRefresh}
           disabled={statsLoading || vaultLoading}
-          className="rounded-xl shadow-sm self-start sm:self-auto h-10 px-4 font-bold transition-transform active:scale-95"
+          className="rounded-xl shadow-sm h-10 px-4 font-bold transition-transform active:scale-95"
         >
           <RefreshCw className={`w-4 h-4 mr-2 ${(statsLoading || vaultLoading) ? 'animate-spin' : ''}`} />
           Refresh Data
         </Button>
-      </div>
-
+      }
+    >
       {statsError && (
         <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-xl flex items-start gap-3 shadow-sm">
           <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
@@ -470,7 +463,7 @@ const AccountDashboard = () => {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </AccountPageShell>
   );
 };
 

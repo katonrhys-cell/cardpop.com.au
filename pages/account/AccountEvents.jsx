@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import { CalendarDays, Plus, Pencil, ExternalLink, Info, MapPin } from 'lucide-react';
-import Breadcrumb from '@/components/Breadcrumb.jsx';
+import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import EventFormModal from '@/components/EventFormModal.jsx';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -54,19 +53,17 @@ const AccountEvents = () => {
   const openEdit = (event) => { setEditingEvent(event); setIsModalOpen(true); };
 
   return (
-    <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-8 w-full space-y-6">
-      <Helmet><title>My Events | CardPop</title></Helmet>
-      <Breadcrumb items={[{ label: 'Account', path: '/account' }, { label: 'My Events' }]} />
-
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">My Events</h1>
-          <p className="text-muted-foreground mt-1">Submit card events and track their review status.</p>
-        </div>
-        <Button onClick={openSubmit} className="font-bold rounded-xl h-11 px-6 shadow-sm shrink-0">
-          <Plus className="w-5 h-5 mr-2" /> Submit Event
+    <AccountPageShell
+      documentTitle="My Events | CardPop"
+      breadcrumb={[{ label: 'Account', path: '/account' }, { label: 'My Events' }]}
+      title="My Events"
+      description="Submit card events and track their review status."
+      actions={
+        <Button size="sm" onClick={openSubmit} className="rounded-xl shadow-sm h-10 px-4 font-bold">
+          <Plus className="w-4 h-4 mr-2" /> Submit Event
         </Button>
-      </div>
+      }
+    >
 
       <div className="flex items-start gap-3 p-4 bg-primary/5 border border-primary/20 rounded-2xl text-sm text-muted-foreground">
         <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
@@ -153,7 +150,7 @@ const AccountEvents = () => {
         mode="user"
         onSaved={fetchMyEvents}
       />
-    </div>
+    </AccountPageShell>
   );
 };
 

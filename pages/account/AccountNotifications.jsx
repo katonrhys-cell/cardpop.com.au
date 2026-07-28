@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
 import {
   Bell, DollarSign, Hammer, TrendingUp, TrendingDown, Clock, Award,
   Tag, CheckCircle2, XCircle, RefreshCw, MessageSquare, UserPlus,
   Star, ShieldCheck, ShieldAlert, Shield, Settings, Check, Filter,
 } from 'lucide-react';
-import Breadcrumb from '@/components/Breadcrumb.jsx';
+import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -100,30 +99,26 @@ const AccountNotifications = () => {
   const filtered = notifications.filter(n => matchFilter(n, activeFilter));
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <Helmet><title>Notifications | CardPop</title></Helmet>
-      <Breadcrumb items={[{ label: 'Account', path: '/account' }, { label: 'Notifications' }]} />
-
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-3xl font-bold font-heading mb-1">Notifications</h1>
-          <p className="text-muted-foreground">
-            {loading ? 'Loading…' : unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+    <AccountPageShell
+      documentTitle="Notifications | CardPop"
+      breadcrumb={[{ label: 'Account', path: '/account' }, { label: 'Notifications' }]}
+      title="Notifications"
+      description={loading ? 'Loading…' : unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+      actions={
+        <>
           {unreadCount > 0 && (
-            <Button variant="outline" onClick={markAllRead} className="rounded-xl h-9 gap-2">
+            <Button variant="outline" size="sm" onClick={markAllRead} className="rounded-xl shadow-sm h-10 px-4 font-bold gap-2">
               <Check className="w-4 h-4" /> Mark all read
             </Button>
           )}
-          <Button variant="outline" asChild className="rounded-xl h-9 gap-2">
+          <Button variant="outline" size="sm" asChild className="rounded-xl shadow-sm h-10 px-4 font-bold gap-2">
             <Link to="/account/notification-settings">
               <Settings className="w-4 h-4" /> Settings
             </Link>
           </Button>
-        </div>
-      </div>
+        </>
+      }
+    >
 
       {/* Filter tabs */}
       <div className="flex gap-2 flex-wrap">
@@ -170,7 +165,7 @@ const AccountNotifications = () => {
           ))}
         </div>
       )}
-    </div>
+    </AccountPageShell>
   );
 };
 

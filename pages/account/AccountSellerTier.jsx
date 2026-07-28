@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { ShieldCheck, BadgeCheck, Award, Zap, User, TrendingUp, Star, Package, Lock } from 'lucide-react';
-import Breadcrumb from '@/components/Breadcrumb.jsx';
+import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { isVerified } from '@/utils/verification.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -91,11 +90,15 @@ const AccountSellerTier = () => {
   }, [currentUser?.id]);
 
   if (loading) return (
-    <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-6 md:py-8 space-y-6">
-      <Skeleton className="h-8 w-48" />
+    <AccountPageShell
+      documentTitle="Seller Tier | CardPop"
+      breadcrumb={[{ label: 'Account', path: '/account' }, { label: 'Seller Tier' }]}
+      title="Seller Tier"
+      description="Your reputation level and path to the next tier."
+    >
       <Skeleton className="h-40 rounded-2xl" />
       <div className="grid md:grid-cols-2 gap-4">{[0,1,2,3].map(i => <Skeleton key={i} className="h-64 rounded-2xl" />)}</div>
-    </div>
+    </AccountPageShell>
   );
 
   const sales      = profile?.total_sales    ?? 0;
@@ -108,15 +111,12 @@ const AccountSellerTier = () => {
   const nextTier = currentTierIdx < TIERS.length - 1 ? TIERS[currentTierIdx + 1] : null;
 
   return (
-    <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-6 md:py-8 space-y-8 animate-in fade-in duration-300">
-      <Helmet><title>Seller Tier | CardPop</title></Helmet>
-      <Breadcrumb items={[{ label: 'Account', path: '/account' }, { label: 'Seller Tier' }]} />
-
-      <div>
-        <h1 className="text-3xl font-bold font-heading mb-1">Seller Tier</h1>
-        <p className="text-muted-foreground">Your reputation level and path to the next tier.</p>
-      </div>
-
+    <AccountPageShell
+      documentTitle="Seller Tier | CardPop"
+      breadcrumb={[{ label: 'Account', path: '/account' }, { label: 'Seller Tier' }]}
+      title="Seller Tier"
+      description="Your reputation level and path to the next tier."
+    >
       {/* Current status */}
       <div className="bg-card border border-border rounded-2xl p-6 flex flex-col sm:flex-row items-center gap-6">
         <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -233,7 +233,7 @@ const AccountSellerTier = () => {
         <p className="font-bold text-foreground mb-1">How are tiers calculated?</p>
         <p>Tiers update automatically as you complete sales and receive reviews. Completed sales are counted when an order reaches <span className="font-bold">completed</span> status. Ratings are the average across all visible reviews. Identity verification is handled securely by Stripe — start it at <Link to="/verify-identity" className="text-primary font-bold hover:underline">Verify Identity</Link>.</p>
       </div>
-    </div>
+    </AccountPageShell>
   );
 };
 
