@@ -6,7 +6,7 @@ import {
   ArrowUpRight, Server, Database, HardDrive, CheckCircle2,
   FolderTree, RefreshCw, ArrowRightLeft, Calendar,
   Tags, BarChart3, Building2, Layers, ShieldCheck, Lock, ShoppingCart, ShoppingBag, Filter, X,
-  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star, Sparkles, LayoutList, Flag, CreditCard, MessagesSquare, Handshake, Rocket
+  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star, Sparkles, LayoutList, Flag, CreditCard, MessagesSquare, Handshake, Rocket, Tv2
 } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -267,6 +267,7 @@ const AdminDashboard = () => {
           <ManagementBox title="Building Your Business" description="Manage affiliate tools shown on the Community business page." icon={Rocket} link="/admin/building-your-business" />
           <ManagementBox title="Category Mapping" description="Map categories to collections." icon={Map} link="/admin/category-mapping" />
           <ManagementBox title="Events Management" description="Create and manage events." icon={Calendar} link="/admin/events" />
+          <ManagementBox title="Whatnot Shows" description="Moderate member-listed Whatnot live shows." icon={Tv2} link="/admin/whatnot-shows" />
           <ManagementBox title="Content Management" description="Edit blog, pages and articles." icon={FileText} link="/admin/content" />
           <ManagementBox title="Hero Showcase" description="Manage cards in the homepage hero animation." icon={Sparkles} link="/admin/hero-showcase" />
           <ManagementBox title="Collection Sections" description="Pin cards to collection page strips." icon={LayoutList} link="/admin/collection-sections" />
