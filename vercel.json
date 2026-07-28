@@ -193,6 +193,39 @@
       "destination": "/api/prerender?path=/shop"
     },
     {
+      "source": "/shop/:group(protection|storage|display|shipping|grading)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
+      "destination": "/api/prerender?path=/shop/:group"
+    },
+    {
+      "source": "/analytics/buying-guides",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
+      "destination": "/api/prerender?path=/analytics/buying-guides"
+    },
+    {
+      "source": "/analytics/buying-guides/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|chrome-lighthouse).*"
+        }
+      ],
+      "destination": "/api/prerender?path=/analytics/buying-guides/:slug"
+    },
+    {
       "source": "/events",
       "has": [
         {
@@ -215,7 +248,7 @@
       "destination": "/api/prerender?path=/events/:slug"
     },
     {
-      "source": "/:page(about|contact|faq|privacy-policy|terms|returns|shipping|trust-safety|safe-buying|accessibility|community|australian-markets|insider-trading|analytics|blog|partners|pricing|photography-standard)",
+      "source": "/:page(about|contact|faq|privacy-policy|terms|returns|shipping|trust-safety|safe-buying|accessibility|community|australian-markets|insider-trading|analytics|blog|partners|pricing|photography-standard|launch)",
       "has": [
         {
           "type": "header",
