@@ -103,5 +103,27 @@
       ]
     },
     "notes": "2023-24 Panini Donruss Net Marvels, Red Laser parallel, PSA GEM MT 10. FIRST TWO-IMAGE FIXTURE, and the first that genuinely needs the back: 'No. 9' and the copyright line '2023-24 PANINI - DONRUSS BASKETBALL' are only legible there. Every earlier fixture noted its number as unreadable — this one tests whether sending the back actually recovers it. ADVERSARIAL BACKGROUND: two other PSA slabs are in frame behind the card, including a Donruss Wembanyama PSA 9 whose own label and cert are partly legible, so there is a real chance of reading the wrong card's details. Year asserted as the season per the card's own copyright, not the '2023 DONRUSS' on the flip. Parallel asserted as 'Red Laser'; the flip abbreviates it to 'NET MARVELS-RED'. Note the GG Jackson fixture calls its parallel 'Red Laser Holo' — if these turn out to be the same family named differently, one of the two expectations needs revising."
+  },
+  {
+    "id": "council-mosaic-pictographs-auto",
+    "images": [
+      "council-mosaic-pictographs-auto-front.jpg",
+      "council-mosaic-pictographs-auto-back.jpg"
+    ],
+    "expected": {
+      "name": "Ricky Council IV",
+      "setName": "Mosaic",
+      "insert": "Pictographs",
+      "cardNumber": "PM-RCF",
+      "year": "2023-24",
+      "collection": "NBA",
+      "rookie": "Rookie Card (RC)",
+      "variants": [
+        "Auto",
+        "Rookie Card (RC)",
+        "Numbered"
+      ]
+    },
+    "notes": "2023-24 Panini Mosaic Pictographs on-card autograph, numbered 08/25, Philadelphia 76ers. THE AUTOGRAPH FIXTURE — a real blue on-card signature over a sticker window, which is what the Auto chip and the isAuto flag exist for. Also the first non-numeric collector number ('No. PM-RCF' on the back, an insert code with a hyphen) and the first printed serial ('08/25'), which should imply the Numbered chip on its own. Front is upside-down and heavily glare-speckled by the mosaic foil under rigid plastic; the back carries the number, the serial and the '2023-24 PANINI - MOSAIC BASKETBALL' copyright, so this is a genuine two-image case. The RC shield is on the front bottom-right. `variants` asserts only what is unambiguous: if the pipeline also returns a finish chip, note that the back prints 'PRIZM' while the front carries the Mosaic logo — a finish chip appearing here is an expectation question, not necessarily a pipeline failure. `parallel` is unasserted: /25 is a limited parallel but its name is not printed."
   }
 ]
