@@ -61,10 +61,13 @@ const out = options.json ? () => {} : (...a) => console.log(...a);
 // ─── pipeline ─────────────────────────────────────────────────────────────────
 
 /** Stage 1: OCR, then ground the read against the public TCG catalogue. */
-async function readCard(buffer, mimetype, log) {
+async function readCard(images, log) {
   const { content, escalated, reason } = await runCardOcr({
     apiKey: process.env.ANTHROPIC_API_KEY,
-    imageBlocks: [{ type: 'image', source: { type: 'base64', media_type: mimetype, data: buffer.toString('base64') } }],
+    imageBlocks: images.map(({ buffer, mimetype }) => ({
+      type: 'image',
+      source: { type: 'base64', media_type: mimetype, data: buffer.toString('base64') },
+    })),
     log,
   });
 
@@ -140,23 +143,34 @@ async function identifyWithCardSight(buffer, mimetype, collection, log) {
  * CardSight hit overlays it only when the match is trustworthy.
  */
 async function runCase(fixture, rectifier, log) {
-  const imagePath = path.join(FIXTURES, 'images', fixture.image);
-  if (!fs.existsSync(imagePath)) throw new Error(`missing image: ${fixture.image}`);
+  // A fixture may carry several angles. Production sends the front plus up to
+  // two extras to OCR — the back is where collector numbers and copyright lines
+  // usually live — but only ever the front to CardSight.
+  const names = (fixture.images ?? [fixture.image]).filter(Boolean).slice(0, 3);
+  if (!names.length) throw new Error('fixture has no image');
 
-  let buffer = fs.readFileSync(imagePath);
-  const mimetype = fixture.image.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+  const images = names.map(name => {
+    const imagePath = path.join(FIXTURES, 'images', name);
+    if (!fs.existsSync(imagePath)) throw new Error(`missing image: ${name}`);
+    return {
+      name,
+      path: imagePath,
+      buffer: fs.readFileSync(imagePath),
+      mimetype: name.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg',
+    };
+  });
 
-  // Stage 0 — rectify the card out of the photo.
+  // Stage 0 — rectify the card out of the front photo (only the front, as in
+  // the app: cropping every angle would double the wait for a secondary read).
   let cropped = false;
   if (rectifier) {
-    const rel = path.relative(REPO_ROOT, imagePath);
-    const res = await rectifier.rectify(rel, fixture.image);
-    buffer = res.buffer;
+    const res = await rectifier.rectify(path.relative(REPO_ROOT, images[0].path), images[0].name);
+    images[0].buffer = res.buffer;
     cropped = res.cropped;
     log(cropped ? 'rectified' : 'no card outline found — using original');
   }
 
-  const { ocr, escalated, reason } = await readCard(buffer, mimetype, log);
+  const { ocr, escalated, reason } = await readCard(images, log);
   if (!ocr) return { fields: {}, meta: { cropped, escalated, escalationReason: reason, ocrFailed: true } };
 
   const fields = {
@@ -178,8 +192,8 @@ async function runCase(fixture, rectifier, log) {
     parallel: '',
   };
 
-  // Stage 2 — the category OCR read chooses the segment.
-  const cardsight = await identifyWithCardSight(buffer, mimetype, ocr.collectionType, log);
+  // Stage 2 — the category OCR read chooses the segment. Front only.
+  const cardsight = await identifyWithCardSight(images[0].buffer, images[0].mimetype, ocr.collectionType, log);
 
   // Stage 4 — overlay only on a clean exact hit.
   const trustworthy = Boolean(
@@ -198,6 +212,7 @@ async function runCase(fixture, rectifier, log) {
     fields,
     meta: {
       cropped,
+      imageCount: images.length,
       escalated,
       escalationReason: reason,
       catalogueVerified: ocr.catalogueMatch?.verified ?? null,

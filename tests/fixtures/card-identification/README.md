@@ -17,7 +17,7 @@ pulls in) enable the catalog stage, and the run says so when they're absent.
 
 ## Adding a card
 
-1. Drop the **original, full-resolution** photo in `images/`.
+1. Drop the **original, full-resolution** photo(s) in `images/`.
 2. Add an entry to `cases.json`.
 
 ```json
@@ -40,6 +40,20 @@ pulls in) enable the catalog stage, and the run says so when they're absent.
 Leave any field you're unsure of **out** — a blank expectation is not scored,
 so a partial fixture is still useful. `notes` is free text for context, most
 usefully what the pipeline currently gets wrong about this card.
+
+### Front and back
+
+Use `images` instead of `image` to supply several angles, front first:
+
+```json
+"images": ["lebron-front.jpg", "lebron-back.jpg"]
+```
+
+This matters more than it sounds. Collector numbers and copyright lines are
+often **only** on the back, so a front-only fixture can't distinguish "the
+pipeline can't read the number" from "the number wasn't in the photo". Up to
+three are sent, matching the app. Only the front goes to CardSight, and only the
+front is rectified.
 
 ### Photos must be originals
 

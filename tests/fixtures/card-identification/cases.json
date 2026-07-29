@@ -68,5 +68,25 @@
       "certNumber": "138138870"
     },
     "notes": "2023-24 Topps Chrome rookie, San Antonio Spurs, PSA MINT 9. SCREENSHOT OF CARDPOP'S OWN LISTING PAGE — and that makes it the weakest of the fixtures as a test of card reading: the page displays 'Victor Wembanyama', '2023-24 Topps Chrome Basketball', 'NBA', '#1', 'Rookie Card (RC)', 'Base' and 'PSA 9' as text, so a model can score full marks without looking at the card at all. Useful for confirming screenshots don't break the pipeline; not evidence about reading cards. The photo inside is a genuine hand-held shot of the slab against a cluttered bedroom background. The PSA label reads '2023 TOPPS CHROME' but the product is the 2023-24 season — asserted as the season per the agreed convention. Base card, so no insert or parallel. The Rookie Card (RC) designation is visible and value-relevant but is not currently a scored field."
+  },
+  {
+    "id": "lebron-net-marvels-red-psa10",
+    "images": [
+      "lebron-net-marvels-red-psa10-front.jpg",
+      "lebron-net-marvels-red-psa10-back.jpg"
+    ],
+    "expected": {
+      "name": "LeBron James",
+      "setName": "Donruss",
+      "insert": "Net Marvels",
+      "cardNumber": "9",
+      "year": "2023-24",
+      "collection": "NBA",
+      "parallel": "Red Laser",
+      "gradingCompany": "PSA",
+      "grade": "10",
+      "certNumber": "99437125"
+    },
+    "notes": "2023-24 Panini Donruss Net Marvels, Red Laser parallel, PSA GEM MT 10. FIRST TWO-IMAGE FIXTURE, and the first that genuinely needs the back: 'No. 9' and the copyright line '2023-24 PANINI - DONRUSS BASKETBALL' are only legible there. Every earlier fixture noted its number as unreadable — this one tests whether sending the back actually recovers it. ADVERSARIAL BACKGROUND: two other PSA slabs are in frame behind the card, including a Donruss Wembanyama PSA 9 whose own label and cert are partly legible, so there is a real chance of reading the wrong card's details. Year asserted as the season per the card's own copyright, not the '2023 DONRUSS' on the flip. Parallel asserted as 'Red Laser'; the flip abbreviates it to 'NET MARVELS-RED'. Note the GG Jackson fixture calls its parallel 'Red Laser Holo' — if these turn out to be the same family named differently, one of the two expectations needs revising."
   }
 ]
