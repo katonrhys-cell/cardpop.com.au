@@ -43,8 +43,28 @@ Every failure path keeps the original: nothing detected, OpenCV failing to
 load, a warp smaller than 600px on its long edge, or the whole step exceeding
 8 seconds. It can improve the input or leave it alone, never block a scan.
 
-Only the front is processed. Cropping the extra angles too would double the
-wait for a secondary read.
+Only the front is *rectified* — cropping the extra angles too would double the
+wait for a secondary read — but **every** image is resized before it is sent.
+
+### The payload cap (why identification used to fail outright)
+
+Vercel refuses a serverless request body over **4.5 MB** with a 413
+(`FUNCTION_PAYLOAD_TOO_LARGE`) before Express ever runs. The form used to post
+raw camera files: up to 5 MB each, up to three of them. Ordinary phone photos
+therefore failed identification completely, and the seller saw Vercel's raw
+`FUNCTION_PAYLOAD_TOO_LARGE` plus a request id.
+
+`prepareAnalysisImages` now resizes every image to a 1600px long edge at JPEG
+q0.85 (~300-500 KB each) and, if the body would still exceed a 3.5 MB budget,
+drops trailing angles — never the front, which is the read that matters. Note
+this costs nothing in accuracy: the models downscale to roughly that size
+anyway, which is the same argument that motivates rectification.
+
+JPEG rather than the compressor's default WebP, because these images go to two
+third-party APIs and JPEG is what both unambiguously accept.
+
+A 413 that still gets through is reported as "those photos are too large to
+analyse together" rather than the raw Vercel body.
 
 **Cost.** OpenCV is a lazily-loaded ~3.5 MB (gzipped) wasm chunk, and this puts
 it on the default path for every seller rather than only those who use the
