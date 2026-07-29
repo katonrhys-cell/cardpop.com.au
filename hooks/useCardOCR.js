@@ -157,11 +157,51 @@ function nameSignal(ocr, candidate) {
   return 'none';
 }
 
+// Words that describe a set without distinguishing it from another, so a name
+// differing only by these is the same set read two ways ("Base" / "Base Set").
+const SET_NOISE_WORDS = new Set(['the', 'set', 'series', 'edition', 'expansion', 'collection', 'tcg']);
+
+/**
+ * Whether two set names refer to the same set.
+ *
+ * Plain substring containment is not good enough here: set names nest, so
+ * "Base Set" contains-matches "Base Set 2" and "Sword & Shield" matches
+ * "Sword & Shield Promo" — different sets that would then corroborate each
+ * other. Containment counts only when the extra words carry no distinguishing
+ * information; a trailing "2" or "Promo" does.
+ */
 function setsMatch(a, b) {
   const na = normalizeName(a);
   const nb = normalizeName(b);
   if (!na || !nb) return false;
-  return na === nb || na.includes(nb) || nb.includes(na);
+  if (na === nb) return true;
+
+  const [shorter, longer] = na.length <= nb.length ? [na, nb] : [nb, na];
+  const shortWords = shorter.split(' ').filter(Boolean);
+  const longWords = longer.split(' ').filter(Boolean);
+  if (!shortWords.every(w => longWords.includes(w))) return false;
+
+  const shortSet = new Set(shortWords);
+  return longWords.filter(w => !shortSet.has(w)).every(w => SET_NOISE_WORDS.has(w));
+}
+
+/**
+ * How well a candidate's set agrees with the read: 'set' when it matches the
+ * one OCR settled on, 'likely set' when it matches one the model shortlisted
+ * instead, null otherwise.
+ *
+ * The prompt asks the model to shortlist up to three sets rather than name one
+ * with false confidence. That shortlist used to be parsed and thrown away —
+ * but a card whose set the model wouldn't commit to is exactly the case where
+ * corroboration is scarcest, and the catalogue independently landing on one of
+ * its three guesses is real agreement. It ranks below an outright set match and
+ * is reported under its own label so the UI never overstates it.
+ */
+function setSignal(ocr, candidate) {
+  if (setsMatch(ocr.cardSetName, candidate.setName)) return 'set';
+  const shortlist = Array.isArray(ocr.candidateSets) ? ocr.candidateSets : [];
+  if (shortlist.some(s => setsMatch(s, candidate.setName))) return 'likely set';
+  return null;
 }
 
 /**
@@ -176,7 +216,7 @@ function evaluateCandidate(ocr, candidate) {
   const name = nameSignal(ocr, candidate);
   const numberMatches = cardNumbersMatch(ocr.cardNumber, candidate.cardNumber);
   const numberConflicts = cardNumbersConflict(ocr.cardNumber, candidate.cardNumber);
-  const setMatches = setsMatch(ocr.cardSetName, candidate.setName);
+  const setMatch = setSignal(ocr, candidate);
   const yearMatches = Boolean(
     ocr.releaseYear && candidate.year && String(candidate.year) === String(ocr.releaseYear)
   );
@@ -184,10 +224,10 @@ function evaluateCandidate(ocr, candidate) {
   const verified = [];
   if (name !== 'none') verified.push('name');
   if (numberMatches) verified.push('number');
-  if (setMatches) verified.push('set');
+  if (setMatch) verified.push(setMatch);
   if (yearMatches) verified.push('year');
 
-  return { name, numberMatches, numberConflicts, setMatches, yearMatches, verified };
+  return { name, numberMatches, numberConflicts, setMatch, yearMatches, verified };
 }
 
 /**
@@ -206,13 +246,13 @@ function isAcceptableMatch(evaluation) {
   if (evaluation.numberConflicts) return false;  // different printing
   if (evaluation.name === 'none') return false;  // never match on non-name evidence alone
   if (evaluation.numberMatches) return true;     // name + printed number agree
-  return evaluation.setMatches || evaluation.yearMatches;
+  return Boolean(evaluation.setMatch) || evaluation.yearMatches;
 }
 
 /** Ranks acceptable candidates: corroborated fields first, then name quality. */
 function matchStrength(evaluation) {
   return (evaluation.numberMatches ? 4 : 0)
-    + (evaluation.setMatches ? 2 : 0)
+    + (evaluation.setMatch === 'set' ? 2 : evaluation.setMatch === 'likely set' ? 1 : 0)
     + (evaluation.yearMatches ? 1 : 0)
     + (evaluation.name === 'exact' ? 2 : evaluation.name === 'partial' ? 1 : 0);
 }

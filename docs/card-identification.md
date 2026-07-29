@@ -24,9 +24,30 @@ photo(s)
 
 `useCardOCR` streams the images to `/card-ocr/scan`, which asks Claude for a
 structured read of the card (name, set, collector number, year, condition,
-grading slab, rarity). A cheap model handles it; `shouldEscalate` retries with a
-stronger one when the JSON is unreadable, has no name, or self-reports low
-confidence.
+grading slab, rarity). A cheap model handles it and `escalationReason` decides
+whether to spend a second, stronger pass.
+
+That decision is made on **the fields the rest of the pipeline consumes**, not
+on the model's opinion of its own work — self-reported confidence is weakly
+calibrated and used to be almost the only signal, so a read could arrive with no
+category, no set and no number and still be accepted because it had a name and
+said "medium". Escalation now fires on:
+
+| Reason | Why it matters |
+|---|---|
+| `unparseable` | no JSON in the reply |
+| `no-name` | nothing to search the catalogue with |
+| `no-category` | `collectionType` picks the CardSight segment; without it, identify falls back to the ten-segment fan-out |
+| `low-confidence` | the model said so |
+| `uncertain-set` | `candidateSets` is non-empty — the prompt tells it to shortlist rather than guess, so a shortlist *is* the uncertainty signal |
+| `no-identity` | neither set nor collector number, so the catalogue has nothing to corroborate a name against |
+
+A read missing *only* the collector number is accepted: many numbers are on the
+back, which the auto-run doesn't have, and the set still gives the catalogue
+something to check.
+
+The escalation result is only taken when it actually read a card — a flaky or
+truncated second call must not replace a usable first one.
 
 The result is then grounded against the public card catalogue
 (`resolveAgainstCatalogue` → `/catalog/search`, covering Pokemon / Magic /
@@ -72,6 +93,20 @@ catalogue only supplies one when OCR couldn't read it.
 claiming a blanket "set & card number verified". Sources that carry nothing to
 verify — the Yu-Gi-Oh adapter returns null set/number/year — therefore produce
 no match and no badge, rather than a false one.
+
+**Shortlisted sets count, but separately.** When the model wouldn't commit to a
+set it returns up to three in `candidateSets`. A candidate whose set matches one
+of those corroborates the match — that's the case with the least evidence going,
+and the catalogue independently landing on one of the model's own guesses is
+real agreement — but it is recorded as `likely set` rather than `set`, ranks
+below an outright set match, and shows as such in the badge.
+
+**Set names are compared on whole words, not substrings.** Set names nest:
+plain containment makes "Base Set" match "Base Set 2", and "Sword & Shield"
+match "Sword & Shield Promo" — different sets that would then corroborate each
+other. A shorter name matches a longer one only when every extra word is
+non-distinguishing (`set`, `series`, `edition`, `collection`, …), so
+"Base" still matches "Base Set" but "Base Set" no longer matches "Base Set 2".
 
 ### 2. Choosing the category
 

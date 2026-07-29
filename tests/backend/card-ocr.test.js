@@ -201,12 +201,28 @@ describe('POST /scan', () => {
   });
 });
 
-// ─── Confidence-gated escalation ───────────────────────────────────────────────
+// ─── Quality-gated escalation ─────────────────────────────────────────────────
+//
+// Escalation is decided on the fields the rest of the pipeline consumes, not on
+// the model's opinion of its own work. A read with a name and "confidence":
+// "high" but no category, set or number used to be accepted and passed straight
+// into a ten-segment CardSight fan-out.
+
+/** A read good enough that no second pass is warranted. */
+const completeRead = (over = {}) => JSON.stringify({
+  name: 'Charizard',
+  collectionType: 'Pokemon',
+  cardSetName: 'Base Set',
+  cardNumber: '4/102',
+  confidence: 'high',
+  candidateSets: [],
+  ...over,
+});
 
 describe('POST /scan — model escalation', () => {
-  it('does not escalate when the fast model is confident', async () => {
+  it('does not escalate on a complete, confident read', async () => {
     mockFiles = oneFile();
-    mockFetch.mockResolvedValue(anthropicOk('{"name":"Charizard","confidence":"high"}'));
+    mockFetch.mockResolvedValue(anthropicOk(completeRead()));
 
     await request(app).post('/scan');
 
@@ -217,21 +233,21 @@ describe('POST /scan — model escalation', () => {
   it('escalates to the stronger model on low confidence and returns its result', async () => {
     mockFiles = oneFile();
     mockFetch
-      .mockResolvedValueOnce(anthropicOk('{"name":"Charizard","confidence":"low"}'))
-      .mockResolvedValueOnce(anthropicOk('{"name":"Charizard","cardSetName":"Base Set","confidence":"high"}'));
+      .mockResolvedValueOnce(anthropicOk(completeRead({ confidence: 'low' })))
+      .mockResolvedValueOnce(anthropicOk(completeRead({ cardSetName: 'Jungle' })));
 
     const res = await request(app).post('/scan');
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(JSON.parse(mockFetch.mock.calls[1][1].body).model).toBe('claude-sonnet-4-6');
-    expect(res.text).toContain('Base Set');
+    expect(res.text).toContain('Jungle');
   });
 
   it('escalates when the fast model returns no card name', async () => {
     mockFiles = oneFile();
     mockFetch
       .mockResolvedValueOnce(anthropicOk('{"name":null}'))
-      .mockResolvedValueOnce(anthropicOk('{"name":"Pikachu","confidence":"high"}'));
+      .mockResolvedValueOnce(anthropicOk(completeRead({ name: 'Pikachu' })));
 
     const res = await request(app).post('/scan');
 
@@ -239,10 +255,81 @@ describe('POST /scan — model escalation', () => {
     expect(res.text).toContain('Pikachu');
   });
 
+  it('escalates when the category is missing', async () => {
+    // collectionType picks the CardSight segment — without it, identify falls
+    // back to ranking guesses from all ten segments against each other.
+    mockFiles = oneFile();
+    mockFetch
+      .mockResolvedValueOnce(anthropicOk(completeRead({ collectionType: null })))
+      .mockResolvedValueOnce(anthropicOk(completeRead()));
+
+    await request(app).post('/scan');
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('escalates when the model shortlisted sets instead of naming one', async () => {
+    mockFiles = oneFile();
+    mockFetch
+      .mockResolvedValueOnce(anthropicOk(completeRead({ candidateSets: ['Base Set', 'Base Set 2'] })))
+      .mockResolvedValueOnce(anthropicOk(completeRead()));
+
+    await request(app).post('/scan');
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('escalates when neither a set nor a collector number was read', async () => {
+    // Nothing for the catalogue lookup to corroborate a name against.
+    mockFiles = oneFile();
+    mockFetch
+      .mockResolvedValueOnce(anthropicOk(completeRead({ cardSetName: null, cardNumber: null })))
+      .mockResolvedValueOnce(anthropicOk(completeRead()));
+
+    await request(app).post('/scan');
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('accepts a read missing only the collector number', async () => {
+    // Common and tolerable — many numbers are on the back, which the auto-run
+    // doesn't have. The set still gives the catalogue something to check.
+    mockFiles = oneFile();
+    mockFetch.mockResolvedValue(anthropicOk(completeRead({ cardNumber: null })));
+
+    await request(app).post('/scan');
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('escalates when the fast reply is not parseable JSON', async () => {
+    mockFiles = oneFile();
+    mockFetch
+      .mockResolvedValueOnce(anthropicOk('I could not read this card.'))
+      .mockResolvedValueOnce(anthropicOk(completeRead()));
+
+    await request(app).post('/scan');
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the fast result when the escalation reads no card', async () => {
+    // A flaky or truncated second call must not replace a usable first one.
+    mockFiles = oneFile();
+    mockFetch
+      .mockResolvedValueOnce(anthropicOk(completeRead({ confidence: 'low' })))
+      .mockResolvedValueOnce(anthropicOk('truncated nonsense'));
+
+    const res = await request(app).post('/scan');
+
+    expect(res.text).toContain('Charizard');
+    expect(res.text).not.toContain('truncated nonsense');
+  });
+
   it('falls back to the fast result when escalation fails', async () => {
     mockFiles = oneFile();
     mockFetch
-      .mockResolvedValueOnce(anthropicOk('{"name":"Charizard","confidence":"low"}'))
+      .mockResolvedValueOnce(anthropicOk(completeRead({ confidence: 'low' })))
       .mockRejectedValueOnce(new Error('sonnet overloaded'));
 
     const res = await request(app).post('/scan');

@@ -41,7 +41,10 @@ async function requestOcr({ apiKey, model, system, promptText, imageBlocks, time
 		},
 		body: JSON.stringify({
 			model,
-			max_tokens: 1024,
+			// Headroom over the ~15-field schema: `description` and `candidateSets`
+			// are open-ended, and a truncated reply reads as unparseable JSON —
+			// which now costs a wasted escalation before failing.
+			max_tokens: 1500,
 			system,
 			messages: [{
 				role: 'user',
@@ -63,18 +66,48 @@ async function requestOcr({ apiKey, model, system, promptText, imageBlocks, time
 	return data.content?.[0]?.text ?? '';
 }
 
-// Decides whether the fast model's result warrants a second pass with the
-// stronger model: unreadable JSON, no card name, or self-reported low confidence.
-function shouldEscalate(content) {
+/** Pulls the JSON object out of a model reply. Returns null when unreadable. */
+function parseOcrJson(content) {
 	try {
-		const match = content.match(/\{[\s\S]*\}/);
-		if (!match) return true;
-		const data = JSON.parse(match[0]);
-		if (!data.name) return true;
-		return String(data.confidence ?? '').toLowerCase() === 'low';
+		const match = String(content ?? '').match(/\{[\s\S]*\}/);
+		return match ? JSON.parse(match[0]) : null;
 	} catch {
-		return true;
+		return null;
 	}
+}
+
+/**
+ * Whether the fast model's read warrants a second pass with the stronger one,
+ * and why. Returns null to accept the fast result.
+ *
+ * The test is about the fields the rest of the pipeline actually depends on,
+ * not the model's opinion of itself. Self-reported confidence is a weak signal
+ * and it used to be almost the only one — a read could come back with no
+ * category, no set and no collector number and still be accepted, because it
+ * had a name and said "medium".
+ *
+ * @param {object|null} data - parsed OCR JSON
+ * @returns {string|null} short reason code, or null when the result is usable
+ */
+function escalationReason(data) {
+	if (!data) return 'unparseable';
+	if (!data.name) return 'no-name';
+
+	// collectionType chooses the CardSight segment. Without it the identify
+	// call falls back to a ten-segment fan-out that ranks guesses from every
+	// sport against each other — the single worst input we can hand it.
+	if (!data.collectionType) return 'no-category';
+
+	if (String(data.confidence ?? '').toLowerCase() === 'low') return 'low-confidence';
+
+	// The prompt tells the model to shortlist sets rather than guess one with
+	// false confidence, so a non-empty shortlist is it saying "I'm not sure".
+	if (Array.isArray(data.candidateSets) && data.candidateSets.length > 0) return 'uncertain-set';
+
+	// Neither of the two fields the catalogue lookup can corroborate against.
+	if (!data.cardNumber && !data.cardSetName) return 'no-identity';
+
+	return null;
 }
 
 router.post('/scan', integratedAiRateLimit, requireAuth, uploadFiles({
@@ -115,13 +148,17 @@ router.post('/scan', integratedAiRateLimit, requireAuth, uploadFiles({
 
 		let content = await requestOcr({ ...ocrArgs, model: OCR_MODEL_FAST, timeoutMs: OCR_TIMEOUT_FAST });
 
-		// Confidence-gated escalation: only pay for the stronger model when the
-		// fast model couldn't confidently identify the card.
-		if (shouldEscalate(content)) {
-			logger.info('[CARD_OCR] Low-confidence fast result — escalating to stronger model');
+		// Quality-gated escalation: only pay for the stronger model when the fast
+		// one left out something the rest of the pipeline depends on.
+		const reason = escalationReason(parseOcrJson(content));
+		if (reason) {
+			logger.info(`[CARD_OCR] Escalating to ${OCR_MODEL_STRONG}: ${reason}`);
 			try {
 				const stronger = await requestOcr({ ...ocrArgs, model: OCR_MODEL_STRONG, timeoutMs: OCR_TIMEOUT_STRONG });
-				if (stronger) content = stronger;
+				// Only take the escalation when it actually read a card — a flaky or
+				// truncated second call must not replace a usable first one.
+				if (parseOcrJson(stronger)?.name) content = stronger;
+				else logger.warn('[CARD_OCR] Escalation returned no usable read — keeping fast result');
 			} catch (err) {
 				// Keep the fast result rather than failing the whole scan.
 				logger.warn(`[CARD_OCR] Escalation failed, using fast result: ${err.message}`);
