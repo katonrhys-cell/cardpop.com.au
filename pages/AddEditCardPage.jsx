@@ -44,6 +44,7 @@ import SellingRequirementsNotice from '@/components/SellingRequirementsNotice.js
 import { isSellingEntitlementError } from '@/utils/listingErrors.js';
 import { loadListingDraft, saveListingDraft, clearListingDraft, hasMeaningfulContent } from '@/lib/listingDraft.js';
 import { shouldAutoIdentify, buildPriceLookupQuery } from '@/utils/listingFlow.js';
+import { confidenceScore, confidenceLabel, isLowConfidence } from '@/utils/cardsightConfidence.js';
 import { validateListingForm, validateListingField } from '@/utils/listingValidation.js';
 import WizardStepper from '@/components/WizardStepper.jsx';
 import { CARD_LANGUAGES } from '@/lib/cardFilters.js';
@@ -181,6 +182,17 @@ const AddEditCardPage = () => {
   const { fetchPricingById, fetchPricingByName, isLoadingCsPrice, csPrice, clearCsPrice } = useCardsightPricing();
   const { isProcessing: isPhotoProcessing, previewUrl, createSlabImagePreview, reset: resetPhotoTemplate } = usePhotoTemplate();
   const { generateDescription, isGenerating: isGeneratingDescription } = useCardDescription();
+
+  // CardSight reports confidence as a "High"/"Medium"/"Low" enum, so it can
+  // never be rendered or compared as a number directly (that produced "NaN%"
+  // and pinned every match to the lowest band). Newer responses carry derived
+  // numeric fields; fall back to deriving them for older/cached payloads.
+  const csConfidence = cardSightResult?.confidenceScore ?? confidenceScore(cardSightResult?.confidence);
+  const csConfidenceLabel = cardSightResult?.confidenceLabel ?? confidenceLabel(cardSightResult?.confidence);
+  const csNeedsReview = Boolean(
+    cardSightResult?.identified &&
+    (cardSightResult.ambiguous || isLowConfidence(cardSightResult.confidenceScore ?? cardSightResult.confidence))
+  );
 
   // Photo template modal state
   const [photoTemplateModal, setPhotoTemplateModal] = useState({ open: false, processType: null, step: 'preview' });
@@ -677,7 +689,16 @@ const AddEditCardPage = () => {
       if (csResult.card?.id) fetchPricingById(csResult.card.id);
       else if (csResult.card?.name) fetchPricingByName(csResult.card.name);
       setIsAutoFilled(true);
-      toast.success('Card identified! Fields auto-filled from catalog.');
+      // Only claim a confident identification when the match actually is one —
+      // an unqualified success toast on a weak or cross-category match is how
+      // wrong details end up saved without anyone looking at them.
+      if (csResult.ambiguous) {
+        toast.warning('Matched more than one category — check the details before saving.');
+      } else if (isLowConfidence(csResult.confidenceScore ?? csResult.confidence)) {
+        toast.warning('Possible match found — please verify the details.');
+      } else {
+        toast.success('Card identified! Fields auto-filled from catalog.');
+      }
       return;
     }
 
@@ -718,6 +739,19 @@ const AddEditCardPage = () => {
       setIsAutoFilled(true);
       // Success/failure feedback is surfaced by useCardOCR itself.
     }
+  };
+
+  // Applies a runner-up detection when the top match was the wrong card. The
+  // alternatives are flat card records, so wrap one back into the identify
+  // result shape `mapCardSightToFormFields` expects.
+  const applyCardSightAlternative = (alt) => {
+    if (!alt) return;
+    const fields = mapCardSightToFormFields({ identified: true, card: alt });
+    setFormData(prev => ({ ...prev, ...fields }));
+    if (alt.id) fetchPricingById(alt.id);
+    else if (alt.name) fetchPricingByName(alt.name);
+    setIsAutoFilled(true);
+    toast.success(`Switched to ${alt.name ?? 'the selected card'}.`);
   };
 
   // ─── On-demand price estimate ─────────────────────────────────────────────
@@ -1509,40 +1543,62 @@ const AddEditCardPage = () => {
                       <h4 className={`text-xs font-bold mb-2 flex items-center gap-1.5 ${cardSightResult?.identified ? 'text-emerald-700' : 'text-primary'}`}>
                         <Sparkles className="w-3.5 h-3.5" />
                         {cardSightResult?.identified
-                          ? `Catalog Match — ${cardSightResult.exactMatch ? 'Exact' : 'Set'}`
+                          ? `Catalog Match — ${csNeedsReview ? 'Needs review' : cardSightResult.exactMatch ? 'Exact' : 'Set'}`
                           : 'AI Analysis — fields auto-filled'}
                       </h4>
 
-                      {cardSightResult?.identified && cardSightResult.confidence !== undefined && (
+                      {cardSightResult?.identified && csConfidence !== null && (
                         <div className="mb-2">
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-[10px] font-semibold text-muted-foreground">Match Confidence</span>
                             <span className={`text-xs font-bold ${
-                              cardSightResult.confidence >= 0.95 ? 'text-emerald-700 dark:text-emerald-400' :
-                              cardSightResult.confidence >= 0.85 ? 'text-green-700 dark:text-green-400' :
-                              cardSightResult.confidence >= 0.7 ? 'text-amber-700 dark:text-amber-400' :
+                              csConfidence >= 0.9 ? 'text-emerald-700 dark:text-emerald-400' :
+                              csConfidence >= 0.75 ? 'text-amber-700 dark:text-amber-400' :
                               'text-orange-700 dark:text-orange-400'
                             }`}>
-                              {Math.round(cardSightResult.confidence * 100)}%
+                              {csConfidenceLabel}
                             </span>
                           </div>
                           <div className="w-full h-1.5 rounded-full bg-muted/50 overflow-hidden">
                             <div
                               className={`h-full transition-all ${
-                                cardSightResult.confidence >= 0.95 ? 'bg-emerald-500' :
-                                cardSightResult.confidence >= 0.85 ? 'bg-green-500' :
-                                cardSightResult.confidence >= 0.7 ? 'bg-amber-500' :
+                                csConfidence >= 0.9 ? 'bg-emerald-500' :
+                                csConfidence >= 0.75 ? 'bg-amber-500' :
                                 'bg-orange-500'
                               }`}
-                              style={{ width: `${Math.round(cardSightResult.confidence * 100)}%` }}
+                              style={{ width: `${Math.round(csConfidence * 100)}%` }}
                             />
                           </div>
                           <p className="text-[10px] text-muted-foreground mt-1">
-                            {cardSightResult.confidence >= 0.95 ? 'Excellent match — high confidence in identification' :
-                             cardSightResult.confidence >= 0.85 ? 'Good match — confident in identification' :
-                             cardSightResult.confidence >= 0.7 ? 'Moderate match — review before saving' :
-                             'Low match — verify details are correct'}
+                            {cardSightResult.ambiguous
+                              ? 'This image also matched a card in another category — check the details below before saving.'
+                              : csConfidence >= 0.9 ? 'Strong match — details came straight from the catalog.'
+                              : csConfidence >= 0.75 ? 'Reasonable match — review the details before saving.'
+                              : 'Weak match — verify every field before saving.'}
                           </p>
+                        </div>
+                      )}
+
+                      {cardSightResult?.identified && cardSightResult.alternatives?.length > 0 && (
+                        <div className="mb-2">
+                          <p className="text-[10px] font-semibold text-muted-foreground mb-1">
+                            Not the right card? Pick a closer match:
+                          </p>
+                          <div className="flex flex-col gap-1">
+                            {cardSightResult.alternatives.map(alt => (
+                              <button
+                                key={alt.id ?? `${alt.setId}-${alt.cardNumber}`}
+                                type="button"
+                                onClick={() => applyCardSightAlternative(alt)}
+                                className="text-left text-[11px] rounded-lg border border-border/60 px-2 py-1.5 hover:bg-muted/60 transition-colors"
+                              >
+                                <span className="font-medium text-foreground">{alt.name ?? 'Unknown card'}</span>
+                                {alt.setName && <span className="text-muted-foreground"> · {alt.setName}</span>}
+                                {alt.year && <span className="text-muted-foreground"> · {alt.year}</span>}
+                                {alt.segment && <span className="text-muted-foreground"> · {alt.segment}</span>}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       )}
 

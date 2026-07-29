@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import {
-  getHighestConfidenceDetection,
   isExactMatch,
   isSetLevelMatch,
   hasGrading,
@@ -9,6 +8,7 @@ import {
   getFieldValue,
 } from 'cardsightai';
 import { getCardSightClient, summarisePricingAud, getSegmentName } from '../utils/cardSightClient.js';
+import { confidenceRank, confidenceScore, confidenceLabel } from '../../utils/cardsightConfidence.js';
 import { uploadFiles } from '../middleware/file-upload.js';
 import { supabaseAuth } from '../middleware/supabase-auth.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -24,6 +24,59 @@ router.use(supabaseAuth);
 
 // CardSight pricing accepts these listing types; anything else is dropped
 const VALID_LISTING_TYPES = new Set(['auction', 'fixed', 'both']);
+
+// How many runner-up detections to hand back so the seller can correct a
+// mis-pick without re-scanning.
+const MAX_ALTERNATIVES = 4;
+
+/**
+ * Match specificity: an exact card hit (the detection carries a card id) is
+ * always a better answer than a set-level guess, which in turn beats a
+ * detection that resolved to neither.
+ */
+function matchSpecificity(detection) {
+  if (isExactMatch(detection)) return 2;
+  if (isSetLevelMatch(detection)) return 1;
+  return 0;
+}
+
+/**
+ * Orders detections merged from the per-segment fan-out.
+ *
+ * Each segment is queried independently and answers with its best guess
+ * *within that segment*, so a Pokemon card scanned without a collection still
+ * yields a plausible-looking basketball detection. Ordering therefore has to be
+ * explicit. The SDK's `getHighestConfidenceDetection` sorts on the confidence
+ * enum alone, and because that enum only has three levels most cross-segment
+ * scans tie — leaving the winner to be decided by the order the segments happen
+ * to sit in the fan-out array (basketball first, pokemon fifth). That is what
+ * made scans return confident-looking cards from the wrong sport.
+ *
+ * @param {Array<{detection: object, segment: string}>} candidates
+ * @returns {Array<{detection: object, segment: string}>} new array, best first
+ */
+function rankCandidates(candidates) {
+  return [...candidates].sort((a, b) =>
+    (matchSpecificity(b.detection) - matchSpecificity(a.detection)) ||
+    (confidenceRank(b.detection.confidence) - confidenceRank(a.detection.confidence))
+  );
+}
+
+/**
+ * True when a runner-up from a *different* segment is just as good as the
+ * winner — i.e. the fan-out produced a genuine cross-sport collision and the
+ * pick is effectively arbitrary. The UI uses this to ask for confirmation
+ * instead of presenting the guess as a verified catalog match.
+ */
+function hasAmbiguousWinner(ranked) {
+  const [best, ...rest] = ranked;
+  if (!best) return false;
+  return rest.some(c =>
+    c.segment !== best.segment &&
+    matchSpecificity(c.detection) === matchSpecificity(best.detection) &&
+    confidenceRank(c.detection.confidence) === confidenceRank(best.detection.confidence)
+  );
+}
 
 // ─── POST /cardsight/identify ─────────────────────────────────────────────────
 // Accepts a card image, returns identification + catalog + pricing in one shot.
@@ -65,17 +118,24 @@ router.post(
         SEGMENTS.map(seg => client.identify.cardBySegment(seg, image))
       );
 
-      // Merge all detections from every segment that returned successfully
-      let allDetections = [];
+      // Merge every segment's detections, keeping the segment each one came
+      // from — it is the only way to tell a cross-sport collision apart from
+      // two genuine candidates within one segment.
+      const candidates = [];
       let serverMessages = [];
-      for (const r of segmentResults) {
+      segmentResults.forEach((r, i) => {
+        const segment = SEGMENTS[i];
         if (r.status === 'fulfilled' && r.value?.data) {
-          allDetections = allDetections.concat(r.value.data.detections ?? []);
+          for (const detection of r.value.data.detections ?? []) {
+            if (detection?.card) candidates.push({ detection, segment });
+          }
           serverMessages = serverMessages.concat(r.value.data.messages ?? []);
+        } else if (r.status === 'rejected') {
+          logger.warn(`[CARDSIGHT] Segment "${segment}" lookup failed: ${r.reason?.message ?? r.reason}`);
         }
-      }
+      });
 
-      if (!allDetections.length) {
+      if (!candidates.length) {
         logger.info(`[CARDSIGHT] No detections. collection=${collection} segments=[${SEGMENTS.join(', ')}] messages=${JSON.stringify(serverMessages)}`);
         return res.json({
           identified: false,
@@ -84,18 +144,51 @@ router.post(
         });
       }
 
-      // Pick the highest-confidence detection across all segments
-      const syntheticResult = { detections: allDetections };
-      const best = getHighestConfidenceDetection(syntheticResult);
+      // Rank explicitly (match specificity first, then confidence) rather than
+      // letting the fan-out array order break the very common confidence tie.
+      const ranked = rankCandidates(candidates);
+      const best = ranked[0]?.detection;
       if (!best) {
         return res.json({ identified: false, message: 'Could not identify card with sufficient confidence.' });
       }
 
+      const ambiguous = hasAmbiguousWinner(ranked);
       const segmentName = await getSegmentName(best.card?.segmentId);
+
+      // Runner-ups worth offering as a correction: real matches only, one entry
+      // per distinct card, so the seller can fix a mis-pick without re-scanning.
+      const seen = new Set([best.card?.id ?? best.card?.setId]);
+      const alternatives = [];
+      for (const { detection, segment } of ranked.slice(1)) {
+        if (alternatives.length >= MAX_ALTERNATIVES) break;
+        if (matchSpecificity(detection) === 0) continue;
+        const key = detection.card?.id ?? detection.card?.setId;
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        alternatives.push({
+          id: detection.card?.id ?? null,
+          name: detection.card?.name ?? null,
+          year: detection.card?.year ?? null,
+          setName: detection.card?.setName ?? null,
+          setId: detection.card?.setId ?? null,
+          cardNumber: detection.card?.number ?? null,
+          manufacturer: detection.card?.manufacturer ?? null,
+          segment: await getSegmentName(detection.card?.segmentId) ?? segment,
+          confidence: detection.confidence,
+          confidenceLabel: confidenceLabel(detection.confidence),
+          exactMatch: isExactMatch(detection),
+        });
+      }
 
       const response = {
         identified: true,
+        // `confidence` stays the raw CardSight enum for compatibility;
+        // consumers should read the derived numeric/label fields.
         confidence: best.confidence,
+        confidenceLabel: confidenceLabel(best.confidence),
+        confidenceScore: confidenceScore(best.confidence),
+        ambiguous,
+        alternatives,
         exactMatch: isExactMatch(best),
         setLevelMatch: isSetLevelMatch(best),
         card: {
@@ -148,7 +241,7 @@ router.post(
           if (summary) response.pricing = summary;
         }
 
-        logger.info(`[CARDSIGHT] Identified card ${cardId} (${response.card.name}) confidence=${best.confidence} collection=${collection}`);
+        logger.info(`[CARDSIGHT] Identified card ${cardId} (${response.card.name}) confidence=${best.confidence} segment=${ranked[0].segment} ambiguous=${ambiguous} candidates=${candidates.length} collection=${collection}`);
 
         // Background: persist market valuations for this card (CardSight + eBay + PSA)
         refreshCardMarketData({
@@ -171,7 +264,7 @@ router.post(
             .eq('owner_id', req.user.id);
         }
       } else {
-        logger.info(`[CARDSIGHT] Set-level or low-confidence match: setId=${best.card?.setId} confidence=${best.confidence} collection=${collection}`);
+        logger.info(`[CARDSIGHT] Set-level or low-confidence match: setId=${best.card?.setId} confidence=${best.confidence} segment=${ranked[0].segment} ambiguous=${ambiguous} candidates=${candidates.length} collection=${collection}`);
       }
 
       res.json(response);
