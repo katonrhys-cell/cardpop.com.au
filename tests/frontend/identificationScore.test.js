@@ -87,6 +87,23 @@ describe('scoreField', () => {
     expect(scoreField('certNumber', '148544264', '')).toBe(VERDICT.MISSING);
   });
 
+  it('scores variant chips as a set, invented beats missed', () => {
+    // An attribute the pipeline invented misdescribes a live listing; one it
+    // merely missed costs a tick. The verdicts have to reflect that.
+    expect(scoreField('variants', ['Auto', 'Refractor'], ['Refractor', 'Auto'])).toBe(VERDICT.CORRECT);
+    expect(scoreField('variants', ['Auto'], ['Auto', 'Patch'])).toBe(VERDICT.WRONG);
+    expect(scoreField('variants', ['Auto', 'Patch'], ['Auto'])).toBe(VERDICT.MISSING);
+    expect(scoreField('variants', ['Auto'], [])).toBe(VERDICT.MISSING);
+  });
+
+  it('treats an empty expected variant list as a real assertion', () => {
+    // "this card has no attributes" is a claim worth checking, so [] is scored
+    // while a missing key is not.
+    expect(scoreField('variants', [], [])).toBe(VERDICT.CORRECT);
+    expect(scoreField('variants', [], ['Auto'])).toBe(VERDICT.WRONG);
+    expect(scoreField('variants', undefined, ['Auto'])).toBe(VERDICT.UNSCORED);
+  });
+
   it('does not accept a partial name as correct', () => {
     // The grounding step accepts partial containment when *searching*; scoring
     // against known truth must not.

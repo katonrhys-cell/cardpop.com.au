@@ -34,6 +34,12 @@ export function mapOCRResult(data) {
     // Rookie designation as printed. Ticks the "Rookie Card (RC)" chip, which
     // is the single source of truth for everything rookie-related.
     rookie: data.rookie || '',
+    // Treatments visible on the card, resolved to real variant chips later —
+    // free text here, because the taxonomy is per-game and the model shouldn't
+    // be asked to know it.
+    attributes: Array.isArray(data.attributes) ? data.attributes : [],
+    // The printed print-run serial ("23/99"), distinct from the collector number.
+    serialNumber: data.serialNumber || '',
     brand: data.brand || '',
     series: data.series || data.cardSetName || '',
     confidence: data.confidence || null,

@@ -35,7 +35,7 @@ import { cardNumbersMatch } from './cardNumber.js';
  */
 export const SCORED_FIELDS = [
   'name', 'setName', 'cardNumber', 'year', 'collection', 'insert', 'parallel',
-  'rookie', 'gradingCompany', 'grade', 'certNumber',
+  'rookie', 'variants', 'gradingCompany', 'grade', 'certNumber',
 ];
 
 export const VERDICT = {
@@ -76,6 +76,23 @@ const COMPARATORS = {
 };
 
 /**
+ * Set-valued fields need their own verdict, because a boolean comparator can't
+ * express the difference that matters: an attribute the pipeline **invented**
+ * misdescribes a live listing, while one it merely **missed** costs a tick.
+ *
+ * So an exact set is correct, any extra is wrong, and a strict subset counts as
+ * missing — the same wrong-beats-missing ordering used everywhere else.
+ */
+const SET_VERDICTS = {
+  variants: (expected, actual) => {
+    const want = new Set((expected ?? []).map(normalizeName).filter(Boolean));
+    const got = new Set((actual ?? []).map(normalizeName).filter(Boolean));
+    if ([...got].some(v => !want.has(v))) return VERDICT.WRONG;
+    return [...want].every(v => got.has(v)) ? VERDICT.CORRECT : VERDICT.MISSING;
+  },
+};
+
+/**
  * Scores one field.
  *
  * @param {string} field - one of SCORED_FIELDS
@@ -84,6 +101,14 @@ const COMPARATORS = {
  * @returns {'correct'|'wrong'|'missing'|'unscored'}
  */
 export function scoreField(field, expected, actual) {
+  const setVerdict = SET_VERDICTS[field];
+  if (setVerdict) {
+    // An empty expected list is a real assertion here ("this card has no
+    // attributes"), so only a missing key leaves it unscored.
+    if (expected === null || expected === undefined) return VERDICT.UNSCORED;
+    return setVerdict(expected, actual);
+  }
+
   if (isBlank(expected)) return VERDICT.UNSCORED;
   if (isBlank(actual)) return VERDICT.MISSING;
   const compare = COMPARATORS[field] ?? ((a, b) => normalizeName(a) === normalizeName(b));

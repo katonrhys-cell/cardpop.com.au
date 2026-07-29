@@ -14,7 +14,7 @@ import CardHierarchySelector from '@/components/CardHierarchySelector.jsx';
 import RookieJerseyIcon from '@/components/icons/RookieJerseyIcon.jsx';
 import { COLLECTION_CONFIGS } from '@/data/collectionConfigs.js';
 import { useCollectionEras } from '@/hooks/useCollectionEras.js';
-import { getVariantGroups, mergeRookieVariant } from '@/lib/cardVariants.js';
+import { getVariantGroups, mergeIdentifiedVariants, resolveVariantChips, impliesFoil } from '@/lib/cardVariants.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -713,6 +713,13 @@ const AddEditCardPage = () => {
     const ocrResult = await scanCard([analysisImage, ...extraFiles.filter(Boolean)].slice(0, 3));
 
     if (ocrResult) {
+      // Resolved against the collection OCR just read, falling back to whatever
+      // the seller had picked — a chip that doesn't exist for the game is dropped.
+      const variantCollection = ocrResult.collectionType || formData.collection;
+      const identifiedChips = resolveVariantChips(
+        [...(ocrResult.attributes ?? []), ...(ocrResult.serialNumber ? ['Numbered'] : [])],
+        variantCollection,
+      );
       setFormData(prev => ({
         ...prev,
         cardName:       ocrResult.name          || prev.cardName,
@@ -726,9 +733,15 @@ const AddEditCardPage = () => {
           ? (gradingCompanyMap[ocrResult.gradingService] ?? prev.gradingCompany)
           : prev.gradingCompany,
         certNumber:     ocrResult.certificationNumber || prev.certNumber,
-        // Tick the rookie chip when the card carries a rookie marking. Additive:
-        // it can add a designation the seller hasn't picked, never remove one.
-        variant:        mergeRookieVariant(prev.variant, ocrResult.rookie),
+        // Tick the chips for what the card actually shows — rookie marking,
+        // autograph, patch, foil treatment, serial numbering. Additive: it can
+        // add a designation the seller hasn't picked, never remove one, and
+        // only ever selects chips that exist for this collection.
+        variant:        mergeIdentifiedVariants(prev.variant, ocrResult, variantCollection),
+        // Dedicated flags that mirror some of those chips.
+        isFoil:         prev.isFoil || impliesFoil(identifiedChips),
+        isAuto:         prev.isAuto || identifiedChips.includes('Auto'),
+        serialNumber:   ocrResult.serialNumber || prev.serialNumber,
         notes: prev.notes || [
           ocrResult.description,
           ocrResult.rarity   ? `Rarity: ${ocrResult.rarity}` : '',

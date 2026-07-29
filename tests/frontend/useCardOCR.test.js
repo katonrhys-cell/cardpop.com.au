@@ -109,6 +109,9 @@ describe('useCardOCR — scanning', () => {
       cardType: 'Fire',
       // Rookie designation as printed — blank when the card carries no marking.
       rookie: '',
+      // Treatments read off the card, and the printed print-run serial.
+      attributes: [],
+      serialNumber: '',
       brand: 'Wizards of the Coast',
       series: 'Base Set',
       confidence: null,

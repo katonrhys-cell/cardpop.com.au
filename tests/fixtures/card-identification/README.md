@@ -132,6 +132,13 @@ Each asserted field comes back `correct`, `wrong` or `missing`:
   card of a young player is not a rookie card. On a confident identification the
   matching chip is ticked in the listing form, and an RPA ticks RC too, since
   everything rookie-related hangs off that one chip.
+- **`variants`** is the set of Card Variant / Finish chips the identification
+  should tick — autograph, patch, foil treatment, die-cut, numbered. It is
+  scored as a set, and asymmetrically: an extra chip is `wrong` (it
+  misdescribes a live listing) while a missed one is `missing`. An empty list
+  is a real assertion, so omit the key entirely if you don't want it scored.
+  Chips are resolved against the collection's own taxonomy, so a Pokemon card
+  can never acquire "Refractor".
 - **`certNumber` is the highest-stakes field.** It is looked up against PSA's
   API, so a wrong cert pulls a *different card's* grade and population into the
   listing. Every digit is compared; a missing cert is far better than a wrong

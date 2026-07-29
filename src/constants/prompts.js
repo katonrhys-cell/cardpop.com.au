@@ -54,6 +54,8 @@ WHERE TO LOOK — the details that identify a card are small and easily misread.
 - COPYRIGHT / YEAR LINE: the fine print along the bottom edge (e.g. "©2023 Pokémon") — use it for releaseYear and to confirm the era. On a sports card the copyright year is usually the first year of the season, so "©2025" on a basketball card means the 2025-26 season.
 - INSERT / SUBSET NAME: the treatment a card belongs to *within* a product, printed large on the front (e.g. "Ball of Duty", "Rated Rookie", "Downtown"). This is NOT the product name — a card can be "Topps Chrome" the product and "Ball of Duty" the insert at the same time. Put the product in cardSetName and the treatment in insertName.
 - ROOKIE MARKINGS: an "RC" shield, a "Rated Rookie" banner, a "1st" badge or an equivalent rookie logo. These identify a rookie card, a distinct and valuable designation. Report ONLY what is printed — never infer a rookie card from the player being early in their career.
+- CARD ATTRIBUTES: an autograph (on-card or sticker), a memorabilia patch or jersey swatch, a die-cut edge, a printed serial number. Report each as a short term in "attributes".
+- SERIAL NUMBERING: a printed "23/99", "07/10" or similar, usually a corner or the back. This is the print run, NOT the collector number — a card can have both.
 - EDITION / PRINT MARKERS: "1st Edition" stamps, "Shadowless", "Unlimited", foil/holo pattern, full-art or alternate-art treatment.
 - If multiple images are provided, the FIRST is the card front; use the BACK and any additional images to read set codes, numbers and copyright text that are clearer or only present there.
 
@@ -76,6 +78,8 @@ Return ONLY valid JSON with these exact fields (use null for anything not clearl
   "certificationNumber": "cert or slab number if visible, else null",
   "rarity": "Common | Uncommon | Rare | Holographic | Secret Rare | null",
   "cardType": "e.g. Holographic, Foil, Full Art, Regular, Reverse Holo, First Edition",
+  "attributes": ["short terms for treatments and attributes VISIBLE on the card — e.g. Autograph, Patch, Relic, Die-Cut, Refractor, Holo, Reverse Holo, Full Art, Alt Art, 1st Edition, Numbered, 1/1, Short Print. Report what you can see; do not list a treatment you are merely inferring from the product name. [] when none"],
+  "serialNumber": "the printed serial/print run exactly as shown (e.g. \"23/99\"), else null — this is NOT the collector number",
   "rookie": "\"Rookie Card (RC)\" when a rookie marking is printed; \"Rookie Patch Auto (RPA)\" only when the card is a rookie AND carries both an autograph and a memorabilia patch; null when no rookie marking is visible",
   "brand": "manufacturer e.g. The Pokemon Company, Wizards of the Coast, Topps, Panini, Upper Deck",
   "series": "broader series or product line name",
