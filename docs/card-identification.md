@@ -10,6 +10,8 @@ order. Touches `pages/AddEditCardPage.jsx` (`handleAnalyzeWithAI`),
 ```
 photo(s)
   │
+  ├─0─ Rectify        detectAndCropCard → card warped flat, background removed
+  │
   ├─1─ OCR            POST /card-ocr/scan      Claude reads the card
   │        └─ grounded against the public TCG catalogue (/catalog/search)
   │
@@ -19,6 +21,36 @@ photo(s)
   │
   └─4─ Overlay        CardSight fields applied only on a clean exact hit
 ```
+
+### 0. Rectify the card out of the photo
+
+`prepareAnalysisImage` (`utils/analysisImage.js`) runs the existing OpenCV
+detection over the front photo and, when it finds a card-shaped quad, warps it
+flat to the standard 1200×1680.
+
+This is about pixels-on-card, not tidiness. Vision APIs downscale what they are
+sent — Anthropic caps the long edge around 1568px — so the card's *share* of
+that budget decides whether the collector number and copyright line are legible.
+A 3000×4000 photo with the card filling 60% of the frame arrives as roughly
+900×1250 pixels of card; the same card cropped and warped arrives intact. It
+also removes background and corrects tilt.
+
+Both models get the rectified image. **The seller's own photo is never
+touched** — this is analysis input only, separate from the manual "Format
+Photo" crop, which does replace the stored image.
+
+Every failure path keeps the original: nothing detected, OpenCV failing to
+load, a warp smaller than 600px on its long edge, or the whole step exceeding
+8 seconds. It can improve the input or leave it alone, never block a scan.
+
+Only the front is processed. Cropping the extra angles too would double the
+wait for a secondary read.
+
+**Cost.** OpenCV is a lazily-loaded ~3.5 MB (gzipped) wasm chunk, and this puts
+it on the default path for every seller rather than only those who use the
+manual crop. First scan on a cold cache pays that download inside the 8-second
+budget; later scans are cached. Set `VITE_OCR_AUTOCROP=false` at build time to
+send the original photo straight to the models.
 
 ### 1. OCR first
 

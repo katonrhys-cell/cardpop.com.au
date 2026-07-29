@@ -23,6 +23,9 @@ describe('shouldAutoIdentify', () => {
   it('does not stack runs while an analysis is in flight', () => {
     expect(shouldAutoIdentify({ ...base, isScanning: true })).toBe(false);
     expect(shouldAutoIdentify({ ...base, isIdentifying: true })).toBe(false);
+    // Image rectification runs before either model is called; swapping photos
+    // during it would otherwise start a second analysis racing the first.
+    expect(shouldAutoIdentify({ ...base, isPreparingImage: true })).toBe(false);
   });
 
   it('handles a missing card name safely', () => {

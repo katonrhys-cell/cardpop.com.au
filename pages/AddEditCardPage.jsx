@@ -45,6 +45,7 @@ import { isSellingEntitlementError } from '@/utils/listingErrors.js';
 import { loadListingDraft, saveListingDraft, clearListingDraft, hasMeaningfulContent } from '@/lib/listingDraft.js';
 import { shouldAutoIdentify, buildPriceLookupQuery } from '@/utils/listingFlow.js';
 import { confidenceScore, confidenceLabel, isLowConfidence } from '@/utils/cardsightConfidence.js';
+import { prepareAnalysisImage } from '@/utils/analysisImage.js';
 import { validateListingForm, validateListingField } from '@/utils/listingValidation.js';
 import WizardStepper from '@/components/WizardStepper.jsx';
 import { CARD_LANGUAGES } from '@/lib/cardFilters.js';
@@ -202,6 +203,9 @@ const AddEditCardPage = () => {
   // Photo template modal state
   const [photoTemplateModal, setPhotoTemplateModal] = useState({ open: false, processType: null, step: 'preview' });
   const [isUploadingTemplate, setIsUploadingTemplate] = useState(false);
+  // True while the card is being rectified out of the photo, before the models
+  // are called — otherwise this step is a silent multi-second gap.
+  const [isPreparingImage, setIsPreparingImage] = useState(false);
 
   const emptyForm = {
     // Card identity
@@ -620,7 +624,7 @@ const AddEditCardPage = () => {
     // Photo-first flow: identification is the default, not an opt-in button.
     // Runs at most once per new card (guarded on an empty card name), and the
     // prefill is non-destructive, so nothing the seller typed is overwritten.
-    if (shouldAutoIdentify({ isEdit, cardName: formData.cardName, isScanning, isIdentifying })) {
+    if (shouldAutoIdentify({ isEdit, cardName: formData.cardName, isScanning, isIdentifying, isPreparingImage })) {
       handleAnalyzeWithAI(file);
     }
   };
@@ -687,6 +691,16 @@ const AddEditCardPage = () => {
     };
     const gradingCompanyMap = { 'PSA': 'psa', 'BGS': 'bgs', 'CGC': 'cgc', 'SGC': 'sgc', 'ACE': 'ace' };
 
+    // ── 0. Rectify the card out of the photo ────────────────────────────────
+    // Both models downscale what they're sent, so the card's share of that
+    // budget decides whether the small print is legible. Falls back to the
+    // original on any failure — see utils/analysisImage.js. Only the front is
+    // processed; cropping the extras too would double the wait for a secondary
+    // read. The seller's own photo is untouched — this is analysis input only.
+    setIsPreparingImage(true);
+    const { file: analysisImage } = await prepareAnalysisImage(frontImage)
+      .finally(() => setIsPreparingImage(false));
+
     // ── 1. OCR first ────────────────────────────────────────────────────────
     // OCR reads the card itself, so it can name the category before we ask a
     // catalog about it. That is what lets step 2 query a single CardSight
@@ -696,7 +710,7 @@ const AddEditCardPage = () => {
     //
     // Pass the front plus any back/extra images so OCR can read set codes and
     // collector numbers that are clearer (or only present) on the back.
-    const ocrResult = await scanCard([frontImage, ...extraFiles.filter(Boolean)].slice(0, 3));
+    const ocrResult = await scanCard([analysisImage, ...extraFiles.filter(Boolean)].slice(0, 3));
 
     if (ocrResult) {
       setFormData(prev => ({
@@ -724,7 +738,7 @@ const AddEditCardPage = () => {
     // ── 2. CardSight, narrowed to the category OCR read ─────────────────────
     // A collection the seller picked themselves always wins over OCR's guess.
     const collection = formData.collection || ocrResult?.collectionType || '';
-    const csResult = await cardSightIdentify(frontImage, collection);
+    const csResult = await cardSightIdentify(analysisImage, collection);
 
     // CardSight has no catalog outside its ten segments, so a Magic or AFL card
     // is expected to come back unidentified — the OCR fields above (already
@@ -1528,7 +1542,7 @@ const AddEditCardPage = () => {
                   ) : null}
 
                   {/* Identify Card Button - AI analysis with recommended label */}
-                  {imageFile && !isScanning && !isIdentifying && !isPhotoProcessing && !isUploadingTemplate && (
+                  {imageFile && !isScanning && !isIdentifying && !isPreparingImage && !isPhotoProcessing && !isUploadingTemplate && (
                     <div className="space-y-1">
                       <Button
                         type="button"
@@ -1544,16 +1558,17 @@ const AddEditCardPage = () => {
                     </div>
                   )}
 
-                  {(isScanning || isIdentifying) && (
+                  {(isScanning || isIdentifying || isPreparingImage) && (
                     <div className="p-3 rounded-xl border border-border bg-muted/30 animate-in fade-in">
                       <p className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                        <Loader2 className="w-3 h-3 animate-spin" /> Analyzing card…
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        {isPreparingImage ? 'Preparing image…' : 'Analyzing card…'}
                       </p>
                     </div>
                   )}
 
                   {/* No-match state — analysis finished but card not found */}
-                  {!isScanning && !isIdentifying && cardSightResult && !cardSightResult.identified && !scanResult && (
+                  {!isScanning && !isIdentifying && !isPreparingImage && cardSightResult && !cardSightResult.identified && !scanResult && (
                     <div className="p-3 rounded-xl border border-border bg-muted/30 animate-in fade-in">
                       <p className="text-xs text-muted-foreground">
                         {cardSightResult.unsupportedCollection
@@ -1564,7 +1579,7 @@ const AddEditCardPage = () => {
                   )}
 
                   {/* Combined AI results panel — shown after analysis completes */}
-                  {!isScanning && !isIdentifying && (cardSightResult?.identified || scanResult) && (
+                  {!isScanning && !isIdentifying && !isPreparingImage && (cardSightResult?.identified || scanResult) && (
                     <div className={`p-3 rounded-xl border animate-in fade-in ${cardSightResult?.identified ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-primary/5 border-primary/20'}`}>
                       <h4 className={`text-xs font-bold mb-2 flex items-center gap-1.5 ${cardSightResult?.identified ? 'text-emerald-700' : 'text-primary'}`}>
                         <Sparkles className="w-3.5 h-3.5" />

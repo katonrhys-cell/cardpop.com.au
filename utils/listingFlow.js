@@ -7,8 +7,11 @@
 //     so re-picking a photo can't clobber work and each card costs at most one
 //     automatic AI call
 //   - never while an analysis is already in flight
-export const shouldAutoIdentify = ({ isEdit, cardName, isScanning, isIdentifying }) =>
-  !isEdit && !cardName?.trim() && !isScanning && !isIdentifying;
+// `isPreparingImage` covers the card-rectification step that runs before either
+// model is called — without it, swapping photos mid-preparation starts a second
+// analysis that races the first.
+export const shouldAutoIdentify = ({ isEdit, cardName, isScanning, isIdentifying, isPreparingImage }) =>
+  !isEdit && !cardName?.trim() && !isScanning && !isIdentifying && !isPreparingImage;
 
 // Form grading values → the service names the eBay price-estimate endpoint
 // expects in its query. 'raw' (ungraded) and 'other' (unrecognised service)
