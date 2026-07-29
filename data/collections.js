@@ -20,3 +20,36 @@ export const SPORTS_COLLECTIONS = [
 ];
 
 export const COLLECTIONS_LIST = [...TCG_COLLECTIONS, ...SPORTS_COLLECTIONS].sort();
+
+/**
+ * Wording a model returns that means one of the collections above.
+ *
+ * Models describe a card by its sport ("Basketball") far more readily than by
+ * its league ("NBA"), and an unmapped category is expensive: it leaves
+ * `collectionType` empty, which sends CardSight into the ten-segment fan-out and
+ * strips the variant taxonomy of its game.
+ */
+export const COLLECTION_ALIASES = {
+  basketball: 'NBA',
+  'nba basketball': 'NBA',
+  football: 'NFL',
+  'american football': 'NFL',
+  'nfl football': 'NFL',
+  baseball: 'MLB',
+  'mlb baseball': 'MLB',
+  hockey: 'NHL',
+  'ice hockey': 'NHL',
+  'nhl hockey': 'NHL',
+  'association football': 'Soccer',
+  mma: 'MMA',
+  'mixed martial arts': 'MMA',
+  'rugby league': 'NRL',
+  'australian rules': 'AFL',
+  'australian football': 'AFL',
+  'pokemon tcg': 'Pokemon',
+  'pokémon': 'Pokemon',
+  mtg: 'Magic: The Gathering',
+  magic: 'Magic: The Gathering',
+  yugioh: 'Yu-Gi-Oh',
+  'yu-gi-oh!': 'Yu-Gi-Oh',
+};
