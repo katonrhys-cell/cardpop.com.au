@@ -107,6 +107,8 @@ describe('useCardOCR — scanning', () => {
       certificationNumber: '12345678',
       rarity: 'Holographic',
       cardType: 'Fire',
+      // Rookie designation as printed — blank when the card carries no marking.
+      rookie: '',
       brand: 'Wizards of the Coast',
       series: 'Base Set',
       confidence: null,

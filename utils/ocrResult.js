@@ -31,6 +31,9 @@ export function mapOCRResult(data) {
     certificationNumber: data.certificationNumber || '',
     rarity,
     cardType: data.cardType || '',
+    // Rookie designation as printed. Ticks the "Rookie Card (RC)" chip, which
+    // is the single source of truth for everything rookie-related.
+    rookie: data.rookie || '',
     brand: data.brand || '',
     series: data.series || data.cardSetName || '',
     confidence: data.confidence || null,

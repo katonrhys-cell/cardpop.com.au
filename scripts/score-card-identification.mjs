@@ -180,6 +180,7 @@ async function runCase(fixture, rectifier, log) {
     year: ocr.releaseYear,
     collection: ocr.collectionType,
     insert: ocr.insertName,
+    rookie: ocr.rookie,
     // Grading comes off the slab label via OCR and is applied to the form
     // directly (handleAnalyzeWithAI), independent of any CardSight match.
     gradingCompany: ocr.gradingService === 'None' ? '' : ocr.gradingService,

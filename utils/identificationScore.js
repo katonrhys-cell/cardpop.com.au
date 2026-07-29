@@ -35,7 +35,7 @@ import { cardNumbersMatch } from './cardNumber.js';
  */
 export const SCORED_FIELDS = [
   'name', 'setName', 'cardNumber', 'year', 'collection', 'insert', 'parallel',
-  'gradingCompany', 'grade', 'certNumber',
+  'rookie', 'gradingCompany', 'grade', 'certNumber',
 ];
 
 export const VERDICT = {
@@ -66,6 +66,8 @@ const COMPARATORS = {
   // The insert/subset a card belongs to ("Ball of Duty"), kept separate from
   // the product it came out of ("Topps Chrome").
   insert: (a, b) => normalizeName(a) === normalizeName(b),
+  // The rookie designation, as one of the variant chip names.
+  rookie: (a, b) => normalizeName(a) === normalizeName(b),
   gradingCompany: (a, b) => normalizeName(a) === normalizeName(b),
   // "10" and "10.0" are the same grade.
   grade: (a, b) => Number.parseFloat(a) === Number.parseFloat(b),

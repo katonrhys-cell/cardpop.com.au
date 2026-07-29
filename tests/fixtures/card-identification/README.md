@@ -126,6 +126,12 @@ Each asserted field comes back `correct`, `wrong` or `missing`:
   abbreviate inconsistently, and the fixture set already contains one slab
   calling a season by its first year and another by its last. Year still
   follows the product's own convention.
+- **`rookie`** is the designation as printed — `Rookie Card (RC)`, or
+  `Rookie Patch Auto (RPA)` when the card is also autographed and has a patch.
+  It is asserted only when a marking is actually on the card; being an early
+  card of a young player is not a rookie card. On a confident identification the
+  matching chip is ticked in the listing form, and an RPA ticks RC too, since
+  everything rookie-related hangs off that one chip.
 - **`certNumber` is the highest-stakes field.** It is looked up against PSA's
   API, so a wrong cert pulls a *different card's* grade and population into the
   listing. Every digit is compared; a missing cert is far better than a wrong

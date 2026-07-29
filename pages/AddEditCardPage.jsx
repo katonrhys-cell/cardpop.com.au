@@ -14,7 +14,7 @@ import CardHierarchySelector from '@/components/CardHierarchySelector.jsx';
 import RookieJerseyIcon from '@/components/icons/RookieJerseyIcon.jsx';
 import { COLLECTION_CONFIGS } from '@/data/collectionConfigs.js';
 import { useCollectionEras } from '@/hooks/useCollectionEras.js';
-import { getVariantGroups } from '@/lib/cardVariants.js';
+import { getVariantGroups, mergeRookieVariant } from '@/lib/cardVariants.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -726,6 +726,9 @@ const AddEditCardPage = () => {
           ? (gradingCompanyMap[ocrResult.gradingService] ?? prev.gradingCompany)
           : prev.gradingCompany,
         certNumber:     ocrResult.certificationNumber || prev.certNumber,
+        // Tick the rookie chip when the card carries a rookie marking. Additive:
+        // it can add a designation the seller hasn't picked, never remove one.
+        variant:        mergeRookieVariant(prev.variant, ocrResult.rookie),
         notes: prev.notes || [
           ocrResult.description,
           ocrResult.rarity   ? `Rarity: ${ocrResult.rarity}` : '',
