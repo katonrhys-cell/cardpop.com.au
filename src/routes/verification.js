@@ -7,12 +7,6 @@ import logger from '../utils/logger.js';
 
 const router = express.Router();
 
-// Google site verification file
-router.get('/googlee177016f79225570.html', (_req, res) => {
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.send('google-site-verification: googlee177016f79225570.html');
-});
-
 // POST /send-verification-email
 router.post('/send-verification-email', authMiddleware, async (req, res) => {
   const trimmedUserId = req.user.id;

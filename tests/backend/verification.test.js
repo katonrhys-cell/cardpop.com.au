@@ -66,16 +66,6 @@ const USER = { id: 'user-1', email: 'test@example.com' };
 
 beforeEach(() => vi.clearAllMocks());
 
-// ─── GET /googlee177016f79225570.html ─────────────────────────────────────────
-
-describe('GET /googlee177016f79225570.html', () => {
-  it('returns the Google site verification content', async () => {
-    const res = await request(app).get('/googlee177016f79225570.html');
-    expect(res.status).toBe(200);
-    expect(res.text).toContain('google-site-verification');
-  });
-});
-
 // ─── POST /send-verification-email ───────────────────────────────────────────
 
 describe('POST /send-verification-email', () => {
