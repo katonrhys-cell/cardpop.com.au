@@ -107,9 +107,11 @@ Each asserted field comes back `correct`, `wrong` or `missing`:
 - **`insert`** is the treatment *within* that product — `Ball of Duty`,
   `Rated Rookie`. A card has both, and folding either into the other loses
   information the listing needs.
-- **A grading label overrides all of it.** A PSA flip reading `2024 OBSIDIAN`
-  means `year: "2024"` even for a basketball card, because the slab is what the
-  buyer is looking at. The season rule applies to raw cards.
+- **A grading label is authoritative for the grade, cert and card number** —
+  the only place those appear. It is *not* reliable for the year: graders
+  abbreviate inconsistently, and the fixture set already contains one slab
+  calling a season by its first year and another by its last. Year still
+  follows the product's own convention.
 - **`certNumber` is the highest-stakes field.** It is looked up against PSA's
   API, so a wrong cert pulls a *different card's* grade and population into the
   listing. Every digit is compared; a missing cert is far better than a wrong

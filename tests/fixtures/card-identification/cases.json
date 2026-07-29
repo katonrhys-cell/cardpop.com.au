@@ -52,6 +52,21 @@
       "grade": "10",
       "certNumber": "148544264"
     },
-    "notes": "FIRST GRADED SLAB and FIRST SCREENSHOT — this is a phone screenshot of an eBay listing page, not a photo of a card, so it tests something different from the rest. The card image sits small inside browser chrome, and the listing title ('2024 Obsidian Orbital Molten Gold /10 LEBRON JAMES #16 PSA 10 POP 2') is legible text in the frame, so a model can score well here by reading the page rather than the card. Treat a good result as evidence about screenshots, not about card reading. Rectification will likely fail or crop to the wrong rectangle — a screenshot is full of them. NOTE THE YEAR: the PSA label reads '2024 OBSIDIAN', a single year, which contradicts the season convention used for the Topps Chrome fixtures; the label is authoritative for a graded card. certNumber matters most here — it is looked up against PSA's API, so a wrong one returns a different card's grade and population."
+    "notes": "FIRST GRADED SLAB and FIRST SCREENSHOT — this is a phone screenshot of an eBay listing page, not a photo of a card, so it tests something different from the rest. The card image sits small inside browser chrome, and the listing title ('2024 Obsidian Orbital Molten Gold /10 LEBRON JAMES #16 PSA 10 POP 2') is legible text in the frame, so a model can score well here by reading the page rather than the card. Treat a good result as evidence about screenshots, not about card reading. Rectification will likely fail or crop to the wrong rectangle — a screenshot is full of them. NOTE THE YEAR: the PSA label reads '2024 OBSIDIAN', a single year, which contradicts the season convention used for the Topps Chrome fixtures; the label is authoritative for a graded card. certNumber matters most here — it is looked up against PSA's API, so a wrong one returns a different card's grade and population. Its label abbreviates the year to '2024' while the Wembanyama slab abbreviates a 2023-24 product to '2023' — PSA's year field is not a consistent convention, so it is not a reliable source for this field."
+  },
+  {
+    "id": "wembanyama-topps-chrome-rc-psa9",
+    "image": "wembanyama-topps-chrome-rc-psa9.png",
+    "expected": {
+      "name": "Victor Wembanyama",
+      "setName": "Topps Chrome",
+      "cardNumber": "1",
+      "year": "2023-24",
+      "collection": "NBA",
+      "gradingCompany": "PSA",
+      "grade": "9",
+      "certNumber": "138138870"
+    },
+    "notes": "2023-24 Topps Chrome rookie, San Antonio Spurs, PSA MINT 9. SCREENSHOT OF CARDPOP'S OWN LISTING PAGE — and that makes it the weakest of the fixtures as a test of card reading: the page displays 'Victor Wembanyama', '2023-24 Topps Chrome Basketball', 'NBA', '#1', 'Rookie Card (RC)', 'Base' and 'PSA 9' as text, so a model can score full marks without looking at the card at all. Useful for confirming screenshots don't break the pipeline; not evidence about reading cards. The photo inside is a genuine hand-held shot of the slab against a cluttered bedroom background. The PSA label reads '2023 TOPPS CHROME' but the product is the 2023-24 season — asserted as the season per the agreed convention. Base card, so no insert or parallel. The Rookie Card (RC) designation is visible and value-relevant but is not currently a scored field."
   }
 ]

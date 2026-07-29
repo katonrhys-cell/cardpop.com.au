@@ -57,7 +57,8 @@ WHERE TO LOOK — the details that identify a card are small and easily misread.
 - If multiple images are provided, the FIRST is the card front; use the BACK and any additional images to read set codes, numbers and copyright text that are clearer or only present there.
 
 GRADING SLABS: If a graded slab is visible, identify PSA / BGS / CGC and extract the numeric grade and cert number from the label.
-- The label is AUTHORITATIVE. Its year, set and card number override anything inferred from the card or the product — a PSA flip reading "2024 OBSIDIAN" means releaseYear "2024", not the 2024-25 season.
+- The label is authoritative for the GRADE, the CERT NUMBER and the CARD NUMBER — it is the only place those appear, and the buyer is looking at the slab.
+- It is NOT reliable for the year. Graders abbreviate inconsistently: the same two-year season shows up as its first year on one flip and its last on another. Use the label to confirm the product, then give releaseYear in the product's own terms — a 2023-24 Topps Chrome card is "2023-24" even when the flip says "2023".
 - Transcribe the cert number DIGIT BY DIGIT. It is looked up against the grader's database, so a single transposed digit returns a different card's grade and population — far worse than leaving it null. If any digit is unclear, return null.
 
 Return ONLY valid JSON with these exact fields (use null for anything not clearly visible):
