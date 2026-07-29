@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { callEbayApi } from '../utils/ebayClient.js';
 import { resolveCardImage } from '../utils/cardImageResolver.js';
+import { leadingCardNumber } from '../../utils/cardNumber.js';
 import logger from '../utils/logger.js';
 
 const router = Router();
@@ -8,9 +9,17 @@ const router = Router();
 const FETCH_TIMEOUT_MS = 8000;
 
 // ── Free API adapters ─────────────────────────────────────────────────────────
+//
+// Each adapter takes an optional `number` (the collector number without its
+// "/total" suffix). Searching on the name alone returns an arbitrary handful of
+// a card's many printings — for a common name the right one usually isn't among
+// them — so when the number was read off the card it is pushed down into the
+// upstream query rather than used only to score whatever came back.
 
-async function searchPokemon(q, take) {
-	const encoded = encodeURIComponent(`name:"${q}*"`);
+async function searchPokemon(q, take, { number } = {}) {
+	const terms = [`name:"${q}*"`];
+	if (number) terms.push(`number:"${number}"`);
+	const encoded = encodeURIComponent(terms.join(' '));
 	const url = `https://api.pokemontcg.io/v2/cards?q=${encoded}&pageSize=${Math.min(take, 20)}&select=id,name,set,number,rarity,images`;
 	const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
 	if (!res.ok) return [];
@@ -27,8 +36,12 @@ async function searchPokemon(q, take) {
 	}));
 }
 
-async function searchScryfall(q, take) {
-	const url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(q)}&order=name&unique=cards`;
+async function searchScryfall(q, take, { number } = {}) {
+	// `cn:` is Scryfall's collector-number filter. Scryfall answers 404 (not an
+	// empty list) when nothing matches, which the !res.ok guard turns into [] —
+	// that is what drives the caller's fall back to the broader name-only pass.
+	const query = number ? `${q} cn:${number}` : q;
+	const url = `https://api.scryfall.com/cards/search?q=${encodeURIComponent(query)}&order=name&unique=cards`;
 	const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
 	if (!res.ok) return [];
 	const { data } = await res.json();
@@ -70,10 +83,11 @@ function resolveApis(collection) {
 	return ['pokemon', 'scryfall', 'yugioh'];
 }
 
-async function runSearches(apis, q, take) {
+async function runSearches(apis, q, take, opts = {}) {
 	const tasks = apis.map(api => {
-		if (api === 'pokemon') return searchPokemon(q, take).catch(() => []);
-		if (api === 'scryfall') return searchScryfall(q, take).catch(() => []);
+		if (api === 'pokemon') return searchPokemon(q, take, opts).catch(() => []);
+		if (api === 'scryfall') return searchScryfall(q, take, opts).catch(() => []);
+		// YGOPRODeck has no collector-number filter, so it always runs name-only.
 		if (api === 'yugioh')   return searchYugioh(q, take).catch(() => []);
 		return Promise.resolve([]);
 	});
@@ -82,17 +96,28 @@ async function runSearches(apis, q, take) {
 }
 
 // ── GET /catalog/search ───────────────────────────────────────────────────────
-// Query params: q (required), collection (optional), segment (alias), take (default 10)
+// Query params: q (required), collection (optional), segment (alias),
+//               number (optional collector number), take (default 10)
+//
+// When a collector number is supplied the search runs in two passes: a precise
+// one filtered on that number, then — only if it found nothing — the broad
+// name-only pass. The fallback matters because a number can be misread, or the
+// upstream can store it in a form the filter doesn't reach; degrading to
+// today's behaviour is better than returning nothing.
 router.get('/search', async (req, res) => {
-	const { q, collection, segment, take = '10' } = req.query;
+	const { q, collection, segment, take = '10', number } = req.query;
 	if (!q?.trim()) return res.status(400).json({ error: 'q is required' });
 
 	const limit = Math.min(parseInt(take, 10) || 10, 50);
 	const col = collection || segment || '';
+	const cardNumber = leadingCardNumber(number);
 
 	try {
 		const apis = resolveApis(col);
-		const raw = await runSearches(apis, q.trim(), limit);
+
+		let raw = cardNumber ? await runSearches(apis, q.trim(), limit, { number: cardNumber }) : [];
+		const precise = raw.length > 0;
+		if (!raw.length) raw = await runSearches(apis, q.trim(), limit);
 
 		// Deduplicate by source+id, cap at limit
 		const seen = new Set();
@@ -103,7 +128,9 @@ router.get('/search', async (req, res) => {
 			return true;
 		}).slice(0, limit);
 
-		res.json({ results });
+		// `precise` tells the caller the collector number was applied upstream,
+		// not just used to score the results afterwards.
+		res.json({ results, precise });
 	} catch (err) {
 		logger.warn(`[CATALOG_SEARCH] ${err.message}`);
 		res.status(502).json({ error: 'Catalog search failed' });

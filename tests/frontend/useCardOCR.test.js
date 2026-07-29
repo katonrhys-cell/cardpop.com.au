@@ -96,6 +96,8 @@ describe('useCardOCR — scanning', () => {
       name: 'Charizard',
       description: 'Holo fire Pokémon',
       cardSetName: 'Base Set',
+      // The insert/subset within the product — blank on a base card.
+      insertName: '',
       cardNumber: '4/102',
       releaseYear: '1999',
       collectionType: 'Pokemon',
@@ -105,6 +107,11 @@ describe('useCardOCR — scanning', () => {
       certificationNumber: '12345678',
       rarity: 'Holographic',
       cardType: 'Fire',
+      // Rookie designation as printed — blank when the card carries no marking.
+      rookie: '',
+      // Treatments read off the card, and the printed print-run serial.
+      attributes: [],
+      serialNumber: '',
       brand: 'Wizards of the Coast',
       series: 'Base Set',
       confidence: null,
@@ -246,7 +253,7 @@ describe('useCardOCR — failure modes', () => {
 // ─── Catalogue grounding ─────────────────────────────────────────────────────
 
 describe('useCardOCR — catalogue bridge', () => {
-  it('overlays authoritative set/number/year on a confident match', async () => {
+  it('overlays authoritative set/year on a corroborated match', async () => {
     mockFetch.mockResolvedValue({
       results: [{
         id: 'base1-4', name: 'Charizard', setName: 'Base Set', year: 1999,
@@ -259,11 +266,234 @@ describe('useCardOCR — catalogue bridge', () => {
     });
 
     expect(result.current.scanResult.cardSetName).toBe('Base Set');
-    expect(result.current.scanResult.cardNumber).toBe('4');
     expect(result.current.scanResult.releaseYear).toBe('1999');
     expect(result.current.scanResult.catalogueMatch).toMatchObject({
       id: 'base1-4', source: 'pokemon-tcg', imageUrl: 'http://img/x.png',
     });
+  });
+
+  it('keeps the collector number that was read off the card', async () => {
+    // The number is printed on the card and OCR read it directly. The catalogue
+    // stores a canonical "4"; replacing the printed "4/102" with it loses the
+    // form collectors actually search by.
+    mockFetch.mockResolvedValue({
+      results: [{ id: 'base1-4', name: 'Charizard', setName: 'Base Set', year: 1999, cardNumber: '4', source: 'pokemon-tcg' }],
+    });
+
+    const result = await runScan({ name: 'Charizard', cardNumber: '4/102', collectionType: 'Pokemon' });
+
+    expect(result.current.scanResult.cardNumber).toBe('4/102');
+  });
+
+  it('fills in the collector number only when OCR could not read one', async () => {
+    mockFetch.mockResolvedValue({
+      results: [{ id: 'base1-4', name: 'Charizard', setName: 'Base Set', year: 1999, cardNumber: '4', source: 'pokemon-tcg' }],
+    });
+
+    const result = await runScan({ name: 'Charizard', cardSetName: 'Base Set', collectionType: 'Pokemon' });
+
+    expect(result.current.scanResult.cardNumber).toBe('4');
+  });
+
+  it('does not overwrite a correct read when only the name matches', async () => {
+    // The regression this whole change exists for: a common name returns an
+    // arbitrary printing, and a name-only match used to be enough to replace
+    // the set, number and year that had been read correctly off the card.
+    mockFetch.mockResolvedValue({
+      results: [{ id: 'sm9-40', name: 'Pikachu', setName: 'Team Up', year: 2019, cardNumber: '40', source: 'pokemon-tcg' }],
+    });
+
+    const result = await runScan({
+      name: 'Pikachu', cardSetName: 'Base Set', cardNumber: '58/102',
+      releaseYear: 1999, collectionType: 'Pokemon',
+    });
+
+    expect(result.current.scanResult.catalogueMatch).toBeUndefined();
+    expect(result.current.scanResult.cardSetName).toBe('Base Set');
+    expect(result.current.scanResult.cardNumber).toBe('58/102');
+    expect(result.current.scanResult.releaseYear).toBe('1999');
+  });
+
+  it('rejects a candidate whose collector number positively disagrees', async () => {
+    mockFetch.mockResolvedValue({
+      results: [{ id: 'x', name: 'Charizard', setName: 'Base Set', year: 1999, cardNumber: '11', source: 'pokemon-tcg' }],
+    });
+
+    const result = await runScan({
+      name: 'Charizard', cardNumber: '4/102', cardSetName: 'Base Set', collectionType: 'Pokemon',
+    });
+
+    expect(result.current.scanResult.catalogueMatch).toBeUndefined();
+  });
+
+  it('treats the same number from a different set total as a different card', async () => {
+    // "4/102" and "4/165" are both card 4, but of different sets.
+    mockFetch.mockResolvedValue({
+      results: [{ id: 'x', name: 'Charizard', setName: 'Other Set', year: 2002, cardNumber: '4/165', source: 'pokemon-tcg' }],
+    });
+
+    const result = await runScan({ name: 'Charizard', cardNumber: '4/102', collectionType: 'Pokemon' });
+
+    expect(result.current.scanResult.catalogueMatch).toBeUndefined();
+  });
+
+  it('accepts a name match corroborated by the set when no number was read', async () => {
+    mockFetch.mockResolvedValue({
+      results: [{ id: 'base1-4', name: 'Charizard', setName: 'Base Set', year: 1999, cardNumber: '4', source: 'pokemon-tcg' }],
+    });
+
+    const result = await runScan({ name: 'Charizard', cardSetName: 'Base Set', collectionType: 'Pokemon' });
+
+    expect(result.current.scanResult.catalogueMatch).toBeDefined();
+    expect(result.current.scanResult.catalogueMatch.verified).toEqual(
+      expect.arrayContaining(['name', 'set'])
+    );
+  });
+
+  it('accepts a name match corroborated by the year when no number was read', async () => {
+    mockFetch.mockResolvedValue({
+      results: [{ id: 'base1-4', name: 'Charizard', setName: 'Base Set', year: 1999, cardNumber: '4', source: 'pokemon-tcg' }],
+    });
+
+    const result = await runScan({ name: 'Charizard', releaseYear: 1999, collectionType: 'Pokemon' });
+
+    expect(result.current.scanResult.catalogueMatch.verified).toEqual(
+      expect.arrayContaining(['name', 'year'])
+    );
+  });
+
+  it('never matches on non-name evidence alone', async () => {
+    mockFetch.mockResolvedValue({
+      results: [{ id: 'x', name: 'Blastoise', setName: 'Base Set', year: 1999, cardNumber: '4', source: 'pokemon-tcg' }],
+    });
+
+    const result = await runScan({
+      name: 'Charizard', cardNumber: '4/102', cardSetName: 'Base Set', collectionType: 'Pokemon',
+    });
+
+    expect(result.current.scanResult.catalogueMatch).toBeUndefined();
+  });
+
+  it('does not claim verification for a source that carries nothing to verify', async () => {
+    // The Yu-Gi-Oh adapter returns setName/cardNumber/year as null, so a name
+    // match can never be corroborated — and must not show a "verified" badge.
+    mockFetch.mockResolvedValue({
+      results: [{ id: '46986414', name: 'Dark Magician', setName: null, year: null, cardNumber: null, source: 'yugioh-api' }],
+    });
+
+    const result = await runScan({ name: 'Dark Magician', collectionType: 'Yu-Gi-Oh' });
+
+    expect(result.current.scanResult.catalogueMatch).toBeUndefined();
+    expect(result.current.scanResult.catalogueCandidates).toHaveLength(1);
+  });
+
+  it('prefers the number-corroborated candidate over an equally-named one', async () => {
+    mockFetch.mockResolvedValue({
+      results: [
+        { id: 'wrong', name: 'Charizard', setName: 'Team Up', year: 2019, cardNumber: '9', source: 'pokemon-tcg' },
+        { id: 'right', name: 'Charizard', setName: 'Base Set', year: 1999, cardNumber: '4', source: 'pokemon-tcg' },
+      ],
+    });
+
+    const result = await runScan({ name: 'Charizard', cardNumber: '4/102', collectionType: 'Pokemon' });
+
+    expect(result.current.scanResult.catalogueMatch.id).toBe('right');
+  });
+
+  it('records which fields were verified', async () => {
+    mockFetch.mockResolvedValue({
+      results: [{ id: 'base1-4', name: 'Charizard', setName: 'Base Set', year: 1999, cardNumber: '4', source: 'pokemon-tcg' }],
+    });
+
+    const result = await runScan({
+      name: 'Charizard', cardNumber: '4/102', cardSetName: 'Base Set',
+      releaseYear: 1999, collectionType: 'Pokemon',
+    });
+
+    expect(result.current.scanResult.catalogueMatch.verified).toEqual(['name', 'number', 'set', 'year']);
+  });
+
+  it('corroborates against a set the model shortlisted when it named none', async () => {
+    // The model was told to shortlist rather than guess a set with false
+    // confidence. That shortlist used to be parsed and discarded, leaving the
+    // hardest case — no set, no number — with nothing to corroborate against.
+    mockFetch.mockResolvedValue({
+      results: [{ id: 'base1-4', name: 'Charizard', setName: 'Base Set', year: 1999, cardNumber: '4', source: 'pokemon-tcg' }],
+    });
+
+    const result = await runScan({
+      name: 'Charizard', collectionType: 'Pokemon',
+      candidateSets: ['Base Set', 'Base Set 2', 'Legendary Collection'],
+    });
+
+    expect(result.current.scanResult.catalogueMatch).toBeDefined();
+    expect(result.current.scanResult.catalogueMatch.verified).toEqual(['name', 'likely set']);
+  });
+
+  it('labels a shortlisted set differently from a confirmed one', async () => {
+    mockFetch.mockResolvedValue({
+      results: [{ id: 'base1-4', name: 'Charizard', setName: 'Base Set', year: 1999, cardNumber: '4', source: 'pokemon-tcg' }],
+    });
+
+    const result = await runScan({
+      name: 'Charizard', cardSetName: 'Base Set', collectionType: 'Pokemon',
+      candidateSets: ['Base Set'],
+    });
+
+    expect(result.current.scanResult.catalogueMatch.verified).toContain('set');
+    expect(result.current.scanResult.catalogueMatch.verified).not.toContain('likely set');
+  });
+
+  it('prefers a confirmed set over a merely shortlisted one', async () => {
+    mockFetch.mockResolvedValue({
+      results: [
+        { id: 'shortlisted', name: 'Charizard', setName: 'Jungle', year: 2000, cardNumber: '4', source: 'pokemon-tcg' },
+        { id: 'confirmed', name: 'Charizard', setName: 'Base Set', year: 1999, cardNumber: '4', source: 'pokemon-tcg' },
+      ],
+    });
+
+    const result = await runScan({
+      name: 'Charizard', cardSetName: 'Base Set', collectionType: 'Pokemon',
+      candidateSets: ['Jungle'],
+    });
+
+    expect(result.current.scanResult.catalogueMatch.id).toBe('confirmed');
+  });
+
+  it('does not treat a nested set name as the same set', async () => {
+    // "Base Set" and "Base Set 2" are different sets. Substring containment
+    // called them equal, letting the wrong one corroborate a match.
+    mockFetch.mockResolvedValue({
+      results: [{ id: 'x', name: 'Charizard', setName: 'Base Set 2', year: 2000, cardNumber: '4', source: 'pokemon-tcg' }],
+    });
+
+    const result = await runScan({ name: 'Charizard', cardSetName: 'Base Set', collectionType: 'Pokemon' });
+
+    expect(result.current.scanResult.catalogueMatch).toBeUndefined();
+  });
+
+  it('still matches a set name that differs only by a filler word', async () => {
+    mockFetch.mockResolvedValue({
+      results: [{ id: 'base1-4', name: 'Charizard', setName: 'Base Set', year: 1999, cardNumber: '4', source: 'pokemon-tcg' }],
+    });
+
+    const result = await runScan({ name: 'Charizard', cardSetName: 'Base', collectionType: 'Pokemon' });
+
+    expect(result.current.scanResult.catalogueMatch).toBeDefined();
+    expect(result.current.scanResult.catalogueMatch.verified).toContain('set');
+  });
+
+  it('does not treat an unrelated set as shortlisted', async () => {
+    mockFetch.mockResolvedValue({
+      results: [{ id: 'x', name: 'Charizard', setName: 'Team Up', year: 2019, cardNumber: '4', source: 'pokemon-tcg' }],
+    });
+
+    const result = await runScan({
+      name: 'Charizard', collectionType: 'Pokemon',
+      candidateSets: ['Base Set', 'Jungle'],
+    });
+
+    expect(result.current.scanResult.catalogueMatch).toBeUndefined();
   });
 
   it('sends the mapped collection as the catalogue collection param', async () => {
@@ -271,6 +501,19 @@ describe('useCardOCR — catalogue bridge', () => {
     const url = mockFetch.mock.calls[0][0];
     expect(url).toContain('/catalog/search?');
     expect(url).toContain('collection=pokemon');
+  });
+
+  it('sends the collector number so the catalogue can filter on it upstream', async () => {
+    await runScan({ name: 'Charizard', cardNumber: '004/102', collectionType: 'Pokemon' });
+    const url = mockFetch.mock.calls[0][0];
+    expect(url).toContain('number=4');
+  });
+
+  it('asks for more rows when there is no number to narrow on', async () => {
+    await runScan({ name: 'Charizard', collectionType: 'Pokemon' });
+    const url = mockFetch.mock.calls[0][0];
+    expect(url).toContain('take=12');
+    expect(url).not.toContain('number=');
   });
 
   it('does not override fields on a weak match but still exposes candidates', async () => {

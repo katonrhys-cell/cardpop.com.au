@@ -1,0 +1,129 @@
+[
+  {
+    "id": "reaves-topps-chrome-base",
+    "image": "reaves-topps-chrome-base.jpg",
+    "expected": {
+      "name": "Austin Reaves",
+      "setName": "Topps Chrome",
+      "cardNumber": "126",
+      "year": "2025-26",
+      "collection": "NBA",
+      "variants": [
+        "Chrome"
+      ]
+    },
+    "notes": "2025-26 Topps Chrome base set, LA Lakers. Printed name is REAVES (not Reeves). Card is in a penny sleeve, photographed sideways, with glare across the right of the frame and a hard white/wood background edge that the quad detector could mistake for the card. The collector number is not on the front — expect it missing rather than wrong unless something invents one. No insert (base card), so `insert` is unasserted."
+  },
+  {
+    "id": "cunningham-ball-of-duty",
+    "image": "cunningham-ball-of-duty.jpg",
+    "expected": {
+      "name": "Cade Cunningham",
+      "setName": "Topps Chrome",
+      "insert": "Ball of Duty",
+      "cardNumber": "BD11",
+      "year": "2025-26",
+      "collection": "NBA"
+    },
+    "notes": "2025-26 Topps Chrome 'Ball of Duty' insert, Detroit Pistons. Same sleeve/rotation/glare conditions. Insert code BD11 is not on the front, but the insert name is printed large. Product goes in setName, treatment in insert."
+  },
+  {
+    "id": "gg-jackson-donruss-red-laser",
+    "image": "gg-jackson-donruss-red-laser.jpg",
+    "expected": {
+      "name": "GG Jackson II",
+      "setName": "Donruss",
+      "insert": "Rated Rookie",
+      "year": "2023-24",
+      "collection": "NBA",
+      "parallel": "Red Laser Holo",
+      "rookie": "Rookie Card (RC)",
+      "variants": [
+        "Rookie Card (RC)"
+      ]
+    },
+    "notes": "2023-24 Donruss Rated Rookie, Memphis Grizzlies. First fixture in a rigid magnetic holder rather than a penny sleeve, first held in hand (fingers and a blurred room in frame rather than a flat surface), first non-Topps manufacturer, and first parallel. The parallel is the point: base and Red Laser Holo share name, set, number and year but are worth very different amounts, so missing it misprices the listing. Expect `parallel` to come back missing unless CardSight returns a trustworthy exact match — OCR has no field that reaches it. Name asserted with the 'II' suffix as printed; if catalogues return 'GG Jackson' this will score wrong, which is a decision to make on the evidence rather than by loosening matching up front. `cardNumber` unasserted (it is on the back). Donruss 'Rated Rookie' is the rookie designation for this product, so `rookie` is asserted as well as `insert` — the same banner carries both meanings, which is a good test of whether the two fields stay distinct."
+  },
+  {
+    "id": "lebron-obsidian-orbital-psa10",
+    "image": "lebron-obsidian-orbital-psa10.png",
+    "expected": {
+      "name": "LeBron James",
+      "setName": "Obsidian",
+      "insert": "Orbital",
+      "cardNumber": "16",
+      "year": "2024",
+      "collection": "NBA",
+      "parallel": "Molten Gold",
+      "gradingCompany": "PSA",
+      "grade": "10",
+      "certNumber": "148544264"
+    },
+    "notes": "FIRST GRADED SLAB and FIRST SCREENSHOT — this is a phone screenshot of an eBay listing page, not a photo of a card, so it tests something different from the rest. The card image sits small inside browser chrome, and the listing title ('2024 Obsidian Orbital Molten Gold /10 LEBRON JAMES #16 PSA 10 POP 2') is legible text in the frame, so a model can score well here by reading the page rather than the card. Treat a good result as evidence about screenshots, not about card reading. Rectification will likely fail or crop to the wrong rectangle — a screenshot is full of them. NOTE THE YEAR: the PSA label reads '2024 OBSIDIAN', a single year, which contradicts the season convention used for the Topps Chrome fixtures; the label is authoritative for a graded card. certNumber matters most here — it is looked up against PSA's API, so a wrong one returns a different card's grade and population. Its label abbreviates the year to '2024' while the Wembanyama slab abbreviates a 2023-24 product to '2023' — PSA's year field is not a consistent convention, so it is not a reliable source for this field."
+  },
+  {
+    "id": "wembanyama-topps-chrome-rc-psa9",
+    "image": "wembanyama-topps-chrome-rc-psa9.png",
+    "expected": {
+      "name": "Victor Wembanyama",
+      "setName": "Topps Chrome",
+      "cardNumber": "1",
+      "year": "2023-24",
+      "collection": "NBA",
+      "gradingCompany": "PSA",
+      "grade": "9",
+      "certNumber": "138138870",
+      "rookie": "Rookie Card (RC)",
+      "variants": [
+        "Rookie Card (RC)",
+        "Chrome"
+      ]
+    },
+    "notes": "2023-24 Topps Chrome rookie, San Antonio Spurs, PSA MINT 9. SCREENSHOT OF CARDPOP'S OWN LISTING PAGE — and that makes it the weakest of the fixtures as a test of card reading: the page displays 'Victor Wembanyama', '2023-24 Topps Chrome Basketball', 'NBA', '#1', 'Rookie Card (RC)', 'Base' and 'PSA 9' as text, so a model can score full marks without looking at the card at all. Useful for confirming screenshots don't break the pipeline; not evidence about reading cards. The photo inside is a genuine hand-held shot of the slab against a cluttered bedroom background. The PSA label reads '2023 TOPPS CHROME' but the product is the 2023-24 season — asserted as the season per the agreed convention. Base card, so no insert or parallel. The RC shield is printed on the card front and the listing page shows the Rookie Card (RC) chip, so `rookie` is asserted."
+  },
+  {
+    "id": "lebron-net-marvels-red-psa10",
+    "images": [
+      "lebron-net-marvels-red-psa10-front.jpg",
+      "lebron-net-marvels-red-psa10-back.jpg"
+    ],
+    "expected": {
+      "name": "LeBron James",
+      "setName": "Donruss",
+      "insert": "Net Marvels",
+      "cardNumber": "9",
+      "year": "2023-24",
+      "collection": "NBA",
+      "parallel": "Red Laser",
+      "gradingCompany": "PSA",
+      "grade": "10",
+      "certNumber": "99437125",
+      "variants": [
+        "Insert"
+      ]
+    },
+    "notes": "2023-24 Panini Donruss Net Marvels, Red Laser parallel, PSA GEM MT 10. FIRST TWO-IMAGE FIXTURE, and the first that genuinely needs the back: 'No. 9' and the copyright line '2023-24 PANINI - DONRUSS BASKETBALL' are only legible there. Every earlier fixture noted its number as unreadable — this one tests whether sending the back actually recovers it. ADVERSARIAL BACKGROUND: two other PSA slabs are in frame behind the card, including a Donruss Wembanyama PSA 9 whose own label and cert are partly legible, so there is a real chance of reading the wrong card's details. Year asserted as the season per the card's own copyright, not the '2023 DONRUSS' on the flip. Parallel asserted as 'Red Laser'; the flip abbreviates it to 'NET MARVELS-RED'. Note the GG Jackson fixture calls its parallel 'Red Laser Holo' — if these turn out to be the same family named differently, one of the two expectations needs revising."
+  },
+  {
+    "id": "council-mosaic-pictographs-auto",
+    "images": [
+      "council-mosaic-pictographs-auto-front.jpg",
+      "council-mosaic-pictographs-auto-back.jpg"
+    ],
+    "expected": {
+      "name": "Ricky Council IV",
+      "setName": "Mosaic",
+      "insert": "Pictographs",
+      "cardNumber": "PM-RCF",
+      "year": "2023-24",
+      "collection": "NBA",
+      "rookie": "Rookie Card (RC)",
+      "variants": [
+        "Auto",
+        "Rookie Card (RC)",
+        "Numbered"
+      ]
+    },
+    "notes": "2023-24 Panini Mosaic Pictographs on-card autograph, numbered 08/25, Philadelphia 76ers. THE AUTOGRAPH FIXTURE — a real blue on-card signature over a sticker window, which is what the Auto chip and the isAuto flag exist for. Also the first non-numeric collector number ('No. PM-RCF' on the back, an insert code with a hyphen) and the first printed serial ('08/25'), which should imply the Numbered chip on its own. Front is upside-down and heavily glare-speckled by the mosaic foil under rigid plastic; the back carries the number, the serial and the '2023-24 PANINI - MOSAIC BASKETBALL' copyright, so this is a genuine two-image case. The RC shield is on the front bottom-right. `variants` asserts only what is unambiguous: if the pipeline also returns a finish chip, note that the back prints 'PRIZM' while the front carries the Mosaic logo — a finish chip appearing here is an expectation question, not necessarily a pipeline failure. `parallel` is unasserted: /25 is a limited parallel but its name is not printed."
+  }
+]

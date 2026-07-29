@@ -1,0 +1,186 @@
+import { describe, it, expect } from 'vitest';
+import {
+  scoreField, scoreCase, summarise, formatSummary, VERDICT,
+} from '@/utils/identificationScore.js';
+
+describe('scoreField', () => {
+  it('marks an agreeing value correct', () => {
+    expect(scoreField('name', 'Charizard', 'Charizard')).toBe(VERDICT.CORRECT);
+  });
+
+  it('marks a disagreeing value wrong', () => {
+    expect(scoreField('name', 'Charizard', 'Blastoise')).toBe(VERDICT.WRONG);
+  });
+
+  it('distinguishes missing from wrong', () => {
+    // The whole point of the split: a blank field costs typing, a wrong one
+    // reaches a live listing.
+    expect(scoreField('setName', 'Base Set', '')).toBe(VERDICT.MISSING);
+    expect(scoreField('setName', 'Base Set', null)).toBe(VERDICT.MISSING);
+    expect(scoreField('setName', 'Base Set', 'Jungle')).toBe(VERDICT.WRONG);
+  });
+
+  it('does not score a field the fixture leaves unasserted', () => {
+    expect(scoreField('year', '', '1999')).toBe(VERDICT.UNSCORED);
+    expect(scoreField('year', null, '1999')).toBe(VERDICT.UNSCORED);
+  });
+
+  it('allows the collector-number forms the pipeline treats as equal', () => {
+    expect(scoreField('cardNumber', '4/102', '4')).toBe(VERDICT.CORRECT);
+    expect(scoreField('cardNumber', '4/102', '004/102')).toBe(VERDICT.CORRECT);
+    expect(scoreField('cardNumber', '4/102', '11')).toBe(VERDICT.WRONG);
+  });
+
+  it('allows set names differing only by a filler word', () => {
+    expect(scoreField('setName', 'Base Set', 'Base')).toBe(VERDICT.CORRECT);
+  });
+
+  it('does not let a nested set name pass as correct', () => {
+    expect(scoreField('setName', 'Base Set', 'Base Set 2')).toBe(VERDICT.WRONG);
+  });
+
+  it('compares names case- and punctuation-insensitively', () => {
+    expect(scoreField('name', "Farfetch'd", 'FARFETCHD')).toBe(VERDICT.CORRECT);
+  });
+
+  it('scores the parallel, since it drives a modern sports card\'s value', () => {
+    expect(scoreField('parallel', 'Red Laser Holo', 'Red Laser Holo')).toBe(VERDICT.CORRECT);
+    expect(scoreField('parallel', 'Red Laser Holo', 'Silver Prizm')).toBe(VERDICT.WRONG);
+    // Blank is the common case today: only CardSight can populate it.
+    expect(scoreField('parallel', 'Red Laser Holo', '')).toBe(VERDICT.MISSING);
+  });
+
+  it('keeps parallel matching strict for now', () => {
+    // Parallel names pack closely inside one product, so tolerance here should
+    // come from a real run rather than a guess.
+    expect(scoreField('parallel', 'Red Laser Holo', 'Red Laser')).toBe(VERDICT.WRONG);
+  });
+
+  it('accepts a season written differently but not a bare year', () => {
+    expect(scoreField('year', '2025-26', '2025-2026')).toBe(VERDICT.CORRECT);
+    expect(scoreField('year', '2025-26', '2025/26')).toBe(VERDICT.CORRECT);
+    // Every source currently returns a single number, so this is the gap the
+    // season convention exposes.
+    expect(scoreField('year', '2025-26', '2025')).toBe(VERDICT.WRONG);
+    expect(scoreField('year', '2025-26', '2024-25')).toBe(VERDICT.WRONG);
+  });
+
+  it('scores the insert separately from the product it came out of', () => {
+    expect(scoreField('insert', 'Ball of Duty', 'Ball of Duty')).toBe(VERDICT.CORRECT);
+    expect(scoreField('insert', 'Ball of Duty', 'Topps Chrome')).toBe(VERDICT.WRONG);
+    expect(scoreField('insert', 'Ball of Duty', '')).toBe(VERDICT.MISSING);
+  });
+
+  it('scores grading fields off the slab label', () => {
+    expect(scoreField('gradingCompany', 'PSA', 'psa')).toBe(VERDICT.CORRECT);
+    expect(scoreField('gradingCompany', 'PSA', 'BGS')).toBe(VERDICT.WRONG);
+    expect(scoreField('grade', '10', '10.0')).toBe(VERDICT.CORRECT);
+    expect(scoreField('grade', '10', '9')).toBe(VERDICT.WRONG);
+  });
+
+  it('requires every digit of a cert number', () => {
+    // The cert is looked up against PSA's API, so a transposed digit returns a
+    // different card's grade and population — a plausible-looking lie.
+    expect(scoreField('certNumber', '148544264', '148544264')).toBe(VERDICT.CORRECT);
+    expect(scoreField('certNumber', '148544264', '#148544264')).toBe(VERDICT.CORRECT);
+    expect(scoreField('certNumber', '148544264', '148544246')).toBe(VERDICT.WRONG);
+    expect(scoreField('certNumber', '148544264', '')).toBe(VERDICT.MISSING);
+  });
+
+  it('scores variant chips as a set, invented beats missed', () => {
+    // An attribute the pipeline invented misdescribes a live listing; one it
+    // merely missed costs a tick. The verdicts have to reflect that.
+    expect(scoreField('variants', ['Auto', 'Refractor'], ['Refractor', 'Auto'])).toBe(VERDICT.CORRECT);
+    expect(scoreField('variants', ['Auto'], ['Auto', 'Patch'])).toBe(VERDICT.WRONG);
+    expect(scoreField('variants', ['Auto', 'Patch'], ['Auto'])).toBe(VERDICT.MISSING);
+    expect(scoreField('variants', ['Auto'], [])).toBe(VERDICT.MISSING);
+  });
+
+  it('treats an empty expected variant list as a real assertion', () => {
+    // "this card has no attributes" is a claim worth checking, so [] is scored
+    // while a missing key is not.
+    expect(scoreField('variants', [], [])).toBe(VERDICT.CORRECT);
+    expect(scoreField('variants', [], ['Auto'])).toBe(VERDICT.WRONG);
+    expect(scoreField('variants', undefined, ['Auto'])).toBe(VERDICT.UNSCORED);
+  });
+
+  it('does not accept a partial name as correct', () => {
+    // The grounding step accepts partial containment when *searching*; scoring
+    // against known truth must not.
+    expect(scoreField('name', 'Charizard VMAX', 'Charizard')).toBe(VERDICT.WRONG);
+  });
+});
+
+describe('scoreCase', () => {
+  it('splits fields into correct, wrong and missing', () => {
+    const score = scoreCase(
+      { name: 'Charizard', setName: 'Base Set', cardNumber: '4/102', year: '1999', collection: 'Pokemon' },
+      { name: 'Charizard', setName: 'Jungle', cardNumber: '', year: '1999', collection: 'Pokemon' },
+    );
+
+    expect(score.correct).toEqual(['name', 'year', 'collection']);
+    expect(score.wrong).toEqual(['setName']);
+    expect(score.missing).toEqual(['cardNumber']);
+  });
+
+  it('keeps both values so a report can show the disagreement', () => {
+    const score = scoreCase({ name: 'Charizard' }, { name: 'Blastoise' });
+    expect(score.fields.name).toMatchObject({ expected: 'Charizard', actual: 'Blastoise' });
+  });
+
+  it('handles a completely empty result', () => {
+    const score = scoreCase({ name: 'Charizard', setName: 'Base Set' }, {});
+    expect(score.missing).toEqual(['name', 'setName']);
+    expect(score.wrong).toEqual([]);
+  });
+});
+
+describe('summarise', () => {
+  const results = [
+    { id: 'a', score: scoreCase({ name: 'Charizard', setName: 'Base Set' }, { name: 'Charizard', setName: 'Base Set' }) },
+    { id: 'b', score: scoreCase({ name: 'Pikachu', setName: 'Base Set' }, { name: 'Pikachu', setName: 'Jungle' }) },
+    { id: 'c', score: scoreCase({ name: 'Mewtwo', setName: 'Base Set' }, { name: 'Mewtwo', setName: '' }) },
+  ];
+
+  it('counts a case as clean only when nothing is wrong', () => {
+    const s = summarise(results);
+    // 'c' has a missing field but nothing wrong, so it still counts as clean.
+    expect(s.cleanCases).toBe(2);
+    expect(s.cases).toBe(3);
+  });
+
+  it('reports correct and wrong rates per field', () => {
+    const s = summarise(results);
+    expect(s.perField.name).toMatchObject({ scored: 3, correct: 3, wrong: 0 });
+    expect(s.perField.setName).toMatchObject({ scored: 3, correct: 1, wrong: 1, missing: 1 });
+    expect(s.perField.setName.wrongRate).toBeCloseTo(1 / 3, 5);
+  });
+
+  it('leaves rates null for a field nothing asserted', () => {
+    const s = summarise(results);
+    expect(s.perField.year.scored).toBe(0);
+    expect(s.perField.year.correctRate).toBeNull();
+  });
+
+  it('totals across every scored field', () => {
+    const s = summarise(results);
+    expect(s.totals).toMatchObject({ scored: 6, correct: 4, wrong: 1, missing: 1 });
+  });
+
+  it('handles an empty run without dividing by zero', () => {
+    const s = summarise([]);
+    expect(s.cases).toBe(0);
+    expect(s.totals.correctRate).toBeNull();
+  });
+});
+
+describe('formatSummary', () => {
+  it('renders a table that names the priority', () => {
+    const text = formatSummary(summarise([
+      { id: 'a', score: scoreCase({ name: 'Charizard' }, { name: 'Blastoise' }) },
+    ]));
+
+    expect(text).toContain('TOTAL');
+    expect(text).toContain('Drive `wrong` to zero');
+  });
+});

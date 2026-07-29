@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import {
-  getHighestConfidenceDetection,
   isExactMatch,
   isSetLevelMatch,
   hasGrading,
@@ -9,6 +8,8 @@ import {
   getFieldValue,
 } from 'cardsightai';
 import { getCardSightClient, summarisePricingAud, getSegmentName } from '../utils/cardSightClient.js';
+import { confidenceScore, confidenceLabel } from '../../utils/cardsightConfidence.js';
+import { rankCandidates, hasAmbiguousWinner, matchSpecificity } from '../utils/cardsightRanking.js';
 import { uploadFiles } from '../middleware/file-upload.js';
 import { supabaseAuth } from '../middleware/supabase-auth.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -24,6 +25,10 @@ router.use(supabaseAuth);
 
 // CardSight pricing accepts these listing types; anything else is dropped
 const VALID_LISTING_TYPES = new Set(['auction', 'fixed', 'both']);
+
+// How many runner-up detections to hand back so the seller can correct a
+// mis-pick without re-scanning.
+const MAX_ALTERNATIVES = 4;
 
 // ─── POST /cardsight/identify ─────────────────────────────────────────────────
 // Accepts a card image, returns identification + catalog + pricing in one shot.
@@ -61,21 +66,43 @@ router.post(
       // If collection is specified, only search those segments; otherwise try all.
       const collection = req.body?.collection || '';
       const SEGMENTS = getSegmentsForCollection(collection);
+
+      // A collection CardSight has no catalog for (Magic, One Piece, AFL, …).
+      // Asking anyway is worse than not asking: every segment answers with its
+      // best guess *within that segment*, so the only possible reply is a
+      // confident-looking card from the wrong hobby. Bail out and let the
+      // caller fall back to OCR + the public TCG catalogue.
+      if (!SEGMENTS.length) {
+        logger.info(`[CARDSIGHT] Skipping identify — "${collection}" is not in the CardSight catalog`);
+        return res.json({
+          identified: false,
+          unsupportedCollection: true,
+          message: `${collection} cards aren't in the CardSight catalog.`,
+        });
+      }
+
       const segmentResults = await Promise.allSettled(
         SEGMENTS.map(seg => client.identify.cardBySegment(seg, image))
       );
 
-      // Merge all detections from every segment that returned successfully
-      let allDetections = [];
+      // Merge every segment's detections, keeping the segment each one came
+      // from — it is the only way to tell a cross-sport collision apart from
+      // two genuine candidates within one segment.
+      const candidates = [];
       let serverMessages = [];
-      for (const r of segmentResults) {
+      segmentResults.forEach((r, i) => {
+        const segment = SEGMENTS[i];
         if (r.status === 'fulfilled' && r.value?.data) {
-          allDetections = allDetections.concat(r.value.data.detections ?? []);
+          for (const detection of r.value.data.detections ?? []) {
+            if (detection?.card) candidates.push({ detection, segment });
+          }
           serverMessages = serverMessages.concat(r.value.data.messages ?? []);
+        } else if (r.status === 'rejected') {
+          logger.warn(`[CARDSIGHT] Segment "${segment}" lookup failed: ${r.reason?.message ?? r.reason}`);
         }
-      }
+      });
 
-      if (!allDetections.length) {
+      if (!candidates.length) {
         logger.info(`[CARDSIGHT] No detections. collection=${collection} segments=[${SEGMENTS.join(', ')}] messages=${JSON.stringify(serverMessages)}`);
         return res.json({
           identified: false,
@@ -84,18 +111,51 @@ router.post(
         });
       }
 
-      // Pick the highest-confidence detection across all segments
-      const syntheticResult = { detections: allDetections };
-      const best = getHighestConfidenceDetection(syntheticResult);
+      // Rank explicitly (match specificity first, then confidence) rather than
+      // letting the fan-out array order break the very common confidence tie.
+      const ranked = rankCandidates(candidates);
+      const best = ranked[0]?.detection;
       if (!best) {
         return res.json({ identified: false, message: 'Could not identify card with sufficient confidence.' });
       }
 
+      const ambiguous = hasAmbiguousWinner(ranked);
       const segmentName = await getSegmentName(best.card?.segmentId);
+
+      // Runner-ups worth offering as a correction: real matches only, one entry
+      // per distinct card, so the seller can fix a mis-pick without re-scanning.
+      const seen = new Set([best.card?.id ?? best.card?.setId]);
+      const alternatives = [];
+      for (const { detection, segment } of ranked.slice(1)) {
+        if (alternatives.length >= MAX_ALTERNATIVES) break;
+        if (matchSpecificity(detection) === 0) continue;
+        const key = detection.card?.id ?? detection.card?.setId;
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        alternatives.push({
+          id: detection.card?.id ?? null,
+          name: detection.card?.name ?? null,
+          year: detection.card?.year ?? null,
+          setName: detection.card?.setName ?? null,
+          setId: detection.card?.setId ?? null,
+          cardNumber: detection.card?.number ?? null,
+          manufacturer: detection.card?.manufacturer ?? null,
+          segment: await getSegmentName(detection.card?.segmentId) ?? segment,
+          confidence: detection.confidence,
+          confidenceLabel: confidenceLabel(detection.confidence),
+          exactMatch: isExactMatch(detection),
+        });
+      }
 
       const response = {
         identified: true,
+        // `confidence` stays the raw CardSight enum for compatibility;
+        // consumers should read the derived numeric/label fields.
         confidence: best.confidence,
+        confidenceLabel: confidenceLabel(best.confidence),
+        confidenceScore: confidenceScore(best.confidence),
+        ambiguous,
+        alternatives,
         exactMatch: isExactMatch(best),
         setLevelMatch: isSetLevelMatch(best),
         card: {
@@ -148,7 +208,7 @@ router.post(
           if (summary) response.pricing = summary;
         }
 
-        logger.info(`[CARDSIGHT] Identified card ${cardId} (${response.card.name}) confidence=${best.confidence} collection=${collection}`);
+        logger.info(`[CARDSIGHT] Identified card ${cardId} (${response.card.name}) confidence=${best.confidence} segment=${ranked[0].segment} ambiguous=${ambiguous} candidates=${candidates.length} collection=${collection}`);
 
         // Background: persist market valuations for this card (CardSight + eBay + PSA)
         refreshCardMarketData({
@@ -171,7 +231,7 @@ router.post(
             .eq('owner_id', req.user.id);
         }
       } else {
-        logger.info(`[CARDSIGHT] Set-level or low-confidence match: setId=${best.card?.setId} confidence=${best.confidence} collection=${collection}`);
+        logger.info(`[CARDSIGHT] Set-level or low-confidence match: setId=${best.card?.setId} confidence=${best.confidence} segment=${ranked[0].segment} ambiguous=${ambiguous} candidates=${candidates.length} collection=${collection}`);
       }
 
       res.json(response);

@@ -1,0 +1,78 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Card rectification harness</title>
+<!--
+  Loaded by scripts/score-card-identification.mjs through a throwaway Vite dev
+  server so the scoring harness can run the real rectification step.
+
+  `prepareAnalysisImage` needs a DOM (canvas) and the OpenCV wasm build, so it
+  cannot run in Node. Rather than approximate it — which would measure something
+  production does not do — the harness drives this page in headless Chromium and
+  gets back the exact bytes the models would have received.
+
+  The page fetches the photo from the dev server itself rather than receiving it
+  as an argument: a multi-megabyte image crosses the CDP bridge as a JSON number
+  array, which is slow enough to look like a hang. Only the (smaller) result
+  comes back, base64-encoded as a single string.
+-->
+<body>
+  <p>Rectification harness — driven by the scoring script.</p>
+  <script type="module">
+    import { prepareAnalysisImage } from '@/utils/analysisImage.js';
+    import { loadOpenCV } from '@/utils/opencvLoader.js';
+
+    const toBase64 = async (blob) => {
+      const reader = new FileReader();
+      return new Promise((resolve, reject) => {
+        reader.onload = () => resolve(String(reader.result).split(',')[1]);
+        reader.onerror = () => reject(new Error('could not encode result'));
+        reader.readAsDataURL(blob);
+      });
+    };
+
+    /**
+     * Pays the one-off OpenCV wasm load up front so the first card isn't
+     * charged for it. Progress is published on window.__warmState so a caller
+     * can distinguish "still loading" from "wedged".
+     */
+    window.__warmState = 'idle';
+    window.__warmUp = () => {
+      const started = Date.now();
+      window.__warmState = 'loading';
+      return loadOpenCV().then(
+        () => { window.__warmState = `ready in ${Date.now() - started}ms`; return true; },
+        (err) => { window.__warmState = `failed: ${err.message}`; throw err; },
+      );
+    };
+
+    /**
+     * @param {string} url - dev-server path to the photo
+     * @param {string} name
+     * @returns {Promise<{ base64: string, cropped: boolean }>}
+     */
+    window.__rectify = async (url, name) => {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`could not load ${url}: ${response.status}`);
+      const original = new File([await response.blob()], name, { type: 'image/jpeg' });
+
+      // Generous budget: here we care about the output, not the latency a
+      // seller would see, and the wasm is already warm by this point.
+      const { file, cropped } = await prepareAnalysisImage(original, { timeoutMs: 120_000 });
+      return { base64: await toBase64(file), cropped };
+    };
+
+    // Diagnostic: reports the OpenCV module's state without hanging.
+    window.__cvProbe = async () => {
+      const mod = await import('@techstark/opencv-js');
+      const cv = mod.default ?? mod;
+      return {
+        typeofCv: typeof cv,
+        hasMat: Boolean(cv?.Mat),
+        isPromise: typeof cv?.then === 'function',
+        keys: Object.keys(cv ?? {}).slice(0, 20),
+      };
+    };
+
+    window.__ready = true;
+  </script>
+</body>

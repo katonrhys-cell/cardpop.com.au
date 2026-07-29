@@ -14,7 +14,7 @@ import CardHierarchySelector from '@/components/CardHierarchySelector.jsx';
 import RookieJerseyIcon from '@/components/icons/RookieJerseyIcon.jsx';
 import { COLLECTION_CONFIGS } from '@/data/collectionConfigs.js';
 import { useCollectionEras } from '@/hooks/useCollectionEras.js';
-import { getVariantGroups } from '@/lib/cardVariants.js';
+import { getVariantGroups, mergeIdentifiedVariants, resolveVariantChips, impliesFoil } from '@/lib/cardVariants.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -44,6 +44,8 @@ import SellingRequirementsNotice from '@/components/SellingRequirementsNotice.js
 import { isSellingEntitlementError } from '@/utils/listingErrors.js';
 import { loadListingDraft, saveListingDraft, clearListingDraft, hasMeaningfulContent } from '@/lib/listingDraft.js';
 import { shouldAutoIdentify, buildPriceLookupQuery } from '@/utils/listingFlow.js';
+import { confidenceScore, confidenceLabel, isLowConfidence } from '@/utils/cardsightConfidence.js';
+import { prepareAnalysisImage } from '@/utils/analysisImage.js';
 import { validateListingForm, validateListingField } from '@/utils/listingValidation.js';
 import WizardStepper from '@/components/WizardStepper.jsx';
 import { CARD_LANGUAGES } from '@/lib/cardFilters.js';
@@ -182,9 +184,28 @@ const AddEditCardPage = () => {
   const { isProcessing: isPhotoProcessing, previewUrl, createSlabImagePreview, reset: resetPhotoTemplate } = usePhotoTemplate();
   const { generateDescription, isGenerating: isGeneratingDescription } = useCardDescription();
 
+  // CardSight reports confidence as a "High"/"Medium"/"Low" enum, so it can
+  // never be rendered or compared as a number directly (that produced "NaN%"
+  // and pinned every match to the lowest band). Newer responses carry derived
+  // numeric fields; fall back to deriving them for older/cached payloads.
+  const csConfidence = cardSightResult?.confidenceScore ?? confidenceScore(cardSightResult?.confidence);
+  const csConfidenceLabel = cardSightResult?.confidenceLabel ?? confidenceLabel(cardSightResult?.confidence);
+  // Mirrors the "trustworthy" test in handleAnalyzeWithAI: anything short of a
+  // clean exact hit is shown as a suggestion, because it was NOT applied to the
+  // form — the fields on screen came from the OCR pass instead.
+  const csNeedsReview = Boolean(
+    cardSightResult?.identified &&
+    !(cardSightResult.exactMatch
+      && !cardSightResult.ambiguous
+      && !isLowConfidence(cardSightResult.confidenceScore ?? cardSightResult.confidence))
+  );
+
   // Photo template modal state
   const [photoTemplateModal, setPhotoTemplateModal] = useState({ open: false, processType: null, step: 'preview' });
   const [isUploadingTemplate, setIsUploadingTemplate] = useState(false);
+  // True while the card is being rectified out of the photo, before the models
+  // are called — otherwise this step is a silent multi-second gap.
+  const [isPreparingImage, setIsPreparingImage] = useState(false);
 
   const emptyForm = {
     // Card identity
@@ -603,7 +624,7 @@ const AddEditCardPage = () => {
     // Photo-first flow: identification is the default, not an opt-in button.
     // Runs at most once per new card (guarded on an empty card name), and the
     // prefill is non-destructive, so nothing the seller typed is overwritten.
-    if (shouldAutoIdentify({ isEdit, cardName: formData.cardName, isScanning, isIdentifying })) {
+    if (shouldAutoIdentify({ isEdit, cardName: formData.cardName, isScanning, isIdentifying, isPreparingImage })) {
       handleAnalyzeWithAI(file);
     }
   };
@@ -664,37 +685,41 @@ const AddEditCardPage = () => {
     clearScan();
     clearCardSight();
 
-    // 1. Try CardSight catalog identification first (returns result directly)
-    const csResult = await cardSightIdentify(frontImage, formData.collection);
-
-    // If CardSight service is unavailable, fall through to OCR — don't bail out
-    if (csResult?.identified) {
-      const fields = mapCardSightToFormFields(csResult);
-      setFormData(prev => ({ ...prev, ...fields }));
-      if (csResult.pricing?.avgPrice) {
-        set('estimatedValue', String(csResult.pricing.avgPrice.toFixed(2)));
-      }
-      if (csResult.card?.id) fetchPricingById(csResult.card.id);
-      else if (csResult.card?.name) fetchPricingByName(csResult.card.name);
-      setIsAutoFilled(true);
-      toast.success('Card identified! Fields auto-filled from catalog.');
-      return;
-    }
-
-    // 2. CardSight didn't find the card — fall back to OCR
-    const advisory = csResult?.serverMessages?.[0]?.message;
-    if (advisory && !csResult?.apiError) toast.info(`Catalog match not found: ${advisory}`);
-
     const conditionMap = {
       'Mint': 'mint', 'Near Mint': 'near_mint', 'Excellent': 'excellent',
       'Good': 'good', 'Fair': 'light_played',
     };
     const gradingCompanyMap = { 'PSA': 'psa', 'BGS': 'bgs', 'CGC': 'cgc', 'SGC': 'sgc', 'ACE': 'ace' };
 
+    // ── 0. Rectify the card out of the photo ────────────────────────────────
+    // Both models downscale what they're sent, so the card's share of that
+    // budget decides whether the small print is legible. Falls back to the
+    // original on any failure — see utils/analysisImage.js. Only the front is
+    // processed; cropping the extras too would double the wait for a secondary
+    // read. The seller's own photo is untouched — this is analysis input only.
+    setIsPreparingImage(true);
+    const { file: analysisImage } = await prepareAnalysisImage(frontImage)
+      .finally(() => setIsPreparingImage(false));
+
+    // ── 1. OCR first ────────────────────────────────────────────────────────
+    // OCR reads the card itself, so it can name the category before we ask a
+    // catalog about it. That is what lets step 2 query a single CardSight
+    // segment. Scanning blind meant fanning out across every segment, and each
+    // one answers with its best guess *within that segment* — the reason a
+    // Pokemon card could come back as a hockey card.
+    //
     // Pass the front plus any back/extra images so OCR can read set codes and
     // collector numbers that are clearer (or only present) on the back.
-    const ocrResult = await scanCard([frontImage, ...extraFiles.filter(Boolean)].slice(0, 3));
+    const ocrResult = await scanCard([analysisImage, ...extraFiles.filter(Boolean)].slice(0, 3));
+
     if (ocrResult) {
+      // Resolved against the collection OCR just read, falling back to whatever
+      // the seller had picked — a chip that doesn't exist for the game is dropped.
+      const variantCollection = ocrResult.collectionType || formData.collection;
+      const identifiedChips = resolveVariantChips(
+        [...(ocrResult.attributes ?? []), ...(ocrResult.serialNumber ? ['Numbered'] : [])],
+        variantCollection,
+      );
       setFormData(prev => ({
         ...prev,
         cardName:       ocrResult.name          || prev.cardName,
@@ -708,16 +733,77 @@ const AddEditCardPage = () => {
           ? (gradingCompanyMap[ocrResult.gradingService] ?? prev.gradingCompany)
           : prev.gradingCompany,
         certNumber:     ocrResult.certificationNumber || prev.certNumber,
+        // Tick the chips for what the card actually shows — rookie marking,
+        // autograph, patch, foil treatment, serial numbering. Additive: it can
+        // add a designation the seller hasn't picked, never remove one, and
+        // only ever selects chips that exist for this collection.
+        variant:        mergeIdentifiedVariants(prev.variant, ocrResult, variantCollection),
+        // Dedicated flags that mirror some of those chips.
+        isFoil:         prev.isFoil || impliesFoil(identifiedChips),
+        isAuto:         prev.isAuto || identifiedChips.includes('Auto'),
+        serialNumber:   ocrResult.serialNumber || prev.serialNumber,
         notes: prev.notes || [
           ocrResult.description,
           ocrResult.rarity   ? `Rarity: ${ocrResult.rarity}` : '',
           ocrResult.cardType ? `Type: ${ocrResult.cardType}` : '',
         ].filter(Boolean).join('\n') || '',
       }));
-      lookupPrice(ocrResult);
       setIsAutoFilled(true);
-      // Success/failure feedback is surfaced by useCardOCR itself.
     }
+
+    // ── 2. CardSight, narrowed to the category OCR read ─────────────────────
+    // A collection the seller picked themselves always wins over OCR's guess.
+    const collection = formData.collection || ocrResult?.collectionType || '';
+    const csResult = await cardSightIdentify(analysisImage, collection);
+
+    // CardSight has no catalog outside its ten segments, so a Magic or AFL card
+    // is expected to come back unidentified — the OCR fields above (already
+    // grounded against the public TCG catalogue by useCardOCR) are the answer.
+    if (!csResult?.identified) {
+      const advisory = csResult?.serverMessages?.[0]?.message;
+      if (advisory && !csResult?.apiError && !csResult?.unsupportedCollection) {
+        toast.info(`Catalog match not found: ${advisory}`);
+      }
+      if (ocrResult) lookupPrice(ocrResult);
+      return;
+    }
+
+    // ── 3. Overlay the catalog record ───────────────────────────────────────
+    // CardSight is authoritative when it returns a clean exact hit; a weak or
+    // cross-category match is left as a suggestion in the results panel so it
+    // can't quietly overwrite what OCR read off the card.
+    const trustworthy = csResult.exactMatch
+      && !csResult.ambiguous
+      && !isLowConfidence(csResult.confidenceScore ?? csResult.confidence);
+
+    if (trustworthy) {
+      setFormData(prev => ({ ...prev, ...mapCardSightToFormFields(csResult) }));
+      if (csResult.pricing?.avgPrice) {
+        set('estimatedValue', String(csResult.pricing.avgPrice.toFixed(2)));
+      }
+      setIsAutoFilled(true);
+      toast.success('Card identified! Fields auto-filled from catalog.');
+    } else if (csResult.ambiguous) {
+      toast.warning('Matched more than one category — check the details before saving.');
+    } else {
+      toast.warning('Possible match found — please verify the details.');
+    }
+
+    if (csResult.card?.id) fetchPricingById(csResult.card.id);
+    else if (csResult.card?.name) fetchPricingByName(csResult.card.name);
+  };
+
+  // Applies a runner-up detection when the top match was the wrong card. The
+  // alternatives are flat card records, so wrap one back into the identify
+  // result shape `mapCardSightToFormFields` expects.
+  const applyCardSightAlternative = (alt) => {
+    if (!alt) return;
+    const fields = mapCardSightToFormFields({ identified: true, card: alt });
+    setFormData(prev => ({ ...prev, ...fields }));
+    if (alt.id) fetchPricingById(alt.id);
+    else if (alt.name) fetchPricingByName(alt.name);
+    setIsAutoFilled(true);
+    toast.success(`Switched to ${alt.name ?? 'the selected card'}.`);
   };
 
   // ─── On-demand price estimate ─────────────────────────────────────────────
@@ -1472,7 +1558,7 @@ const AddEditCardPage = () => {
                   ) : null}
 
                   {/* Identify Card Button - AI analysis with recommended label */}
-                  {imageFile && !isScanning && !isIdentifying && !isPhotoProcessing && !isUploadingTemplate && (
+                  {imageFile && !isScanning && !isIdentifying && !isPreparingImage && !isPhotoProcessing && !isUploadingTemplate && (
                     <div className="space-y-1">
                       <Button
                         type="button"
@@ -1488,61 +1574,88 @@ const AddEditCardPage = () => {
                     </div>
                   )}
 
-                  {(isScanning || isIdentifying) && (
+                  {(isScanning || isIdentifying || isPreparingImage) && (
                     <div className="p-3 rounded-xl border border-border bg-muted/30 animate-in fade-in">
                       <p className="text-xs font-medium text-muted-foreground flex items-center gap-2">
-                        <Loader2 className="w-3 h-3 animate-spin" /> Analyzing card…
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        {isPreparingImage ? 'Preparing image…' : 'Analyzing card…'}
                       </p>
                     </div>
                   )}
 
                   {/* No-match state — analysis finished but card not found */}
-                  {!isScanning && !isIdentifying && cardSightResult && !cardSightResult.identified && !scanResult && (
+                  {!isScanning && !isIdentifying && !isPreparingImage && cardSightResult && !cardSightResult.identified && !scanResult && (
                     <div className="p-3 rounded-xl border border-border bg-muted/30 animate-in fade-in">
-                      <p className="text-xs text-muted-foreground">Card not found in catalog. Try a clearer image or fill in the details manually.</p>
+                      <p className="text-xs text-muted-foreground">
+                        {cardSightResult.unsupportedCollection
+                          ? `${formData.collection || 'This category'} isn't covered by the card catalog — fill in the details manually.`
+                          : 'Card not found in catalog. Try a clearer image or fill in the details manually.'}
+                      </p>
                     </div>
                   )}
 
                   {/* Combined AI results panel — shown after analysis completes */}
-                  {!isScanning && !isIdentifying && (cardSightResult?.identified || scanResult) && (
+                  {!isScanning && !isIdentifying && !isPreparingImage && (cardSightResult?.identified || scanResult) && (
                     <div className={`p-3 rounded-xl border animate-in fade-in ${cardSightResult?.identified ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-primary/5 border-primary/20'}`}>
                       <h4 className={`text-xs font-bold mb-2 flex items-center gap-1.5 ${cardSightResult?.identified ? 'text-emerald-700' : 'text-primary'}`}>
                         <Sparkles className="w-3.5 h-3.5" />
                         {cardSightResult?.identified
-                          ? `Catalog Match — ${cardSightResult.exactMatch ? 'Exact' : 'Set'}`
+                          ? `Catalog Match — ${csNeedsReview ? 'Needs review' : cardSightResult.exactMatch ? 'Exact' : 'Set'}`
                           : 'AI Analysis — fields auto-filled'}
                       </h4>
 
-                      {cardSightResult?.identified && cardSightResult.confidence !== undefined && (
+                      {cardSightResult?.identified && csConfidence !== null && (
                         <div className="mb-2">
                           <div className="flex items-center justify-between mb-1">
                             <span className="text-[10px] font-semibold text-muted-foreground">Match Confidence</span>
                             <span className={`text-xs font-bold ${
-                              cardSightResult.confidence >= 0.95 ? 'text-emerald-700 dark:text-emerald-400' :
-                              cardSightResult.confidence >= 0.85 ? 'text-green-700 dark:text-green-400' :
-                              cardSightResult.confidence >= 0.7 ? 'text-amber-700 dark:text-amber-400' :
+                              csConfidence >= 0.9 ? 'text-emerald-700 dark:text-emerald-400' :
+                              csConfidence >= 0.75 ? 'text-amber-700 dark:text-amber-400' :
                               'text-orange-700 dark:text-orange-400'
                             }`}>
-                              {Math.round(cardSightResult.confidence * 100)}%
+                              {csConfidenceLabel}
                             </span>
                           </div>
                           <div className="w-full h-1.5 rounded-full bg-muted/50 overflow-hidden">
                             <div
                               className={`h-full transition-all ${
-                                cardSightResult.confidence >= 0.95 ? 'bg-emerald-500' :
-                                cardSightResult.confidence >= 0.85 ? 'bg-green-500' :
-                                cardSightResult.confidence >= 0.7 ? 'bg-amber-500' :
+                                csConfidence >= 0.9 ? 'bg-emerald-500' :
+                                csConfidence >= 0.75 ? 'bg-amber-500' :
                                 'bg-orange-500'
                               }`}
-                              style={{ width: `${Math.round(cardSightResult.confidence * 100)}%` }}
+                              style={{ width: `${Math.round(csConfidence * 100)}%` }}
                             />
                           </div>
                           <p className="text-[10px] text-muted-foreground mt-1">
-                            {cardSightResult.confidence >= 0.95 ? 'Excellent match — high confidence in identification' :
-                             cardSightResult.confidence >= 0.85 ? 'Good match — confident in identification' :
-                             cardSightResult.confidence >= 0.7 ? 'Moderate match — review before saving' :
-                             'Low match — verify details are correct'}
+                            {cardSightResult.ambiguous
+                              ? 'This image also matched a card in another category — check the details below before saving.'
+                              : csConfidence >= 0.9 ? 'Strong match — details came straight from the catalog.'
+                              : csConfidence >= 0.75 ? 'Reasonable match — review the details before saving.'
+                              : 'Weak match — verify every field before saving.'}
                           </p>
+                        </div>
+                      )}
+
+                      {cardSightResult?.identified && cardSightResult.alternatives?.length > 0 && (
+                        <div className="mb-2">
+                          <p className="text-[10px] font-semibold text-muted-foreground mb-1">
+                            Not the right card? Pick a closer match:
+                          </p>
+                          <div className="flex flex-col gap-1">
+                            {cardSightResult.alternatives.map(alt => (
+                              <button
+                                key={alt.id ?? `${alt.setId}-${alt.cardNumber}`}
+                                type="button"
+                                onClick={() => applyCardSightAlternative(alt)}
+                                className="text-left text-[11px] rounded-lg border border-border/60 px-2 py-1.5 hover:bg-muted/60 transition-colors"
+                              >
+                                <span className="font-medium text-foreground">{alt.name ?? 'Unknown card'}</span>
+                                {alt.setName && <span className="text-muted-foreground"> · {alt.setName}</span>}
+                                {alt.year && <span className="text-muted-foreground"> · {alt.year}</span>}
+                                {alt.segment && <span className="text-muted-foreground"> · {alt.segment}</span>}
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       )}
 
@@ -1575,11 +1688,20 @@ const AddEditCardPage = () => {
                         </>
                       )}
 
-                      {scanResult && !cardSightResult?.identified && (
+                      {scanResult && (!cardSightResult?.identified || csNeedsReview) && (
                         <>
+                          {csNeedsReview && (
+                            <p className="text-[10px] text-muted-foreground mb-1">
+                              Fields below were read from your photo — the catalog match above was too
+                              uncertain to apply automatically.
+                            </p>
+                          )}
                           {scanResult.catalogueMatch && (
                             <div className="text-[11px] font-semibold text-emerald-700 bg-emerald-500/10 rounded-lg px-2.5 py-1.5 mb-2">
-                              ✓ Matched to catalogue ({scanResult.catalogueMatch.source}) — set &amp; card number verified
+                              ✓ Matched to catalogue ({scanResult.catalogueMatch.source})
+                              {scanResult.catalogueMatch.verified?.length
+                                ? ` — ${scanResult.catalogueMatch.verified.join(' + ')} verified`
+                                : ''}
                             </div>
                           )}
                           <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-foreground/80 mb-2">

@@ -82,6 +82,76 @@ describe('GET /search', () => {
     expect(res.body.results).toHaveLength(1);
   });
 
+  it('pushes the collector number into the Pokémon query', async () => {
+    // Filtering upstream is the point: a name-only search returns an arbitrary
+    // page of a card's many printings, and the right one usually isn't in it.
+    h.pokemon = [{ id: 'p1', name: 'Charizard', set: { name: 'Base' }, number: '4' }];
+
+    const res = await request(app).get('/search').query({ q: 'Charizard', collection: 'pokemon', number: '4/102' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.precise).toBe(true);
+    const url = decodeURIComponent(global.fetch.mock.calls[0][0]);
+    expect(url).toContain('number:"4"');
+  });
+
+  it('pushes the collector number into the Scryfall query', async () => {
+    h.scryfall = [{ id: 's1', name: 'Black Lotus', set_name: 'Alpha', collector_number: '232' }];
+
+    await request(app).get('/search').query({ q: 'Black Lotus', collection: 'magic', number: '232' });
+
+    const url = decodeURIComponent(global.fetch.mock.calls[0][0]);
+    expect(url).toContain('cn:232');
+  });
+
+  it('strips the set total and leading zeros before filtering', async () => {
+    h.pokemon = [{ id: 'p1', name: 'Charizard', set: { name: 'Base' }, number: '4' }];
+
+    await request(app).get('/search').query({ q: 'Charizard', collection: 'pokemon', number: '004/102' });
+
+    const url = decodeURIComponent(global.fetch.mock.calls[0][0]);
+    expect(url).toContain('number:"4"');
+  });
+
+  it('falls back to a name-only search when the number filter finds nothing', async () => {
+    // A misread number, or one the upstream stores differently, must degrade to
+    // the old behaviour rather than returning an empty result.
+    let call = 0;
+    global.fetch = vi.fn(() => {
+      call += 1;
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ data: call === 1 ? [] : [{ id: 'p1', name: 'Charizard', set: { name: 'Base' }, number: '4' }] }),
+      });
+    });
+
+    const res = await request(app).get('/search').query({ q: 'Charizard', collection: 'pokemon', number: '999' });
+
+    expect(res.body.results).toHaveLength(1);
+    expect(res.body.precise).toBe(false);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(decodeURIComponent(global.fetch.mock.calls[1][0])).not.toContain('number:');
+  });
+
+  it('runs a single name-only pass when no number is supplied', async () => {
+    h.pokemon = [{ id: 'p1', name: 'Charizard', set: { name: 'Base' }, number: '4' }];
+
+    const res = await request(app).get('/search').query({ q: 'Charizard', collection: 'pokemon' });
+
+    expect(res.body.precise).toBe(false);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(decodeURIComponent(global.fetch.mock.calls[0][0])).not.toContain('number:');
+  });
+
+  it('ignores an unreadable collector number', async () => {
+    h.pokemon = [{ id: 'p1', name: 'Charizard', set: { name: 'Base' }, number: '4' }];
+
+    await request(app).get('/search').query({ q: 'Charizard', collection: 'pokemon', number: '---' });
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(decodeURIComponent(global.fetch.mock.calls[0][0])).not.toContain('number:');
+  });
+
   it('drops an API whose upstream request fails', async () => {
     global.fetch = vi.fn(() => Promise.resolve({ ok: false, json: async () => ({}) }));
     const res = await request(app).get('/search?q=x&collection=pokemon');

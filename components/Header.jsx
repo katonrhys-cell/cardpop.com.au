@@ -32,20 +32,9 @@ const MobileNavMenus = lazy(() => import('@/components/HeaderMenus.jsx').then(m 
 
 const prefetchMenus = () => import('@/components/HeaderMenus.jsx');
 
-export const TCG_COLLECTIONS = [
-  'Pokemon', 'Magic: The Gathering', 'Yu-Gi-Oh', 'Digimon',
-  'Riftbound', 'TMNT', 'Final Fantasy', 'Disney Lorcana', 'One Piece',
-  'Flesh and Blood', 'Dragon Ball Super', 'Star Wars Unlimited',
-  'Weiss Schwarz', 'Cardfight!! Vanguard',
-];
-
-export const SPORTS_COLLECTIONS = [
-  'NBA', 'NFL', 'MLB', 'Cricket', 'NRL', 'NHL', 'Formula 1',
-  'Wrestling', 'Golf', 'Soccer', 'AFL', 'AFLW', 'Rugby Union',
-  'Boxing', 'MMA', 'Tennis', 'UFC',
-];
-
-export const COLLECTIONS_LIST = [...TCG_COLLECTIONS, ...SPORTS_COLLECTIONS].sort();
+// Re-exported for the many components that already import them from here; the
+// lists themselves live in data/collections.js so non-React code can use them.
+export { TCG_COLLECTIONS, SPORTS_COLLECTIONS, COLLECTIONS_LIST } from '@/data/collections.js';
 
 const Header = () => {
   const { isAuthenticated, currentUser, isAdmin, logout, isVerified, loading: authLoading } = useAuth();

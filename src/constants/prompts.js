@@ -51,18 +51,26 @@ SPORTS: NBA, NFL, MLB, Cricket, NRL, NHL, Formula 1, Wrestling, Golf, Soccer, AF
 WHERE TO LOOK — the details that identify a card are small and easily misread. Inspect these regions deliberately:
 - SET SYMBOL: the small icon near the bottom of the art (Pokemon) or set code stamped on the card — it pins down the exact set/expansion.
 - COLLECTOR NUMBER: usually a bottom corner, formatted "x/y" (e.g. 4/102) or a set code + number (e.g. SWSH114, TG12/TG30). Transcribe it EXACTLY, including the part after the slash.
-- COPYRIGHT / YEAR LINE: the fine print along the bottom edge (e.g. "©2023 Pokémon") — use it for releaseYear and to confirm the era.
+- COPYRIGHT / YEAR LINE: the fine print along the bottom edge (e.g. "©2023 Pokémon") — use it for releaseYear and to confirm the era. On a sports card the copyright year is usually the first year of the season, so "©2025" on a basketball card means the 2025-26 season.
+- INSERT / SUBSET NAME: the treatment a card belongs to *within* a product, printed large on the front (e.g. "Ball of Duty", "Rated Rookie", "Downtown"). This is NOT the product name — a card can be "Topps Chrome" the product and "Ball of Duty" the insert at the same time. Put the product in cardSetName and the treatment in insertName.
+- ROOKIE MARKINGS: an "RC" shield, a "Rated Rookie" banner, a "1st" badge or an equivalent rookie logo. These identify a rookie card, a distinct and valuable designation. Report ONLY what is printed — never infer a rookie card from the player being early in their career.
+- CARD ATTRIBUTES: an autograph (on-card or sticker), a memorabilia patch or jersey swatch, a die-cut edge, a printed serial number. Report each as a short term in "attributes".
+- SERIAL NUMBERING: a printed "23/99", "07/10" or similar, usually a corner or the back. This is the print run, NOT the collector number — a card can have both.
 - EDITION / PRINT MARKERS: "1st Edition" stamps, "Shadowless", "Unlimited", foil/holo pattern, full-art or alternate-art treatment.
 - If multiple images are provided, the FIRST is the card front; use the BACK and any additional images to read set codes, numbers and copyright text that are clearer or only present there.
 
 GRADING SLABS: If a graded slab is visible, identify PSA / BGS / CGC and extract the numeric grade and cert number from the label.
+- The label is authoritative for the GRADE, the CERT NUMBER and the CARD NUMBER — it is the only place those appear, and the buyer is looking at the slab.
+- It is NOT reliable for the year. Graders abbreviate inconsistently: the same two-year season shows up as its first year on one flip and its last on another. Use the label to confirm the product, then give releaseYear in the product's own terms — a 2023-24 Topps Chrome card is "2023-24" even when the flip says "2023".
+- Transcribe the cert number DIGIT BY DIGIT. It is looked up against the grader's database, so a single transposed digit returns a different card's grade and population — far worse than leaving it null. If any digit is unclear, return null.
 
 Return ONLY valid JSON with these exact fields (use null for anything not clearly visible):
 {
   "name": "exact card name as printed on the card",
-  "cardSetName": "set or expansion name (e.g. Base Set, Brilliant Stars, 2023 Topps Series 1)",
+  "cardSetName": "the PRODUCT a card came out of (e.g. Base Set, Brilliant Stars, Topps Chrome, Donruss) — not the insert treatment",
+  "insertName": "the insert/subset within that product if one is printed (e.g. Ball of Duty, Rated Rookie), else null",
   "cardNumber": "card number as printed (e.g. 4/102, SWSH114, 25/100)",
-  "releaseYear": number_or_null,
+  "releaseYear": "year as a string. Sports products whose season spans two calendar years (NBA, NHL, soccer) use the season, e.g. \\"2025-26\\"; everything else uses a single year, e.g. \\"1999\\". Only use a season when the card or its product clearly indicates one — otherwise give the single year, and null if neither is legible",
   "collectionType": "one of the valid collection types above or null",
   "condition": "Mint | Near Mint | Excellent | Good | Fair",
   "gradingService": "PSA | BGS | CGC | None",
@@ -70,6 +78,9 @@ Return ONLY valid JSON with these exact fields (use null for anything not clearl
   "certificationNumber": "cert or slab number if visible, else null",
   "rarity": "Common | Uncommon | Rare | Holographic | Secret Rare | null",
   "cardType": "e.g. Holographic, Foil, Full Art, Regular, Reverse Holo, First Edition",
+  "attributes": ["short terms for treatments and attributes VISIBLE on the card — e.g. Autograph, Patch, Relic, Die-Cut, Refractor, Holo, Reverse Holo, Full Art, Alt Art, 1st Edition, Numbered, 1/1, Short Print. Report what you can see; do not list a treatment you are merely inferring from the product name. [] when none"],
+  "serialNumber": "the printed serial/print run exactly as shown (e.g. \"23/99\"), else null — this is NOT the collector number",
+  "rookie": "\"Rookie Card (RC)\" when a rookie marking is printed; \"Rookie Patch Auto (RPA)\" only when the card is a rookie AND carries both an autograph and a memorabilia patch; null when no rookie marking is visible",
   "brand": "manufacturer e.g. The Pokemon Company, Wizards of the Coast, Topps, Panini, Upper Deck",
   "series": "broader series or product line name",
   "description": "brief description including notable details, special attributes, edition markers, print run",

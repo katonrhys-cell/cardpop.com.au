@@ -16,8 +16,12 @@ vi.mock('../../src/utils/cardSightClient.js', () => ({
   summarisePricingAud: mockSummarise,
   getSegmentName: mockGetSegmentName,
 }));
+// Mirror the SDK's real match-classification semantics — the route's ranking is
+// built on them, so stubbing them to vi.fn() would make the ordering tests vacuous.
 vi.mock('cardsightai', () => ({
-  getHighestConfidenceDetection: vi.fn(), isExactMatch: vi.fn(), isSetLevelMatch: vi.fn(),
+  getHighestConfidenceDetection: vi.fn(),
+  isExactMatch: (d) => d?.card?.id !== undefined,
+  isSetLevelMatch: (d) => d?.card?.id === undefined && d?.card?.setId !== undefined,
   hasGrading: vi.fn(), hasParallel: vi.fn(), getParallelInfo: vi.fn(), getFieldValue: vi.fn(),
 }));
 vi.mock('../../src/utils/collectionSegmentMap.js', () => ({ getSegmentsForCollection: mockGetSegments }));
@@ -168,5 +172,128 @@ describe('POST /identify', () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ identified: false });
     expect(res.body.message).toMatch(/no card detected/i);
+  });
+
+  it('skips CardSight entirely for a collection it has no catalog for', async () => {
+    // Empty segment list = "CardSight cannot hold this". Querying anyway can
+    // only return a card from the wrong hobby, so no API call should be made.
+    mockGetSegments.mockReturnValue([]);
+    const res = await request(app).post('/identify').field('collection', 'Magic: The Gathering');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ identified: false, unsupportedCollection: true });
+    expect(mockClient.identify.cardBySegment).not.toHaveBeenCalled();
+  });
+});
+
+// ─── POST /identify — cross-segment ranking ───────────────────────────────────
+// When no collection is given the route fans out across every segment, and each
+// segment answers with its best guess *within that segment*. Ranking has to be
+// explicit: the SDK's confidence-enum-only sort left ties to be decided by the
+// fan-out array order, so sports segments beat pokemon on every tie.
+
+const detection = (card, confidence) => ({ card, confidence });
+
+/** Route `cardBySegment(segment, image)` calls to per-segment detection lists. */
+function mockSegments(bySegment) {
+  mockGetSegments.mockReturnValue(Object.keys(bySegment));
+  mockClient.identify.cardBySegment.mockImplementation((seg) =>
+    Promise.resolve({ data: { detections: bySegment[seg] ?? [], messages: [] } })
+  );
+}
+
+describe('POST /identify — cross-segment ranking', () => {
+  beforeEach(() => {
+    mockGetSegmentName.mockImplementation(async (id) => id ?? null);
+    mockClient.catalog.cards.get.mockResolvedValue({ data: null });
+    mockClient.pricing.get.mockResolvedValue({ data: null });
+    mockSummarise.mockResolvedValue(null);
+  });
+
+  it('prefers an exact match over a set-level match from an earlier segment', async () => {
+    mockSegments({
+      basketball: [detection({ setId: 'nba-set', setName: 'Hoops', segmentId: 'basketball' }, 'High')],
+      pokemon:    [detection({ id: 'pk-1', name: 'Charizard', setName: 'Base Set', segmentId: 'pokemon' }, 'High')],
+    });
+
+    const res = await request(app).post('/identify');
+    expect(res.status).toBe(200);
+    expect(res.body.identified).toBe(true);
+    expect(res.body.card.name).toBe('Charizard');
+    expect(res.body.exactMatch).toBe(true);
+  });
+
+  it('prefers a higher confidence tier among equally specific matches', async () => {
+    mockSegments({
+      basketball: [detection({ id: 'nba-1', name: 'Wrong Player', segmentId: 'basketball' }, 'Low')],
+      pokemon:    [detection({ id: 'pk-1', name: 'Charizard', segmentId: 'pokemon' }, 'High')],
+    });
+
+    const res = await request(app).post('/identify');
+    expect(res.body.card.name).toBe('Charizard');
+    expect(res.body.confidence).toBe('High');
+  });
+
+  it('normalises the confidence enum into a numeric score and label', async () => {
+    mockSegments({
+      pokemon: [detection({ id: 'pk-1', name: 'Charizard', segmentId: 'pokemon' }, 'Medium')],
+    });
+
+    const res = await request(app).post('/identify');
+    // The enum must never reach the client as the only confidence signal —
+    // multiplying it by 100 is what rendered "NaN%" in the listing form.
+    expect(res.body.confidenceLabel).toBe('Medium');
+    expect(res.body.confidenceScore).toBeCloseTo(0.82, 2);
+    expect(Number.isNaN(res.body.confidenceScore)).toBe(false);
+  });
+
+  it('flags an equally-ranked match from another segment as ambiguous', async () => {
+    mockSegments({
+      basketball: [detection({ id: 'nba-1', name: 'Some Player', segmentId: 'basketball' }, 'High')],
+      pokemon:    [detection({ id: 'pk-1', name: 'Charizard', segmentId: 'pokemon' }, 'High')],
+    });
+
+    const res = await request(app).post('/identify');
+    expect(res.body.ambiguous).toBe(true);
+    expect(res.body.alternatives).toHaveLength(1);
+    expect(res.body.alternatives[0]).toMatchObject({ name: 'Charizard', exactMatch: true });
+  });
+
+  it('is not ambiguous when the winner outranks every other segment', async () => {
+    mockSegments({
+      basketball: [detection({ setId: 'nba-set', segmentId: 'basketball' }, 'Low')],
+      pokemon:    [detection({ id: 'pk-1', name: 'Charizard', segmentId: 'pokemon' }, 'High')],
+    });
+
+    const res = await request(app).post('/identify');
+    expect(res.body.ambiguous).toBe(false);
+    expect(res.body.card.name).toBe('Charizard');
+  });
+
+  it('ignores segments whose lookup rejected and still ranks the rest', async () => {
+    mockGetSegments.mockReturnValue(['basketball', 'pokemon']);
+    mockClient.identify.cardBySegment.mockImplementation((seg) =>
+      seg === 'basketball'
+        ? Promise.reject(new Error('segment unavailable'))
+        : Promise.resolve({ data: { detections: [detection({ id: 'pk-1', name: 'Charizard', segmentId: 'pokemon' }, 'High')], messages: [] } })
+    );
+
+    const res = await request(app).post('/identify');
+    expect(res.body.identified).toBe(true);
+    expect(res.body.card.name).toBe('Charizard');
+  });
+
+  it('caps alternatives and drops duplicates of the winning card', async () => {
+    mockSegments({
+      pokemon: [
+        detection({ id: 'pk-1', name: 'Charizard', segmentId: 'pokemon' }, 'High'),
+        detection({ id: 'pk-1', name: 'Charizard', segmentId: 'pokemon' }, 'High'),
+        detection({ id: 'pk-2', name: 'Blastoise', segmentId: 'pokemon' }, 'High'),
+      ],
+    });
+
+    const res = await request(app).post('/identify');
+    expect(res.body.card.name).toBe('Charizard');
+    expect(res.body.alternatives.map(a => a.name)).toEqual(['Blastoise']);
   });
 });
