@@ -219,6 +219,29 @@ routing it was 10 CardSight calls on every scan (the blind fan-out) plus an OCR
 call whenever that missed. The fan-out now only happens when the category can't
 be determined at all.
 
+## Measuring it
+
+`scripts/score-card-identification.mjs` runs labelled fixtures through the real
+pipeline and reports per-field accuracy. Fixtures and usage:
+`tests/fixtures/card-identification/README.md`.
+
+It imports the same modules the app does — prompt and escalation policy
+(`src/utils/cardOcr.js`), grounding rules (`utils/catalogueGrounding.js`),
+segment map, and CardSight ranking (`src/utils/cardsightRanking.js`) — so it
+measures production behaviour rather than a re-implementation. Those modules were
+pulled out of the scan route and the React hook for exactly this reason; keep new
+decision logic out of the route handler and the hook so it stays measurable.
+
+The one thing the script does re-implement is the **orchestration order**, which
+lives in `handleAnalyzeWithAI` (`pages/AddEditCardPage.jsx`) and is welded to
+React state. If you reorder the stages there, reorder them in the script too.
+
+Scoring splits every field into `correct` / `wrong` / `missing`, because **wrong
+is much worse than missing**: a blank field costs a seller some typing, a
+confidently wrong one reaches a live listing. Drive `wrong` to zero before
+chasing `correct` upward — filling more fields incorrectly improves coverage
+while lowering trust.
+
 ## Debugging a bad identification
 
 `/cardsight/identify` logs the winning segment, candidate count and ambiguity:

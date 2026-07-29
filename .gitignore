@@ -61,3 +61,10 @@ samples/stripe-connect-v2-marketplace-demo/.demo-data.json
 # Legacy PocketBase data — holds real password hashes / auth tokenKeys / PII.
 # Must never be committed (see SECURITY_AUDIT_2026-07-21.md → C1).
 pb_data/
+
+# Card-identification fixture photos. Full-resolution originals are a few MB
+# each, and downscaling them would defeat the point — the rectification step
+# they measure operates on the original. cases.json (the expected answers) IS
+# committed; the images live in the "cardpop.com.au- site backup" Drive folder
+# under card-identification-fixtures/. See the fixtures README.
+/tests/fixtures/card-identification/images/

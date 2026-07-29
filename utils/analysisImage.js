@@ -17,7 +17,7 @@
  * only improve the input or leave it alone, never block a scan.
  */
 
-import { detectAndCropCard } from '@/utils/detectCard.js';
+import { detectAndCropCard } from './detectCard.js';
 
 // Detection lazy-loads OpenCV (a large wasm chunk) on first use. Cap the wait so
 // a slow connection or a failed load delays the scan by this much at worst.
