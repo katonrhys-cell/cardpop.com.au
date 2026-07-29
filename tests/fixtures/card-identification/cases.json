@@ -1,1 +1,23 @@
-[]
+[
+  {
+    "id": "reaves-topps-chrome-base",
+    "image": "reaves-topps-chrome-base.jpg",
+    "expected": {
+      "name": "Austin Reaves",
+      "setName": "Topps Chrome",
+      "cardNumber": "126",
+      "collection": "NBA"
+    },
+    "notes": "2025-26 Topps Chrome base set, LA Lakers. Printed name is REAVES (not Reeves). Card is in a penny sleeve, photographed sideways, with glare across the right of the frame and a hard white/wood background edge that the quad detector could mistake for the card. The collector number is not on the front — expect it missing rather than wrong unless something invents one. `year` deliberately unasserted until we settle on release-year vs season."
+  },
+  {
+    "id": "cunningham-ball-of-duty",
+    "image": "cunningham-ball-of-duty.jpg",
+    "expected": {
+      "name": "Cade Cunningham",
+      "cardNumber": "BD11",
+      "collection": "NBA"
+    },
+    "notes": "2025-26 Topps Chrome 'Ball of Duty' insert, Detroit Pistons. Same sleeve/rotation/glare conditions. Insert code BD11 is not on the front. `setName` deliberately unasserted: for an insert it is unclear whether the right answer is the product (Topps Chrome) or the insert (Ball of Duty) — decide that before asserting it. `year` unasserted for the same reason as the other case."
+  }
+]

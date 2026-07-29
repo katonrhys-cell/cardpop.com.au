@@ -13,6 +13,40 @@ export function normalizeName(s) {
 // differing only by these is the same set read two ways ("Base" / "Base Set").
 const SET_NOISE_WORDS = new Set(['the', 'set', 'series', 'edition', 'expansion', 'collection', 'tcg']);
 
+const FULL_YEAR = /^(19|20)\d{2}$/;
+const SHORT_YEAR = /^\d{2}$/;
+
+/**
+ * Splits a leading season off a set name's words.
+ * "2025 26 topps chrome" → { years: ['2025', '26'], rest: ['topps', 'chrome'] }
+ */
+function splitSeasonPrefix(words) {
+  const years = [];
+  let i = 0;
+  while (i < words.length) {
+    const isFull = FULL_YEAR.test(words[i]);
+    // A bare two-digit token only reads as a year when it follows a full one,
+    // so the "2" in "Base Set 2" is never mistaken for a season.
+    const isShortFollowingYear = years.length > 0 && SHORT_YEAR.test(words[i]);
+    if (!isFull && !isShortFollowingYear) break;
+    years.push(words[i]);
+    i += 1;
+  }
+  return { years, rest: words.slice(i) };
+}
+
+/** Word-level comparison ignoring words that don't distinguish one set from another. */
+function coreWordsMatch(wordsA, wordsB) {
+  if (!wordsA.length || !wordsB.length) return false;
+  if (wordsA.join(' ') === wordsB.join(' ')) return true;
+
+  const [shortWords, longWords] = wordsA.length <= wordsB.length ? [wordsA, wordsB] : [wordsB, wordsA];
+  if (!shortWords.every(w => longWords.includes(w))) return false;
+
+  const shortSet = new Set(shortWords);
+  return longWords.filter(w => !shortSet.has(w)).every(w => SET_NOISE_WORDS.has(w));
+}
+
 /**
  * Whether two set names refer to the same set.
  *
@@ -21,20 +55,26 @@ const SET_NOISE_WORDS = new Set(['the', 'set', 'series', 'edition', 'expansion',
  * "Sword & Shield Promo" — different sets that would then corroborate each
  * other. Containment counts only when the extra words carry no distinguishing
  * information; a trailing "2" or "Promo" does.
+ *
+ * Sports sets add a second wrinkle. They are conventionally written with a
+ * season prefix — "2025-26 Topps Chrome" — while the same set read off the card
+ * is usually just "Topps Chrome". Those are the same set, and the year is
+ * carried by its own field, so a prefix present on only one side is ignored.
+ * When *both* carry one it still distinguishes: "1999 Topps Chrome" is not
+ * "2025-26 Topps Chrome".
  */
 export function setsMatch(a, b) {
-  const na = normalizeName(a);
-  const nb = normalizeName(b);
-  if (!na || !nb) return false;
-  if (na === nb) return true;
+  const wordsA = normalizeName(a).split(' ').filter(Boolean);
+  const wordsB = normalizeName(b).split(' ').filter(Boolean);
+  if (!wordsA.length || !wordsB.length) return false;
 
-  const [shorter, longer] = na.length <= nb.length ? [na, nb] : [nb, na];
-  const shortWords = shorter.split(' ').filter(Boolean);
-  const longWords = longer.split(' ').filter(Boolean);
-  if (!shortWords.every(w => longWords.includes(w))) return false;
+  const seasonA = splitSeasonPrefix(wordsA);
+  const seasonB = splitSeasonPrefix(wordsB);
+  if (seasonA.years.length && seasonB.years.length && seasonA.years[0] !== seasonB.years[0]) {
+    return false;
+  }
 
-  const shortSet = new Set(shortWords);
-  return longWords.filter(w => !shortSet.has(w)).every(w => SET_NOISE_WORDS.has(w));
+  return coreWordsMatch(seasonA.rest, seasonB.rest);
 }
 
 /** Normalised name with all spacing removed, so punctuation can't split a word. */
