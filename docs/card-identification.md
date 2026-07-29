@@ -30,11 +30,48 @@ confidence.
 
 The result is then grounded against the public card catalogue
 (`resolveAgainstCatalogue` → `/catalog/search`, covering Pokemon / Magic /
-Yu-Gi-Oh) so the free-text guess gets a real set, number and year where a
-confident candidate exists.
+Yu-Gi-Oh) — see "Grounding rules" below, which govern when that lookup is
+allowed to overwrite anything.
 
 **OCR runs first because it is the only step that can name the category.**
 Everything downstream depends on that.
+
+### Grounding rules
+
+The collector number is the discriminating field. A card *name* can match
+hundreds of printings; "4/102" pins down one. Two rules follow.
+
+**Query with it.** `/catalog/search` accepts a `number` param and pushes it into
+the upstream query (`number:"4"` for the Pokémon API, `cn:4` for Scryfall). The
+search runs in two passes — precise first, then name-only if that found nothing,
+so a misread number degrades to the old behaviour instead of returning nothing.
+The response's `precise` flag says which pass produced the results. YGOPRODeck
+has no number filter and always runs name-only.
+
+**Require corroboration before overwriting.** A candidate is accepted only when:
+
+- its collector number agrees with the printed one, **and** the name matches; or
+- no number was read, the name matches, **and** the set or year also agrees.
+
+A candidate whose number *positively disagrees* is disqualified outright — it is
+a different printing. An absent number is merely unknown and does not
+disqualify. Nothing is ever matched on non-name evidence alone.
+
+This bar exists because the previous one (name match alone) actively corrupted
+correct reads: for any card with multiple printings, an arbitrary candidate from
+the name search replaced the set, number and year that OCR had read correctly
+off the card. Grounding made the answer worse than no grounding.
+
+**What the overlay may change.** The catalogue is authoritative for set name,
+year and rarity — often absent or ambiguous on the card. The **collector number
+is not overwritten**: it is printed on the card and was read directly, so the
+catalogue only supplies one when OCR couldn't read it.
+
+`catalogueMatch.verified` lists the fields that actually agreed (`['name',
+'number', 'set', 'year']`), and the UI badge renders exactly that instead of
+claiming a blanket "set & card number verified". Sources that carry nothing to
+verify — the Yu-Gi-Oh adapter returns null set/number/year — therefore produce
+no match and no badge, rather than a false one.
 
 ### 2. Choosing the category
 

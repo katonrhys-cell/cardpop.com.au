@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { integratedAiClient } from '@/lib/integratedAiClient';
 import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 import { useIsMounted } from '@/hooks/useIsMounted.js';
+import { leadingCardNumber, cardNumbersMatch, cardNumbersConflict } from '@/utils/cardNumber.js';
 
 const SSEEventType = {
   Content: 'content',
@@ -146,34 +147,74 @@ function normalizeName(s) {
   return (s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-// Compare the leading numeric portion of two collector numbers, ignoring the
-// "/total" suffix and leading zeros (e.g. "004/102" matches "4").
-function cardNumbersMatch(a, b) {
-  const lead = v => String(v ?? '').split('/')[0].replace(/[^a-z0-9]/gi, '').replace(/^0+/, '').toLowerCase();
-  const na = lead(a);
-  const nb = lead(b);
-  return !!na && na === nb;
-}
-
-// Scores a catalogue candidate against the OCR result. Name match dominates;
-// a matching card number or year adds confidence.
-function scoreCandidate(ocr, candidate) {
+/** 'exact' | 'partial' | 'none' — how well a candidate's name matches the read. */
+function nameSignal(ocr, candidate) {
   const target = normalizeName(ocr.name);
   const name = normalizeName(candidate.name);
-  let score = 0;
+  if (!target || !name) return 'none';
+  if (name === target) return 'exact';
+  if (name.includes(target) || target.includes(name)) return 'partial';
+  return 'none';
+}
 
-  if (name && name === target) score += 3;
-  else if (name && (name.includes(target) || target.includes(name))) score += 2;
-  else {
-    const targetTokens = new Set(target.split(' ').filter(Boolean));
-    const overlap = name.split(' ').filter(w => targetTokens.has(w)).length;
-    score += Math.min(overlap, 2) * 0.5;
-  }
+function setsMatch(a, b) {
+  const na = normalizeName(a);
+  const nb = normalizeName(b);
+  if (!na || !nb) return false;
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
 
-  if (ocr.cardNumber && cardNumbersMatch(ocr.cardNumber, candidate.cardNumber)) score += 2;
-  if (ocr.releaseYear && candidate.year && String(candidate.year) === String(ocr.releaseYear)) score += 1;
+/**
+ * Compares one catalogue candidate against what OCR read off the card, and
+ * reports which fields independently agree.
+ *
+ * `numberConflicts` is tracked separately from "doesn't match": a candidate
+ * with no number on record is merely unknown, but one whose number positively
+ * disagrees is a different printing and must never be merged in.
+ */
+function evaluateCandidate(ocr, candidate) {
+  const name = nameSignal(ocr, candidate);
+  const numberMatches = cardNumbersMatch(ocr.cardNumber, candidate.cardNumber);
+  const numberConflicts = cardNumbersConflict(ocr.cardNumber, candidate.cardNumber);
+  const setMatches = setsMatch(ocr.cardSetName, candidate.setName);
+  const yearMatches = Boolean(
+    ocr.releaseYear && candidate.year && String(candidate.year) === String(ocr.releaseYear)
+  );
 
-  return score;
+  const verified = [];
+  if (name !== 'none') verified.push('name');
+  if (numberMatches) verified.push('number');
+  if (setMatches) verified.push('set');
+  if (yearMatches) verified.push('year');
+
+  return { name, numberMatches, numberConflicts, setMatches, yearMatches, verified };
+}
+
+/**
+ * Whether a candidate is trustworthy enough to overwrite what OCR read.
+ *
+ * The bar is deliberately high. A name match alone used to be enough, which
+ * meant that for any card with more than one printing — Pikachu, Charizard,
+ * Black Lotus — an arbitrary candidate from the name search replaced the set,
+ * number and year that had been read correctly off the card. Grounding made
+ * the answer worse than no grounding at all.
+ *
+ * So: the printed collector number settles it when both sides have one, and
+ * without it we need two independent agreements before overwriting anything.
+ */
+function isAcceptableMatch(evaluation) {
+  if (evaluation.numberConflicts) return false;  // different printing
+  if (evaluation.name === 'none') return false;  // never match on non-name evidence alone
+  if (evaluation.numberMatches) return true;     // name + printed number agree
+  return evaluation.setMatches || evaluation.yearMatches;
+}
+
+/** Ranks acceptable candidates: corroborated fields first, then name quality. */
+function matchStrength(evaluation) {
+  return (evaluation.numberMatches ? 4 : 0)
+    + (evaluation.setMatches ? 2 : 0)
+    + (evaluation.yearMatches ? 1 : 0)
+    + (evaluation.name === 'exact' ? 2 : evaluation.name === 'partial' ? 1 : 0);
 }
 
 // Resolves the OCR guess against the public card catalogue and, when a
@@ -185,7 +226,12 @@ async function resolveAgainstCatalogue(result) {
   if (!name) return result;
 
   try {
-    const params = new URLSearchParams({ q: name, take: '8' });
+    // Send the collector number so the catalogue can filter on it upstream
+    // instead of us picking through an arbitrary page of same-name printings.
+    // Without one, ask for more rows — that's the harder case, not the easier.
+    const cardNumber = leadingCardNumber(result.cardNumber);
+    const params = new URLSearchParams({ q: name, take: cardNumber ? '8' : '12' });
+    if (cardNumber) params.set('number', cardNumber);
     const collection = catalogueCollectionParam(result.collectionType);
     if (collection) params.set('collection', collection);
 
@@ -194,25 +240,30 @@ async function resolveAgainstCatalogue(result) {
     if (!candidates.length) return result;
 
     const ranked = candidates
-      .map(c => ({ candidate: c, score: scoreCandidate(result, c) }))
-      .sort((a, b) => b.score - a.score);
+      .map(candidate => ({ candidate, evaluation: evaluateCandidate(result, candidate) }))
+      .sort((a, b) => matchStrength(b.evaluation) - matchStrength(a.evaluation));
 
     const top3 = ranked.slice(0, 3).map(r => r.candidate);
-    const best = ranked[0];
+    const best = ranked.find(r => isAcceptableMatch(r.evaluation));
 
-    // Below this threshold we surface candidates but don't override OCR fields.
-    if (!best || best.score < 2) {
+    // Nothing corroborated well enough — surface the candidates for the seller
+    // to look at, but leave every field exactly as it was read off the card.
+    if (!best) {
       return { ...result, catalogueCandidates: top3 };
     }
 
     const m = best.candidate;
     return {
       ...result,
+      // The catalogue is authoritative for the set, year and rarity — those are
+      // often absent or ambiguous on the card itself.
       cardSetName: m.setName || result.cardSetName,
-      cardNumber: m.cardNumber || result.cardNumber,
       releaseYear: m.year ? String(m.year) : result.releaseYear,
       rarity: result.rarity || mapRarity(m.rarity),
       series: m.setName || result.series,
+      // The collector number is printed on the card and was read directly, so
+      // it stands. The catalogue only supplies one when OCR couldn't read it.
+      cardNumber: result.cardNumber || m.cardNumber || '',
       catalogueMatch: {
         id: m.id,
         name: m.name,
@@ -222,6 +273,9 @@ async function resolveAgainstCatalogue(result) {
         rarity: m.rarity ?? null,
         imageUrl: m.imageUrl ?? null,
         source: m.source ?? null,
+        // Exactly which fields agreed, so the UI can say what was checked
+        // rather than claiming a blanket verification.
+        verified: best.evaluation.verified,
       },
       catalogueCandidates: top3,
     };

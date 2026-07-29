@@ -1667,7 +1667,10 @@ const AddEditCardPage = () => {
                           )}
                           {scanResult.catalogueMatch && (
                             <div className="text-[11px] font-semibold text-emerald-700 bg-emerald-500/10 rounded-lg px-2.5 py-1.5 mb-2">
-                              ✓ Matched to catalogue ({scanResult.catalogueMatch.source}) — set &amp; card number verified
+                              ✓ Matched to catalogue ({scanResult.catalogueMatch.source})
+                              {scanResult.catalogueMatch.verified?.length
+                                ? ` — ${scanResult.catalogueMatch.verified.join(' + ')} verified`
+                                : ''}
                             </div>
                           )}
                           <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-foreground/80 mb-2">
