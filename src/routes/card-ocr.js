@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { uploadFiles } from '../middleware/file-upload.js';
 import { integratedAiRateLimit } from '../middleware/integrated-ai-rate-limit.js';
 import { supabaseAuth } from '../middleware/supabase-auth.js';
-import { runCardOcr, toImageBlocks } from '../utils/cardOcr.js';
+import { runCardOcr, toImageBlocks, describeOcrFailure } from '../utils/cardOcr.js';
 import logger from '../utils/logger.js';
 
 const router = Router();
@@ -51,8 +51,10 @@ router.post('/scan', integratedAiRateLimit, requireAuth, uploadFiles({
 		sseWrite(res, 'completed', '[COMPLETED]');
 		res.end();
 	} catch (err) {
+		// Full detail to the logs, a safe summary to the browser — the provider's
+		// message can carry our account and billing state.
 		logger.error(`[CARD_OCR] scan failed: ${err.message}`);
-		sseWrite(res, 'error', err.message);
+		sseWrite(res, 'error', describeOcrFailure(err));
 		res.end();
 	}
 });
