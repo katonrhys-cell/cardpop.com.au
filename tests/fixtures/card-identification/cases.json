@@ -19,5 +19,16 @@
       "collection": "NBA"
     },
     "notes": "2025-26 Topps Chrome 'Ball of Duty' insert, Detroit Pistons. Same sleeve/rotation/glare conditions. Insert code BD11 is not on the front. `setName` deliberately unasserted: for an insert it is unclear whether the right answer is the product (Topps Chrome) or the insert (Ball of Duty) — decide that before asserting it. `year` unasserted for the same reason as the other case."
+  },
+  {
+    "id": "gg-jackson-donruss-red-laser",
+    "image": "gg-jackson-donruss-red-laser.jpg",
+    "expected": {
+      "name": "GG Jackson II",
+      "setName": "Donruss",
+      "collection": "NBA",
+      "parallel": "Red Laser Holo"
+    },
+    "notes": "2023-24 Donruss Rated Rookie, Memphis Grizzlies. First fixture in a rigid magnetic holder rather than a penny sleeve, first held in hand (fingers and a blurred room in frame rather than a flat surface), first non-Topps manufacturer, and first parallel. The parallel is the point: base and Red Laser Holo share name, set, number and year but are worth very different amounts, so missing it misprices the listing. Expect `parallel` to come back missing unless CardSight returns a trustworthy exact match — OCR has no field that reaches it. Name asserted with the 'II' suffix as printed; if catalogues return 'GG Jackson' this will score wrong, which is a decision to make on the evidence rather than by loosening matching up front. `cardNumber` and `year` unasserted (number is on the back; release-year convention still unsettled)."
   }
 ]

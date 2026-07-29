@@ -84,7 +84,15 @@ Each asserted field comes back `correct`, `wrong` or `missing`:
   number that matters: it reaches a live listing and misrepresents the sale.
 - **missing** — nothing was produced. Costs the seller some typing.
 - **correct** — agrees, allowing for the tolerances the pipeline itself uses:
-  `4/102` matches `4`, and `Base` matches `Base Set` (but not `Base Set 2`).
+  `4/102` matches `4`; `Base` matches `Base Set` (but not `Base Set 2`); and a
+  season prefix is ignored when only one side has it, so `Topps Chrome` matches
+  `2025-26 Topps Chrome` but not `1999 Topps Chrome`.
+
+`parallel` is scored too, and strictly — on a modern sports card it is usually
+the biggest driver of value, since the base and the Red Laser Holo of the same
+player share name, set, number and year. Note that **only CardSight can fill
+it**: OCR's `cardType` read goes into the listing notes and never reaches a
+field, so expect `missing` unless CardSight returns a trustworthy exact match.
 
 A case is **clean** only when nothing came back wrong. Chase `wrong` to zero
 before chasing `correct` upward — filling more fields incorrectly raises

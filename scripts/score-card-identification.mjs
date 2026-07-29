@@ -31,7 +31,7 @@ import { getSegmentsForCollection } from '../src/utils/collectionSegmentMap.js';
 import { rankCandidates, hasAmbiguousWinner } from '../src/utils/cardsightRanking.js';
 import { isLowConfidence } from '../utils/cardsightConfidence.js';
 import { scoreCase, summarise, formatSummary, VERDICT, SCORED_FIELDS } from '../utils/identificationScore.js';
-import { isExactMatch } from 'cardsightai';
+import { isExactMatch, hasParallel, getParallelInfo } from 'cardsightai';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURES = path.join(REPO_ROOT, 'tests/fixtures/card-identification');
@@ -125,6 +125,7 @@ async function identifyWithCardSight(buffer, mimetype, collection, log) {
   const best = ranked[0].detection;
   return {
     card: best.card,
+    parallel: hasParallel(best) ? (getParallelInfo(best)?.name ?? null) : null,
     confidence: best.confidence,
     segment: ranked[0].segment,
     exactMatch: isExactMatch(best),
@@ -164,6 +165,11 @@ async function runCase(fixture, rectifier, log) {
     cardNumber: ocr.cardNumber,
     year: ocr.releaseYear,
     collection: ocr.collectionType,
+    // Only CardSight can fill this: mapCardSightToFormFields sets parallelName,
+    // while OCR's `cardType` read goes into the notes and never reaches a field.
+    // Left blank here on purpose so the harness shows that gap rather than
+    // papering over it.
+    parallel: '',
   };
 
   // Stage 2 — the category OCR read chooses the segment.
@@ -179,6 +185,7 @@ async function runCase(fixture, rectifier, log) {
     if (c?.setName) fields.setName = c.setName;
     if (c?.number) fields.cardNumber = c.number;
     if (c?.year) fields.year = String(c.year);
+    if (cardsight.parallel) fields.parallel = cardsight.parallel;
   }
 
   return {

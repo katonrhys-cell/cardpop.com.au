@@ -15,8 +15,16 @@
 import { namesMatch, setsMatch, normalizeName } from './cardMatch.js';
 import { cardNumbersMatch } from './cardNumber.js';
 
-/** Fields scored, and how each is compared. */
-export const SCORED_FIELDS = ['name', 'setName', 'cardNumber', 'year', 'collection'];
+/**
+ * Fields scored, and how each is compared.
+ *
+ * `parallel` is here because on a modern sports card it is usually the single
+ * biggest driver of value — a Red Laser Holo and the base card of the same
+ * player carry the same name, set, number and year, and are worth wildly
+ * different amounts. A pipeline that gets everything else right and misses the
+ * parallel has still mispriced the listing.
+ */
+export const SCORED_FIELDS = ['name', 'setName', 'cardNumber', 'year', 'collection', 'parallel'];
 
 export const VERDICT = {
   CORRECT: 'correct',
@@ -28,13 +36,18 @@ export const VERDICT = {
 const isBlank = v => v === null || v === undefined || String(v).trim() === '';
 
 const COMPARATORS = {
-  // Set names get the same noise-word tolerance the pipeline uses ("Base" is
-  // "Base Set"); everything else is exact after normalisation.
+  // Set names get the same noise-word and season-prefix tolerance the pipeline
+  // uses ("Base" is "Base Set", "Topps Chrome" is "2025-26 Topps Chrome").
   setName: setsMatch,
   name: namesMatch,
   cardNumber: cardNumbersMatch,
   year: (a, b) => String(a).trim() === String(b).trim(),
   collection: (a, b) => normalizeName(a) === normalizeName(b),
+  // Deliberately strict to start with. Parallel names are close-packed within a
+  // product ("Red Laser" and "Red Laser Holo" can be different parallels), so
+  // any tolerance here should be added on the evidence of a real run rather
+  // than guessed at now.
+  parallel: (a, b) => normalizeName(a) === normalizeName(b),
 };
 
 /**

@@ -43,6 +43,19 @@ describe('scoreField', () => {
     expect(scoreField('name', "Farfetch'd", 'FARFETCHD')).toBe(VERDICT.CORRECT);
   });
 
+  it('scores the parallel, since it drives a modern sports card\'s value', () => {
+    expect(scoreField('parallel', 'Red Laser Holo', 'Red Laser Holo')).toBe(VERDICT.CORRECT);
+    expect(scoreField('parallel', 'Red Laser Holo', 'Silver Prizm')).toBe(VERDICT.WRONG);
+    // Blank is the common case today: only CardSight can populate it.
+    expect(scoreField('parallel', 'Red Laser Holo', '')).toBe(VERDICT.MISSING);
+  });
+
+  it('keeps parallel matching strict for now', () => {
+    // Parallel names pack closely inside one product, so tolerance here should
+    // come from a real run rather than a guess.
+    expect(scoreField('parallel', 'Red Laser Holo', 'Red Laser')).toBe(VERDICT.WRONG);
+  });
+
   it('does not accept a partial name as correct', () => {
     // The grounding step accepts partial containment when *searching*; scoring
     // against known truth must not.
