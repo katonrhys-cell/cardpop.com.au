@@ -189,9 +189,14 @@ const AddEditCardPage = () => {
   // numeric fields; fall back to deriving them for older/cached payloads.
   const csConfidence = cardSightResult?.confidenceScore ?? confidenceScore(cardSightResult?.confidence);
   const csConfidenceLabel = cardSightResult?.confidenceLabel ?? confidenceLabel(cardSightResult?.confidence);
+  // Mirrors the "trustworthy" test in handleAnalyzeWithAI: anything short of a
+  // clean exact hit is shown as a suggestion, because it was NOT applied to the
+  // form — the fields on screen came from the OCR pass instead.
   const csNeedsReview = Boolean(
     cardSightResult?.identified &&
-    (cardSightResult.ambiguous || isLowConfidence(cardSightResult.confidenceScore ?? cardSightResult.confidence))
+    !(cardSightResult.exactMatch
+      && !cardSightResult.ambiguous
+      && !isLowConfidence(cardSightResult.confidenceScore ?? cardSightResult.confidence))
   );
 
   // Photo template modal state
@@ -676,45 +681,23 @@ const AddEditCardPage = () => {
     clearScan();
     clearCardSight();
 
-    // 1. Try CardSight catalog identification first (returns result directly)
-    const csResult = await cardSightIdentify(frontImage, formData.collection);
-
-    // If CardSight service is unavailable, fall through to OCR — don't bail out
-    if (csResult?.identified) {
-      const fields = mapCardSightToFormFields(csResult);
-      setFormData(prev => ({ ...prev, ...fields }));
-      if (csResult.pricing?.avgPrice) {
-        set('estimatedValue', String(csResult.pricing.avgPrice.toFixed(2)));
-      }
-      if (csResult.card?.id) fetchPricingById(csResult.card.id);
-      else if (csResult.card?.name) fetchPricingByName(csResult.card.name);
-      setIsAutoFilled(true);
-      // Only claim a confident identification when the match actually is one —
-      // an unqualified success toast on a weak or cross-category match is how
-      // wrong details end up saved without anyone looking at them.
-      if (csResult.ambiguous) {
-        toast.warning('Matched more than one category — check the details before saving.');
-      } else if (isLowConfidence(csResult.confidenceScore ?? csResult.confidence)) {
-        toast.warning('Possible match found — please verify the details.');
-      } else {
-        toast.success('Card identified! Fields auto-filled from catalog.');
-      }
-      return;
-    }
-
-    // 2. CardSight didn't find the card — fall back to OCR
-    const advisory = csResult?.serverMessages?.[0]?.message;
-    if (advisory && !csResult?.apiError) toast.info(`Catalog match not found: ${advisory}`);
-
     const conditionMap = {
       'Mint': 'mint', 'Near Mint': 'near_mint', 'Excellent': 'excellent',
       'Good': 'good', 'Fair': 'light_played',
     };
     const gradingCompanyMap = { 'PSA': 'psa', 'BGS': 'bgs', 'CGC': 'cgc', 'SGC': 'sgc', 'ACE': 'ace' };
 
+    // ── 1. OCR first ────────────────────────────────────────────────────────
+    // OCR reads the card itself, so it can name the category before we ask a
+    // catalog about it. That is what lets step 2 query a single CardSight
+    // segment. Scanning blind meant fanning out across every segment, and each
+    // one answers with its best guess *within that segment* — the reason a
+    // Pokemon card could come back as a hockey card.
+    //
     // Pass the front plus any back/extra images so OCR can read set codes and
     // collector numbers that are clearer (or only present) on the back.
     const ocrResult = await scanCard([frontImage, ...extraFiles.filter(Boolean)].slice(0, 3));
+
     if (ocrResult) {
       setFormData(prev => ({
         ...prev,
@@ -735,10 +718,49 @@ const AddEditCardPage = () => {
           ocrResult.cardType ? `Type: ${ocrResult.cardType}` : '',
         ].filter(Boolean).join('\n') || '',
       }));
-      lookupPrice(ocrResult);
       setIsAutoFilled(true);
-      // Success/failure feedback is surfaced by useCardOCR itself.
     }
+
+    // ── 2. CardSight, narrowed to the category OCR read ─────────────────────
+    // A collection the seller picked themselves always wins over OCR's guess.
+    const collection = formData.collection || ocrResult?.collectionType || '';
+    const csResult = await cardSightIdentify(frontImage, collection);
+
+    // CardSight has no catalog outside its ten segments, so a Magic or AFL card
+    // is expected to come back unidentified — the OCR fields above (already
+    // grounded against the public TCG catalogue by useCardOCR) are the answer.
+    if (!csResult?.identified) {
+      const advisory = csResult?.serverMessages?.[0]?.message;
+      if (advisory && !csResult?.apiError && !csResult?.unsupportedCollection) {
+        toast.info(`Catalog match not found: ${advisory}`);
+      }
+      if (ocrResult) lookupPrice(ocrResult);
+      return;
+    }
+
+    // ── 3. Overlay the catalog record ───────────────────────────────────────
+    // CardSight is authoritative when it returns a clean exact hit; a weak or
+    // cross-category match is left as a suggestion in the results panel so it
+    // can't quietly overwrite what OCR read off the card.
+    const trustworthy = csResult.exactMatch
+      && !csResult.ambiguous
+      && !isLowConfidence(csResult.confidenceScore ?? csResult.confidence);
+
+    if (trustworthy) {
+      setFormData(prev => ({ ...prev, ...mapCardSightToFormFields(csResult) }));
+      if (csResult.pricing?.avgPrice) {
+        set('estimatedValue', String(csResult.pricing.avgPrice.toFixed(2)));
+      }
+      setIsAutoFilled(true);
+      toast.success('Card identified! Fields auto-filled from catalog.');
+    } else if (csResult.ambiguous) {
+      toast.warning('Matched more than one category — check the details before saving.');
+    } else {
+      toast.warning('Possible match found — please verify the details.');
+    }
+
+    if (csResult.card?.id) fetchPricingById(csResult.card.id);
+    else if (csResult.card?.name) fetchPricingByName(csResult.card.name);
   };
 
   // Applies a runner-up detection when the top match was the wrong card. The
@@ -1533,7 +1555,11 @@ const AddEditCardPage = () => {
                   {/* No-match state — analysis finished but card not found */}
                   {!isScanning && !isIdentifying && cardSightResult && !cardSightResult.identified && !scanResult && (
                     <div className="p-3 rounded-xl border border-border bg-muted/30 animate-in fade-in">
-                      <p className="text-xs text-muted-foreground">Card not found in catalog. Try a clearer image or fill in the details manually.</p>
+                      <p className="text-xs text-muted-foreground">
+                        {cardSightResult.unsupportedCollection
+                          ? `${formData.collection || 'This category'} isn't covered by the card catalog — fill in the details manually.`
+                          : 'Card not found in catalog. Try a clearer image or fill in the details manually.'}
+                      </p>
                     </div>
                   )}
 
@@ -1631,8 +1657,14 @@ const AddEditCardPage = () => {
                         </>
                       )}
 
-                      {scanResult && !cardSightResult?.identified && (
+                      {scanResult && (!cardSightResult?.identified || csNeedsReview) && (
                         <>
+                          {csNeedsReview && (
+                            <p className="text-[10px] text-muted-foreground mb-1">
+                              Fields below were read from your photo — the catalog match above was too
+                              uncertain to apply automatically.
+                            </p>
+                          )}
                           {scanResult.catalogueMatch && (
                             <div className="text-[11px] font-semibold text-emerald-700 bg-emerald-500/10 rounded-lg px-2.5 py-1.5 mb-2">
                               ✓ Matched to catalogue ({scanResult.catalogueMatch.source}) — set &amp; card number verified

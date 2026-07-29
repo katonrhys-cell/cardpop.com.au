@@ -114,6 +114,21 @@ router.post(
       // If collection is specified, only search those segments; otherwise try all.
       const collection = req.body?.collection || '';
       const SEGMENTS = getSegmentsForCollection(collection);
+
+      // A collection CardSight has no catalog for (Magic, One Piece, AFL, …).
+      // Asking anyway is worse than not asking: every segment answers with its
+      // best guess *within that segment*, so the only possible reply is a
+      // confident-looking card from the wrong hobby. Bail out and let the
+      // caller fall back to OCR + the public TCG catalogue.
+      if (!SEGMENTS.length) {
+        logger.info(`[CARDSIGHT] Skipping identify — "${collection}" is not in the CardSight catalog`);
+        return res.json({
+          identified: false,
+          unsupportedCollection: true,
+          message: `${collection} cards aren't in the CardSight catalog.`,
+        });
+      }
+
       const segmentResults = await Promise.allSettled(
         SEGMENTS.map(seg => client.identify.cardBySegment(seg, image))
       );

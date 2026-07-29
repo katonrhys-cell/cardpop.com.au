@@ -173,6 +173,17 @@ describe('POST /identify', () => {
     expect(res.body).toMatchObject({ identified: false });
     expect(res.body.message).toMatch(/no card detected/i);
   });
+
+  it('skips CardSight entirely for a collection it has no catalog for', async () => {
+    // Empty segment list = "CardSight cannot hold this". Querying anyway can
+    // only return a card from the wrong hobby, so no API call should be made.
+    mockGetSegments.mockReturnValue([]);
+    const res = await request(app).post('/identify').field('collection', 'Magic: The Gathering');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ identified: false, unsupportedCollection: true });
+    expect(mockClient.identify.cardBySegment).not.toHaveBeenCalled();
+  });
 });
 
 // ─── POST /identify — cross-segment ranking ───────────────────────────────────
