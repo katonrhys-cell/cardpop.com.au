@@ -45,7 +45,7 @@ import { isSellingEntitlementError } from '@/utils/listingErrors.js';
 import { loadListingDraft, saveListingDraft, clearListingDraft, hasMeaningfulContent } from '@/lib/listingDraft.js';
 import { shouldAutoIdentify, buildPriceLookupQuery } from '@/utils/listingFlow.js';
 import { confidenceScore, confidenceLabel, isLowConfidence } from '@/utils/cardsightConfidence.js';
-import { prepareAnalysisImage } from '@/utils/analysisImage.js';
+import { prepareAnalysisImages } from '@/utils/analysisImage.js';
 import { validateListingForm, validateListingField } from '@/utils/listingValidation.js';
 import WizardStepper from '@/components/WizardStepper.jsx';
 import { CARD_LANGUAGES } from '@/lib/cardFilters.js';
@@ -697,9 +697,17 @@ const AddEditCardPage = () => {
     // original on any failure — see utils/analysisImage.js. Only the front is
     // processed; cropping the extras too would double the wait for a secondary
     // read. The seller's own photo is untouched — this is analysis input only.
+    // Also resizes every image to something worth sending: Vercel rejects a
+    // request body over 4.5 MB with a 413 before any of our code runs, and raw
+    // phone photos are 3-5 MB each. See utils/analysisImage.js.
     setIsPreparingImage(true);
-    const { file: analysisImage } = await prepareAnalysisImage(frontImage)
-      .finally(() => setIsPreparingImage(false));
+    const { files: analysisImages, dropped } = await prepareAnalysisImages(
+      [frontImage, ...extraFiles.filter(Boolean)].slice(0, 3),
+    ).finally(() => setIsPreparingImage(false));
+    const analysisImage = analysisImages[0] ?? frontImage;
+    if (dropped > 0) {
+      toast.info(`Using the front${analysisImages.length > 1 ? ' and one other angle' : ' photo only'} — the rest were too large to send together.`);
+    }
 
     // ── 1. OCR first ────────────────────────────────────────────────────────
     // OCR reads the card itself, so it can name the category before we ask a
@@ -710,7 +718,7 @@ const AddEditCardPage = () => {
     //
     // Pass the front plus any back/extra images so OCR can read set codes and
     // collector numbers that are clearer (or only present) on the back.
-    const ocrResult = await scanCard([analysisImage, ...extraFiles.filter(Boolean)].slice(0, 3));
+    const ocrResult = await scanCard(analysisImages);
 
     if (ocrResult) {
       // Resolved against the collection OCR just read, falling back to whatever

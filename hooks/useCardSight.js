@@ -36,7 +36,11 @@ export function useCardSight() {
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
         // Return structured error so caller can show a meaningful message
-        const errMsg = err.error || err.message || `CardSight identify failed (${response.status})`;
+        // A 413 comes from Vercel's body limit, not CardSight, and its raw body
+        // isn't JSON — say something a seller can act on.
+        const errMsg = response.status === 413
+          ? 'That photo is too large to analyse. Try a smaller one.'
+          : (err.error || err.message || `CardSight identify failed (${response.status})`);
         return { identified: false, apiError: true, message: errMsg };
       }
 
