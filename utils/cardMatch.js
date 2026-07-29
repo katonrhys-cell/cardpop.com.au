@@ -77,6 +77,31 @@ export function setsMatch(a, b) {
   return coreWordsMatch(seasonA.rest, seasonB.rest);
 }
 
+/**
+ * Canonicalises a year or season to one written form.
+ *
+ * Sports products that span two calendar years are conventionally written as a
+ * season — CardPop's chosen format is "2025-26" — but the same season turns up
+ * as "2025-2026", "2025/26" and "2025–26" depending on the source. Those are
+ * formatting differences, not disagreements.
+ *
+ * A single year stays a single year: "2025" is deliberately NOT equal to
+ * "2025-26", because a listing showing only the first year is missing the
+ * season the seller asked for.
+ */
+export function normalizeSeason(value) {
+  const raw = String(value ?? '').trim();
+
+  const span = raw.match(/^(\d{4})\s*[-/–—]\s*(\d{2,4})$/);
+  if (span) {
+    const [, start, rawEnd] = span;
+    return `${start}-${rawEnd.length === 4 ? rawEnd.slice(2) : rawEnd}`;
+  }
+
+  const single = raw.match(/^(\d{4})$/);
+  return single ? single[1] : raw.toLowerCase();
+}
+
 /** Normalised name with all spacing removed, so punctuation can't split a word. */
 const compactName = s => normalizeName(s).replace(/ /g, '');
 

@@ -12,19 +12,23 @@
  * (`scripts/score-card-identification.mjs`) supplies the actual results.
  */
 
-import { namesMatch, setsMatch, normalizeName } from './cardMatch.js';
+import { namesMatch, setsMatch, normalizeName, normalizeSeason } from './cardMatch.js';
 import { cardNumbersMatch } from './cardNumber.js';
 
 /**
  * Fields scored, and how each is compared.
  *
- * `parallel` is here because on a modern sports card it is usually the single
- * biggest driver of value — a Red Laser Holo and the base card of the same
- * player carry the same name, set, number and year, and are worth wildly
- * different amounts. A pipeline that gets everything else right and misses the
- * parallel has still mispriced the listing.
+ * `parallel` and `insert` are here because on a modern sports card they are
+ * usually the biggest drivers of value — a Red Laser Holo and the base card of
+ * the same player carry the same name, set, number and year, and are worth
+ * wildly different amounts. A pipeline that gets everything else right and
+ * misses them has still mispriced the listing.
+ *
+ * `setName` is the product a card came out of ("Topps Chrome"); `insert` is the
+ * subset within it ("Ball of Duty"). Keeping them apart matters — folding the
+ * insert into the set name loses the product, and vice versa.
  */
-export const SCORED_FIELDS = ['name', 'setName', 'cardNumber', 'year', 'collection', 'parallel'];
+export const SCORED_FIELDS = ['name', 'setName', 'cardNumber', 'year', 'collection', 'insert', 'parallel'];
 
 export const VERDICT = {
   CORRECT: 'correct',
@@ -41,13 +45,19 @@ const COMPARATORS = {
   setName: setsMatch,
   name: namesMatch,
   cardNumber: cardNumbersMatch,
-  year: (a, b) => String(a).trim() === String(b).trim(),
+  // Season formatting varies by source ("2025-2026", "2025/26"); the written
+  // form is canonicalised, but "2025" stays distinct from "2025-26" — a listing
+  // showing only the first year is missing the season.
+  year: (a, b) => normalizeSeason(a) === normalizeSeason(b),
   collection: (a, b) => normalizeName(a) === normalizeName(b),
   // Deliberately strict to start with. Parallel names are close-packed within a
   // product ("Red Laser" and "Red Laser Holo" can be different parallels), so
   // any tolerance here should be added on the evidence of a real run rather
   // than guessed at now.
   parallel: (a, b) => normalizeName(a) === normalizeName(b),
+  // The insert/subset a card belongs to ("Ball of Duty"), kept separate from
+  // the product it came out of ("Topps Chrome").
+  insert: (a, b) => normalizeName(a) === normalizeName(b),
 };
 
 /**

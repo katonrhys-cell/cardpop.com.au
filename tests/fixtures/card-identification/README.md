@@ -29,7 +29,9 @@ pulls in) enable the catalog stage, and the run says so when they're absent.
     "setName": "Base Set",
     "cardNumber": "4/102",
     "year": "1999",
-    "collection": "Pokemon"
+    "collection": "Pokemon",
+    "insert": null,
+    "parallel": null
   },
   "notes": "Holo, unlimited. Previously came back as a hockey card."
 }
@@ -88,7 +90,19 @@ Each asserted field comes back `correct`, `wrong` or `missing`:
   season prefix is ignored when only one side has it, so `Topps Chrome` matches
   `2025-26 Topps Chrome` but not `1999 Topps Chrome`.
 
-`parallel` is scored too, and strictly — on a modern sports card it is usually
+### Conventions
+
+- **`year`** is the season for sports products that span two calendar years —
+  `2025-26`, not `2025`. Single-year products (Pokemon, MLB) use `1999`.
+  Formatting is canonicalised, so `2025-2026` and `2025/26` both count, but a
+  bare `2025` does **not** match `2025-26`: a listing showing only the first
+  year is missing the season.
+- **`setName`** is the product a card came out of — `Topps Chrome`, `Donruss`.
+- **`insert`** is the treatment *within* that product — `Ball of Duty`,
+  `Rated Rookie`. A card has both, and folding either into the other loses
+  information the listing needs.
+
+`insert` and `parallel` are scored too, and strictly — on a modern sports card it is usually
 the biggest driver of value, since the base and the Red Laser Holo of the same
 player share name, set, number and year. Note that **only CardSight can fill
 it**: OCR's `cardType` read goes into the listing notes and never reaches a

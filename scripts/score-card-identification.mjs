@@ -165,6 +165,7 @@ async function runCase(fixture, rectifier, log) {
     cardNumber: ocr.cardNumber,
     year: ocr.releaseYear,
     collection: ocr.collectionType,
+    insert: ocr.insertName,
     // Only CardSight can fill this: mapCardSightToFormFields sets parallelName,
     // while OCR's `cardType` read goes into the notes and never reaches a field.
     // Left blank here on purpose so the harness shows that gap rather than

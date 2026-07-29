@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeName, setsMatch, namesMatch } from '@/utils/cardMatch.js';
+import { normalizeName, setsMatch, namesMatch, normalizeSeason } from '@/utils/cardMatch.js';
 
 describe('normalizeName', () => {
   it('lowercases and reduces punctuation to single spaces', () => {
@@ -88,5 +88,34 @@ describe('namesMatch', () => {
   it('returns false when either side is missing', () => {
     expect(namesMatch('', 'Charizard')).toBe(false);
     expect(namesMatch('Charizard', null)).toBe(false);
+  });
+});
+
+describe('normalizeSeason', () => {
+  it('canonicalises the ways a season gets written', () => {
+    expect(normalizeSeason('2025-26')).toBe('2025-26');
+    expect(normalizeSeason('2025-2026')).toBe('2025-26');
+    expect(normalizeSeason('2025/26')).toBe('2025-26');
+    expect(normalizeSeason('2025 - 2026')).toBe('2025-26');
+  });
+
+  it('leaves a single year alone', () => {
+    expect(normalizeSeason('1999')).toBe('1999');
+  });
+
+  it('keeps a single year distinct from a season', () => {
+    // A listing showing only "2025" is missing the season the seller asked for,
+    // so this must not silently pass as a match.
+    expect(normalizeSeason('2025')).not.toBe(normalizeSeason('2025-26'));
+  });
+
+  it('distinguishes different seasons', () => {
+    expect(normalizeSeason('2024-25')).not.toBe(normalizeSeason('2025-26'));
+  });
+
+  it('is safe on missing or unparseable input', () => {
+    expect(normalizeSeason(null)).toBe('');
+    expect(normalizeSeason('')).toBe('');
+    expect(normalizeSeason('n/a')).toBe('n/a');
   });
 });

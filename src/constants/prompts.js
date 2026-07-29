@@ -51,7 +51,8 @@ SPORTS: NBA, NFL, MLB, Cricket, NRL, NHL, Formula 1, Wrestling, Golf, Soccer, AF
 WHERE TO LOOK — the details that identify a card are small and easily misread. Inspect these regions deliberately:
 - SET SYMBOL: the small icon near the bottom of the art (Pokemon) or set code stamped on the card — it pins down the exact set/expansion.
 - COLLECTOR NUMBER: usually a bottom corner, formatted "x/y" (e.g. 4/102) or a set code + number (e.g. SWSH114, TG12/TG30). Transcribe it EXACTLY, including the part after the slash.
-- COPYRIGHT / YEAR LINE: the fine print along the bottom edge (e.g. "©2023 Pokémon") — use it for releaseYear and to confirm the era.
+- COPYRIGHT / YEAR LINE: the fine print along the bottom edge (e.g. "©2023 Pokémon") — use it for releaseYear and to confirm the era. On a sports card the copyright year is usually the first year of the season, so "©2025" on a basketball card means the 2025-26 season.
+- INSERT / SUBSET NAME: the treatment a card belongs to *within* a product, printed large on the front (e.g. "Ball of Duty", "Rated Rookie", "Downtown"). This is NOT the product name — a card can be "Topps Chrome" the product and "Ball of Duty" the insert at the same time. Put the product in cardSetName and the treatment in insertName.
 - EDITION / PRINT MARKERS: "1st Edition" stamps, "Shadowless", "Unlimited", foil/holo pattern, full-art or alternate-art treatment.
 - If multiple images are provided, the FIRST is the card front; use the BACK and any additional images to read set codes, numbers and copyright text that are clearer or only present there.
 
@@ -60,9 +61,10 @@ GRADING SLABS: If a graded slab is visible, identify PSA / BGS / CGC and extract
 Return ONLY valid JSON with these exact fields (use null for anything not clearly visible):
 {
   "name": "exact card name as printed on the card",
-  "cardSetName": "set or expansion name (e.g. Base Set, Brilliant Stars, 2023 Topps Series 1)",
+  "cardSetName": "the PRODUCT a card came out of (e.g. Base Set, Brilliant Stars, Topps Chrome, Donruss) — not the insert treatment",
+  "insertName": "the insert/subset within that product if one is printed (e.g. Ball of Duty, Rated Rookie), else null",
   "cardNumber": "card number as printed (e.g. 4/102, SWSH114, 25/100)",
-  "releaseYear": number_or_null,
+  "releaseYear": "year as a string. Sports products whose season spans two calendar years (NBA, NHL, soccer) use the season, e.g. \\"2025-26\\"; everything else uses a single year, e.g. \\"1999\\". Only use a season when the card or its product clearly indicates one — otherwise give the single year, and null if neither is legible",
   "collectionType": "one of the valid collection types above or null",
   "condition": "Mint | Near Mint | Excellent | Good | Fair",
   "gradingService": "PSA | BGS | CGC | None",

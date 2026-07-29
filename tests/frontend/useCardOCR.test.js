@@ -96,6 +96,8 @@ describe('useCardOCR — scanning', () => {
       name: 'Charizard',
       description: 'Holo fire Pokémon',
       cardSetName: 'Base Set',
+      // The insert/subset within the product — blank on a base card.
+      insertName: '',
       cardNumber: '4/102',
       releaseYear: '1999',
       collectionType: 'Pokemon',

@@ -56,6 +56,21 @@ describe('scoreField', () => {
     expect(scoreField('parallel', 'Red Laser Holo', 'Red Laser')).toBe(VERDICT.WRONG);
   });
 
+  it('accepts a season written differently but not a bare year', () => {
+    expect(scoreField('year', '2025-26', '2025-2026')).toBe(VERDICT.CORRECT);
+    expect(scoreField('year', '2025-26', '2025/26')).toBe(VERDICT.CORRECT);
+    // Every source currently returns a single number, so this is the gap the
+    // season convention exposes.
+    expect(scoreField('year', '2025-26', '2025')).toBe(VERDICT.WRONG);
+    expect(scoreField('year', '2025-26', '2024-25')).toBe(VERDICT.WRONG);
+  });
+
+  it('scores the insert separately from the product it came out of', () => {
+    expect(scoreField('insert', 'Ball of Duty', 'Ball of Duty')).toBe(VERDICT.CORRECT);
+    expect(scoreField('insert', 'Ball of Duty', 'Topps Chrome')).toBe(VERDICT.WRONG);
+    expect(scoreField('insert', 'Ball of Duty', '')).toBe(VERDICT.MISSING);
+  });
+
   it('does not accept a partial name as correct', () => {
     // The grounding step accepts partial containment when *searching*; scoring
     // against known truth must not.

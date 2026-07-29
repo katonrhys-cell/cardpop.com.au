@@ -18,6 +18,10 @@ export function mapOCRResult(data) {
     name: data.name || '',
     description: data.description || '',
     cardSetName: data.cardSetName || '',
+    // The insert/subset within the product ("Ball of Duty"), kept apart from
+    // the product itself ("Topps Chrome") — they are different attributes and
+    // folding either into the other loses information a listing needs.
+    insertName: data.insertName || '',
     cardNumber: data.cardNumber || '',
     releaseYear: data.releaseYear ? String(data.releaseYear) : '',
     collectionType,
