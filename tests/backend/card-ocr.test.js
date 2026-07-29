@@ -183,10 +183,11 @@ describe('POST /scan', () => {
 
     const res = await request(app).post('/scan');
 
-    // Headers are already sent, so the failure is reported in-band over SSE.
+    // Headers are already sent, so the failure is reported in-band over SSE —
+    // as a message for the seller, not the provider's status line.
     expect(res.status).toBe(200);
     expect(res.text).toContain('"type":"error"');
-    expect(res.text).toContain('429');
+    expect(res.text).toContain('Too many scans');
   });
 
   it('emits an SSE error event when the fetch itself rejects', async () => {
@@ -197,7 +198,9 @@ describe('POST /scan', () => {
 
     expect(res.status).toBe(200);
     expect(res.text).toContain('"type":"error"');
-    expect(res.text).toContain('network down');
+    // The underlying cause goes to the logs, not to the seller.
+    expect(res.text).not.toContain('network down');
+    expect(res.text).toContain('Could not read that card');
   });
 });
 
@@ -338,5 +341,59 @@ describe('POST /scan — model escalation', () => {
     expect(res.text).toContain('Charizard');
     expect(res.text).toContain('"type":"completed"');
     expect(res.text).not.toContain('"type":"error"');
+  });
+});
+
+// ─── Provider errors must not reach the seller verbatim ───────────────────────
+
+describe('POST /scan — failure messages', () => {
+  it('does not leak account or billing state to the browser', async () => {
+    // A real reply seen in production. It tells a seller nothing, and our
+    // account's balance is not theirs to read.
+    mockFiles = oneFile();
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 400,
+      text: async () => JSON.stringify({
+        error: { message: 'Your credit balance is too low to access the Anthropic API.' },
+      }),
+    });
+
+    const res = await request(app).post('/scan');
+
+    expect(res.text).not.toContain('credit balance');
+    expect(res.text).not.toContain('Anthropic');
+    expect(res.text).toContain('temporarily unavailable');
+  });
+
+  it('keeps an invalid key just as opaque', async () => {
+    mockFiles = oneFile();
+    mockFetch.mockResolvedValue({
+      ok: false, status: 401,
+      text: async () => JSON.stringify({ error: { message: 'invalid x-api-key' } }),
+    });
+
+    const res = await request(app).post('/scan');
+
+    expect(res.text).not.toContain('x-api-key');
+    expect(res.text).toContain('temporarily unavailable');
+  });
+
+  it('tells the seller to wait when rate limited', async () => {
+    mockFiles = oneFile();
+    mockFetch.mockResolvedValue({ ok: false, status: 429, text: async () => 'rate limit' });
+
+    const res = await request(app).post('/scan');
+
+    expect(res.text).toContain('Too many scans');
+  });
+
+  it('suggests a clearer photo when the read simply fails', async () => {
+    mockFiles = oneFile();
+    mockFetch.mockRejectedValue(new Error('network down'));
+
+    const res = await request(app).post('/scan');
+
+    expect(res.text).toContain('Could not read that card');
   });
 });
