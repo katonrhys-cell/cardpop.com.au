@@ -30,7 +30,7 @@ import { groundAgainstCatalogue, buildCatalogueQuery } from '../utils/catalogueG
 import { getSegmentsForCollection } from '../src/utils/collectionSegmentMap.js';
 import { rankCandidates, hasAmbiguousWinner } from '../src/utils/cardsightRanking.js';
 import { isLowConfidence } from '../utils/cardsightConfidence.js';
-import { resolveVariantChips } from '../lib/cardVariants.js';
+import { mergeIdentifiedVariants } from '../lib/cardVariants.js';
 import { scoreCase, summarise, formatSummary, VERDICT, SCORED_FIELDS } from '../utils/identificationScore.js';
 import { isExactMatch, hasParallel, getParallelInfo } from 'cardsightai';
 
@@ -184,10 +184,9 @@ async function runCase(fixture, rectifier, log) {
     rookie: ocr.rookie,
     // Resolved the same way the listing form resolves them, so the harness
     // scores the chips a seller would actually end up with.
-    variants: resolveVariantChips(
-      [...(ocr.attributes ?? []), ...(ocr.serialNumber ? ['Numbered'] : [])],
-      ocr.collectionType,
-    ),
+    // Exactly what the listing form applies, rookie chip included — computing
+    // this any other way measures something the seller never sees.
+    variants: mergeIdentifiedVariants([], ocr, ocr.collectionType),
     // Grading comes off the slab label via OCR and is applied to the form
     // directly (handleAnalyzeWithAI), independent of any CardSight match.
     gradingCompany: ocr.gradingService === 'None' ? '' : ocr.gradingService,

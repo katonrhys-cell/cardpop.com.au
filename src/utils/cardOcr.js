@@ -8,6 +8,7 @@
  */
 
 import { CardOCRPrompt } from '../constants/prompts.js';
+import { mapCollectionType } from '../../utils/ocrResult.js';
 
 // Cheap model handles most scans; escalate to the stronger model only when the
 // cheap one left something out — keeps cost low while lifting accuracy on hard cards.
@@ -49,7 +50,11 @@ export function escalationReason(data) {
 	// collectionType chooses the CardSight segment. Without it the identify
 	// call falls back to a ten-segment fan-out that ranks guesses from every
 	// sport against each other — the single worst input we can hand it.
-	if (!data.collectionType) return 'no-category';
+	//
+	// Test the MAPPED value, not the raw string. A model answering "Basketball"
+	// looks like a category here but maps to nothing downstream, so checking the
+	// raw field let exactly the case this guard exists for slip through.
+	if (!mapCollectionType(data.collectionType)) return 'no-category';
 
 	if (String(data.confidence ?? '').toLowerCase() === 'low') return 'low-confidence';
 

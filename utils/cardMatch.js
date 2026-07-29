@@ -11,7 +11,14 @@ export function normalizeName(s) {
 
 // Words that describe a set without distinguishing it from another, so a name
 // differing only by these is the same set read two ways ("Base" / "Base Set").
-const SET_NOISE_WORDS = new Set(['the', 'set', 'series', 'edition', 'expansion', 'collection', 'tcg']);
+const SET_NOISE_WORDS = new Set([
+  'the', 'set', 'series', 'edition', 'expansion', 'collection', 'tcg',
+  // Manufacturer and sport words. A model reads "Panini Mosaic Basketball" off
+  // a card whose product is "Mosaic"; the extra words describe the same set
+  // rather than distinguishing it from another.
+  'panini', 'topps', 'upper', 'deck', 'leaf', 'wizards', 'coast',
+  'basketball', 'football', 'baseball', 'hockey', 'soccer', 'cricket',
+]);
 
 const FULL_YEAR = /^(19|20)\d{2}$/;
 const SHORT_YEAR = /^\d{2}$/;

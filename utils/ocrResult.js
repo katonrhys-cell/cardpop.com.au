@@ -6,7 +6,7 @@
  * model output exactly the way production does rather than approximating it.
  */
 
-import { COLLECTIONS_LIST } from '../data/collections.js';
+import { COLLECTIONS_LIST, COLLECTION_ALIASES } from '../data/collections.js';
 
 export function mapOCRResult(data) {
   const condition = mapCondition(data.condition);
@@ -90,7 +90,20 @@ export function mapRarity(raw) {
 
 export function mapCollectionType(raw) {
   if (!raw) return '';
-  const lower = raw.toLowerCase();
-  const match = COLLECTIONS_LIST.find(c => c.toLowerCase() === lower || lower.includes(c.toLowerCase()));
-  return match || '';
+  const lower = String(raw).trim().toLowerCase();
+
+  const exact = COLLECTIONS_LIST.find(c => c.toLowerCase() === lower);
+  if (exact) return exact;
+
+  // A model saying "Basketball" means NBA. Without this the category comes back
+  // empty, and an empty category is what sends CardSight into its ten-segment
+  // fan-out — the worst input the identify call can get.
+  const alias = COLLECTION_ALIASES[lower];
+  if (alias) return alias;
+
+  const contained = COLLECTIONS_LIST.find(c => lower.includes(c.toLowerCase()));
+  if (contained) return contained;
+
+  const aliasHit = Object.keys(COLLECTION_ALIASES).find(k => lower.includes(k));
+  return aliasHit ? COLLECTION_ALIASES[aliasHit] : '';
 }
