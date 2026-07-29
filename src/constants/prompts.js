@@ -57,6 +57,8 @@ WHERE TO LOOK — the details that identify a card are small and easily misread.
 - If multiple images are provided, the FIRST is the card front; use the BACK and any additional images to read set codes, numbers and copyright text that are clearer or only present there.
 
 GRADING SLABS: If a graded slab is visible, identify PSA / BGS / CGC and extract the numeric grade and cert number from the label.
+- The label is AUTHORITATIVE. Its year, set and card number override anything inferred from the card or the product — a PSA flip reading "2024 OBSIDIAN" means releaseYear "2024", not the 2024-25 season.
+- Transcribe the cert number DIGIT BY DIGIT. It is looked up against the grader's database, so a single transposed digit returns a different card's grade and population — far worse than leaving it null. If any digit is unclear, return null.
 
 Return ONLY valid JSON with these exact fields (use null for anything not clearly visible):
 {

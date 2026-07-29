@@ -71,6 +71,22 @@ describe('scoreField', () => {
     expect(scoreField('insert', 'Ball of Duty', '')).toBe(VERDICT.MISSING);
   });
 
+  it('scores grading fields off the slab label', () => {
+    expect(scoreField('gradingCompany', 'PSA', 'psa')).toBe(VERDICT.CORRECT);
+    expect(scoreField('gradingCompany', 'PSA', 'BGS')).toBe(VERDICT.WRONG);
+    expect(scoreField('grade', '10', '10.0')).toBe(VERDICT.CORRECT);
+    expect(scoreField('grade', '10', '9')).toBe(VERDICT.WRONG);
+  });
+
+  it('requires every digit of a cert number', () => {
+    // The cert is looked up against PSA's API, so a transposed digit returns a
+    // different card's grade and population — a plausible-looking lie.
+    expect(scoreField('certNumber', '148544264', '148544264')).toBe(VERDICT.CORRECT);
+    expect(scoreField('certNumber', '148544264', '#148544264')).toBe(VERDICT.CORRECT);
+    expect(scoreField('certNumber', '148544264', '148544246')).toBe(VERDICT.WRONG);
+    expect(scoreField('certNumber', '148544264', '')).toBe(VERDICT.MISSING);
+  });
+
   it('does not accept a partial name as correct', () => {
     // The grounding step accepts partial containment when *searching*; scoring
     // against known truth must not.

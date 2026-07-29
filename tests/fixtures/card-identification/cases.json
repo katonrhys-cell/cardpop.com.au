@@ -36,5 +36,22 @@
       "parallel": "Red Laser Holo"
     },
     "notes": "2023-24 Donruss Rated Rookie, Memphis Grizzlies. First fixture in a rigid magnetic holder rather than a penny sleeve, first held in hand (fingers and a blurred room in frame rather than a flat surface), first non-Topps manufacturer, and first parallel. The parallel is the point: base and Red Laser Holo share name, set, number and year but are worth very different amounts, so missing it misprices the listing. Expect `parallel` to come back missing unless CardSight returns a trustworthy exact match — OCR has no field that reaches it. Name asserted with the 'II' suffix as printed; if catalogues return 'GG Jackson' this will score wrong, which is a decision to make on the evidence rather than by loosening matching up front. `cardNumber` unasserted (it is on the back)."
+  },
+  {
+    "id": "lebron-obsidian-orbital-psa10",
+    "image": "lebron-obsidian-orbital-psa10.png",
+    "expected": {
+      "name": "LeBron James",
+      "setName": "Obsidian",
+      "insert": "Orbital",
+      "cardNumber": "16",
+      "year": "2024",
+      "collection": "NBA",
+      "parallel": "Molten Gold",
+      "gradingCompany": "PSA",
+      "grade": "10",
+      "certNumber": "148544264"
+    },
+    "notes": "FIRST GRADED SLAB and FIRST SCREENSHOT — this is a phone screenshot of an eBay listing page, not a photo of a card, so it tests something different from the rest. The card image sits small inside browser chrome, and the listing title ('2024 Obsidian Orbital Molten Gold /10 LEBRON JAMES #16 PSA 10 POP 2') is legible text in the frame, so a model can score well here by reading the page rather than the card. Treat a good result as evidence about screenshots, not about card reading. Rectification will likely fail or crop to the wrong rectangle — a screenshot is full of them. NOTE THE YEAR: the PSA label reads '2024 OBSIDIAN', a single year, which contradicts the season convention used for the Topps Chrome fixtures; the label is authoritative for a graded card. certNumber matters most here — it is looked up against PSA's API, so a wrong one returns a different card's grade and population."
   }
 ]

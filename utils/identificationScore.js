@@ -27,8 +27,16 @@ import { cardNumbersMatch } from './cardNumber.js';
  * `setName` is the product a card came out of ("Topps Chrome"); `insert` is the
  * subset within it ("Ball of Duty"). Keeping them apart matters — folding the
  * insert into the set name loses the product, and vice versa.
+ *
+ * `certNumber` is the highest-stakes field here. It is not decoration: the app
+ * looks it up against PSA's API, so a wrong cert doesn't just misdescribe the
+ * card, it pulls a *different card's* grade and population data into the
+ * listing. One transposed digit is a plausible-looking lie.
  */
-export const SCORED_FIELDS = ['name', 'setName', 'cardNumber', 'year', 'collection', 'insert', 'parallel'];
+export const SCORED_FIELDS = [
+  'name', 'setName', 'cardNumber', 'year', 'collection', 'insert', 'parallel',
+  'gradingCompany', 'grade', 'certNumber',
+];
 
 export const VERDICT = {
   CORRECT: 'correct',
@@ -58,6 +66,11 @@ const COMPARATORS = {
   // The insert/subset a card belongs to ("Ball of Duty"), kept separate from
   // the product it came out of ("Topps Chrome").
   insert: (a, b) => normalizeName(a) === normalizeName(b),
+  gradingCompany: (a, b) => normalizeName(a) === normalizeName(b),
+  // "10" and "10.0" are the same grade.
+  grade: (a, b) => Number.parseFloat(a) === Number.parseFloat(b),
+  // Digits only, and every one of them has to be right.
+  certNumber: (a, b) => String(a).replace(/\D/g, '') === String(b).replace(/\D/g, ''),
 };
 
 /**

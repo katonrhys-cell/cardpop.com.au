@@ -166,6 +166,11 @@ async function runCase(fixture, rectifier, log) {
     year: ocr.releaseYear,
     collection: ocr.collectionType,
     insert: ocr.insertName,
+    // Grading comes off the slab label via OCR and is applied to the form
+    // directly (handleAnalyzeWithAI), independent of any CardSight match.
+    gradingCompany: ocr.gradingService === 'None' ? '' : ocr.gradingService,
+    grade: ocr.gradeScore,
+    certNumber: ocr.certificationNumber,
     // Only CardSight can fill this: mapCardSightToFormFields sets parallelName,
     // while OCR's `cardType` read goes into the notes and never reaches a field.
     // Left blank here on purpose so the harness shows that gap rather than

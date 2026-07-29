@@ -76,6 +76,12 @@ Aim for a mix that looks like real inventory rather than a clean test set:
 - A graded slab, where the card sits behind plastic with a label above it.
 - A card whose collector number is only on the back.
 
+**A note on screenshots.** One fixture is a phone screenshot of an eBay listing
+rather than a photo of a card. Sellers really do this, so it is worth measuring
+— but score it separately in your head: the listing title is legible text in the
+frame, so a model can get everything right without reading the card at all. A
+good result there says something about screenshots, not about card reading.
+
 A dozen is enough to start. Coverage matters more than volume.
 
 ## How scoring works
@@ -101,6 +107,13 @@ Each asserted field comes back `correct`, `wrong` or `missing`:
 - **`insert`** is the treatment *within* that product — `Ball of Duty`,
   `Rated Rookie`. A card has both, and folding either into the other loses
   information the listing needs.
+- **A grading label overrides all of it.** A PSA flip reading `2024 OBSIDIAN`
+  means `year: "2024"` even for a basketball card, because the slab is what the
+  buyer is looking at. The season rule applies to raw cards.
+- **`certNumber` is the highest-stakes field.** It is looked up against PSA's
+  API, so a wrong cert pulls a *different card's* grade and population into the
+  listing. Every digit is compared; a missing cert is far better than a wrong
+  one.
 
 `insert` and `parallel` are scored too, and strictly — on a modern sports card it is usually
 the biggest driver of value, since the base and the Red Laser Holo of the same
