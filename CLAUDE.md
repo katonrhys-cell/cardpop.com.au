@@ -81,6 +81,7 @@ Routes are registered in `src/routes/index.js`. Each domain has its own router f
 | `/integrated-ai` | `routes/integrated-ai.js` | AI chat |
 | `/card-ocr` | `routes/card-ocr.js` | Card image scanning — step 1 of identification, see `docs/card-identification.md` |
 | `/cardsight` | `routes/cardsight.js` | CardSight catalog match + pricing — step 3 of identification |
+| `/card-scans` | `routes/card-scans.js` | Logs every identification and accumulates `card_catalogue` — see `docs/card-identification.md` |
 | `/categories` | `routes/categories.js` | Category management |
 | `/subcategories` | `routes/subcategories.js` | Subcategory management |
 | `/event-scan` | `routes/event-scan.js` | Admin management of the nightly event-scanner source list |

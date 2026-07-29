@@ -12,6 +12,7 @@ import subscriptionRouter from './subscription.js';
 import verificationRouter from './verification.js';
 import integratedAiRouter from './integrated-ai.js';
 import cardOcrRouter from './card-ocr.js';
+import cardScansRouter from './card-scans.js';
 import cardDescriptionRouter from './card-description.js';
 import gradeEstimatorRouter from './grade-estimator.js';
 import eventScraperRouter from './event-scraper.js';
@@ -63,6 +64,7 @@ export default () => {
 
     // Card OCR routes with rate limiting
     router.use('/card-ocr', cardOcrRouter);
+    router.use('/card-scans', cardScansRouter);
 
     // AI SEO description generation with rate limiting
     router.use('/card-description', cardDescriptionRouter);
