@@ -49,6 +49,7 @@ import { loadListingDraft, saveListingDraft, clearListingDraft, hasMeaningfulCon
 import { shouldAutoIdentify, buildPriceLookupQuery } from '@/utils/listingFlow.js';
 import { confidenceScore, confidenceLabel, isLowConfidence } from '@/utils/cardsightConfidence.js';
 import { prepareAnalysisImages } from '@/utils/analysisImage.js';
+import { shouldPromptForBack, missingBackFields, backPhotoPromptText } from '@/utils/backPhotoPrompt.js';
 import { useCardScanLog, buildScanPayload } from '@/hooks/useCardScanLog.js';
 import { validateListingForm, validateListingField } from '@/utils/listingValidation.js';
 import WizardStepper from '@/components/WizardStepper.jsx';
@@ -213,6 +214,9 @@ const AddEditCardPage = () => {
   // True while the card is being rectified out of the photo, before the models
   // are called — otherwise this step is a silent multi-second gap.
   const [isPreparingImage, setIsPreparingImage] = useState(false);
+  // How many images the last read actually used. Drives the back-photo prompt:
+  // a field still missing after a back was sent is not a back-photo problem.
+  const [analysedImageCount, setAnalysedImageCount] = useState(0);
 
   const emptyForm = {
     // Card identity
@@ -731,6 +735,7 @@ const AddEditCardPage = () => {
       [frontImage, ...extraFiles.filter(Boolean)].slice(0, 3),
     ).finally(() => setIsPreparingImage(false));
     const analysisImage = analysisImages[0] ?? frontImage;
+    setAnalysedImageCount(analysisImages.length);
     if (dropped > 0) {
       toast.info(`Using the front${analysisImages.length > 1 ? ' and one other angle' : ' photo only'} — the rest were too large to send together.`);
     }
@@ -1523,7 +1528,10 @@ const AddEditCardPage = () => {
 
                 {/* Extra image slots — count driven by max_images_per_listing */}
                 <div className="mt-4">
-                  <p className="text-xs font-semibold text-muted-foreground mb-2">Additional Photos (up to {maxExtraSlots})</p>
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">
+                    Additional Photos (up to {maxExtraSlots})
+                    {' '}<span className="font-normal">— a photo of the back improves identification</span>
+                  </p>
                   <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                     {extraFiles.map((_, idx) => (
                       <div key={idx} className="aspect-square">
@@ -1561,8 +1569,14 @@ const AddEditCardPage = () => {
                             </button>
                           </div>
                         ) : (
-                          <label className="flex w-full h-full rounded-lg border-2 border-dashed border-border bg-muted/30 items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors">
+                          <label className="flex flex-col w-full h-full rounded-lg border-2 border-dashed border-border bg-muted/30 items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors">
                             <Plus className="w-4 h-4 text-muted-foreground" />
+                            {/* The first extra slot is named because identification
+                                reads it: the set code, collector number and year are
+                                often only on the back. */}
+                            {idx === 0 && (
+                              <span className="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">Back</span>
+                            )}
                             <input
                               type="file"
                               accept="image/jpeg,image/png,image/webp"
@@ -1794,6 +1808,20 @@ const AddEditCardPage = () => {
                             {scanResult.rarity && <div className="col-span-2"><strong className="text-foreground">Rarity:</strong> {scanResult.rarity}</div>}
                           </div>
                         </>
+                      )}
+
+                      {/* Ask for the back only when it would actually help. Every
+                          missing year and card number in the scoring harness came
+                          from a front-only read, and both fixtures that included a
+                          back got them right — those fields are printed on the back
+                          and simply absent from the front. Suppressed once a back
+                          has been sent, so a seller is never asked to re-shoot for
+                          something the second photo already failed to supply. */}
+                      {shouldPromptForBack({ scanResult, analysedImageCount }) && (
+                        <div className="text-[11px] font-semibold text-sky-700 dark:text-sky-300 bg-sky-500/10 rounded-lg px-2.5 py-1.5 mb-2">
+                          📸 {backPhotoPromptText(missingBackFields(scanResult))}
+                          {' '}Drop it into the first Additional Photos slot and identify again.
+                        </div>
                       )}
 
                       <div className="pt-2 border-t border-border/50">
