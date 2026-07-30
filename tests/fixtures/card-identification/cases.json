@@ -165,5 +165,18 @@
       "variants": []
     },
     "notes": "Second Team Rocket card, and deliberately a near-duplicate of dark-charmeleon-team-rocket-unlimited: same set, same Uncommon diamond, same '(c)1999-2000 Wizards' copyright, same non-holo, same 90-degree rotation and hand-held framing. It is here for two narrow reasons rather than broad coverage. SAME-SET DISCRIMINATION: 39/82 and 32/82 differ only in the card number within one 82-card set, so a pipeline that anchors on the set and guesses the number has two fixtures that catch it. NAME PREFIX: 'Dark Kadabra' must not be satisfied by 'Kadabra' — the Wizards-era 'Dark' prefix is part of the card's identity and a different card entirely, which is what namesMatch's no-containment rule protects. Adds sample size to the Pokemon measurement but no new card *type* — it is not holo, not graded, not first edition, and has no distractor card in frame. The remaining Pokemon gaps after this are a holo, a graded slab, and a genuine 1st Edition stamp. `year` and the empty `variants` follow the same reasoning as the other two Pokemon cases; see the README."
+  },
+  {
+    "id": "squirtle-base-set-unlimited",
+    "image": "squirtle-base-set-unlimited.jpg",
+    "expected": {
+      "name": "Squirtle",
+      "setName": "Base Set",
+      "cardNumber": "63/102",
+      "year": "1999",
+      "collection": "Pokemon",
+      "variants": []
+    },
+    "notes": "THE YEAR DISCRIMINATOR, and the most load-bearing Pokemon case so far. This card's copyright is a SINGLE year — '(c)1995, 96, 98 Nintendo, Creatures, GAMEFREAK. (c)1999 Wizards' — whereas the three other Pokemon fixtures all print the range '(c)1999-2000 Wizards'. So `year` is '1999', not '1999-2000', and normalizeSeason keeps those distinct. With three fixtures expecting the range, a pipeline that pattern-matches 'Wizards-era Pokemon means 1999-2000' would score them all correct and only fail here — which is exactly the fabrication mode the releaseYear rule exists to prevent (a 2025-26 card once came back '2021-22'). SECOND, and subtler: Base Set cards carry NO set symbol. Nothing on this card says 'Base Set'. The only on-card clues are the number '63/102' and the 1999 copyright, so resolving the set REQUIRES the catalogue grounding step to look it up by card number — the model is forbidden from supplying it from product knowledge. This is the first fixture where setName has no readable source at all, making it a direct test of groundAgainstCatalogue rather than of OCR. THIRD, 'Base Set' is the literal set name behind the setsMatch substring guard: plain containment made it match 'Base Set 2', a different set that would then corroborate it. A real card now exercises that guard. Also the first /102 set total and the first bare Pokemon name — no 'Dark' or \"Misty's\" prefix — so it checks the pipeline does not over-prefix. Common (filled circle), non-holo, unlimited (thick yellow border, no 1st Edition stamp, not shadowless), illustrated by Mitsuhiro Arita. Rotated 90 degrees, hand-held. `variants` is an empty set for the same reason as the other Pokemon cases: any chip returned is an invention."
   }
 ]
