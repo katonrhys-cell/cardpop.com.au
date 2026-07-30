@@ -196,6 +196,66 @@ describe('POST /scrape-event-url', () => {
       expect.objectContaining({ dispatcher: expect.anything() }),
     );
   });
+
+  it('blocks a redirect to a literal private address', async () => {
+    // The dispatcher's SSRF lookup only runs for hostnames that go through DNS
+    // — Node skips it entirely for an IP literal — so the literal check has to
+    // run on every hop. When fetch followed redirects itself, only the first
+    // URL was ever checked and an attacker-controlled page could 302 to
+    // http://169.254.169.254/ and be fetched unguarded.
+    mockFetch
+      .mockResolvedValueOnce({
+        status: 302,
+        headers: { get: (h) => (h === 'location' ? 'http://169.254.169.254/latest/meta-data/' : null) },
+        body: { cancel: async () => {} },
+      })
+      .mockResolvedValue({ ok: true, status: 200, text: async () => 'SHOULD NOT BE REACHED' });
+
+    const res = await request(app)
+      .post('/scrape-event-url')
+      .send({ url: 'https://example.com/event' });
+
+    expect(res.status).toBe(400);
+    // Only the first hop was fetched — the redirect target never opened a socket.
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('follows a redirect to another public URL and returns its content', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        status: 301,
+        headers: { get: (h) => (h === 'location' ? 'https://elsewhere.example/event' : null) },
+        body: { cancel: async () => {} },
+      })
+      .mockResolvedValueOnce({ ok: true, status: 200, text: async () => '<p>moved here</p>' });
+
+    const res = await request(app)
+      .post('/scrape-event-url')
+      .send({ url: 'https://example.com/event' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.content).toContain('moved here');
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      2,
+      'https://elsewhere.example/event',
+      expect.objectContaining({ dispatcher: expect.anything(), redirect: 'manual' }),
+    );
+  });
+
+  it('stops after too many redirects instead of looping forever', async () => {
+    mockFetch.mockResolvedValue({
+      status: 302,
+      headers: { get: (h) => (h === 'location' ? 'https://example.com/loop' : null) },
+      body: { cancel: async () => {} },
+    });
+
+    const res = await request(app)
+      .post('/scrape-event-url')
+      .send({ url: 'https://example.com/event' });
+
+    expect(res.status).toBe(400);
+    expect(mockFetch.mock.calls.length).toBeLessThanOrEqual(6);
+  });
 });
 
 // ─── ssrfSafeLookup (the DNS-rebinding-safe dispatcher lookup) ────────────────
