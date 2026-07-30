@@ -9,6 +9,7 @@ import { installChunkReloadGuard, dropRecoveredErrors } from '@/lib/chunkReload.
 import { installImageCdnFallback } from '@/utils/imageCdnFallback.js';
 import { installWebMcp } from '@/lib/webmcp.js';
 import { GA_MEASUREMENT_ID, installGtag } from '@/lib/analytics.js';
+import { loadAdsenseScript } from '@/lib/adsense.js';
 import '@/index.css';
 import '@/global.css';
 
@@ -204,6 +205,16 @@ const loadThirdPartyScripts = () => {
       document.head.appendChild(cfScript);
     } catch { /* analytics is non-critical */ }
   }
+
+  // Google AdSense loader (adsbygoogle.js), site-wide. AdSense publishes this
+  // as a static <script> for the document <head>, but the `strict-dynamic` CSP
+  // blocks markup-inserted third-party scripts — injecting it from here makes
+  // it trusted transitively (same reasoning as the Cloudflare beacon above).
+  // Loading it on every page, rather than only where an <ins> slot mounts, is
+  // what site verification and Auto ads need. See lib/adsense.js.
+  try {
+    loadAdsenseScript();
+  } catch { /* ads are non-critical */ }
 
   // Impact affiliate tracking
   try {
