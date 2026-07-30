@@ -93,7 +93,24 @@ export function ssrfSafeLookup(hostname, options, callback) {
     .catch(cb);
 }
 
-const ssrfSafeDispatcher = new Agent({ connect: { lookup: ssrfSafeLookup } });
+export const ssrfSafeDispatcher = new Agent({ connect: { lookup: ssrfSafeLookup } });
+
+// Redirects must be followed by hand, one hop at a time.
+//
+// ssrfSafeLookup only guards hostnames that actually go through DNS: Node's
+// net.connect skips the `lookup` callback entirely when the host is an IP
+// literal, so a URL like http://169.254.169.254/ reaches the socket with no
+// check at all. assertNotLiteralPrivateAddress covers that — but it only ever
+// ran on the URL the caller passed in, while fetch() follows redirects itself
+// (redirect: 'follow' is the default). A page could therefore answer 302 to an
+// IP-literal private address and be fetched unguarded: both callers here fetch
+// URLs that came from outside the app (an admin's paste box, and web-search
+// results in the nightly scanner), so that redirect is attacker-reachable.
+//
+// Taking redirects manually means assertNotLiteralPrivateAddress runs on EVERY
+// hop, so the literal-IP path is closed the whole way down the chain.
+const MAX_REDIRECTS = 5;
+const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 /**
  * Fetch a page's HTML with the SSRF guard applied and a hard timeout.
@@ -102,37 +119,61 @@ const ssrfSafeDispatcher = new Agent({ connect: { lookup: ssrfSafeLookup } });
 export async function fetchWebpageContent(url, { timeoutMs = DEFAULT_TIMEOUT_MS, logPrefix = 'SAFE_FETCH' } = {}) {
   logger.info(`[${logPrefix}] Fetching content from URL: ${url}`);
 
-  // SSRF guard: literal IP/localhost checked here; DNS-resolved hostnames are
-  // pinned to their validated address via ssrfSafeDispatcher below.
-  assertNotLiteralPrivateAddress(url);
-
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await undiciFetch(url, {
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Accept-Encoding': 'gzip, deflate',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-      },
-      dispatcher: ssrfSafeDispatcher,
-      signal: controller.signal,
-    });
+    let currentUrl = url;
 
-    clearTimeout(timeoutId);
+    for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+      // SSRF guard, re-applied per hop: literal IP/localhost checked here;
+      // DNS-resolved hostnames are pinned to their validated address by
+      // ssrfSafeDispatcher.
+      assertNotLiteralPrivateAddress(currentUrl);
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch webpage: ${response.status} ${response.statusText}`);
+      const response = await undiciFetch(currentUrl, {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.5',
+          'Accept-Encoding': 'gzip, deflate',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+        },
+        dispatcher: ssrfSafeDispatcher,
+        redirect: 'manual',
+        signal: controller.signal,
+      });
+
+      if (REDIRECT_STATUSES.has(response.status)) {
+        const location = response.headers.get('location');
+        // Drain the body so the connection can be reused rather than leaked.
+        await response.body?.cancel().catch(() => {});
+        if (!location) {
+          throw new Error(`Failed to fetch webpage: ${response.status} with no Location header`);
+        }
+        const next = new URL(location, currentUrl).toString();
+        if (!isFetchableHttpUrl(next)) {
+          throw new Error('Blocked: redirect to a non-HTTP(S) URL');
+        }
+        logger.info(`[${logPrefix}] Following redirect ${currentUrl} → ${next}`);
+        currentUrl = next;
+        continue;
+      }
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch webpage: ${response.status} ${response.statusText}`);
+      }
+
+      const content = await response.text();
+      logger.info(`[${logPrefix}] Successfully fetched ${content.length} bytes from ${currentUrl}`);
+      return content;
     }
 
-    const content = await response.text();
-    logger.info(`[${logPrefix}] Successfully fetched ${content.length} bytes from ${url}`);
-    return content;
+    throw new Error(`Blocked: more than ${MAX_REDIRECTS} redirects`);
   } catch (error) {
     clearTimeout(timeoutId);
     if (error.name === 'AbortError') {

@@ -9,6 +9,8 @@ import { requireAal2 } from '../middleware/requireAal2.js';
 import { validateRequestBody, validateRequestParams, validateRequestQuery } from '../middleware/validateRequest.js';
 import { setUserRoleSchema, setUserRoleBodySchema, reviewVerificationSchema, reviewVerificationBodySchema, processRefundSchema, processRefundBodySchema, getDisputesSchema, resolveDisputeSchema, resolveDisputeBodySchema, setUserStatusSchema, setUserStatusBodySchema, identityReviewSchema, identityReviewBodySchema, createBusinessProfileBodySchema, businessProfileIdSchema, updateBusinessProfileBodySchema, createCardArtBodySchema, cardArtIdSchema } from '../schemas/adminSchemas.js';
 import { cardArtLookupKey } from '../utils/cardImageResolver.js';
+import { assertNotLiteralPrivateAddress, ssrfSafeDispatcher } from '../utils/safeFetch.js';
+import { fetch } from 'undici';
 import logger from '../utils/logger.js';
 
 const router = Router();
@@ -763,16 +765,55 @@ router.post('/affiliate-metadata', async (req, res) => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
-    const upstream = await fetch(parsed.toString(), {
-      signal: controller.signal,
-      redirect: 'follow',
-      headers: {
-        // Look like a real browser — Amazon serves a bot page to obvious crawlers.
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-AU,en;q=0.9',
-      },
-    });
+    // Redirects are followed BY HAND so the allow-list and the private-address
+    // check apply to every hop, not just the first. Two of the allow-listed
+    // hosts (amzn.to, a.co) are URL shorteners whose whole job is to redirect,
+    // and the previous `redirect: 'follow'` let the redirect target skip both
+    // checks entirely — a redirect to http://169.254.169.254/ would have been
+    // fetched. The SSRF-safe dispatcher additionally pins each DNS-resolved
+    // hostname to the address it validated, closing the rebinding window.
+    const MAX_HOPS = 5;
+    let current = parsed;
+    let upstream = null;
+
+    for (let hop = 0; hop <= MAX_HOPS; hop += 1) {
+      if (current.protocol !== 'https:') {
+        return res.status(400).json({ error: 'Only https:// links are supported.' });
+      }
+      if (!isAllowedAffiliateHost(current.hostname)) {
+        return res.status(400).json({ error: 'Only Amazon affiliate links can be auto-filled right now.' });
+      }
+      assertNotLiteralPrivateAddress(current.toString());
+
+      const hopResponse = await fetch(current.toString(), {
+        signal: controller.signal,
+        redirect: 'manual',
+        dispatcher: ssrfSafeDispatcher,
+        headers: {
+          // Look like a real browser — Amazon serves a bot page to obvious crawlers.
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml',
+          'Accept-Language': 'en-AU,en;q=0.9',
+        },
+      });
+
+      if ([301, 302, 303, 307, 308].includes(hopResponse.status)) {
+        const location = hopResponse.headers.get('location');
+        await hopResponse.body?.cancel().catch(() => {});
+        if (!location) {
+          return res.status(502).json({ error: 'The page could not be read. Enter the details manually.' });
+        }
+        current = new URL(location, current);
+        continue;
+      }
+
+      upstream = hopResponse;
+      break;
+    }
+
+    if (!upstream) {
+      return res.status(502).json({ error: 'The page redirected too many times. Enter the details manually.' });
+    }
     if (!upstream.ok) {
       return res.status(502).json({ error: `The page could not be read (HTTP ${upstream.status}). Enter the details manually.` });
     }

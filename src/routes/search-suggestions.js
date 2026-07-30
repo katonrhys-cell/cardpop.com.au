@@ -25,10 +25,17 @@ router.get('/', async (req, res) => {
       return res.json({ suggestions: [], didYouMean: null });
     }
 
-    // Search for card names in vault_items
+    // Search for card names in vault_items.
+    //
+    // Scoped to PUBLIC items only. This router runs with the service-role client
+    // (RLS bypassed) and needs no authentication, so an unscoped query published
+    // the card names sitting in every user's private vault to anonymous callers
+    // — a `q` of two common letters walks the whole table two characters at a
+    // time. `is_public` mirrors the vault_items SELECT policy's public branch.
     const { data: cards, error: cardsError } = await supabase
       .from('vault_items')
       .select('card_name')
+      .eq('is_public', true)
       .ilike('card_name', `%${safeQ}%`)
       .limit(limit)
       .order('card_name');
@@ -68,6 +75,7 @@ router.get('/', async (req, res) => {
       const { data: popularCards, error: popularError } = await supabase
         .from('vault_items')
         .select('card_name')
+        .eq('is_public', true)
         .order('created_at', { ascending: false })
         .limit(10);
 
@@ -90,6 +98,7 @@ router.get('/', async (req, res) => {
       const { data: allCards, error: allCardsError } = await supabase
         .from('vault_items')
         .select('card_name')
+        .eq('is_public', true)
         .order('created_at', { ascending: false })
         .limit(500);
 
