@@ -14,7 +14,10 @@ import CardHierarchySelector from '@/components/CardHierarchySelector.jsx';
 import RookieJerseyIcon from '@/components/icons/RookieJerseyIcon.jsx';
 import { COLLECTION_CONFIGS } from '@/data/collectionConfigs.js';
 import { useCollectionEras } from '@/hooks/useCollectionEras.js';
-import { getVariantGroups, mergeIdentifiedVariants, resolveVariantChips, impliesFoil } from '@/lib/cardVariants.js';
+import {
+  getVariantGroups, mergeIdentifiedVariants, resolveVariantChips, impliesFoil,
+  FOIL_VARIANT, getFoilFinishes, splitFoilFinishes, expandFoilFinishes,
+} from '@/lib/cardVariants.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -74,8 +77,10 @@ const LISTING_OPTIONS = [
 ];
 
 // ─── Wizard steps (new cards) ─────────────────────────────────────────────────
-// Each step lists the validation fields (utils/listingValidation.js) that must
-// pass before advancing. Edit mode keeps the classic full form.
+// Each step lists the validation fields (utils/listingValidation.js) it owns.
+// They're checked when the seller moves on — to mark them for review, not to
+// hold them there — and enforced for real on submit. Edit mode keeps the
+// classic full form.
 const WIZARD_STEPS = [
   { key: 'photos',  title: 'Photos',  fields: ['cardImage'] },
   { key: 'details', title: 'Details', fields: ['hierarchy', 'cardName', 'year'] },
@@ -144,7 +149,6 @@ const AddEditCardPage = () => {
     setExtraPreviews(fit);
   }, [maxExtraSlots]);
   const [errors, setErrors]             = useState({});
-  const [isAutoFilled, setIsAutoFilled] = useState(false);
   // Step-by-step wizard state — new cards only; edit mode always uses the full
   // form. The mode preference persists so returning sellers keep their choice.
   const [useFullForm, setUseFullForm] = useState(() => {
@@ -177,6 +181,7 @@ const AddEditCardPage = () => {
   const [showRookieGuide, setShowRookieGuide] = useState(false);
   const [showRefractorGuide, setShowRefractorGuide] = useState(false);
   const [showPrizmGuide, setShowPrizmGuide]   = useState(false);
+  const [showFoilGuide, setShowFoilGuide]     = useState(false);
 
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
@@ -222,6 +227,9 @@ const AddEditCardPage = () => {
     parallelPrintRun: '',
     notesFromCardSight: '',
     // Attributes
+    // The specific foil/holo finishes behind the single "Foil / Holo" chip.
+    // Persisted into `variant` alongside it — see expandFoilFinishes.
+    foilFinishes:   [],
     isFoil:         false,
     isSealed:       false,
     serialNumber:   '',
@@ -418,7 +426,16 @@ const AddEditCardPage = () => {
     if (hierarchy.subsetId) setSubsetId(hierarchy.subsetId);
     // Merge over the current defaults so fields added after the draft was
     // saved keep their initial values.
-    setFormData(prev => ({ ...prev, ...draftForm }));
+    setFormData(prev => {
+      const restored = { ...prev, ...draftForm };
+      // A draft saved before the finishes moved into their own panel holds them
+      // as chips — route them the same way a saved listing is loaded.
+      const split = splitFoilFinishes(
+        expandFoilFinishes(restored.variant, restored.foilFinishes),
+        restored.collection,
+      );
+      return { ...restored, variant: split.variants, foilFinishes: split.foilFinishes };
+    });
     setRestorableDraft(null);
     // A restored draft has content across the steps — unlock the whole wizard
     // so the seller can jump straight to wherever they left off.
@@ -495,6 +512,12 @@ const AddEditCardPage = () => {
             .then(({ data }) => { if (data?.raw_data) setPsaPopData(data.raw_data); });
         }
 
+        // Saved variants are one flat list; the form splits the specific
+        // foil/holo finishes out of it so they show in the Foil / Holo Details
+        // panel rather than as chips (expandFoilFinishes puts them back on save).
+        const savedVariants = card.variant ? card.variant.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const split = splitFoilFinishes(savedVariants, card.collection);
+
         setFormData({
           collection:     card.collection     || 'Pokemon',
           cardName:       card.card_name      || '',
@@ -505,10 +528,11 @@ const AddEditCardPage = () => {
           // the rookie designation — surface the legacy is_rookie flag through it
           // so older rows still show (and keep) their rookie status when edited.
           variant:        (() => {
-            const v = card.variant ? card.variant.split(',').map(s => s.trim()).filter(Boolean) : [];
+            const v = [...split.variants];
             if (card.is_rookie && !v.includes('Rookie Card (RC)')) v.push('Rookie Card (RC)');
             return v;
           })(),
+          foilFinishes:   split.foilFinishes,
           isFoil:         card.is_foil        ?? false,
           isSealed:       card.is_sealed      ?? false,
           serialNumber:   card.serial_number  || '',
@@ -747,7 +771,18 @@ const AddEditCardPage = () => {
         // autograph, patch, foil treatment, serial numbering. Additive: it can
         // add a designation the seller hasn't picked, never remove one, and
         // only ever selects chips that exist for this collection.
-        variant:        mergeIdentifiedVariants(prev.variant, ocrResult, variantCollection),
+        ...(() => {
+          // A finish is reported by name ("Reverse Holo"), so it is routed into
+          // the Foil / Holo Details panel exactly as a saved listing is loaded —
+          // it must never come back as a loose chip.
+          const merged = mergeIdentifiedVariants(
+            expandFoilFinishes(prev.variant, prev.foilFinishes),
+            ocrResult,
+            variantCollection,
+          );
+          const split = splitFoilFinishes(merged, variantCollection);
+          return { variant: split.variants, foilFinishes: split.foilFinishes };
+        })(),
         // Dedicated flags that mirror some of those chips.
         isFoil:         prev.isFoil || impliesFoil(identifiedChips),
         isAuto:         prev.isAuto || identifiedChips.includes('Auto'),
@@ -758,7 +793,6 @@ const AddEditCardPage = () => {
           ocrResult.cardType ? `Type: ${ocrResult.cardType}` : '',
         ].filter(Boolean).join('\n') || '',
       }));
-      setIsAutoFilled(true);
     }
 
     // ── 2. CardSight, narrowed to the category OCR read ─────────────────────
@@ -792,7 +826,6 @@ const AddEditCardPage = () => {
       if (csResult.pricing?.avgPrice) {
         set('estimatedValue', String(csResult.pricing.avgPrice.toFixed(2)));
       }
-      setIsAutoFilled(true);
       toast.success('Card identified! Fields auto-filled from catalog.');
     } else if (csResult.ambiguous) {
       toast.warning('Matched more than one category — check the details before saving.');
@@ -828,7 +861,6 @@ const AddEditCardPage = () => {
     setFormData(prev => ({ ...prev, ...fields }));
     if (alt.id) fetchPricingById(alt.id);
     else if (alt.name) fetchPricingByName(alt.name);
-    setIsAutoFilled(true);
     toast.success(`Switched to ${alt.name ?? 'the selected card'}.`);
   };
 
@@ -862,7 +894,7 @@ const AddEditCardPage = () => {
       cardNumber:      formData.cardNumber,
       year:            formData.year,
       manufacturerName: formData.manufacturerName,
-      variant:         formData.variant,
+      variant:         expandFoilFinishes(formData.variant, formData.foilFinishes),
       parallelName:    formData.parallelName || parallelOpts.find(p => p.id === parallelId)?.name || '',
       serialNumber:    formData.serialNumber,
       isRookie:        formData.variant.includes('Rookie Card (RC)'),
@@ -1033,27 +1065,21 @@ const AddEditCardPage = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Advance only when the current step's fields validate — problems surface
-  // inline on the step they belong to instead of piling up at the end.
+  // Moving on is never blocked. The step's fields are re-checked so anything
+  // outstanding is marked inline for the seller to review in their own time,
+  // but a half-filled field doesn't trap them mid-flow — Save is the real
+  // gate, and it jumps back to the first step that still needs work.
   const goNextStep = () => {
     const stepFields = WIZARD_STEPS[wizardStep].fields;
-    const stepErrors = {};
-    stepFields.forEach((field) => {
-      const message = validateListingField(field, formData, validationCtx);
-      if (message) stepErrors[field] = message;
-    });
     setErrors(prev => {
       const next = { ...prev };
       stepFields.forEach((field) => {
-        if (stepErrors[field]) next[field] = stepErrors[field];
+        const message = validateListingField(field, formData, validationCtx);
+        if (message) next[field] = message;
         else delete next[field];
       });
       return next;
     });
-    if (Object.keys(stepErrors).length > 0) {
-      toast.error('Please fix the highlighted issue before continuing');
-      return;
-    }
     const nextIndex = Math.min(wizardStep + 1, WIZARD_STEPS.length - 1);
     setMaxStepReached(m => Math.max(m, nextIndex));
     goToStep(nextIndex);
@@ -1229,6 +1255,11 @@ const AddEditCardPage = () => {
         extraImagePaths.push(filePath);
       }
 
+      // The chips plus the finishes chosen in the Foil / Holo Details panel.
+      // They persist as one flat list, so the strings buyers filter on
+      // ('Reverse Holo', 'Surge Foil'…) are unchanged by the panel move.
+      const savedVariants = expandFoilFinishes(formData.variant, formData.foilFinishes);
+
       const isGraded  = formData.gradingCompany !== 'raw';
       const isPublic  = formData.listingType !== 'private';
       const tradeAud  = parseFloat(formData.tradeValue) || 0;
@@ -1247,8 +1278,10 @@ const AddEditCardPage = () => {
         set_name:            formData.setName?.trim()     || null,
         card_number:         formData.cardNumber?.trim()  || null,
         year:                formData.year?.trim() || null,
-        variant:             formData.variant.length ? formData.variant.join(', ') : null,
-        is_foil:             formData.isFoil,
+        variant:             savedVariants.length ? savedVariants.join(', ') : null,
+        // Selecting the Foil / Holo chip says the card is foiled, so the flag
+        // buyers filter on follows it without needing the toggle ticked too.
+        is_foil:             formData.isFoil || formData.variant.includes(FOIL_VARIANT),
         is_sealed:           formData.isSealed,
         // The "Rookie Card (RC)" variant chip is the single source of truth for
         // the rookie designation — filters query this derived flag
@@ -1360,7 +1393,6 @@ const AddEditCardPage = () => {
               setExtraFiles(Array(maxExtraSlots).fill(null));
               setExtraPreviews(Array(maxExtraSlots).fill(null));
               setErrors({});
-              setIsAutoFilled(false);
               clearCrop();
               setAdjusting(null);
               clearScan();
@@ -1637,10 +1669,15 @@ const AddEditCardPage = () => {
                     </div>
                   )}
 
-                  {/* Combined AI results panel — shown after analysis completes */}
+                  {/* Combined AI results panel — shown after analysis completes.
+                      Emerald for a confirmed catalog match, sky for an OCR-only
+                      read. Neither is the brand red the OCR case used to use — a
+                      card read perfectly off the photo was being reported in the
+                      same colour as a failure, which read as "something went
+                      wrong". */}
                   {!isScanning && !isIdentifying && !isPreparingImage && (cardSightResult?.identified || scanResult) && (
-                    <div className={`p-3 rounded-xl border animate-in fade-in ${cardSightResult?.identified ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-primary/5 border-primary/20'}`}>
-                      <h4 className={`text-xs font-bold mb-2 flex items-center gap-1.5 ${cardSightResult?.identified ? 'text-emerald-700' : 'text-primary'}`}>
+                    <div className={`p-3 rounded-xl border animate-in fade-in ${cardSightResult?.identified ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-sky-500/5 border-sky-500/20'}`}>
+                      <h4 className={`text-xs font-bold mb-2 flex items-center gap-1.5 ${cardSightResult?.identified ? 'text-emerald-700' : 'text-sky-700 dark:text-sky-400'}`}>
                         <Sparkles className="w-3.5 h-3.5" />
                         {cardSightResult?.identified
                           ? `Catalog Match — ${csNeedsReview ? 'Needs review' : cardSightResult.exactMatch ? 'Exact' : 'Set'}`
@@ -1765,7 +1802,7 @@ const AddEditCardPage = () => {
                           size="sm"
                           variant="outline"
                           className="text-xs w-full"
-                          onClick={() => { clearScan(); clearCardSight(); setIsAutoFilled(false); }}
+                          onClick={() => { clearScan(); clearCardSight(); }}
                         >
                           Dismiss
                         </Button>
@@ -1778,12 +1815,12 @@ const AddEditCardPage = () => {
 
   const detailsSection = (
               <SectionCard title="Card Details">
-                {isAutoFilled && (
-                  <div className="flex items-center text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-md w-fit -mt-2">
-                    <Sparkles className="w-3 h-3 mr-1" /> AI Auto-filled — review before saving
-                  </div>
-                )}
-
+                {/* Auto-filled fields are deliberately left unmarked. The ring
+                    they used to carry is drawn in the brand red the error state
+                    also uses, so a perfectly-read card looked like a form full
+                    of problems and sellers stopped to "fix" it. The identify
+                    panel on the photos step already says what was read; the
+                    values are here to be reviewed in passing, not corrected. */}
                 <div className="grid md:grid-cols-2 gap-4">
                   {/* Category → Franchise → Manufacturer */}
                   <CardHierarchySelector
@@ -1803,7 +1840,6 @@ const AddEditCardPage = () => {
                       setSetId(id);
                       if (name) set('setName', name);
                     }}
-                    highlighted={isAutoFilled}
                   />
 
                   {errors.hierarchy && (
@@ -1863,7 +1899,7 @@ const AddEditCardPage = () => {
                       onChange={e => set('cardName', e.target.value)}
                       onBlur={() => validateFieldOnBlur('cardName')}
                       placeholder="e.g. Charizard"
-                      className={`h-11 bg-background ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''} ${errors.cardName ? 'border-destructive' : ''}`}
+                      className={`h-11 bg-background ${errors.cardName ? 'border-destructive' : ''}`}
                     />
                     {errors.cardName && <p className="text-destructive text-xs">{errors.cardName}</p>}
                   </div>
@@ -1917,10 +1953,10 @@ const AddEditCardPage = () => {
                       value={formData.year}
                       onChange={e => set('year', e.target.value)}
                       onBlur={() => validateFieldOnBlur('year')}
-                      placeholder={`${new Date().getFullYear()} or ${new Date().getFullYear()}/${new Date().getFullYear() + 1}`}
+                      placeholder={`${new Date().getFullYear()} or ${new Date().getFullYear()}-${String((new Date().getFullYear() + 1) % 100).padStart(2, '0')}`}
                       className={`h-11 bg-background ${errors.year ? 'border-destructive' : ''}`}
                     />
-                    <p className="text-muted-foreground text-xs">Enter a single year (e.g. 2025) or a season range (e.g. 2025/2026).</p>
+                    <p className="text-muted-foreground text-xs">Enter a single year (e.g. 2025) or a season (e.g. 2025-26 or 2025/2026).</p>
                     {errors.year && <p className="text-destructive text-xs">{errors.year}</p>}
                   </div>
 
@@ -1931,7 +1967,7 @@ const AddEditCardPage = () => {
                       {formData.variant.length > 0 && (
                         <button
                           type="button"
-                          onClick={() => set('variant', [])}
+                          onClick={() => { set('variant', []); set('foilFinishes', []); }}
                           className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
                         >
                           Clear all
@@ -1991,7 +2027,14 @@ const AddEditCardPage = () => {
                     </div>
                     {formData.variant.length > 0 && (
                       <p className="text-xs text-primary font-medium">
-                        Selected: {formData.variant.join(' · ')}
+                        {/* The finishes chosen in the details panel below are part
+                            of the selection, so they belong in this summary. */}
+                        Selected: {expandFoilFinishes(formData.variant, formData.foilFinishes).join(' · ')}
+                      </p>
+                    )}
+                    {formData.variant.includes(FOIL_VARIANT) && (
+                      <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                        Pick the exact finish in <span className="font-bold">Foil / Holo Details</span> below.
                       </p>
                     )}
                   </div>
@@ -2000,7 +2043,7 @@ const AddEditCardPage = () => {
                   <div className="space-y-2">
                     <Label className="font-bold">Condition <span className="text-destructive">*</span></Label>
                     <Select value={formData.condition} onValueChange={v => set('condition', v)}>
-                      <SelectTrigger className={`h-11 bg-background ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''}`}>
+                      <SelectTrigger className="h-11 bg-background">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -2090,6 +2133,131 @@ const AddEditCardPage = () => {
                         />
                       </div>
                     </div>
+
+                    {/* Foil / Holo sub-details — shown when the single "Foil / Holo"
+                        finish chip is selected in the Card Variant / Finish section.
+                        Every named holo pattern and foil treatment lives here rather
+                        than as its own chip; the strings saved are the same ones, so
+                        buyers' rarity filters are unaffected. */}
+                    {formData.variant.includes(FOIL_VARIANT) && (
+                      <div className="mt-3 p-4 rounded-xl border-2 border-amber-400/30 bg-amber-400/5 space-y-4 animate-in fade-in slide-in-from-top-1">
+                        <p className="text-xs font-extrabold uppercase tracking-widest text-amber-700 dark:text-amber-400">✨ Foil / Holo Details</p>
+
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Finish Type</Label>
+                          {(() => {
+                            const finishes = getFoilFinishes(formData.collection);
+                            const known = new Set(finishes.map(f => f.value));
+                            // A finish kept from another collection (the seller
+                            // changed the game after picking it) — shown so it can
+                            // be seen and cleared rather than saved invisibly.
+                            const otherSelected = formData.foilFinishes.filter(f => !known.has(f));
+                            const toggle = (value) => set(
+                              'foilFinishes',
+                              formData.foilFinishes.includes(value)
+                                ? formData.foilFinishes.filter(f => f !== value)
+                                : [...formData.foilFinishes, value],
+                            );
+                            const renderOption = ({ value, desc }) => {
+                              const active = formData.foilFinishes.includes(value);
+                              return (
+                                <button
+                                  key={value}
+                                  type="button"
+                                  onClick={() => toggle(value)}
+                                  className={`flex flex-col items-start px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
+                                    active
+                                      ? 'border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-400 shadow-sm'
+                                      : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                  }`}
+                                >
+                                  <span className="font-bold text-xs">{active ? '✓ ' : ''}{value}</span>
+                                  {desc && (
+                                    <span className={`text-[10px] mt-0.5 leading-tight ${active ? 'text-amber-600/70 dark:text-amber-400/70' : 'text-muted-foreground'}`}>{desc}</span>
+                                  )}
+                                </button>
+                              );
+                            };
+                            return (
+                              <>
+                                {finishes.length > 0 ? (
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {finishes.map(renderOption)}
+                                  </div>
+                                ) : (
+                                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                    {formData.collection
+                                      ? `${formData.collection} finishes are listed as their own chips above — nothing extra to pick here.`
+                                      : 'Pick a collection above to see its foil and holo finishes.'}
+                                  </p>
+                                )}
+                                {otherSelected.length > 0 && (
+                                  <div className="space-y-1.5">
+                                    <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">Also Selected</p>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      {otherSelected.map(value => renderOption({ value }))}
+                                    </div>
+                                  </div>
+                                )}
+                                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                                  Select every finish the card actually has — most cards have just one.
+                                </p>
+                              </>
+                            );
+                          })()}
+
+                          {/* Collapsible foil / holo guide */}
+                          <div className="rounded-xl border border-amber-400/25 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setShowFoilGuide(v => !v)}
+                              className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-amber-400/5 transition-colors"
+                            >
+                              <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400">Which finish does my card have? View guide</span>
+                              <ChevronDown className={`h-3.5 w-3.5 text-amber-600 dark:text-amber-400 transition-transform duration-200 ${showFoilGuide ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showFoilGuide && (
+                              <div className="px-3 pb-3 divide-y divide-border/40">
+                                {[
+                                  {
+                                    title: 'Holo vs reverse holo',
+                                    badge: 'Basics',
+                                    badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20',
+                                    body: 'A holo card shines in the artwork window only. On a reverse holo the shine is on the rest of the card and the artwork is printed flat — the same card exists in both, and they price differently.',
+                                  },
+                                  {
+                                    title: 'Pattern holos',
+                                    badge: 'Patterns',
+                                    badgeClass: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-500/20',
+                                    body: 'Tilt the card to the light and look at the shape of the shine: a star field is Cosmos, shattered lines are Cracked Ice, dots are Confetti, and repeating balls are Poké Ball or Master Ball — Master Ball being far scarcer.',
+                                  },
+                                  {
+                                    title: 'Magic foil treatments',
+                                    badge: 'Magic',
+                                    badgeClass: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20',
+                                    body: 'Traditional foil is glossy and tends to curl; Etched foil is matte and flat. Set-specific treatments (Surge, Galaxy, Textured, Step-and-Compleat, Oil Slick, Gilded, Halo, Confetti) are printed only in the sets that introduced them.',
+                                  },
+                                  {
+                                    title: 'Finish drives price',
+                                    badge: 'Value',
+                                    badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20',
+                                    body: 'The finish is often the whole difference between a common and a chase card, and buyers filter on it directly. Naming it exactly gets the listing in front of the people hunting that version.',
+                                  },
+                                ].map(({ title, badge, badgeClass, body }) => (
+                                  <div key={title} className="py-2.5 first:pt-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-[11px] font-bold text-foreground">{title}</span>
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${badgeClass}`}>{badge}</span>
+                                    </div>
+                                    <p className="text-[10px] leading-relaxed text-muted-foreground">{body}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Refractor sub-details — shown when the "Refractor" finish is
                         selected in the Card Variant / Finish section (Finish group). */}
@@ -3227,7 +3395,7 @@ const AddEditCardPage = () => {
                           value={formData.grade}
                           onChange={e => set('grade', e.target.value)}
                           placeholder="e.g. 9.5 or Authentic"
-                          className={`h-11 bg-background ${isAutoFilled && formData.grade ? 'border-primary/50 ring-1 ring-primary/20' : ''}`}
+                          className="h-11 bg-background"
                         />
                       </div>
 
@@ -3416,7 +3584,7 @@ const AddEditCardPage = () => {
                         onChange={e => set('estimatedValue', e.target.value)}
                         onBlur={() => validateFieldOnBlur('estimatedValue')}
                         placeholder="0.00"
-                        className={`h-11 pl-8 bg-background tabular-nums ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''} ${errors.estimatedValue ? 'border-destructive' : ''}`}
+                        className={`h-11 pl-8 bg-background tabular-nums ${errors.estimatedValue ? 'border-destructive' : ''}`}
                       />
                     </div>
                     {errors.estimatedValue && <p className="text-destructive text-xs">{errors.estimatedValue}</p>}
@@ -3492,7 +3660,7 @@ const AddEditCardPage = () => {
                       onChange={e => set('notes', e.target.value)}
                       placeholder="Add details about this card's condition, history or unique features — or tap Generate Description to write an SEO-friendly one for you."
                       rows={4}
-                      className={`resize-none bg-background ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''}`}
+                      className="resize-none bg-background"
                     />
                     <p className="text-xs text-muted-foreground">
                       Generate a unique, search-friendly description from the details above, then edit it to suit.

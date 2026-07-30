@@ -19,16 +19,29 @@ const FIELD_VALIDATORS = {
     return null;
   },
 
+  // Seasons are printed on cards several ways — 2025/2026, 2025-2026 and the
+  // shorthand 2025-26 all mean the same season, and the hyphen forms are what
+  // both card fronts and the identification pipeline actually produce. Accept
+  // all of them rather than rejecting a correctly-read year.
   year: (f) => {
     const yearVal = f.year?.trim();
     if (!yearVal) return null;
-    const match = yearVal.match(/^(\d{4})(?:\/(\d{4}))?$/);
-    if (!match) return 'Enter a single year (e.g. 2025) or a range (e.g. 2025/2026)';
+    const match = yearVal.match(/^(\d{4})(?:\s*[/–—-]\s*(\d{2}|\d{4}))?$/);
+    if (!match) return 'Enter a single year (e.g. 2025) or a season (e.g. 2025-26)';
     const maxYear = new Date().getFullYear() + 1;
     const start = parseInt(match[1], 10);
-    const end = match[2] ? parseInt(match[2], 10) : null;
     if (start < 1900 || start > maxYear) return `Year must be between 1900 and ${maxYear}`;
-    if (end !== null && end !== start + 1) return 'A season range must be two consecutive years (e.g. 2025/2026)';
+    if (match[2]) {
+      const rawEnd = match[2];
+      let end = parseInt(rawEnd, 10);
+      if (rawEnd.length === 2) {
+        // Expand "26" against the start year's century, rolling over for
+        // seasons that cross one (1999-00 → 2000).
+        end += Math.floor(start / 100) * 100;
+        if (end < start) end += 100;
+      }
+      if (end !== start + 1) return 'A season must be two consecutive years (e.g. 2025-26)';
+    }
     return null;
   },
 

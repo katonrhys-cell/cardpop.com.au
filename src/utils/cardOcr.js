@@ -8,6 +8,7 @@
  */
 
 import { CardOCRPrompt } from '../constants/prompts.js';
+import { mapCollectionType } from '../../utils/ocrResult.js';
 
 // Cheap model handles most scans; escalate to the stronger model only when the
 // cheap one left something out — keeps cost low while lifting accuracy on hard cards.
@@ -49,7 +50,11 @@ export function escalationReason(data) {
 	// collectionType chooses the CardSight segment. Without it the identify
 	// call falls back to a ten-segment fan-out that ranks guesses from every
 	// sport against each other — the single worst input we can hand it.
-	if (!data.collectionType) return 'no-category';
+	//
+	// Test the MAPPED value, not the raw string. A model answering "Basketball"
+	// looks like a category here but maps to nothing downstream, so checking the
+	// raw field let exactly the case this guard exists for slip through.
+	if (!mapCollectionType(data.collectionType)) return 'no-category';
 
 	if (String(data.confidence ?? '').toLowerCase() === 'low') return 'low-confidence';
 
@@ -61,6 +66,40 @@ export function escalationReason(data) {
 	if (!data.cardNumber && !data.cardSetName) return 'no-identity';
 
 	return null;
+}
+
+/**
+ * Turns a provider failure into something safe to show a seller.
+ *
+ * The raw message must never reach the browser. Anthropic's replies carry our
+ * account state — "Your credit balance is too low", key problems, rate-limit
+ * details — which is both meaningless to a seller and not theirs to see. The
+ * full error still goes to the logs, where it is the thing an operator needs.
+ *
+ * @param {Error} err
+ * @returns {string} a message intended for the seller
+ */
+export function describeOcrFailure(err) {
+	const raw = String(err?.message ?? '');
+
+	// Billing, auth and configuration: nothing the seller can do, and none of
+	// their business. Same wording for all three so the reply leaks nothing.
+	if (/credit balance|billing|quota/i.test(raw)) {
+		return 'Card identification is temporarily unavailable. Please fill in the details manually.';
+	}
+	if (/API error 40[13]|authentication|invalid x-api-key|permission/i.test(raw)) {
+		return 'Card identification is temporarily unavailable. Please fill in the details manually.';
+	}
+	if (/API error 429|rate limit/i.test(raw)) {
+		return 'Too many scans at once. Wait a moment and try again.';
+	}
+	if (/abort|timeout|timed out/i.test(raw)) {
+		return 'That scan took too long. Try again with a single, clearer photo of the front.';
+	}
+	if (/API error 5\d\d|overloaded/i.test(raw)) {
+		return 'The identification service is busy. Try again in a moment.';
+	}
+	return 'Could not read that card. Try a clearer, well-lit photo of the front.';
 }
 
 /** Tells the model how to read multiple images: first = front, rest = back/extra. */

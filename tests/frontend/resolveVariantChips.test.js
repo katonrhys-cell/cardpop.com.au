@@ -4,6 +4,8 @@ import {
   mergeIdentifiedVariants,
   impliesFoil,
   ROOKIE_VARIANT,
+  FOIL_VARIANT,
+  splitFoilFinishes,
 } from '@/lib/cardVariants.js';
 
 describe('resolveVariantChips', () => {
@@ -30,6 +32,22 @@ describe('resolveVariantChips', () => {
     expect(resolveVariantChips(['Cosmos Holo'], 'NBA')).toEqual([]);
   });
 
+  it('resolves a bare "foil" to the umbrella finish chip', () => {
+    // No specific treatment was named, so there is nothing to tick in the
+    // details panel — the chip alone is the honest answer.
+    expect(resolveVariantChips(['foil'], 'Pokemon')).toEqual([FOIL_VARIANT]);
+    // Magic prints a finish actually called "Foil", so the exact match wins.
+    expect(resolveVariantChips(['foil'], 'Magic')).toEqual(['Foil']);
+  });
+
+  it('feeds an identified finish into the details panel, not the chip list', () => {
+    const chips = resolveVariantChips(['reverse holofoil'], 'Pokemon');
+    expect(splitFoilFinishes(chips, 'Pokemon')).toEqual({
+      variants: [FOIL_VARIANT],
+      foilFinishes: ['Reverse Holo'],
+    });
+  });
+
   it('drops anything that is not a real chip', () => {
     expect(resolveVariantChips(['shiny sparkly thing', ''], 'NBA')).toEqual([]);
   });
@@ -49,6 +67,7 @@ describe('impliesFoil', () => {
     expect(impliesFoil(['Refractor'])).toBe(true);
     expect(impliesFoil(['Reverse Holo'])).toBe(true);
     expect(impliesFoil(['Surge Foil'])).toBe(true);
+    expect(impliesFoil([FOIL_VARIANT])).toBe(true);
   });
 
   it('does not treat Nonfoil as foil', () => {
