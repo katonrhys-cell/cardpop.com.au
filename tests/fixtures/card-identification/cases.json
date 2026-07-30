@@ -178,5 +178,25 @@
       "variants": []
     },
     "notes": "THE YEAR DISCRIMINATOR, and the most load-bearing Pokemon case so far. This card's copyright is a SINGLE year — '(c)1995, 96, 98 Nintendo, Creatures, GAMEFREAK. (c)1999 Wizards' — whereas the three other Pokemon fixtures all print the range '(c)1999-2000 Wizards'. So `year` is '1999', not '1999-2000', and normalizeSeason keeps those distinct. With three fixtures expecting the range, a pipeline that pattern-matches 'Wizards-era Pokemon means 1999-2000' would score them all correct and only fail here — which is exactly the fabrication mode the releaseYear rule exists to prevent (a 2025-26 card once came back '2021-22'). SECOND, and subtler: Base Set cards carry NO set symbol. Nothing on this card says 'Base Set'. The only on-card clues are the number '63/102' and the 1999 copyright, so resolving the set REQUIRES the catalogue grounding step to look it up by card number — the model is forbidden from supplying it from product knowledge. This is the first fixture where setName has no readable source at all, making it a direct test of groundAgainstCatalogue rather than of OCR. THIRD, 'Base Set' is the literal set name behind the setsMatch substring guard: plain containment made it match 'Base Set 2', a different set that would then corroborate it. A real card now exercises that guard. Also the first /102 set total and the first bare Pokemon name — no 'Dark' or \"Misty's\" prefix — so it checks the pipeline does not over-prefix. Common (filled circle), non-holo, unlimited (thick yellow border, no 1st Edition stamp, not shadowless), illustrated by Mitsuhiro Arita. Rotated 90 degrees, hand-held. `variants` is an empty set for the same reason as the other Pokemon cases: any chip returned is an invention."
+  },
+  {
+    "id": "lebron-topps-chrome-rc-bgs9",
+    "image": "lebron-topps-chrome-rc-bgs9.jpg",
+    "expected": {
+      "name": "LeBron James",
+      "setName": "Topps Chrome",
+      "cardNumber": "111",
+      "year": "2003-04",
+      "collection": "NBA",
+      "rookie": "Rookie Card (RC)",
+      "variants": [
+        "Rookie Card (RC)",
+        "Chrome"
+      ],
+      "gradingCompany": "BGS",
+      "grade": "9",
+      "certNumber": "0008570121"
+    },
+    "notes": "THE FIRST BGS SLAB — every other graded fixture is PSA, and the Beckett label is a different object entirely. Two properties here are genuinely dangerous and untested anywhere else in the suite. (1) SUBGRADES. The label prints CENTERING 8.5, EDGES 9.5, CORNERS 9.5, SURFACE 9.5 beside the overall 9. Four numbers that look exactly like a grade sit next to the one that is. Returning 9.5 instead of 9 is the obvious failure, and `grade` is compared with parseFloat so 9 vs 9.5 scores WRONG — verified. On a card in this price bracket a wrong grade is the most expensive single field the pipeline can get wrong short of the cert. (2) A CERT WITH LEADING ZEROS: '0008570121'. PSA certs are 8-9 digits with no leading zeros, so no existing fixture covers this. Anything that parses the cert as a number turns it into 8570121 and silently pulls a different card's grade and population. The comparator strips non-digits but compares as a STRING, so the dropped zeros score WRONG rather than passing — verified. certNumber is the highest-stakes field in the whole harness. Also a useful counter-example on slab years: this label prints the full season '2003-04 TOPPS CHROME', whereas the Wembanyama PSA label truncates a 2023-24 product to '2023'. Together they show why the label is authoritative for grade, cert and number but NOT for the year. Third Topps Chrome fixture and the first from a different era, so it exercises setsMatch's season-prefix tolerance against a 2003-04 prefix and the deterministic 'Chrome' chip from productFinishNames. `insert` and `parallel` are unasserted: this is the base rookie, not an insert or a parallel. Photographed in a car through a glare-streaked slab at an angle, which is a harder read than any of the flat-scanned fixtures. NOTE ON THE PROMPT: CardOCRPrompt currently says only 'extract the numeric grade and cert number from the label', which gives no guidance for a label carrying five numbers. That gap is deliberately NOT pre-emptively patched. Every defect in PR #832 came from a prompt change I reasoned into place without measuring, so this fixture exists to tell us whether the gap actually costs anything before anyone edits the prompt again."
   }
 ]
