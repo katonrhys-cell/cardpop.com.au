@@ -121,9 +121,10 @@
       "variants": [
         "Auto",
         "Rookie Card (RC)",
-        "Numbered"
+        "Numbered",
+        "Mosaic"
       ]
     },
-    "notes": "2023-24 Panini Mosaic Pictographs on-card autograph, numbered 08/25, Philadelphia 76ers. THE AUTOGRAPH FIXTURE — a real blue on-card signature over a sticker window, which is what the Auto chip and the isAuto flag exist for. Also the first non-numeric collector number ('No. PM-RCF' on the back, an insert code with a hyphen) and the first printed serial ('08/25'), which should imply the Numbered chip on its own. Front is upside-down and heavily glare-speckled by the mosaic foil under rigid plastic; the back carries the number, the serial and the '2023-24 PANINI - MOSAIC BASKETBALL' copyright, so this is a genuine two-image case. The RC shield is on the front bottom-right. `variants` asserts only what is unambiguous: if the pipeline also returns a finish chip, note that the back prints 'PRIZM' while the front carries the Mosaic logo — a finish chip appearing here is an expectation question, not necessarily a pipeline failure. `parallel` is unasserted: /25 is a limited parallel but its name is not printed."
+    "notes": "2023-24 Panini Mosaic Pictographs on-card autograph, numbered 08/25, Philadelphia 76ers. THE AUTOGRAPH FIXTURE — a real blue on-card signature over a sticker window, which is what the Auto chip and the isAuto flag exist for. Also the first non-numeric collector number ('No. PM-RCF' on the back, an insert code with a hyphen) and the first printed serial ('08/25'), which should imply the Numbered chip on its own. Front is upside-down and heavily glare-speckled by the mosaic foil under rigid plastic; the back carries the number, the serial and the '2023-24 PANINI - MOSAIC BASKETBALL' copyright, so this is a genuine two-image case. The RC shield is on the front bottom-right. `variants` now includes 'Mosaic', derived deterministically from the product name by `productFinishNames` rather than read off the card — every card in Panini Mosaic carries the mosaic pattern, so it is a fact about the product, not a treatment the model has to spot. (The back also prints 'PRIZM'; that is not asserted, because the product is Mosaic.) `parallel` is unasserted: /25 is a limited parallel but its name is not printed."
   }
 ]

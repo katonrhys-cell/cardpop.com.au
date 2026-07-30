@@ -139,6 +139,13 @@ Each asserted field comes back `correct`, `wrong` or `missing`:
   is a real assertion, so omit the key entirely if you don't want it scored.
   Chips are resolved against the collection's own taxonomy, so a Pokemon card
   can never acquire "Refractor".
+  Note that some chips are **derived, not read**: a printed serial implies
+  `Numbered`, and a product whose name *is* the finish implies that finish —
+  `Topps Chrome` implies `Chrome`, `Mosaic` implies `Mosaic` (see
+  `productFinishNames` in `lib/cardVariants.js`). Expect those chips even
+  though nothing on the card spells them out; the OCR prompt deliberately
+  forbids the model from naming a treatment it cannot see, so guessing them
+  from product knowledge is exactly what it must not do.
 - **`certNumber` is the highest-stakes field.** It is looked up against PSA's
   API, so a wrong cert pulls a *different card's* grade and population into the
   listing. Every digit is compared; a missing cert is far better than a wrong
