@@ -113,10 +113,17 @@ Each asserted field comes back `correct`, `wrong` or `missing`:
 ### Conventions
 
 - **`year`** is the season for sports products that span two calendar years —
-  `2025-26`, not `2025`. Single-year products (Pokemon, MLB) use `1999`.
-  Formatting is canonicalised, so `2025-2026` and `2025/26` both count, but a
-  bare `2025` does **not** match `2025-26`: a listing showing only the first
-  year is missing the season.
+  `2025-26`, not `2025`. Formatting is canonicalised, so `2025-2026` and
+  `2025/26` both count, but a bare `2025` does **not** match `2025-26`: a
+  listing showing only the first year is missing the season.
+  For **Wizards-era Pokemon** the value is the copyright range printed on the
+  card — `1999-2000` for Team Rocket and Gym Challenge — because that is what is
+  physically on the card. It is deliberately *not* the set's release year: Gym
+  Challenge came out in 2000, but that fact is nowhere on the card, and reading
+  it off would need exactly the product knowledge the OCR prompt bans (the rule
+  that stopped a 2025-26 card being dated `2021-22`). If release-year semantics
+  are wanted, they belong in the catalogue step, which has real set release
+  dates, not in the model.
 - **`setName`** is the product a card came out of — `Topps Chrome`, `Donruss`.
 - **`insert`** is the treatment *within* that product — `Ball of Duty`,
   `Rated Rookie`. A card has both, and folding either into the other loses

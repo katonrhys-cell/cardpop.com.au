@@ -119,3 +119,51 @@ describe('normalizeSeason', () => {
     expect(normalizeSeason('n/a')).toBe('n/a');
   });
 });
+
+// ─── accents and TCG set names ───────────────────────────────────────────────
+// Added when the first Pokemon fixtures went in and immediately failed on
+// setName: "Pokemon Team Rocket" did not match "Team Rocket". Two separate
+// causes, both fixed here.
+describe('normalizeName — accent folding', () => {
+  it('folds accents instead of splitting the word on them', () => {
+    // The original bug: é became a space, so "Pokémon" was "pok mon" — two
+    // words, which no noise-word entry could ever cover.
+    expect(normalizeName('Pokémon')).toBe('pokemon');
+    expect(normalizeName('Pokémon')).toBe(normalizeName('Pokemon'));
+  });
+
+  it('folds accents in card names too', () => {
+    expect(normalizeName('Flabébé')).toBe('flabebe');
+    expect(normalizeName('Café')).toBe('cafe');
+  });
+
+  it('still turns punctuation into spaces, which compactName relies on', () => {
+    expect(normalizeName("Farfetch'd")).toBe('farfetch d');
+    expect(normalizeName("Misty's Staryu")).toBe('misty s staryu');
+  });
+});
+
+describe('setsMatch — game name as a noise word', () => {
+  it('ignores a prepended game name', () => {
+    expect(setsMatch('Team Rocket', 'Pokemon Team Rocket')).toBe(true);
+    expect(setsMatch('Team Rocket', 'Pokémon Team Rocket')).toBe(true);
+    expect(setsMatch('Gym Challenge', 'Pokemon Gym Challenge')).toBe(true);
+  });
+
+  it('still separates sets that differ by a real word', () => {
+    expect(setsMatch('Gym Challenge', 'Gym Heroes')).toBe(false);
+    expect(setsMatch('Team Rocket', 'Team Rocket Returns')).toBe(false);
+  });
+
+  it('leaves "magic" out of the noise list on purpose', () => {
+    // Making it noise would reduce "Magic Origins" to "Origins". Silently
+    // merging two distinct sets is worse than one false mismatch, so game names
+    // are added only when a fixture demonstrates the need.
+    expect(setsMatch('Magic Origins', 'Origins')).toBe(false);
+  });
+
+  it('does not disturb the sports cases it was built for', () => {
+    expect(setsMatch('Mosaic', 'Panini Mosaic Basketball')).toBe(true);
+    expect(setsMatch('Topps Chrome', '2025-26 Topps Chrome')).toBe(true);
+  });
+});

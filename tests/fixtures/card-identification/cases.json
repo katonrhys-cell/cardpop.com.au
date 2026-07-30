@@ -126,5 +126,31 @@
       ]
     },
     "notes": "2023-24 Panini Mosaic Pictographs on-card autograph, numbered 08/25, Philadelphia 76ers. THE AUTOGRAPH FIXTURE — a real blue on-card signature over a sticker window, which is what the Auto chip and the isAuto flag exist for. Also the first non-numeric collector number ('No. PM-RCF' on the back, an insert code with a hyphen) and the first printed serial ('08/25'), which should imply the Numbered chip on its own. Front is upside-down and heavily glare-speckled by the mosaic foil under rigid plastic; the back carries the number, the serial and the '2023-24 PANINI - MOSAIC BASKETBALL' copyright, so this is a genuine two-image case. The RC shield is on the front bottom-right. `variants` now includes 'Mosaic', derived deterministically from the product name by `productFinishNames` rather than read off the card — every card in Panini Mosaic carries the mosaic pattern, so it is a fact about the product, not a treatment the model has to spot. (The back also prints 'PRIZM'; that is not asserted, because the product is Mosaic.) `parallel` is unasserted: /25 is a limited parallel but its name is not printed."
+  },
+  {
+    "id": "dark-charmeleon-team-rocket-unlimited",
+    "image": "dark-charmeleon-team-rocket-unlimited.jpg",
+    "expected": {
+      "name": "Dark Charmeleon",
+      "setName": "Team Rocket",
+      "cardNumber": "32/82",
+      "year": "1999-2000",
+      "collection": "Pokemon",
+      "variants": []
+    },
+    "notes": "THE FIRST POKEMON FIXTURE — until this case the entire TCG path was unmeasured and every fixture was NBA. Wizards-era Team Rocket Dark Charmeleon, non-holo Uncommon (the rarity symbol beside '32/82' is a diamond), unlimited print run. Exercises everything the sports fixtures cannot: the pokemon CardSight segment instead of a sports one, a '32/82' number whose set total matters (cardNumbersMatch compares the total, so 32/82 must not match 32/132), and a set name with no manufacturer word in it. The photo is rotated 90 degrees — the card is portrait but the frame is landscape, so the text runs bottom-to-top — and it is held in a hand over a stack of other cards, which is the realistic seller photo the rectification step exists for. `year` is '1999-2000' because that is the copyright range printed on the card ('(c)1999-2000 Wizards'); see the README note, this is a convention call, not a release date. `variants` asserts an EMPTY set deliberately: nothing on this card warrants a chip, so an empty list is the assertion that catches the pipeline inventing a Pokemon finish the way it once invented Refractor on a Donruss card. 'Unlimited' is a real chip and factually correct here, but it is derived from the ABSENCE of a 1st Edition stamp, which the OCR prompt forbids the model from inferring — so it is deliberately not asserted. If the pipeline does return 'Unlimited', that is an expectation question, not a failure. `rarity` is not a scored field, so Uncommon is recorded here only."
+  },
+  {
+    "id": "mistys-staryu-gym-challenge",
+    "image": "mistys-staryu-gym-challenge.jpg",
+    "expected": {
+      "name": "Misty's Staryu",
+      "setName": "Gym Challenge",
+      "cardNumber": "92/132",
+      "year": "1999-2000",
+      "collection": "Pokemon",
+      "variants": []
+    },
+    "notes": "THE DISTRACTOR FIXTURE — a second card is visible at the right edge of the frame, and its own collector number '29/82' is legible. No other fixture tests this: the pipeline must read the SUBJECT card's number (92/132) and not a neighbouring card's, and 29/82 is a plausible-looking wrong answer from a different set entirely. A wrong cardNumber reaches a live listing, so this is exactly the failure mode worth measuring. Also the first apostrophe in a card name, which is why normalizeName carries a compact-name comparison (\"Misty's Staryu\" must not lose to \"mistys staryu\"); the same fix that made Farfetch'd work. Common rarity (filled circle beside the number), non-holo, illustrated by Ken Sugimori, Gym Challenge. Rotated 90 degrees like the Dark Charmeleon case, held over a stack. `year` is '1999-2000' from the printed '(c)1999-2000 Wizards' copyright. Note the user described this card as released in 2000, which is true of Gym Challenge, but the release year is NOT printed on the card — asserting it would require exactly the product knowledge the prompt bans. See the README. `variants` is an empty set: this card is non-holo and carries no attribute chip, so any chip returned is an invention."
   }
 ]
