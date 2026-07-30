@@ -93,7 +93,7 @@ create policy "card_scans_select_admin" on public.card_scans
   for select using (
     exists (
       select 1 from public.profiles p
-      where p.id = auth.uid() and p.role = 'admin'
+      where p.id = auth.uid() and p.is_admin = true
     )
   );
 
@@ -208,6 +208,17 @@ begin
 end;
 $$;
 
+-- The function is security definer, so who may call it is the whole security
+-- boundary: revoke the implicit PUBLIC execute grant, then hand it back to the
+-- service role alone. The grant is not optional — revoking from PUBLIC drops
+-- service_role's implicit privilege too, and because catalogue logging is
+-- fire-and-forget a missing grant would lose every observation silently rather
+-- than surfacing an error. (Matches `compute_seller_tier`, whose ACL is exactly
+-- {postgres, service_role}.)
 revoke all on function public.record_catalogue_observation(
   text, text, text, text, text, text, text, text, text, text, boolean, boolean
 ) from public, anon, authenticated;
+
+grant execute on function public.record_catalogue_observation(
+  text, text, text, text, text, text, text, text, text, text, boolean, boolean
+) to service_role;
