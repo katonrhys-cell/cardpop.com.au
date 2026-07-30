@@ -7,6 +7,7 @@ import { POPULAR_CARDS } from '../utils/ebayPopularCards.js';
 import * as ebayCache from '../utils/ebayCache.js';
 import { getUsdToAudRate } from '../utils/exchangeRates.js';
 import logger from '../utils/logger.js';
+import { queryString } from '../utils/queryString.js';
 
 const router = express.Router();
 
@@ -21,14 +22,15 @@ const router = express.Router();
  * Response: array of listing objects (NOT wrapped in an envelope)
  */
 router.get('/search', async (req, res) => {
-  const { cardName, limit = '20' } = req.query;
+  const { limit = '20' } = req.query;
+  const cardName = queryString(req.query.cardName);
 
-  if (!cardName?.trim()) {
+  if (!cardName) {
     return res.status(400).json({ error: 'cardName query parameter is required' });
   }
 
   const limitNum = Math.min(200, Math.max(1, parseInt(limit, 10) || 20));
-  const query = cardName.trim();
+  const query = cardName;
 
   logger.info(`[EBAY_SEARCH] Searching for: "${query}", limit: ${limitNum}`);
 
@@ -84,17 +86,20 @@ router.get('/search', async (req, res) => {
  *   { count, avgPrice, minPrice, maxPrice, listings[] }
  */
 router.get('/price-estimate', async (req, res) => {
-  const { name, set, gradingService, gradeScore } = req.query;
+  const { gradeScore } = req.query;
+  const name = queryString(req.query.name);
+  const set = queryString(req.query.set);
+  const gradingService = queryString(req.query.gradingService);
 
-  if (!name?.trim()) {
+  if (!name) {
     return res.status(400).json({ error: 'name query parameter is required' });
   }
 
   // Build a targeted search query
-  const parts = [name.trim()];
-  if (set?.trim()) parts.push(set.trim());
+  const parts = [name];
+  if (set) parts.push(set);
   if (gradingService && gradingService !== 'None') {
-    parts.push(gradingService.trim());
+    parts.push(gradingService);
     if (gradeScore) parts.push(String(gradeScore).trim());
   }
   const query = parts.join(' ');

@@ -125,7 +125,8 @@ const CommissionSettingsPage = () => {
   const fetchSettings = useCallback(async () => {
     const keys = [
       'commissions_enabled', 'gst_enabled', 'gst_rate_pct', 'gst_on_commission_only',
-      'commission_on_offers', 'commission_on_auctions', 'commission_on_trades', 'commission_on_featured',
+      'commission_on_fixed', 'commission_on_offers', 'commission_on_auctions', 'commission_on_trades',
+      'commission_on_featured',
     ];
     const { data } = await supabase.from('platform_settings').select('key, value').in('key', keys);
     const map = {};
@@ -171,12 +172,17 @@ const CommissionSettingsPage = () => {
 
   const handleSettingToggle = async (key, newValue) => {
     setSavingSettings(s => ({ ...s, [key]: true }));
-    const { error } = await supabase
+    // Select the updated row back: an UPDATE against a key that has no row
+    // reports no error but changes nothing, so without this a missing setting
+    // silently no-ops while the UI flips the switch and says "Setting saved".
+    const { data: updated, error } = await supabase
       .from('platform_settings')
       .update({ value: newValue })
-      .eq('key', key);
+      .eq('key', key)
+      .select('key');
     setSavingSettings(s => ({ ...s, [key]: false }));
     if (error) { toast.error(`Failed to update ${key}`); return; }
+    if (!updated?.length) { toast.error(`Setting ${key} does not exist yet — run pending migrations`); return; }
     setSettings(s => ({ ...s, [key]: newValue }));
     toast.success('Setting saved');
   };
@@ -332,8 +338,8 @@ const CommissionSettingsPage = () => {
             <SettingToggle
               label="Commission on Buy Now / Fixed"
               description="Charge commission on fixed-price listings."
-              settingKey="commission_on_offers"
-              value={settings['commission_on_offers']}
+              settingKey="commission_on_fixed"
+              value={settings['commission_on_fixed']}
               onChange={handleSettingToggle}
             />
             <SettingToggle

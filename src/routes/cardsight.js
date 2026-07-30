@@ -18,6 +18,7 @@ import supabase from '../utils/supabaseClient.js';
 import { refreshCardMarketData } from '../utils/marketDataService.js';
 import { getSegmentsForCollection } from '../utils/collectionSegmentMap.js';
 import logger from '../utils/logger.js';
+import { queryString } from '../utils/queryString.js';
 
 const router = Router();
 
@@ -282,12 +283,13 @@ router.get('/pricing/:cardId', async (req, res) => {
 // ─── GET /cardsight/autocomplete ─────────────────────────────────────────────
 // Lightweight card-name lookup used to resolve a name to a CardSight card ID.
 router.get('/autocomplete', async (req, res) => {
-  const { q, take } = req.query;
-  if (!q?.trim()) return res.status(400).json({ error: 'q is required' });
+  const { take } = req.query;
+  const q = queryString(req.query.q);
+  if (!q) return res.status(400).json({ error: 'q is required' });
 
   const client = getCardSightClient();
   const { data } = await client.catalog.search({
-    q: q.trim(),
+    q,
     type: 'card',
     ...(take && { take: Number(take) }),
   });
@@ -298,12 +300,13 @@ router.get('/autocomplete', async (req, res) => {
 // ─── GET /cardsight/catalog/search ───────────────────────────────────────────
 // Fuzzy search across cards, sets, and releases.
 router.get('/catalog/search', async (req, res) => {
-  const { q, type, year, segment } = req.query;
-  if (!q?.trim()) return res.status(400).json({ error: 'q is required' });
+  const { type, year, segment } = req.query;
+  const q = queryString(req.query.q);
+  if (!q) return res.status(400).json({ error: 'q is required' });
 
   const client = getCardSightClient();
   const { data } = await client.catalog.search({
-    q: q.trim(),
+    q,
     ...(type && { type }),
     ...(year && { year }),
     ...(segment && { segment }),

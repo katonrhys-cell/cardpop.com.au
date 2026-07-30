@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { useAdmin } from '@/contexts/AdminContext.jsx';
 import { useDebounce } from '@/hooks/useDebounce.js';
 import { toCdnUrl } from '@/utils/imageUrl.js';
+import { orFilterTerm } from '@/src/utils/orFilterTerm.js';
 
 const SellersManagementPage = () => {
   const navigate = useNavigate();
@@ -49,8 +50,12 @@ const SellersManagementPage = () => {
         .order('created_at', { ascending: false })
         .range((page - 1) * 20, page * 20 - 1);
 
-      if (debouncedSearch) {
-        query = query.or(`display_name.ilike.%${debouncedSearch}%,username.ilike.%${debouncedSearch}%,business_name.ilike.%${debouncedSearch}%`);
+      // Sanitize before interpolating: `.or()` takes PostgREST filter grammar,
+      // not a bound parameter, so a term containing a comma/paren/wildcard
+      // rewrites the query (a search for "Cards, Co" 400s as "Failed to load").
+      const searchTerm = orFilterTerm(debouncedSearch);
+      if (searchTerm) {
+        query = query.or(`display_name.ilike.%${searchTerm}%,username.ilike.%${searchTerm}%,business_name.ilike.%${searchTerm}%`);
       }
 
       if (featuredFilter === 'featured') {

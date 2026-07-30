@@ -14,6 +14,7 @@ import {
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { toCdnUrl } from '@/utils/imageUrl.js';
+import { orFilterTerm } from '@/src/utils/orFilterTerm.js';
 
 // Admin chat moderation / search.
 //
@@ -25,8 +26,10 @@ import { toCdnUrl } from '@/utils/imageUrl.js';
 const PAGE_LIMIT = 100;
 
 // Strip PostgREST filter-grammar + LIKE wildcards from a user term before it is
-// interpolated into an `.or()` string, and clamp its length.
-const sanitizeTerm = (raw) => (raw || '').replace(/[%,().*:]/g, '').trim().slice(0, 80);
+// interpolated into an `.or()` string, and clamp its length. Shared with the
+// other admin search pages — the local copy this replaced missed `_` (a
+// single-character LIKE wildcard) and `\` (its escape character).
+const sanitizeTerm = (raw) => orFilterTerm(raw);
 
 const nameOf = (p) => p?.display_name || p?.username || 'Unknown user';
 const initial = (p) => (nameOf(p)[0] || '?').toUpperCase();

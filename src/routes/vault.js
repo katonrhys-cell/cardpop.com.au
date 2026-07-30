@@ -4,6 +4,7 @@ import supabase from '../utils/supabaseClient.js';
 import { authMiddleware, optionalAuthMiddleware, isAdminUser } from '../middleware/auth.js';
 import { requireAdmin } from '../middleware/requireAal2.js';
 import logger from '../utils/logger.js';
+import { queryString } from '../utils/queryString.js';
 
 const router = express.Router();
 
@@ -11,7 +12,8 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 // GET /vault/products — authenticated user's own vault items
 router.get('/products', authMiddleware, async (req, res) => {
-  const { page = '1', limit = '20', sort = 'created_at' } = req.query;
+  const { page = '1', limit = '20' } = req.query;
+  const sort = queryString(req.query.sort) || 'created_at';
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
   const from = (pageNum - 1) * limitNum;
@@ -51,12 +53,14 @@ router.get('/products', authMiddleware, async (req, res) => {
 
 // GET /vault/public — public vault items for marketplace
 router.get('/public', async (req, res) => {
-  const { page = '1', limit = '20', sort = 'created_at', userId } = req.query;
+  const { page = '1', limit = '20' } = req.query;
+  const sort = queryString(req.query.sort) || 'created_at';
+  const userId = queryString(req.query.userId);
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
   const from = (pageNum - 1) * limitNum;
 
-  if (userId?.trim() && !UUID_RE.test(userId.trim())) {
+  if (userId && !UUID_RE.test(userId)) {
     return res.status(400).json({ error: 'Invalid userId format' });
   }
 
@@ -65,7 +69,7 @@ router.get('/public', async (req, res) => {
     .select('*, profiles!vault_items_owner_id_fkey(username, business_name)', { count: 'exact' })
     .eq('is_public', true);
 
-  if (userId?.trim()) query = query.eq('owner_id', userId.trim());
+  if (userId) query = query.eq('owner_id', userId);
 
   const sortCol = sort.replace('-', '') === 'price' ? 'asking_price' : 'created_at';
   query = query.order(sortCol, { ascending: !sort.startsWith('-') }).range(from, from + limitNum - 1);
