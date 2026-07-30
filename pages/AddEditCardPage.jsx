@@ -73,8 +73,10 @@ const LISTING_OPTIONS = [
 ];
 
 // ─── Wizard steps (new cards) ─────────────────────────────────────────────────
-// Each step lists the validation fields (utils/listingValidation.js) that must
-// pass before advancing. Edit mode keeps the classic full form.
+// Each step lists the validation fields (utils/listingValidation.js) it owns.
+// They're checked when the seller moves on — to mark them for review, not to
+// hold them there — and enforced for real on submit. Edit mode keeps the
+// classic full form.
 const WIZARD_STEPS = [
   { key: 'photos',  title: 'Photos',  fields: ['cardImage'] },
   { key: 'details', title: 'Details', fields: ['hierarchy', 'cardName', 'year'] },
@@ -1015,27 +1017,21 @@ const AddEditCardPage = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Advance only when the current step's fields validate — problems surface
-  // inline on the step they belong to instead of piling up at the end.
+  // Moving on is never blocked. The step's fields are re-checked so anything
+  // outstanding is marked inline for the seller to review in their own time,
+  // but a half-filled field doesn't trap them mid-flow — Save is the real
+  // gate, and it jumps back to the first step that still needs work.
   const goNextStep = () => {
     const stepFields = WIZARD_STEPS[wizardStep].fields;
-    const stepErrors = {};
-    stepFields.forEach((field) => {
-      const message = validateListingField(field, formData, validationCtx);
-      if (message) stepErrors[field] = message;
-    });
     setErrors(prev => {
       const next = { ...prev };
       stepFields.forEach((field) => {
-        if (stepErrors[field]) next[field] = stepErrors[field];
+        const message = validateListingField(field, formData, validationCtx);
+        if (message) next[field] = message;
         else delete next[field];
       });
       return next;
     });
-    if (Object.keys(stepErrors).length > 0) {
-      toast.error('Please fix the highlighted issue before continuing');
-      return;
-    }
     const nextIndex = Math.min(wizardStep + 1, WIZARD_STEPS.length - 1);
     setMaxStepReached(m => Math.max(m, nextIndex));
     goToStep(nextIndex);
@@ -1882,10 +1878,10 @@ const AddEditCardPage = () => {
                       value={formData.year}
                       onChange={e => set('year', e.target.value)}
                       onBlur={() => validateFieldOnBlur('year')}
-                      placeholder={`${new Date().getFullYear()} or ${new Date().getFullYear()}/${new Date().getFullYear() + 1}`}
+                      placeholder={`${new Date().getFullYear()} or ${new Date().getFullYear()}-${String((new Date().getFullYear() + 1) % 100).padStart(2, '0')}`}
                       className={`h-11 bg-background ${errors.year ? 'border-destructive' : ''}`}
                     />
-                    <p className="text-muted-foreground text-xs">Enter a single year (e.g. 2025) or a season range (e.g. 2025/2026).</p>
+                    <p className="text-muted-foreground text-xs">Enter a single year (e.g. 2025) or a season (e.g. 2025-26 or 2025/2026).</p>
                     {errors.year && <p className="text-destructive text-xs">{errors.year}</p>}
                   </div>
 
