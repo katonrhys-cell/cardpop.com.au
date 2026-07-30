@@ -1,8 +1,21 @@
 import process from 'node:process';
 import 'dotenv/config';
 import { CardSightAI } from 'cardsightai';
-import { getUsdToAudRate } from './exchangeRates.js';
 import logger from './logger.js';
+
+// The FX rate is fetched through the shared cache, which imports the backend
+// Supabase client — and that client deliberately throws at module load when
+// SUPABASE_SERVICE_ROLE_KEY is absent, to fail fast on a misconfigured server.
+//
+// A static import here would extend that requirement to *identifying* a card,
+// which needs no database at all: it made a CardSight outage indistinguishable
+// from a Supabase misconfiguration, and left the scoring harness unable to
+// exercise CardSight without a service-role key it has no use for. Only the
+// AUD conversion needs the rate, so only that path pays for it.
+async function loadUsdToAudRate() {
+	const { getUsdToAudRate } = await import('./exchangeRates.js');
+	return getUsdToAudRate();
+}
 
 let _client = null;
 
@@ -74,7 +87,7 @@ export async function summarisePricingAud(pricing) {
 	const summary = summarisePricing(pricing);
 	if (!summary) return null;
 
-	const rate = await getUsdToAudRate();
+	const rate = await loadUsdToAudRate();
 	const round2 = n => Math.round(n * 100) / 100;
 
 	return {

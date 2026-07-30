@@ -15,8 +15,9 @@
  * lives in `handleAnalyzeWithAI` in pages/AddEditCardPage.jsx and is welded to
  * React state. Keep the two in step; the stage comments below mirror it.
  *
- * Needs ANTHROPIC_API_KEY, and CARDSIGHT_API_KEY for the catalog stage. Every
- * run costs real API calls — a manual tool, deliberately not part of CI.
+ * Needs ANTHROPIC_API_KEY, and CARDSIGHT_API_KEY for the catalog stage — no
+ * database credentials are required for either. Every run costs real API calls;
+ * this is a manual tool, deliberately not part of CI.
  */
 
 import fs from 'node:fs';
@@ -99,9 +100,8 @@ async function identifyWithCardSight(buffer, mimetype, collection, log) {
     return null;
   }
 
-  // Imported lazily: the CardSight client pulls in the backend Supabase client,
-  // which refuses to load without a service-role key. A run that only scores the
-  // OCR path shouldn't need one.
+  // Imported lazily so a run that only scores the OCR path never touches the
+  // CardSight SDK at all.
   let client;
   try {
     const { getCardSightClient } = await import('../src/utils/cardSightClient.js');
