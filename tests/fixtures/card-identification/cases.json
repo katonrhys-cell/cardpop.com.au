@@ -152,5 +152,18 @@
       "variants": []
     },
     "notes": "THE DISTRACTOR FIXTURE — a second card is visible at the right edge of the frame, and its own collector number '29/82' is legible. No other fixture tests this: the pipeline must read the SUBJECT card's number (92/132) and not a neighbouring card's, and 29/82 is a plausible-looking wrong answer from a different set entirely. A wrong cardNumber reaches a live listing, so this is exactly the failure mode worth measuring. Also the first apostrophe in a card name, which is why normalizeName carries a compact-name comparison (\"Misty's Staryu\" must not lose to \"mistys staryu\"); the same fix that made Farfetch'd work. Common rarity (filled circle beside the number), non-holo, illustrated by Ken Sugimori, Gym Challenge. Rotated 90 degrees like the Dark Charmeleon case, held over a stack. `year` is '1999-2000' from the printed '(c)1999-2000 Wizards' copyright. Note the user described this card as released in 2000, which is true of Gym Challenge, but the release year is NOT printed on the card — asserting it would require exactly the product knowledge the prompt bans. See the README. `variants` is an empty set: this card is non-holo and carries no attribute chip, so any chip returned is an invention."
+  },
+  {
+    "id": "dark-kadabra-team-rocket",
+    "image": "dark-kadabra-team-rocket.jpg",
+    "expected": {
+      "name": "Dark Kadabra",
+      "setName": "Team Rocket",
+      "cardNumber": "39/82",
+      "year": "1999-2000",
+      "collection": "Pokemon",
+      "variants": []
+    },
+    "notes": "Second Team Rocket card, and deliberately a near-duplicate of dark-charmeleon-team-rocket-unlimited: same set, same Uncommon diamond, same '(c)1999-2000 Wizards' copyright, same non-holo, same 90-degree rotation and hand-held framing. It is here for two narrow reasons rather than broad coverage. SAME-SET DISCRIMINATION: 39/82 and 32/82 differ only in the card number within one 82-card set, so a pipeline that anchors on the set and guesses the number has two fixtures that catch it. NAME PREFIX: 'Dark Kadabra' must not be satisfied by 'Kadabra' — the Wizards-era 'Dark' prefix is part of the card's identity and a different card entirely, which is what namesMatch's no-containment rule protects. Adds sample size to the Pokemon measurement but no new card *type* — it is not holo, not graded, not first edition, and has no distractor card in frame. The remaining Pokemon gaps after this are a holo, a graded slab, and a genuine 1st Edition stamp. `year` and the empty `variants` follow the same reasoning as the other two Pokemon cases; see the README."
   }
 ]
