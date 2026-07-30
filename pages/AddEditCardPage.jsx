@@ -14,7 +14,10 @@ import CardHierarchySelector from '@/components/CardHierarchySelector.jsx';
 import RookieJerseyIcon from '@/components/icons/RookieJerseyIcon.jsx';
 import { COLLECTION_CONFIGS } from '@/data/collectionConfigs.js';
 import { useCollectionEras } from '@/hooks/useCollectionEras.js';
-import { getVariantGroups, mergeIdentifiedVariants, resolveVariantChips, impliesFoil } from '@/lib/cardVariants.js';
+import {
+  getVariantGroups, mergeIdentifiedVariants, resolveVariantChips, impliesFoil,
+  FOIL_VARIANT, getFoilFinishes, splitFoilFinishes, expandFoilFinishes,
+} from '@/lib/cardVariants.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -177,6 +180,7 @@ const AddEditCardPage = () => {
   const [showRookieGuide, setShowRookieGuide] = useState(false);
   const [showRefractorGuide, setShowRefractorGuide] = useState(false);
   const [showPrizmGuide, setShowPrizmGuide]   = useState(false);
+  const [showFoilGuide, setShowFoilGuide]     = useState(false);
 
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
@@ -221,6 +225,9 @@ const AddEditCardPage = () => {
     parallelPrintRun: '',
     notesFromCardSight: '',
     // Attributes
+    // The specific foil/holo finishes behind the single "Foil / Holo" chip.
+    // Persisted into `variant` alongside it — see expandFoilFinishes.
+    foilFinishes:   [],
     isFoil:         false,
     isSealed:       false,
     serialNumber:   '',
@@ -417,7 +424,16 @@ const AddEditCardPage = () => {
     if (hierarchy.subsetId) setSubsetId(hierarchy.subsetId);
     // Merge over the current defaults so fields added after the draft was
     // saved keep their initial values.
-    setFormData(prev => ({ ...prev, ...draftForm }));
+    setFormData(prev => {
+      const restored = { ...prev, ...draftForm };
+      // A draft saved before the finishes moved into their own panel holds them
+      // as chips — route them the same way a saved listing is loaded.
+      const split = splitFoilFinishes(
+        expandFoilFinishes(restored.variant, restored.foilFinishes),
+        restored.collection,
+      );
+      return { ...restored, variant: split.variants, foilFinishes: split.foilFinishes };
+    });
     setRestorableDraft(null);
     // A restored draft has content across the steps — unlock the whole wizard
     // so the seller can jump straight to wherever they left off.
@@ -494,6 +510,12 @@ const AddEditCardPage = () => {
             .then(({ data }) => { if (data?.raw_data) setPsaPopData(data.raw_data); });
         }
 
+        // Saved variants are one flat list; the form splits the specific
+        // foil/holo finishes out of it so they show in the Foil / Holo Details
+        // panel rather than as chips (expandFoilFinishes puts them back on save).
+        const savedVariants = card.variant ? card.variant.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const split = splitFoilFinishes(savedVariants, card.collection);
+
         setFormData({
           collection:     card.collection     || 'Pokemon',
           cardName:       card.card_name      || '',
@@ -504,10 +526,11 @@ const AddEditCardPage = () => {
           // the rookie designation — surface the legacy is_rookie flag through it
           // so older rows still show (and keep) their rookie status when edited.
           variant:        (() => {
-            const v = card.variant ? card.variant.split(',').map(s => s.trim()).filter(Boolean) : [];
+            const v = [...split.variants];
             if (card.is_rookie && !v.includes('Rookie Card (RC)')) v.push('Rookie Card (RC)');
             return v;
           })(),
+          foilFinishes:   split.foilFinishes,
           isFoil:         card.is_foil        ?? false,
           isSealed:       card.is_sealed      ?? false,
           serialNumber:   card.serial_number  || '',
@@ -746,7 +769,18 @@ const AddEditCardPage = () => {
         // autograph, patch, foil treatment, serial numbering. Additive: it can
         // add a designation the seller hasn't picked, never remove one, and
         // only ever selects chips that exist for this collection.
-        variant:        mergeIdentifiedVariants(prev.variant, ocrResult, variantCollection),
+        ...(() => {
+          // A finish is reported by name ("Reverse Holo"), so it is routed into
+          // the Foil / Holo Details panel exactly as a saved listing is loaded —
+          // it must never come back as a loose chip.
+          const merged = mergeIdentifiedVariants(
+            expandFoilFinishes(prev.variant, prev.foilFinishes),
+            ocrResult,
+            variantCollection,
+          );
+          const split = splitFoilFinishes(merged, variantCollection);
+          return { variant: split.variants, foilFinishes: split.foilFinishes };
+        })(),
         // Dedicated flags that mirror some of those chips.
         isFoil:         prev.isFoil || impliesFoil(identifiedChips),
         isAuto:         prev.isAuto || identifiedChips.includes('Auto'),
@@ -842,7 +876,7 @@ const AddEditCardPage = () => {
       cardNumber:      formData.cardNumber,
       year:            formData.year,
       manufacturerName: formData.manufacturerName,
-      variant:         formData.variant,
+      variant:         expandFoilFinishes(formData.variant, formData.foilFinishes),
       parallelName:    formData.parallelName || parallelOpts.find(p => p.id === parallelId)?.name || '',
       serialNumber:    formData.serialNumber,
       isRookie:        formData.variant.includes('Rookie Card (RC)'),
@@ -1203,6 +1237,11 @@ const AddEditCardPage = () => {
         extraImagePaths.push(filePath);
       }
 
+      // The chips plus the finishes chosen in the Foil / Holo Details panel.
+      // They persist as one flat list, so the strings buyers filter on
+      // ('Reverse Holo', 'Surge Foil'…) are unchanged by the panel move.
+      const savedVariants = expandFoilFinishes(formData.variant, formData.foilFinishes);
+
       const isGraded  = formData.gradingCompany !== 'raw';
       const isPublic  = formData.listingType !== 'private';
       const tradeAud  = parseFloat(formData.tradeValue) || 0;
@@ -1221,8 +1260,10 @@ const AddEditCardPage = () => {
         set_name:            formData.setName?.trim()     || null,
         card_number:         formData.cardNumber?.trim()  || null,
         year:                formData.year?.trim() || null,
-        variant:             formData.variant.length ? formData.variant.join(', ') : null,
-        is_foil:             formData.isFoil,
+        variant:             savedVariants.length ? savedVariants.join(', ') : null,
+        // Selecting the Foil / Holo chip says the card is foiled, so the flag
+        // buyers filter on follows it without needing the toggle ticked too.
+        is_foil:             formData.isFoil || formData.variant.includes(FOIL_VARIANT),
         is_sealed:           formData.isSealed,
         // The "Rookie Card (RC)" variant chip is the single source of truth for
         // the rookie designation — filters query this derived flag
@@ -1891,7 +1932,7 @@ const AddEditCardPage = () => {
                       {formData.variant.length > 0 && (
                         <button
                           type="button"
-                          onClick={() => set('variant', [])}
+                          onClick={() => { set('variant', []); set('foilFinishes', []); }}
                           className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
                         >
                           Clear all
@@ -1951,7 +1992,14 @@ const AddEditCardPage = () => {
                     </div>
                     {formData.variant.length > 0 && (
                       <p className="text-xs text-primary font-medium">
-                        Selected: {formData.variant.join(' · ')}
+                        {/* The finishes chosen in the details panel below are part
+                            of the selection, so they belong in this summary. */}
+                        Selected: {expandFoilFinishes(formData.variant, formData.foilFinishes).join(' · ')}
+                      </p>
+                    )}
+                    {formData.variant.includes(FOIL_VARIANT) && (
+                      <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
+                        Pick the exact finish in <span className="font-bold">Foil / Holo Details</span> below.
                       </p>
                     )}
                   </div>
@@ -2050,6 +2098,131 @@ const AddEditCardPage = () => {
                         />
                       </div>
                     </div>
+
+                    {/* Foil / Holo sub-details — shown when the single "Foil / Holo"
+                        finish chip is selected in the Card Variant / Finish section.
+                        Every named holo pattern and foil treatment lives here rather
+                        than as its own chip; the strings saved are the same ones, so
+                        buyers' rarity filters are unaffected. */}
+                    {formData.variant.includes(FOIL_VARIANT) && (
+                      <div className="mt-3 p-4 rounded-xl border-2 border-amber-400/30 bg-amber-400/5 space-y-4 animate-in fade-in slide-in-from-top-1">
+                        <p className="text-xs font-extrabold uppercase tracking-widest text-amber-700 dark:text-amber-400">✨ Foil / Holo Details</p>
+
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold text-foreground">Finish Type</Label>
+                          {(() => {
+                            const finishes = getFoilFinishes(formData.collection);
+                            const known = new Set(finishes.map(f => f.value));
+                            // A finish kept from another collection (the seller
+                            // changed the game after picking it) — shown so it can
+                            // be seen and cleared rather than saved invisibly.
+                            const otherSelected = formData.foilFinishes.filter(f => !known.has(f));
+                            const toggle = (value) => set(
+                              'foilFinishes',
+                              formData.foilFinishes.includes(value)
+                                ? formData.foilFinishes.filter(f => f !== value)
+                                : [...formData.foilFinishes, value],
+                            );
+                            const renderOption = ({ value, desc }) => {
+                              const active = formData.foilFinishes.includes(value);
+                              return (
+                                <button
+                                  key={value}
+                                  type="button"
+                                  onClick={() => toggle(value)}
+                                  className={`flex flex-col items-start px-3 py-2.5 rounded-xl border-2 text-left transition-all ${
+                                    active
+                                      ? 'border-amber-500 bg-amber-500/10 text-amber-700 dark:text-amber-400 shadow-sm'
+                                      : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
+                                  }`}
+                                >
+                                  <span className="font-bold text-xs">{active ? '✓ ' : ''}{value}</span>
+                                  {desc && (
+                                    <span className={`text-[10px] mt-0.5 leading-tight ${active ? 'text-amber-600/70 dark:text-amber-400/70' : 'text-muted-foreground'}`}>{desc}</span>
+                                  )}
+                                </button>
+                              );
+                            };
+                            return (
+                              <>
+                                {finishes.length > 0 ? (
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {finishes.map(renderOption)}
+                                  </div>
+                                ) : (
+                                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                    {formData.collection
+                                      ? `${formData.collection} finishes are listed as their own chips above — nothing extra to pick here.`
+                                      : 'Pick a collection above to see its foil and holo finishes.'}
+                                  </p>
+                                )}
+                                {otherSelected.length > 0 && (
+                                  <div className="space-y-1.5">
+                                    <p className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">Also Selected</p>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      {otherSelected.map(value => renderOption({ value }))}
+                                    </div>
+                                  </div>
+                                )}
+                                <p className="text-[10px] text-muted-foreground leading-relaxed">
+                                  Select every finish the card actually has — most cards have just one.
+                                </p>
+                              </>
+                            );
+                          })()}
+
+                          {/* Collapsible foil / holo guide */}
+                          <div className="rounded-xl border border-amber-400/25 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => setShowFoilGuide(v => !v)}
+                              className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-amber-400/5 transition-colors"
+                            >
+                              <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400">Which finish does my card have? View guide</span>
+                              <ChevronDown className={`h-3.5 w-3.5 text-amber-600 dark:text-amber-400 transition-transform duration-200 ${showFoilGuide ? 'rotate-180' : ''}`} />
+                            </button>
+                            {showFoilGuide && (
+                              <div className="px-3 pb-3 divide-y divide-border/40">
+                                {[
+                                  {
+                                    title: 'Holo vs reverse holo',
+                                    badge: 'Basics',
+                                    badgeClass: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20',
+                                    body: 'A holo card shines in the artwork window only. On a reverse holo the shine is on the rest of the card and the artwork is printed flat — the same card exists in both, and they price differently.',
+                                  },
+                                  {
+                                    title: 'Pattern holos',
+                                    badge: 'Patterns',
+                                    badgeClass: 'bg-violet-500/10 text-violet-700 dark:text-violet-400 border border-violet-500/20',
+                                    body: 'Tilt the card to the light and look at the shape of the shine: a star field is Cosmos, shattered lines are Cracked Ice, dots are Confetti, and repeating balls are Poké Ball or Master Ball — Master Ball being far scarcer.',
+                                  },
+                                  {
+                                    title: 'Magic foil treatments',
+                                    badge: 'Magic',
+                                    badgeClass: 'bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20',
+                                    body: 'Traditional foil is glossy and tends to curl; Etched foil is matte and flat. Set-specific treatments (Surge, Galaxy, Textured, Step-and-Compleat, Oil Slick, Gilded, Halo, Confetti) are printed only in the sets that introduced them.',
+                                  },
+                                  {
+                                    title: 'Finish drives price',
+                                    badge: 'Value',
+                                    badgeClass: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20',
+                                    body: 'The finish is often the whole difference between a common and a chase card, and buyers filter on it directly. Naming it exactly gets the listing in front of the people hunting that version.',
+                                  },
+                                ].map(({ title, badge, badgeClass, body }) => (
+                                  <div key={title} className="py-2.5 first:pt-2">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <span className="text-[11px] font-bold text-foreground">{title}</span>
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${badgeClass}`}>{badge}</span>
+                                    </div>
+                                    <p className="text-[10px] leading-relaxed text-muted-foreground">{body}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Refractor sub-details — shown when the "Refractor" finish is
                         selected in the Card Variant / Finish section (Finish group). */}

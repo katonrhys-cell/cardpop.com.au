@@ -7,7 +7,12 @@ import {
   VARIANT_BADGES,
   resolveGameKey,
   getVariantGroups,
+  getVariantChips,
   getCardVariants,
+  getFoilFinishes,
+  splitFoilFinishes,
+  expandFoilFinishes,
+  FOIL_VARIANT,
 } from '@/lib/cardVariants.js';
 
 describe('resolveGameKey', () => {
@@ -57,6 +62,107 @@ describe('getVariantGroups / getCardVariants', () => {
   it('falls back to the combined list when no game matches', () => {
     expect(getVariantGroups('One Piece')).toBe(ALL_VARIANT_GROUPS);
     expect(getVariantGroups(undefined)).toBe(ALL_VARIANT_GROUPS);
+  });
+});
+
+describe('foil / holo finishes', () => {
+  it('offers one finish chip, not one per named holo', () => {
+    const chips = getVariantChips('Pokemon');
+    expect(chips).toContain(FOIL_VARIANT);
+    expect(chips).not.toContain('Cosmos Holo');
+    expect(chips).not.toContain('Reverse Holo');
+    expect(getVariantChips('Magic')).not.toContain('Surge Foil');
+  });
+
+  it('keeps the named finishes in the persisted vocabulary', () => {
+    // Browse filters and identifications resolve against this list, so the
+    // strings must survive the move into the details panel.
+    expect(getCardVariants('Pokemon')).toContain('Reverse Holo');
+    expect(getCardVariants('Magic')).toContain('Surge Foil');
+  });
+
+  it('lists the finishes for the panel, per game', () => {
+    const pokemon = getFoilFinishes('Pokemon').map(f => f.value);
+    expect(pokemon).toContain('Cosmos Holo');
+    expect(pokemon).not.toContain('Surge Foil');
+    expect(getFoilFinishes('Magic').map(f => f.value)).toContain('Etched Foil');
+  });
+
+  it('leaves the sports taxonomy alone', () => {
+    // Sports finishes are parallels with their own chips (and Prizm/Refractor
+    // panels) — there is no umbrella foil chip to reveal a panel behind.
+    expect(getVariantChips('NBA')).toContain('Holo');
+    expect(getVariantChips('NBA')).not.toContain(FOIL_VARIANT);
+    expect(getFoilFinishes('NBA')).toEqual([]);
+  });
+
+  it('never offers the same finish as both a chip and a panel option', () => {
+    for (const collection of ['Pokemon', 'Magic', 'NBA', 'Yu-Gi-Oh', 'One Piece', undefined]) {
+      const chips = new Set(getVariantChips(collection));
+      for (const { value } of getFoilFinishes(collection)) {
+        expect(chips.has(value)).toBe(false);
+      }
+    }
+  });
+});
+
+describe('splitFoilFinishes / expandFoilFinishes', () => {
+  it('routes a saved finish into the panel behind the finish chip', () => {
+    expect(splitFoilFinishes(['Reverse Holo', 'Full Art'], 'Pokemon')).toEqual({
+      variants: [FOIL_VARIANT, 'Full Art'],
+      foilFinishes: ['Reverse Holo'],
+    });
+  });
+
+  it('adds the chip once for several finishes', () => {
+    const { variants, foilFinishes } = splitFoilFinishes(['Holo', 'Textured', FOIL_VARIANT], 'Pokemon');
+    expect(variants).toEqual([FOIL_VARIANT]);
+    expect(foilFinishes).toEqual(['Holo', 'Textured']);
+  });
+
+  it('leaves a sports parallel chip as a chip', () => {
+    expect(splitFoilFinishes(['Holo', 'Prizm'], 'NBA')).toEqual({
+      variants: ['Holo', 'Prizm'],
+      foilFinishes: [],
+    });
+  });
+
+  it('keeps the chip on its own when no finish was recorded', () => {
+    expect(splitFoilFinishes([FOIL_VARIANT], 'Pokemon')).toEqual({
+      variants: [FOIL_VARIANT],
+      foilFinishes: [],
+    });
+  });
+
+  it('is safe on missing input', () => {
+    expect(splitFoilFinishes(null, 'Pokemon')).toEqual({ variants: [], foilFinishes: [] });
+    expect(splitFoilFinishes(undefined, undefined)).toEqual({ variants: [], foilFinishes: [] });
+  });
+
+  it('round-trips what was saved, adding the chip a legacy row never had', () => {
+    const saved = ['Reverse Holo', 'Full Art', '1st Edition'];
+    const { variants, foilFinishes } = splitFoilFinishes(saved, 'Pokemon');
+    const resaved = expandFoilFinishes(variants, foilFinishes);
+    // Nothing is lost, and the finish chip is now alongside the finish itself.
+    for (const v of saved) expect(resaved).toContain(v);
+    expect(resaved).toContain(FOIL_VARIANT);
+    // Stable from there on — loading and saving again changes nothing.
+    const second = splitFoilFinishes(resaved, 'Pokemon');
+    expect(expandFoilFinishes(second.variants, second.foilFinishes)).toEqual(resaved);
+  });
+
+  it('drops the finishes when the finish chip is unticked', () => {
+    // Otherwise unticking Foil / Holo would leave a stale holo on the listing.
+    expect(expandFoilFinishes(['Full Art'], ['Reverse Holo'])).toEqual(['Full Art']);
+  });
+
+  it('does not duplicate a finish already in the chip list', () => {
+    expect(expandFoilFinishes([FOIL_VARIANT, 'Holo'], ['Holo'])).toEqual([FOIL_VARIANT, 'Holo']);
+  });
+
+  it('is safe on missing input', () => {
+    expect(expandFoilFinishes(null, null)).toEqual([]);
+    expect(expandFoilFinishes([FOIL_VARIANT], null)).toEqual([FOIL_VARIANT]);
   });
 });
 
