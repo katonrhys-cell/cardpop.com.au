@@ -25,10 +25,17 @@ comment on column public.orders.gst_included_aud is
 -- Shipping: $10 flat, free over $50. Upsert so this applies whether or not the
 -- rows already exist (platform_settings predates migration tracking). value is
 -- jsonb, matching every other platform_settings row.
-insert into public.platform_settings (key, value)
+--
+-- `label` and `group_name` must be supplied: label is NOT NULL with no default,
+-- and only one of these two keys already exists in production, so the other
+-- takes the INSERT path and needs every not-null column. Labels match the
+-- wording already used in Admin → Platform Settings; group_name matches the
+-- existing shipping rows. ON CONFLICT deliberately updates only value, so an
+-- existing row keeps whatever label and grouping an admin already has.
+insert into public.platform_settings (key, value, label, group_name)
 values
-  ('default_shipping_rate_aud', '10'::jsonb),
-  ('free_shipping_threshold_aud', '50'::jsonb)
+  ('default_shipping_rate_aud',   '10'::jsonb, 'Default Shipping Rate (AUD)',   'shipping'),
+  ('free_shipping_threshold_aud', '50'::jsonb, 'Free Shipping Threshold (AUD)', 'shipping')
 on conflict (key) do update
   set value = excluded.value,
       updated_at = now();
