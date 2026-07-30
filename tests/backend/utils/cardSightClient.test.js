@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 // ─── mocks ────────────────────────────────────────────────────────────────────
@@ -166,5 +167,42 @@ describe('getCardSightClient', () => {
     const b = getCardSightClient();
     expect(a).toBe(b);
     expect(CardSightCtor).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─── module-load coupling guard ──────────────────────────────────────────────
+
+// Identifying a card touches no database, but this module used to import the FX
+// helper statically — and that reaches the backend Supabase client, which throws
+// at module load without SUPABASE_SERVICE_ROLE_KEY. A CardSight outage was then
+// indistinguishable from a Supabase misconfiguration, and the scoring harness
+// couldn't exercise CardSight without a service-role key it has no use for.
+//
+// This runs in a subprocess on purpose: the mocks at the top of this file
+// replace exchangeRates.js, which is exactly the import being guarded, and the
+// failure it guards against happens at import time.
+describe('module load without a Supabase service-role key', () => {
+  it('imports cleanly and reports only the missing CardSight key', () => {
+    const moduleUrl = new URL('../../../src/utils/cardSightClient.js', import.meta.url).href;
+    const script = `
+      const { getCardSightClient } = await import(${JSON.stringify(moduleUrl)});
+      try { getCardSightClient(); process.stdout.write('NO_THROW'); }
+      catch (err) { process.stdout.write(err.message); }
+    `;
+    // Empty strings rather than deletes: dotenv/config skips keys already
+    // present in process.env, so a local .env can't put them back.
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        SUPABASE_SERVICE_ROLE_KEY: '',
+        CARDSIGHT_API_KEY: '',
+        CARDSIGHTAI_API_KEY: '',
+      },
+    });
+
+    expect(result.stderr).not.toMatch(/SUPABASE_SERVICE_ROLE_KEY/);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toMatch(/CardSight API not configured/);
   });
 });
