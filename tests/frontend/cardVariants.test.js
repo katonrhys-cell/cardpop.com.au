@@ -13,6 +13,8 @@ import {
   splitFoilFinishes,
   expandFoilFinishes,
   FOIL_VARIANT,
+  productFinishNames,
+  mergeIdentifiedVariants,
 } from '@/lib/cardVariants.js';
 
 describe('resolveGameKey', () => {
@@ -190,5 +192,77 @@ describe('backward compatibility', () => {
         expect(new Set(group.variants).size).toBe(group.variants.length);
       }
     }
+  });
+});
+
+// ─── product-implied finishes ────────────────────────────────────────────────
+// Two Topps Chrome fixtures expected a `Chrome` chip while a third asserted
+// nothing, and the OCR prompt forbids the model from naming a treatment it
+// cannot see printed. "Chrome" is the product name, so it is derived here
+// instead of asked for — the same way `Numbered` follows from a printed serial.
+describe('productFinishNames', () => {
+  it('derives the finish from a product whose name is the finish', () => {
+    expect(productFinishNames('Topps Chrome')).toEqual(['Chrome']);
+    expect(productFinishNames('Mosaic')).toEqual(['Mosaic']);
+    expect(productFinishNames('Donruss Optic')).toEqual(['Optic']);
+    expect(productFinishNames('Panini Prizm')).toEqual(['Prizm']);
+  });
+
+  it('keeps the finish when the product has a suffix', () => {
+    expect(productFinishNames('Topps Chrome Sapphire')).toEqual(['Chrome']);
+  });
+
+  it('derives nothing from products whose base cards carry no finish', () => {
+    expect(productFinishNames('Donruss')).toEqual([]);
+    expect(productFinishNames('Obsidian')).toEqual([]);
+    expect(productFinishNames('Topps Series One')).toEqual([]);
+  });
+
+  it('matches whole words only', () => {
+    // Guards the substring trap that broke set matching before: "Chromebook"
+    // must not read as Chrome.
+    expect(productFinishNames('Chromebook Classics')).toEqual([]);
+    expect(productFinishNames('Optical Illusions')).toEqual([]);
+  });
+
+  it('is case and punctuation insensitive', () => {
+    expect(productFinishNames('TOPPS CHROME')).toEqual(['Chrome']);
+    expect(productFinishNames('topps-chrome')).toEqual(['Chrome']);
+  });
+
+  it('handles missing input', () => {
+    expect(productFinishNames(null)).toEqual([]);
+    expect(productFinishNames(undefined)).toEqual([]);
+    expect(productFinishNames('')).toEqual([]);
+  });
+});
+
+describe('mergeIdentifiedVariants — product-implied finish', () => {
+  it('ticks Chrome for a Topps Chrome card without the model naming it', () => {
+    const merged = mergeIdentifiedVariants([], { cardSetName: 'Topps Chrome' }, 'NBA');
+    expect(merged).toContain('Chrome');
+  });
+
+  it('combines the product finish with the rookie designation', () => {
+    const merged = mergeIdentifiedVariants(
+      [], { cardSetName: 'Topps Chrome', rookie: 'Rookie Card (RC)' }, 'NBA',
+    );
+    expect(merged).toContain('Chrome');
+    expect(merged).toContain('Rookie Card (RC)');
+  });
+
+  it('adds nothing for a product that implies no finish', () => {
+    expect(mergeIdentifiedVariants([], { cardSetName: 'Donruss' }, 'NBA')).toEqual([]);
+  });
+
+  it('does not duplicate a finish the seller already picked', () => {
+    const merged = mergeIdentifiedVariants(['Chrome'], { cardSetName: 'Topps Chrome' }, 'NBA');
+    expect(merged.filter(v => v === 'Chrome')).toHaveLength(1);
+  });
+
+  it('drops a finish that is not a chip for the collection', () => {
+    // resolveVariantChips still gates on the game's taxonomy — Pokemon has no
+    // Mosaic chip, so a product name mentioning it contributes nothing.
+    expect(mergeIdentifiedVariants([], { cardSetName: 'Mosaic' }, 'Pokemon')).toEqual([]);
   });
 });
