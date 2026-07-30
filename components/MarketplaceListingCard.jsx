@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { slugify } from '@/lib/slugify.js';
 import { VARIANT_BADGES, ROOKIE_VARIANT } from '@/lib/cardVariants.js';
 import RookiePill from '@/components/RookiePill.jsx';
-import { getRefractorLabel, getRefractorBadgeClass } from '@/lib/cardAttributeLabels.js';
+import { getAutographLabel, getRefractorLabel, getRefractorBadgeClass, genericVariantChips } from '@/lib/cardAttributeLabels.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { useWatchlist } from '@/hooks/useWatchlist.js';
 import SellerRatingDisplay from '@/components/SellerRatingDisplay.jsx';
@@ -55,6 +55,7 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
   // reference is the RookiePill under the card.
   const overlayBadge = Object.entries(VARIANT_BADGES).find(([key, cfg]) => cfg.overlay !== false && variants.includes(key));
   const isRookie = variants.includes(ROOKIE_VARIANT) || !!vaultItem?.is_rookie;
+  const autoLabel = getAutographLabel(vaultItem);
   const borderClass = specialBadge
     ? `${specialBadge[1].border} ${specialBadge[1].glow}`
     : 'border border-border';
@@ -179,18 +180,12 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
             )}
             {vaultItem?.is_foil && <Badge variant="outline" className="text-[10px] font-bold border-yellow-400/50 text-yellow-700 bg-yellow-400/10">Foil</Badge>}
             {getRefractorLabel(vaultItem) && <Badge variant="outline" className={`text-[10px] font-bold ${getRefractorBadgeClass(vaultItem)}`}>{getRefractorLabel(vaultItem)}</Badge>}
-            {vaultItem?.is_auto && (
-              <Badge variant="outline" className="text-[10px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10">
-                {[
-                  vaultItem.auto_signers > 1 ? ['','Dual','Triple','Quad'][vaultItem.auto_signers - 1] : null,
-                  {on_card:'On-Card',sticker:'Sticker',cut:'Cut Sig',licensed:'Licensed',in_person:'IP'}[vaultItem.auto_type] ?? null,
-                  'Auto',
-                ].filter(Boolean).join(' ')}
-              </Badge>
+            {autoLabel && (
+              <Badge variant="outline" className="text-[10px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10">{autoLabel}</Badge>
             )}
             {isRookie && <RookiePill />}
             {vaultItem?.is_sealed && <Badge variant="outline" className="text-[10px] font-bold border-green-400/50 text-green-700 bg-green-400/10">Sealed</Badge>}
-            {variants.filter(v => v !== 'Refractor' && v !== ROOKIE_VARIANT).map(v => (
+            {genericVariantChips(variants).map(v => (
               <Badge key={v} variant="outline" className="text-[10px] font-bold border-primary/30 text-primary bg-primary/5">{v}</Badge>
             ))}
           </div>

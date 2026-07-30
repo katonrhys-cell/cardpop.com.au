@@ -5,7 +5,7 @@ import { Star, ShieldCheck, ZoomIn, ShoppingCart } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { slugify } from '@/lib/slugify.js';
-import { getRefractorLabel, getRefractorBadgeClass } from '@/lib/cardAttributeLabels.js';
+import { getAutographLabel, getRefractorLabel, getRefractorBadgeClass, genericVariantChips } from '@/lib/cardAttributeLabels.js';
 import CardMicroscope from '@/components/CardMicroscope.jsx';
 import CardImage from '@/components/CardImage.jsx';
 import CardShowcase from '@/components/vault/CardShowcase.jsx';
@@ -20,6 +20,7 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
   const variants = (product.variant || product.cardVariant || '').split(',').map(v => v.trim()).filter(Boolean);
   const isRookie = variants.includes(ROOKIE_VARIANT) || !!(product.is_rookie || product.isRookie);
+  const autoLabel = getAutographLabel(product);
   const rawImg = product.images?.[0] || product.cardImage?.[0] || product.card_image || product.image_url || null;
   const { src: imgSrc, srcSet: imgSrcSet, fallbackSrc: imgFallback, thumbSrc: imgThumb } = getCardImage(rawImg);
   const sellerId = product.seller_id || product.seller || product.owner_id || product.owner || product.user_id;
@@ -130,10 +131,10 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
             )}
             {(product.is_foil || product.isFoil) && <Badge variant="outline" className="text-[10px] font-bold border-yellow-400/50 text-yellow-700 bg-yellow-400/10">Foil</Badge>}
             {getRefractorLabel(product) && <Badge variant="outline" className={`text-[10px] font-bold ${getRefractorBadgeClass(product)}`}>{getRefractorLabel(product)}</Badge>}
-            {(product.is_auto || product.isAuto) && <Badge variant="outline" className="text-[10px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10">Auto</Badge>}
+            {autoLabel && <Badge variant="outline" className="text-[10px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10">{autoLabel}</Badge>}
             {isRookie && <RookiePill />}
             {(product.is_sealed || product.isSealed) && <Badge variant="outline" className="text-[10px] font-bold border-green-400/50 text-green-700 bg-green-400/10">Sealed</Badge>}
-            {variants.filter(v => v !== 'Refractor' && v !== ROOKIE_VARIANT).map(v => (
+            {genericVariantChips(variants).map(v => (
               <Badge key={v} variant="outline" className="text-[10px] font-bold border-primary/30 text-primary bg-primary/5">{v}</Badge>
             ))}
           </div>

@@ -25,6 +25,7 @@ import CertificationVerificationSection from '@/components/CertificationVerifica
 import GradeBadge from '@/components/GradeBadge.jsx';
 import BnplMessage from '@/components/BnplMessage.jsx';
 import { ROOKIE_VARIANT } from '@/lib/cardVariants.js';
+import { getAutographLabel, getRefractorLabel, getRefractorBadgeClass, genericVariantChips } from '@/lib/cardAttributeLabels.js';
 import RookiePill from '@/components/RookiePill.jsx';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
@@ -416,13 +417,8 @@ const ProductDetailPage = ({ source: sourceProp }) => {
   const variantChips = vi?.variant
     ? vi.variant.split(',').map(s => s.trim()).filter(Boolean)
     : [];
-  const autoLabel = vi?.is_auto
-    ? [
-        vi.auto_signers > 1 ? ['', 'Dual', 'Triple', 'Quad'][vi.auto_signers - 1] : null,
-        { on_card: 'On-Card', sticker: 'Sticker', cut: 'Cut Sig', licensed: 'Licensed', in_person: 'IP' }[vi.auto_type] ?? null,
-        'Auto',
-      ].filter(Boolean).join(' ')
-    : null;
+  const autoLabel = getAutographLabel(vi);
+  const refractorLabel = getRefractorLabel(vi);
   const hasCardDetails = !!vi && (
     variantChips.length > 0 || vi.is_foil || vi.is_refractor || vi.is_auto ||
     vi.is_rookie || vi.is_sealed || vi.serial_number || vi.parallel?.name ||
@@ -530,11 +526,11 @@ const ProductDetailPage = ({ source: sourceProp }) => {
                   {vi.card_number && <Badge variant="secondary" className="text-[11px] font-medium">#{vi.card_number}</Badge>}
                   {vi.serial_number && <Badge variant="secondary" className="text-[11px] font-bold">#{vi.serial_number}</Badge>}
                   {vi.is_foil && <Badge variant="outline" className="text-[11px] font-bold border-yellow-400/50 text-yellow-700 bg-yellow-400/10 dark:text-yellow-300">Foil</Badge>}
-                  {vi.is_refractor && <Badge variant="outline" className="text-[11px] font-bold border-indigo-400/50 text-indigo-700 bg-indigo-400/10 dark:text-indigo-300">Refractor</Badge>}
-                  {vi.is_auto && <Badge variant="outline" className="text-[11px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10 dark:text-blue-300">{autoLabel}</Badge>}
+                  {refractorLabel && <Badge variant="outline" className={`text-[11px] font-bold ${getRefractorBadgeClass(vi)}`}>{refractorLabel}</Badge>}
+                  {autoLabel && <Badge variant="outline" className="text-[11px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10 dark:text-blue-300">{autoLabel}</Badge>}
                   {(vi.is_rookie || variantChips.includes(ROOKIE_VARIANT)) && <RookiePill className="text-[11px]" />}
                   {vi.is_sealed && <Badge variant="outline" className="text-[11px] font-bold border-green-400/50 text-green-700 bg-green-400/10 dark:text-green-300">Sealed</Badge>}
-                  {variantChips.filter(v => v !== ROOKIE_VARIANT).map(v => (
+                  {genericVariantChips(variantChips).map(v => (
                     <Badge key={v} variant="outline" className="text-[11px] font-bold border-primary/30 text-primary bg-primary/5">{v}</Badge>
                   ))}
                 </div>
