@@ -1,0 +1,143 @@
+name: Migration drift
+
+# Fails when production's applied migrations are behind supabase/migrations/.
+#
+# Why this exists: on 2026-07-30 it surfaced that `supabase db push` had failed
+# on every merge to main since 2026-07-22, leaving 14 migrations unapplied for a
+# week. One of them fixed the selling gate, so identity-verified sellers with a
+# card on file silently could not list anything.
+#
+# Nothing raised the alarm. Vercel deploys the frontend through its own Git
+# integration, so the site kept shipping normally against a schema that was
+# quietly out of date, and the only signal was a red run in the Actions tab that
+# nobody happened to look at.
+#
+# supabase-migrations.yml goes red at the moment a push fails; this goes red
+# every day until the drift is actually resolved, and files a tracking issue so
+# the gap shows up without anyone opening the Actions tab. It is a safety net for
+# that workflow, not a replacement for it.
+#
+# Uses the same two repository secrets as supabase-migrations.yml:
+#   SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD
+
+on:
+  schedule:
+    # 21:00 UTC daily (07:00 AEST) — after the working day's merges have landed.
+    - cron: '0 21 * * *'
+  # Allow an on-demand check straight after fixing a failed push.
+  workflow_dispatch:
+
+concurrency:
+  group: migration-drift
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Compare local migrations against production
+        id: drift
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          supabase link --project-ref odoglvswwymyjuwlonkf
+
+          # `migration list --linked` prints a LOCAL | REMOTE | TIME table. A row
+          # carrying a LOCAL version with an empty REMOTE column is a migration
+          # this repo has that the project's schema_migrations does not.
+          if ! supabase migration list --linked > list.txt 2>&1; then
+            echo "::error::supabase migration list failed — could not determine drift"
+            cat list.txt
+            exit 1
+          fi
+          cat list.txt
+
+          # Strip everything but digits per column, which drops the header and
+          # the ---- separator rows without needing to match on their text.
+          pending=$(awk -F'|' '
+            NF >= 2 {
+              local = $1; remote = $2
+              gsub(/[^0-9]/, "", local)
+              gsub(/[^0-9]/, "", remote)
+              if (local != "" && remote == "") print local
+            }' list.txt)
+
+          if [ -z "$pending" ]; then
+            echo "Production is up to date with supabase/migrations/."
+            exit 0
+          fi
+
+          count=$(printf '%s\n' "$pending" | wc -l | tr -d ' ')
+          {
+            echo "### Production is behind \`supabase/migrations/\`"
+            echo
+            echo "$count migration(s) exist in this repo but are not recorded in the"
+            echo "project's \`schema_migrations\`:"
+            echo
+            echo '```'
+            printf '%s\n' "$pending"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          {
+            echo "pending<<PENDING_EOF"
+            printf '%s\n' "$pending"
+            echo "PENDING_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "::error::$count migration(s) not applied to production"
+          exit 1
+
+      - name: File a tracking issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PENDING: ${{ steps.drift.outputs.pending }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Production schema is behind supabase/migrations/"
+
+          # One open issue is the signal. Don't comment on each daily re-run —
+          # that turns a standing alarm into a notification treadmill people mute.
+          existing=$(gh issue list --state open --search "\"$title\" in:title" \
+                       --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "Issue #$existing is already open — leaving it alone."
+            exit 0
+          fi
+
+          {
+            echo '`supabase db push` has not applied every migration in this repo to'
+            echo 'production, so the app may be running against a schema older than the'
+            echo 'code expects.'
+            echo
+            if [ -n "$PENDING" ]; then
+              echo 'Migration versions in the repo with no matching row in `schema_migrations`:'
+              echo
+              echo '```'
+              printf '%s\n' "$PENDING"
+              echo '```'
+            else
+              echo 'The drift check could not read the migration list — see the run log.'
+            fi
+            echo
+            echo "Failing run: $RUN_URL"
+            echo
+            echo 'Fix whatever made the push fail, then re-run the **Supabase migrations**'
+            echo 'workflow. Close this issue once **Migration drift** passes.'
+          } > issue-body.md
+
+          gh issue create --title "$title" --body-file issue-body.md
