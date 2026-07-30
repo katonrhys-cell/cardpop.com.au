@@ -175,11 +175,14 @@ WITH CHECK (
   )
 );
 
--- Admins can update claims (add auth check for admin role)
+-- Admins can update claims. NOTE: admin is `profiles.is_admin boolean` —
+-- there is no `profiles.role` column. Every real policy in
+-- supabase/migrations/ uses `is_admin = true`; copying a `role = 'admin'`
+-- check into a migration makes it fail to apply.
 CREATE POLICY "Admins can update claims" ON buyer_protection_claims FOR UPDATE 
 USING (EXISTS (
   SELECT 1 FROM profiles 
-  WHERE id = auth.uid() AND role = 'admin'
+  WHERE id = auth.uid() AND is_admin = true
 ));
 ```
 

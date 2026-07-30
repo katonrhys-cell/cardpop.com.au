@@ -49,6 +49,7 @@ import { loadListingDraft, saveListingDraft, clearListingDraft, hasMeaningfulCon
 import { shouldAutoIdentify, buildPriceLookupQuery } from '@/utils/listingFlow.js';
 import { confidenceScore, confidenceLabel, isLowConfidence } from '@/utils/cardsightConfidence.js';
 import { prepareAnalysisImages } from '@/utils/analysisImage.js';
+import { useCardScanLog, buildScanPayload } from '@/hooks/useCardScanLog.js';
 import { validateListingForm, validateListingField } from '@/utils/listingValidation.js';
 import WizardStepper from '@/components/WizardStepper.jsx';
 import { CARD_LANGUAGES } from '@/lib/cardFilters.js';
@@ -188,6 +189,7 @@ const AddEditCardPage = () => {
   const { fetchPricingById, fetchPricingByName, isLoadingCsPrice, csPrice, clearCsPrice } = useCardsightPricing();
   const { isProcessing: isPhotoProcessing, previewUrl, createSlabImagePreview, reset: resetPhotoTemplate } = usePhotoTemplate();
   const { generateDescription, isGenerating: isGeneratingDescription } = useCardDescription();
+  const { record: recordScan, confirm: confirmScan, clearScanLog } = useCardScanLog();
 
   // CardSight reports confidence as a "High"/"Medium"/"Low" enum, so it can
   // never be rendered or compared as a number directly (that produced "NaN%"
@@ -807,6 +809,7 @@ const AddEditCardPage = () => {
         toast.info(`Catalog match not found: ${advisory}`);
       }
       if (ocrResult) lookupPrice(ocrResult);
+      logScan(ocrResult, csResult, analysisImages.length);
       return;
     }
 
@@ -832,6 +835,21 @@ const AddEditCardPage = () => {
 
     if (csResult.card?.id) fetchPricingById(csResult.card.id);
     else if (csResult.card?.name) fetchPricingByName(csResult.card.name);
+
+    logScan(ocrResult, csResult, analysisImages.length);
+  };
+
+  // Records the identification so a catalogue can accumulate out of it. Entirely
+  // fire-and-forget — the scan has already succeeded for the seller and nothing
+  // here may block or slow that down.
+  const logScan = (ocrResult, csResult, imageCount) => {
+    if (!ocrResult && !csResult?.identified) return;
+    recordScan(buildScanPayload({
+      ocr: ocrResult ?? null,
+      cardSight: csResult ?? null,
+      imageCount,
+      variants: formData.variant,
+    }));
   };
 
   // Applies a runner-up detection when the top match was the wrong card. The
@@ -1336,6 +1354,14 @@ const AddEditCardPage = () => {
         }
         if (error) throw error;
         formDirtyRef.current = false;
+        const savedIdentity = {
+          collection: formData.collection, setName: formData.setName,
+          insertName: formData.insertName ?? null, cardNumber: formData.cardNumber,
+          parallel: formData.parallelName || null, cardName: formData.cardName,
+          year: formData.year, rookie: formData.variant?.includes('Rookie Card (RC)') ? 'Rookie Card (RC)' : null,
+          variants: formData.variant,
+        };
+        confirmScan(savedIdentity, id);
         const syncStatus = await syncMarketplaceListing(id);
         showListingOutcome(syncStatus, 'Card updated successfully!');
         navigate('/vault');
@@ -1348,6 +1374,14 @@ const AddEditCardPage = () => {
         formDirtyRef.current = false;
         clearListingDraft(currentUser.id);
         setRestorableDraft(null);
+        const savedIdentity = {
+          collection: formData.collection, setName: formData.setName,
+          insertName: formData.insertName ?? null, cardNumber: formData.cardNumber,
+          parallel: formData.parallelName || null, cardName: formData.cardName,
+          year: formData.year, rookie: formData.variant?.includes('Rookie Card (RC)') ? 'Rookie Card (RC)' : null,
+          variants: formData.variant,
+        };
+        confirmScan(savedIdentity, inserted.id);
         const syncStatus = await syncMarketplaceListing(inserted.id);
         showListingOutcome(syncStatus, 'Card added to your vault!', {
           action: {
@@ -1362,6 +1396,7 @@ const AddEditCardPage = () => {
               clearCrop();
               setAdjusting(null);
               clearScan();
+              clearScanLog();
               setWizardStep(0);
               setMaxStepReached(0);
               // Keep franchise/manufacturer selected for fast repeat entry

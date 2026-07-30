@@ -262,6 +262,49 @@ confidently wrong one reaches a live listing. Drive `wrong` to zero before
 chasing `correct` upward — filling more fields incorrectly improves coverage
 while lowering trust.
 
+## Every scan is recorded
+
+`POST /card-scans` logs each identification to `card_scans`, and
+`PATCH /card-scans/:id` attaches what the seller actually saved. Both are
+fire-and-forget from the form: logging is bookkeeping behind a scan that already
+succeeded, so a failure there must never surface to the seller.
+
+Two things get captured, and the second is the more valuable:
+
+- **What the pipeline read**, plus how it got there — model escalation and its
+  reason, which fields the catalogue corroborated, CardSight's confidence and
+  ambiguity, how many images the read had. Aggregated this is a production
+  accuracy signal: the fixture harness measures seven cards, this measures every
+  scan a seller runs. `escalation_reason` is indexed for exactly that — a gate
+  that fires on every scan is costing a second model call for nothing.
+- **What the seller changed.** An edit after an identification is ground truth,
+  and it is the only ground truth that arrives for free.
+
+### The catalogue
+
+`card_catalogue` is the deduplicated result: one row per distinct card,
+accumulating observations, so CardPop ends up with its own card database rather
+than depending on third-party catalogues to recognise a card. It is a **shared**
+table — `vault_items` already holds a seller's own cards — readable by anyone and
+written only by the backend, so no seller can corrupt it.
+
+Identity comes from `utils/catalogueKey.js`. What counts as a distinct card is
+what counts as a distinct thing to sell, so the **parallel and insert are part of
+the key**: a base card and its Red Laser share name, set, number and year and are
+worth very different amounts.
+
+`buildCatalogueKey` returns **null** when a read isn't specific enough, and that
+null matters more than the happy path. A scan that produced only a player name
+can't be told apart from a hundred other printings, and writing it to the
+catalogue would create an entry later scans wrongly merge into — poisoning the
+record permanently. Such scans are still logged; they just don't earn an entry.
+Keys that had to fall back to the name are marked `strong_key = false`.
+
+`observations` counts every scan resolving to a key; `confirmations` counts only
+those a seller then saved without correcting the identity fields. **An entry with
+many observations and no confirmations is one the pipeline keeps producing and
+sellers keep fixing** — the most useful thing in the table.
+
 ## Debugging a bad identification
 
 `/cardsight/identify` logs the winning segment, candidate count and ambiguity:
