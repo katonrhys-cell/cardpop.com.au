@@ -3,6 +3,7 @@ import { callEbayApi } from '../utils/ebayClient.js';
 import { resolveCardImage } from '../utils/cardImageResolver.js';
 import { leadingCardNumber } from '../../utils/cardNumber.js';
 import logger from '../utils/logger.js';
+import { queryString } from '../utils/queryString.js';
 
 const router = Router();
 
@@ -105,8 +106,9 @@ async function runSearches(apis, q, take, opts = {}) {
 // upstream can store it in a form the filter doesn't reach; degrading to
 // today's behaviour is better than returning nothing.
 router.get('/search', async (req, res) => {
-	const { q, collection, segment, take = '10', number } = req.query;
-	if (!q?.trim()) return res.status(400).json({ error: 'q is required' });
+	const { collection, segment, take = '10', number } = req.query;
+	const q = queryString(req.query.q);
+	if (!q) return res.status(400).json({ error: 'q is required' });
 
 	const limit = Math.min(parseInt(take, 10) || 10, 50);
 	const col = collection || segment || '';
@@ -115,9 +117,9 @@ router.get('/search', async (req, res) => {
 	try {
 		const apis = resolveApis(col);
 
-		let raw = cardNumber ? await runSearches(apis, q.trim(), limit, { number: cardNumber }) : [];
+		let raw = cardNumber ? await runSearches(apis, q, limit, { number: cardNumber }) : [];
 		const precise = raw.length > 0;
-		if (!raw.length) raw = await runSearches(apis, q.trim(), limit);
+		if (!raw.length) raw = await runSearches(apis, q, limit);
 
 		// Deduplicate by source+id, cap at limit
 		const seen = new Set();
@@ -140,15 +142,16 @@ router.get('/search', async (req, res) => {
 // ── GET /catalog/autocomplete ─────────────────────────────────────────────────
 // Lightweight typeahead: name + set only, no images.
 router.get('/autocomplete', async (req, res) => {
-	const { q, collection, take = '5' } = req.query;
-	if (!q?.trim() || q.trim().length < 2) return res.json({ results: [] });
+	const { collection, take = '5' } = req.query;
+	const q = queryString(req.query.q);
+	if (q.length < 2) return res.json({ results: [] });
 
 	const limit = Math.min(parseInt(take, 10) || 5, 20);
 	const col = collection || '';
 
 	try {
 		const apis = resolveApis(col);
-		const raw = await runSearches(apis, q.trim(), limit);
+		const raw = await runSearches(apis, q, limit);
 
 		const seen = new Set();
 		const results = raw
@@ -173,13 +176,16 @@ router.get('/autocomplete', async (req, res) => {
 // callers don't need separate field mapping.
 // Query params: name (required), set (optional), grading_service, grade
 router.get('/pricing', async (req, res) => {
-	const { name, set, grading_service, grade } = req.query;
-	if (!name?.trim()) return res.status(400).json({ error: 'name is required' });
+	const { grade } = req.query;
+	const name = queryString(req.query.name);
+	const set = queryString(req.query.set);
+	const grading_service = queryString(req.query.grading_service);
+	if (!name) return res.status(400).json({ error: 'name is required' });
 
-	const parts = [name.trim()];
-	if (set?.trim()) parts.push(set.trim());
+	const parts = [name];
+	if (set) parts.push(set);
 	if (grading_service && grading_service !== 'None' && grading_service !== 'raw') {
-		parts.push(grading_service.trim());
+		parts.push(grading_service);
 		if (grade) parts.push(String(grade).trim());
 	}
 	const query = parts.join(' ');

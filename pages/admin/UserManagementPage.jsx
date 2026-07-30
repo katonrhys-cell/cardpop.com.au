@@ -19,6 +19,7 @@ import { apiServerClient as apiClient } from '@/lib/apiServerClient.js';
 import { toast } from 'sonner';
 import { useAdmin } from '@/contexts/AdminContext.jsx';
 import { useDebounce } from '@/hooks/useDebounce.js';
+import { orFilterTerm } from '@/src/utils/orFilterTerm.js';
 
 const UserManagementPage = () => {
   const navigate = useNavigate();
@@ -92,8 +93,12 @@ const UserManagementPage = () => {
     try {
       let query = supabase.from('profiles').select(PUBLIC_PROFILE_COLUMNS, { count: 'exact' }).order('created_at', { ascending: false }).range((page - 1) * 20, page * 20 - 1);
 
-      if (debouncedSearch) {
-        query = query.or(`display_name.ilike.%${debouncedSearch}%,username.ilike.%${debouncedSearch}%`);
+      // Sanitize before interpolating: `.or()` takes PostgREST filter grammar,
+      // not a bound parameter, so a term containing a comma/paren/wildcard
+      // rewrites the query (a search for "Smith, J" 400s as "Failed to load").
+      const searchTerm = orFilterTerm(debouncedSearch);
+      if (searchTerm) {
+        query = query.or(`display_name.ilike.%${searchTerm}%,username.ilike.%${searchTerm}%`);
       }
       if (statusFilter === 'admin') query = query.eq('is_admin', true);
       if (statusFilter === 'regular') query = query.eq('is_admin', false);

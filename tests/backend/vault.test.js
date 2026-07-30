@@ -101,6 +101,15 @@ describe('GET /products', () => {
 
 // ─── GET /public ──────────────────────────────────────────────────────────────
 
+describe('GET /products query robustness', () => {
+  it('does not 500 when sort is repeated', async () => {
+    mockUser = { id: 'user-1', app_metadata: {} };
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: [], error: null, count: 0 }));
+    const res = await request(app).get('/products?sort=a&sort=b');
+    expect(res.status).toBe(200);
+  });
+});
+
 describe('GET /public', () => {
   it('returns public items with userName from profiles', async () => {
     const publicItem = { ...ITEM, is_public: true };
@@ -135,6 +144,21 @@ describe('GET /public', () => {
     mockSupabase.from.mockReturnValue(makeBuilder({ data: [], error: null, count: 0 }));
     const res = await request(app).get('/public?userId=00000000-0000-0000-0000-000000000001');
     expect(res.status).toBe(200);
+  });
+
+  // Express parses a repeated parameter into an array, so `sort.replace(...)`
+  // used to throw a TypeError and answer 500 on this unauthenticated endpoint.
+  it('does not 500 when sort is repeated', async () => {
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: [], error: null, count: 0 }));
+    const res = await request(app).get('/public?sort=a&sort=b');
+    expect(res.status).toBe(200);
+  });
+
+  it('does not 500 when userId is repeated', async () => {
+    mockSupabase.from.mockReturnValue(makeBuilder({ data: [], error: null, count: 0 }));
+    const res = await request(app).get('/public?userId=not-a-uuid&userId=x');
+    // Still validated — collapsed to the first entry, which is not a UUID.
+    expect(res.status).toBe(400);
   });
 });
 

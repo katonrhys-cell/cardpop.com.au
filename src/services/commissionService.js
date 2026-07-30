@@ -58,8 +58,14 @@ async function calculateBreakdown(listing, transactionType = 'fixed') {
   let configId = null;
 
   if (commEnabled) {
+    // Each transaction type gets its OWN toggle. 'fixed' used to share
+    // 'commission_on_offers' with 'offer', so switching off commission for
+    // negotiated offers silently switched it off for every ordinary Buy Now
+    // sale too — the platform's main revenue path — and the two admin toggles
+    // moved as one. 'commission_on_fixed' is seeded from the old shared value
+    // so existing behaviour carries over.
     const ttKey = {
-      fixed:   'commission_on_offers',
+      fixed:   'commission_on_fixed',
       auction: 'commission_on_auctions',
       trade:   'commission_on_trades',
       offer:   'commission_on_offers',
