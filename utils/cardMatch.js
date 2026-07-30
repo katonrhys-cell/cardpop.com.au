@@ -6,7 +6,17 @@
 
 /** Lowercases and reduces to alphanumeric words separated by single spaces. */
 export function normalizeName(s) {
-  return (s || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+  return (s || '')
+    .toLowerCase()
+    // Fold accents before stripping punctuation, or an accented letter becomes a
+    // space and splits the word in half: "Pokémon" turned into "pok mon", so no
+    // amount of noise-word tuning could make "Pokémon Team Rocket" match "Team
+    // Rocket". Accents are common in this domain — Pokémon itself, Flabébé,
+    // Nidoran♀ — and folding them is what a seller typing plain ASCII expects.
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 // Words that describe a set without distinguishing it from another, so a name
@@ -18,6 +28,15 @@ const SET_NOISE_WORDS = new Set([
   // rather than distinguishing it from another.
   'panini', 'topps', 'upper', 'deck', 'leaf', 'wizards', 'coast',
   'basketball', 'football', 'baseball', 'hockey', 'soccer', 'cricket',
+  // Game names get prepended the same way: a model reads "Pokemon Team Rocket"
+  // off a card whose set is "Team Rocket". Only `pokemon` is listed, because it
+  // is the only one a fixture has actually demonstrated. The others are left out
+  // on purpose — `magic` would reduce "Magic Origins" to "Origins", and the
+  // multi-word names ("One Piece", "Yu-Gi-Oh") would put common words like
+  // `one` and `piece` on the noise list. Silently merging two distinct sets is
+  // far worse than one false mismatch, so add these only when a real card shows
+  // the need.
+  'pokemon',
 ]);
 
 const FULL_YEAR = /^(19|20)\d{2}$/;
