@@ -66,6 +66,15 @@ describe('field rules', () => {
     expect(validateListingField('year', { year: `${currentYear}/${currentYear + 2}` })).toMatch(/consecutive/);
   });
 
+  it('accepts the hyphenated season forms printed on sports cards', () => {
+    expect(validateListingField('year', { year: '2023-24' })).toBeNull();
+    expect(validateListingField('year', { year: '2023-2024' })).toBeNull();
+    expect(validateListingField('year', { year: '2023 - 24' })).toBeNull();
+    expect(validateListingField('year', { year: '1999-00' })).toBeNull();
+    expect(validateListingField('year', { year: '2023-25' })).toMatch(/consecutive/);
+    expect(validateListingField('year', { year: '2023-23' })).toMatch(/consecutive/);
+  });
+
   it('requires an asking price only for sale listing types', () => {
     expect(validateListingField('askingPrice', { listingType: 'For Sale', askingPrice: '' })).toMatch(/asking price/);
     expect(validateListingField('askingPrice', { listingType: 'For Sale & Trade', askingPrice: '0' })).toMatch(/asking price/);
