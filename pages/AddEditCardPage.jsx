@@ -145,7 +145,6 @@ const AddEditCardPage = () => {
     setExtraPreviews(fit);
   }, [maxExtraSlots]);
   const [errors, setErrors]             = useState({});
-  const [isAutoFilled, setIsAutoFilled] = useState(false);
   // Step-by-step wizard state — new cards only; edit mode always uses the full
   // form. The mode preference persists so returning sellers keep their choice.
   const [useFullForm, setUseFullForm] = useState(() => {
@@ -758,7 +757,6 @@ const AddEditCardPage = () => {
           ocrResult.cardType ? `Type: ${ocrResult.cardType}` : '',
         ].filter(Boolean).join('\n') || '',
       }));
-      setIsAutoFilled(true);
     }
 
     // ── 2. CardSight, narrowed to the category OCR read ─────────────────────
@@ -791,7 +789,6 @@ const AddEditCardPage = () => {
       if (csResult.pricing?.avgPrice) {
         set('estimatedValue', String(csResult.pricing.avgPrice.toFixed(2)));
       }
-      setIsAutoFilled(true);
       toast.success('Card identified! Fields auto-filled from catalog.');
     } else if (csResult.ambiguous) {
       toast.warning('Matched more than one category — check the details before saving.');
@@ -812,7 +809,6 @@ const AddEditCardPage = () => {
     setFormData(prev => ({ ...prev, ...fields }));
     if (alt.id) fetchPricingById(alt.id);
     else if (alt.name) fetchPricingByName(alt.name);
-    setIsAutoFilled(true);
     toast.success(`Switched to ${alt.name ?? 'the selected card'}.`);
   };
 
@@ -1322,7 +1318,6 @@ const AddEditCardPage = () => {
               setExtraFiles(Array(maxExtraSlots).fill(null));
               setExtraPreviews(Array(maxExtraSlots).fill(null));
               setErrors({});
-              setIsAutoFilled(false);
               clearCrop();
               setAdjusting(null);
               clearScan();
@@ -1598,10 +1593,15 @@ const AddEditCardPage = () => {
                     </div>
                   )}
 
-                  {/* Combined AI results panel — shown after analysis completes */}
+                  {/* Combined AI results panel — shown after analysis completes.
+                      Emerald for a confirmed catalog match, sky for an OCR-only
+                      read. Neither is the brand red the OCR case used to use — a
+                      card read perfectly off the photo was being reported in the
+                      same colour as a failure, which read as "something went
+                      wrong". */}
                   {!isScanning && !isIdentifying && !isPreparingImage && (cardSightResult?.identified || scanResult) && (
-                    <div className={`p-3 rounded-xl border animate-in fade-in ${cardSightResult?.identified ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-primary/5 border-primary/20'}`}>
-                      <h4 className={`text-xs font-bold mb-2 flex items-center gap-1.5 ${cardSightResult?.identified ? 'text-emerald-700' : 'text-primary'}`}>
+                    <div className={`p-3 rounded-xl border animate-in fade-in ${cardSightResult?.identified ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-sky-500/5 border-sky-500/20'}`}>
+                      <h4 className={`text-xs font-bold mb-2 flex items-center gap-1.5 ${cardSightResult?.identified ? 'text-emerald-700' : 'text-sky-700 dark:text-sky-400'}`}>
                         <Sparkles className="w-3.5 h-3.5" />
                         {cardSightResult?.identified
                           ? `Catalog Match — ${csNeedsReview ? 'Needs review' : cardSightResult.exactMatch ? 'Exact' : 'Set'}`
@@ -1726,7 +1726,7 @@ const AddEditCardPage = () => {
                           size="sm"
                           variant="outline"
                           className="text-xs w-full"
-                          onClick={() => { clearScan(); clearCardSight(); setIsAutoFilled(false); }}
+                          onClick={() => { clearScan(); clearCardSight(); }}
                         >
                           Dismiss
                         </Button>
@@ -1739,12 +1739,12 @@ const AddEditCardPage = () => {
 
   const detailsSection = (
               <SectionCard title="Card Details">
-                {isAutoFilled && (
-                  <div className="flex items-center text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-md w-fit -mt-2">
-                    <Sparkles className="w-3 h-3 mr-1" /> AI Auto-filled — review before saving
-                  </div>
-                )}
-
+                {/* Auto-filled fields are deliberately left unmarked. The ring
+                    they used to carry is drawn in the brand red the error state
+                    also uses, so a perfectly-read card looked like a form full
+                    of problems and sellers stopped to "fix" it. The identify
+                    panel on the photos step already says what was read; the
+                    values are here to be reviewed in passing, not corrected. */}
                 <div className="grid md:grid-cols-2 gap-4">
                   {/* Category → Franchise → Manufacturer */}
                   <CardHierarchySelector
@@ -1764,7 +1764,6 @@ const AddEditCardPage = () => {
                       setSetId(id);
                       if (name) set('setName', name);
                     }}
-                    highlighted={isAutoFilled}
                   />
 
                   {errors.hierarchy && (
@@ -1824,7 +1823,7 @@ const AddEditCardPage = () => {
                       onChange={e => set('cardName', e.target.value)}
                       onBlur={() => validateFieldOnBlur('cardName')}
                       placeholder="e.g. Charizard"
-                      className={`h-11 bg-background ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''} ${errors.cardName ? 'border-destructive' : ''}`}
+                      className={`h-11 bg-background ${errors.cardName ? 'border-destructive' : ''}`}
                     />
                     {errors.cardName && <p className="text-destructive text-xs">{errors.cardName}</p>}
                   </div>
@@ -1961,7 +1960,7 @@ const AddEditCardPage = () => {
                   <div className="space-y-2">
                     <Label className="font-bold">Condition <span className="text-destructive">*</span></Label>
                     <Select value={formData.condition} onValueChange={v => set('condition', v)}>
-                      <SelectTrigger className={`h-11 bg-background ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''}`}>
+                      <SelectTrigger className="h-11 bg-background">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -3188,7 +3187,7 @@ const AddEditCardPage = () => {
                           value={formData.grade}
                           onChange={e => set('grade', e.target.value)}
                           placeholder="e.g. 9.5 or Authentic"
-                          className={`h-11 bg-background ${isAutoFilled && formData.grade ? 'border-primary/50 ring-1 ring-primary/20' : ''}`}
+                          className="h-11 bg-background"
                         />
                       </div>
 
@@ -3377,7 +3376,7 @@ const AddEditCardPage = () => {
                         onChange={e => set('estimatedValue', e.target.value)}
                         onBlur={() => validateFieldOnBlur('estimatedValue')}
                         placeholder="0.00"
-                        className={`h-11 pl-8 bg-background tabular-nums ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''} ${errors.estimatedValue ? 'border-destructive' : ''}`}
+                        className={`h-11 pl-8 bg-background tabular-nums ${errors.estimatedValue ? 'border-destructive' : ''}`}
                       />
                     </div>
                     {errors.estimatedValue && <p className="text-destructive text-xs">{errors.estimatedValue}</p>}
@@ -3453,7 +3452,7 @@ const AddEditCardPage = () => {
                       onChange={e => set('notes', e.target.value)}
                       placeholder="Add details about this card's condition, history or unique features — or tap Generate Description to write an SEO-friendly one for you."
                       rows={4}
-                      className={`resize-none bg-background ${isAutoFilled ? 'border-primary/50 ring-1 ring-primary/20' : ''}`}
+                      className="resize-none bg-background"
                     />
                     <p className="text-xs text-muted-foreground">
                       Generate a unique, search-friendly description from the details above, then edit it to suit.

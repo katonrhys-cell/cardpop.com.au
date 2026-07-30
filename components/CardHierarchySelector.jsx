@@ -20,7 +20,6 @@ import { useCategories } from '@/hooks/useCategories.js';
  *   onFranchiseChange(id, name)
  *   onManufacturerChange(id)
  *   onSetChange(id, name)
- *   highlighted       – apply AI-autofill ring style
  */
 const CardHierarchySelector = ({
   categoryId,
@@ -33,7 +32,6 @@ const CardHierarchySelector = ({
   onManufacturerChange,
   onTeamChange,
   onSetChange,
-  highlighted = false,
 }) => {
   const {
     getCategories,
@@ -171,7 +169,6 @@ const CardHierarchySelector = ({
     );
   }
 
-  const ring = highlighted ? 'border-primary/50 ring-1 ring-primary/20' : '';
 
   return (
     <div className="md:col-span-2 space-y-4">
@@ -183,7 +180,7 @@ const CardHierarchySelector = ({
             Category <span className="text-destructive">*</span>
           </Label>
           <Select value={categoryId || ''} onValueChange={handleCategoryChange}>
-            <SelectTrigger className={`h-11 bg-background ${ring}`}>
+            <SelectTrigger className="h-11 bg-background">
               <SelectValue placeholder="Select category…" />
             </SelectTrigger>
             <SelectContent>
@@ -204,7 +201,7 @@ const CardHierarchySelector = ({
             onValueChange={handleFranchiseChange}
             disabled={!categoryId || loadingFranchises}
           >
-            <SelectTrigger className={`h-11 bg-background ${ring}`}>
+            <SelectTrigger className="h-11 bg-background">
               {loadingFranchises
                 ? <span className="flex items-center gap-2 text-muted-foreground"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading…</span>
                 : <SelectValue placeholder={categoryId ? 'Select franchise…' : 'Pick category first'} />
@@ -251,7 +248,7 @@ const CardHierarchySelector = ({
             </div>
           ) : (
             <Select value={teamId || ''} onValueChange={handleTeamChange}>
-              <SelectTrigger className={`h-11 bg-background ${ring}`}>
+              <SelectTrigger className="h-11 bg-background">
                 <SelectValue placeholder="Select team…" />
               </SelectTrigger>
               <SelectContent>
