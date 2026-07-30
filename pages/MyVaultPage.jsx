@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import Breadcrumb from '@/components/Breadcrumb.jsx';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -271,33 +272,23 @@ const MyVaultPage = () => {
   };
 
   return (
-    <div className="flex flex-col font-sans w-full max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-12">
+    <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-8 w-full space-y-6">
       <Helmet><title>My Digital Vault | CardPop</title></Helmet>
+      <Breadcrumb items={[{ label: 'Account', path: '/account' }, { label: 'My Vault' }]} />
 
-      <div className="mb-8">
-        <h1 className="font-serif text-4xl md:text-5xl font-extrabold mb-4 text-foreground tracking-tight">My Digital Vault</h1>
-        <p className="text-lg text-muted-foreground max-w-2xl text-balance">
-          Manage your personal collection securely. Track values and mark cards for trading.
-        </p>
-      </div>
-
-      <div className="bg-card border border-border rounded-2xl p-6 mb-8 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-6 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-1.5 h-full bg-primary" />
-        <div className="flex-1 z-10 flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
-            <ShieldCheck className="w-6 h-6" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-foreground mb-1">Add to Your Vault</h2>
-            <p className="text-sm text-muted-foreground">Digitize your collection to track values and mark cards for trading.</p>
-          </div>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">My Vault</h1>
+          <p className="text-muted-foreground mt-1">
+            Manage your personal collection securely. Track values and mark cards for trading.
+          </p>
         </div>
-        <Button onClick={() => navigate('/vault/add')} className="w-full sm:w-auto rounded-xl font-bold h-12 px-6 shadow-md transition-transform active:scale-[0.98]">
+        <Button onClick={() => navigate('/vault/add')} className="font-bold rounded-xl h-11 px-6 shadow-sm shrink-0">
           <Plus className="w-5 h-5 mr-2" /> Add New Card
         </Button>
       </div>
 
-      <div className="bg-muted/30 border border-border p-4 rounded-2xl mb-8 flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <Select value={filterCollection} onValueChange={changeFilter}>
           <SelectTrigger className="w-[200px] bg-background border-border rounded-xl font-medium">
             <SelectValue placeholder="All Collections" />
