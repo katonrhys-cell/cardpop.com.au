@@ -33,6 +33,10 @@
     {
       "path": "/cron/event-scan",
       "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/stripe/reconcile-pending",
+      "schedule": "15 * * * *"
     }
   ],
   "redirects": [
