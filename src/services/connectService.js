@@ -2,28 +2,26 @@ import stripe from '../utils/stripeClient.js';
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { namesMatch } from './identityService.js';
-import { buildSellerAccountParams, isPayoutReady, payoutAccountName } from '../utils/sellerAccountShape.js';
+import { createSellerConnectAccount, isPayoutReady, payoutAccountName, sellerLossLiability } from '../utils/sellerAccountShape.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Seller payout accounts are Stripe Connect Express accounts (v1 Accounts API).
+// Seller payout accounts are Stripe Connect accounts (v1 Accounts API) created
+// with Managed Risk + Stripe-managed pricing + the Express Dashboard, so Stripe
+// — not CardPop — carries unrecoverable negative balances. The full rationale
+// and the fallback to the legacy Express shape live in
+// ../utils/sellerAccountShape.js, which this flow and the backfill script share
+// verbatim; see docs/stripe-connect.md for the runbook.
 //
-// Each seller is an Express account with only the `transfers` capability, so the
-// platform can push their sale proceeds to them via
+// Sellers receive their sale proceeds via
 // `stripe.transfers.create({ destination })` — exactly the money flow
-// payoutService.js uses. The account shape lives in
-// ../utils/sellerAccountShape.js so this flow and the backfill script share it
-// verbatim.
-//
-// (This service originally targeted the v2 Accounts API, which failed in
-// production with "Accounts v2 is not enabled for your livemode merchant" —
-// Express accounts are available on any platform with Connect activated.)
+// payoutService.js uses.
 //
 // The account id is stored in profiles.stripe_connect_account_id and used as a
 // transfer destination; the onboarded flag is derived from payouts_enabled +
 // the transfers capability on retrieve.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Create an Express seller account and persist its id onto the profile.
+// Create a seller payout account and persist its id onto the profile.
 // Idempotent: if the profile already has an account id it is returned unchanged
 // and no Stripe call is made. Single source of truth for seller-account shape —
 // the on-demand onboarding flow and the bulk backfill
@@ -38,7 +36,15 @@ export async function ensureSellerConnectAccount(userId, existingAccountId = nul
     return { accountId: existingAccountId, created: false };
   }
 
-  const account = await stripe.accounts.create(buildSellerAccountParams(userId, opts));
+  const { account, config, fallbackReason } = await createSellerConnectAccount(stripe, userId, opts);
+
+  if (config !== 'managed_risk') {
+    // Loud on purpose: this seller's account is platform-liable, so every
+    // negative balance it ever carries is CardPop's to cover. If this fires for
+    // reasons other than STRIPE_CONNECT_LEGACY_EXPRESS, the platform isn't
+    // enabled for the Managed Risk configuration yet.
+    logger.error(`[STRIPE CONNECT] Account ${account.id} (user ${userId}) fell back to legacy Express — CardPop carries loss liability. Reason: ${fallbackReason}`);
+  }
 
   const { error } = await supabase
     .from('profiles')
@@ -137,6 +143,10 @@ export async function getConnectStatus(req, res) {
       accountId: profile.stripe_connect_account_id,
       detailsSubmitted: Boolean(account.details_submitted),
       payoutsEnabled: Boolean(account.payouts_enabled),
+      // 'stripe' = Managed Risk; 'platform' = an account created before that
+      // configuration, whose negative balances CardPop still has to cover.
+      // Surfaced for ops/admin visibility — the seller UI ignores it.
+      lossLiability: sellerLossLiability(account),
       wallet_balance_aud: profile?.wallet_balance_aud || 0,
     });
   } catch (err) {

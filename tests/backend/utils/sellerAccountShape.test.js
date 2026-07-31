@@ -1,24 +1,43 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildSellerAccountParams,
+  buildLegacyExpressAccountParams,
   isPayoutReady,
   payoutAccountName,
 } from '../../../src/utils/sellerAccountShape.js';
 
 describe('buildSellerAccountParams', () => {
-  it('builds an AU Express account requesting card_payments + transfers', () => {
+  it('builds an AU Managed Risk account requesting card_payments + transfers', () => {
     const params = buildSellerAccountParams('user-1', { email: 'seller@x.com', displayName: 'Ash Cards' });
     expect(params).toMatchObject({
-      type: 'express',
       country: 'AU',
       email: 'seller@x.com',
+      controller: {
+        fees: { payer: 'account' },
+        losses: { payments: 'stripe' },
+        requirement_collection: 'stripe',
+        stripe_dashboard: { type: 'express' },
+      },
       capabilities: {
         card_payments: { requested: true },
         transfers: { requested: true },
       },
       business_profile: { name: 'Ash Cards' },
-      metadata: { cardpop_user_id: 'user-1' },
+      metadata: { cardpop_user_id: 'user-1', cardpop_account_config: 'managed_risk' },
     });
+    // The Accounts API rejects `type` and `controller` together.
+    expect(params).not.toHaveProperty('type');
+  });
+
+  it('keeps the legacy Express shape available for the fallback path', () => {
+    const params = buildLegacyExpressAccountParams('user-1', { email: 'seller@x.com' });
+    expect(params).toMatchObject({
+      type: 'express',
+      country: 'AU',
+      email: 'seller@x.com',
+      metadata: { cardpop_user_id: 'user-1', cardpop_account_config: 'express' },
+    });
+    expect(params).not.toHaveProperty('controller');
   });
 
   it('omits email and business_profile when not supplied', () => {

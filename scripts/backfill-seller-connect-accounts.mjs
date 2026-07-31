@@ -1,4 +1,4 @@
-// One-off backfill that pre-creates a Stripe Connect Express account for every
+// One-off backfill that pre-creates a Stripe Connect payout account for every
 // existing seller who doesn't have one yet.
 //
 // Normally an account is created lazily the first time a seller opens the payout
@@ -9,8 +9,9 @@
 // link before payouts are enabled (stripe_connect_onboarded stays false).
 //
 // The account shape is defined in exactly one place —
-// src/utils/sellerAccountShape.js (buildSellerAccountParams) — so this backfill
-// can never drift from the on-demand flow.
+// src/utils/sellerAccountShape.js (createSellerConnectAccount) — so this
+// backfill can never drift from the on-demand flow, including the Managed Risk
+// configuration and its fallback.
 //
 // Who counts as a "seller": by default, profiles entitled to sell
 // (subscription_status in trialing/active/grandfathered, or an unexpired trial),
@@ -30,7 +31,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
-import { buildSellerAccountParams } from '../src/utils/sellerAccountShape.js';
+import { createSellerConnectAccount } from '../src/utils/sellerAccountShape.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -139,13 +140,15 @@ for await (const seller of sellersNeedingAccount()) {
   }
 
   try {
-    // Mirror the on-demand flow exactly (shared Express-account shape).
-    const account = await stripe.accounts.create(
-      buildSellerAccountParams(seller.id, {
-        email: seller.email || undefined,
-        displayName: seller.display_name || seller.full_name || undefined,
-      })
-    );
+    // Mirror the on-demand flow exactly (shared account shape + fallback).
+    const { account, config, fallbackReason } = await createSellerConnectAccount(stripe, seller.id, {
+      email: seller.email || undefined,
+      displayName: seller.display_name || seller.full_name || undefined,
+    });
+
+    if (config !== 'managed_risk') {
+      console.warn(`  WARNING: ${account.id} created as legacy Express (CardPop carries loss liability): ${fallbackReason}`);
+    }
 
     const { error: updErr } = await supabase
       .from('profiles')

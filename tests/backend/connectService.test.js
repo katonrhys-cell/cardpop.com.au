@@ -28,7 +28,14 @@ vi.mock('../../src/utils/supabaseClient.js', () => {
 });
 
 import { ensureSellerConnectAccount, getConnectStatus } from '../../src/services/connectService.js';
-import { buildSellerAccountParams, isPayoutReady, payoutAccountName } from '../../src/utils/sellerAccountShape.js';
+import {
+  buildSellerAccountParams,
+  buildLegacyExpressAccountParams,
+  createSellerConnectAccount,
+  isPayoutReady,
+  payoutAccountName,
+  sellerLossLiability,
+} from '../../src/utils/sellerAccountShape.js';
 
 beforeEach(() => {
   mockStripe.accounts.create.mockReset();
@@ -36,12 +43,20 @@ beforeEach(() => {
   supabaseState.updateError = null;
   supabaseState.lastUpdate = null;
   supabaseState.profile = null;
+  delete process.env.STRIPE_CONNECT_LEGACY_EXPRESS;
 });
 
 describe('buildSellerAccountParams', () => {
-  it('builds an AU Express account requesting card_payments + transfers', () => {
+  it('builds an AU account with Managed Risk, Stripe-managed pricing and the Express Dashboard', () => {
     const params = buildSellerAccountParams('user-1', { email: 'a@b.com', displayName: 'Ada' });
-    expect(params.type).toBe('express');
+    // `type` and `controller` are mutually exclusive in the Accounts API.
+    expect('type' in params).toBe(false);
+    expect(params.controller).toEqual({
+      fees: { payer: 'account' },
+      losses: { payments: 'stripe' },
+      requirement_collection: 'stripe',
+      stripe_dashboard: { type: 'express' },
+    });
     expect(params.country).toBe('AU');
     expect(params.capabilities.transfers.requested).toBe(true);
     // Requested alongside transfers because transfers-only account creation
@@ -50,12 +65,93 @@ describe('buildSellerAccountParams', () => {
     expect(params.email).toBe('a@b.com');
     expect(params.business_profile.name).toBe('Ada');
     expect(params.metadata.cardpop_user_id).toBe('user-1');
+    expect(params.metadata.cardpop_account_config).toBe('managed_risk');
   });
 
   it('omits email / business_profile when not provided (no undefined keys)', () => {
     const params = buildSellerAccountParams('user-2');
     expect('email' in params).toBe(false);
     expect('business_profile' in params).toBe(false);
+  });
+});
+
+describe('buildLegacyExpressAccountParams', () => {
+  it('keeps the pre-Managed-Risk shape for the fallback path', () => {
+    const params = buildLegacyExpressAccountParams('user-1', { email: 'a@b.com' });
+    expect(params.type).toBe('express');
+    expect('controller' in params).toBe(false);
+    expect(params.country).toBe('AU');
+    expect(params.capabilities.transfers.requested).toBe(true);
+    expect(params.metadata.cardpop_account_config).toBe('express');
+  });
+});
+
+describe('createSellerConnectAccount', () => {
+  const invalidRequest = (message) => Object.assign(new Error(message), { type: 'invalid_request_error' });
+
+  it('creates the Managed Risk shape when Stripe accepts it', async () => {
+    mockStripe.accounts.create.mockResolvedValue({ id: 'acct_mr' });
+
+    const result = await createSellerConnectAccount(mockStripe, 'user-1');
+
+    expect(result).toEqual({ account: { id: 'acct_mr' }, config: 'managed_risk' });
+    expect(mockStripe.accounts.create).toHaveBeenCalledTimes(1);
+    expect(mockStripe.accounts.create.mock.calls[0][0].controller.losses.payments).toBe('stripe');
+    // A stable idempotency key stops an SDK retry after a timeout from creating
+    // a second account for the same seller.
+    expect(mockStripe.accounts.create.mock.calls[0][1]).toEqual({ idempotencyKey: 'cardpop_seller_user-1_managed_risk' });
+  });
+
+  it('falls back to legacy Express when Stripe rejects the configuration', async () => {
+    mockStripe.accounts.create
+      .mockRejectedValueOnce(invalidRequest('Managed Risk is not enabled for your merchant'))
+      .mockResolvedValueOnce({ id: 'acct_express' });
+
+    const result = await createSellerConnectAccount(mockStripe, 'user-2');
+
+    expect(result.config).toBe('express');
+    expect(result.account.id).toBe('acct_express');
+    expect(result.fallbackReason).toMatch(/not enabled/);
+    expect(mockStripe.accounts.create.mock.calls[1][0].type).toBe('express');
+  });
+
+  it('re-throws the original error when the fallback fails too (bad request data)', async () => {
+    mockStripe.accounts.create
+      .mockRejectedValueOnce(invalidRequest('Invalid email address'))
+      .mockRejectedValueOnce(invalidRequest('Invalid email address (retry)'));
+
+    await expect(createSellerConnectAccount(mockStripe, 'user-3', { email: 'nope' })).rejects.toThrow('Invalid email address');
+  });
+
+  it('does not retry on a connection error — a second attempt could orphan an account', async () => {
+    const connErr = Object.assign(new Error('network down'), { type: 'StripeConnectionError' });
+    mockStripe.accounts.create.mockRejectedValueOnce(connErr);
+
+    await expect(createSellerConnectAccount(mockStripe, 'user-4')).rejects.toThrow('network down');
+    expect(mockStripe.accounts.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('STRIPE_CONNECT_LEGACY_EXPRESS=true pins new accounts back to Express', async () => {
+    process.env.STRIPE_CONNECT_LEGACY_EXPRESS = 'true';
+    mockStripe.accounts.create.mockResolvedValue({ id: 'acct_pinned' });
+
+    const result = await createSellerConnectAccount(mockStripe, 'user-5');
+
+    expect(result.config).toBe('express');
+    expect(mockStripe.accounts.create).toHaveBeenCalledTimes(1);
+    expect(mockStripe.accounts.create.mock.calls[0][0].type).toBe('express');
+  });
+});
+
+describe('sellerLossLiability', () => {
+  it('reports Stripe only when the account actually carries Managed Risk', () => {
+    expect(sellerLossLiability({ controller: { losses: { payments: 'stripe' } } })).toBe('stripe');
+    expect(sellerLossLiability({ controller: { losses: { payments: 'application' } } })).toBe('platform');
+    // Legacy Express accounts, and any response without the hash, are assumed
+    // platform-liable rather than reporting protection that may not exist.
+    expect(sellerLossLiability({ controller: { type: 'application' } })).toBe('platform');
+    expect(sellerLossLiability({})).toBe('platform');
+    expect(sellerLossLiability(null)).toBe('platform');
   });
 });
 
@@ -78,14 +174,14 @@ describe('ensureSellerConnectAccount', () => {
     expect(supabaseState.lastUpdate).toBeNull();
   });
 
-  it('creates an Express account and persists it when none exists', async () => {
+  it('creates a Managed Risk account and persists it when none exists', async () => {
     mockStripe.accounts.create.mockResolvedValue({ id: 'acct_new' });
 
     const result = await ensureSellerConnectAccount('user-2', null, { email: 'a@b.com', displayName: 'Ada' });
 
     expect(result).toEqual({ accountId: 'acct_new', created: true });
     const args = mockStripe.accounts.create.mock.calls[0][0];
-    expect(args.type).toBe('express');
+    expect(args.controller.losses.payments).toBe('stripe');
     expect(args.country).toBe('AU');
     expect(args.capabilities.transfers.requested).toBe(true);
     expect(args.metadata.cardpop_user_id).toBe('user-2');
