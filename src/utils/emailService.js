@@ -162,7 +162,8 @@ export async function sendContactMessage({ to, name, email, subject, message }) 
 }
 
 // Admin heads-up when a user submits an event to the community calendar. Sent to
-// the configurable admin contact address, not to a customer.
+// admin accounts (and the configurable admin contact address), not to a customer.
+// `to` may be a single address or an array of addresses.
 export async function sendEventSubmitted({ to, event }) {
   return send({
     to,

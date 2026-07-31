@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
   Bell, DollarSign, Hammer, TrendingUp, TrendingDown, Clock, Award,
   Tag, CheckCircle2, XCircle, RefreshCw, MessageSquare, UserPlus,
-  Star, ShieldCheck, ShieldAlert, Shield, Settings, Check,
+  Star, ShieldCheck, ShieldAlert, Shield, Settings, Check, CalendarClock,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,7 @@ const TYPE_CONFIG = {
   watchlist_price_drop:     { icon: TrendingDown,  color: 'text-amber-500' },
   watchlist_bid:            { icon: Hammer,        color: 'text-amber-500' },
   watchlist_ending_soon:    { icon: Clock,         color: 'text-red-500' },
+  event_pending_review:     { icon: CalendarClock, color: 'text-blue-500' },
   system:                   { icon: Bell,          color: 'text-slate-500' },
 };
 
