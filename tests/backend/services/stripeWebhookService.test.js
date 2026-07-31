@@ -13,7 +13,7 @@ vi.mock('../../../src/utils/supabaseClient.js', () => ({ default: mockSupabase, 
 vi.mock('../../../src/utils/emailService.js', () => ({
   sendOrderConfirmed: vi.fn(), sendItemSold: vi.fn(), sendOrderAdminNotice: vi.fn(),
 }));
-vi.mock('../../../src/utils/adminNotificationRecipient.js', () => ({ getAdminNotificationEmail: vi.fn() }));
+vi.mock('../../../src/utils/adminNotificationRecipient.js', () => ({ getAdminNotificationEmails: vi.fn() }));
 vi.mock('../../../src/services/payoutService.js', () => ({ payoutSeller: vi.fn() }));
 vi.mock('../../../src/services/welcomeOfferService.js', () => ({
   markWelcomeDiscountRedeemed: vi.fn(), releaseWelcomeDiscount: mockReleaseWelcomeDiscount,

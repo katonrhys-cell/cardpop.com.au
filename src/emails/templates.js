@@ -358,6 +358,31 @@ ${summaryTable([
   );
 }
 
+// ─── Identity verification needs manual review (admin notification) ──────────
+
+// Sent to admin accounts when a user's Stripe Identity document name doesn't
+// match their profile name and the verification is routed to manual review
+// (see identityService.js applyIdentitySession). It's an internal heads-up,
+// not a customer email, so it links straight to the user's admin detail page.
+export function identityReviewNeededEmail({ userId, userName, userEmail }) {
+  const body = `<p>A user's identity verification needs manual review — the name on their submitted ID didn't automatically match their account name.</p>
+${summaryTable([
+  ['User', esc(userName) || '—'],
+  ['Email', esc(userEmail) || '—'],
+])}
+<p>Review it on the user's admin detail page to approve or reject the verification.</p>`;
+
+  return cpEmail(
+    `Identity verification needs review: ${esc(userName) || 'A user'}`,
+    'Identity Review Needed',
+    'A verification needs your review',
+    body,
+    `https://cardpop.com.au/admin/users/${userId}`,
+    'Review in Admin',
+    'You received this because you are a CardPop admin.',
+  );
+}
+
 // ─── Contact form message (admin/support) ─────────────────────────────────────
 
 export function contactMessageEmail({ name, email, subject, message }) {

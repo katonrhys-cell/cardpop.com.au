@@ -2,6 +2,37 @@ import stripe from '../utils/stripeClient.js';
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { isStripeObjectMissing } from '../utils/stripeErrors.js';
+import { sendIdentityReviewNeeded } from '../utils/emailService.js';
+import { getAdminNotificationEmails } from '../utils/adminNotificationRecipient.js';
+
+// Best-effort: alert admins (in-app + email) that a verification needs a human
+// look. Never throws — called from the Stripe Identity webhook, where an
+// unhandled error would turn a successfully-processed event into a 500 and
+// cause Stripe to retry it.
+async function notifyAdminsOfIdentityReview({ userId, userName, userEmail }) {
+  try {
+    const { data: admins } = await supabase.from('profiles').select('id').eq('is_admin', true);
+    if (admins?.length) {
+      await supabase.from('notifications').insert(admins.map(a => ({
+        user_id: a.id,
+        type: 'verification_requested',
+        title: 'Identity verification needs review',
+        body: `${userName || 'A user'}'s ID name doesn't match their profile — needs manual approve/reject.`,
+        link: `/admin/users/${userId}`,
+        entity_id: userId,
+      })));
+    }
+  } catch (e) {
+    logger.warn(`[IDENTITY] admin review in-app notification failed for ${userId}: ${e.message}`);
+  }
+
+  try {
+    const to = await getAdminNotificationEmails();
+    await sendIdentityReviewNeeded({ to, userId, userName, userEmail });
+  } catch (e) {
+    logger.warn(`[IDENTITY] admin review email failed for ${userId}: ${e.message}`);
+  }
+}
 
 // Stripe Identity document verification.
 //
@@ -23,7 +54,7 @@ const isApproved = (profile) =>
 async function getProfile(userId) {
   const { data } = await supabase
     .from('profiles')
-    .select('stripe_identity_session_id, verification_status, is_verified, display_name, identity_name_mismatch')
+    .select('stripe_identity_session_id, verification_status, is_verified, display_name, identity_name_mismatch, email')
     .eq('id', userId)
     .maybeSingle();
   return data;
@@ -98,6 +129,7 @@ export async function applyIdentitySession(session) {
         title: 'Identity check under review',
         body: 'The name on your ID didn’t match your profile name, so our team is reviewing your verification. No action is needed from you.',
       }).then(() => {}, () => {});
+      await notifyAdminsOfIdentityReview({ userId, userName: verifiedName || profile?.display_name, userEmail: profile?.email });
       return;
     }
 
