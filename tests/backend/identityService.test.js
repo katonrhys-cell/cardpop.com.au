@@ -8,13 +8,20 @@ const mockStripe = vi.hoisted(() => ({
 vi.mock('../../src/utils/stripeClient.js', () => ({ default: mockStripe }));
 
 // Supabase double: select().eq().maybeSingle() resolves the configurable
-// profile, updates and inserts are recorded per table.
-const supabaseState = vi.hoisted(() => ({ profile: null, updates: [], inserts: [] }));
+// profile; select('id').eq('is_admin', true) (the admin-fanout query) resolves
+// the configurable admin list directly. Updates and inserts are recorded per
+// table.
+const supabaseState = vi.hoisted(() => ({ profile: null, admins: [], updates: [], inserts: [] }));
 vi.mock('../../src/utils/supabaseClient.js', () => {
   const sb = {
     from: (table) => ({
       select: () => ({
-        eq: () => ({ maybeSingle: () => Promise.resolve({ data: supabaseState.profile, error: null }) }),
+        eq: (col) => {
+          if (table === 'profiles' && col === 'is_admin') {
+            return Promise.resolve({ data: supabaseState.admins, error: null });
+          }
+          return { maybeSingle: () => Promise.resolve({ data: supabaseState.profile, error: null }) };
+        },
       }),
       update: (payload) => ({
         eq: () => {
@@ -31,6 +38,12 @@ vi.mock('../../src/utils/supabaseClient.js', () => {
   return { supabase: sb, default: sb };
 });
 
+const mockSendIdentityReviewNeeded = vi.hoisted(() => vi.fn());
+vi.mock('../../src/utils/emailService.js', () => ({ sendIdentityReviewNeeded: mockSendIdentityReviewNeeded }));
+
+const mockGetAdminNotificationEmails = vi.hoisted(() => vi.fn());
+vi.mock('../../src/utils/adminNotificationRecipient.js', () => ({ getAdminNotificationEmails: mockGetAdminNotificationEmails }));
+
 import { applyIdentitySession, createIdentitySession, getIdentityStatus, namesMatch } from '../../src/services/identityService.js';
 
 const mockRes = () => {
@@ -43,7 +56,10 @@ const mockRes = () => {
 beforeEach(() => {
   mockStripe.identity.verificationSessions.create.mockReset();
   mockStripe.identity.verificationSessions.retrieve.mockReset();
+  mockSendIdentityReviewNeeded.mockReset().mockResolvedValue(true);
+  mockGetAdminNotificationEmails.mockReset().mockResolvedValue(['admin@cardpop.com.au']);
   supabaseState.profile = null;
+  supabaseState.admins = [];
   supabaseState.updates = [];
   supabaseState.inserts = [];
 });
@@ -89,7 +105,8 @@ describe('applyIdentitySession', () => {
   });
 
   it('routes a document/profile name mismatch to manual review instead of approving', async () => {
-    supabaseState.profile = { display_name: 'Maya Smith' };
+    supabaseState.profile = { display_name: 'Maya Smith', email: 'maya@example.com' };
+    supabaseState.admins = [{ id: 'admin-1' }, { id: 'admin-2' }];
     await applyIdentitySession({
       id: 'vs_1',
       status: 'verified',
@@ -103,8 +120,23 @@ describe('applyIdentitySession', () => {
     expect(update.payload.identity_name_mismatch).toBe(true);
     expect(update.payload.legal_name).toBe('Maya Chen');
 
-    const notif = supabaseState.inserts.find(i => i.table === 'notifications');
+    const notif = supabaseState.inserts.find(i => i.table === 'notifications' && i.payload.user_id === 'user-1');
     expect(notif.payload.type).toBe('identity_review');
+
+    // Admins get fanned out an in-app notification and an email.
+    const adminNotifInsert = supabaseState.inserts.find(i => i.table === 'notifications' && Array.isArray(i.payload));
+    expect(adminNotifInsert.payload).toHaveLength(2);
+    expect(adminNotifInsert.payload.every(p => p.type === 'verification_requested')).toBe(true);
+    expect(adminNotifInsert.payload.map(p => p.user_id)).toEqual(['admin-1', 'admin-2']);
+    expect(adminNotifInsert.payload[0].link).toBe('/admin/users/user-1');
+
+    expect(mockGetAdminNotificationEmails).toHaveBeenCalled();
+    expect(mockSendIdentityReviewNeeded).toHaveBeenCalledWith({
+      to: ['admin@cardpop.com.au'],
+      userId: 'user-1',
+      userName: 'Maya Chen',
+      userEmail: 'maya@example.com',
+    });
   });
 
   it('does not re-flag or re-notify a mismatch already awaiting review', async () => {

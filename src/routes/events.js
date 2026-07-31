@@ -3,7 +3,7 @@ import supabase from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { sendEventSubmitted } from '../utils/emailService.js';
-import { getAdminNotificationEmail } from '../utils/adminNotificationRecipient.js';
+import { getAdminNotificationEmails } from '../utils/adminNotificationRecipient.js';
 
 const router = Router();
 
@@ -12,9 +12,11 @@ const router = Router();
  *
  * Fired by the user-facing event form immediately after a user inserts a
  * `pending_review` event, so a new community submission doesn't sit unnoticed
- * in the moderation queue. The recipient is the dedicated Notification Email set
- * under Admin → Platform Settings (falls back to the contact address, then a
- * default alerts inbox).
+ * in the moderation queue. Emails every admin account, plus the dedicated
+ * Notification Email set under Admin → Platform Settings (falls back to the
+ * contact address, then a default alerts inbox) for backward compatibility.
+ * A separate DB trigger (see supabase/migrations) also fans out an in-app
+ * notification to every admin — this endpoint only handles the email leg.
  *
  * Auth + ownership are checked so a user can only trigger a notice for their own
  * freshly-submitted, still-pending event — never email an arbitrary address or
@@ -44,10 +46,10 @@ router.post('/notify-submission', authMiddleware, async (req, res) => {
       return res.json({ ok: true, skipped: 'not_pending' });
     }
 
-    const recipient = await getAdminNotificationEmail();
-    await sendEventSubmitted({ to: recipient, event });
+    const recipients = await getAdminNotificationEmails();
+    await sendEventSubmitted({ to: recipients, event });
 
-    logger.info(`[EVENTS] Notified ${recipient} of pending event ${event.id}`);
+    logger.info(`[EVENTS] Notified ${recipients.join(', ')} of pending event ${event.id}`);
     res.json({ ok: true });
   } catch (err) {
     logger.error(`[EVENTS] notify-submission failed: ${err.message}`);

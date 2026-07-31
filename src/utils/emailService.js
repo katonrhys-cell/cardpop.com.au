@@ -11,6 +11,7 @@ import {
   welcomeOfferEmail,
   launchWelcomeEmail,
   eventSubmittedEmail,
+  identityReviewNeededEmail,
   orderAdminNoticeEmail,
   contactMessageEmail,
 } from '../emails/templates.js';
@@ -162,11 +163,23 @@ export async function sendContactMessage({ to, name, email, subject, message }) 
 }
 
 // Admin heads-up when a user submits an event to the community calendar. Sent to
-// the configurable admin contact address, not to a customer.
+// admin accounts (and the configurable admin contact address), not to a customer.
+// `to` may be a single address or an array of addresses.
 export async function sendEventSubmitted({ to, event }) {
   return send({
     to,
     subject: `New event pending review: ${event?.title || 'Untitled'}`,
     html: eventSubmittedEmail({ event }),
+  });
+}
+
+// Admin heads-up when a user's Stripe Identity check needs manual review
+// (document name doesn't match their profile). `to` may be a single address
+// or an array of addresses.
+export async function sendIdentityReviewNeeded({ to, userId, userName, userEmail }) {
+  return send({
+    to,
+    subject: `Identity verification needs review: ${userName || 'A user'}`,
+    html: identityReviewNeededEmail({ userId, userName, userEmail }),
   });
 }

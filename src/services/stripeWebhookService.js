@@ -1,7 +1,7 @@
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { sendOrderConfirmed, sendItemSold, sendOrderAdminNotice } from '../utils/emailService.js';
-import { getAdminNotificationEmail } from '../utils/adminNotificationRecipient.js';
+import { getAdminNotificationEmails } from '../utils/adminNotificationRecipient.js';
 import { payoutSeller } from './payoutService.js';
 import { markWelcomeDiscountRedeemed, releaseWelcomeDiscount } from './welcomeOfferService.js';
 import { recordShopOrderReferral } from './partnerService.js';
@@ -64,16 +64,34 @@ async function getPlatformSetting(key, defaultValue) {
   return data?.value !== undefined ? data.value : defaultValue;
 }
 
-// Email the admin notification inbox about a confirmed order. Best-effort — a
-// mail failure must never re-throw and turn a fulfilled order into a webhook 500
-// (which Stripe would retry). Recipient is resolved from the admin Settings page
-// (dedicated Notification Email, then Contact Email, then a default inbox).
+// Email every admin account about a confirmed order, and drop an in-app
+// notification in each admin's bell so a new order shows up without anyone
+// having to check email or refresh Admin -> Orders. Best-effort — a failure
+// here must never re-throw and turn a fulfilled order into a webhook 500
+// (which Stripe would retry).
 async function notifyAdminOfOrder({ orderId, buyerName, buyerEmail, total, itemsSummary, sellerName }) {
   try {
-    const to = await getAdminNotificationEmail();
+    const to = await getAdminNotificationEmails();
     await sendOrderAdminNotice({ to, orderId, buyerName, buyerEmail, total, itemsSummary, sellerName });
   } catch (e) {
-    logger.warn(`[STRIPE] admin order notice failed for order ${orderId || 'n/a'}: ${e.message}`);
+    logger.warn(`[STRIPE] admin order notice email failed for order ${orderId || 'n/a'}: ${e.message}`);
+  }
+
+  try {
+    const { data: admins } = await supabase.from('profiles').select('id').eq('is_admin', true);
+    if (admins?.length) {
+      const amount = typeof total === 'number' ? `$${total.toFixed(2)}` : 'an order';
+      await supabase.from('notifications').insert(admins.map(a => ({
+        user_id: a.id,
+        type: 'order_placed',
+        title: 'New order placed',
+        body: `${buyerName || 'A buyer'} placed ${amount} order for ${itemsSummary || 'an item'}${sellerName ? ` from ${sellerName}` : ''}.`,
+        link: '/admin/orders',
+        entity_id: orderId,
+      })));
+    }
+  } catch (e) {
+    logger.warn(`[STRIPE] admin order notice in-app notification failed for order ${orderId || 'n/a'}: ${e.message}`);
   }
 }
 

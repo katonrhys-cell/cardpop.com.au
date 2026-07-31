@@ -34,4 +34,36 @@ async function getAdminNotificationEmail() {
   }
 }
 
-export { getAdminNotificationEmail, ADMIN_NOTIFICATION_FALLBACK };
+/**
+ * Resolve every address an admin alert should reach: every admin account's
+ * own login email, plus the configured alerts inbox from getAdminNotificationEmail()
+ * (kept for backward compatibility — it may not belong to any admin profile).
+ * Deduped case-insensitively. Falls back to getAdminNotificationEmail() alone
+ * if no admin profiles are found, so an alert is never silently dropped.
+ */
+async function getAdminNotificationEmails() {
+  const configured = await getAdminNotificationEmail();
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('email')
+      .eq('is_admin', true)
+      .not('email', 'is', null);
+    if (error) throw error;
+
+    const seen = new Set();
+    const recipients = [];
+    for (const addr of [...(data || []).map(r => r.email), configured]) {
+      const trimmed = typeof addr === 'string' && addr.trim();
+      if (!trimmed || seen.has(trimmed.toLowerCase())) continue;
+      seen.add(trimmed.toLowerCase());
+      recipients.push(trimmed);
+    }
+    return recipients.length ? recipients : [configured];
+  } catch (e) {
+    logger.warn(`[NOTIFY] Failed to resolve admin notification emails: ${e.message}`);
+    return [configured];
+  }
+}
+
+export { getAdminNotificationEmail, getAdminNotificationEmails, ADMIN_NOTIFICATION_FALLBACK };
