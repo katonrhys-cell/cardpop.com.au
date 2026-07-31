@@ -85,7 +85,7 @@ Routes are registered in `src/routes/index.js`. Each domain has its own router f
 | `/categories` | `routes/categories.js` | Category management |
 | `/subcategories` | `routes/subcategories.js` | Subcategory management |
 | `/event-scan` | `routes/event-scan.js` | Admin management of the nightly event-scanner source list |
-| `/vault` | `routes/vault.js` | Vault security operations |
+| `/vault` | `routes/vault.js` | Vault reads + admin base-value ops. `/vault/items` (`routes/vault-items.js`) is the card upload/update endpoint — one call writes the vault row and syncs the marketplace listing, via a **caller-scoped** Supabase client so RLS (ownership, `can_sell()`, locked columns) stays the enforcement point — see `docs/vault-upload.md` |
 | `/newsletter` | `routes/newsletter.js` | Kit.com newsletter subscription |
 
 **Auth middleware** (`src/middleware/auth.js`) validates Bearer tokens by calling `supabase.auth.getUser(token)`. The backend Supabase client (`src/utils/supabaseClient.js`) uses the `SUPABASE_SERVICE_ROLE_KEY` env var for admin-level operations.
