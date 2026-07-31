@@ -192,6 +192,20 @@ describe('ensureSellerConnectAccount', () => {
     });
   });
 
+  it('still onboards the seller when Stripe rejects Managed Risk (degrades, never blocks)', async () => {
+    mockStripe.accounts.create
+      .mockRejectedValueOnce(Object.assign(new Error('not enabled'), { type: 'invalid_request_error' }))
+      .mockResolvedValueOnce({ id: 'acct_fallback' });
+
+    const result = await ensureSellerConnectAccount('user-fb', null);
+
+    expect(result).toEqual({ accountId: 'acct_fallback', created: true });
+    expect(supabaseState.lastUpdate).toEqual({
+      stripe_connect_account_id: 'acct_fallback',
+      stripe_connect_onboarded: false,
+    });
+  });
+
   it('throws if the account is created but cannot be persisted (avoids silent orphan)', async () => {
     mockStripe.accounts.create.mockResolvedValue({ id: 'acct_orphan' });
     supabaseState.updateError = { message: 'db down' };

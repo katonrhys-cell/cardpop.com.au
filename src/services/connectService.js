@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node';
 import stripe from '../utils/stripeClient.js';
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
@@ -43,7 +44,15 @@ export async function ensureSellerConnectAccount(userId, existingAccountId = nul
     // negative balance it ever carries is CardPop's to cover. If this fires for
     // reasons other than STRIPE_CONNECT_LEGACY_EXPRESS, the platform isn't
     // enabled for the Managed Risk configuration yet.
-    logger.error(`[STRIPE CONNECT] Account ${account.id} (user ${userId}) fell back to legacy Express — CardPop carries loss liability. Reason: ${fallbackReason}`);
+    //
+    // Raised to Sentry as well as the log, because logger.error only writes to
+    // stdout — Sentry's Express handler captures thrown errors, and this path
+    // deliberately doesn't throw (onboarding still succeeds). Without this the
+    // degradation would sit unnoticed in Vercel logs while every new seller
+    // silently onboarded platform-liable.
+    const message = `[STRIPE CONNECT] Account ${account.id} (user ${userId}) fell back to legacy Express — CardPop carries loss liability. Reason: ${fallbackReason}`;
+    logger.error(message);
+    Sentry.captureMessage(message, 'error');
   }
 
   const { error } = await supabase
