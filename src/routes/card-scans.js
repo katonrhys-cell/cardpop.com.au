@@ -200,7 +200,11 @@ router.patch('/:id', async (req, res) => {
 // ─── GET /card-scans ─────────────────────────────────────────────────────────
 // The caller's own scan history, newest first.
 router.get('/', async (req, res) => {
-  const take = Math.min(Number(req.query.take) || 25, 100);
+  // Floor at 1 as well as capping at 100: a negative ?take (e.g. -5) is
+  // truthy, so `Number(...) || 25` keeps it, and PostgREST rejects a negative
+  // .limit() — 502-ing the caller's own history. parseInt also drops a
+  // fractional take. Matches the clamp pattern used across the other routes.
+  const take = Math.min(100, Math.max(1, parseInt(req.query.take, 10) || 25));
 
   const { data, error } = await supabase
     .from('card_scans')

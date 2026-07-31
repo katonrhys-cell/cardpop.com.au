@@ -64,11 +64,45 @@ const AdminSettingsPage = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const upserts = Object.entries(settings).map(([key, value]) => ({ key, value }));
-      const { error } = await supabase
+      const entries = Object.entries(settings).map(([key, value]) => ({ key, value }));
+
+      // platform_settings.label is NOT NULL with no default, so a bare
+      // {key, value} upsert fails its INSERT arm for any key whose row doesn't
+      // exist yet (an unseeded setting) — and one bad key fails the WHOLE
+      // batch, so nothing on the page saves. Split the save: existing rows get
+      // the value-only upsert (its conflict arm touches only the provided
+      // columns, leaving curated labels alone); missing rows are inserted with
+      // a label derived from the key so the constraint is satisfied.
+      const { data: existingRows, error: readErr } = await supabase
         .from('platform_settings')
-        .upsert(upserts, { onConflict: 'key' });
-      if (error) throw error;
+        .select('key');
+      if (readErr) throw readErr;
+      const existing = new Set((existingRows ?? []).map(r => r.key));
+
+      const updates = entries.filter(e => existing.has(e.key));
+      const inserts = entries
+        .filter(e => !existing.has(e.key))
+        .map(({ key, value }) => ({
+          key,
+          value,
+          label: key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+          group_name: 'general',
+        }));
+
+      if (updates.length) {
+        const { error } = await supabase
+          .from('platform_settings')
+          .upsert(updates, { onConflict: 'key' });
+        if (error) throw error;
+      }
+      if (inserts.length) {
+        // Upsert (not insert) so a concurrent save racing this one conflicts
+        // harmlessly instead of failing on the duplicate key.
+        const { error } = await supabase
+          .from('platform_settings')
+          .upsert(inserts, { onConflict: 'key' });
+        if (error) throw error;
+      }
       toast.success('Settings saved successfully.');
     } catch (err) {
       toast.error(err.message || 'Failed to save settings.');

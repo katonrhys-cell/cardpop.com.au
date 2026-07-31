@@ -84,6 +84,21 @@ const toText = (html = '', max = 300) => {
 
 const isoDate = (d) => (d ? new Date(d).toISOString() : undefined);
 
+// Decode a single path segment without throwing. A malformed %-escape (e.g.
+// a crawler hitting "/shop/%" or "/marketplace/%ZZ") makes decodeURIComponent
+// raise URIError; unguarded, that bubbles to the handler's catch and answers a
+// transient 503 "try again later", telling crawlers to retry — and keep
+// indexing — a URL that is permanently broken. Returning the raw segment
+// instead lets the slug/UUID lookup simply miss and fall through to the honest
+// 404 that a bad URL should get.
+const safeDecode = (s) => {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+};
+
 // Mirror of lib/slugify.js — kept inline so the serverless function has no
 // dependency on the frontend bundle.
 const slugify = (str = '') => String(str)
@@ -2875,7 +2890,7 @@ export default async function handler(req, res) {
     // single-segment slugs return null and fall through to the SPA shell.
     const shopCollectionMatch = rawPath.match(/^\/shop\/([^/?#]+)$/);
     if (shopCollectionMatch) {
-      const doc = await renderShopCollection(supabase, decodeURIComponent(shopCollectionMatch[1]));
+      const doc = await renderShopCollection(supabase, safeDecode(shopCollectionMatch[1]));
       if (doc) return sendDoc(res, doc);
     }
 
@@ -2901,7 +2916,7 @@ export default async function handler(req, res) {
 
     const eventsMatch = rawPath.match(/^\/events\/([^/?#]+)/);
     if (eventsMatch) {
-      const param = decodeURIComponent(eventsMatch[1]);
+      const param = safeDecode(eventsMatch[1]);
       // Known category slugs render a filtered landing; everything else is an
       // individual event (looked up by UUID or slug).
       if (EVENT_CATEGORIES[param]) {
@@ -2912,14 +2927,14 @@ export default async function handler(req, res) {
 
     const shopProductMatch = rawPath.match(/^\/product\/shop\/([^/?#]+)(?:\/([^/?#]+))?/);
     if (shopProductMatch) {
-      const id = decodeURIComponent(shopProductMatch[1]);
-      const slug = shopProductMatch[2] ? decodeURIComponent(shopProductMatch[2]) : undefined;
+      const id = safeDecode(shopProductMatch[1]);
+      const slug = shopProductMatch[2] ? safeDecode(shopProductMatch[2]) : undefined;
       return sendDoc(res, await renderShopProduct(supabase, id, slug));
     }
 
     const dealerMatch = rawPath.match(/^\/dealer\/([^/?#]+)/);
     if (dealerMatch) {
-      const id = decodeURIComponent(dealerMatch[1]);
+      const id = safeDecode(dealerMatch[1]);
       return sendDoc(res, await renderDealer(supabase, id));
     }
 
@@ -2929,20 +2944,20 @@ export default async function handler(req, res) {
 
     const collectionMatch = rawPath.match(/^\/collections\/([^/?#]+)/);
     if (collectionMatch) {
-      const slug = decodeURIComponent(collectionMatch[1]);
+      const slug = safeDecode(collectionMatch[1]);
       return sendDoc(res, await renderCollection(supabase, slug));
     }
 
     const sellerMatch = rawPath.match(/^\/seller\/([^/?#]+)/);
     if (sellerMatch) {
-      const id = decodeURIComponent(sellerMatch[1]);
+      const id = safeDecode(sellerMatch[1]);
       return sendDoc(res, await renderSeller(supabase, id));
     }
 
     const listingMatch = rawPath.match(/^\/marketplace\/([^/?#]+)(?:\/([^/?#]+))?/);
     if (listingMatch) {
-      const id = decodeURIComponent(listingMatch[1]);
-      const slug = listingMatch[2] ? decodeURIComponent(listingMatch[2]) : undefined;
+      const id = safeDecode(listingMatch[1]);
+      const slug = listingMatch[2] ? safeDecode(listingMatch[2]) : undefined;
       return sendDoc(res, await renderListing(supabase, id, slug));
     }
 
@@ -2952,7 +2967,7 @@ export default async function handler(req, res) {
 
     const buyingGuideMatch = rawPath.match(/^\/analytics\/buying-guides\/([^/?#]+)/);
     if (buyingGuideMatch) {
-      return sendDoc(res, await renderBuyingGuide(supabase, decodeURIComponent(buyingGuideMatch[1])));
+      return sendDoc(res, await renderBuyingGuide(supabase, safeDecode(buyingGuideMatch[1])));
     }
 
     if (rawPath === '/prices') {
@@ -2965,7 +2980,7 @@ export default async function handler(req, res) {
 
     const storesCityMatch = rawPath.match(/^\/card-shops\/([^/?#]+)/);
     if (storesCityMatch) {
-      const citySlug = decodeURIComponent(storesCityMatch[1]);
+      const citySlug = safeDecode(storesCityMatch[1]);
       if (DIRECTORY_CITIES[citySlug]) {
         return res.status(200).send(await renderStoresCity(supabase, citySlug));
       }
@@ -2981,8 +2996,8 @@ export default async function handler(req, res) {
 
     const pricesMatch = rawPath.match(/^\/prices\/([^/?#]+)(?:\/([^/?#]+))?/);
     if (pricesMatch) {
-      const category = decodeURIComponent(pricesMatch[1]);
-      const cardSlug = pricesMatch[2] ? decodeURIComponent(pricesMatch[2]) : null;
+      const category = safeDecode(pricesMatch[1]);
+      const cardSlug = pricesMatch[2] ? safeDecode(pricesMatch[2]) : null;
       if (PRICE_CATEGORIES[category]) {
         return sendDoc(res, cardSlug
           ? await renderPriceCard(supabase, category, cardSlug)
@@ -2992,12 +3007,12 @@ export default async function handler(req, res) {
 
     const blogCategoryMatch = rawPath.match(/^\/blog\/category\/([^/?#]+)/);
     if (blogCategoryMatch) {
-      return sendDoc(res, await renderBlogCategory(supabase, decodeURIComponent(blogCategoryMatch[1])));
+      return sendDoc(res, await renderBlogCategory(supabase, safeDecode(blogCategoryMatch[1])));
     }
 
     const blogMatch = rawPath.match(/^\/blog\/([^/?#]+)/);
-    if (blogMatch && decodeURIComponent(blogMatch[1]) !== 'category') {
-      const param = decodeURIComponent(blogMatch[1]);
+    if (blogMatch && safeDecode(blogMatch[1]) !== 'category') {
+      const param = safeDecode(blogMatch[1]);
       return sendDoc(res, await renderBlogArticle(supabase, param));
     }
 

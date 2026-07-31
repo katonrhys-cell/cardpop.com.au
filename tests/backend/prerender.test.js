@@ -504,6 +504,19 @@ describe('prerender unknown paths', () => {
     expect(body).toContain('noindex');
     expect(body).toContain('Page Not Found');
   });
+
+  // A malformed %-escape makes decodeURIComponent throw. That must resolve to
+  // the honest 404 for a broken URL, NOT the transient 503 "try again later"
+  // that tells crawlers to keep the URL indexed and retry it forever.
+  it.each([
+    '/shop/%',
+    '/marketplace/%ZZ',
+    '/seller/%E0%A4%A',
+    '/collections/%C3',
+  ])('returns 404 (not 503) for a malformed path %s', async (path) => {
+    const { status } = await run(path);
+    expect(status).toBe(404);
+  });
 });
 
 describe('prerender whatnot page', () => {

@@ -65,13 +65,35 @@ async function clearLoginAttempts(email, ipAddress) {
   }
 }
 
+// Opportunistic cleanup: rows only ever leave this table via a successful
+// login (clearLoginAttempts), so failed attempts against dead accounts, typo'd
+// emails and rotating attacker IPs accrue forever. Every row gets locked_until
+// stamped at insert, so one whose lock lapsed over 30 days ago belongs to a
+// (email, ip) pair with no failures in a month — dead weight. Piggybacked on
+// recording a failure (a rare event) rather than a scheduler, and fire-and-
+// forget so it can never slow down or fail the login path itself.
+const PURGE_ATTEMPTS_AFTER_MS = 30 * 24 * 3600 * 1000;
+function purgeStaleLoginAttempts() {
+  const cutoff = new Date(Date.now() - PURGE_ATTEMPTS_AFTER_MS).toISOString();
+  supabase
+    .from('login_attempts')
+    .delete()
+    .lt('locked_until', cutoff)
+    .then(
+      ({ error }) => { if (error) logger.warn(`[LOGIN] Stale-attempt purge failed: ${error.message}`); },
+      () => {},
+    );
+}
+
 // Check if a login is allowed (rate-limit gate). The IP is always taken from
 // the request server-side (never the body) — this prevents IP spoofing and,
 // because lockouts are keyed on (email, ip), stops an attacker from clearing or
 // poisoning a victim's lockout from a different IP.
 router.post('/attempt', async (req, res) => {
   const { email } = req.body;
-  if (!email) return res.status(400).json({ error: 'Email is required' });
+  // typeof guard: a non-string body value (array/object) would make
+  // email.trim() throw and answer 500 instead of a clean 400.
+  if (!email || typeof email !== 'string') return res.status(400).json({ error: 'Email is required' });
   const ipAddress = req.ip || 'unknown';
 
   const check = await checkLoginAttempts(email.trim().toLowerCase(), ipAddress);
@@ -82,10 +104,11 @@ router.post('/attempt', async (req, res) => {
 // Record a failed login
 router.post('/record-failure', async (req, res) => {
   const { email } = req.body;
-  if (!email) return res.status(400).json({ error: 'Email is required' });
+  if (!email || typeof email !== 'string') return res.status(400).json({ error: 'Email is required' });
   const ipAddress = req.ip || 'unknown';
 
   await recordFailedAttempt(email.trim().toLowerCase(), ipAddress);
+  purgeStaleLoginAttempts();
   res.json({ success: true });
 });
 
@@ -95,7 +118,7 @@ router.post('/record-failure', async (req, res) => {
 // with just an email and no credentials — nullifying the brute-force lockout.
 router.post('/record-success', async (req, res) => {
   const { email } = req.body;
-  if (!email) return res.status(400).json({ error: 'Email is required' });
+  if (!email || typeof email !== 'string') return res.status(400).json({ error: 'Email is required' });
 
   const authHeader = req.headers.authorization || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;

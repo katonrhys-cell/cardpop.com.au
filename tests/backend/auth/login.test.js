@@ -31,6 +31,7 @@ function makeBuilder(result = { data: null, error: null }) {
     update: vi.fn().mockReturnThis(),
     delete: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    lt: vi.fn().mockReturnThis(),
     maybeSingle: vi.fn().mockResolvedValue(result),
     then: (resolve, reject) => Promise.resolve(result).then(resolve, reject),
     catch: fn => Promise.resolve(result).catch(fn),
@@ -104,12 +105,19 @@ describe('POST /record-failure', () => {
     expect(res.status).toBe(400);
   });
 
+  it('returns 400 for a non-string email (repeated JSON field)', async () => {
+    const res = await request(app).post('/record-failure').send({ email: ['a@b.co', 'c@d.co'] });
+    expect(res.status).toBe(400);
+  });
+
   it('inserts new record when none exists', async () => {
     const checkBuilder = makeBuilder({ data: null, error: null });
     const insertBuilder = makeBuilder({ data: null, error: null });
     mockSupabase.from
       .mockReturnValueOnce(checkBuilder)
-      .mockReturnValueOnce(insertBuilder);
+      .mockReturnValueOnce(insertBuilder)
+      // fire-and-forget stale-attempt purge issues a third from() call
+      .mockReturnValue(makeBuilder({ data: null, error: null }));
     const res = await request(app).post('/record-failure').send({ email: 'test@example.com', ipAddress: '1.2.3.4' });
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
@@ -121,10 +129,26 @@ describe('POST /record-failure', () => {
     const updateBuilder = makeBuilder({ data: null, error: null });
     mockSupabase.from
       .mockReturnValueOnce(checkBuilder)
-      .mockReturnValueOnce(updateBuilder);
+      .mockReturnValueOnce(updateBuilder)
+      .mockReturnValue(makeBuilder({ data: null, error: null }));
     const res = await request(app).post('/record-failure').send({ email: 'test@example.com', ipAddress: '1.2.3.4' });
     expect(res.status).toBe(200);
     expect(updateBuilder.update).toHaveBeenCalledWith(expect.objectContaining({ failed_attempts: 3 }));
+  });
+
+  it('purges stale attempt rows as a side effect', async () => {
+    const checkBuilder = makeBuilder({ data: null, error: null });
+    const insertBuilder = makeBuilder({ data: null, error: null });
+    const purgeBuilder = makeBuilder({ data: null, error: null });
+    mockSupabase.from
+      .mockReturnValueOnce(checkBuilder)
+      .mockReturnValueOnce(insertBuilder)
+      .mockReturnValue(purgeBuilder);
+    const res = await request(app).post('/record-failure').send({ email: 'test@example.com', ipAddress: '1.2.3.4' });
+    expect(res.status).toBe(200);
+    expect(purgeBuilder.delete).toHaveBeenCalled();
+    // Deletes only rows whose lock lapsed before the cutoff — never fresh ones.
+    expect(purgeBuilder.lt).toHaveBeenCalledWith('locked_until', expect.any(String));
   });
 });
 
