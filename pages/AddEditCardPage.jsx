@@ -41,10 +41,10 @@ import CardCropPreview from '@/components/CardCropPreview.jsx';
 import CardCornerAdjuster from '@/components/CardCornerAdjuster.jsx';
 import { warpCardWithCorners } from '@/utils/detectCard.js';
 import DisplayStylePicker from '@/components/vault/DisplayStylePicker.jsx';
-import { canUseStyle, normalizeStyle, normalizeTier } from '@/lib/displayStyles.js';
+import { normalizeTier } from '@/lib/displayStyles.js';
 import { publicImageUrl, thumbStoragePath } from '@/utils/imageUrl.js';
 import SellingRequirementsNotice from '@/components/SellingRequirementsNotice.jsx';
-import { isSellingEntitlementError } from '@/utils/listingErrors.js';
+import apiServerClient from '@/lib/apiServerClient.js';
 import { loadListingDraft, saveListingDraft, clearListingDraft, hasMeaningfulContent } from '@/lib/listingDraft.js';
 import { shouldAutoIdentify, buildPriceLookupQuery } from '@/utils/listingFlow.js';
 import { confidenceScore, confidenceLabel, isLowConfidence } from '@/utils/cardsightConfidence.js';
@@ -1090,86 +1090,16 @@ const AddEditCardPage = () => {
     goToStep(nextIndex);
   };
 
-  // ─── Marketplace listing sync ─────────────────────────────────────────────
-  // The marketplace reads exclusively from the `listings` table, so choosing a
-  // public listing type here must create/update a matching listings row.
-  // Without this the card is only flagged on the vault_items row and never
-  // appears in the marketplace. Mirrors the logic in VaultListingModal.
-  //
-  // Returns how the marketplace row actually ended up, so the caller can tell
-  // the seller the truth rather than a blanket success:
+  // ─── Marketplace listing outcome ──────────────────────────────────────────
+  // The vault write and the marketplace listing sync both happen server-side
+  // in one call (src/routes/vault-items.js). The response's listing.status
+  // reports how the marketplace row actually ended up, so the seller hears
+  // the truth rather than a blanket success:
   //   'archived' — card went private
   //   'listed'   — live on the marketplace now
   //   'pending'  — saved, but held for admin approval (listing_approval_required)
   //   'blocked'  — denied by the can_sell() RLS gate (identity/card-on-file missing)
   //   'error'    — any other failure (the vault card itself is already saved)
-  const syncMarketplaceListing = async (cardId) => {
-    const isPublic = formData.listingType !== 'private';
-    const isSale   = formData.listingType === 'For Sale' || formData.listingType === 'For Sale & Trade';
-    const acceptsTrade = formData.listingType === 'For Trade' || formData.listingType === 'For Sale & Trade';
-    const isEOI    = formData.listingType === 'Expression of Interest';
-    try {
-      if (!isPublic) {
-        // Going private — archive any active listing.
-        const { error } = await supabase
-          .from('listings')
-          .update({ status: 'archived' })
-          .eq('vault_item_id', cardId)
-          .eq('seller_id', currentUser.id)
-          .neq('status', 'archived');
-        if (error) throw error;
-        return 'archived';
-      }
-
-      const listingPayload = {
-        vault_item_id: cardId,
-        seller_id:     currentUser.id,
-        listing_type:  isEOI ? 'expression_of_interest' : (isSale ? 'fixed' : 'trade'),
-        status:        'active',
-        accepts_trade: acceptsTrade,
-        price_aud:     isSale ? (parseFloat(formData.askingPrice) || null) : null,
-        // Expression of Interest: no fixed price — publish the seller's target
-        // range and open the listing to offers.
-        price_min_aud: isEOI ? (parseFloat(formData.offerMin) || null) : null,
-        price_max_aud: isEOI ? (parseFloat(formData.offerMax) || null) : null,
-        ...(isEOI ? { accepts_offers: true } : {}),
-        listed_at:     new Date().toISOString(),
-      };
-
-      // Reuse an existing non-archived listing if one already exists.
-      const { data: existing } = await supabase
-        .from('listings')
-        .select('id')
-        .eq('vault_item_id', cardId)
-        .neq('status', 'archived')
-        .maybeSingle();
-
-      // Read the status back: the enforce_listing_approval trigger may have
-      // downgraded a new 'active' listing to 'pending', and the seller needs
-      // to know their card isn't visible yet.
-      let row, error;
-      if (existing) {
-        ({ data: row, error } = await supabase
-          .from('listings')
-          .update(listingPayload)
-          .eq('id', existing.id)
-          .eq('seller_id', currentUser.id)
-          .select('status')
-          .single());
-      } else {
-        ({ data: row, error } = await supabase
-          .from('listings')
-          .insert(listingPayload)
-          .select('status')
-          .single());
-      }
-      if (error) throw error;
-      return row?.status === 'pending' ? 'pending' : 'listed';
-    } catch (err) {
-      console.error('Marketplace listing sync failed:', err);
-      return isSellingEntitlementError(err) ? 'blocked' : 'error';
-    }
-  };
 
   // Turn the sync outcome into an honest toast. `savedMsg` is the base success
   // message for the vault card itself; `successOpts` (e.g. the "Add Another"
@@ -1202,6 +1132,30 @@ const AddEditCardPage = () => {
     }
   };
 
+  // Highlight validation problems and bring the seller to them. Used for the
+  // instant client-side pass AND for any errors the server's own validation
+  // reports back — both speak the same field names (utils/listingValidation.js).
+  const surfaceValidationErrors = (newErrors) => {
+    setErrors(newErrors);
+    const count = Object.keys(newErrors).length;
+    toast.error(count === 1 ? 'Please fix the highlighted issue' : `Please fix the ${count} highlighted issues`);
+    // In wizard mode jump to the first step with a problem — its fields
+    // would otherwise be invisible on an unmounted step.
+    if (wizardMode) {
+      const badStep = WIZARD_STEPS.findIndex(s => s.fields.some(f => newErrors[f]));
+      if (badStep >= 0 && badStep !== wizardStep) setWizardStep(badStep);
+    }
+    // Jump to the first problem — on a long form (especially mobile) the
+    // errored field may be far off-screen.
+    setTimeout(() => {
+      const el = document.querySelector('.border-destructive, [data-invalid="true"]');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.focus?.();
+      }
+    }, 50);
+  };
+
   // ─── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -1209,27 +1163,11 @@ const AddEditCardPage = () => {
     // Category/Franchise hierarchy — so the seller sees all problems at once
     // instead of fixing one gate only to discover the next on resubmit.
     const newErrors = validateListingForm(formData, validationCtx);
-    setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) {
-      const count = Object.keys(newErrors).length;
-      toast.error(count === 1 ? 'Please fix the highlighted issue' : `Please fix the ${count} highlighted issues`);
-      // In wizard mode jump to the first step with a problem — its fields
-      // would otherwise be invisible on an unmounted step.
-      if (wizardMode) {
-        const badStep = WIZARD_STEPS.findIndex(s => s.fields.some(f => newErrors[f]));
-        if (badStep >= 0 && badStep !== wizardStep) setWizardStep(badStep);
-      }
-      // Jump to the first problem — on a long form (especially mobile) the
-      // errored field may be far off-screen.
-      setTimeout(() => {
-        const el = document.querySelector('.border-destructive, [data-invalid="true"]');
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          el.focus?.();
-        }
-      }, 50);
+      surfaceValidationErrors(newErrors);
       return;
     }
+    setErrors({});
 
     setSaving(true);
     try {
@@ -1267,10 +1205,13 @@ const AddEditCardPage = () => {
 
       const isGraded  = formData.gradingCompany !== 'raw';
       const isPublic  = formData.listingType !== 'private';
-      const tradeAud  = parseFloat(formData.tradeValue) || 0;
 
+      // The server re-derives every flag that follows from the variant chips
+      // or listing type (is_rookie, is_public, trade_value_locked, …) and
+      // owns owner_id / the display-style tier clamp / the CardSight
+      // timestamp — see src/utils/vaultItemInput.js. This payload only
+      // carries what the seller actually entered.
       const payload = {
-        owner_id:            currentUser.id,
         category_id:         selCategoryId || null,
         franchise_id:        franchiseId || null,
         manufacturer_id:     manufacturerId || null,
@@ -1284,14 +1225,8 @@ const AddEditCardPage = () => {
         card_number:         formData.cardNumber?.trim()  || null,
         year:                formData.year?.trim() || null,
         variant:             savedVariants.length ? savedVariants.join(', ') : null,
-        // Selecting the Foil / Holo chip says the card is foiled, so the flag
-        // buyers filter on follows it without needing the toggle ticked too.
-        is_foil:             formData.isFoil || formData.variant.includes(FOIL_VARIANT),
+        is_foil:             formData.isFoil,
         is_sealed:           formData.isSealed,
-        // The "Rookie Card (RC)" variant chip is the single source of truth for
-        // the rookie designation — filters query this derived flag
-        is_rookie:           formData.variant.includes('Rookie Card (RC)'),
-        is_refractor:        formData.variant.includes('Refractor'),
         serial_number:       formData.serialNumber?.trim() || null,
         is_auto:             formData.isAuto,
         auto_type:           formData.variant.includes('Auto') ? (formData.autoType || null) : null,
@@ -1320,21 +1255,15 @@ const AddEditCardPage = () => {
         acquired_date:       formData.acquiredDate || null,
         acquired_from:       formData.acquiredFrom?.trim() || null,
         notes:               formData.notes?.trim()       || null,
-        trade_value_aud:     tradeAud,
-        trade_value_locked:  tradeAud > 0,
+        trade_value_aud:     parseFloat(formData.tradeValue) || 0,
         listing_type:        isPublic ? formData.listingType : 'Private',
-        is_public:           isPublic,
-        // Persist the chosen display style, clamped to what the user's tier
-        // allows so a locked style can never be saved by bypassing the picker.
-        display_style:       canUseStyle(formData.displayStyle, subscriptionTier)
-                               ? normalizeStyle(formData.displayStyle)
-                               : 'classic',
+        display_style:       formData.displayStyle,
         // Persist CardSight ID if we got an exact match during this session
+        // (the server stamps cardsight_identified_at itself)
         ...(cardSightResult?.exactMatch && cardSightResult?.card?.id
           ? {
               cardsight_card_id: cardSightResult.card.id,
               cardsight_set_id:  cardSightResult.card.setId ?? null,
-              cardsight_identified_at: new Date().toISOString(),
             }
           : {}),
       };
@@ -1342,52 +1271,51 @@ const AddEditCardPage = () => {
       if (cardImagePath) payload.card_image = cardImagePath;
       if (extraImagePaths.length) payload.card_images = extraImagePaths;
 
-      // `language` is a newly added column. Vercel's deploy and the Supabase
-      // migration workflow run independently on merge, so for a brief window
-      // the new frontend can be live against a schema that lacks it. Rather
-      // than fail the seller's listing, drop the field and retry once.
-      // (PGRST204 = "Could not find the 'x' column ... in the schema cache".)
-      const isMissingLanguageColumn = (err) =>
-        err && (err.code === 'PGRST204' || /schema cache/i.test(err.message || '')) &&
-        /language/i.test(err.message || '');
-      const withoutLanguage = () => { const { language, ...rest } = payload; return rest; };
+      // One call does the rest server-side (src/routes/vault-items.js): the
+      // vault write and the marketplace listing sync together, validated with
+      // the same rules that just ran above. Photos stay client-uploaded —
+      // only their storage paths travel in the payload.
+      const res = await apiServerClient.fetch(isEdit ? `/vault/items/${id}` : '/vault/items', {
+        method: isEdit ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          item: payload,
+          pricing: {
+            askingPrice: formData.askingPrice || null,
+            offerMin: formData.offerMin || null,
+            offerMax: formData.offerMax || null,
+          },
+        }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // Server-side validation speaks the same field names as the client
+        // pass — highlight the inputs instead of a dead-end error toast.
+        if (res.status === 400 && result.fields) {
+          surfaceValidationErrors(result.fields);
+          return;
+        }
+        throw new Error(result.error || 'Failed to save card');
+      }
+
+      formDirtyRef.current = false;
+      const savedCardId = result.item?.id || id;
+      const syncStatus = result.listing?.status;
+      const savedIdentity = {
+        collection: formData.collection, setName: formData.setName,
+        insertName: formData.insertName ?? null, cardNumber: formData.cardNumber,
+        parallel: formData.parallelName || null, cardName: formData.cardName,
+        year: formData.year, rookie: formData.variant?.includes('Rookie Card (RC)') ? 'Rookie Card (RC)' : null,
+        variants: formData.variant,
+      };
+      confirmScan(savedIdentity, savedCardId);
 
       if (isEdit) {
-        let { error } = await supabase.from('vault_items').update(payload).eq('id', id).eq('owner_id', currentUser.id);
-        if (isMissingLanguageColumn(error)) {
-          ({ error } = await supabase.from('vault_items').update(withoutLanguage()).eq('id', id).eq('owner_id', currentUser.id));
-        }
-        if (error) throw error;
-        formDirtyRef.current = false;
-        const savedIdentity = {
-          collection: formData.collection, setName: formData.setName,
-          insertName: formData.insertName ?? null, cardNumber: formData.cardNumber,
-          parallel: formData.parallelName || null, cardName: formData.cardName,
-          year: formData.year, rookie: formData.variant?.includes('Rookie Card (RC)') ? 'Rookie Card (RC)' : null,
-          variants: formData.variant,
-        };
-        confirmScan(savedIdentity, id);
-        const syncStatus = await syncMarketplaceListing(id);
         showListingOutcome(syncStatus, 'Card updated successfully!');
         navigate('/vault');
       } else {
-        let { data: inserted, error } = await supabase.from('vault_items').insert(payload).select('id').single();
-        if (isMissingLanguageColumn(error)) {
-          ({ data: inserted, error } = await supabase.from('vault_items').insert(withoutLanguage()).select('id').single());
-        }
-        if (error) throw error;
-        formDirtyRef.current = false;
         clearListingDraft(currentUser.id);
         setRestorableDraft(null);
-        const savedIdentity = {
-          collection: formData.collection, setName: formData.setName,
-          insertName: formData.insertName ?? null, cardNumber: formData.cardNumber,
-          parallel: formData.parallelName || null, cardName: formData.cardName,
-          year: formData.year, rookie: formData.variant?.includes('Rookie Card (RC)') ? 'Rookie Card (RC)' : null,
-          variants: formData.variant,
-        };
-        confirmScan(savedIdentity, inserted.id);
-        const syncStatus = await syncMarketplaceListing(inserted.id);
         showListingOutcome(syncStatus, 'Card added to your vault!', {
           action: {
             label: 'Add Another',
