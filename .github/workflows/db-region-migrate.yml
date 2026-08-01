@@ -20,7 +20,7 @@ name: DB region migration (Tokyo -> Sydney)
 # preceded by a wipe of what it loads into the NEW project only.
 #
 # Secrets required:
-#   SUPABASE_DB_PASSWORD         - OLD (Tokyo) project's database password
+#   SUPABASE_DB_PASSWORD_TOKYO   - OLD (Tokyo) project database password
 #   SUPABASE_DB_PASSWORD_SYDNEY  - NEW (Sydney) project's database password
 #
 # Trigger: workflow_dispatch (Actions tab, if visible), or push a change to
@@ -51,11 +51,11 @@ jobs:
     steps:
       - name: Check secrets present
         env:
-          OLD_PW: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          OLD_PW: ${{ secrets.SUPABASE_DB_PASSWORD_TOKYO }}
           NEW_PW: ${{ secrets.SUPABASE_DB_PASSWORD_SYDNEY }}
         run: |
           missing=0
-          [ -z "$OLD_PW" ] && { echo "::error::Secret SUPABASE_DB_PASSWORD is not set"; missing=1; }
+          [ -z "$OLD_PW" ] && { echo "::error::Secret SUPABASE_DB_PASSWORD_TOKYO is not set (old Tokyo project DB password)"; missing=1; }
           [ -z "$NEW_PW" ] && { echo "::error::Secret SUPABASE_DB_PASSWORD_SYDNEY is not set (Sydney project's DB password)"; missing=1; }
           exit $missing
 
@@ -70,7 +70,7 @@ jobs:
 
       - name: Resolve pooler hosts (runners are IPv4-only; direct db.* is IPv6)
         env:
-          OLD_PW: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          OLD_PW: ${{ secrets.SUPABASE_DB_PASSWORD_TOKYO }}
           NEW_PW: ${{ secrets.SUPABASE_DB_PASSWORD_SYDNEY }}
         run: |
           PSQL=/usr/lib/postgresql/17/bin/psql
@@ -90,7 +90,7 @@ jobs:
 
       - name: Dump old project (read-only)
         env:
-          OLD_PW: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          OLD_PW: ${{ secrets.SUPABASE_DB_PASSWORD_TOKYO }}
         run: |
           set -euo pipefail
           BIN=/usr/lib/postgresql/17/bin
@@ -219,7 +219,7 @@ jobs:
 
       - name: Verify row counts match
         env:
-          OLD_PW: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          OLD_PW: ${{ secrets.SUPABASE_DB_PASSWORD_TOKYO }}
           NEW_PW: ${{ secrets.SUPABASE_DB_PASSWORD_SYDNEY }}
         run: |
           set -euo pipefail
