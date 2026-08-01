@@ -20,8 +20,10 @@ name: DB region migration (Tokyo -> Sydney)
 # preceded by a wipe of what it loads into the NEW project only.
 #
 # Secrets required:
-#   SUPABASE_DB_PASSWORD_TOKYO   - OLD (Tokyo) project database password
-#   SUPABASE_DB_PASSWORD_SYDNEY  - NEW (Sydney) project's database password
+#   SUPABASE_DB_PASSWORD_TOKYO       - OLD (Tokyo) project database password
+#   SUPABASE_DB_PASSWORD_SYDNEY      - NEW (Sydney) project's database password
+#   SUPABASE_SERVICE_ROLE_KEY_TOKYO  - OLD (Tokyo) service-role key (storage mirror)
+#   SUPABASE_SERVICE_ROLE_KEY_SYDNEY - NEW (Sydney) service-role key (storage mirror)
 #
 # Trigger: workflow_dispatch (Actions tab, if visible), or push a change to
 # .github/db-region-migrate.trigger on the migration branch (works even while
@@ -49,6 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
+
       - name: Check secrets present
         env:
           OLD_PW: ${{ secrets.SUPABASE_DB_PASSWORD_TOKYO }}
@@ -285,3 +288,44 @@ jobs:
               end loop;
             end $$;
           SQL
+
+  mirror-storage:
+    needs: migrate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check secrets present
+        env:
+          OLD_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_TOKYO }}
+          NEW_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_SYDNEY }}
+        run: |
+          missing=0
+          [ -z "$OLD_KEY" ] && { echo "::error::Secret SUPABASE_SERVICE_ROLE_KEY_TOKYO is not set"; missing=1; }
+          [ -z "$NEW_KEY" ] && { echo "::error::Secret SUPABASE_SERVICE_ROLE_KEY_SYDNEY is not set"; missing=1; }
+          exit $missing
+
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install supabase-js (standalone, avoid full workspace install)
+        run: |
+          mkdir -p /tmp/storage-migrate
+          cd /tmp/storage-migrate
+          npm init -y >/dev/null
+          npm install --silent @supabase/supabase-js@^2
+          cp "$GITHUB_WORKSPACE/scripts/migrate-storage-objects.mjs" .
+
+      - name: Mirror storage objects Tokyo -> Sydney
+        env:
+          OLD_SUPABASE_URL: https://odoglvswwymyjuwlonkf.supabase.co
+          OLD_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_TOKYO }}
+          NEW_SUPABASE_URL: https://vrfsaazuqjxotnieqlkd.supabase.co
+          NEW_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY_SYDNEY }}
+        run: |
+          cd /tmp/storage-migrate
+          node migrate-storage-objects.mjs
