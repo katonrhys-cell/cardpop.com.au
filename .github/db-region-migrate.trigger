@@ -1,1 +1,1 @@
-run 1: initial transfer 2026-08-01T00:42:49Z
+run 2: exclude generated columns from auth copy 2026-08-01T00:46:18Z

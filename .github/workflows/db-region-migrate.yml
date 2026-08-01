@@ -108,8 +108,10 @@ jobs:
             -f data.sql
 
           # auth users + identities (exact column lists from the source)
-          UCOLS=$(old_psql -Atc "select string_agg(quote_ident(column_name), ',' order by ordinal_position) from information_schema.columns where table_schema='auth' and table_name='users'")
-          ICOLS=$(old_psql -Atc "select string_agg(quote_ident(column_name), ',' order by ordinal_position) from information_schema.columns where table_schema='auth' and table_name='identities'")
+          # is_generated='NEVER': generated columns (e.g. auth.users.confirmed_at)
+          # cannot be used in COPY — the target computes them itself.
+          UCOLS=$(old_psql -Atc "select string_agg(quote_ident(column_name), ',' order by ordinal_position) from information_schema.columns where table_schema='auth' and table_name='users' and is_generated='NEVER'")
+          ICOLS=$(old_psql -Atc "select string_agg(quote_ident(column_name), ',' order by ordinal_position) from information_schema.columns where table_schema='auth' and table_name='identities' and is_generated='NEVER'")
           echo "$UCOLS" > auth_users.cols
           echo "$ICOLS" > auth_identities.cols
           old_psql -c "\\copy auth.users ($UCOLS) to 'auth_users.csv' with (format csv)"
