@@ -1,1 +1,1 @@
-run 4: fix storage-policy drop generation 2026-08-01T01:00:23Z
+run 5: mirror storage objects Tokyo -> Sydney 2026-08-01T02:28:16Z
