@@ -51,7 +51,7 @@ const Header = () => {
   // Read cached session from localStorage so the skeleton matches the expected auth state,
   // preventing a layout shift when auth resolves and replaces the wrong-sized placeholder.
   const [optimisticAuth] = useState(() => {
-    try { return !!localStorage.getItem('sb-odoglvswwymyjuwlonkf-auth-token'); }
+    try { return !!localStorage.getItem('sb-vrfsaazuqjxotnieqlkd-auth-token'); }
     catch { return false; }
   });
   const { isDark, toggle: toggleDarkMode } = useDarkMode();

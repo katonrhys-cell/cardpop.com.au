@@ -38,9 +38,9 @@ If it ever does hold sensitive data, **encrypt the archive** and keep it out of 
 ```bash
 npm i -g supabase                 # or rely on the npx fallback in the script
 supabase login
-supabase link --project-ref odoglvswwymyjuwlonkf
+supabase link --project-ref vrfsaazuqjxotnieqlkd
 
-export SUPABASE_URL=https://odoglvswwymyjuwlonkf.supabase.co
+export SUPABASE_URL=https://vrfsaazuqjxotnieqlkd.supabase.co
 export SUPABASE_SERVICE_ROLE_KEY=<service-role-key>   # Dashboard → Settings → API
 ```
 

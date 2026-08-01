@@ -154,7 +154,7 @@ const isStorageImage = (url) =>
 // Canonical Supabase Storage origin — the source of truth every storage object
 // is always readable from. Hardcoded like the project URL elsewhere
 // (lib/supabaseClient.js) and the worker's ORIGIN (cloudflare/image-proxy-worker.js).
-const SUPABASE_ORIGIN = 'https://odoglvswwymyjuwlonkf.supabase.co';
+const SUPABASE_ORIGIN = 'https://vrfsaazuqjxotnieqlkd.supabase.co';
 
 // Map a storage image served through the image CDN (any non-Supabase host) back
 // to the canonical Supabase origin, keeping the /storage/v1/... path intact.
@@ -305,7 +305,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Any other cross-origin request — above all Supabase REST/Auth calls
-  // (odoglvswwymyjuwlonkf.supabase.co/rest/v1/…, /auth/v1/…) — must go
+  // (vrfsaazuqjxotnieqlkd.supabase.co/rest/v1/…, /auth/v1/…) — must go
   // straight to the network. Their extension-less paths used to fall into the
   // stale-while-revalidate branch below, which (a) served DB query results
   // from cache first, so the homepage showed stale or empty featured

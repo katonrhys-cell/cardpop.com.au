@@ -162,7 +162,7 @@ describe('POST /stream', () => {
 
   it('drops client image blocks that are not on our own storage (SSRF-by-proxy defence)', async () => {
     mockStream.mockResolvedValue(makeSseStream());
-    const okUrl = 'https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/object/public/ai-images/ok.png';
+    const okUrl = 'https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/ai-images/ok.png';
     const userMessage = [
       { type: 'text', text: 'what is this?' },
       { type: 'image', image: 'http://169.254.169.254/latest/meta-data/' },

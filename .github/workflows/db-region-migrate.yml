@@ -1,0 +1,277 @@
+name: DB region migration (Tokyo -> Sydney)
+
+# One-shot data-plane migration for docs/database-region-migration.md.
+#
+# Dumps the OLD Tokyo project (odoglvswwymyjuwlonkf) and loads it into the NEW
+# Sydney project (vrfsaazuqjxotnieqlkd): schema + data for the app-owned
+# schemas (public, private), the supabase_migrations history (so CI db push
+# sees an up-to-date project), auth.users/auth.identities, storage bucket
+# definitions + storage RLS policies, the on_auth_user_created trigger and the
+# realtime publication membership.
+#
+# Deliberately NOT copied (integration-owned, recreated by re-enabling the
+# Stripe Sync Engine integration on the new project): the stripe schema, the
+# public.{accounts,balance,"balance transactions",charges} wrapper foreign
+# tables, pg_cron jobs, the pgmq queue, Vault secrets and the stripe-* edge
+# functions. Storage OBJECT data (the actual files) is also not copied here —
+# mirror the files separately (see the runbook, step 4).
+#
+# READ-ONLY against the old project. Safe to re-run: every load step is
+# preceded by a wipe of what it loads into the NEW project only.
+#
+# Secrets required:
+#   SUPABASE_DB_PASSWORD         - OLD (Tokyo) project's database password
+#   SUPABASE_DB_PASSWORD_SYDNEY  - NEW (Sydney) project's database password
+#
+# Trigger: workflow_dispatch (Actions tab, if visible), or push a change to
+# .github/db-region-migrate.trigger on the migration branch (works even while
+# the workflow only exists on that branch).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/db-migration-sydney-4yla6k]
+    paths:
+      - '.github/db-region-migrate.trigger'
+
+concurrency:
+  group: db-region-migrate
+  cancel-in-progress: false
+
+env:
+  OLD_REF: odoglvswwymyjuwlonkf
+  OLD_REGION: ap-northeast-1
+  NEW_REF: vrfsaazuqjxotnieqlkd
+  NEW_REGION: ap-southeast-2
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check secrets present
+        env:
+          OLD_PW: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          NEW_PW: ${{ secrets.SUPABASE_DB_PASSWORD_SYDNEY }}
+        run: |
+          missing=0
+          [ -z "$OLD_PW" ] && { echo "::error::Secret SUPABASE_DB_PASSWORD is not set"; missing=1; }
+          [ -z "$NEW_PW" ] && { echo "::error::Secret SUPABASE_DB_PASSWORD_SYDNEY is not set (Sydney project's DB password)"; missing=1; }
+          exit $missing
+
+      - name: Install PostgreSQL 17 client (server is PG17; pg_dump must match)
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          wget -qO- https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/pgdg.asc > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+          /usr/lib/postgresql/17/bin/psql --version
+          /usr/lib/postgresql/17/bin/pg_dump --version
+
+      - name: Resolve pooler hosts (runners are IPv4-only; direct db.* is IPv6)
+        env:
+          OLD_PW: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          NEW_PW: ${{ secrets.SUPABASE_DB_PASSWORD_SYDNEY }}
+        run: |
+          PSQL=/usr/lib/postgresql/17/bin/psql
+          resolve() { # $1=ref $2=region $3=password
+            for h in "aws-1-$2.pooler.supabase.com" "aws-0-$2.pooler.supabase.com"; do
+              if PGPASSWORD="$3" timeout 20 $PSQL "host=$h port=5432 user=postgres.$1 dbname=postgres sslmode=require" -Atc 'select 1' >/dev/null 2>&1; then
+                echo "$h"; return 0
+              fi
+            done
+            return 1
+          }
+          OLD_HOST=$(resolve "$OLD_REF" "$OLD_REGION" "$OLD_PW") || { echo "::error::Cannot reach old project pooler"; exit 1; }
+          NEW_HOST=$(resolve "$NEW_REF" "$NEW_REGION" "$NEW_PW") || { echo "::error::Cannot reach new project pooler (is SUPABASE_DB_PASSWORD_SYDNEY correct?)"; exit 1; }
+          echo "OLD_HOST=$OLD_HOST" >> "$GITHUB_ENV"
+          echo "NEW_HOST=$NEW_HOST" >> "$GITHUB_ENV"
+          echo "Old pooler: $OLD_HOST / New pooler: $NEW_HOST"
+
+      - name: Dump old project (read-only)
+        env:
+          OLD_PW: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          BIN=/usr/lib/postgresql/17/bin
+          OLD_CONN="host=$OLD_HOST port=5432 user=postgres.$OLD_REF dbname=postgres sslmode=require"
+          old_psql() { PGPASSWORD="$OLD_PW" $BIN/psql "$OLD_CONN" -v ON_ERROR_STOP=1 "$@"; }
+
+          # App-owned schemas + migration history; exclude the wrapper foreign tables.
+          PGPASSWORD="$OLD_PW" $BIN/pg_dump "$OLD_CONN" --schema-only --no-owner \
+            -n public -n private -n supabase_migrations \
+            -T public.accounts -T public.balance -T 'public."balance transactions"' -T public.charges \
+            -f schema.sql
+          PGPASSWORD="$OLD_PW" $BIN/pg_dump "$OLD_CONN" --data-only \
+            -n public -n private -n supabase_migrations \
+            -T public.accounts -T public.balance -T 'public."balance transactions"' -T public.charges \
+            -f data.sql
+
+          # auth users + identities (exact column lists from the source)
+          UCOLS=$(old_psql -Atc "select string_agg(quote_ident(column_name), ',' order by ordinal_position) from information_schema.columns where table_schema='auth' and table_name='users'")
+          ICOLS=$(old_psql -Atc "select string_agg(quote_ident(column_name), ',' order by ordinal_position) from information_schema.columns where table_schema='auth' and table_name='identities'")
+          echo "$UCOLS" > auth_users.cols
+          echo "$ICOLS" > auth_identities.cols
+          old_psql -c "\\copy auth.users ($UCOLS) to 'auth_users.csv' with (format csv)"
+          old_psql -c "\\copy auth.identities ($ICOLS) to 'auth_identities.csv' with (format csv)"
+
+          # storage bucket definitions (not object rows - files are mirrored separately
+          # and the upload recreates object rows)
+          BCOLS="id,name,public,file_size_limit,allowed_mime_types,created_at,updated_at"
+          echo "$BCOLS" > buckets.cols
+          old_psql -c "\\copy storage.buckets ($BCOLS) to 'buckets.csv' with (format csv)"
+
+          # storage RLS policies -> executable DDL
+          old_psql -Atc "
+            select 'create policy '||quote_ident(policyname)
+                 ||' on '||quote_ident(schemaname)||'.'||quote_ident(tablename)
+                 ||case when permissive='RESTRICTIVE' then ' as restrictive' else '' end
+                 ||' for '||lower(cmd)
+                 ||' to '||(select string_agg(quote_ident(r), ', ') from unnest(roles) r)
+                 ||coalesce(' using ('||qual||')','')
+                 ||coalesce(' with check ('||with_check||')','')
+                 ||';'
+            from pg_policies where schemaname='storage' order by tablename, policyname;
+          " > storage_policies.sql
+
+          # user-defined triggers on managed schemas (auth/storage)
+          old_psql -Atc "
+            select pg_get_triggerdef(t.oid)||';'
+            from pg_trigger t
+            join pg_class c on c.oid=t.tgrelid
+            join pg_namespace n on n.oid=c.relnamespace
+            where not t.tgisinternal and n.nspname in ('auth','storage')
+            order by 1;
+          " | sed 's/^CREATE TRIGGER/CREATE OR REPLACE TRIGGER/' > managed_triggers.sql
+
+          # realtime publication membership
+          old_psql -Atc "
+            select 'alter publication supabase_realtime add table only '
+                 ||quote_ident(schemaname)||'.'||quote_ident(tablename)||';'
+            from pg_publication_tables where pubname='supabase_realtime' order by 1;
+          " > realtime_pub.sql
+
+          echo "--- dump sizes ---"; ls -la schema.sql data.sql *.csv *.sql
+
+      - name: Load into new project
+        env:
+          NEW_PW: ${{ secrets.SUPABASE_DB_PASSWORD_SYDNEY }}
+        run: |
+          set -euo pipefail
+          BIN=/usr/lib/postgresql/17/bin
+          NEW_CONN="host=$NEW_HOST port=5432 user=postgres.$NEW_REF dbname=postgres sslmode=require"
+          new_psql() { PGPASSWORD="$NEW_PW" $BIN/psql "$NEW_CONN" -v ON_ERROR_STOP=1 "$@"; }
+
+          # Re-runnable: wipe ONLY what this job loads, on the NEW project.
+          new_psql <<'SQL'
+            drop schema if exists public cascade;
+            create schema public;
+            grant usage on schema public to postgres, anon, authenticated, service_role;
+            grant all on schema public to postgres, service_role;
+            drop schema if exists private cascade;
+            drop schema if exists supabase_migrations cascade;
+            truncate auth.identities, auth.users cascade;
+          SQL
+
+          # Extensions the app schema depends on (idempotent; extensions schema is managed)
+          new_psql <<'SQL'
+            create extension if not exists pg_trgm with schema extensions;
+            create extension if not exists pg_net with schema extensions;
+            create extension if not exists hypopg with schema extensions;
+            create extension if not exists index_advisor with schema extensions;
+          SQL
+
+          # The wipe step already recreated the public schema; drop any
+          # CREATE/ALTER SCHEMA public lines pg_dump may have emitted.
+          sed -i -e '/^CREATE SCHEMA public;$/d' -e '/^ALTER SCHEMA public OWNER TO/d' schema.sql
+
+          new_psql --single-transaction -f schema.sql
+          new_psql --single-transaction -c 'set session_replication_role = replica' -f data.sql
+
+          UCOLS=$(cat auth_users.cols)
+          ICOLS=$(cat auth_identities.cols)
+          new_psql -c 'set session_replication_role = replica' \
+                   -c "\\copy auth.users ($UCOLS) from 'auth_users.csv' with (format csv)" \
+                   -c "\\copy auth.identities ($ICOLS) from 'auth_identities.csv' with (format csv)"
+
+          BCOLS=$(cat buckets.cols)
+          new_psql -c 'set session_replication_role = replica' \
+                   -c "delete from storage.buckets" \
+                   -c "\\copy storage.buckets ($BCOLS) from 'buckets.csv' with (format csv)"
+
+          # Policies may already exist on a re-run: drop-if-exists first, derived from the file.
+          sed -E 's/^create policy ("[^"]+"|[a-zA-Z0-9_]+) on ([^ ]+).*/drop policy if exists \1 on \2;/' storage_policies.sql > drop_storage_policies.sql
+          new_psql -f drop_storage_policies.sql
+          new_psql -f storage_policies.sql
+          new_psql -f managed_triggers.sql
+          # Tolerant: on a re-run, tables already in the publication error individually.
+          PGPASSWORD="$NEW_PW" $BIN/psql "$NEW_CONN" -f realtime_pub.sql || true
+
+      - name: Verify row counts match
+        env:
+          OLD_PW: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          NEW_PW: ${{ secrets.SUPABASE_DB_PASSWORD_SYDNEY }}
+        run: |
+          set -euo pipefail
+          BIN=/usr/lib/postgresql/17/bin
+          counts() { # $1=host $2=ref $3=password
+            PGPASSWORD="$3" $BIN/psql "host=$1 port=5432 user=postgres.$2 dbname=postgres sslmode=require" -v ON_ERROR_STOP=1 -Atc "
+              select n.nspname||'.'||c.relname||'='||(xpath('/row/c/text()',
+                query_to_xml(format('select count(*) as c from %I.%I', n.nspname, c.relname), false, true, '')))[1]::text
+              from pg_class c join pg_namespace n on n.oid=c.relnamespace
+              where c.relkind='r' and n.nspname in ('public','private','supabase_migrations')
+              union all select 'auth.users='||count(*)::text from auth.users
+              union all select 'auth.identities='||count(*)::text from auth.identities
+              union all select 'storage.buckets='||count(*)::text from storage.buckets
+              order by 1;
+            "
+          }
+          counts "$OLD_HOST" "$OLD_REF" "$OLD_PW" > old_counts.txt
+          counts "$NEW_HOST" "$NEW_REF" "$NEW_PW" > new_counts.txt
+          echo "--- old ---"; cat old_counts.txt
+          echo "--- new ---"; cat new_counts.txt
+          diff old_counts.txt new_counts.txt && echo "ROW COUNTS MATCH"
+
+      - name: Rewrite stored image/asset URLs to the new host
+        env:
+          NEW_PW: ${{ secrets.SUPABASE_DB_PASSWORD_SYDNEY }}
+        run: |
+          set -euo pipefail
+          BIN=/usr/lib/postgresql/17/bin
+          PGPASSWORD="$NEW_PW" $BIN/psql "host=$NEW_HOST port=5432 user=postgres.$NEW_REF dbname=postgres sslmode=require" -v ON_ERROR_STOP=1 <<'SQL'
+            do $$
+            declare
+              r record;
+              n bigint;
+            begin
+              for r in
+                select table_schema, table_name, column_name
+                from information_schema.columns
+                where table_schema in ('public','private')
+                  and data_type in ('text','character varying')
+              loop
+                execute format(
+                  'update %I.%I set %I = replace(%I, ''odoglvswwymyjuwlonkf.supabase.co'', ''vrfsaazuqjxotnieqlkd.supabase.co'')
+                   where %I like ''%%odoglvswwymyjuwlonkf.supabase.co%%''',
+                  r.table_schema, r.table_name, r.column_name, r.column_name, r.column_name);
+                get diagnostics n = row_count;
+                if n > 0 then
+                  raise notice '% rows updated in %.%.%', n, r.table_schema, r.table_name, r.column_name;
+                end if;
+              end loop;
+              for r in
+                select table_schema, table_name, column_name
+                from information_schema.columns
+                where table_schema in ('public','private') and data_type = 'jsonb'
+              loop
+                execute format(
+                  'update %I.%I set %I = replace(%I::text, ''odoglvswwymyjuwlonkf.supabase.co'', ''vrfsaazuqjxotnieqlkd.supabase.co'')::jsonb
+                   where %I::text like ''%%odoglvswwymyjuwlonkf.supabase.co%%''',
+                  r.table_schema, r.table_name, r.column_name, r.column_name, r.column_name);
+                get diagnostics n = row_count;
+                if n > 0 then
+                  raise notice '% rows updated in %.%.% (jsonb)', n, r.table_schema, r.table_name, r.column_name;
+                end if;
+              end loop;
+            end $$;
+          SQL

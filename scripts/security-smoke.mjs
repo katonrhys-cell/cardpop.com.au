@@ -8,10 +8,10 @@
 //
 // Exit code 0 = all checks passed, 1 = one or more failed.
 
-const SUPABASE_URL = 'https://odoglvswwymyjuwlonkf.supabase.co';
+const SUPABASE_URL = 'https://vrfsaazuqjxotnieqlkd.supabase.co';
 // Public anon key — identical to lib/supabaseClient.js's baked-in fallback.
 const ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY
-  || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kb2dsdnN3d3lteWp1d2xvbmtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3OTQ5NTgsImV4cCI6MjA5NDM3MDk1OH0.R5fwR42iKIEsfx1iA-fjk4YPLCH3mcmoIKkosEy6g1I';
+  || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZyZnNhYXp1cWp4b3RuaWVxbGtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1NDM0MTEsImV4cCI6MjEwMTExOTQxMX0.R4JqdifHRVBUjPleXqtJ963h6Q8eVosrjDtpGynw8Fo';
 
 const rest = (query) =>
   fetch(`${SUPABASE_URL}/rest/v1/${query}`, {

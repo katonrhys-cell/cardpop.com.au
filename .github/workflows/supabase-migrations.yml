@@ -81,5 +81,5 @@ jobs:
         # newest remote one. All repo migrations are idempotent, so applying
         # stragglers out of order is safe.
         run: |
-          supabase link --project-ref odoglvswwymyjuwlonkf
+          supabase link --project-ref vrfsaazuqjxotnieqlkd
           supabase db push --include-all

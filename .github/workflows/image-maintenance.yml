@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      SUPABASE_URL: https://odoglvswwymyjuwlonkf.supabase.co
+      SUPABASE_URL: https://vrfsaazuqjxotnieqlkd.supabase.co
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
     steps:
       - name: Check secret is configured
