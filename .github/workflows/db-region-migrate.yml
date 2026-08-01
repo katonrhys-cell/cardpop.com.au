@@ -186,6 +186,9 @@ jobs:
           # The wipe step already recreated the public schema; drop any
           # CREATE/ALTER SCHEMA public lines pg_dump may have emitted.
           sed -i -e '/^CREATE SCHEMA public;$/d' -e '/^ALTER SCHEMA public OWNER TO/d' schema.sql
+          # Platform-owned default ACLs (FOR ROLE supabase_admin etc.) can only
+          # be set by those roles themselves - keep only postgres' own.
+          sed -i '/^ALTER DEFAULT PRIVILEGES FOR ROLE/{/FOR ROLE postgres /!d}' schema.sql
 
           new_psql --single-transaction -f schema.sql
           new_psql --single-transaction -c 'set session_replication_role = replica' -f data.sql
