@@ -135,6 +135,12 @@ jobs:
                  ||';'
             from pg_policies where schemaname='storage' order by tablename, policyname;
           " > storage_policies.sql
+          # One-line drop statements for re-runs (policy bodies span lines; names never do)
+          old_psql -Atc "
+            select 'drop policy if exists '||quote_ident(policyname)
+                 ||' on '||quote_ident(schemaname)||'.'||quote_ident(tablename)||';'
+            from pg_policies where schemaname='storage' order by tablename, policyname;
+          " > drop_storage_policies.sql
 
           # user-defined triggers on managed schemas (auth/storage)
           old_psql -Atc "
@@ -204,8 +210,7 @@ jobs:
                    -c "delete from storage.buckets" \
                    -c "\\copy storage.buckets ($BCOLS) from 'buckets.csv' with (format csv)"
 
-          # Policies may already exist on a re-run: drop-if-exists first, derived from the file.
-          sed -E 's/^create policy ("[^"]+"|[a-zA-Z0-9_]+) on ([^ ]+).*/drop policy if exists \1 on \2;/' storage_policies.sql > drop_storage_policies.sql
+          # Policies may already exist on a re-run: drop-if-exists first.
           new_psql -f drop_storage_policies.sql
           new_psql -f storage_policies.sql
           new_psql -f managed_triggers.sql
