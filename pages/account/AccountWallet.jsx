@@ -47,12 +47,11 @@ const AccountWallet = () => {
     if (!currentUser?.id) return;
     setLoadingSales(true);
     try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('id, created_at, item_price_aud, commission_pct, platform_fee_aud, seller_proceeds_aud, payout_status, stripe_transfer_id, listing_id')
-        .eq('seller_id', currentUser.id)
-        .order('created_at', { ascending: false })
-        .limit(20);
+      // seller_sales() resolves the seller per order_items line as well as from
+      // orders.seller_id. Querying orders directly missed every cart sale: a
+      // cart can span multiple sellers, so those rows carry seller_id = NULL
+      // and the seller lives inside the line.
+      const { data, error } = await supabase.rpc('seller_sales', { p_limit: 20 });
       if (error) throw error;
       setSales(data || []);
     } catch {
@@ -137,7 +136,7 @@ const AccountWallet = () => {
     }
   };
 
-  const totalEarned = sales.reduce((s, o) => s + (Number(o.seller_proceeds_aud) || 0), 0);
+  const totalEarned = sales.reduce((s, o) => s + (Number(o.proceeds_aud) || 0), 0);
   const walletBalance = connectStatus?.wallet_balance_aud || 0;
 
   return (
@@ -324,16 +323,18 @@ const AccountWallet = () => {
               ) : sales.map((order) => {
                 const status = PAYOUT_STATUS[order.payout_status] || PAYOUT_STATUS.pending;
                 return (
-                  <tr key={order.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
+                  <tr key={`${order.order_id}-${order.listing_id || 'x'}`} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
                     <td className="px-6 py-4 text-muted-foreground">
-                      {new Date(order.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {new Date(order.sold_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </td>
                     <td className="px-4 py-4 text-right tabular-nums font-medium">${Number(order.item_price_aud || 0).toFixed(2)}</td>
+                    {/* Commission only — the old column showed platform_fee_aud,
+                        which bundles the GST the buyer paid on top and so read
+                        as a bigger deduction than the seller actually bore. */}
                     <td className="px-4 py-4 text-right tabular-nums text-muted-foreground">
-                      −${Number(order.platform_fee_aud || 0).toFixed(2)}
-                      {order.commission_pct > 0 && <span className="text-xs ml-1">({order.commission_pct}%)</span>}
+                      −${Number(order.commission_aud || 0).toFixed(2)}
                     </td>
-                    <td className="px-4 py-4 text-right tabular-nums font-bold text-emerald-600">${Number(order.seller_proceeds_aud || 0).toFixed(2)}</td>
+                    <td className="px-4 py-4 text-right tabular-nums font-bold text-emerald-600">${Number(order.proceeds_aud || 0).toFixed(2)}</td>
                     <td className="px-4 py-4 text-center">
                       <Badge variant="outline" className={`text-xs font-bold ${status.cls}`}>{status.label}</Badge>
                     </td>
