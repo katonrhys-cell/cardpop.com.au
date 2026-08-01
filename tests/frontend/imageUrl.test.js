@@ -119,7 +119,7 @@ describe('getCardImage with transforms disabled (default)', () => {
 
   it('does not transform stored absolute Supabase object URLs either', () => {
     const stored =
-      'https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/object/public/vault-images/u/c.webp';
+      'https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/vault-images/u/c.webp';
     const r = getCardImage(stored, { widths: [240, 400, 600] });
     expect(r.src).toBe('https://cdn/object/vault-images/u/c.webp');
     expect(r.srcSet).toBeNull();
@@ -134,7 +134,7 @@ describe('getCardImage with transforms disabled (default)', () => {
 
 describe('toCdnUrl', () => {
   const storageUrl =
-    'https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/object/public/vault-images/user/card.jpg';
+    'https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/vault-images/user/card.jpg';
 
   it('is a no-op when no CDN host is configured', () => {
     expect(toCdnUrl(storageUrl)).toBe(storageUrl);
@@ -157,7 +157,7 @@ describe('toCdnUrl', () => {
   it('rewrites render/image (transform) URLs too', () => {
     _setCdnHostForTests('dxxxx.cloudfront.net');
     const renderUrl =
-      'https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/render/image/public/vault-images/user/card.jpg?width=240';
+      'https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/render/image/public/vault-images/user/card.jpg?width=240';
     expect(toCdnUrl(renderUrl)).toBe(
       'https://dxxxx.cloudfront.net/storage/v1/render/image/public/vault-images/user/card.jpg?width=240'
     );
@@ -227,7 +227,7 @@ describe('getCardImage with stored absolute Supabase URLs', () => {
   // original was a multi-MB payload per image.
   it('derives bucket/path and builds transformed URLs', () => {
     const stored =
-      'https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/object/public/vault-images/u/c.webp';
+      'https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/vault-images/u/c.webp';
     const r = getCardImage(stored, { widths: [240, 400, 600] });
     expect(r.src).toBe('https://cdn/render/vault-images/u/c.webp?w=400&q=75');
     expect(r.srcSet).toMatch(/240w.*400w.*600w/);
@@ -237,7 +237,7 @@ describe('getCardImage with stored absolute Supabase URLs', () => {
   it('serves the untransformed object URL once transforms are flagged off', () => {
     markTransformsUnavailable();
     const stored =
-      'https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/object/public/vault-images/u/c.webp';
+      'https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/vault-images/u/c.webp';
     const r = getCardImage(stored);
     expect(r.src).toBe('https://cdn/object/vault-images/u/c.webp');
     expect(r.srcSet).toBeNull();
@@ -248,7 +248,7 @@ describe('parseStorageObjectUrl', () => {
   it('splits an absolute Supabase object URL into bucket and path', () => {
     expect(
       parseStorageObjectUrl(
-        'https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/object/public/vault-images/u/c%20d.webp?v=1'
+        'https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/vault-images/u/c%20d.webp?v=1'
       )
     ).toEqual({ bucket: 'vault-images', path: 'u/c d.webp' });
   });
@@ -257,7 +257,7 @@ describe('parseStorageObjectUrl', () => {
     expect(parseStorageObjectUrl('https://example.com/pic.png')).toBeNull();
     expect(
       parseStorageObjectUrl(
-        'https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/render/image/public/vault-images/u/c.webp'
+        'https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/render/image/public/vault-images/u/c.webp'
       )
     ).toBeNull();
     expect(parseStorageObjectUrl('user/card.jpg')).toBeNull();
@@ -268,8 +268,8 @@ describe('parseStorageObjectUrl', () => {
 describe('cdnifyStorageUrlsInHtml', () => {
   const html =
     '<p>intro</p>' +
-    '<img src="https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/object/public/media/media/1.png" alt="a">' +
-    '<img src="https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/render/image/public/media/media/2.png?width=640" alt="b">' +
+    '<img src="https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/media/media/1.png" alt="a">' +
+    '<img src="https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/render/image/public/media/media/2.png?width=640" alt="b">' +
     '<img src="https://elsewhere.example/pic.jpg" alt="c">';
 
   it('is a no-op when no CDN host is configured', () => {
@@ -325,7 +325,7 @@ describe('grid thumbnails (thumbSrc)', () => {
   });
 
   it('derives thumbSrc from stored absolute Supabase object URLs too', () => {
-    const stored = `https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/object/public/vault-images/u/${NEW_TS}.jpg`;
+    const stored = `https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/vault-images/u/${NEW_TS}.jpg`;
     expect(getCardImage(stored).thumbSrc).toBe(`https://cdn/object/vault-images/u/${NEW_TS}.thumb.webp`);
   });
 

@@ -4,7 +4,9 @@
 
 > **Read this first.** A Supabase project's region **cannot be changed in place** — there is no setting for it. "Changing region" means **standing up a brand-new project in Sydney and migrating everything into it**, then repointing the app. It involves **downtime**, a **new project URL + keys**, and ~10 code/config repoint points. For ~100 ms this is only worth doing deliberately (e.g. as part of a bigger AU push), not casually. If you only care about smoothing the occasional restart blip, the retry wrapper in `lib/supabaseClient.js` plus a Supabase maintenance window get you most of the resilience for none of the risk.
 
-The current project ref is `odoglvswwymyjuwlonkf`. Throughout, `<NEW_REF>` is the new Sydney project's ref.
+> **Status: executed 2026-08-01.** The Sydney project is `vrfsaazuqjxotnieqlkd` (`ap-southeast-2`) and the app now points at it. The old Tokyo project `odoglvswwymyjuwlonkf` is kept **paused** as rollback for at least a week post-cutover, then deleted. The steps below are kept as the runbook that was followed (and for any future region move).
+
+The old (source) project ref is `odoglvswwymyjuwlonkf`. Throughout, `<NEW_REF>` is the new Sydney project's ref (`vrfsaazuqjxotnieqlkd`).
 
 ---
 
@@ -19,35 +21,21 @@ The current project ref is `odoglvswwymyjuwlonkf`. Throughout, `<NEW_REF>` is th
 1. Supabase Dashboard → New project → **Region: Southeast Asia (Sydney) `ap-southeast-2`**. Match the Postgres major version (17) and pick a compute tier ≥ the current one.
 2. Record the new **project URL** (`https://<NEW_REF>.supabase.co`), **anon key**, **service-role key**, and **DB password**.
 
-## 2. Migrate the schema
+## 2 + 3. Migrate the schema and data — `.github/workflows/db-region-migrate.yml`
 
-The repo migrations are the source of truth, so build the schema from them rather than replaying a dump:
+> **Do not try to build the schema with `supabase db push` on a fresh project — it fails immediately.** The repo's migrations do not bootstrap from zero: the base schema (`profiles`, `listings`, …) came from the ~76 dashboard-era migrations that pre-date this repo (removed from tracking 2026-07-03, backed up to `supabase_migrations.schema_migrations_backup_20260703`). The very first repo migration references `public.profiles` and dies. The schema must come from a **dump of the old project**.
 
-```bash
-supabase link --project-ref <NEW_REF>
-supabase db push            # applies everything in supabase/migrations/
-```
+Both steps are automated in the one-shot workflow `.github/workflows/db-region-migrate.yml` (GitHub Actions runners can reach the Supabase poolers; it needs the `SUPABASE_DB_PASSWORD` secret for the old project and `SUPABASE_DB_PASSWORD_SYDNEY` for the new one). It is read-only against the old project and re-runnable, and transfers:
 
-If the live schema has drifted from the repo, reconcile the repo first — do **not** hand-edit the new project.
+- schema + data for the app-owned schemas (`public`, `private`), excluding the four legacy Stripe-wrapper foreign tables (`accounts`, `balance`, `"balance transactions"`, `charges`)
+- the `supabase_migrations.schema_migrations` history, so CI `db push` sees the new project as fully applied
+- `auth.users` + `auth.identities` (other auth tables are skipped — sessions/refresh tokens just force a re-login)
+- `storage.buckets` definitions, the 14 storage RLS policies, the `on_auth_user_created` trigger, and the `supabase_realtime` publication membership — none of which a `pg_dump -n public` carries
+- rewrites stored `…supabase.co` URLs in every text/jsonb column to the new host
 
-## 3. Migrate the data
+**Deliberately not copied** (owned by the Stripe Sync Engine integration; recreated by re-enabling it on the new project — Dashboard → Integrations → Stripe): the `stripe` schema, the wrapper foreign tables, the `stripe-setup`/`stripe-webhook`/`stripe-worker` edge functions, the `stripe-sync-worker` pg_cron job, the `stripe_sync_work` pgmq queue, and the Vault secrets. After re-enabling, re-apply the grants from `supabase/migrations/20260706212946_grant_stripe_sync_schema_access.sql` by hand (the migration is already marked applied in history).
 
-```bash
-# roles first (grants/ownership), then data
-psql "postgresql://postgres:<NEW_DB_PASSWORD>@db.<NEW_REF>.supabase.co:5432/postgres" -f roles.sql
-psql "postgresql://postgres:<NEW_DB_PASSWORD>@db.<NEW_REF>.supabase.co:5432/postgres" -f data.sql
-```
-
-### Auth users
-
-`auth.users` is not in the public-schema data. Dump and load the auth schema explicitly from the source project:
-
-```bash
-supabase db dump --schema auth -f auth.sql       # against the OLD project
-psql "postgresql://postgres:<NEW_DB_PASSWORD>@db.<NEW_REF>.supabase.co:5432/postgres" -f auth.sql
-```
-
-Verify row counts match (`select count(*) from auth.users;`) on both projects before cutover.
+The workflow ends with an old-vs-new row-count diff over every table it copied and fails on any mismatch.
 
 ## 4. Migrate storage
 
@@ -72,13 +60,21 @@ The old ref is **hardcoded** in several files. Search-and-replace `odoglvswwymyj
 - [ ] `api/prerender.js` — SSR/OG client URL + anon key
 - [ ] `api/sitemap.js`
 - [ ] `src/utils/supabaseClient.js` — backend client fallback
-- [ ] `src/routes/integrated-ai.js`
-- [ ] `components/Header.jsx`
+- [ ] `src/routes/integrated-ai.js` — allowed image-host list
+- [ ] `components/Header.jsx` — `sb-<ref>-auth-token` localStorage key
 - [ ] `public/sw.js` — service-worker storage-URL cache matcher
+- [ ] `public/auth.md` + `public/.well-known/oauth-protected-resource` — published auth metadata (URL + anon key)
+- [ ] `index.html` — preconnect hint
 - [ ] `cloudflare/image-proxy-worker.js` — `ORIGIN` constant (redeploy the worker after)
 - [ ] `supabase/config.toml` — `project_id`
-- [ ] `vercel.json`
-- [ ] tests: `tests/frontend/imageUrl.test.js`, `tests/backend/imageProxyWorker.test.js`, `tests/backend/integrated-ai.test.js`
+- [ ] `vercel.json` — CSP `connect-src`/headers
+- [ ] `.env.example`
+- [ ] `.github/workflows/supabase-migrations.yml`, `migration-drift.yml` — `supabase link --project-ref`
+- [ ] `.github/workflows/image-maintenance.yml` — `SUPABASE_URL`
+- [ ] `scripts/backup-supabase.sh`, `scripts/security-smoke.mjs`, `scripts/ops-dashboard/Code.gs`, `tools/backfill-images.mjs`
+- [ ] tests: `tests/frontend/imageUrl.test.js`, `tests/backend/imageProxyWorker.test.js`, `tests/backend/integrated-ai.test.js`, `tests/backend/setup.js` (anon key)
+- [ ] docs that state the live URL: `CLAUDE.md`, `docs/oauth-login.md`, `docs/backup-and-restore.md`, `docs/image-cdn.md`, `docs/ddos-protection.md`, `docs/email-inboxes.md`
+- [ ] `SECURITY_AUDIT_*.md` is a point-in-time record — leave it alone
 
 > Confirm the list is current before you start: `grep -rn odoglvswwymyjuwlonkf --include='*.js' --include='*.jsx' --include='*.toml' --include='*.json' . | grep -v node_modules`
 

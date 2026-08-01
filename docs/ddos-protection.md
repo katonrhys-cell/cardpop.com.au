@@ -134,7 +134,7 @@ lets a MITM sit between Cloudflare and Vercel.
 
 ## The Supabase direct-exposure issue
 
-The frontend talks straight to `odoglvswwymyjuwlonkf.supabase.co` (Auth,
+The frontend talks straight to `vrfsaazuqjxotnieqlkd.supabase.co` (Auth,
 PostgREST, Storage, Realtime) — that traffic **bypasses Cloudflare
 entirely**. Supabase's platform has its own infrastructure-level DDoS
 mitigation, so the realistic risk is not downtime but **quota/cost

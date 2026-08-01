@@ -17,7 +17,7 @@
  * ── Usage ──────────────────────────────────────────────────────────────────
  *   Requires a service-role key (never commit it):
  *
- *     export SUPABASE_URL="https://odoglvswwymyjuwlonkf.supabase.co"
+ *     export SUPABASE_URL="https://vrfsaazuqjxotnieqlkd.supabase.co"
  *     export SUPABASE_SERVICE_ROLE_KEY="<your service role key>"
  *
  *   Preview (no writes):

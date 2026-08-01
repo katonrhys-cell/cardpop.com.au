@@ -10,8 +10,8 @@ import { BUYING_GUIDES, getBuyingGuide, GUIDE_CATEGORY_META, GUIDE_PRICE_CATEGOR
 // fully-formed HTML with titles, meta tags and JSON-LD. Humans are unaffected —
 // their requests fall through to the SPA (index.html).
 
-const SUPABASE_URL = 'https://odoglvswwymyjuwlonkf.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kb2dsdnN3d3lteWp1d2xvbmtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3OTQ5NTgsImV4cCI6MjA5NDM3MDk1OH0.R5fwR42iKIEsfx1iA-fjk4YPLCH3mcmoIKkosEy6g1I';
+const SUPABASE_URL = 'https://vrfsaazuqjxotnieqlkd.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZyZnNhYXp1cWp4b3RuaWVxbGtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1NDM0MTEsImV4cCI6MjEwMTExOTQxMX0.R4JqdifHRVBUjPleXqtJ963h6Q8eVosrjDtpGynw8Fo';
 
 const BASE_URL = 'https://cardpop.com.au';
 

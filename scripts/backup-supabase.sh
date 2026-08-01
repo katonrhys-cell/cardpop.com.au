@@ -19,8 +19,8 @@
 # Prerequisites (one-time):
 #   npm i -g supabase              # or use npx supabase ...
 #   supabase login
-#   supabase link --project-ref odoglvswwymyjuwlonkf
-#   export SUPABASE_URL=https://odoglvswwymyjuwlonkf.supabase.co
+#   supabase link --project-ref vrfsaazuqjxotnieqlkd
+#   export SUPABASE_URL=https://vrfsaazuqjxotnieqlkd.supabase.co
 #   export SUPABASE_SERVICE_ROLE_KEY=<service-role-key>   # for the storage half
 #
 # Usage:
@@ -61,7 +61,7 @@ node scripts/backup-storage.mjs "${STORAGE_ARGS[@]}"
 echo "==> Writing manifest ..."
 cat > "${WORK}/MANIFEST.txt" <<EOF
 CardPop Supabase backup
-project_ref : odoglvswwymyjuwlonkf
+project_ref : vrfsaazuqjxotnieqlkd
 created_utc : ${STAMP}
 contents    : roles.sql, schema.sql, data.sql, storage/
 sensitive   : $([ "${INCLUDE_SENSITIVE:-0}" = "1" ] && echo "verification-docs INCLUDED" || echo "verification-docs excluded")

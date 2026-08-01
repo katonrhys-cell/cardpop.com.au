@@ -220,7 +220,7 @@ Supabase service-role key to list, and the Worker must already have the `IMAGES`
 binding:
 
 ```
-SUPABASE_URL=https://odoglvswwymyjuwlonkf.supabase.co \
+SUPABASE_URL=https://vrfsaazuqjxotnieqlkd.supabase.co \
 SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
 node scripts/backfill-images-to-r2.mjs --dry-run   # preview
 # then drop --dry-run to run for real
@@ -239,7 +239,7 @@ first time they're shown — no upload-path change needed.
 CloudFront's always-free tier is 1 TB/month egress + 10M requests and does
 not expire. No Worker code — pure console configuration:
 
-1. CloudFront → Create distribution: origin `odoglvswwymyjuwlonkf.supabase.co`
+1. CloudFront → Create distribution: origin `vrfsaazuqjxotnieqlkd.supabase.co`
    (HTTPS only), GET/HEAD, compress on, redirect HTTP→HTTPS, price class
    "All" (includes Australia).
 2. Custom cache policy: min TTL `86400`, max `31536000`, default `604800`;

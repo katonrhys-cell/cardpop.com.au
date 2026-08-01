@@ -24,7 +24,7 @@ const SHEET_NAME = 'Weekly Metrics';
 // use a Domain property instead, change this to 'sc-domain:cardpop.com.au'.
 const GSC_SITE_URL = 'https://cardpop.com.au/';
 
-const SUPABASE_URL = 'https://odoglvswwymyjuwlonkf.supabase.co';
+const SUPABASE_URL = 'https://vrfsaazuqjxotnieqlkd.supabase.co';
 
 const HEADERS = [
   'Week ending',

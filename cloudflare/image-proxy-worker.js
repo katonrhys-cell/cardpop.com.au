@@ -7,7 +7,7 @@
 // the source of truth; see docs/image-cdn.md for setup.
 //
 // The URL path is passed through verbatim, so the app only swaps hostnames:
-//   https://odoglvswwymyjuwlonkf.supabase.co/storage/v1/object/public/…
+//   https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/…
 //   → https://img.cardpop.com.au/storage/v1/object/public/…
 //
 // R2 fast path: when the `IMAGES` R2 binding is present, an /object/public/
@@ -20,7 +20,7 @@
 // Transform requests (/render/image/public/) are never served from R2 — R2
 // can't resize — so they always proxy to Supabase.
 
-const ORIGIN = 'https://odoglvswwymyjuwlonkf.supabase.co';
+const ORIGIN = 'https://vrfsaazuqjxotnieqlkd.supabase.co';
 
 // Only public storage objects (and the transform endpoint, should image
 // transformations ever be enabled) — never the Auth/REST API, and never
