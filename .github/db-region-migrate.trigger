@@ -1,1 +1,1 @@
-run 5: mirror storage objects Tokyo -> Sydney 2026-08-01T02:28:16Z
+run 6: retry after SUPABASE_DB_PASSWORD_TOKYO fix 2026-08-01T02:39:53Z
