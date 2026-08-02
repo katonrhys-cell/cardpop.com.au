@@ -15,7 +15,7 @@ import {
   getPaypalSubscription,
   verifyPaypalWebhook,
 } from '../utils/paypalClient.js';
-import { TRIAL_DAYS } from '../../config/subscription.js';
+import { TRIAL_DAYS, ENV, normalizePaidTier } from '../../config/subscription.js';
 import { validatePartnerCode } from '../services/partnerService.js';
 
 const router = express.Router();
@@ -35,12 +35,15 @@ router.get('/status', authMiddleware, async (req, res) => {
 // ─── POST /stripe/checkout ───────────────────────────────────────────────────
 // Start the trial via Stripe Checkout in subscription mode. The card is captured
 // but NOT charged until the trial ends (trial_period_days). Returns a hosted URL.
+// `tier` picks which paid plan is bought ('pro' | 'premium' | 'elite' |
+// 'ultimate', default 'pro'); each tier bills against its own Stripe price.
 router.post('/stripe/checkout', authMiddleware, async (req, res) => {
   try {
-    const priceId = process.env.STRIPE_SUBSCRIPTION_PRICE_ID;
+    const tier = normalizePaidTier(req.body?.tier);
+    const priceId = process.env[ENV.stripePriceIds[tier]];
     if (!priceId) {
-      logger.error('[SUB] STRIPE_SUBSCRIPTION_PRICE_ID not configured');
-      return res.status(503).json({ error: 'Subscriptions are not configured yet.' });
+      logger.error(`[SUB] ${ENV.stripePriceIds[tier]} not configured`);
+      return res.status(503).json({ error: `The ${tier} plan is not available yet.` });
     }
 
     const { successUrl, cancelUrl, refCode } = req.body;
@@ -58,7 +61,9 @@ router.post('/stripe/checkout', authMiddleware, async (req, res) => {
     // doesn't have to re-derive pricing. An invalid ref code never blocks the
     // trial — it's silently dropped.
     let discounts;
-    const subMetadata = { userId };
+    // `tier` in the metadata is what the webhook mirrors onto
+    // profiles.subscription_tier when the subscription is entitled.
+    const subMetadata = { userId, tier };
     if (typeof refCode === 'string' && refCode.trim()) {
       try {
         const partner = await validatePartnerCode(userId, refCode);
@@ -119,11 +124,13 @@ router.post('/paypal/create', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'returnUrl and cancelUrl are required' });
     }
 
+    const tier = normalizePaidTier(req.body?.tier);
     const { id, approveUrl } = await createPaypalSubscription({
       userId: req.user.id,
       email: req.user.email,
       returnUrl,
       cancelUrl,
+      tier,
     });
     if (!approveUrl) throw new Error('PayPal did not return an approval link');
 
@@ -168,6 +175,7 @@ router.post('/paypal/activate', authMiddleware, async (req, res) => {
       paypalSubscriptionId: subscriptionId,
       status,
       trialEndsAt,
+      planId: sub.plan_id || null,
     });
 
     res.json({ subscription_status: status });
@@ -203,6 +211,7 @@ router.post('/paypal/webhook', async (req, res) => {
           paypalSubscriptionId: subscriptionId,
           status: mapPaypalStatus(resource.status),
           trialEndsAt: resource.billing_info?.next_billing_time || null,
+          planId: resource.plan_id || null,
         });
         break;
       default:

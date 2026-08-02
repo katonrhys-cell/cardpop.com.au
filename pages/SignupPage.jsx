@@ -192,8 +192,8 @@ const SignupPage = () => {
               To list, sell or trade, verify your <span className="text-foreground font-bold">ID</span> (a quick photo
               of your licence or passport, handled securely by Stripe) and add a{' '}
               <span className="text-foreground font-bold">card on file</span> — it's never charged until a sale or
-              trade completes. Want unlimited listings, a storefront and premium tools? Upgrade to{' '}
-              <span className="text-foreground font-bold">Pro</span> anytime.
+              trade completes. Want more monthly listings, your own store page and premium display
+              styles? Upgrade to <span className="text-foreground font-bold">Pro</span> or higher anytime.
             </p>
             <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
               We've also sent your <span className="text-foreground font-bold">welcome code</span> in a separate

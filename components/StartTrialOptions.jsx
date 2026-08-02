@@ -3,19 +3,26 @@ import apiServerClient from '@/lib/apiServerClient.js';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { CreditCard, Loader2, ShieldCheck } from 'lucide-react';
-import { TRIAL_DAYS, SUBSCRIPTION_PRICE_AUD, PAYMENT_PROVIDERS } from '@/config/subscription.js';
+import { TRIAL_DAYS, TIER_PRICES_AUD, PAYMENT_PROVIDERS, normalizePaidTier } from '@/config/subscription.js';
+import { PLANS } from '@/config/plans.js';
 import { getReferralCode } from '@/lib/referral.js';
 
 /**
- * Payment-method capture that starts the CardPop Pro free trial via Stripe or
- * PayPal.
+ * Payment-method capture that starts a CardPop membership free trial via
+ * Stripe or PayPal. `tier` picks which paid plan is bought ('pro' | 'premium'
+ * | 'elite' | 'ultimate'); the server bills the matching Stripe price /
+ * PayPal plan.
  *
  * Both providers redirect off-site (Stripe Checkout / PayPal approval) so no
  * card data ever touches CardPop. The card is stored but not charged until the
  * trial ends. `returnPath` is where the provider sends the user back to.
  */
-const StartTrialOptions = ({ returnPath = '/account/membership' }) => {
+const StartTrialOptions = ({ returnPath = '/account/membership', tier = 'pro' }) => {
   const [busy, setBusy] = useState(null); // 'stripe' | 'paypal' | null
+
+  const paidTier = normalizePaidTier(tier);
+  const tierName = PLANS[paidTier]?.name || 'Pro';
+  const priceAud = TIER_PRICES_AUD[paidTier];
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const successUrl = `${origin}${returnPath}?trial=started`;
@@ -29,7 +36,7 @@ const StartTrialOptions = ({ returnPath = '/account/membership' }) => {
         headers: { 'Content-Type': 'application/json' },
         // A partner ?ref=CODE captured this session attributes the referral;
         // the server validates it and simply ignores an invalid code.
-        body: JSON.stringify({ successUrl, cancelUrl, ...(getReferralCode() ? { refCode: getReferralCode() } : {}) }),
+        body: JSON.stringify({ successUrl, cancelUrl, tier: paidTier, ...(getReferralCode() ? { refCode: getReferralCode() } : {}) }),
       });
       const data = await res.json();
       if (!res.ok || !data.url) throw new Error(data.error || 'Could not start checkout');
@@ -46,7 +53,7 @@ const StartTrialOptions = ({ returnPath = '/account/membership' }) => {
       const res = await apiServerClient.fetch('/subscription/paypal/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ returnUrl: successUrl, cancelUrl }),
+        body: JSON.stringify({ returnUrl: successUrl, cancelUrl, tier: paidTier }),
       });
       const data = await res.json();
       if (!res.ok || !data.approveUrl) throw new Error(data.error || 'Could not start PayPal');
@@ -62,11 +69,11 @@ const StartTrialOptions = ({ returnPath = '/account/membership' }) => {
       <div className="rounded-card border border-border bg-muted/30 p-4 text-sm">
         <div className="flex items-center gap-2 font-bold text-foreground">
           <ShieldCheck className="h-4 w-4 text-brand-red" />
-          {TRIAL_DAYS} days free, then ${SUBSCRIPTION_PRICE_AUD}/month
+          {TRIAL_DAYS} days free, then ${priceAud}/month
         </div>
         <p className="mt-1 text-muted-foreground">
-          Add a payment method to unlock CardPop Pro. You won't be charged until your trial ends,
-          and you can cancel anytime before then.
+          Add a payment method to unlock CardPop {tierName}. You won't be charged until your trial
+          ends, and you can cancel anytime before then.
         </p>
       </div>
 
@@ -77,7 +84,7 @@ const StartTrialOptions = ({ returnPath = '/account/membership' }) => {
           className="h-12 w-full bg-brand-red font-bold hover:bg-brand-red/90"
         >
           {busy === 'stripe' ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
-          Start Pro trial with card
+          Start {tierName} trial with card
         </Button>
       )}
 

@@ -3,6 +3,7 @@ import { COLLECTION_SEO } from '../data/collectionSeo.js';
 import { SHOP_COLLECTION_SEO, resolveShopCollectionSlug } from '../data/shopCollectionSeo.js';
 import { BLOG_CATEGORIES, BLOG_CATEGORY_MAP } from '../data/blogCategories.js';
 import { BUYING_GUIDES, getBuyingGuide, GUIDE_CATEGORY_META, GUIDE_PRICE_CATEGORY } from '../data/buyingGuides.js';
+import { PAID_TIERS, hasStorefront } from '../config/plans.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -192,6 +193,9 @@ async function renderLocalTraders(supabase) {
     .select('id, store_slug, business_name, display_name, username, business_tagline, business_logo_url, location_state, location_suburb, rating, reviews_count, is_featured_seller')
     .eq('is_sole_trader', true)
     .eq('is_public', true)
+    // Store pages are a paid-membership perk — mirror the SPA's filter so
+    // crawlers never index a storefront the app won't show.
+    .in('subscription_tier', PAID_TIERS)
     .order('is_featured_seller', { ascending: false })
     .order('rating', { ascending: false, nullsFirst: false })
     .limit(100);
@@ -264,13 +268,16 @@ async function renderDealer(supabase, param) {
   const byUuid = UUID_RE.test(param);
   let dealerQuery = supabase
     .from('profiles')
-    .select('id, store_slug, business_name, display_name, username, business_tagline, bio, business_logo_url, avatar_url, location_state, location_suburb, rating, reviews_count, total_sales, is_sole_trader, is_public, created_at');
+    .select('id, store_slug, business_name, display_name, username, business_tagline, bio, business_logo_url, avatar_url, location_state, location_suburb, rating, reviews_count, total_sales, is_sole_trader, is_public, subscription_tier, subscription_status, created_at');
   dealerQuery = byUuid ? dealerQuery.eq('id', param) : dealerQuery.eq('store_slug', param);
   const { data: dealer } = await dealerQuery.maybeSingle();
 
   const canonical = `${BASE_URL}/dealer/${dealer?.store_slug || param}`;
 
-  if (!dealer || !dealer.is_sole_trader || dealer.is_public === false) {
+  // Store pages are a paid-membership perk — a Hobby account's store 404s
+  // here exactly as it does in the SPA.
+  if (!dealer || !dealer.is_sole_trader || dealer.is_public === false
+      || !hasStorefront({ subscriptionTier: dealer.subscription_tier, subscriptionStatus: dealer.subscription_status })) {
     return notFound({
       title: 'Store Unavailable | CardPop',
       description: 'This dealer store could not be found on CardPop.',
@@ -1646,36 +1653,51 @@ const STATIC_CONTENT = {
   },
 
   // Keep pricing copy in sync with config/plans.js + config/subscription.js
-  // (Pro price $20/mo AUD, 30-day trial, Hobby cap 25 active listings).
+  // (monthly listing limits 5/15/30/50/unlimited, prices $20/$40/$80/$150 AUD,
+  // 30-day trial).
   '/pricing': {
-    title: 'Pricing — Hobby & Pro | CardPop',
-    description: 'CardPop is free to join. Buy instantly, and sell once your ID is verified — paying only a small fee per sale. Upgrade to Pro for unlimited listings, a storefront and premium tools.',
+    title: 'Pricing — Hobby, Pro, Premium, Elite & Ultimate | CardPop',
+    description: 'CardPop is free to join. Buy instantly, and sell once your ID is verified — paying only a small fee per sale. Upgrade to Pro, Premium, Elite or Ultimate for more monthly listings, your own store page and premium display styles.',
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Pricing', path: '/pricing' }],
     h1: 'Simple, fair pricing',
-    intro: 'Joining CardPop is free, forever. Browse and buy right away. To list, sell or trade, just verify your identity — then you only pay a small fee when a sale or trade completes. Go Pro when you want the full seller toolkit.',
+    intro: 'Joining CardPop is free, forever. Browse and buy right away. To list, sell or trade, just verify your identity — then you only pay a small fee when a sale or trade completes. Upgrade when you want more monthly listings, your own store page and the premium showcase styles.',
     sections: [
       { h2: 'Hobby — free forever', paras: ['Free forever — collect, buy and sell casually.'], items: [
         { text: 'Browse and buy instantly — no membership needed.' },
-        { text: 'List and sell up to 25 cards once your ID is verified.' },
+        { text: 'List up to 5 cards a month once your ID is verified.' },
         { text: 'Pay only a small fee when a sale or trade completes.' },
         { text: 'Card on file required to sell or trade — never charged until you transact.' },
         { text: 'Trade with other verified collectors.' },
         { text: 'Community, wishlists and price tracking.' },
       ] },
-      { h2: 'Pro — $20/month AUD, 30-day free trial', paras: ['The full CardPop toolkit for serious sellers.'], items: [
+      { h2: 'Pro — $20/month AUD, 30-day free trial', paras: ['Your own store page and the Pro display styles.'], items: [
         { text: 'Everything in Hobby, plus:' },
-        { text: 'Unlimited active listings.' },
-        { text: 'Your own branded storefront and store URL.' },
+        { text: '15 listings a month.' },
+        { text: 'Your own branded store page on the Local Traders directory.' },
+        { text: 'Pro display styles for your listings.' },
         { text: 'Pro seller badge for extra buyer trust.' },
         { text: 'Advanced sales analytics and price insights.' },
-        { text: 'Premium Vault display styles.' },
-        { text: 'Priority placement in search and priority support.' },
         { text: 'Up to 20 images per listing.' },
+      ] },
+      { h2: 'Premium — $40/month AUD', paras: ['More listings and the Premium showcase styles.'], items: [
+        { text: 'Everything in Pro, plus 30 listings a month.' },
+        { text: 'Premium display styles — Glass Museum and Slab Display.' },
+        { text: 'Priority placement in the Local Traders directory.' },
+      ] },
+      { h2: 'Elite — $80/month AUD', paras: ['High-volume selling with the Elite showcase.'], items: [
+        { text: 'Everything in Premium, plus 50 listings a month.' },
+        { text: 'Elite display styles — Rotating Premium showcase.' },
+        { text: 'Priority support.' },
+      ] },
+      { h2: 'Ultimate — $150/month AUD', paras: ['No limits. The full CardPop experience.'], items: [
+        { text: 'Everything in Elite, plus unlimited listings.' },
+        { text: 'Ultimate display styles — interactive Holographic showcase.' },
+        { text: 'Top placement in search and Local Traders.' },
       ] },
       { h2: 'How it works', items: [
         { text: "Buy with no membership — anyone can check out. A card on file gives one-tap buying and is required to sell or trade, but it's never charged until you actually transact." },
         { text: 'Verify to sell & trade — to list, sell or trade on any plan, verify your ID (a quick selfie + document check via Stripe) and keep a card on file.' },
-        { text: 'Fees only when you sell — no listing fees and no monthly cost on Hobby; you pay a small fee only when a sale or trade goes through.' },
+        { text: 'Fees only when you sell — no listing fees and no monthly cost on Hobby; every plan pays the same small fee only when a sale or trade goes through.' },
       ] },
     ],
     links: [{ text: 'Create a free account', href: '/signup' }, { text: 'Browse the Marketplace', href: '/marketplace' }, { text: 'Trust & Safety', href: '/trust-safety' }],
@@ -2660,7 +2682,7 @@ async function renderSeller(supabase, param) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, store_slug, business_name, display_name, username, bio, business_tagline, avatar_url, business_logo_url, location_state, location_suburb, rating, reviews_count, is_sole_trader, is_public')
+    .select('id, store_slug, business_name, display_name, username, bio, business_tagline, avatar_url, business_logo_url, location_state, location_suburb, rating, reviews_count, is_sole_trader, is_public, subscription_tier, subscription_status')
     .eq('id', param)
     .maybeSingle();
 
@@ -2674,10 +2696,14 @@ async function renderSeller(supabase, param) {
   }
 
   const name = profile.display_name || profile.business_name || profile.username || 'CardPop Seller';
-  // Sole traders have a dedicated /dealer store page (in the sitemap and
+  // Paid sole traders have a dedicated /dealer store page (in the sitemap and
   // prerendered) with substantially the same content — that page is canonical,
   // so /seller/:id for them is a declared alternate rather than a duplicate.
-  const canonical = profile.is_sole_trader
+  // A Hobby sole trader has no live store page, so their /seller page stays
+  // canonical for itself.
+  const hasStore = profile.is_sole_trader
+    && hasStorefront({ subscriptionTier: profile.subscription_tier, subscriptionStatus: profile.subscription_status });
+  const canonical = hasStore
     ? `${BASE_URL}/dealer/${profile.store_slug || profile.id}`
     : canonicalSelf;
   const image = absUrl(profile.avatar_url || profile.business_logo_url);
@@ -2729,7 +2755,7 @@ async function renderSeller(supabase, param) {
   ${profile.business_tagline ? `<p>${esc(profile.business_tagline)}</p>` : ''}
   ${location ? `<p>${esc(location)}</p>` : ''}
   ${profile.bio ? `<p>${esc(profile.bio)}</p>` : ''}
-  ${profile.is_sole_trader ? `<p><a href="${esc(canonical)}">Visit this seller's store</a></p>` : ''}
+  ${hasStore ? `<p><a href="${esc(canonical)}">Visit this seller's store</a></p>` : ''}
   <h2>Active Listings (${listings.length})</h2>
   <ul>
 ${itemsHtml || '    <li>No active listings at the moment.</li>'}

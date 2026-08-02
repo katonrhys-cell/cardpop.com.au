@@ -13,6 +13,8 @@ import {
   mapStripeStatus,
   mapPaypalStatus,
   getSubscriptionStatus,
+  tierFromStripeSubscription,
+  tierFromPaypalPlanId,
 } from '../../../src/services/subscriptionService.js';
 
 beforeEach(() => vi.clearAllMocks());
@@ -70,6 +72,47 @@ describe('mapPaypalStatus', () => {
     expect(mapPaypalStatus('')).toBe('none');
     expect(mapPaypalStatus(null)).toBe('none');
     expect(mapPaypalStatus(undefined)).toBe('none');
+  });
+});
+
+describe('tierFromStripeSubscription', () => {
+  it('trusts a valid tier stamped into the subscription metadata', () => {
+    expect(tierFromStripeSubscription({ metadata: { tier: 'premium' } })).toBe('premium');
+    expect(tierFromStripeSubscription({ metadata: { tier: 'ultimate' } })).toBe('ultimate');
+  });
+
+  it('ignores a bogus metadata tier and falls back to the price-id match', () => {
+    vi.stubEnv('STRIPE_SUBSCRIPTION_PRICE_ID_ELITE', 'price_elite_123');
+    try {
+      expect(tierFromStripeSubscription({
+        metadata: { tier: 'god-mode' },
+        items: { data: [{ price: { id: 'price_elite_123' } }] },
+      })).toBe('elite');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('falls back to pro for legacy subscriptions with no metadata or matching price', () => {
+    expect(tierFromStripeSubscription({})).toBe('pro');
+    expect(tierFromStripeSubscription({ items: { data: [{ price: { id: 'price_unknown' } }] } })).toBe('pro');
+  });
+});
+
+describe('tierFromPaypalPlanId', () => {
+  it('resolves a configured per-tier plan id', () => {
+    vi.stubEnv('PAYPAL_SUBSCRIPTION_PLAN_ID_PREMIUM', 'P-PREMIUM');
+    try {
+      expect(tierFromPaypalPlanId('P-PREMIUM')).toBe('premium');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('falls back to pro for unknown or missing plan ids', () => {
+    expect(tierFromPaypalPlanId('P-UNKNOWN')).toBe('pro');
+    expect(tierFromPaypalPlanId(null)).toBe('pro');
+    expect(tierFromPaypalPlanId(undefined)).toBe('pro');
   });
 });
 

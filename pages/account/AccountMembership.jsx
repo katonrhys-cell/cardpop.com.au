@@ -8,24 +8,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { BadgeCheck, Clock, Gift, Loader2, Sparkles } from 'lucide-react';
-import { TRIAL_DAYS } from '@/config/subscription.js';
+import { TRIAL_DAYS, TIER_PRICES_AUD, PAID_TIER_ORDER, normalizePaidTier } from '@/config/subscription.js';
+import { PLANS, planKeyFromTier } from '@/config/plans.js';
 
-const STATUS_LABEL = {
-  trialing:      { label: 'Pro trial active', tone: 'text-brand-red', Icon: Sparkles },
-  active:        { label: 'CardPop Pro active', tone: 'text-green-600', Icon: BadgeCheck },
-  grandfathered: { label: 'CardPop Pro active', tone: 'text-green-600', Icon: BadgeCheck },
+const statusLabel = (subscriptionStatus, tierName) => ({
+  trialing:      { label: `${tierName} trial active`, tone: 'text-brand-red', Icon: Sparkles },
+  active:        { label: `CardPop ${tierName} active`, tone: 'text-green-600', Icon: BadgeCheck },
+  grandfathered: { label: `CardPop ${tierName} active`, tone: 'text-green-600', Icon: BadgeCheck },
   past_due:      { label: 'Payment overdue',   tone: 'text-yellow-600', Icon: Clock },
-  canceled:      { label: 'Pro cancelled', tone: 'text-muted-foreground', Icon: Clock },
+  canceled:      { label: 'Membership cancelled', tone: 'text-muted-foreground', Icon: Clock },
   none:          { label: 'Hobby (free) plan', tone: 'text-muted-foreground', Icon: Clock },
-};
+}[subscriptionStatus]);
 
 const AccountMembership = () => {
-  const { isPro, subscriptionStatus, trialDaysLeft, refetchProfile } = useAuth();
+  const { isPro, subscriptionStatus, subscriptionTier, trialDaysLeft, refetchProfile } = useAuth();
   const [params, setParams] = useSearchParams();
   const [activating, setActivating] = useState(false);
   const [welcomeCode, setWelcomeCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);
   const [codeConfirmed, setCodeConfirmed] = useState(false);
+  // Which paid tier the member is buying — preselected by /pricing's
+  // "?tier=premium" style links, switchable here before checkout.
+  const [selectedTier, setSelectedTier] = useState(() => normalizePaidTier(params.get('tier')));
 
   // Prefill the welcome-code input with the user's own unredeemed code so
   // arriving from the offer email is one click, not a copy-paste hunt.
@@ -101,19 +105,21 @@ const AccountMembership = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const meta = STATUS_LABEL[subscriptionStatus] || STATUS_LABEL.none;
+  const currentTierName = PLANS[planKeyFromTier(subscriptionTier)]?.name || 'Pro';
+  const meta = statusLabel(subscriptionStatus, currentTierName) || statusLabel('none', currentTierName);
   const { Icon } = meta;
 
   return (
     <AccountPageShell
       documentTitle="Membership | CardPop"
       breadcrumb={[{ label: 'Account', path: '/account' }, { label: 'Membership' }]}
-      title="CardPop Pro"
+      title="CardPop Membership"
       description={
         <>
-          Buying and selling are free on every plan (selling just needs ID verification). Pro is the
-          optional upgrade that unlocks unlimited listings, your own storefront, a Pro badge and premium
-          tools. <Link to="/pricing" className="text-primary hover:underline">Compare plans →</Link>
+          Buying and selling are free on every plan (selling just needs ID verification). The paid
+          tiers — Pro, Premium, Elite and Ultimate — unlock a bigger monthly listing allowance, your
+          own store page on Local Traders and premium display styles.{' '}
+          <Link to="/pricing" className="text-primary hover:underline">Compare plans →</Link>
         </>
       }
     >
@@ -165,9 +171,36 @@ const AccountMembership = () => {
 
           <div>
             <h2 className="mb-4 font-heading text-lg font-bold text-foreground">
-              Start your {TRIAL_DAYS}-day Pro trial
+              Start your {TRIAL_DAYS}-day free trial
             </h2>
-            <StartTrialOptions returnPath="/account/membership" />
+
+            {/* Tier picker — every paid tier starts with the same free trial. */}
+            <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {PAID_TIER_ORDER.map((tier) => {
+                const active = selectedTier === tier;
+                return (
+                  <button
+                    key={tier}
+                    type="button"
+                    onClick={() => setSelectedTier(tier)}
+                    className={`rounded-xl border p-3 text-left transition-all ${
+                      active
+                        ? 'border-brand-red bg-brand-red/5 ring-2 ring-brand-red/20'
+                        : 'border-border bg-card hover:border-brand-red/40'
+                    }`}
+                  >
+                    <span className={`block text-sm font-bold ${active ? 'text-foreground' : 'text-muted-foreground'}`}>
+                      {PLANS[tier]?.name || tier}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      ${TIER_PRICES_AUD[tier]}/mo
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <StartTrialOptions returnPath="/account/membership" tier={selectedTier} />
           </div>
         </>
       )}

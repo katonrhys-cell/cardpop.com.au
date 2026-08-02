@@ -1,76 +1,99 @@
-# CardPop Pro (Hobby vs Pro) — setup guide
+# CardPop membership tiers (Hobby / Pro / Premium / Elite / Ultimate) — setup guide
 
-CardPop has two account plans, defined in `config/plans.js`:
+CardPop has five account plans, defined in `config/plans.js`:
 
 - **Hobby** — free, forever. Anyone can browse and buy immediately. To list,
   sell or trade, a Hobby user completes **Stripe Identity verification** *and*
   keeps a **card on file** (so the per-sale/trade fee can always be collected —
   trades have no proceeds to net it from). The card is never charged until a
-  sale or trade actually completes. After that they sell for free and pay only
-  the per-transaction fee.
-- **Pro** — a paid subscription (**$20 AUD/month**, with a 30-day free trial and
-  a card/PayPal on file). Requires ID verification and a Stripe customer, and
-  unlocks premium features, higher limits, and the Pro badge/storefront. Pro
-  pays the **same** per-transaction fees as Hobby — it's for access, not fees.
+  sale or trade actually completes. Hobby can create **5 new listings per
+  calendar month** and never gets a storefront.
+- **Pro / Premium / Elite / Ultimate** — paid monthly subscriptions
+  (**$20 / $40 / $80 / $150 AUD/month**, each with a 30-day free trial and a
+  card/PayPal on file). Every paid tier requires ID verification and a Stripe
+  customer, and unlocks a bigger monthly listing allowance
+  (**15 / 30 / 50 / unlimited**), a **store page** on the Local Traders
+  directory, and progressively fancier Vault display styles (see
+  `lib/displayStyles.js` — access is cumulative). Every tier pays the **same**
+  per-transaction fees as Hobby — the subscription is for access, not fees.
 
-> **Important model note:** the subscription no longer gates *selling*. Selling
-> is gated on **identity verification** (`profiles.is_verified`) **and a card on
-> file** (`profiles.has_saved_card`) via the DB `can_sell()` function — see
-> `supabase/migrations/20260719150000_can_sell_requires_identity_and_reset_plans.sql`
-> and `20260719160000_require_card_on_file_to_sell.sql`. The card flag is
-> mirrored from Stripe by the save-card webhook and the `/wallet/payment-methods`
-> read.
-> The Stripe/PayPal subscription described below drives the **Pro** tier only,
-> mirrored onto `profiles.subscription_status` **and** `profiles.subscription_tier`
-> (`'pro'` when trialing/active, `'free'` otherwise) by the webhook handlers.
+> **Important model note:** the subscription does not gate *selling* outright.
+> Selling is gated on **identity verification** (`profiles.is_verified`) **and
+> a card on file** (`profiles.has_saved_card`) via the DB `can_sell()` function
+> — see `supabase/migrations/20260728205156_fix_selling_gate_uses_stale_private_can_sell.sql`.
+> What the paid tiers change is the **monthly listing quota** (enforced by the
+> `enforce_monthly_listing_quota` BEFORE INSERT trigger on `public.listings`)
+> and the storefront/display-style perks. The Stripe/PayPal subscription drives
+> `profiles.subscription_status` **and** `profiles.subscription_tier` (the tier
+> whose price the subscription bills when trialing/active, `'free'` otherwise)
+> via the webhook handlers. Which paid tier a subscription buys is resolved from
+> the `tier` stamped in the subscription metadata (Stripe) or the billing plan
+> id (PayPal) — see `tierFromStripeSubscription` / `tierFromPaypalPlanId` in
+> `src/services/subscriptionService.js`.
 
 ## Where to change the offer
 
-`config/subscription.js` is the single source of truth for the Pro price/trial,
-used by both the frontend and backend; `config/plans.js` holds the Hobby-vs-Pro
-feature/limit matrix and the plan-key helpers (`planFromTier`, `isProAccount`).
+`config/subscription.js` is the single source of truth for prices/trial,
+used by both the frontend and backend; `config/plans.js` holds the per-tier
+feature/limit matrix and the plan-key helpers (`planKeyFromTier`,
+`isProAccount`, `hasStorefront`, `listingsPerMonthForTier`).
 
 | Setting | Meaning |
 |---|---|
-| `TRIAL_DAYS` | Length of the Pro free trial (default `30`). |
-| `REQUIRE_CARD_AT_SIGNUP` | Require a payment method to start the Pro trial. |
-| `SUBSCRIPTION_PRICE_AUD` | Pro price billed after the trial (`20`; must match Stripe/PayPal). |
+| `TRIAL_DAYS` | Length of the free trial (default `30`, all paid tiers). |
+| `REQUIRE_CARD_AT_SIGNUP` | Require a payment method to start the trial. |
+| `TIER_PRICES_AUD` | Monthly price per paid tier (`{ pro: 20, premium: 40, elite: 80, ultimate: 150 }`; must match Stripe/PayPal). |
 | `PAYMENT_PROVIDERS` | Providers offered, e.g. `['stripe', 'paypal']`. |
-| `ENTITLED_STATUSES` | Statuses that grant Pro (`trialing`, `active`, `grandfathered`). |
+| `ENTITLED_STATUSES` | Statuses that grant the paid tier (`trialing`, `active`, `grandfathered`). |
 
-> Changing `TRIAL_DAYS` also requires updating the trial length on the Stripe
-> price / PayPal plan (below), since the provider enforces the actual trial.
+> Changing `TRIAL_DAYS` also requires updating the trial length on the PayPal
+> plans (below), since PayPal enforces the actual trial there. Stripe applies
+> the trial per-checkout from `TRIAL_DAYS`.
+>
+> Changing a **monthly listing limit** means changing it in BOTH
+> `config/plans.js` (`LISTINGS_PER_MONTH`) and the
+> `enforce_monthly_listing_quota` trigger (new migration) — the DB is the
+> enforcement point, the config is what the UI displays.
 
 ## 1. Apply the database migrations
 
-`supabase/migrations/20260701000001_add_subscription_trial.sql` adds the
-subscription columns to `profiles`, a `can_sell()` function, and a **restrictive
-RLS policy** on `listings`. The later
-`20260719150000_can_sell_requires_identity_and_reset_plans.sql` migration
-switches `can_sell()` to the **identity** gate and resets legacy grandfathered
-accounts to free Hobby (everyone starts on Hobby; Pro is opt-in).
+`supabase/migrations/20260701000001_add_subscription_trial.sql` added the
+subscription columns; `20260630000002_add_display_styles.sql` added
+`subscription_tier`; `20260802060100_enforce_monthly_listing_quota.sql` adds
+the per-tier monthly listing quota trigger; and
+`20260802060200_lock_profiles_subscription_tier.sql` pins `subscription_tier`
+against user self-writes (only the service-role webhook flow may set it).
+
+Migrations apply automatically on merge to `main` (see CLAUDE.md); locally:
 
 ```bash
-supabase db push        # or run the SQL via the Supabase dashboard
+supabase db push
 ```
 
-## 2. Stripe — recurring price with a trial
+## 2. Stripe — one recurring price per paid tier
 
-1. Create a **Product** (e.g. "CardPop Pro") and a **recurring Price**
-   (`$20 AUD / month`) in the Stripe dashboard.
-2. Copy the price id (`price_...`) into the env var `STRIPE_SUBSCRIPTION_PRICE_ID`.
-   The trial length is applied per-checkout from `TRIAL_DAYS`, so you do **not**
-   need to set a trial on the price itself.
+1. Create a **Product** per tier (e.g. "CardPop Pro", "CardPop Premium", …) and
+   a **recurring Price** for each (`$20 / $40 / $80 / $150 AUD / month`).
+2. Copy each price id (`price_...`) into its env var:
+   `STRIPE_SUBSCRIPTION_PRICE_ID` (Pro — legacy un-suffixed name),
+   `STRIPE_SUBSCRIPTION_PRICE_ID_PREMIUM`, `STRIPE_SUBSCRIPTION_PRICE_ID_ELITE`,
+   `STRIPE_SUBSCRIPTION_PRICE_ID_ULTIMATE`. A tier whose price id is unset
+   simply can't be purchased (its checkout answers 503); the others keep
+   working. The trial length is applied per-checkout from `TRIAL_DAYS`, so you
+   do **not** need to set a trial on the prices themselves.
 3. Add these webhook events to your existing Stripe webhook endpoint
    (`/api/stripe/webhook`): `customer.subscription.created`,
    `customer.subscription.updated`, `customer.subscription.deleted`,
    `customer.subscription.trial_will_end`.
 
-## 3. PayPal — subscription plan with a trial
+## 3. PayPal — one billing plan per paid tier
 
-1. Create a **Product** and a **Billing Plan** in PayPal with a 30-day free
-   trial cycle followed by the `$20 AUD / month` regular cycle.
-2. Copy the plan id (`P-...`) into `PAYPAL_SUBSCRIPTION_PLAN_ID`.
+1. Create a **Product** and a **Billing Plan** per tier in PayPal, each with a
+   30-day free trial cycle followed by the tier's regular monthly cycle.
+2. Copy each plan id (`P-...`) into its env var:
+   `PAYPAL_SUBSCRIPTION_PLAN_ID` (Pro — legacy un-suffixed name),
+   `PAYPAL_SUBSCRIPTION_PLAN_ID_PREMIUM`, `PAYPAL_SUBSCRIPTION_PLAN_ID_ELITE`,
+   `PAYPAL_SUBSCRIPTION_PLAN_ID_ULTIMATE`.
 3. Create a **Webhook** pointing at `/api/subscription/paypal/webhook` subscribed
    to `BILLING.SUBSCRIPTION.*` events, and copy its id into `PAYPAL_WEBHOOK_ID`.
 
@@ -80,9 +103,11 @@ Add to Vercel (and `.env` for local dev):
 
 | Variable | Used by |
 |---|---|
-| `STRIPE_SUBSCRIPTION_PRICE_ID` | Stripe subscription checkout |
+| `STRIPE_SUBSCRIPTION_PRICE_ID` | Stripe checkout — Pro |
+| `STRIPE_SUBSCRIPTION_PRICE_ID_PREMIUM` / `_ELITE` / `_ULTIMATE` | Stripe checkout — higher tiers |
 | `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` | PayPal REST auth |
-| `PAYPAL_SUBSCRIPTION_PLAN_ID` | PayPal subscription plan |
+| `PAYPAL_SUBSCRIPTION_PLAN_ID` | PayPal plan — Pro |
+| `PAYPAL_SUBSCRIPTION_PLAN_ID_PREMIUM` / `_ELITE` / `_ULTIMATE` | PayPal plans — higher tiers |
 | `PAYPAL_WEBHOOK_ID` | PayPal webhook verification |
 | `PAYPAL_ENV` | `sandbox` or `live` |
 
@@ -91,20 +116,23 @@ marketplace checkout and are reused here.
 
 ## How the flow works
 
-- **Registration** (`pages/SignupPage.jsx`): after the account is created, if the
-  Supabase session is live (email confirmation disabled) the user is sent to
-  `/account/membership` to add a card/PayPal immediately. If email confirmation
-  is **enabled**, they verify first and add the payment method on their first
-  sign-in (the selling gate points them there).
+- **Choosing a tier** (`pages/PricingPage.jsx` → `/account/membership?tier=…`):
+  the pricing page links each paid plan to the membership page with the tier
+  preselected; the member can switch tiers there before checkout.
 - **Payment capture** (`components/StartTrialOptions.jsx`): redirects to Stripe
-  Checkout (subscription mode, `trial_period_days`) or PayPal approval. No card
-  data touches CardPop.
+  Checkout (subscription mode, `trial_period_days`, the tier's price, `tier`
+  stamped in the subscription metadata) or PayPal approval (the tier's plan).
+  No card data touches CardPop.
 - **State sync** (`src/services/subscriptionService.js`): provider webhooks
   mirror the subscription status onto `profiles.subscription_status` /
-  `trial_ends_at`.
-- **Gating**: `contexts/AuthContext.jsx` derives `canSell`; the DB `can_sell()`
-  RLS policy is the hard enforcement; `components/SellingRequirementsNotice.jsx`
-  (shown in the add-card form and the vault listing modal) handles the UX.
+  `trial_ends_at`, and the purchased tier onto `profiles.subscription_tier`.
+- **Gating**: `contexts/AuthContext.jsx` derives `canSell` / `isPro` /
+  `subscriptionTier`; the DB `can_sell()` RLS policy and the
+  `enforce_monthly_listing_quota` trigger are the hard enforcement;
+  `components/SellingRequirementsNotice.jsx` and the quota toasts
+  (`utils/listingErrors.js`) handle the UX. Store pages are filtered to paid
+  tiers in `pages/community/LocalTradersPage.jsx`, `pages/SoleTraderStorePage.jsx`,
+  `api/prerender.js` and `api/sitemap.js`.
 
 > To collect the card strictly **during** registration, disable "Confirm email"
 > in Supabase Auth so `signUp()` returns a session. Otherwise the card step

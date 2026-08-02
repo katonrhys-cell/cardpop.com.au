@@ -1,13 +1,15 @@
 /**
- * Account plans — single source of truth for CardPop's Hobby vs Pro tiers.
+ * Account plans — single source of truth for CardPop's membership tiers.
  *
  * There are two free-standing concepts in this codebase; don't conflate them:
  *
- *   1. ACCOUNT PLAN (this file) — Hobby (free) vs Pro ($/mo). Stored on
- *      `profiles.subscription_tier` ('free' = Hobby, 'pro'+ = Pro). The Pro
- *      upgrade is billed through the Stripe/PayPal subscription machinery, whose
- *      lifecycle is mirrored onto `profiles.subscription_status` — see
- *      `config/subscription.js` for the price / trial knobs.
+ *   1. ACCOUNT PLAN (this file) — Hobby (free) and the four paid tiers:
+ *      Pro, Premium, Elite and Ultimate. Stored on `profiles.subscription_tier`
+ *      ('free' = Hobby; 'pro' | 'premium' | 'elite' | 'ultimate' = the paid
+ *      ladder). Paid tiers are billed through the Stripe/PayPal subscription
+ *      machinery, whose lifecycle is mirrored onto
+ *      `profiles.subscription_status` — see `config/subscription.js` for the
+ *      price / trial knobs.
  *
  *   2. SELLER REPUTATION (`profiles.seller_tier`) — an *earned* ladder
  *      (Verified → Trusted → Top Rated → Power) based on sales/rating. Unrelated
@@ -16,21 +18,29 @@
  * The model:
  *   • Hobby is FREE, forever. Anyone can browse and buy immediately. To list,
  *     sell or trade, a Hobby user must complete Stripe Identity verification
- *     (`profiles.is_verified`) — after that they sell for free and pay only the
- *     per-transaction fee (see `commissionService`). Hobby users are encouraged
- *     (never forced) to save a card on file so buying is one tap; the card is
- *     never charged unless they actually transact.
- *   • Pro costs money each month (see SUBSCRIPTION_PRICE_AUD). It requires ID
- *     verification and a Stripe customer too, and unlocks premium features,
- *     higher limits, and the Pro badge / full storefront. Pro pays the SAME
- *     per-transaction fees as Hobby — the subscription is for access, not fees.
+ *     (`profiles.is_verified`) — after that they can list up to
+ *     5 cards each calendar month and pay only the per-transaction fee (see
+ *     `commissionService`). Hobby accounts never get a storefront on the
+ *     Local Traders directory.
+ *   • The paid tiers cost money each month (see TIER_PRICES_AUD in
+ *     `config/subscription.js`). They require ID verification and a payment
+ *     method too, and unlock a bigger monthly listing allowance, the branded
+ *     storefront on Local Traders, and progressively fancier Vault display
+ *     styles (see `lib/displayStyles.js` — access is cumulative by tier).
+ *     Every tier pays the SAME per-transaction fees as Hobby — the
+ *     subscription is for access, not fees.
+ *
+ * The MONTHLY LISTING LIMITS declared here are mirrored in the database by
+ * the `enforce_monthly_listing_quota` trigger on `public.listings` (see the
+ * migration that created it). Change a limit in BOTH places or the UI and the
+ * database will disagree.
  *
  * This file is intentionally dependency-free so it imports cleanly from the
  * React SPA (via the `@/` alias) and from the Express backend (relative path).
  */
 
 import {
-  SUBSCRIPTION_PRICE_AUD,
+  TIER_PRICES_AUD,
   SUBSCRIPTION_CURRENCY,
   SUBSCRIPTION_INTERVAL,
   TRIAL_DAYS,
@@ -39,27 +49,65 @@ import {
 /** Canonical plan keys used across the UI and copy. */
 export const PLAN_HOBBY = 'hobby';
 export const PLAN_PRO = 'pro';
+export const PLAN_PREMIUM = 'premium';
+export const PLAN_ELITE = 'elite';
+export const PLAN_ULTIMATE = 'ultimate';
+
+/** All plan keys in ascending order (Hobby first). */
+export const PLAN_ORDER = [PLAN_HOBBY, PLAN_PRO, PLAN_PREMIUM, PLAN_ELITE, PLAN_ULTIMATE];
+
+/** The `profiles.subscription_tier` values that count as paid, ascending. */
+export const PAID_TIERS = ['pro', 'premium', 'elite', 'ultimate'];
 
 /**
- * Map a `profiles.subscription_tier` value onto a plan key. The tier column's
- * CHECK allows 'free' | 'pro' | 'premium' | 'elite' | 'ultimate' (see
- * `lib/displayStyles.js`). 'free' is Hobby; anything above it is Pro-or-better,
- * which for account-plan purposes is simply "Pro". An unknown value is treated
- * as the safest default (Hobby / free).
+ * How many NEW listings each tier may create per calendar month.
+ * `null` = unlimited. Keyed by `profiles.subscription_tier` value.
+ * Mirrored in the DB by the `enforce_monthly_listing_quota` trigger — keep
+ * the two in sync.
+ */
+export const LISTINGS_PER_MONTH = {
+  free: 5,
+  pro: 15,
+  premium: 30,
+  elite: 50,
+  ultimate: null, // unlimited
+};
+
+/** Monthly listing allowance for a tier (unknown tiers get the Hobby limit). */
+export function listingsPerMonthForTier(tier) {
+  return Object.prototype.hasOwnProperty.call(LISTINGS_PER_MONTH, tier)
+    ? LISTINGS_PER_MONTH[tier]
+    : LISTINGS_PER_MONTH.free;
+}
+
+/**
+ * Map a `profiles.subscription_tier` value onto its plan key. The tier
+ * column's CHECK allows 'free' | 'pro' | 'premium' | 'elite' | 'ultimate'
+ * (see `lib/displayStyles.js`). 'free' is Hobby; the paid values map 1:1.
+ * An unknown value is treated as the safest default (Hobby / free).
+ */
+export function planKeyFromTier(tier) {
+  return PAID_TIERS.includes(tier) ? tier : PLAN_HOBBY;
+}
+
+/**
+ * Back-compat coarse mapping: Hobby vs "Pro-or-better". Call sites that only
+ * care whether the account pays at all (badge, gating) keep working unchanged.
  */
 export function planFromTier(tier) {
   return tier && tier !== 'free' ? PLAN_PRO : PLAN_HOBBY;
 }
 
-/** True when the given subscription_tier counts as a paid (Pro) account. */
+/** True when the given subscription_tier counts as a paid account. */
 export function isProTier(tier) {
   return planFromTier(tier) === PLAN_PRO;
 }
 
 /**
- * Pro is "active" when EITHER the tier column says so (mirrored by the
- * subscription webhook) OR the live subscription status is entitled — belt and
- * braces so a brief mismatch between the two never locks a paying member out.
+ * Paid membership is "active" when EITHER the tier column says so (mirrored by
+ * the subscription webhook) OR the live subscription status is entitled — belt
+ * and braces so a brief mismatch between the two never locks a paying member
+ * out.
  */
 export function isProAccount({ subscriptionTier, subscriptionStatus } = {}) {
   return (
@@ -69,27 +117,39 @@ export function isProAccount({ subscriptionTier, subscriptionStatus } = {}) {
 }
 
 /**
- * Feature / limit matrix. `limit: null` means unlimited. Kept declarative so the
- * pricing page and any server-side quota check read from the same table.
+ * Does this account get a storefront (a /dealer store page listed on Local
+ * Traders)? Every paid tier does; Hobby never does. Same belt-and-braces
+ * status fallback as isProAccount.
+ */
+export function hasStorefront({ subscriptionTier, subscriptionStatus } = {}) {
+  return isProAccount({ subscriptionTier, subscriptionStatus });
+}
+
+/**
+ * Feature / limit matrix. `listingsPerMonth: null` means unlimited. Kept
+ * declarative so the pricing page and any server-side quota check read from
+ * the same table. `vaultDisplayStyles` names the ladder step in
+ * `lib/displayStyles.js` each tier unlocks (access is cumulative).
  */
 export const PLANS = {
   [PLAN_HOBBY]: {
     key: PLAN_HOBBY,
     name: 'Hobby',
+    tier: 'free',
     tagline: 'Free forever — collect, buy and sell casually.',
     priceAud: 0,
     interval: null,
     limits: {
-      activeListings: 25,
+      listingsPerMonth: LISTINGS_PER_MONTH.free,
       imagesPerListing: 6,
       // Cosmetic vault display styles the tier can pick (see displayStyles.js).
-      vaultDisplayStyles: 'basic',
+      vaultDisplayStyles: 'classic',
       storefront: false,
       analytics: 'basic',
     },
     features: [
       'Browse and buy instantly — no membership needed',
-      'List and sell up to 25 cards once your ID is verified',
+      `List up to ${LISTINGS_PER_MONTH.free} cards a month once your ID is verified`,
       'Pay only a small fee when a sale or trade completes',
       'Card on file required to sell or trade — never charged until you transact',
       'Trade with other verified collectors',
@@ -99,40 +159,118 @@ export const PLANS = {
   [PLAN_PRO]: {
     key: PLAN_PRO,
     name: 'Pro',
-    tagline: 'The full CardPop toolkit for serious sellers.',
-    priceAud: SUBSCRIPTION_PRICE_AUD,
+    tier: 'pro',
+    tagline: 'Your own store page and the Pro display styles.',
+    priceAud: TIER_PRICES_AUD.pro,
     currency: SUBSCRIPTION_CURRENCY,
     interval: SUBSCRIPTION_INTERVAL,
     trialDays: TRIAL_DAYS,
     limits: {
-      activeListings: null, // unlimited
+      listingsPerMonth: LISTINGS_PER_MONTH.pro,
+      imagesPerListing: 20,
+      vaultDisplayStyles: 'pro',
+      storefront: true,
+      analytics: 'advanced',
+    },
+    features: [
+      'Everything in Hobby, plus:',
+      `${LISTINGS_PER_MONTH.pro} listings a month`,
+      'Your own branded store page on Local Traders',
+      'Pro display styles for your listings',
+      'Pro seller badge for extra buyer trust',
+      'Advanced sales analytics and price insights',
+      'Up to 20 images per listing',
+    ],
+  },
+  [PLAN_PREMIUM]: {
+    key: PLAN_PREMIUM,
+    name: 'Premium',
+    tier: 'premium',
+    tagline: 'More listings and the Premium showcase styles.',
+    priceAud: TIER_PRICES_AUD.premium,
+    currency: SUBSCRIPTION_CURRENCY,
+    interval: SUBSCRIPTION_INTERVAL,
+    trialDays: TRIAL_DAYS,
+    limits: {
+      listingsPerMonth: LISTINGS_PER_MONTH.premium,
       imagesPerListing: 20,
       vaultDisplayStyles: 'premium',
       storefront: true,
       analytics: 'advanced',
     },
     features: [
-      'Everything in Hobby, plus:',
-      'Unlimited active listings',
-      'Your own branded storefront and store URL',
-      'Pro seller badge for extra buyer trust',
-      'Advanced sales analytics and price insights',
-      'Premium Vault display styles',
-      'Priority placement in search and priority support',
-      'Up to 20 images per listing',
+      'Everything in Pro, plus:',
+      `${LISTINGS_PER_MONTH.premium} listings a month`,
+      'Premium display styles — Glass Museum and Slab Display',
+      'Priority placement in the Local Traders directory',
+    ],
+  },
+  [PLAN_ELITE]: {
+    key: PLAN_ELITE,
+    name: 'Elite',
+    tier: 'elite',
+    tagline: 'High-volume selling with the Elite showcase.',
+    priceAud: TIER_PRICES_AUD.elite,
+    currency: SUBSCRIPTION_CURRENCY,
+    interval: SUBSCRIPTION_INTERVAL,
+    trialDays: TRIAL_DAYS,
+    limits: {
+      listingsPerMonth: LISTINGS_PER_MONTH.elite,
+      imagesPerListing: 20,
+      vaultDisplayStyles: 'elite',
+      storefront: true,
+      analytics: 'advanced',
+    },
+    features: [
+      'Everything in Premium, plus:',
+      `${LISTINGS_PER_MONTH.elite} listings a month`,
+      'Elite display styles — Rotating Premium showcase',
+      'Priority support',
+    ],
+  },
+  [PLAN_ULTIMATE]: {
+    key: PLAN_ULTIMATE,
+    name: 'Ultimate',
+    tier: 'ultimate',
+    tagline: 'No limits. The full CardPop experience.',
+    priceAud: TIER_PRICES_AUD.ultimate,
+    currency: SUBSCRIPTION_CURRENCY,
+    interval: SUBSCRIPTION_INTERVAL,
+    trialDays: TRIAL_DAYS,
+    limits: {
+      listingsPerMonth: LISTINGS_PER_MONTH.ultimate,
+      imagesPerListing: 20,
+      vaultDisplayStyles: 'ultimate',
+      storefront: true,
+      analytics: 'advanced',
+    },
+    features: [
+      'Everything in Elite, plus:',
+      'Unlimited listings',
+      'Ultimate display styles — interactive Holographic showcase',
+      'Top placement in search and Local Traders',
     ],
   },
 };
 
-/** Convenience: the number of free-tier active listings before Pro is needed. */
-export const HOBBY_MAX_ACTIVE_LISTINGS = PLANS[PLAN_HOBBY].limits.activeListings;
+/** Convenience: the Hobby monthly listing allowance. */
+export const HOBBY_LISTINGS_PER_MONTH = LISTINGS_PER_MONTH.free;
 
 export default {
   PLAN_HOBBY,
   PLAN_PRO,
+  PLAN_PREMIUM,
+  PLAN_ELITE,
+  PLAN_ULTIMATE,
+  PLAN_ORDER,
+  PAID_TIERS,
   PLANS,
+  LISTINGS_PER_MONTH,
+  listingsPerMonthForTier,
+  planKeyFromTier,
   planFromTier,
   isProTier,
   isProAccount,
-  HOBBY_MAX_ACTIVE_LISTINGS,
+  hasStorefront,
+  HOBBY_LISTINGS_PER_MONTH,
 };
