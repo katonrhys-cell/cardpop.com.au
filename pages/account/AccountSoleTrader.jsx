@@ -40,7 +40,7 @@ const slugify = (s) => String(s || '')
   .replace(/-+$/g, '');
 
 const AccountSoleTrader = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, isPro } = useAuth();
   const [loading, setLoading]           = useState(false);
   const [pageLoading, setPageLoading]   = useState(true);
 
@@ -184,6 +184,40 @@ const AccountSoleTrader = () => {
       <div className="h-8 w-48 bg-muted rounded-xl" />
       <div className="h-64 bg-muted rounded-2xl" />
     </div>
+  );
+
+  // Store pages are a paid-membership perk. Hobby accounts see the pitch
+  // instead of the editor; any details they saved before a downgrade are kept
+  // and come straight back when they upgrade again.
+  if (!isPro) return (
+    <AccountPageShell
+      documentTitle="Sole Trader Account | CardPop"
+      breadcrumb={[{ label: 'Account', path: '/account' }, { label: 'Sole Trader' }]}
+      title="Sole Trader Account"
+      description="Your own dealer store page on the Local Traders directory — a paid membership perk."
+    >
+      <Card className="shadow-sm">
+        <CardContent className="p-8 text-center space-y-4">
+          <div className="mx-auto w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+            <Store className="w-7 h-7 text-primary" />
+          </div>
+          <h2 className="font-heading text-xl font-bold text-foreground">Store pages are a membership perk</h2>
+          <p className="text-muted-foreground max-w-lg mx-auto">
+            Upgrade to Pro (or higher) to open your own branded store page. Your listings will appear
+            on the marketplace <em>and</em> on your store page in the Local Traders directory, with
+            your logo, tagline, trust badges and store URL.
+          </p>
+          <div className="flex justify-center gap-3 pt-2">
+            <Button asChild className="rounded-xl h-11 px-6 font-bold">
+              <Link to="/account/membership">Upgrade membership</Link>
+            </Button>
+            <Button asChild variant="outline" className="rounded-xl h-11 px-6 font-bold">
+              <Link to="/pricing">Compare plans</Link>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </AccountPageShell>
   );
 
   const currentLogoUrl = logoPreview ?? (removeLogo ? null : existingLogoUrl);

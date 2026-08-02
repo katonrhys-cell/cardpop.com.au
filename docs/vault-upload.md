@@ -79,6 +79,7 @@ card itself is already saved in every case):
 | `listed` | live on the marketplace now |
 | `pending` | held for admin approval by the listing-approval trigger |
 | `blocked` | denied by the `can_sell()` gate — identity/card-on-file missing |
+| `quota` | rejected by the monthly listing quota trigger — the seller has used their tier's monthly listing allowance (see `LISTINGS_PER_MONTH` in `config/plans.js`) |
 | `error` | listing write failed; the seller can re-list from the vault |
 
 ## Update semantics

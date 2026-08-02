@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { BadgeCheck, Search, MapPin, Star, Package, ArrowRight, ShieldCheck, Store, Sparkles } from 'lucide-react';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import { PAID_TIERS } from '@/config/plans.js';
 
 const AU_STATES = [
   { code: 'NSW', label: 'New South Wales' },
@@ -105,8 +106,11 @@ const LocalTradersPage = () => {
       .select('id, store_slug, business_name, business_tagline, business_logo_url, avatar_url, business_categories, location_state, location_suburb, rating, reviews_count, total_sales, seller_tier, display_name, username, is_verified, is_featured_seller')
       .eq('is_sole_trader', true)
       .eq('is_public', true)
-      // Promoted stores pinned to the top, then by rating. All sole traders
-      // are shown — promotion/verification will become subscription perks.
+      // Store pages are a paid-membership perk: only Pro-and-above accounts
+      // appear in the directory. Hobby sole traders keep their saved business
+      // details but get no storefront until they upgrade.
+      .in('subscription_tier', PAID_TIERS)
+      // Promoted stores pinned to the top, then by rating.
       .order('is_featured_seller', { ascending: false })
       .order('rating', { ascending: false, nullsFirst: false })
       .limit(24)

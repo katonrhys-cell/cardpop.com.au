@@ -439,15 +439,28 @@ describe('prerender seller profiles', () => {
     expect(body).not.toContain('noindex');
   });
 
-  it('canonicalises sole traders to their dealer store page', async () => {
+  it('canonicalises PAID sole traders to their dealer store page', async () => {
     state.result = { data: {
       id: UUID, display_name: 'Poke Den', business_name: 'Poke Den',
       store_slug: 'poke-den', is_sole_trader: true, is_public: true,
+      subscription_tier: 'pro', subscription_status: 'active',
     } };
     const { status, body } = await run(`/seller/${UUID}`);
     expect(status).toBe(200);
     expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/dealer/poke-den" />');
     expect(body).not.toContain('noindex');
+  });
+
+  it('keeps /seller canonical for a Hobby (free) sole trader — no live store page', async () => {
+    state.result = { data: {
+      id: UUID, display_name: 'Poke Den', business_name: 'Poke Den',
+      store_slug: 'poke-den', is_sole_trader: true, is_public: true,
+      subscription_tier: 'free', subscription_status: 'none',
+    } };
+    const { status, body } = await run(`/seller/${UUID}`);
+    expect(status).toBe(200);
+    expect(body).toContain(`<link rel="canonical" href="https://cardpop.com.au/seller/${UUID}" />`);
+    expect(body).not.toContain('/dealer/poke-den');
   });
 
   it('returns a 404 with noindex for a missing or private profile', async () => {

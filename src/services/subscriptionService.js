@@ -4,9 +4,45 @@ import logger from '../utils/logger.js';
 import { markTrialRedeemed } from './welcomeOfferService.js';
 import { isStripeObjectMissing } from '../utils/stripeErrors.js';
 import { recordSubscriptionReferral } from './partnerService.js';
+import { ENV, PAID_TIER_ORDER } from '../../config/subscription.js';
 
-/** A subscription status that maps to the paid Pro tier. */
+/** A subscription status that maps to a paid tier. */
 const isEntitledStatus = (status) => ['trialing', 'active'].includes(status);
+
+/**
+ * Which paid tier a Stripe subscription buys. The tier is stamped into the
+ * subscription metadata at checkout; for subscriptions created before the
+ * multi-tier ladder (or with missing metadata) fall back to matching the
+ * billed price id against the per-tier price env vars, then to 'pro' (every
+ * legacy subscription was Pro).
+ */
+export function tierFromStripeSubscription(subscription) {
+  const metaTier = subscription?.metadata?.tier;
+  if (PAID_TIER_ORDER.includes(metaTier)) return metaTier;
+  const priceId = subscription?.items?.data?.[0]?.price?.id;
+  if (priceId) {
+    for (const tier of PAID_TIER_ORDER) {
+      const configured = process.env[ENV.stripePriceIds[tier]];
+      if (configured && configured === priceId) return tier;
+    }
+  }
+  return 'pro';
+}
+
+/**
+ * Which paid tier a PayPal billing plan buys, resolved against the per-tier
+ * plan-id env vars. Unknown/missing plan ids fall back to 'pro' (the only
+ * plan that existed before the ladder).
+ */
+export function tierFromPaypalPlanId(planId) {
+  if (planId) {
+    for (const tier of PAID_TIER_ORDER) {
+      const configured = process.env[ENV.paypalPlanIds[tier]];
+      if (configured && configured === planId) return tier;
+    }
+  }
+  return 'pro';
+}
 
 /**
  * Subscription / free-trial state management.
@@ -99,10 +135,11 @@ export async function applyStripeSubscription(subscription) {
     : null;
 
   // Drive the account-plan column from the subscription lifecycle: an entitled
-  // membership (trialing/active) IS the Pro tier; anything else drops to Hobby
-  // ('free'). This keeps profiles.subscription_tier — the value the UI and any
-  // quota check read — in lockstep with what the member actually pays for.
-  const tier = isEntitledStatus(status) ? 'pro' : 'free';
+  // membership (trialing/active) gets the tier its price bills for; anything
+  // else drops to Hobby ('free'). This keeps profiles.subscription_tier — the
+  // value the UI, the storefront gate and the monthly listing quota read — in
+  // lockstep with what the member actually pays for.
+  const tier = isEntitledStatus(status) ? tierFromStripeSubscription(subscription) : 'free';
 
   const { error } = await supabase
     .from('profiles')
@@ -141,10 +178,11 @@ export async function applyStripeSubscription(subscription) {
 }
 
 /**
- * Apply a PayPal subscription state to a profile.
- * @param {object} args - { userId?, paypalSubscriptionId, status, trialEndsAt? }
+ * Apply a PayPal subscription state to a profile. `planId` (the PayPal billing
+ * plan the subscription runs on) picks the paid tier; omitted → 'pro'.
+ * @param {object} args - { userId?, paypalSubscriptionId, status, trialEndsAt?, planId? }
  */
-export async function applyPaypalSubscription({ userId, paypalSubscriptionId, status, trialEndsAt = null }) {
+export async function applyPaypalSubscription({ userId, paypalSubscriptionId, status, trialEndsAt = null, planId = null }) {
   if (!userId) {
     const { data: profile } = await supabase
       .from('profiles')
@@ -164,7 +202,7 @@ export async function applyPaypalSubscription({ userId, paypalSubscriptionId, st
     .update({
       subscription_status:    status,
       subscription_provider:  'paypal',
-      subscription_tier:      isEntitledStatus(status) ? 'pro' : 'free',
+      subscription_tier:      isEntitledStatus(status) ? tierFromPaypalPlanId(planId) : 'free',
       paypal_subscription_id: paypalSubscriptionId,
       trial_ends_at:          trialEndsAt,
     })

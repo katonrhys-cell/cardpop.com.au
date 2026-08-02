@@ -7,6 +7,7 @@ import {
   Frame, Wand2, SlidersHorizontal, HandCoins, History, Camera,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import { listingsPerMonthForTier } from '@/config/plans.js';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCategories } from '@/hooks/useCategories.js';
@@ -1099,6 +1100,7 @@ const AddEditCardPage = () => {
   //   'listed'   — live on the marketplace now
   //   'pending'  — saved, but held for admin approval (listing_approval_required)
   //   'blocked'  — denied by the can_sell() RLS gate (identity/card-on-file missing)
+  //   'quota'    — rejected by the monthly listing quota (tier limit reached)
   //   'error'    — any other failure (the vault card itself is already saved)
 
   // Turn the sync outcome into an honest toast. `savedMsg` is the base success
@@ -1124,6 +1126,17 @@ const AddEditCardPage = () => {
           }
         );
         break;
+      case 'quota': {
+        const limit = listingsPerMonthForTier(subscriptionTier);
+        toast.warning(
+          `${savedMsg} But it is NOT live — you've used all ${limit} of this month's listings on your plan. Upgrade for a bigger monthly allowance, or relist it from your vault next month.`,
+          {
+            duration: 12000,
+            action: { label: 'See plans', onClick: () => navigate('/pricing') },
+          }
+        );
+        break;
+      }
       case 'error':
         toast.warning(`${savedMsg} But updating its marketplace listing failed — you can re-list it from your vault.`, { duration: 10000 });
         break;

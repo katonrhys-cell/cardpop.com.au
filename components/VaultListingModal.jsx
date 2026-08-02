@@ -6,7 +6,8 @@ import { toast } from 'sonner';
 import { Loader2, Lock, ShoppingCart, ArrowRightLeft, Layers, DollarSign, TrendingUp, Tag, RotateCcw, HandCoins } from 'lucide-react';
 import PriceRangeIndicator from '@/components/PriceRangeIndicator.jsx';
 import SellingRequirementsNotice from '@/components/SellingRequirementsNotice.jsx';
-import { isSellingEntitlementError } from '@/utils/listingErrors.js';
+import { isSellingEntitlementError, isListingQuotaError } from '@/utils/listingErrors.js';
+import { listingsPerMonthForTier } from '@/config/plans.js';
 import {
   Dialog,
   DialogContent,
@@ -75,7 +76,7 @@ const OPTIONS = [
 ];
 
 const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, subscriptionTier } = useAuth();
   const { settings } = usePlatformSettings();
   // Trade listing choices only exist while the enable_trading flag is on
   const visibleOptions = OPTIONS.filter(
@@ -285,7 +286,12 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
       onClose();
     } catch (error) {
       console.error('Listing update error:', error);
-      if (isSellingEntitlementError(error)) {
+      if (isListingQuotaError(error)) {
+        toast.error(
+          `You've used all ${listingsPerMonthForTier(subscriptionTier)} of this month's listings on your plan. Upgrade your membership for a bigger monthly allowance, or try again next month.`,
+          { duration: 10000 }
+        );
+      } else if (isSellingEntitlementError(error)) {
         toast.error(
           "Your card can't go live yet — selling requires identity verification and a card on file. Finish those two steps, then try again.",
           { duration: 10000 }

@@ -301,18 +301,41 @@ const HomePage = () => {
             const featured = featuredRes.data ?? [];
             if (featured.length >= LIMIT) return { data: featured.slice(0, LIMIT), error: null };
 
+            const seen = new Set(featured.map(c => c.id));
+            const merged = [...featured];
+
+            // Membership perk: Premium-and-up sellers' newest public cards
+            // fill the remaining Featured Cards slots ahead of everyone
+            // else's. The !inner join makes the owner-tier filter drop
+            // non-matching rows instead of null-ing the embed. Best-effort —
+            // any error just falls through to the generic backfill.
+            const PREMIUM_SELECT = `${VAULT_ITEM_CARD_COLUMNS}, owner:profiles!vault_items_owner_id_fkey!inner(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count, subscription_tier), vault_images(${VAULT_IMAGE_CARD_COLUMNS})`;
+            const premiumRes = await supabase.from('vault_items').select(PREMIUM_SELECT)
+              .eq('is_public', true).neq('listing_type', 'Private')
+              .in('owner.subscription_tier', ['premium', 'elite', 'ultimate'])
+              .order('created_at', { ascending: false }).limit(LIMIT);
+            for (const card of premiumRes.data ?? []) {
+              if (!seen.has(card.id)) { seen.add(card.id); merged.push(card); }
+            }
+            if (merged.length >= LIMIT) return { data: merged.slice(0, LIMIT), error: null };
+
             // Backfill with the most recent cards so the grid is never emptier
             // than before curation existed (empty selection = previous behaviour).
-            const fillRes = await publicBase().order('created_at', { ascending: false }).limit(LIMIT + featured.length);
-            if (fillRes.error) return { data: featured, error: null };
-            const seen = new Set(featured.map(c => c.id));
+            const fillRes = await publicBase().order('created_at', { ascending: false }).limit(LIMIT + merged.length);
+            if (fillRes.error) return { data: merged, error: null };
             const backfill = (fillRes.data ?? []).filter(c => !seen.has(c.id));
-            return { data: [...featured, ...backfill].slice(0, LIMIT), error: null };
+            return { data: [...merged, ...backfill].slice(0, LIMIT), error: null };
           },
             5 * 60 * 1000
           ),
+          // Featured Sellers = admin-flagged accounts plus every Ultimate
+          // member (homepage placement is an Ultimate membership perk).
           cachedQuery('homepage_featured_sellers', () =>
-            supabase.from('profiles').select(PUBLIC_PROFILE_COLUMNS).eq('is_featured_seller', true).eq('is_active', true).limit(4),
+            supabase.from('profiles').select(PUBLIC_PROFILE_COLUMNS)
+              .or('is_featured_seller.eq.true,subscription_tier.eq.ultimate')
+              .eq('is_active', true)
+              .order('rating', { ascending: false, nullsFirst: false })
+              .limit(4),
             5 * 60 * 1000
           ),
         ]);

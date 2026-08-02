@@ -171,7 +171,13 @@ const WhatnotShowFormModal = ({ isOpen, onClose, show = null, onSaved }) => {
       onSaved?.();
       onClose?.();
     } catch (err) {
-      toast.error(err.message || 'Failed to save your show. Please try again.');
+      // The whatnot_shows insert policy denies non-Premium members — explain
+      // the perk instead of surfacing a raw row-level-security error.
+      if (err?.code === '42501' || /row-level security/i.test(err?.message || '')) {
+        toast.error('Listing Whatnot shows is a Premium-and-up membership perk. Upgrade your membership to advertise your shows.', { duration: 10000 });
+      } else {
+        toast.error(err.message || 'Failed to save your show. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }

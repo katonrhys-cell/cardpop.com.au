@@ -11,8 +11,9 @@
 //   'listed'   — live on the marketplace now
 //   'pending'  — saved, but held for admin approval
 //   'blocked'  — denied by the can_sell() RLS gate (identity/card missing)
+//   'quota'    — rejected by the monthly listing quota trigger (tier limit)
 //   'error'    — any other failure (the vault card itself is already saved)
-import { isSellingEntitlementError } from '../../utils/listingErrors.js';
+import { isSellingEntitlementError, isListingQuotaError } from '../../utils/listingErrors.js';
 import { PUBLIC_LISTING_TYPES } from '../utils/vaultItemInput.js';
 import logger from '../utils/logger.js';
 
@@ -84,6 +85,7 @@ export const syncMarketplaceListing = async (userClient, { cardId, userId, listi
     return row?.status === 'pending' ? 'pending' : 'listed';
   } catch (err) {
     logger.error(`[VAULT] Marketplace listing sync failed for card ${cardId}:`, err);
+    if (isListingQuotaError(err)) return 'quota';
     return isSellingEntitlementError(err) ? 'blocked' : 'error';
   }
 };

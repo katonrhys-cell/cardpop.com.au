@@ -18,7 +18,7 @@ import {
 // about — how payments are secured, how purchases are protected, and how we
 // verify who's on the other end of a trade. Copy is deliberately accurate to
 // the integrations we run: Stripe for order checkout (PCI-DSS hosted payment,
-// with PayPal/Afterpay/wallets offered as methods), PayPal for membership
+// with PayPal/Afterpay/wallets offered as methods), Stripe for membership
 // billing, and Stripe Identity for the ID check at registration.
 
 // Stripe brand mark — white parallelogram, shown on Stripe's blurple tile
@@ -79,7 +79,7 @@ const FAQ = [
   },
   {
     q: 'What payment methods can I use?',
-    a: 'At checkout you can pay with Visa, Mastercard, American Express, PayPal, Afterpay, Apple Pay, Google Pay or Stripe Link. CardPop memberships can also be billed securely through PayPal.',
+    a: 'At checkout you can pay with Visa, Mastercard, American Express, PayPal, Afterpay, Apple Pay, Google Pay or Stripe Link.',
   },
   {
     q: 'What happens if my order never arrives or is not as described?',
@@ -119,7 +119,7 @@ const TrustSafetyPage = () => {
     >
       <SEOHead
         title="Trust & Safety — Secure Payments & Buyer Protection | CardPop™"
-        description="How CardPop protects you: PCI-DSS payments via Stripe, PayPal, a 14-day Buyer Protection Guarantee, seller chargeback protection, and Stripe Identity ID verification at registration."
+        description="How CardPop protects you: PCI-DSS payments via Stripe, a 14-day Buyer Protection Guarantee, seller chargeback protection, and Stripe Identity ID verification at registration."
         structuredData={faqStructuredData}
       />
 
@@ -131,7 +131,7 @@ const TrustSafetyPage = () => {
       </div>
 
       <SectionHeading icon={Lock}>Secure Payments</SectionHeading>
-      <p>Every purchase on <CardPopBrand /> is processed by <strong>Stripe</strong>, a globally certified <strong>PCI-DSS Level 1</strong> payment provider. Card details are entered inside Stripe’s encrypted, hosted checkout — they never touch or pass through CardPop’s servers. At checkout you can pay with <strong>Visa, Mastercard, American Express, PayPal, Afterpay, Apple Pay, Google Pay or Stripe Link</strong>, and CardPop memberships can also be billed securely through PayPal. All traffic is protected by 256-bit SSL end to end.</p>
+      <p>Every purchase on <CardPopBrand /> is processed by <strong>Stripe</strong>, a globally certified <strong>PCI-DSS Level 1</strong> payment provider. Card details are entered inside Stripe’s encrypted, hosted checkout — they never touch or pass through CardPop’s servers. At checkout you can pay with <strong>Visa, Mastercard, American Express, PayPal, Afterpay, Apple Pay, Google Pay or Stripe Link</strong>. All traffic is protected by 256-bit SSL end to end.</p>
 
       <SectionHeading icon={ShieldCheck}>Buyer Protection</SectionHeading>
       <p>Every order is backed by our <strong>14-day Buyer Protection Guarantee</strong>. If an item doesn’t arrive within the expected timeframe, or is significantly not as described, you can request a full refund through our resolution process. Your payment is only ever released to the seller once the transaction completes cleanly, so you’re never left out of pocket for an order that goes wrong.</p>
