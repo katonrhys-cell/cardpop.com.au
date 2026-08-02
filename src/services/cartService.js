@@ -2,8 +2,19 @@ import { supabase } from '../utils/supabaseClient.js';
 import { calculateBreakdown } from './commissionService.js';
 import { getPlatformSetting } from './stripeWebhookService.js';
 
-export async function priceCart(items, userId) {
+/**
+ * Price a cart server-side.
+ *
+ * @param items    cart lines ({ type: 'shop' | 'listing', id, quantity })
+ * @param userId   buyer's id, or null for a guest
+ * @param options  `waiveShipping: true` drops the flat shipping fee — used by
+ *                 partner codes whose perk includes free shipping. The amount
+ *                 that would otherwise have been charged comes back as
+ *                 `shippingWaivedCents` so the UI can show what was saved.
+ */
+export async function priceCart(items, userId, options = {}) {
   const httpError = (statusCode, message) => Object.assign(new Error(message), { statusCode });
+  const waiveShipping = options?.waiveShipping === true;
 
   const gstEnabled = await getPlatformSetting('gst_enabled', true);
   const gstRate = Number(await getPlatformSetting('gst_rate_pct', 10));
@@ -122,9 +133,17 @@ export async function priceCart(items, userId) {
   const shipRateCents = Math.round(Number(await getPlatformSetting('default_shipping_rate_aud', 10)) * 100);
   const freeThresholdCents = Math.round(Number(await getPlatformSetting('free_shipping_threshold_aud', 50)) * 100);
   let shippingCents = 0;
+  // What a free-shipping perk actually saved the buyer — 0 unless a fee was both
+  // due and waived, so an order that was already shipping-free (marketplace-only
+  // cart, or over the threshold) never claims a saving it didn't make.
+  let shippingWaivedCents = 0;
   if (shopItemsCents > 0 && shipRateCents > 0) {
     const qualifiesForFree = freeThresholdCents > 0 && shopItemsCents >= freeThresholdCents;
     shippingCents = qualifiesForFree ? 0 : shipRateCents;
+    if (waiveShipping && shippingCents > 0) {
+      shippingWaivedCents = shippingCents;
+      shippingCents = 0;
+    }
   }
   // The shipping fee is GST-inclusive too, so its tax component is part of the
   // reported GST (not an extra charge) — mirrors how the item prices are treated.
@@ -145,5 +164,5 @@ export async function priceCart(items, userId) {
     lineItems.push({ price_data: { currency: 'aud', product_data: { name: 'Shipping' }, unit_amount: shippingCents }, quantity: 1 });
   }
 
-  return { lineItems, orderLines, itemsCents, commissionCents, gstCents, includedGstCents, shippingCents, grandCents: itemsCents + commissionCents + gstCents + shippingCents };
+  return { lineItems, orderLines, itemsCents, commissionCents, gstCents, includedGstCents, shippingCents, shippingWaivedCents, grandCents: itemsCents + commissionCents + gstCents + shippingCents };
 }
