@@ -1,15 +1,18 @@
 import 'dotenv/config';
 import logger from './logger.js';
+import { ENV, normalizePaidTier } from '../../config/subscription.js';
 
 /**
  * Minimal PayPal REST client for subscription billing.
  *
  * Uses the v1 Billing Subscriptions API. Credentials come from env:
  *   PAYPAL_CLIENT_ID, PAYPAL_CLIENT_SECRET, PAYPAL_ENV ('sandbox' | 'live'),
- *   PAYPAL_SUBSCRIPTION_PLAN_ID (P-...), PAYPAL_WEBHOOK_ID.
+ *   the per-tier billing plan ids (PAYPAL_SUBSCRIPTION_PLAN_ID for Pro,
+ *   PAYPAL_SUBSCRIPTION_PLAN_ID_PREMIUM / _ELITE / _ULTIMATE for the higher
+ *   tiers — see config/subscription.js ENV), and PAYPAL_WEBHOOK_ID.
  *
- * The plan itself (including the 30-day free trial) is created once in the
- * PayPal dashboard / API and referenced here by id — see docs/SUBSCRIPTION_SETUP.md.
+ * The plans themselves (including the 30-day free trial) are created once in
+ * the PayPal dashboard / API and referenced here by id — see docs/SUBSCRIPTION_SETUP.md.
  */
 
 const PAYPAL_ENV = process.env.PAYPAL_ENV === 'live' ? 'live' : 'sandbox';
@@ -45,13 +48,15 @@ async function getAccessToken() {
 }
 
 /**
- * Create a subscription against the configured plan and return the approval URL
- * the buyer must visit to authorise it.
- * @param {object} args - { userId, email, returnUrl, cancelUrl }
+ * Create a subscription against the requested tier's billing plan and return
+ * the approval URL the buyer must visit to authorise it.
+ * @param {object} args - { userId, email, returnUrl, cancelUrl, tier? }
  */
-export async function createPaypalSubscription({ userId, email, returnUrl, cancelUrl }) {
-  const planId = process.env.PAYPAL_SUBSCRIPTION_PLAN_ID;
-  if (!planId) throw new Error('PAYPAL_SUBSCRIPTION_PLAN_ID is not configured');
+export async function createPaypalSubscription({ userId, email, returnUrl, cancelUrl, tier }) {
+  const paidTier = normalizePaidTier(tier);
+  const planEnvName = ENV.paypalPlanIds[paidTier];
+  const planId = process.env[planEnvName];
+  if (!planId) throw new Error(`${planEnvName} is not configured`);
 
   const token = await getAccessToken();
   const res = await fetch(`${BASE_URL}/v1/billing/subscriptions`, {

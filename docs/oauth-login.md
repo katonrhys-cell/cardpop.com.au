@@ -15,7 +15,7 @@ There is no code to write to add a provider button — it's all wired already:
   `supabase.auth.signInWithOAuth({ provider, options: { redirectTo } })`, which
   redirects the browser to the provider.
 - The provider sends the user back to Supabase's callback
-  (`https://odoglvswwymyjuwlonkf.supabase.co/auth/v1/callback`), which creates
+  (`https://vrfsaazuqjxotnieqlkd.supabase.co/auth/v1/callback`), which creates
   the Supabase session and redirects to `redirectTo` — `/account` for both the
   login and signup pages (`pages/LoginPage.jsx`, `pages/SignupPage.jsx`).
 - `lib/supabaseClient.js` has `detectSessionInUrl: true`, so on return the
@@ -75,7 +75,7 @@ and **Supabase** (to store its credentials). Do them in this order.
 2. In **Valid OAuth Redirect URIs**, paste the Supabase callback URL exactly:
 
    ```
-   https://odoglvswwymyjuwlonkf.supabase.co/auth/v1/callback
+   https://vrfsaazuqjxotnieqlkd.supabase.co/auth/v1/callback
    ```
 
 3. Leave **Client OAuth Login**, **Web OAuth Login** and **Enforce HTTPS**
@@ -97,9 +97,9 @@ and **Supabase** (to store its credentials). Do them in this order.
 
 ### 4. Put the credentials into Supabase
 
-1. Open the Supabase dashboard → project **odoglvswwymyjuwlonkf** →
+1. Open the Supabase dashboard → project **vrfsaazuqjxotnieqlkd** →
    **Authentication → Providers → Facebook**.
-   (Direct: <https://supabase.com/dashboard/project/odoglvswwymyjuwlonkf/auth/providers>)
+   (Direct: <https://supabase.com/dashboard/project/vrfsaazuqjxotnieqlkd/auth/providers>)
 2. Toggle **Enable Facebook** on.
 3. Paste the **App ID** into **Facebook client ID** and the **App Secret** into
    **Facebook secret**.

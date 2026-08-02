@@ -288,8 +288,12 @@ const CheckoutPage = () => {
         if (data?.promoError) {
           toast.error(data.promoError);
           setPromoCode('');
-        } else if (promoCode && !useWallet && data?.discountAud > 0) {
-          toast.success(`Code applied — $${Number(data.discountAud).toFixed(2)} off.`);
+        } else if (promoCode && !useWallet && (data?.discountAud > 0 || data?.freeShipping)) {
+          // A partner code can be worth applying for free shipping alone, so the
+          // confirmation covers a $0-off code that still dropped the fee.
+          const off = data.discountAud > 0 ? `$${Number(data.discountAud).toFixed(2)} off` : '';
+          const ship = data.freeShipping ? 'free shipping' : '';
+          toast.success(`Code applied — ${[off, ship].filter(Boolean).join(' + ')}.`);
         }
       })
       .catch(() => { if (!cancelled) setPricing(null); });
@@ -310,8 +314,15 @@ const CheckoutPage = () => {
   // Settings); 0 when the cart has no shop items or the order ships free.
   const shipping = pricing ? Number(pricing.shippingAud || 0) : 0;
   const discount = pricing && !pricing.promoError ? Number(pricing.discountAud || 0) : 0;
+  // A partner code whose perk is free shipping already waived the fee in the
+  // server quote (`shipping` above is 0), so the saving is only visible here.
+  const freeShipping = !!pricing && !pricing.promoError && !!pricing.freeShipping;
+  const shippingWaived = freeShipping ? Number(pricing.shippingWaivedAud || 0) : 0;
   const total = pricing?.totalAud ?? clientSubtotal;
-  const appliedPromoCode = discount > 0 ? promoCode : '';
+  // The code counts as applied when it saved the buyer anything at all — a
+  // free-shipping-only code has a $0 discount but must still be sent with the
+  // order, or the waiver (and the partner's attribution) is lost at checkout.
+  const appliedPromoCode = discount > 0 || freeShipping ? promoCode : '';
 
   const validateShipping = () => {
     const { email, firstName, lastName, address, suburb, state, postcode, verified, placesUnavailable } = shippingData;
@@ -427,6 +438,7 @@ const CheckoutPage = () => {
       gst={gst}
       gstIncluded={gstIncluded}
       shipping={shipping}
+      shippingWaived={shippingWaived}
       discount={discount}
       total={total}
       // "Edit Cart" opens the cart drawer (remove items / change quantities)
@@ -445,7 +457,9 @@ const CheckoutPage = () => {
         {appliedPromoCode ? (
           <div className="flex items-center justify-between text-sm">
             <span className="font-mono tracking-widest">{appliedPromoCode}</span>
-            <span className="text-green-600 font-semibold">−${discount.toFixed(2)} applied</span>
+            <span className="text-green-600 font-semibold">
+              {discount > 0 ? `−$${discount.toFixed(2)} applied` : 'Free shipping applied'}
+            </span>
             <Button
               variant="ghost"
               size="sm"
@@ -620,6 +634,7 @@ const CheckoutPage = () => {
                         gst={gst}
                         gstIncluded={gstIncluded}
                         shipping={shipping}
+                        shippingWaived={shippingWaived}
                         discount={discount}
                         total={total}
                       />

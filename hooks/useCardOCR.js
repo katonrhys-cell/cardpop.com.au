@@ -4,6 +4,7 @@ import { integratedAiClient } from '@/lib/integratedAiClient';
 import { useIsMounted } from '@/hooks/useIsMounted.js';
 import { groundAgainstCatalogue } from '@/utils/catalogueGrounding.js';
 import { mapOCRResult, catalogueCollectionParam } from '@/utils/ocrResult.js';
+import { ANALYSIS_IMAGE_LIMIT } from '@/utils/listingFlow.js';
 
 const SSEEventType = {
   Content: 'content',
@@ -20,7 +21,7 @@ export function useCardOCR() {
     // Accept a single File or an array of Files (front + back/extra angles).
     const imageFiles = (Array.isArray(imageInput) ? imageInput : [imageInput])
       .filter(Boolean)
-      .slice(0, 3);
+      .slice(0, ANALYSIS_IMAGE_LIMIT);
     if (!imageFiles.length) return;
 
     setIsScanning(true);

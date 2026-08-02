@@ -301,18 +301,41 @@ const HomePage = () => {
             const featured = featuredRes.data ?? [];
             if (featured.length >= LIMIT) return { data: featured.slice(0, LIMIT), error: null };
 
+            const seen = new Set(featured.map(c => c.id));
+            const merged = [...featured];
+
+            // Membership perk: Premium-and-up sellers' newest public cards
+            // fill the remaining Featured Cards slots ahead of everyone
+            // else's. The !inner join makes the owner-tier filter drop
+            // non-matching rows instead of null-ing the embed. Best-effort —
+            // any error just falls through to the generic backfill.
+            const PREMIUM_SELECT = `${VAULT_ITEM_CARD_COLUMNS}, owner:profiles!vault_items_owner_id_fkey!inner(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count, subscription_tier), vault_images(${VAULT_IMAGE_CARD_COLUMNS})`;
+            const premiumRes = await supabase.from('vault_items').select(PREMIUM_SELECT)
+              .eq('is_public', true).neq('listing_type', 'Private')
+              .in('owner.subscription_tier', ['premium', 'elite', 'ultimate'])
+              .order('created_at', { ascending: false }).limit(LIMIT);
+            for (const card of premiumRes.data ?? []) {
+              if (!seen.has(card.id)) { seen.add(card.id); merged.push(card); }
+            }
+            if (merged.length >= LIMIT) return { data: merged.slice(0, LIMIT), error: null };
+
             // Backfill with the most recent cards so the grid is never emptier
             // than before curation existed (empty selection = previous behaviour).
-            const fillRes = await publicBase().order('created_at', { ascending: false }).limit(LIMIT + featured.length);
-            if (fillRes.error) return { data: featured, error: null };
-            const seen = new Set(featured.map(c => c.id));
+            const fillRes = await publicBase().order('created_at', { ascending: false }).limit(LIMIT + merged.length);
+            if (fillRes.error) return { data: merged, error: null };
             const backfill = (fillRes.data ?? []).filter(c => !seen.has(c.id));
-            return { data: [...featured, ...backfill].slice(0, LIMIT), error: null };
+            return { data: [...merged, ...backfill].slice(0, LIMIT), error: null };
           },
             5 * 60 * 1000
           ),
+          // Featured Sellers = admin-flagged accounts plus every Ultimate
+          // member (homepage placement is an Ultimate membership perk).
           cachedQuery('homepage_featured_sellers', () =>
-            supabase.from('profiles').select(PUBLIC_PROFILE_COLUMNS).eq('is_featured_seller', true).eq('is_active', true).limit(4),
+            supabase.from('profiles').select(PUBLIC_PROFILE_COLUMNS)
+              .or('is_featured_seller.eq.true,subscription_tier.eq.ultimate')
+              .eq('is_active', true)
+              .order('rating', { ascending: false, nullsFirst: false })
+              .limit(4),
             5 * 60 * 1000
           ),
         ]);
@@ -398,7 +421,7 @@ const HomePage = () => {
       />
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section className="relative min-h-[92dvh] flex items-start justify-center pt-10 sm:pt-14 pb-16 px-5 sm:px-8 lg:px-12 xl:px-16 overflow-hidden bg-zinc-950">
+      <section className="relative lg:min-h-[92dvh] flex items-start justify-center pt-8 sm:pt-14 pb-10 sm:pb-16 px-5 sm:px-8 lg:px-12 xl:px-16 overflow-hidden bg-zinc-950">
 
         {/* Stage floor gradient */}
         <div className="absolute inset-0 bg-gradient-to-b from-zinc-950 via-[#0f0f14] to-zinc-950 pointer-events-none" />
@@ -460,7 +483,7 @@ const HomePage = () => {
           <div className="text-center lg:text-left">
             {/* LIVE show badge */}
             <div
-              className="anim-pop-in inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-8 border text-sm font-black tracking-wider uppercase"
+              className="anim-pop-in inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-5 sm:mb-8 border text-sm font-black tracking-wider uppercase"
               style={{
                 animationDelay: '0.15s',
                 background: 'rgba(220,38,38,0.12)',
@@ -475,7 +498,7 @@ const HomePage = () => {
               <span className="text-white/60 font-semibold normal-case tracking-normal">Australia's Card Show</span>
             </div>
 
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[4.25rem] font-bold font-serif tracking-normal text-balance mb-6 leading-[1.2] text-white">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[4.25rem] font-bold font-serif tracking-normal text-balance mb-4 sm:mb-6 leading-[1.2] text-white">
               Sell Your Trading Cards to{' '}
               <br className="hidden sm:block" />
               <span
@@ -486,11 +509,11 @@ const HomePage = () => {
               </span>
             </h1>
 
-            <p className="text-base md:text-lg text-zinc-400 max-w-lg mb-10 leading-relaxed text-balance mx-auto lg:mx-0">
+            <p className="text-base md:text-lg text-zinc-400 max-w-lg mb-6 sm:mb-10 leading-relaxed text-balance mx-auto lg:mx-0">
               CardPop is Australia's marketplace for Pokémon, MTG, sports cards and more. List your collection in minutes, reach thousands of verified collectors, and get paid securely in AUD — with buyer protection on every order.
             </p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-10">
+            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 sm:gap-4 mb-6 sm:mb-10">
               <Button
                 asChild
                 size="lg"
@@ -551,9 +574,9 @@ const HomePage = () => {
           Renders nothing until the counts load, and skips any metric that is
           still zero: honest numbers or no numbers. */}
       {statItems.length >= 2 && (
-        <section ref={statsRef} className="py-12 border-y border-border bg-card">
+        <section ref={statsRef} className="py-8 md:py-12 border-y border-border bg-card">
           <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
-            <div className={`grid grid-cols-2 gap-8 md:gap-4 ${statItems.length >= 4 ? 'md:grid-cols-4' : statItems.length === 3 ? 'md:grid-cols-3' : ''}`}>
+            <div className={`grid grid-cols-2 gap-6 md:gap-4 ${statItems.length >= 4 ? 'md:grid-cols-4' : statItems.length === 3 ? 'md:grid-cols-3' : ''}`}>
               {statItems.map((stat) => (
                 <StatItem key={stat.label} {...stat} inView={statsInView} />
               ))}
@@ -563,7 +586,7 @@ const HomePage = () => {
       )}
 
       {/* ── Trust strip ──────────────────────────────────────────────────── */}
-      <section className="py-10 bg-background border-b border-border">
+      <section className="py-8 md:py-10 bg-background border-b border-border">
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {TRUST_SIGNALS.map(({ icon: Icon, title, body }) => (
@@ -591,9 +614,9 @@ const HomePage = () => {
       </section>
 
       {/* ── Category browse ───────────────────────────────────────────────── */}
-      <section className="py-16 bg-background">
+      <section className="py-10 md:py-16 bg-background">
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
-          <div className="flex items-end justify-between mb-8">
+          <div className="flex items-end justify-between mb-6 md:mb-8">
             <div>
               <h2 className="text-2xl md:text-3xl font-bold font-serif mb-1">Browse by Category</h2>
               <p className="text-muted-foreground text-sm">Find exactly what you collect.</p>
@@ -673,18 +696,18 @@ const HomePage = () => {
       </section>
 
       {/* ── Bento features ───────────────────────────────────────────────── */}
-      <section className="py-24 bg-card border-y border-border relative">
+      <section className="py-12 md:py-24 bg-card border-y border-border relative">
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold font-serif mb-4">Built for Serious Collectors</h2>
+          <div className="text-center mb-8 md:mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold font-serif mb-3 md:mb-4">Built for Serious Collectors</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">Everything you need to manage your collection and make informed trades.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[minmax(250px,auto)]">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 md:auto-rows-[minmax(250px,auto)]">
             {/* Large feature */}
-            <div className="md:col-span-2 bg-secondary rounded-3xl p-8 md:p-12 flex flex-col justify-between relative overflow-hidden group">
+            <div className="md:col-span-2 bg-secondary rounded-3xl p-6 md:p-12 flex flex-col justify-between relative overflow-hidden group">
               <div className="relative z-10 max-w-md">
-                <div className="w-12 h-12 bg-background rounded-xl flex items-center justify-center mb-6 shadow-sm">
+                <div className="w-12 h-12 bg-background rounded-xl flex items-center justify-center mb-4 md:mb-6 shadow-sm">
                   <ShieldCheck className="w-6 h-6 text-primary" />
                 </div>
                 <h3 className="text-2xl font-bold mb-3 text-secondary-foreground">Bank-Grade Security</h3>
@@ -696,9 +719,9 @@ const HomePage = () => {
             </div>
 
             {/* Small feature 1 */}
-            <div className="bg-muted rounded-3xl p-8 flex flex-col justify-between group hover:bg-muted/80 transition-colors">
+            <div className="bg-muted rounded-3xl p-6 md:p-8 flex flex-col justify-between group hover:bg-muted/80 transition-colors">
               <div>
-                <div className="w-12 h-12 bg-background rounded-xl flex items-center justify-center mb-6 shadow-sm">
+                <div className="w-12 h-12 bg-background rounded-xl flex items-center justify-center mb-4 md:mb-6 shadow-sm">
                   <TrendingUp className="w-6 h-6 text-primary" />
                 </div>
                 <h3 className="text-xl font-bold mb-3 text-foreground">Live Market Data</h3>
@@ -709,9 +732,9 @@ const HomePage = () => {
             </div>
 
             {/* Small feature 2 */}
-            <div className="bg-muted rounded-3xl p-8 flex flex-col justify-between group hover:bg-muted/80 transition-colors">
+            <div className="bg-muted rounded-3xl p-6 md:p-8 flex flex-col justify-between group hover:bg-muted/80 transition-colors">
               <div>
-                <div className="w-12 h-12 bg-background rounded-xl flex items-center justify-center mb-6 shadow-sm">
+                <div className="w-12 h-12 bg-background rounded-xl flex items-center justify-center mb-4 md:mb-6 shadow-sm">
                   <Search className="w-6 h-6 text-primary" />
                 </div>
                 <h3 className="text-xl font-bold mb-3 text-foreground">Smart Discovery</h3>
@@ -722,18 +745,18 @@ const HomePage = () => {
             </div>
 
             {/* CTA feature */}
-            <div className="md:col-span-2 bg-primary text-primary-foreground rounded-3xl p-8 md:p-12 flex flex-col sm:flex-row items-center justify-between gap-8 relative overflow-hidden">
+            <div className="md:col-span-2 bg-primary text-primary-foreground rounded-3xl p-6 md:p-12 flex flex-col sm:flex-row items-center justify-between gap-6 md:gap-8 relative overflow-hidden">
               <div className="relative z-10 max-w-md">
-                <h3 className="text-2xl md:text-3xl font-bold mb-4">Ready to start trading?</h3>
-                <p className="text-primary-foreground/90 mb-8">
+                <h3 className="text-2xl md:text-3xl font-bold mb-3 md:mb-4">Ready to start trading?</h3>
+                <p className="text-primary-foreground/90 mb-6 md:mb-8">
                   Join our community of verified collectors and start building your dream vault today.
                 </p>
                 <Button asChild variant="secondary" size="lg" className="rounded-xl font-bold text-primary hover:bg-background">
                   <Link to="/signup">Get Started Now</Link>
                 </Button>
               </div>
-              <div className="relative z-10 w-32 h-32 sm:w-48 sm:h-48 bg-primary-foreground/10 rounded-full flex items-center justify-center backdrop-blur-sm border border-primary-foreground/20">
-                <Users className="w-16 h-16 sm:w-24 sm:h-24 text-primary-foreground/80" />
+              <div className="relative z-10 w-24 h-24 sm:w-48 sm:h-48 bg-primary-foreground/10 rounded-full flex items-center justify-center backdrop-blur-sm border border-primary-foreground/20">
+                <Users className="w-12 h-12 sm:w-24 sm:h-24 text-primary-foreground/80" />
               </div>
             </div>
           </div>
@@ -741,16 +764,16 @@ const HomePage = () => {
       </section>
 
       {/* ── How it works ─────────────────────────────────────────────────── */}
-      <section className="py-24 bg-background">
+      <section className="py-12 md:py-24 bg-background">
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold font-serif mb-4">How CardPop Works</h2>
+          <div className="text-center mb-8 md:mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold font-serif mb-3 md:mb-4">How CardPop Works</h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
               Three simple steps to start trading with confidence across Australia.
             </p>
           </div>
 
-          <div ref={howRef} className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+          <div ref={howRef} className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 relative">
             {/* Connecting line — desktop only */}
             <div className="hidden md:block absolute top-10 left-[calc(16.67%+1.5rem)] right-[calc(16.67%+1.5rem)] h-px bg-gradient-to-r from-primary/20 via-primary/60 to-primary/20 z-0" />
 
@@ -761,7 +784,7 @@ const HomePage = () => {
                 style={howInView ? { animationDelay: `${i * 0.15}s` } : undefined}
               >
                 {/* Step number badge */}
-                <div className="w-20 h-20 rounded-2xl bg-primary flex items-center justify-center mb-6 shadow-lg shadow-primary/20 relative">
+                <div className="w-20 h-20 rounded-2xl bg-primary flex items-center justify-center mb-4 md:mb-6 shadow-lg shadow-primary/20 relative">
                   <step.icon className="w-9 h-9 text-primary-foreground" />
                   <span className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-background border-2 border-border text-[10px] font-extrabold text-muted-foreground flex items-center justify-center">
                     {step.step}
@@ -773,7 +796,7 @@ const HomePage = () => {
             ))}
           </div>
 
-          <div className="mt-14 text-center">
+          <div className="mt-8 md:mt-14 text-center">
             <Button asChild size="lg" className="h-14 px-10 rounded-2xl font-bold text-lg shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5">
               <Link to="/signup">Start for Free <ArrowRight className="ml-2 w-5 h-5" /></Link>
             </Button>
@@ -782,11 +805,11 @@ const HomePage = () => {
       </section>
 
       {/* ── Featured cards ────────────────────────────────────────────────── */}
-      <section className="py-24 bg-muted/30 border-t border-border">
+      <section className="py-12 md:py-24 bg-muted/30 border-t border-border">
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
-          <div className="flex items-end justify-between mb-12">
+          <div className="flex items-end justify-between mb-6 md:mb-12">
             <div>
-              <h2 className="text-3xl font-bold font-serif mb-2">Featured Cards</h2>
+              <h2 className="text-3xl font-bold font-serif mb-1 md:mb-2">Featured Cards</h2>
               <p className="text-muted-foreground">Handpicked listings from Australian collectors.</p>
             </div>
             <Button asChild variant="ghost" className="hidden sm:flex font-bold hover:bg-muted">
@@ -830,7 +853,7 @@ const HomePage = () => {
             </div>
           )}
 
-          <div className="mt-8 text-center sm:hidden">
+          <div className="mt-6 text-center sm:hidden">
             <Button asChild variant="outline" className="w-full rounded-xl font-bold">
               <Link to="/marketplace">View All Listings</Link>
             </Button>
@@ -839,10 +862,10 @@ const HomePage = () => {
       </section>
 
       {/* ── Featured sellers ──────────────────────────────────────────────── */}
-      <section className="py-24 bg-background border-t border-border">
+      <section className="py-12 md:py-24 bg-background border-t border-border">
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold font-serif mb-4">Trusted Australian Sellers</h2>
+          <div className="text-center mb-8 md:mb-16">
+            <h2 className="text-3xl font-bold font-serif mb-3 md:mb-4">Trusted Australian Sellers</h2>
             <p className="text-muted-foreground max-w-2xl mx-auto">Trade with confidence. Every seller is verified and rated by the CardPop community.</p>
           </div>
 
@@ -878,7 +901,7 @@ const HomePage = () => {
       </section>
 
       {/* ── Recently viewed (renders nothing until the visitor has viewed cards) ── */}
-      <section className="py-10 bg-background">
+      <section className="py-6 md:py-10 bg-background">
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
           <RecentlyViewed />
         </div>

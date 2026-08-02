@@ -3,9 +3,10 @@ import { COLLECTION_SEO } from '../data/collectionSeo.js';
 import { SHOP_COLLECTION_SEO } from '../data/shopCollectionSeo.js';
 import { BLOG_CATEGORIES } from '../data/blogCategories.js';
 import { BUYING_GUIDES } from '../data/buyingGuides.js';
+import { PAID_TIERS } from '../config/plans.js';
 
-const SUPABASE_URL = 'https://odoglvswwymyjuwlonkf.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kb2dsdnN3d3lteWp1d2xvbmtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3OTQ5NTgsImV4cCI6MjA5NDM3MDk1OH0.R5fwR42iKIEsfx1iA-fjk4YPLCH3mcmoIKkosEy6g1I';
+const SUPABASE_URL = 'https://vrfsaazuqjxotnieqlkd.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_lHlLkeTfwzhWQ80Zz6pL6g_jc7Y8p33';
 
 const BASE_URL = 'https://cardpop.com.au';
 const TODAY = new Date().toISOString().split('T')[0];
@@ -164,6 +165,9 @@ export default async function handler(req, res) {
           .select('id, store_slug, updated_at')
           .eq('is_sole_trader', true)
           .eq('is_public', true)
+          // Store pages are a paid-membership perk — only advertise stores
+          // that renderDealer() will actually serve.
+          .in('subscription_tier', PAID_TIERS)
           .limit(500),
         supabase
           .from('shop_products')
@@ -191,16 +195,17 @@ export default async function handler(req, res) {
           .eq('status', 'approved')
           .limit(500),
         // Public seller profiles (/seller/:id) — prerendered for crawlers but
-        // previously absent from the sitemap. Sole traders are excluded here:
-        // their canonical is the /dealer store page (already listed above), so
-        // /seller/:id for them is a declared alternate, not a URL to advertise.
-        // is_public IS NOT false and is_sole_trader IS NOT true mirror exactly
-        // what renderSeller() serves (null is_public/is_sole_trader render).
+        // previously absent from the sitemap. PAID sole traders are excluded
+        // here: their canonical is the /dealer store page (already listed
+        // above), so /seller/:id for them is a declared alternate, not a URL
+        // to advertise. A Hobby ('free') sole trader has no live store page,
+        // so their /seller page stays canonical and IS advertised — mirroring
+        // renderSeller()'s hasStore logic.
         supabase
           .from('profiles')
           .select('id, updated_at, reviews_count')
           .not('is_public', 'is', false)
-          .not('is_sole_trader', 'is', true)
+          .or('is_sole_trader.not.is.true,subscription_tier.eq.free')
           .order('updated_at', { ascending: false })
           .limit(1000),
         // Seller ids that currently have an active listing — the content gate

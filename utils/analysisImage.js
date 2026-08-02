@@ -19,6 +19,7 @@
 
 import { detectAndCropCard } from './detectCard.js';
 import { compressImage } from './compressImage.js';
+import { ANALYSIS_IMAGE_LIMIT } from './listingFlow.js';
 
 // Detection lazy-loads OpenCV (a large wasm chunk) on first use. Cap the wait so
 // a slow connection or a failed load delays the scan by this much at worst.
@@ -109,7 +110,9 @@ async function boundForUpload(file) {
  * @returns {Promise<{ files: File[], cropped: boolean, dropped: number }>}
  */
 export async function prepareAnalysisImages(files, options = {}) {
-  const present = (Array.isArray(files) ? files : [files]).filter(Boolean);
+  const present = (Array.isArray(files) ? files : [files])
+    .filter(Boolean)
+    .slice(0, ANALYSIS_IMAGE_LIMIT);
   if (!present.length) return { files: [], cropped: false, dropped: 0 };
 
   const [front, ...extras] = present;

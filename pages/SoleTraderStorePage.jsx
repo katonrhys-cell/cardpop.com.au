@@ -34,6 +34,7 @@ import VaultListingCard from '@/components/VaultListingCard.jsx';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import WhatnotIcon from '@/components/WhatnotIcon.jsx';
+import { hasStorefront } from '@/config/plans.js';
 
 const BADGE_META = {
   authentic:          { label: '100% Authentic',     desc: 'All cards verified before listing',                   Icon: CheckCircle2 },
@@ -74,6 +75,11 @@ const SoleTraderStorePage = () => {
         if (!profile) throw new Error('Store not found.');
         if (!profile.is_sole_trader) throw new Error('This page is not a dealer store.');
         if (profile.is_public === false) throw new Error('This store is private.');
+        // Store pages are a paid-membership perk — a Hobby account's store is
+        // unavailable (their business details are kept for when they upgrade).
+        if (!hasStorefront({ subscriptionTier: profile.subscription_tier, subscriptionStatus: profile.subscription_status })) {
+          throw new Error('This store is not currently active.');
+        }
 
         // Redirect legacy UUID links to the clean slug URL.
         if (byUuid && profile.store_slug && mounted) {
@@ -113,6 +119,7 @@ const SoleTraderStorePage = () => {
         setListings(combined);
         setStats({ totalListings: combined.length, averageRating: avgRating, totalReviews: totalReviews || (profile.reviews_count || 0) });
       } catch (err) {
+        if (mounted) setError(err.message || 'Store not found.');
       } finally {
         if (mounted) setLoading(false);
       }

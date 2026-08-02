@@ -9,8 +9,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import { CalendarDays, ExternalLink, Plus, Tv2, Trash2, Pencil, Clock, Star, ListChecks } from 'lucide-react';
+import { CalendarDays, ExternalLink, Plus, Tv2, Trash2, Pencil, Clock, Star, ListChecks, Sparkles } from 'lucide-react';
 import { publicImageUrl, toCdnUrl } from '@/utils/imageUrl.js';
+import { canListWhatnotShows, PLANS, WHATNOT_SHOWS_MIN_TIER } from '@/config/plans.js';
 import WhatnotShowFormModal from '@/components/WhatnotShowFormModal.jsx';
 
 import WhatnotIcon from '@/components/WhatnotIcon.jsx';
@@ -27,7 +28,10 @@ const StarRating = ({ rating, count }) => {
 };
 
 const WhatnotShowsPage = () => {
-  const { currentUser, isAuthenticated } = useAuth();
+  const { currentUser, isAuthenticated, subscriptionTier } = useAuth();
+  // Listing shows is a Premium-and-up perk (enforced by the whatnot_shows
+  // insert policy — this just keeps the UI honest about it).
+  const canList = canListWhatnotShows(subscriptionTier);
 
   const [shows, setShows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -128,19 +132,29 @@ const WhatnotShowsPage = () => {
             <div>
               <p className="font-bold text-foreground text-base mb-0.5">Got a show coming up?</p>
               <p className="text-sm text-muted-foreground">
-                List it here so your followers know when to tune in — it goes live straight away.
+                {canList
+                  ? 'List it here so your followers know when to tune in — it goes live straight away.'
+                  : `Advertising your Whatnot shows here is a ${PLANS[WHATNOT_SHOWS_MIN_TIER].name}-and-up membership perk.`}
               </p>
             </div>
             <div className="flex flex-wrap gap-2 shrink-0">
               <Button variant="outline" className="rounded-xl font-bold gap-2" asChild>
                 <Link to="/account/shows"><ListChecks className="w-4 h-4" /> My Shows</Link>
               </Button>
-              <Button
-                onClick={openCreate}
-                className="bg-[#FFDF00] hover:bg-[#FFDF00]/90 text-black font-bold rounded-xl gap-2"
-              >
-                <Plus className="w-4 h-4" /> List My Show
-              </Button>
+              {canList ? (
+                <Button
+                  onClick={openCreate}
+                  className="bg-[#FFDF00] hover:bg-[#FFDF00]/90 text-black font-bold rounded-xl gap-2"
+                >
+                  <Plus className="w-4 h-4" /> List My Show
+                </Button>
+              ) : (
+                <Button className="font-bold rounded-xl gap-2" asChild>
+                  <Link to={`/account/membership?tier=${WHATNOT_SHOWS_MIN_TIER}`}>
+                    <Sparkles className="w-4 h-4" /> Upgrade to {PLANS[WHATNOT_SHOWS_MIN_TIER].name}
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
         ) : (
@@ -354,12 +368,19 @@ const WhatnotShowsPage = () => {
             <WhatnotIcon className="w-14 h-14 mb-4 opacity-60" />
             <p className="text-foreground text-xl font-bold mb-2">No shows listed yet</p>
             <p className="text-sm text-muted-foreground mb-6">Be the first to advertise your upcoming Whatnot show.</p>
-            {isAuthenticated && (
+            {isAuthenticated && canList && (
               <Button
                 onClick={openCreate}
                 className="rounded-xl font-bold bg-[#FFDF00] hover:bg-[#FFDF00]/90 text-black gap-2"
               >
                 <Plus className="w-4 h-4" /> List My Show
+              </Button>
+            )}
+            {isAuthenticated && !canList && (
+              <Button className="rounded-xl font-bold gap-2" asChild>
+                <Link to={`/account/membership?tier=${WHATNOT_SHOWS_MIN_TIER}`}>
+                  <Sparkles className="w-4 h-4" /> Upgrade to {PLANS[WHATNOT_SHOWS_MIN_TIER].name} to list shows
+                </Link>
               </Button>
             )}
           </div>

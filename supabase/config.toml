@@ -4,8 +4,8 @@
 # project_id is the reference id of your Supabase project. It links this repo to
 # the remote project so the GitHub integration and `supabase db push` know which
 # database to target. For CardPop this is the ref from the project URL
-# (https://odoglvswwymyjuwlonkf.supabase.co).
-project_id = "odoglvswwymyjuwlonkf"
+# (https://vrfsaazuqjxotnieqlkd.supabase.co).
+project_id = "vrfsaazuqjxotnieqlkd"
 
 [api]
 enabled = true

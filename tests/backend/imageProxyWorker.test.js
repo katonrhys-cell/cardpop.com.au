@@ -60,14 +60,14 @@ describe('worker fetch handler', () => {
     expect(res.status).toBe(200);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     expect(fetchSpy.mock.calls[0][0]).toBe(
-      `https://odoglvswwymyjuwlonkf.supabase.co${OBJECT_PATH}`
+      `https://vrfsaazuqjxotnieqlkd.supabase.co${OBJECT_PATH}`
     );
   });
 
   it('canonicalises render-path queries before hitting origin', async () => {
     await run(`${RENDER_PATH}?evil=1&width=250&quality=75`);
     expect(fetchSpy.mock.calls[0][0]).toBe(
-      `https://odoglvswwymyjuwlonkf.supabase.co${RENDER_PATH}?quality=75&width=320`
+      `https://vrfsaazuqjxotnieqlkd.supabase.co${RENDER_PATH}?quality=75&width=320`
     );
   });
 

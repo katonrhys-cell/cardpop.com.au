@@ -80,6 +80,25 @@ describe('createPaypalSubscription', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('bills the requested tier against its own plan id', async () => {
+    process.env.PAYPAL_SUBSCRIPTION_PLAN_ID_ELITE = 'P-ELITE';
+    fetch
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(jsonResponse({ id: 'I-SUB3', status: 'APPROVAL_PENDING', links: [] }));
+    await createPaypalSubscription({ userId: 'u1', tier: 'elite' });
+    const [, subCall] = fetch.mock.calls;
+    expect(JSON.parse(subCall[1].body).plan_id).toBe('P-ELITE');
+  });
+
+  it('coerces an unknown tier back onto the Pro plan', async () => {
+    fetch
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(jsonResponse({ id: 'I-SUB4', status: 'APPROVAL_PENDING', links: [] }));
+    await createPaypalSubscription({ userId: 'u1', tier: 'god-mode' });
+    const [, subCall] = fetch.mock.calls;
+    expect(JSON.parse(subCall[1].body).plan_id).toBe('P-123');
+  });
+
   it('throws when the subscription create call fails', async () => {
     fetch
       .mockResolvedValueOnce(tokenResponse())

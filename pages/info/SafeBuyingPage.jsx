@@ -10,7 +10,7 @@ import { ShieldCheck } from 'lucide-react';
 // entry in api/prerender.js (keep the two in sync — no cloaking), listed in the
 // sitemap, and reachable from the footer. Copy is accurate to the integrations
 // we run: Stripe order checkout (PCI-DSS, with PayPal/wallets as methods),
-// PayPal membership billing, and Stripe Identity ID verification.
+// Stripe membership billing, and Stripe Identity ID verification.
 
 const FAQ = [
   {
@@ -62,7 +62,7 @@ const SafeBuyingPage = () => {
       <p>Buying trading cards online should never feel like a gamble. CardPop™ is built from the ground up to be <strong>Australia’s safest place to buy Pokémon, Magic: The Gathering, Yu-Gi-Oh! and sports cards</strong> — every order is paid securely, backed by buyer protection, and handled by identity-verified members. Here’s exactly how you’re protected on every purchase.</p>
 
       <h2>Every payment is secure</h2>
-      <p>All purchases are processed by <strong>Stripe</strong>, a globally certified <strong>PCI-DSS Level 1</strong> payment provider. Your card details are entered on Stripe’s encrypted checkout and <strong>never touch CardPop’s servers</strong>. You can pay with <strong>Visa, Mastercard, American Express, PayPal, Afterpay, Apple Pay, Google Pay or Stripe Link</strong>, all in Australian dollars — and CardPop memberships can also be billed securely through PayPal.</p>
+      <p>All purchases are processed by <strong>Stripe</strong>, a globally certified <strong>PCI-DSS Level 1</strong> payment provider. Your card details are entered on Stripe’s encrypted checkout and <strong>never touch CardPop’s servers</strong>. You can pay with <strong>Visa, Mastercard, American Express, PayPal, Afterpay, Apple Pay, Google Pay or Stripe Link</strong>, all in Australian dollars.</p>
 
       <h2>Buyer protection on every order</h2>
       <p>Every purchase is backed by our <strong>14-day Buyer Protection Guarantee</strong>. If your item doesn’t arrive within the expected timeframe, or is significantly not as described, you can request a <strong>full refund</strong> through our resolution process. You’re never left out of pocket for an order that goes wrong.</p>

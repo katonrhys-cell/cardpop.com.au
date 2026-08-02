@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-import { Plus, Pencil, Trash2, ExternalLink, Info, Clock, CalendarDays, EyeOff } from 'lucide-react';
+import { Plus, Pencil, Trash2, ExternalLink, Info, Clock, CalendarDays, EyeOff, Sparkles } from 'lucide-react';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import WhatnotShowFormModal from '@/components/WhatnotShowFormModal.jsx';
 import WhatnotIcon from '@/components/WhatnotIcon.jsx';
@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import { canListWhatnotShows, PLANS, WHATNOT_SHOWS_MIN_TIER } from '@/config/plans.js';
 import { supabase } from '@/lib/supabaseClient.js';
 import { toCdnUrl } from '@/utils/imageUrl.js';
 import { toast } from 'sonner';
@@ -36,7 +37,10 @@ const statusBadge = (show) => {
 };
 
 const AccountShows = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, subscriptionTier } = useAuth();
+  // Listing shows is a Premium-and-up perk (enforced by the whatnot_shows
+  // insert policy). Existing shows stay manageable regardless of tier.
+  const canList = canListWhatnotShows(subscriptionTier);
   const [shows, setShows] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -117,22 +121,40 @@ const AccountShows = () => {
             List your Whatnot live shows and manage where they appear.
           </p>
         </div>
-        <Button onClick={openCreate} className="font-bold rounded-xl h-11 px-6 shadow-sm shrink-0 bg-[#FFDF00] hover:bg-[#FFDF00]/90 text-black">
-          <Plus className="w-5 h-5 mr-2" /> List a Show
-        </Button>
+        {canList && (
+          <Button onClick={openCreate} className="font-bold rounded-xl h-11 px-6 shadow-sm shrink-0 bg-[#FFDF00] hover:bg-[#FFDF00]/90 text-black">
+            <Plus className="w-5 h-5 mr-2" /> List a Show
+          </Button>
+        )}
       </div>
 
-      <div className="flex items-start gap-3 p-4 bg-[#FFDF00]/10 border border-[#FFDF00]/40 rounded-2xl text-sm text-muted-foreground">
-        <Info className="w-5 h-5 text-yellow-600 dark:text-[#FFDF00] shrink-0 mt-0.5" />
-        <p>
-          Every show you list appears automatically on the{' '}
-          <Link to="/community/whatnot" className="text-primary font-semibold hover:underline">Whatnot directory</Link>
-          {' '}— no review needed. {upcomingCount > 0 && (
-            <>You currently have <span className="font-semibold text-foreground">{upcomingCount}</span> upcoming {upcomingCount === 1 ? 'show' : 'shows'} live. </>
-          )}
-          Toggle a show off any time to hide it without deleting it.
-        </p>
-      </div>
+      {canList ? (
+        <div className="flex items-start gap-3 p-4 bg-[#FFDF00]/10 border border-[#FFDF00]/40 rounded-2xl text-sm text-muted-foreground">
+          <Info className="w-5 h-5 text-yellow-600 dark:text-[#FFDF00] shrink-0 mt-0.5" />
+          <p>
+            Every show you list appears automatically on the{' '}
+            <Link to="/community/whatnot" className="text-primary font-semibold hover:underline">Whatnot directory</Link>
+            {' '}— no review needed. {upcomingCount > 0 && (
+              <>You currently have <span className="font-semibold text-foreground">{upcomingCount}</span> upcoming {upcomingCount === 1 ? 'show' : 'shows'} live. </>
+            )}
+            Toggle a show off any time to hide it without deleting it.
+          </p>
+        </div>
+      ) : (
+        <div className="flex items-start gap-3 p-4 bg-brand-blue/5 border border-brand-blue/30 rounded-2xl text-sm text-muted-foreground">
+          <Sparkles className="w-5 h-5 text-brand-blue shrink-0 mt-0.5" />
+          <p>
+            Advertising your Whatnot live shows on the{' '}
+            <Link to="/community/whatnot" className="text-primary font-semibold hover:underline">community directory</Link>
+            {' '}is a <span className="font-semibold text-foreground">{PLANS[WHATNOT_SHOWS_MIN_TIER].name}</span>-and-up
+            membership perk.{' '}
+            <Link to={`/account/membership?tier=${WHATNOT_SHOWS_MIN_TIER}`} className="text-primary font-semibold hover:underline">
+              Upgrade your membership
+            </Link>
+            {' '}to list new shows. Any shows you've already listed stay manageable below.
+          </p>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="space-y-4">
@@ -152,9 +174,17 @@ const AccountShows = () => {
           <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
             Going live on Whatnot? List your show so collectors across Australia know when to tune in.
           </p>
-          <Button onClick={openCreate} className="rounded-xl font-bold bg-[#FFDF00] hover:bg-[#FFDF00]/90 text-black">
-            <Plus className="w-4 h-4 mr-2" /> List Your First Show
-          </Button>
+          {canList ? (
+            <Button onClick={openCreate} className="rounded-xl font-bold bg-[#FFDF00] hover:bg-[#FFDF00]/90 text-black">
+              <Plus className="w-4 h-4 mr-2" /> List Your First Show
+            </Button>
+          ) : (
+            <Button asChild className="rounded-xl font-bold">
+              <Link to={`/account/membership?tier=${WHATNOT_SHOWS_MIN_TIER}`}>
+                <Sparkles className="w-4 h-4 mr-2" /> Upgrade to {PLANS[WHATNOT_SHOWS_MIN_TIER].name} to list shows
+              </Link>
+            </Button>
+          )}
         </div>
       ) : (
         <div className="space-y-4">

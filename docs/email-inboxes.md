@@ -115,7 +115,7 @@ forwarded; the real fix is changing them at the source.
   Portfolio invite went to reece@, so it's active.)
 - **Stray Supabase project:** `supabase-cardpop-australia`
   (`pffitekuotmyhxlugwtm`, created via the Vercel Marketplace, now paused) is a
-  duplicate — the app uses `odoglvswwymyjuwlonkf`. Consider deleting the stray to
+  duplicate — the app uses `vrfsaazuqjxotnieqlkd`. Consider deleting the stray to
   avoid confusion and billing surprises. There are also quota-exceeded notices
   for an org `pysxhujsamygmcclmelr` — worth confirming which org owns the live
   project and consolidating.

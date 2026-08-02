@@ -60,6 +60,8 @@ vi.mock('../../src/utils/supabaseClient.js', () => {
     q.range = () => q;
     q.update = () => q;
     q.contains = () => q;
+    // Partner promo codes are matched case-insensitively (partners.code).
+    q.ilike = () => q;
     q.single = () => Promise.resolve({ data: null, error: null });
     // The identity gate's profiles lookup uses its own mock so it doesn't
     // consume the generic listing/offer mock the handlers rely on.
@@ -400,6 +402,81 @@ describe('POST /calculate-cart', () => {
     // $200 GST-inclusive, over the $100 free-shipping threshold → $200 total.
     expect(res.body.subtotalAud).toBe(200);
     expect(res.body.shippingAud).toBe(0);
+    expect(res.body.totalAud).toBe(200);
+  });
+
+  // A partner code is resolved BEFORE the cart is priced, so its lookup is the
+  // first maybeSingle the handler makes — queued ahead of the pricing reads.
+  const partnerRow = (overrides = {}) => mockMaybeSingle.mockResolvedValueOnce({
+    data: {
+      id: 'partner-1', user_id: 'partner-user', code: 'CREATOR10',
+      discount_pct: 0, commission_pct: 5, free_shipping: true, status: 'approved',
+      ...overrides,
+    },
+    error: null,
+  });
+
+  it("waives the shipping fee for a partner code carrying the free-shipping perk", async () => {
+    partnerRow();
+    gstSettings();
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: { id: 'p1', title: 'Single Card', price_aud: 50, stock_quantity: 5, status: 'active' },
+      error: null,
+    });
+    shippingSettings(9.95, 100);
+    const res = await request(app).post('/calculate-cart').send({
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }],
+      promoCode: 'CREATOR10',
+    });
+    expect(res.status).toBe(200);
+    // The $9.95 fee was due (subtotal under the $100 threshold) and waived.
+    expect(res.body.shippingAud).toBe(0);
+    expect(res.body.freeShipping).toBe(true);
+    expect(res.body.shippingWaivedAud).toBe(9.95);
+    expect(res.body.totalAud).toBe(50);
+    // 0% off but free shipping — the code did something, so no "does nothing" error.
+    expect(res.body.promoError).toBeNull();
+  });
+
+  it('still charges shipping for a partner code without the free-shipping perk', async () => {
+    partnerRow({ free_shipping: false, discount_pct: 10 });
+    gstSettings();
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: { id: 'p1', title: 'Single Card', price_aud: 50, stock_quantity: 5, status: 'active' },
+      error: null,
+    });
+    shippingSettings(9.95, 100);
+    const res = await request(app).post('/calculate-cart').send({
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }],
+      promoCode: 'CREATOR10',
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.shippingAud).toBe(9.95);
+    expect(res.body.freeShipping).toBe(false);
+    expect(res.body.shippingWaivedAud).toBe(0);
+    // $50 + $9.95 shipping − $5 (10% of the shop subtotal) = $54.95
+    expect(res.body.discountAud).toBe(5);
+    expect(res.body.totalAud).toBe(54.95);
+  });
+
+  it("reports free shipping as no saving when the order already shipped free", async () => {
+    partnerRow();
+    gstSettings();
+    mockMaybeSingle.mockResolvedValueOnce({
+      data: { id: 'p1', title: 'Booster Box', price_aud: 100, stock_quantity: 5, status: 'active' },
+      error: null,
+    });
+    shippingSettings(9.95, 100);
+    const res = await request(app).post('/calculate-cart').send({
+      items: [{ type: 'shop', id: 'p1', quantity: 2 }],
+      promoCode: 'CREATOR10',
+    });
+    expect(res.status).toBe(200);
+    // Already over the threshold — the perk waived nothing, so it claims nothing,
+    // and a 0%-off code that saved the buyer nothing says so.
+    expect(res.body.freeShipping).toBe(false);
+    expect(res.body.shippingWaivedAud).toBe(0);
+    expect(res.body.promoError).toBe('This code applies to CardPop Shop items only.');
     expect(res.body.totalAud).toBe(200);
   });
 });

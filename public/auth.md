@@ -31,7 +31,7 @@ grant and no dynamic client registration (RFC 7591). An agent authenticates as
 a **real CardPop user account** and then presents that user's short-lived access
 token to the CardPop API.
 
-- **Authorization server (token issuer):** `https://odoglvswwymyjuwlonkf.supabase.co/auth/v1`
+- **Authorization server (token issuer):** `https://vrfsaazuqjxotnieqlkd.supabase.co/auth/v1`
 - **Token type:** JSON Web Token (JWT), sent as `Authorization: Bearer <access_token>`.
 - **Apikey requirement:** Supabase's own auth endpoints (token, user, JWKS,
   discovery) are gated behind Supabase's public, publishable anon key, which
@@ -39,7 +39,7 @@ token to the CardPop API.
   CardPop's browser client:
 
   ```
-  apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kb2dsdnN3d3lteWp1d2xvbmtmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3OTQ5NTgsImV4cCI6MjA5NDM3MDk1OH0.R5fwR42iKIEsfx1iA-fjk4YPLCH3mcmoIKkosEy6g1I
+  apikey: sb_publishable_lHlLkeTfwzhWQ80Zz6pL6g_jc7Y8p33
   ```
 
 ### 1. Obtain an access token from Supabase
@@ -48,7 +48,7 @@ Sign in as an existing CardPop user (email/password, or one of the enabled OAuth
 providers — Google, GitHub, Facebook). Example password grant:
 
 ```http
-POST https://odoglvswwymyjuwlonkf.supabase.co/auth/v1/token?grant_type=password
+POST https://vrfsaazuqjxotnieqlkd.supabase.co/auth/v1/token?grant_type=password
 apikey: <public anon key above>
 Content-Type: application/json
 
@@ -58,7 +58,7 @@ Content-Type: application/json
 The response contains an `access_token` (the JWT) and a `refresh_token`. Refresh
 via `POST /auth/v1/token?grant_type=refresh_token` when it expires (~1 hour).
 Token signing keys are published at
-`https://odoglvswwymyjuwlonkf.supabase.co/auth/v1/.well-known/jwks.json`
+`https://vrfsaazuqjxotnieqlkd.supabase.co/auth/v1/.well-known/jwks.json`
 (also requires the `apikey` header).
 
 ### 2. Call the CardPop API with the token

@@ -8,7 +8,9 @@ order. Touches `pages/AddEditCardPage.jsx` (`handleAnalyzeWithAI`),
 ## The pipeline
 
 ```
-photo(s)
+Identify button  (never an upload side-effect — see below)
+  │
+photo(s)          front + up to two more angles, ANALYSIS_IMAGE_LIMIT total
   │
   ├─0─ Rectify        detectAndCropCard → card warped flat, background removed
   │
@@ -21,6 +23,43 @@ photo(s)
   │
   └─4─ Overlay        CardSight fields applied only on a clean exact hit
 ```
+
+### Why it is a button
+
+Identification used to fire automatically the moment a seller dropped their
+first photo onto a new card. It no longer does: `handleImageChange` stores the
+photo and nothing else, and the only trigger is the **Identify Card** button.
+
+The auto-run's problem was structural, not cosmetic. Firing on the first upload
+means the read is always **front-only**, and the front is the weaker half of the
+card — the set code, collector number and release year are frequently printed
+only on the back. The pipeline has accepted several images the whole time; the
+auto-run simply guaranteed it never got them, because it ran before the seller
+had a chance to add any.
+
+The clearest evidence was the flow's own fallback: read the front, notice the
+year is missing, then show the back-photo prompt (`utils/backPhotoPrompt.js`)
+asking the seller to add the back and identify *again*. Two model calls, a
+re-shoot and a second wait, to reach what one call with two photos answers
+directly.
+
+So the button is now the trigger, and it states what the next read will actually
+see (`identifyCallToAction` in `utils/listingFlow.js`):
+
+| Photos loaded | Button | Hint |
+|---|---|---|
+| Front only, no read yet | `Identify Card` | asks for the back **first**, naming why |
+| 2-3, no read yet | `Identify Card from N photos` | reads them together |
+| More photos added since the last read | `Identify Again with N photos` | ringed, because the read is now stale |
+| Unchanged since the last read | `Identify Again` | states the count the last read used |
+
+`analysisPhotoCount` and `ANALYSIS_IMAGE_LIMIT` (also `utils/listingFlow.js`) are
+what keep that copy honest — the same constant caps `prepareAnalysisImages` and
+`useCardOCR`, so the button can't promise a photo the request would drop.
+
+The back-photo prompt stays, and stays correct: a front-only read is now a
+choice the seller made rather than one the flow made for them, so it is still
+worth telling them what the back would have added.
 
 ### 0. Rectify the card out of the photo
 
@@ -238,6 +277,12 @@ Per scan: **1 Claude OCR call + at most 1 CardSight call.** Before OCR-first
 routing it was 10 CardSight calls on every scan (the blind fan-out) plus an OCR
 call whenever that missed. The fan-out now only happens when the category can't
 be determined at all.
+
+Making the scan manual also removed the auto-run's own cost, which was easy to
+miss: every new card with a photo spent a scan, including the ones a seller
+abandoned, and every card the front-only read couldn't finish spent a second one
+on the re-run. A deliberate scan carries more images per call but there are
+fewer wasted calls to pay for.
 
 ## Measuring it
 

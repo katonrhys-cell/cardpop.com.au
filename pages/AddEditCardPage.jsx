@@ -7,6 +7,7 @@ import {
   Frame, Wand2, SlidersHorizontal, HandCoins, History, Camera,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import { listingsPerMonthForTier } from '@/config/plans.js';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCategories } from '@/hooks/useCategories.js';
@@ -41,12 +42,17 @@ import CardCropPreview from '@/components/CardCropPreview.jsx';
 import CardCornerAdjuster from '@/components/CardCornerAdjuster.jsx';
 import { warpCardWithCorners } from '@/utils/detectCard.js';
 import DisplayStylePicker from '@/components/vault/DisplayStylePicker.jsx';
-import { canUseStyle, normalizeStyle, normalizeTier } from '@/lib/displayStyles.js';
+import { normalizeTier } from '@/lib/displayStyles.js';
 import { publicImageUrl, thumbStoragePath } from '@/utils/imageUrl.js';
 import SellingRequirementsNotice from '@/components/SellingRequirementsNotice.jsx';
-import { isSellingEntitlementError } from '@/utils/listingErrors.js';
+import apiServerClient from '@/lib/apiServerClient.js';
 import { loadListingDraft, saveListingDraft, clearListingDraft, hasMeaningfulContent } from '@/lib/listingDraft.js';
-import { shouldAutoIdentify, buildPriceLookupQuery } from '@/utils/listingFlow.js';
+import {
+  buildPriceLookupQuery,
+  identifyCallToAction,
+  analysisPhotoCount,
+  ANALYSIS_IMAGE_LIMIT,
+} from '@/utils/listingFlow.js';
 import { confidenceScore, confidenceLabel, isLowConfidence } from '@/utils/cardsightConfidence.js';
 import { prepareAnalysisImages } from '@/utils/analysisImage.js';
 import { shouldPromptForBack, missingBackFields, backPhotoPromptText } from '@/utils/backPhotoPrompt.js';
@@ -157,6 +163,10 @@ const AddEditCardPage = () => {
   });
   const [wizardStep, setWizardStep] = useState(0);
   const [maxStepReached, setMaxStepReached] = useState(0);
+  // When the final wizard step was entered — submits landing almost
+  // immediately after are the tail of a double-click on "Next", not a real
+  // save (the Next button swaps into the submit button in place).
+  const publishStepEnteredAt = useRef(0);
   const wizardMode = !isEdit && !useFullForm;
   // Hierarchy selection
   const [selCategoryId, setSelCategoryId]     = useState('');
@@ -637,9 +647,12 @@ const AddEditCardPage = () => {
     const reader = new FileReader();
     reader.onloadend = () => setImagePreview(reader.result);
     reader.readAsDataURL(file);
-    // Clear any previous analysis results when a new image is selected
+    // Clear any previous analysis results when a new image is selected — the
+    // image count with them, so the Identify button goes back to offering a
+    // first read of this photo rather than "identify again".
     clearScan();
     clearCardSight();
+    setAnalysedImageCount(0);
     clearCrop();
     setAdjusting(null);
     runPhotoQuality(file);
@@ -651,12 +664,10 @@ const AddEditCardPage = () => {
     // Allow re-picking the same file (change events don't fire otherwise) —
     // the main dropzone and the mobile take-photo input share this handler.
     e.target.value = '';
-    // Photo-first flow: identification is the default, not an opt-in button.
-    // Runs at most once per new card (guarded on an empty card name), and the
-    // prefill is non-destructive, so nothing the seller typed is overwritten.
-    if (shouldAutoIdentify({ isEdit, cardName: formData.cardName, isScanning, isIdentifying, isPreparingImage })) {
-      handleAnalyzeWithAI(file);
-    }
+    // Identification deliberately does NOT fire here. Reading the front alone is
+    // the weakest read available — the set code, collector number and year are
+    // often only on the back — so the seller adds their photos first and presses
+    // Identify once. See utils/listingFlow.js.
   };
 
   // Apply a cropped image to the given slot ('main' or an extra-photo index).
@@ -706,11 +717,11 @@ const AddEditCardPage = () => {
   };
 
   // ─── Unified AI analysis ──────────────────────────────────────────────────
-  // `file` is passed explicitly by the auto-run in handleImageChange (the
-  // imageFile state hasn't committed yet at that point); the manual button
-  // omits it and analyzes the current image.
-  const handleAnalyzeWithAI = async (file) => {
-    const frontImage = file instanceof File ? file : imageFile;
+  // Only ever invoked by the Identify button, so it reads committed state: the
+  // main photo plus whatever extra angles the seller has loaded by now. That
+  // waiting is the reason it is a button — see utils/listingFlow.js.
+  const handleAnalyzeWithAI = async () => {
+    const frontImage = imageFile;
     if (!frontImage) return;
     clearScan();
     clearCardSight();
@@ -732,7 +743,7 @@ const AddEditCardPage = () => {
     // phone photos are 3-5 MB each. See utils/analysisImage.js.
     setIsPreparingImage(true);
     const { files: analysisImages, dropped } = await prepareAnalysisImages(
-      [frontImage, ...extraFiles.filter(Boolean)].slice(0, 3),
+      [frontImage, ...extraFiles.filter(Boolean)].slice(0, ANALYSIS_IMAGE_LIMIT),
     ).finally(() => setIsPreparingImage(false));
     const analysisImage = analysisImages[0] ?? frontImage;
     setAnalysedImageCount(analysisImages.length);
@@ -1066,6 +1077,7 @@ const AddEditCardPage = () => {
   };
 
   const goToStep = (index) => {
+    if (index === WIZARD_STEPS.length - 1) publishStepEnteredAt.current = Date.now();
     setWizardStep(index);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -1090,86 +1102,18 @@ const AddEditCardPage = () => {
     goToStep(nextIndex);
   };
 
-  // ─── Marketplace listing sync ─────────────────────────────────────────────
-  // The marketplace reads exclusively from the `listings` table, so choosing a
-  // public listing type here must create/update a matching listings row.
-  // Without this the card is only flagged on the vault_items row and never
-  // appears in the marketplace. Mirrors the logic in VaultListingModal.
-  //
-  // Returns how the marketplace row actually ended up, so the caller can tell
-  // the seller the truth rather than a blanket success:
-  //   'archived' — card went private
-  //   'listed'   — live on the marketplace now
-  //   'pending'  — saved, but held for admin approval (listing_approval_required)
-  //   'blocked'  — denied by the can_sell() RLS gate (identity/card-on-file missing)
-  //   'error'    — any other failure (the vault card itself is already saved)
-  const syncMarketplaceListing = async (cardId) => {
-    const isPublic = formData.listingType !== 'private';
-    const isSale   = formData.listingType === 'For Sale' || formData.listingType === 'For Sale & Trade';
-    const acceptsTrade = formData.listingType === 'For Trade' || formData.listingType === 'For Sale & Trade';
-    const isEOI    = formData.listingType === 'Expression of Interest';
-    try {
-      if (!isPublic) {
-        // Going private — archive any active listing.
-        const { error } = await supabase
-          .from('listings')
-          .update({ status: 'archived' })
-          .eq('vault_item_id', cardId)
-          .eq('seller_id', currentUser.id)
-          .neq('status', 'archived');
-        if (error) throw error;
-        return 'archived';
-      }
-
-      const listingPayload = {
-        vault_item_id: cardId,
-        seller_id:     currentUser.id,
-        listing_type:  isEOI ? 'expression_of_interest' : (isSale ? 'fixed' : 'trade'),
-        status:        'active',
-        accepts_trade: acceptsTrade,
-        price_aud:     isSale ? (parseFloat(formData.askingPrice) || null) : null,
-        // Expression of Interest: no fixed price — publish the seller's target
-        // range and open the listing to offers.
-        price_min_aud: isEOI ? (parseFloat(formData.offerMin) || null) : null,
-        price_max_aud: isEOI ? (parseFloat(formData.offerMax) || null) : null,
-        ...(isEOI ? { accepts_offers: true } : {}),
-        listed_at:     new Date().toISOString(),
-      };
-
-      // Reuse an existing non-archived listing if one already exists.
-      const { data: existing } = await supabase
-        .from('listings')
-        .select('id')
-        .eq('vault_item_id', cardId)
-        .neq('status', 'archived')
-        .maybeSingle();
-
-      // Read the status back: the enforce_listing_approval trigger may have
-      // downgraded a new 'active' listing to 'pending', and the seller needs
-      // to know their card isn't visible yet.
-      let row, error;
-      if (existing) {
-        ({ data: row, error } = await supabase
-          .from('listings')
-          .update(listingPayload)
-          .eq('id', existing.id)
-          .eq('seller_id', currentUser.id)
-          .select('status')
-          .single());
-      } else {
-        ({ data: row, error } = await supabase
-          .from('listings')
-          .insert(listingPayload)
-          .select('status')
-          .single());
-      }
-      if (error) throw error;
-      return row?.status === 'pending' ? 'pending' : 'listed';
-    } catch (err) {
-      console.error('Marketplace listing sync failed:', err);
-      return isSellingEntitlementError(err) ? 'blocked' : 'error';
-    }
-  };
+  // ─── Marketplace listing outcome ──────────────────────────────────────────
+  // The vault write and the marketplace listing sync both happen server-side
+  // in one call (src/routes/vault-items.js). The response's listing.status
+  // reports how the marketplace row actually ended up, so the seller hears
+  // the truth rather than a blanket success:
+  //   'archived'     — card went private
+  //   'listed'       — live on the marketplace now
+  //   'pending'      — saved, but held for admin approval (listing_approval_required)
+  //   'blocked'      — denied by the can_sell() RLS gate (identity/card-on-file missing)
+  //   'quota'        — rejected by the monthly listing quota (tier limit reached)
+  //   'sold_visible' — card went private but its sold listing stays on the marketplace
+  //   'error'        — any other failure (the vault card itself is already saved)
 
   // Turn the sync outcome into an honest toast. `savedMsg` is the base success
   // message for the vault card itself; `successOpts` (e.g. the "Add Another"
@@ -1194,6 +1138,20 @@ const AddEditCardPage = () => {
           }
         );
         break;
+      case 'quota': {
+        const limit = listingsPerMonthForTier(subscriptionTier);
+        toast.warning(
+          `${savedMsg} But it is NOT live — you've used all ${limit} of this month's listings on your plan. Upgrade for a bigger monthly allowance, or relist it from your vault next month.`,
+          {
+            duration: 12000,
+            action: { label: 'See plans', onClick: () => navigate('/pricing') },
+          }
+        );
+        break;
+      }
+      case 'sold_visible':
+        toast.info(`${savedMsg} It's private in your vault, but its sold marketplace listing stays visible until an admin archives it.`, { duration: 10000 });
+        break;
       case 'error':
         toast.warning(`${savedMsg} But updating its marketplace listing failed — you can re-list it from your vault.`, { duration: 10000 });
         break;
@@ -1202,34 +1160,47 @@ const AddEditCardPage = () => {
     }
   };
 
+  // Highlight validation problems and bring the seller to them. Used for the
+  // instant client-side pass AND for any errors the server's own validation
+  // reports back — both speak the same field names (utils/listingValidation.js).
+  const surfaceValidationErrors = (newErrors) => {
+    setErrors(newErrors);
+    const count = Object.keys(newErrors).length;
+    toast.error(count === 1 ? 'Please fix the highlighted issue' : `Please fix the ${count} highlighted issues`);
+    // In wizard mode jump to the first step with a problem — its fields
+    // would otherwise be invisible on an unmounted step.
+    if (wizardMode) {
+      const badStep = WIZARD_STEPS.findIndex(s => s.fields.some(f => newErrors[f]));
+      if (badStep >= 0 && badStep !== wizardStep) setWizardStep(badStep);
+    }
+    // Jump to the first problem — on a long form (especially mobile) the
+    // errored field may be far off-screen.
+    setTimeout(() => {
+      const el = document.querySelector('.border-destructive, [data-invalid="true"]');
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.focus?.();
+      }
+    }, 50);
+  };
+
   // ─── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // "Next: List it" and "Save Card" are the same button element swapped in
+    // place, so the second click of a double-click (or a second tap while the
+    // page is still scrolling) lands on the submit button and would save the
+    // card — defaulting it to Private — before the List It step was ever seen.
+    if (wizardMode && Date.now() - publishStepEnteredAt.current < 600) return;
     // One validation pass covers everything — fields, card image, and the
     // Category/Franchise hierarchy — so the seller sees all problems at once
     // instead of fixing one gate only to discover the next on resubmit.
     const newErrors = validateListingForm(formData, validationCtx);
-    setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) {
-      const count = Object.keys(newErrors).length;
-      toast.error(count === 1 ? 'Please fix the highlighted issue' : `Please fix the ${count} highlighted issues`);
-      // In wizard mode jump to the first step with a problem — its fields
-      // would otherwise be invisible on an unmounted step.
-      if (wizardMode) {
-        const badStep = WIZARD_STEPS.findIndex(s => s.fields.some(f => newErrors[f]));
-        if (badStep >= 0 && badStep !== wizardStep) setWizardStep(badStep);
-      }
-      // Jump to the first problem — on a long form (especially mobile) the
-      // errored field may be far off-screen.
-      setTimeout(() => {
-        const el = document.querySelector('.border-destructive, [data-invalid="true"]');
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          el.focus?.();
-        }
-      }, 50);
+      surfaceValidationErrors(newErrors);
       return;
     }
+    setErrors({});
 
     setSaving(true);
     try {
@@ -1267,10 +1238,13 @@ const AddEditCardPage = () => {
 
       const isGraded  = formData.gradingCompany !== 'raw';
       const isPublic  = formData.listingType !== 'private';
-      const tradeAud  = parseFloat(formData.tradeValue) || 0;
 
+      // The server re-derives every flag that follows from the variant chips
+      // or listing type (is_rookie, is_public, trade_value_locked, …) and
+      // owns owner_id / the display-style tier clamp / the CardSight
+      // timestamp — see src/utils/vaultItemInput.js. This payload only
+      // carries what the seller actually entered.
       const payload = {
-        owner_id:            currentUser.id,
         category_id:         selCategoryId || null,
         franchise_id:        franchiseId || null,
         manufacturer_id:     manufacturerId || null,
@@ -1284,14 +1258,8 @@ const AddEditCardPage = () => {
         card_number:         formData.cardNumber?.trim()  || null,
         year:                formData.year?.trim() || null,
         variant:             savedVariants.length ? savedVariants.join(', ') : null,
-        // Selecting the Foil / Holo chip says the card is foiled, so the flag
-        // buyers filter on follows it without needing the toggle ticked too.
-        is_foil:             formData.isFoil || formData.variant.includes(FOIL_VARIANT),
+        is_foil:             formData.isFoil,
         is_sealed:           formData.isSealed,
-        // The "Rookie Card (RC)" variant chip is the single source of truth for
-        // the rookie designation — filters query this derived flag
-        is_rookie:           formData.variant.includes('Rookie Card (RC)'),
-        is_refractor:        formData.variant.includes('Refractor'),
         serial_number:       formData.serialNumber?.trim() || null,
         is_auto:             formData.isAuto,
         auto_type:           formData.variant.includes('Auto') ? (formData.autoType || null) : null,
@@ -1320,21 +1288,15 @@ const AddEditCardPage = () => {
         acquired_date:       formData.acquiredDate || null,
         acquired_from:       formData.acquiredFrom?.trim() || null,
         notes:               formData.notes?.trim()       || null,
-        trade_value_aud:     tradeAud,
-        trade_value_locked:  tradeAud > 0,
+        trade_value_aud:     parseFloat(formData.tradeValue) || 0,
         listing_type:        isPublic ? formData.listingType : 'Private',
-        is_public:           isPublic,
-        // Persist the chosen display style, clamped to what the user's tier
-        // allows so a locked style can never be saved by bypassing the picker.
-        display_style:       canUseStyle(formData.displayStyle, subscriptionTier)
-                               ? normalizeStyle(formData.displayStyle)
-                               : 'classic',
+        display_style:       formData.displayStyle,
         // Persist CardSight ID if we got an exact match during this session
+        // (the server stamps cardsight_identified_at itself)
         ...(cardSightResult?.exactMatch && cardSightResult?.card?.id
           ? {
               cardsight_card_id: cardSightResult.card.id,
               cardsight_set_id:  cardSightResult.card.setId ?? null,
-              cardsight_identified_at: new Date().toISOString(),
             }
           : {}),
       };
@@ -1342,52 +1304,51 @@ const AddEditCardPage = () => {
       if (cardImagePath) payload.card_image = cardImagePath;
       if (extraImagePaths.length) payload.card_images = extraImagePaths;
 
-      // `language` is a newly added column. Vercel's deploy and the Supabase
-      // migration workflow run independently on merge, so for a brief window
-      // the new frontend can be live against a schema that lacks it. Rather
-      // than fail the seller's listing, drop the field and retry once.
-      // (PGRST204 = "Could not find the 'x' column ... in the schema cache".)
-      const isMissingLanguageColumn = (err) =>
-        err && (err.code === 'PGRST204' || /schema cache/i.test(err.message || '')) &&
-        /language/i.test(err.message || '');
-      const withoutLanguage = () => { const { language, ...rest } = payload; return rest; };
+      // One call does the rest server-side (src/routes/vault-items.js): the
+      // vault write and the marketplace listing sync together, validated with
+      // the same rules that just ran above. Photos stay client-uploaded —
+      // only their storage paths travel in the payload.
+      const res = await apiServerClient.fetch(isEdit ? `/vault/items/${id}` : '/vault/items', {
+        method: isEdit ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          item: payload,
+          pricing: {
+            askingPrice: formData.askingPrice || null,
+            offerMin: formData.offerMin || null,
+            offerMax: formData.offerMax || null,
+          },
+        }),
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // Server-side validation speaks the same field names as the client
+        // pass — highlight the inputs instead of a dead-end error toast.
+        if (res.status === 400 && result.fields) {
+          surfaceValidationErrors(result.fields);
+          return;
+        }
+        throw new Error(result.error || 'Failed to save card');
+      }
+
+      formDirtyRef.current = false;
+      const savedCardId = result.item?.id || id;
+      const syncStatus = result.listing?.status;
+      const savedIdentity = {
+        collection: formData.collection, setName: formData.setName,
+        insertName: formData.insertName ?? null, cardNumber: formData.cardNumber,
+        parallel: formData.parallelName || null, cardName: formData.cardName,
+        year: formData.year, rookie: formData.variant?.includes('Rookie Card (RC)') ? 'Rookie Card (RC)' : null,
+        variants: formData.variant,
+      };
+      confirmScan(savedIdentity, savedCardId);
 
       if (isEdit) {
-        let { error } = await supabase.from('vault_items').update(payload).eq('id', id).eq('owner_id', currentUser.id);
-        if (isMissingLanguageColumn(error)) {
-          ({ error } = await supabase.from('vault_items').update(withoutLanguage()).eq('id', id).eq('owner_id', currentUser.id));
-        }
-        if (error) throw error;
-        formDirtyRef.current = false;
-        const savedIdentity = {
-          collection: formData.collection, setName: formData.setName,
-          insertName: formData.insertName ?? null, cardNumber: formData.cardNumber,
-          parallel: formData.parallelName || null, cardName: formData.cardName,
-          year: formData.year, rookie: formData.variant?.includes('Rookie Card (RC)') ? 'Rookie Card (RC)' : null,
-          variants: formData.variant,
-        };
-        confirmScan(savedIdentity, id);
-        const syncStatus = await syncMarketplaceListing(id);
         showListingOutcome(syncStatus, 'Card updated successfully!');
         navigate('/vault');
       } else {
-        let { data: inserted, error } = await supabase.from('vault_items').insert(payload).select('id').single();
-        if (isMissingLanguageColumn(error)) {
-          ({ data: inserted, error } = await supabase.from('vault_items').insert(withoutLanguage()).select('id').single());
-        }
-        if (error) throw error;
-        formDirtyRef.current = false;
         clearListingDraft(currentUser.id);
         setRestorableDraft(null);
-        const savedIdentity = {
-          collection: formData.collection, setName: formData.setName,
-          insertName: formData.insertName ?? null, cardNumber: formData.cardNumber,
-          parallel: formData.parallelName || null, cardName: formData.cardName,
-          year: formData.year, rookie: formData.variant?.includes('Rookie Card (RC)') ? 'Rookie Card (RC)' : null,
-          variants: formData.variant,
-        };
-        confirmScan(savedIdentity, inserted.id);
-        const syncStatus = await syncMarketplaceListing(inserted.id);
         showListingOutcome(syncStatus, 'Card added to your vault!', {
           action: {
             label: 'Add Another',
@@ -1402,6 +1363,7 @@ const AddEditCardPage = () => {
               setAdjusting(null);
               clearScan();
               clearScanLog();
+              setAnalysedImageCount(0);
               setWizardStep(0);
               setMaxStepReached(0);
               // Keep franchise/manufacturer selected for fast repeat entry
@@ -1425,6 +1387,15 @@ const AddEditCardPage = () => {
   );
 
   const isGraded = formData.gradingCompany !== 'raw';
+
+  // Identification is manual, so the button itself carries the guidance the old
+  // auto-run had no opportunity to give: how many photos the next read will use,
+  // and — with only the front loaded — that the back is worth adding before
+  // spending the read rather than after it.
+  const identifyCta = identifyCallToAction({
+    photoCount: analysisPhotoCount(imageFile, extraFiles),
+    analysedImageCount,
+  });
 
   // ─── Section blocks ───────────────────────────────────────────────────────
   // Each form section is defined once and composed below either as the classic
@@ -1530,7 +1501,9 @@ const AddEditCardPage = () => {
                 <div className="mt-4">
                   <p className="text-xs font-semibold text-muted-foreground mb-2">
                     Additional Photos (up to {maxExtraSlots})
-                    {' '}<span className="font-normal">— a photo of the back improves identification</span>
+                    {' '}<span className="font-normal">
+                      — add the back <em>before</em> identifying; your first {ANALYSIS_IMAGE_LIMIT} photos are read together
+                    </span>
                   </p>
                   <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                     {extraFiles.map((_, idx) => (
@@ -1646,19 +1619,23 @@ const AddEditCardPage = () => {
                     </div>
                   ) : null}
 
-                  {/* Identify Card Button - AI analysis with recommended label */}
-                  {imageFile && !isScanning && !isIdentifying && !isPreparingImage && !isPhotoProcessing && !isUploadingTemplate && (
+                  {/* Identify Card button — the only way an identification runs.
+                      Nothing fires on upload, so a seller can load the front, the
+                      back and one more angle and have all of them read together
+                      in a single pass. The hint below states what the next read
+                      will actually see. */}
+                  {identifyCta && !isScanning && !isIdentifying && !isPreparingImage && !isPhotoProcessing && !isUploadingTemplate && (
                     <div className="space-y-1">
                       <Button
                         type="button"
                         variant="secondary"
-                        onClick={() => handleAnalyzeWithAI()}
-                        className="w-full bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 border border-emerald-500/20 dark:text-emerald-400"
+                        onClick={handleAnalyzeWithAI}
+                        className={`w-full bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 border dark:text-emerald-400 ${identifyCta.stale ? 'border-emerald-500/60 ring-1 ring-emerald-500/30' : 'border-emerald-500/20'}`}
                       >
-                        <Sparkles className="w-4 h-4 mr-2" /> Identify Card
+                        <Sparkles className="w-4 h-4 mr-2" /> {identifyCta.label}
                       </Button>
                       <p className="text-xs text-center text-muted-foreground">
-                        Runs automatically when you add your first photo — tap to run again.
+                        {identifyCta.hint}
                       </p>
                     </div>
                   )}
@@ -3950,11 +3927,14 @@ const AddEditCardPage = () => {
                     </Button>
                   )}
                   {wizardStep < WIZARD_STEPS.length - 1 ? (
-                    <Button type="button" onClick={goNextStep} className="h-12 px-8 font-bold">
+                    // Distinct keys force a remount when Next becomes Save, so
+                    // focus (and a queued Enter/Space) can't carry over onto
+                    // the submit button.
+                    <Button key="wizard-next" type="button" onClick={goNextStep} className="h-12 px-8 font-bold">
                       Next: {WIZARD_STEPS[wizardStep + 1].title} <ChevronRight className="w-4 h-4 ml-1" />
                     </Button>
                   ) : (
-                    <Button type="submit" disabled={saving} className="h-12 px-8 font-bold shadow-lg shadow-primary/20">
+                    <Button key="wizard-save" type="submit" disabled={saving} className="h-12 px-8 font-bold shadow-lg shadow-primary/20">
                       {saving
                         ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Saving...</>
                         : <><Save className="w-5 h-5 mr-2" /> Save Card</>}

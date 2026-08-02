@@ -5,6 +5,8 @@ import { Heart, ZoomIn } from 'lucide-react';
 // Lazy: the zoom modal drags framer-motion with it — load it only on demand.
 const ImageZoomModal = lazy(() => import('@/components/ImageZoomModal.jsx'));
 import CardImage from '@/components/CardImage.jsx';
+import CardShowcase from '@/components/vault/CardShowcase.jsx';
+import { normalizeStyle, DEFAULT_STYLE } from '@/lib/displayStyles.js';
 import { getCardImage, CARD_GRID_SIZES, toCdnUrl } from '@/utils/imageUrl.js';
 import { isVerified } from '@/utils/verification.js';
 import { toast } from 'sonner';
@@ -45,6 +47,11 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
   // vault_images stores storage_path; card_image may be a full URL or storage path
   const imgPath = vaultItem?.card_image || vaultItem?.vault_images?.[0]?.storage_path || null;
   const { src: imgSrc, srcSet: imgSrcSet, fallbackSrc: imgFallback, thumbSrc: imgThumb } = getCardImage(imgPath);
+  // The seller's chosen display style (holographic, slab, glass…) renders
+  // through the Card Showcase Engine. Classic keeps the long-standing grid
+  // treatment (object-cover crop + hover zoom) so only opted-in cards change.
+  const displayStyle = normalizeStyle(vaultItem?.display_style);
+  const useShowcase = displayStyle !== DEFAULT_STYLE;
 
   const rawVariants = vaultItem?.variant
     ? vaultItem.variant.split(',').map(s => s.trim()).filter(Boolean)
@@ -69,18 +76,33 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
   return (
     <div className={`group flex flex-col h-full bg-card rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 ${borderClass} ${isSold ? 'opacity-95' : ''}`}>
       <Link to={detailPath} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
-        <CardImage
-          src={imgSrc}
-          srcSet={imgSrcSet}
-          sizes={CARD_GRID_SIZES}
-          fallbackSrc={imgFallback}
-          thumbSrc={imgThumb}
-          alt={listing.title || 'Listing Image'}
-          imgClassName={`w-full h-full object-cover transition-transform duration-500 ${isSold ? 'grayscale-[35%] group-hover:scale-100' : 'group-hover:scale-105'}`}
-          width="400"
-          height="500"
-          priority={priority}
-        />
+        {useShowcase ? (
+          <CardShowcase
+            src={imgSrc}
+            srcSet={imgSrcSet}
+            sizes={CARD_GRID_SIZES}
+            fallbackSrc={imgFallback}
+            thumbSrc={imgThumb}
+            alt={listing.title || 'Listing Image'}
+            displayStyle={displayStyle}
+            width="400"
+            height="500"
+            priority={priority}
+          />
+        ) : (
+          <CardImage
+            src={imgSrc}
+            srcSet={imgSrcSet}
+            sizes={CARD_GRID_SIZES}
+            fallbackSrc={imgFallback}
+            thumbSrc={imgThumb}
+            alt={listing.title || 'Listing Image'}
+            imgClassName={`w-full h-full object-cover transition-transform duration-500 ${isSold ? 'grayscale-[35%] group-hover:scale-100' : 'group-hover:scale-105'}`}
+            width="400"
+            height="500"
+            priority={priority}
+          />
+        )}
         {/* Sold overlay — the listing stays visible but is clearly marked sold */}
         {isSold && (
           <>

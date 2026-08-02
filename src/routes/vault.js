@@ -5,10 +5,15 @@ import { authMiddleware, optionalAuthMiddleware, isAdminUser } from '../middlewa
 import { requireAdmin } from '../middleware/requireAal2.js';
 import logger from '../utils/logger.js';
 import { queryString } from '../utils/queryString.js';
+import vaultItemsRouter from './vault-items.js';
 
 const router = express.Router();
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Card upload/update — POST /vault/items, PUT /vault/items/:id. Mounted before
+// the GET /:id catch-all below so the sub-router owns the /items path.
+router.use('/items', vaultItemsRouter);
 
 // GET /vault/products — authenticated user's own vault items
 router.get('/products', authMiddleware, async (req, res) => {

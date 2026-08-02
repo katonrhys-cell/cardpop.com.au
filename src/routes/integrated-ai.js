@@ -14,7 +14,7 @@ const router = Router();
 // storage / image CDN over https; anything else is dropped before forwarding.
 // The server's own uploads (uploadImagesToSupabase) already use these hosts.
 const ALLOWED_IMAGE_HOSTS = new Set([
-	'odoglvswwymyjuwlonkf.supabase.co',
+	'vrfsaazuqjxotnieqlkd.supabase.co',
 	'img.cardpop.com.au',
 ]);
 function isAllowedImageUrl(value) {
