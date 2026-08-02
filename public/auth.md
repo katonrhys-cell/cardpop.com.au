@@ -39,7 +39,7 @@ token to the CardPop API.
   CardPop's browser client:
 
   ```
-  apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZyZnNhYXp1cWp4b3RuaWVxbGtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1NDM0MTEsImV4cCI6MjEwMTExOTQxMX0.R4JqdifHRVBUjPleXqtJ963h6Q8eVosrjDtpGynw8Fo
+  apikey: sb_publishable_lHlLkeTfwzhWQ80Zz6pL6g_jc7Y8p33
   ```
 
 ### 1. Obtain an access token from Supabase
