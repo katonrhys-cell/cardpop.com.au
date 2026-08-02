@@ -10,7 +10,8 @@ import { useCart } from '@/hooks/useCart.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
 import { Card } from '@/components/ui/card';
-import { GooglePayMark } from '@/components/checkout/PaymentMethodSelector.jsx';
+import { PaymentBadge } from '@/components/checkout/PaymentMethodSelector.jsx';
+import { GooglePayMark } from '@/components/checkout/PaymentMarks.jsx';
 import Turnstile from '@/components/Turnstile.jsx';
 import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
 
@@ -257,7 +258,11 @@ const CheckoutSuccessPage = () => {
             {sessionData?.walletType === 'google_pay' && (
               <div className="flex items-center justify-between border-b border-border/50 pb-2">
                 <span className="text-muted-foreground">Paid with</span>
-                <GooglePayMark />
+                {/* The mark fills its badge, so it needs the sized wrapper —
+                    which also guarantees the white backing it needs in dark mode. */}
+                <PaymentBadge label="Google Pay">
+                  <GooglePayMark />
+                </PaymentBadge>
               </div>
             )}
             <div className="flex justify-between pb-2">
