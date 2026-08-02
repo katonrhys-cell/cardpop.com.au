@@ -16,7 +16,9 @@ import { toast } from 'sonner';
 import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 import VaultListingModal from '@/components/VaultListingModal.jsx';
 import PSAPopPanel from '@/components/PSAPopPanel.jsx';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { publicImageUrl, getCardImage, CARD_GRID_SIZES } from '@/utils/imageUrl.js';
+import CardShowcase from '@/components/vault/CardShowcase.jsx';
+import { normalizeStyle, DEFAULT_STYLE } from '@/lib/displayStyles.js';
 import { ROOKIE_VARIANT } from '@/lib/cardVariants.js';
 import RookiePill from '@/components/RookiePill.jsx';
 
@@ -127,6 +129,12 @@ const AccountVault = () => {
     if (card.card_image) {
       imageUrl = publicImageUrl(card.card_image);
     }
+    // The card's chosen display style (holographic, slab, glass…) renders
+    // through the Card Showcase Engine here too, so the vault matches how the
+    // card appears on the marketplace. Classic keeps the flat vault treatment.
+    const displayStyle = normalizeStyle(card.display_style);
+    const useShowcase = !!imageUrl && displayStyle !== DEFAULT_STYLE;
+    const { src: imgSrc, srcSet: imgSrcSet, fallbackSrc: imgFallback, canonicalSrc: imgCanonical, thumbSrc: imgThumb } = getCardImage(card.card_image);
     const isForTrade = card.listing_type === 'For Trade' || card.listing_type === 'For Sale & Trade';
 
     return (
@@ -158,8 +166,21 @@ const AccountVault = () => {
           </DropdownMenu>
         </div>
 
-        <div className="aspect-[4/5] bg-muted/40 relative flex items-center justify-center border-b border-border/50 p-4">
-          {imageUrl ? (
+        <div className="aspect-[4/5] bg-muted/40 relative flex items-center justify-center border-b border-border/50 p-4 overflow-hidden">
+          {useShowcase ? (
+            <CardShowcase
+              src={imgSrc}
+              srcSet={imgSrcSet}
+              sizes={CARD_GRID_SIZES}
+              fallbackSrc={imgFallback}
+              canonicalSrc={imgCanonical}
+              thumbSrc={imgThumb}
+              alt={card.card_name}
+              displayStyle={displayStyle}
+              width="400"
+              height="500"
+            />
+          ) : imageUrl ? (
             <img src={imageUrl} alt={card.card_name} className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" loading="lazy" />
           ) : (
             <div className="flex flex-col items-center text-muted-foreground opacity-50">
