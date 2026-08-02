@@ -55,17 +55,15 @@ const AccountDashboard = () => {
         .then(({ data }) => { if (!cancelled && data) setSellerTier(data.seller_tier); })
 
       try {
-        const [salesRes, revenueRes, listingsRes, vaultRes, tradesRes] = await Promise.all([
-          // "Completed Sales" / "Total Revenue" are seller-side stats, so scope
-          // to seller_id (not buyer OR seller — a user's own purchases aren't
-          // their revenue) and use the real terminal order status 'completed'
-          // ('delivered' is never written anywhere, so this was always 0).
-          supabase.from('orders').select('id', { count: 'exact', head: true })
-            .eq('seller_id', currentUser.id)
-            .eq('status', 'completed'),
-          supabase.from('orders').select('total_aud')
-            .eq('seller_id', currentUser.id)
-            .eq('status', 'completed'),
+        const [salesRes, listingsRes, vaultRes, tradesRes] = await Promise.all([
+          // "Completed Sales" / "Total Revenue" are seller-side stats. Scoping
+          // them to orders.seller_id missed every cart sale — a cart can span
+          // multiple sellers, so those rows carry seller_id = NULL and the
+          // seller lives inside each order_items line. seller_sales_summary()
+          // resolves both shapes, and reports the seller's own proceeds rather
+          // than orders.total_aud (what the *buyer* paid, commission and GST
+          // included, which overstated revenue on every sale).
+          supabase.rpc('seller_sales_summary'),
           supabase.from('listings').select('id', { count: 'exact', head: true })
             .eq('seller_id', currentUser.id).eq('status', 'active').neq('listing_type', 'vault'),
           supabase.from('vault_items').select('id', { count: 'exact', head: true })
@@ -82,17 +80,18 @@ const AccountDashboard = () => {
         // previously went unchecked — count/data falls back to 0/[] below,
         // silently rendering a real failure as "0 sales" / "$0 revenue"
         // instead of surfacing it.
-        const namedResults = { sales: salesRes, revenue: revenueRes, listings: listingsRes, vault: vaultRes, trades: tradesRes };
+        const namedResults = { sales: salesRes, listings: listingsRes, vault: vaultRes, trades: tradesRes };
         const failed = Object.entries(namedResults).filter(([, r]) => r.error);
         if (failed.length > 0) {
           failed.forEach(([name, r]) => console.error(`Failed to load ${name} stats:`, r.error));
           setStatsError('Some statistics failed to load — the numbers below may be incomplete. Try refreshing.');
         }
 
-        const revenue = (revenueRes.data || []).reduce((s, t) => s + (t.total_aud || 0), 0);
+        // The RPC returns a single row: { completed_sales, revenue_aud }.
+        const summary = Array.isArray(salesRes.data) ? salesRes.data[0] : salesRes.data;
         setStats({
-          salesCount:      salesRes.count    || 0,
-          revenue,
+          salesCount:      Number(summary?.completed_sales) || 0,
+          revenue:         Number(summary?.revenue_aud) || 0,
           listingsCount:   listingsRes.count  || 0,
           vaultItemsCount: vaultRes.count    || 0,
           pendingTrades:   tradesRes.count   || 0,

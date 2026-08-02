@@ -227,6 +227,10 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Safety net: a single stray fixed-width element must not give the whole
+       page a horizontal scrollbar on phones. It lives on <body>, not <html>,
+       and that placement is load-bearing — see the html rule below. */
+    overflow-x: clip;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -237,10 +241,17 @@
 
   html {
     scroll-behavior: smooth;
-    /* Safety net: a single stray fixed-width element must not give the whole
-       page a horizontal scrollbar on phones. `clip` (not `hidden`) so no new
-       scroll container is created and position:sticky descendants keep working. */
-    overflow-x: clip;
+    /* <html> must keep `overflow: visible` on BOTH axes. That is the only case
+       in which the browser propagates <body>'s overflow up to the viewport —
+       and every Radix layer (dropdown, select, dialog, sheet) locks scrolling
+       by setting `overflow: hidden !important` on <body>. With propagation,
+       that lock lands on the viewport and <body> stays a normal block box.
+       Without it (e.g. `overflow-x: clip` here), <body> itself turns into a
+       scroll container whose own scroll offset is 0, so every
+       `position: sticky` descendant — the site header above all — re-anchors
+       to the top of the document and jumps off-screen the moment a menu is
+       opened on a scrolled page. The horizontal-overflow safety net therefore
+       lives on <body> instead. */
   }
 }
 

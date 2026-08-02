@@ -32,6 +32,20 @@ const MobileNavMenus = lazy(() => import('@/components/HeaderMenus.jsx').then(m 
 
 const prefetchMenus = () => import('@/components/HeaderMenus.jsx');
 
+// Every Radix layer that locks scrolling sets inline styles on <body>, not just
+// Dialog/Sheet: dropdown menus (role="menu") and selects (role="listbox") do too.
+// The stale-style failsafe below must recognise all of them, or it strips the
+// pointer-events lock out from under a menu that is still open.
+const OPEN_LAYER_SELECTOR =
+  '[data-state="open"][role="dialog"], [data-state="open"][role="menu"], [data-state="open"][role="listbox"]';
+
+const clearStaleBodyStyles = () => {
+  if (document.querySelector(OPEN_LAYER_SELECTOR)) return;
+  if (document.body.style.pointerEvents === 'none') document.body.style.pointerEvents = '';
+  if (document.body.style.overflow === 'hidden') document.body.style.overflow = '';
+  if (document.body.style.paddingRight) document.body.style.paddingRight = '';
+};
+
 // Re-exported for the many components that already import them from here; the
 // lists themselves live in data/collections.js so non-React code can use them.
 export { TCG_COLLECTIONS, SPORTS_COLLECTIONS, COLLECTIONS_LIST } from '@/data/collections.js';
@@ -84,15 +98,6 @@ const Header = () => {
   // This causes the next page's scroll to be locked at the previous page's position,
   // making the new page appear blank even though it rendered correctly.
   useEffect(() => {
-    const clearStaleBodyStyles = () => {
-      const hasOpenLayer = document.querySelector('[data-state="open"][role="dialog"]');
-      if (!hasOpenLayer) {
-        if (document.body.style.pointerEvents === 'none') document.body.style.pointerEvents = '';
-        if (document.body.style.overflow === 'hidden') document.body.style.overflow = '';
-        if (document.body.style.paddingRight) document.body.style.paddingRight = '';
-      }
-    };
-
     // Watch for any style change on body and fix it after animations settle.
     // Debounce into a single tracked timeout so rapid mutations don't pile up
     // and so the pending timeout can be cancelled on unmount (otherwise it can
@@ -117,14 +122,6 @@ const Header = () => {
   // Clear stale body styles immediately on every route change, and again after
   // 400ms to catch anything that the close animation set after the route changed.
   useEffect(() => {
-    const clearStaleBodyStyles = () => {
-      const hasOpenLayer = document.querySelector('[data-state="open"][role="dialog"]');
-      if (!hasOpenLayer) {
-        if (document.body.style.pointerEvents === 'none') document.body.style.pointerEvents = '';
-        if (document.body.style.overflow === 'hidden') document.body.style.overflow = '';
-        if (document.body.style.paddingRight) document.body.style.paddingRight = '';
-      }
-    };
     clearStaleBodyStyles();
     const timer = setTimeout(clearStaleBodyStyles, 400);
     return () => clearTimeout(timer);
