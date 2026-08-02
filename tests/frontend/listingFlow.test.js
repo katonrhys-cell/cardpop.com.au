@@ -1,35 +1,73 @@
 import { describe, it, expect } from 'vitest';
-import { shouldAutoIdentify, buildPriceLookupQuery } from '@/utils/listingFlow.js';
+import {
+  buildPriceLookupQuery,
+  identifyCallToAction,
+  analysisPhotoCount,
+  ANALYSIS_IMAGE_LIMIT,
+} from '@/utils/listingFlow.js';
 
-const base = { isEdit: false, cardName: '', isScanning: false, isIdentifying: false };
+const photo = (name) => new File(['x'], name, { type: 'image/jpeg' });
 
-describe('shouldAutoIdentify', () => {
-  it('runs for a fresh photo on a new card', () => {
-    expect(shouldAutoIdentify(base)).toBe(true);
+describe('analysisPhotoCount', () => {
+  it('counts the front plus the filled extra slots', () => {
+    expect(analysisPhotoCount(photo('front.jpg'), [photo('back.jpg'), null, null])).toBe(2);
   });
 
-  it('never runs in edit mode', () => {
-    expect(shouldAutoIdentify({ ...base, isEdit: true })).toBe(false);
+  it('ignores empty slots', () => {
+    expect(analysisPhotoCount(photo('front.jpg'), [null, null])).toBe(1);
   });
 
-  it('never overwrites an already-filled card name', () => {
-    expect(shouldAutoIdentify({ ...base, cardName: 'Charizard' })).toBe(false);
+  it('is zero with no front photo', () => {
+    // Extras alone are never sent, so counting them would render an Identify
+    // button that returns immediately without reading anything.
+    expect(analysisPhotoCount(null, [photo('back.jpg')])).toBe(0);
+    expect(analysisPhotoCount(null, [])).toBe(0);
   });
 
-  it('treats a whitespace-only card name as empty', () => {
-    expect(shouldAutoIdentify({ ...base, cardName: '   ' })).toBe(true);
+  it('caps at the number an identification actually sends', () => {
+    const extras = Array.from({ length: 9 }, (_, i) => photo(`extra-${i}.jpg`));
+    expect(analysisPhotoCount(photo('front.jpg'), extras)).toBe(ANALYSIS_IMAGE_LIMIT);
   });
 
-  it('does not stack runs while an analysis is in flight', () => {
-    expect(shouldAutoIdentify({ ...base, isScanning: true })).toBe(false);
-    expect(shouldAutoIdentify({ ...base, isIdentifying: true })).toBe(false);
-    // Image rectification runs before either model is called; swapping photos
-    // during it would otherwise start a second analysis racing the first.
-    expect(shouldAutoIdentify({ ...base, isPreparingImage: true })).toBe(false);
+  it('tolerates a missing extras array', () => {
+    expect(analysisPhotoCount(photo('front.jpg'))).toBe(1);
+  });
+});
+
+describe('identifyCallToAction', () => {
+  it('offers nothing without a photo', () => {
+    expect(identifyCallToAction({ photoCount: 0 })).toBeNull();
   });
 
-  it('handles a missing card name safely', () => {
-    expect(shouldAutoIdentify({ ...base, cardName: undefined })).toBe(true);
+  it('asks for the back before spending a front-only read', () => {
+    // The whole reason identification is manual: this advice has to arrive
+    // before the read, not in the results panel afterwards.
+    const cta = identifyCallToAction({ photoCount: 1 });
+    expect(cta.label).toBe('Identify Card');
+    expect(cta.hint).toMatch(/back/i);
+    expect(cta.stale).toBe(false);
+  });
+
+  it('says how many photos a multi-photo read will use', () => {
+    expect(identifyCallToAction({ photoCount: 3 }).label).toBe('Identify Card from 3 photos');
+  });
+
+  it('flags a read as stale once more photos are added', () => {
+    const cta = identifyCallToAction({ photoCount: 2, analysedImageCount: 1 });
+    expect(cta.label).toBe('Identify Again with 2 photos');
+    expect(cta.stale).toBe(true);
+  });
+
+  it('offers a plain re-run when the photos have not changed', () => {
+    const cta = identifyCallToAction({ photoCount: 2, analysedImageCount: 2 });
+    expect(cta.label).toBe('Identify Again');
+    expect(cta.hint).toBe('Last read used 2 photos.');
+    expect(cta.stale).toBe(false);
+  });
+
+  it('does not call a removed photo a new one', () => {
+    // Fewer photos than the last read is not staleness — nothing was added.
+    expect(identifyCallToAction({ photoCount: 1, analysedImageCount: 2 }).stale).toBe(false);
   });
 });
 
