@@ -47,7 +47,12 @@ import { publicImageUrl, thumbStoragePath } from '@/utils/imageUrl.js';
 import SellingRequirementsNotice from '@/components/SellingRequirementsNotice.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
 import { loadListingDraft, saveListingDraft, clearListingDraft, hasMeaningfulContent } from '@/lib/listingDraft.js';
-import { shouldAutoIdentify, buildPriceLookupQuery } from '@/utils/listingFlow.js';
+import {
+  buildPriceLookupQuery,
+  identifyCallToAction,
+  analysisPhotoCount,
+  ANALYSIS_IMAGE_LIMIT,
+} from '@/utils/listingFlow.js';
 import { confidenceScore, confidenceLabel, isLowConfidence } from '@/utils/cardsightConfidence.js';
 import { prepareAnalysisImages } from '@/utils/analysisImage.js';
 import { shouldPromptForBack, missingBackFields, backPhotoPromptText } from '@/utils/backPhotoPrompt.js';
@@ -642,9 +647,12 @@ const AddEditCardPage = () => {
     const reader = new FileReader();
     reader.onloadend = () => setImagePreview(reader.result);
     reader.readAsDataURL(file);
-    // Clear any previous analysis results when a new image is selected
+    // Clear any previous analysis results when a new image is selected — the
+    // image count with them, so the Identify button goes back to offering a
+    // first read of this photo rather than "identify again".
     clearScan();
     clearCardSight();
+    setAnalysedImageCount(0);
     clearCrop();
     setAdjusting(null);
     runPhotoQuality(file);
@@ -656,12 +664,10 @@ const AddEditCardPage = () => {
     // Allow re-picking the same file (change events don't fire otherwise) —
     // the main dropzone and the mobile take-photo input share this handler.
     e.target.value = '';
-    // Photo-first flow: identification is the default, not an opt-in button.
-    // Runs at most once per new card (guarded on an empty card name), and the
-    // prefill is non-destructive, so nothing the seller typed is overwritten.
-    if (shouldAutoIdentify({ isEdit, cardName: formData.cardName, isScanning, isIdentifying, isPreparingImage })) {
-      handleAnalyzeWithAI(file);
-    }
+    // Identification deliberately does NOT fire here. Reading the front alone is
+    // the weakest read available — the set code, collector number and year are
+    // often only on the back — so the seller adds their photos first and presses
+    // Identify once. See utils/listingFlow.js.
   };
 
   // Apply a cropped image to the given slot ('main' or an extra-photo index).
@@ -711,11 +717,11 @@ const AddEditCardPage = () => {
   };
 
   // ─── Unified AI analysis ──────────────────────────────────────────────────
-  // `file` is passed explicitly by the auto-run in handleImageChange (the
-  // imageFile state hasn't committed yet at that point); the manual button
-  // omits it and analyzes the current image.
-  const handleAnalyzeWithAI = async (file) => {
-    const frontImage = file instanceof File ? file : imageFile;
+  // Only ever invoked by the Identify button, so it reads committed state: the
+  // main photo plus whatever extra angles the seller has loaded by now. That
+  // waiting is the reason it is a button — see utils/listingFlow.js.
+  const handleAnalyzeWithAI = async () => {
+    const frontImage = imageFile;
     if (!frontImage) return;
     clearScan();
     clearCardSight();
@@ -737,7 +743,7 @@ const AddEditCardPage = () => {
     // phone photos are 3-5 MB each. See utils/analysisImage.js.
     setIsPreparingImage(true);
     const { files: analysisImages, dropped } = await prepareAnalysisImages(
-      [frontImage, ...extraFiles.filter(Boolean)].slice(0, 3),
+      [frontImage, ...extraFiles.filter(Boolean)].slice(0, ANALYSIS_IMAGE_LIMIT),
     ).finally(() => setIsPreparingImage(false));
     const analysisImage = analysisImages[0] ?? frontImage;
     setAnalysedImageCount(analysisImages.length);
@@ -1357,6 +1363,7 @@ const AddEditCardPage = () => {
               setAdjusting(null);
               clearScan();
               clearScanLog();
+              setAnalysedImageCount(0);
               setWizardStep(0);
               setMaxStepReached(0);
               // Keep franchise/manufacturer selected for fast repeat entry
@@ -1380,6 +1387,15 @@ const AddEditCardPage = () => {
   );
 
   const isGraded = formData.gradingCompany !== 'raw';
+
+  // Identification is manual, so the button itself carries the guidance the old
+  // auto-run had no opportunity to give: how many photos the next read will use,
+  // and — with only the front loaded — that the back is worth adding before
+  // spending the read rather than after it.
+  const identifyCta = identifyCallToAction({
+    photoCount: analysisPhotoCount(imageFile, extraFiles),
+    analysedImageCount,
+  });
 
   // ─── Section blocks ───────────────────────────────────────────────────────
   // Each form section is defined once and composed below either as the classic
@@ -1485,7 +1501,9 @@ const AddEditCardPage = () => {
                 <div className="mt-4">
                   <p className="text-xs font-semibold text-muted-foreground mb-2">
                     Additional Photos (up to {maxExtraSlots})
-                    {' '}<span className="font-normal">— a photo of the back improves identification</span>
+                    {' '}<span className="font-normal">
+                      — add the back <em>before</em> identifying; your first {ANALYSIS_IMAGE_LIMIT} photos are read together
+                    </span>
                   </p>
                   <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
                     {extraFiles.map((_, idx) => (
@@ -1601,19 +1619,23 @@ const AddEditCardPage = () => {
                     </div>
                   ) : null}
 
-                  {/* Identify Card Button - AI analysis with recommended label */}
-                  {imageFile && !isScanning && !isIdentifying && !isPreparingImage && !isPhotoProcessing && !isUploadingTemplate && (
+                  {/* Identify Card button — the only way an identification runs.
+                      Nothing fires on upload, so a seller can load the front, the
+                      back and one more angle and have all of them read together
+                      in a single pass. The hint below states what the next read
+                      will actually see. */}
+                  {identifyCta && !isScanning && !isIdentifying && !isPreparingImage && !isPhotoProcessing && !isUploadingTemplate && (
                     <div className="space-y-1">
                       <Button
                         type="button"
                         variant="secondary"
-                        onClick={() => handleAnalyzeWithAI()}
-                        className="w-full bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 border border-emerald-500/20 dark:text-emerald-400"
+                        onClick={handleAnalyzeWithAI}
+                        className={`w-full bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/20 border dark:text-emerald-400 ${identifyCta.stale ? 'border-emerald-500/60 ring-1 ring-emerald-500/30' : 'border-emerald-500/20'}`}
                       >
-                        <Sparkles className="w-4 h-4 mr-2" /> Identify Card
+                        <Sparkles className="w-4 h-4 mr-2" /> {identifyCta.label}
                       </Button>
                       <p className="text-xs text-center text-muted-foreground">
-                        Runs automatically when you add your first photo — tap to run again.
+                        {identifyCta.hint}
                       </p>
                     </div>
                   )}
