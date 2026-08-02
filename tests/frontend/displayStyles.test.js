@@ -14,9 +14,10 @@ import {
 } from '@/lib/displayStyles.js';
 
 describe('displayStyles registry integrity', () => {
-  it('exposes exactly the seven canonical styles in ladder order', () => {
+  it('exposes exactly the ten canonical styles in ladder order', () => {
     expect(DISPLAY_STYLES.map(s => s.key)).toEqual([
-      'classic', 'stand', 'floating', 'glass', 'slab', 'rotating', 'holographic',
+      'classic', 'stand', 'floating', 'neon', 'glass', 'slab',
+      'spotlight', 'rotating', 'prism', 'holographic',
     ]);
   });
 
@@ -88,21 +89,21 @@ describe('getAccessibleStyles', () => {
     expect(getAccessibleStyles('free').map(s => s.key)).toEqual(['classic']);
   });
 
-  it('pro users add Stand and Floating', () => {
+  it('pro users add Stand, Floating and Neon', () => {
     expect(getAccessibleStyles('pro').map(s => s.key)).toEqual([
-      'classic', 'stand', 'floating',
+      'classic', 'stand', 'floating', 'neon',
     ]);
   });
 
-  it('premium users add Glass and Slab', () => {
+  it('premium users add Glass, Slab and Spotlight', () => {
     expect(getAccessibleStyles('premium').map(s => s.key)).toEqual([
-      'classic', 'stand', 'floating', 'glass', 'slab',
+      'classic', 'stand', 'floating', 'neon', 'glass', 'slab', 'spotlight',
     ]);
   });
 
-  it('elite users add Rotating', () => {
+  it('elite users add Rotating and Prism', () => {
     expect(getAccessibleStyles('elite').map(s => s.key)).toEqual([
-      'classic', 'stand', 'floating', 'glass', 'slab', 'rotating',
+      'classic', 'stand', 'floating', 'neon', 'glass', 'slab', 'spotlight', 'rotating', 'prism',
     ]);
   });
 

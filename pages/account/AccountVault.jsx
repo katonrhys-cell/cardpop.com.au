@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Plus, Package, ImageOff, Lock, ShoppingCart, ArrowRightLeft,
-  Layers, Edit, Trash2, MoreHorizontal, AlertCircle, X, HandCoins,
+  Layers, Edit, Trash2, MoreHorizontal, AlertCircle, X, HandCoins, Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,8 +15,11 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 import VaultListingModal from '@/components/VaultListingModal.jsx';
+import DisplayStyleDialog from '@/components/vault/DisplayStyleDialog.jsx';
 import PSAPopPanel from '@/components/PSAPopPanel.jsx';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { publicImageUrl, getCardImage, CARD_GRID_SIZES } from '@/utils/imageUrl.js';
+import CardShowcase from '@/components/vault/CardShowcase.jsx';
+import { normalizeStyle, DEFAULT_STYLE } from '@/lib/displayStyles.js';
 import { ROOKIE_VARIANT } from '@/lib/cardVariants.js';
 import RookiePill from '@/components/RookiePill.jsx';
 
@@ -52,8 +55,14 @@ const AccountVault = () => {
   const [error, setError] = useState(null);
   const [filterCollection, setFilterCollection] = useState('');
   const [listingModal, setListingModal] = useState({ open: false, card: null });
+  const [styleModal, setStyleModal] = useState({ open: false, card: null });
   const [page, setPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+
+  // A saved style is reflected in place — no refetch for a cosmetic change.
+  const handleStyleSaved = (cardId, styleKey) => {
+    setCards(prev => prev.map(c => (c.id === cardId ? { ...c, display_style: styleKey } : c)));
+  };
 
   // Change the collection filter and reset to page 1 in one update.
   const changeFilter = (val) => { setFilterCollection(val); setPage(0); };
@@ -127,6 +136,12 @@ const AccountVault = () => {
     if (card.card_image) {
       imageUrl = publicImageUrl(card.card_image);
     }
+    // The card's chosen display style (holographic, slab, glass…) renders
+    // through the Card Showcase Engine here too, so the vault matches how the
+    // card appears on the marketplace. Classic keeps the flat vault treatment.
+    const displayStyle = normalizeStyle(card.display_style);
+    const useShowcase = !!imageUrl && displayStyle !== DEFAULT_STYLE;
+    const { src: imgSrc, srcSet: imgSrcSet, fallbackSrc: imgFallback, canonicalSrc: imgCanonical, thumbSrc: imgThumb } = getCardImage(card.card_image);
     const isForTrade = card.listing_type === 'For Trade' || card.listing_type === 'For Sale & Trade';
 
     return (
@@ -150,6 +165,9 @@ const AccountVault = () => {
               <DropdownMenuItem onClick={() => setListingModal({ open: true, card })} className="cursor-pointer gap-2 font-medium">
                 <ShoppingCart className="w-4 h-4" /> Manage Listing
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStyleModal({ open: true, card })} className="cursor-pointer gap-2 font-medium">
+                <Sparkles className="w-4 h-4" /> Display Style
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => handleDelete(card.id)} className="cursor-pointer gap-2 text-destructive focus:text-destructive focus:bg-destructive/10 font-medium">
                 <Trash2 className="w-4 h-4" /> Remove
@@ -158,8 +176,21 @@ const AccountVault = () => {
           </DropdownMenu>
         </div>
 
-        <div className="aspect-[4/5] bg-muted/40 relative flex items-center justify-center border-b border-border/50 p-4">
-          {imageUrl ? (
+        <div className="aspect-[4/5] bg-muted/40 relative flex items-center justify-center border-b border-border/50 p-4 overflow-hidden">
+          {useShowcase ? (
+            <CardShowcase
+              src={imgSrc}
+              srcSet={imgSrcSet}
+              sizes={CARD_GRID_SIZES}
+              fallbackSrc={imgFallback}
+              canonicalSrc={imgCanonical}
+              thumbSrc={imgThumb}
+              alt={card.card_name}
+              displayStyle={displayStyle}
+              width="400"
+              height="500"
+            />
+          ) : imageUrl ? (
             <img src={imageUrl} alt={card.card_name} className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500" loading="lazy" />
           ) : (
             <div className="flex flex-col items-center text-muted-foreground opacity-50">
@@ -317,6 +348,13 @@ const AccountVault = () => {
         onClose={() => setListingModal({ open: false, card: null })}
         product={listingModal.card}
         onUpdate={fetchVault}
+      />
+
+      <DisplayStyleDialog
+        open={styleModal.open}
+        onOpenChange={(open) => setStyleModal(s => ({ ...s, open }))}
+        card={styleModal.card}
+        onSaved={(styleKey) => handleStyleSaved(styleModal.card?.id, styleKey)}
       />
     </AccountPageShell>
   );

@@ -239,3 +239,60 @@ describe('PUT /items/:id', () => {
     expect(archiveB.update).toHaveBeenCalledWith({ status: 'archived' });
   });
 });
+
+// ─── PATCH /items/:id/display-style ──────────────────────────────────────────
+
+describe('PATCH /items/:id/display-style', () => {
+  it('rejects a malformed id', async () => {
+    const res = await request(app)
+      .patch('/items/nope/display-style')
+      .send({ displayStyle: 'glass' });
+    expect(res.status).toBe(400);
+  });
+
+  it('refuses a style above the owner\'s tier without touching the row', async () => {
+    queueFrom(profilesB('free'));
+    const res = await request(app)
+      .patch(`/items/${EXISTING.id}/display-style`)
+      .send({ displayStyle: 'holographic' });
+    expect(res.status).toBe(403);
+    // Only the profiles read happened — no vault_items write.
+    expect(mockUserClient.from).toHaveBeenCalledTimes(1);
+  });
+
+  it('saves an entitled style, pinned to the caller\'s ownership', async () => {
+    const updateB = builder({ data: { id: EXISTING.id }, error: null });
+    queueFrom(profilesB('ultimate'), updateB);
+
+    const res = await request(app)
+      .patch(`/items/${EXISTING.id}/display-style`)
+      .send({ displayStyle: 'holographic' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.displayStyle).toBe('holographic');
+    expect(updateB.update).toHaveBeenCalledWith({ display_style: 'holographic' });
+    expect(updateB.eq).toHaveBeenCalledWith('owner_id', 'u1');
+  });
+
+  it('normalizes an unknown style to classic (always allowed)', async () => {
+    const updateB = builder({ data: { id: EXISTING.id }, error: null });
+    queueFrom(profilesB('free'), updateB);
+
+    const res = await request(app)
+      .patch(`/items/${EXISTING.id}/display-style`)
+      .send({ displayStyle: 'sparkle-bonanza' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.displayStyle).toBe('classic');
+    expect(updateB.update).toHaveBeenCalledWith({ display_style: 'classic' });
+  });
+
+  it('404s when the card is not in the caller\'s vault', async () => {
+    queueFrom(profilesB('pro'), builder({ data: null, error: null }));
+    const res = await request(app)
+      .patch(`/items/${EXISTING.id}/display-style`)
+      .send({ displayStyle: 'neon' });
+    expect(res.status).toBe(404);
+  });
+});
+
