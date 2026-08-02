@@ -141,8 +141,8 @@ const AccountShows = () => {
           </p>
         </div>
       ) : (
-        <div className="flex items-start gap-3 p-4 bg-brand-blue/5 border border-brand-blue/30 rounded-2xl text-sm text-muted-foreground">
-          <Sparkles className="w-5 h-5 text-brand-blue shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 p-4 bg-brand-red/5 border border-brand-red/30 rounded-2xl text-sm text-muted-foreground">
+          <Sparkles className="w-5 h-5 text-brand-red shrink-0 mt-0.5" />
           <p>
             Advertising your Whatnot live shows on the{' '}
             <Link to="/community/whatnot" className="text-primary font-semibold hover:underline">community directory</Link>

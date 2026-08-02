@@ -222,7 +222,7 @@ const EventsManagementPage = () => {
                             {event.is_featured && <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />}
                             {event.auto_discovered && (
                               <Radar
-                                className="w-3.5 h-3.5 text-brand-blue shrink-0"
+                                className="w-3.5 h-3.5 text-muted-foreground shrink-0"
                                 aria-label="Found by the automated scan"
                               />
                             )}

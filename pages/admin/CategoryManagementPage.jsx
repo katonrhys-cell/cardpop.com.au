@@ -257,7 +257,7 @@ const CategoryManagementPage = () => {
                     ? <ChevronDown className="w-4 h-4" />
                     : <ChevronRight className="w-4 h-4" />}
                 </button>
-                <FolderTree className="w-4 h-4 text-brand-blue shrink-0" />
+                <FolderTree className="w-4 h-4 text-muted-foreground shrink-0" />
 
                 {editingId === cat.id ? (
                   <InlineEdit

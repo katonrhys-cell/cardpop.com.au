@@ -28,7 +28,7 @@ const slugify = (str) =>
 const EMPTY_FORM = {
   name: '', slug: '', category: '', tagline: '', description: '',
   why_i_use_it: '', how_it_helps_you: '', affiliate_url: '', cta_label: 'Learn more',
-  logo_url: '', icon: 'Sparkles', accent: 'from-brand-red to-brand-blue', badge: '',
+  logo_url: '', icon: 'Sparkles', accent: 'from-brand-red to-brand-charcoal', badge: '',
   sort_order: 0, is_published: true,
 };
 
@@ -95,7 +95,7 @@ const BusinessAffiliateLinksAdminPage = () => {
       cta_label: link.cta_label || 'Learn more',
       logo_url: link.logo_url || '',
       icon: link.icon || 'Sparkles',
-      accent: link.accent || 'from-brand-red to-brand-blue',
+      accent: link.accent || 'from-brand-red to-brand-charcoal',
       badge: link.badge || '',
       sort_order: link.sort_order ?? 0,
       is_published: link.is_published ?? true,
@@ -142,7 +142,7 @@ const BusinessAffiliateLinksAdminPage = () => {
       cta_label: formData.cta_label.trim() || 'Learn more',
       logo_url: formData.logo_url.trim() || null,
       icon: formData.icon || null,
-      accent: formData.accent.trim() || 'from-brand-red to-brand-blue',
+      accent: formData.accent.trim() || 'from-brand-red to-brand-charcoal',
       badge: formData.badge.trim() || null,
       sort_order: Number.isFinite(Number(formData.sort_order)) ? parseInt(formData.sort_order, 10) : 0,
       is_published: !!formData.is_published,
