@@ -161,6 +161,10 @@ and can be cleaned up.
 | `SUPABASE_SERVICE_ROLE_KEY` | Backend Supabase client (admin) |
 | `STRIPE_SECRET_KEY` | Stripe routes |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook verification |
+| `STRIPE_SUBSCRIPTION_PRICE_ID` | Membership billing — the Pro tier's recurring Stripe price (`price_...`). Each paid tier's checkout answers 503 until its price id is set — see `docs/SUBSCRIPTION_SETUP.md` |
+| `STRIPE_SUBSCRIPTION_PRICE_ID_PREMIUM` | Membership billing — Premium tier price |
+| `STRIPE_SUBSCRIPTION_PRICE_ID_ELITE` | Membership billing — Elite tier price |
+| `STRIPE_SUBSCRIPTION_PRICE_ID_ULTIMATE` | Membership billing — Ultimate tier price |
 | `STRIPE_IDENTITY_FLOW_ID` | *(optional)* Stripe Identity Verification Flow (`vf_...`) for signup ID checks — falls back to an inline document+selfie config |
 | `STRIPE_CONNECT_LEGACY_EXPRESS` | *(optional)* `true` pins **new** seller payout accounts back to the legacy `type: 'express'` shape (platform carries loss liability). Default (unset) creates them with Managed Risk + Stripe-managed pricing + Express Dashboard — see `docs/stripe-connect.md` |
 | `EBAY_APP_ID` | eBay API client |
