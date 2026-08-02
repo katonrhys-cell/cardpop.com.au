@@ -11,7 +11,7 @@
 const SUPABASE_URL = 'https://vrfsaazuqjxotnieqlkd.supabase.co';
 // Public anon key — identical to lib/supabaseClient.js's baked-in fallback.
 const ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY
-  || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZyZnNhYXp1cWp4b3RuaWVxbGtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1NDM0MTEsImV4cCI6MjEwMTExOTQxMX0.R4JqdifHRVBUjPleXqtJ963h6Q8eVosrjDtpGynw8Fo';
+  || 'sb_publishable_lHlLkeTfwzhWQ80Zz6pL6g_jc7Y8p33';
 
 const rest = (query) =>
   fetch(`${SUPABASE_URL}/rest/v1/${query}`, {

@@ -5,7 +5,7 @@ import { BLOG_CATEGORIES } from '../data/blogCategories.js';
 import { BUYING_GUIDES } from '../data/buyingGuides.js';
 
 const SUPABASE_URL = 'https://vrfsaazuqjxotnieqlkd.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZyZnNhYXp1cWp4b3RuaWVxbGtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1NDM0MTEsImV4cCI6MjEwMTExOTQxMX0.R4JqdifHRVBUjPleXqtJ963h6Q8eVosrjDtpGynw8Fo';
+const SUPABASE_ANON_KEY = 'sb_publishable_lHlLkeTfwzhWQ80Zz6pL6g_jc7Y8p33';
 
 const BASE_URL = 'https://cardpop.com.au';
 const TODAY = new Date().toISOString().split('T')[0];
