@@ -25,6 +25,12 @@ import logger from '../utils/logger.js';
 // It only ever reports. Replaying the missed webhook is a deliberate act (the
 // fulfilment path moves money), so this deliberately does not self-heal — it
 // tells you which session to resend.
+//
+// Runs once a day (vercel.json). Hourly would be better — a stuck payment is
+// then found within the hour rather than within the day — but Vercel's Hobby
+// plan rejects any cron that fires more than once daily, and the whole
+// deployment fails to build with one. Restore `15 * * * *` if the account moves
+// to Pro; nothing else here depends on the cadence.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // How long an order may legitimately sit 'pending' before it's suspicious.
@@ -88,8 +94,8 @@ export async function findUnfulfilledPaidOrders(stripe, { now = Date.now() } = {
   return { checked: pending.length, stuck, truncated: pending.length === MAX_ORDERS_PER_RUN };
 }
 
-// Which of these orders have already been reported, so an hourly cron doesn't
-// re-notify the same stuck order every hour. Keyed on notifications.related_id,
+// Which of these orders have already been reported, so a repeat run doesn't
+// re-notify the same stuck order every time. Keyed on notifications.related_id,
 // which carries the order id.
 async function alreadyAlerted(orderIds) {
   if (!orderIds.length) return new Set();
