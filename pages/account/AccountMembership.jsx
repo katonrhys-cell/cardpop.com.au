@@ -59,7 +59,7 @@ const AccountMembership = () => {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Could not validate the code.');
       setCodeConfirmed(true);
-      toast.success('Code confirmed! Add a card or PayPal below to start your free trial.');
+      toast.success('Code confirmed! Add a card below to start your free trial.');
     } catch (err) {
       toast.error(err.message || 'Could not validate the code.');
     } finally {
@@ -144,13 +144,13 @@ const AccountMembership = () => {
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
               New members get a code by email. Redeem it to claim your {TRIAL_DAYS}-day free trial —
-              add a card or PayPal to activate, and you won't be charged until the trial ends.
+              add a card to activate, and you won't be charged until the trial ends.
               The same code also gives you 10% off your first order at checkout.
             </p>
             {codeConfirmed ? (
               <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-green-600">
                 <BadgeCheck className="h-4 w-4" />
-                Code confirmed — choose Stripe or PayPal below to start your {TRIAL_DAYS} free days.
+                Code confirmed — add your card below to start your {TRIAL_DAYS} free days.
               </p>
             ) : (
               <form onSubmit={handleRedeemWelcomeCode} className="mt-4 flex gap-2">

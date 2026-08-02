@@ -86,7 +86,12 @@ supabase db push
    `customer.subscription.updated`, `customer.subscription.deleted`,
    `customer.subscription.trial_will_end`.
 
-## 3. PayPal — one billing plan per paid tier
+## 3. PayPal — currently switched OFF
+
+Memberships are billed through **Stripe only**: `PAYMENT_PROVIDERS` in
+`config/subscription.js` is `['stripe']`, so the PayPal button never renders.
+The PayPal machinery (routes, client, webhook handler) remains in the codebase
+and fails safe while unconfigured. To re-enable it later:
 
 1. Create a **Product** and a **Billing Plan** per tier in PayPal, each with a
    30-day free trial cycle followed by the tier's regular monthly cycle.
@@ -96,6 +101,7 @@ supabase db push
    `PAYPAL_SUBSCRIPTION_PLAN_ID_ULTIMATE`.
 3. Create a **Webhook** pointing at `/api/subscription/paypal/webhook` subscribed
    to `BILLING.SUBSCRIPTION.*` events, and copy its id into `PAYPAL_WEBHOOK_ID`.
+4. Add `'paypal'` back to `PAYMENT_PROVIDERS`.
 
 ## 4. Environment variables
 

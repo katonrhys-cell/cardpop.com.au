@@ -50,8 +50,14 @@ export const SUBSCRIPTION_PRICE_AUD = TIER_PRICES_AUD.pro;
 export const SUBSCRIPTION_CURRENCY = 'aud';
 export const SUBSCRIPTION_INTERVAL = 'month';
 
-/** Payment providers offered for the paid upgrade, in display order. */
-export const PAYMENT_PROVIDERS = ['stripe', 'paypal'];
+/**
+ * Payment providers offered for the paid upgrade, in display order.
+ * Memberships are billed through STRIPE ONLY. The PayPal subscription
+ * machinery (routes, client, webhook) is still in the codebase and fails safe
+ * while unconfigured — add 'paypal' back here (and configure its env vars) to
+ * re-enable it.
+ */
+export const PAYMENT_PROVIDERS = ['stripe'];
 
 /**
  * What the paid subscription unlocks. Kept here so the meaning of an entitlement

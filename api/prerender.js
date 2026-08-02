@@ -1367,7 +1367,7 @@ const STATIC_CONTENT = {
     intro: 'Buying trading cards online should never feel like a gamble. CardPop™ is built to be Australia’s safest place to buy Pokémon, Magic: The Gathering, Yu-Gi-Oh! and sports cards — every order is paid securely, backed by buyer protection, and handled by identity-verified members.',
     sections: [
       { h2: 'Every payment is secure', paras: [
-        'All purchases are processed by Stripe, a globally certified PCI-DSS Level 1 payment provider. Your card details are entered on Stripe’s encrypted checkout and never touch CardPop’s servers. You can pay with Visa, Mastercard, American Express, PayPal, Afterpay, Apple Pay, Google Pay or Stripe Link, all in Australian dollars — and CardPop memberships can also be billed securely through PayPal.',
+        'All purchases are processed by Stripe, a globally certified PCI-DSS Level 1 payment provider. Your card details are entered on Stripe’s encrypted checkout and never touch CardPop’s servers. You can pay with Visa, Mastercard, American Express, PayPal, Afterpay, Apple Pay, Google Pay or Stripe Link, all in Australian dollars.',
       ] },
       { h2: 'Buyer protection on every order', paras: [
         'Every purchase is backed by our 14-day Buyer Protection Guarantee. If your item doesn’t arrive within the expected timeframe, or is significantly not as described, you can request a full refund through our resolution process. You’re never left out of pocket for an order that goes wrong.',
@@ -1683,6 +1683,7 @@ const STATIC_CONTENT = {
         { text: 'Everything in Pro, plus 30 listings a month.' },
         { text: 'Premium display styles — Glass Museum and Slab Display.' },
         { text: 'Advertise your Whatnot live shows on the community directory.' },
+        { text: 'Your cards fill the homepage Featured Cards spots.' },
         { text: 'Priority placement in the Local Traders directory.' },
       ] },
       { h2: 'Elite — $80/month AUD', paras: ['High-volume selling with the Elite showcase.'], items: [
@@ -1693,6 +1694,7 @@ const STATIC_CONTENT = {
       { h2: 'Ultimate — $150/month AUD', paras: ['No limits. The full CardPop experience.'], items: [
         { text: 'Everything in Elite, plus unlimited listings.' },
         { text: 'Ultimate display styles — interactive Holographic showcase.' },
+        { text: 'Featured Seller placement on the CardPop homepage.' },
         { text: 'Top placement in search and Local Traders.' },
       ] },
       { h2: 'How it works', items: [

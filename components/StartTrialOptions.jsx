@@ -103,7 +103,7 @@ const StartTrialOptions = ({ returnPath = '/account/membership', tier = 'pro' })
       )}
 
       <p className="text-center text-xs text-muted-foreground">
-        Secured by Stripe &amp; PayPal. CardPop never sees your card number.
+        Secured by {PAYMENT_PROVIDERS.includes('paypal') ? 'Stripe & PayPal' : 'Stripe'}. CardPop never sees your card number.
       </p>
     </div>
   );

@@ -175,7 +175,7 @@ const PricingPage = () => {
       </div>
 
       <p className="mt-8 text-center text-xs text-muted-foreground">
-        Prices in AUD and include applicable taxes. Payments are securely processed by Stripe and PayPal —
+        Prices in AUD and include applicable taxes. Payments are securely processed by Stripe —
         CardPop never sees your card number.
       </p>
     </div>
