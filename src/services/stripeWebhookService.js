@@ -454,18 +454,18 @@ async function handleCartOrder(existing, session, stripe) {
   }
 
   const amountCents2 = session.amount_total || 0;
-  if (existing.buyer_id) {
-    await supabase.from('notifications').insert({
-      user_id: existing.buyer_id,
-      type: 'order_confirmed',
-      title: 'Order Confirmed',
-      body: `Your payment of $${(amountCents2 / 100).toFixed(2)} AUD was successful.`,
-    });
-  }
+
+  // The buyer's "Purchase confirmed" notification comes from the on_order_paid
+  // DB trigger, which fires on the pending -> payment_confirmed update above —
+  // so it is emitted exactly once, only after payment actually clears.
+  //
+  // Sellers on a cart order can't come from that trigger: a cart order has no
+  // single seller_id, and the individual lines are only known here.
   for (const sid of sellerIds) {
     await supabase.from('notifications').insert({
-      user_id: sid, type: 'item_sold', title: 'Item Sold!',
+      user_id: sid, type: 'listing_sold', title: 'Your card sold! 🎉',
       body: 'One of your listings sold through a cart checkout.',
+      link: '/transactions', related_id: existing.id,
     });
   }
 
@@ -685,23 +685,10 @@ async function handleSingleItemOrder(session, stripe) {
       .eq('id', meta.offerId);
   }
 
-  if (userId) {
-    await supabase.from('notifications').insert({
-      user_id: userId,
-      type: 'order_confirmed',
-      title: 'Order Confirmed',
-      body: `Your payment of $${(amountCents / 100).toFixed(2)} AUD was successful.`,
-    });
-  }
-
-  if (sellerId) {
-    await supabase.from('notifications').insert({
-      user_id: sellerId,
-      type: 'item_sold',
-      title: 'Item Sold!',
-      body: `Your listing sold for $${itemPrice.toFixed(2)} AUD. You'll receive $${sellerProceeds.toFixed(2)} after fees.`,
-    });
-  }
+  // Buyer and seller notifications come from the on_order_paid DB trigger. This
+  // path inserts the order already `payment_confirmed`, so the trigger fires on
+  // that insert — after payment, once, with the card name and a link to
+  // /transactions.
 
   const [{ data: buyerProfile }, { data: sellerProfile }] = await Promise.all([
     userId ? supabase.from('profiles').select('email, display_name').eq('id', userId).maybeSingle() : { data: null },
