@@ -198,18 +198,13 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
 
     setLoading(true);
     try {
-      // Update vault item visibility/type
-      const { error: vaultErr } = await supabase
-        .from('vault_items')
-        .update({
-          listing_type: selected.key,
-          is_public: selected.isPublic,
-          ...(selected.needsTrade ? { trade_value_aud: Number(price) || product.trade_value_aud } : {}),
-        })
-        .eq('id', product.id).eq('owner_id', currentUser.id);
-      if (vaultErr) throw vaultErr;
-
+      // The listings row is written FIRST and the vault item's badge second:
+      // the listing write is the one with gates that can fail (can_sell,
+      // quota, approval, the sellers-can't-touch-sold-rows RLS rule), and
+      // updating the vault first left cards badged "Private" while their
+      // listing was still live on the marketplace.
       let listingStatusAfterSave = null;
+      let soldStaysVisible = false;
       if (selected.isPublic) {
         // Upsert a listings row so the card appears in the marketplace
         const listingPayload = {
@@ -273,12 +268,38 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
         const { error: archiveErr } = await supabase
           .from('listings')
           .update({ status: 'archived' })
-          .eq('vault_item_id', product.id).eq('seller_id', currentUser.id);
+          .eq('vault_item_id', product.id).eq('seller_id', currentUser.id)
+          .neq('status', 'archived');
         if (archiveErr) throw archiveErr;
+        // RLS stops sellers updating sold rows, so the archive can silently
+        // match nothing — verify what actually remains on the marketplace.
+        const { data: remaining, error: remainErr } = await supabase
+          .from('listings')
+          .select('id, status')
+          .eq('vault_item_id', product.id)
+          .neq('status', 'archived');
+        if (remainErr) throw remainErr;
+        if (remaining?.length) {
+          if (remaining.every((r) => r.status === 'sold')) soldStaysVisible = true;
+          else throw new Error('Could not remove the marketplace listing — please try again.');
+        }
       }
+
+      // Update vault item visibility/type
+      const { error: vaultErr } = await supabase
+        .from('vault_items')
+        .update({
+          listing_type: selected.key,
+          is_public: selected.isPublic,
+          ...(selected.needsTrade ? { trade_value_aud: Number(price) || product.trade_value_aud } : {}),
+        })
+        .eq('id', product.id).eq('owner_id', currentUser.id);
+      if (vaultErr) throw vaultErr;
 
       if (listingStatusAfterSave === 'pending') {
         toast.success('Listing submitted — it will appear on the marketplace once approved.', { duration: 8000 });
+      } else if (soldStaysVisible) {
+        toast.info('Card set to private, but its sold marketplace listing stays visible until an admin archives it.', { duration: 10000 });
       } else {
         toast.success(`Card updated: ${selected.label}`);
       }
@@ -392,13 +413,17 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
             {visibleOptions.map((opt) => {
               const Icon = opt.icon;
               const isActive = selected?.key === opt.key;
+              // A public option is redundant when it's already the live
+              // status; Private is redundant only when there's also no live
+              // listing left — a card badged Private WITH a live listing
+              // (drifted state) must be able to re-pick Private to archive it.
               return (
                 <Button
                   key={opt.key}
                   variant="outline"
                   className={`w-full justify-start h-11 rounded-xl font-medium transition-colors ${opt.className} ${isActive ? 'ring-2 ring-primary' : ''}`}
                   onClick={() => handleSelect(opt)}
-                  disabled={loading || (product.listing_type === opt.key && hasActiveListing)}
+                  disabled={loading || (product.listing_type === opt.key && (opt.isPublic ? hasActiveListing : !hasActiveListing))}
                 >
                   <Icon className="w-4 h-4 mr-3 shrink-0" />
                   {opt.label}

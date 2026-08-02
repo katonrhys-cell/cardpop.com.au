@@ -7,12 +7,14 @@
 //
 // Returns an honest status for the seller's toast rather than a blanket
 // success:
-//   'archived' — card is private; any active listing was archived
-//   'listed'   — live on the marketplace now
-//   'pending'  — saved, but held for admin approval
-//   'blocked'  — denied by the can_sell() RLS gate (identity/card missing)
-//   'quota'    — rejected by the monthly listing quota trigger (tier limit)
-//   'error'    — any other failure (the vault card itself is already saved)
+//   'archived'     — card is private; any active listing was archived
+//   'listed'       — live on the marketplace now
+//   'pending'      — saved, but held for admin approval
+//   'blocked'      — denied by the can_sell() RLS gate (identity/card missing)
+//   'quota'        — rejected by the monthly listing quota trigger (tier limit)
+//   'sold_visible' — card went private but its sold listing stays on the
+//                    marketplace (sellers can't archive sold rows; admins can)
+//   'error'        — any other failure (the vault card itself is already saved)
 import { isSellingEntitlementError, isListingQuotaError } from '../../utils/listingErrors.js';
 import { PUBLIC_LISTING_TYPES } from '../utils/vaultItemInput.js';
 import logger from '../utils/logger.js';
@@ -35,7 +37,17 @@ export const syncMarketplaceListing = async (userClient, { cardId, userId, listi
         .eq('seller_id', userId)
         .neq('status', 'archived');
       if (error) throw error;
-      return 'archived';
+      // RLS stops sellers updating sold rows, so the archive can silently
+      // match nothing while the card is still visible on the marketplace —
+      // report what actually remains instead of trusting the update.
+      const { data: remaining, error: checkError } = await userClient
+        .from('listings')
+        .select('id, status')
+        .eq('vault_item_id', cardId)
+        .neq('status', 'archived');
+      if (checkError) throw checkError;
+      if (!remaining?.length) return 'archived';
+      return remaining.every((r) => r.status === 'sold') ? 'sold_visible' : 'error';
     }
 
     const listingPayload = {

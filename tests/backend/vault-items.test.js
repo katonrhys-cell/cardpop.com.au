@@ -69,7 +69,8 @@ describe('POST /items', () => {
   it('creates a private card and archives listings', async () => {
     const insertB = builder({ data: { id: 'card-1' }, error: null });
     const archiveB = builder({ error: null });
-    queueFrom(profilesB(), insertB, archiveB);
+    const verifyB = builder({ data: [], error: null }); // nothing left un-archived
+    queueFrom(profilesB(), insertB, archiveB, verifyB);
 
     const res = await request(app).post('/items').send({ item: VALID_ITEM });
 
@@ -226,7 +227,8 @@ describe('PUT /items/:id', () => {
 
   it('archives the listing when the card goes private', async () => {
     const archiveB = builder({ error: null });
-    queueFrom(builder({ data: EXISTING, error: null }), profilesB(), builder({ error: null }), archiveB);
+    const verifyB = builder({ data: [], error: null }); // nothing left un-archived
+    queueFrom(builder({ data: EXISTING, error: null }), profilesB(), builder({ error: null }), archiveB, verifyB);
 
     const res = await request(app)
       .put(`/items/${EXISTING.id}`)

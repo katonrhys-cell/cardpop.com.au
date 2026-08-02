@@ -158,6 +158,10 @@ const AddEditCardPage = () => {
   });
   const [wizardStep, setWizardStep] = useState(0);
   const [maxStepReached, setMaxStepReached] = useState(0);
+  // When the final wizard step was entered — submits landing almost
+  // immediately after are the tail of a double-click on "Next", not a real
+  // save (the Next button swaps into the submit button in place).
+  const publishStepEnteredAt = useRef(0);
   const wizardMode = !isEdit && !useFullForm;
   // Hierarchy selection
   const [selCategoryId, setSelCategoryId]     = useState('');
@@ -1067,6 +1071,7 @@ const AddEditCardPage = () => {
   };
 
   const goToStep = (index) => {
+    if (index === WIZARD_STEPS.length - 1) publishStepEnteredAt.current = Date.now();
     setWizardStep(index);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -1096,12 +1101,13 @@ const AddEditCardPage = () => {
   // in one call (src/routes/vault-items.js). The response's listing.status
   // reports how the marketplace row actually ended up, so the seller hears
   // the truth rather than a blanket success:
-  //   'archived' — card went private
-  //   'listed'   — live on the marketplace now
-  //   'pending'  — saved, but held for admin approval (listing_approval_required)
-  //   'blocked'  — denied by the can_sell() RLS gate (identity/card-on-file missing)
-  //   'quota'    — rejected by the monthly listing quota (tier limit reached)
-  //   'error'    — any other failure (the vault card itself is already saved)
+  //   'archived'     — card went private
+  //   'listed'       — live on the marketplace now
+  //   'pending'      — saved, but held for admin approval (listing_approval_required)
+  //   'blocked'      — denied by the can_sell() RLS gate (identity/card-on-file missing)
+  //   'quota'        — rejected by the monthly listing quota (tier limit reached)
+  //   'sold_visible' — card went private but its sold listing stays on the marketplace
+  //   'error'        — any other failure (the vault card itself is already saved)
 
   // Turn the sync outcome into an honest toast. `savedMsg` is the base success
   // message for the vault card itself; `successOpts` (e.g. the "Add Another"
@@ -1137,6 +1143,9 @@ const AddEditCardPage = () => {
         );
         break;
       }
+      case 'sold_visible':
+        toast.info(`${savedMsg} It's private in your vault, but its sold marketplace listing stays visible until an admin archives it.`, { duration: 10000 });
+        break;
       case 'error':
         toast.warning(`${savedMsg} But updating its marketplace listing failed — you can re-list it from your vault.`, { duration: 10000 });
         break;
@@ -1172,6 +1181,11 @@ const AddEditCardPage = () => {
   // ─── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
+    // "Next: List it" and "Save Card" are the same button element swapped in
+    // place, so the second click of a double-click (or a second tap while the
+    // page is still scrolling) lands on the submit button and would save the
+    // card — defaulting it to Private — before the List It step was ever seen.
+    if (wizardMode && Date.now() - publishStepEnteredAt.current < 600) return;
     // One validation pass covers everything — fields, card image, and the
     // Category/Franchise hierarchy — so the seller sees all problems at once
     // instead of fixing one gate only to discover the next on resubmit.
@@ -3891,11 +3905,14 @@ const AddEditCardPage = () => {
                     </Button>
                   )}
                   {wizardStep < WIZARD_STEPS.length - 1 ? (
-                    <Button type="button" onClick={goNextStep} className="h-12 px-8 font-bold">
+                    // Distinct keys force a remount when Next becomes Save, so
+                    // focus (and a queued Enter/Space) can't carry over onto
+                    // the submit button.
+                    <Button key="wizard-next" type="button" onClick={goNextStep} className="h-12 px-8 font-bold">
                       Next: {WIZARD_STEPS[wizardStep + 1].title} <ChevronRight className="w-4 h-4 ml-1" />
                     </Button>
                   ) : (
-                    <Button type="submit" disabled={saving} className="h-12 px-8 font-bold shadow-lg shadow-primary/20">
+                    <Button key="wizard-save" type="submit" disabled={saving} className="h-12 px-8 font-bold shadow-lg shadow-primary/20">
                       {saving
                         ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Saving...</>
                         : <><Save className="w-5 h-5 mr-2" /> Save Card</>}
