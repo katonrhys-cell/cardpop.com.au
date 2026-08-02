@@ -114,34 +114,54 @@ router.post('/calculate-cart', optionalAuthMiddleware, async (req, res) => {
     // priceCart tolerates (they can't be the seller of any listing), and promo
     // codes / wallet balance are account-only perks that are simply ignored.
     const userId = req.user?.id ?? null;
-    const priced = await priceCart(items, userId);
+    const code = typeof promoCode === 'string' ? promoCode.trim() : '';
+
+    // A partner code can carry a free-shipping perk, so it has to be resolved
+    // BEFORE the cart is priced — the waiver changes the shipping line itself,
+    // not just a discount applied on top of the total. Welcome offers never
+    // touch shipping, so they stay in the post-pricing block below. An invalid
+    // code doesn't fail the whole calculation: the UI shows `promoError` inline
+    // and the undiscounted totals stay correct.
+    let partner = null;
+    let promoError = null;
+    if (userId && code && !isWelcomeCodeFormat(code)) {
+      try {
+        partner = await validatePartnerCode(userId, code);
+      } catch (promoErr) {
+        if (!promoErr.statusCode) throw promoErr;
+        promoError = promoErr.message;
+      }
+    }
+
+    const priced = await priceCart(items, userId, { waiveShipping: !!partner?.free_shipping });
 
     // Preview the promo discount without creating any Stripe objects. Codes in
     // the POP-XXXX-XXXX shape are personal welcome offers; anything else is a
-    // partner referral code (discounts shop items only). An invalid code
-    // doesn't fail the whole calculation — the UI shows `promoError` inline
-    // and the undiscounted totals stay correct.
+    // partner referral code (discounts shop items only).
     let discountCents = 0;
-    let promoError = null;
     let walletBalanceCents = 0;
     let walletAppliedCents = 0;
     if (!userId) {
       // Guest: no welcome offer / partner attribution / wallet — leave totals
       // undiscounted and don't surface an error for a harmlessly-ignored code.
-    } else if (typeof promoCode === 'string' && promoCode.trim()) {
-      try {
-        if (isWelcomeCodeFormat(promoCode)) {
-          const offer = await validateWelcomeDiscount(userId, promoCode);
+    } else if (code) {
+      if (isWelcomeCodeFormat(code)) {
+        try {
+          const offer = await validateWelcomeDiscount(userId, code);
           discountCents = welcomeDiscountCents(offer, priced.itemsCents);
-        } else {
-          const partner = await validatePartnerCode(userId, promoCode);
-          discountCents = partnerDiscountCents(partner, priced.orderLines);
-          if (discountCents <= 0) promoError = 'This code applies to CardPop Shop items only.';
+        } catch (promoErr) {
+          if (!promoErr.statusCode) throw promoErr;
+          promoError = promoErr.message;
         }
-      } catch (promoErr) {
-        if (!promoErr.statusCode) throw promoErr;
-        promoError = promoErr.message;
+      } else if (partner) {
+        discountCents = partnerDiscountCents(partner, priced.orderLines);
+        // Free shipping alone is worth applying the code for, so only tell the
+        // buyer it did nothing when it bought them neither.
+        if (discountCents <= 0 && priced.shippingWaivedCents <= 0) {
+          promoError = 'This code applies to CardPop Shop items only.';
+        }
       }
+      // else: the code failed validation above and promoError is already set.
     } else if (useWalletBalance) {
       // Live read from Stripe — CardPop keeps no local wallet ledger for buyers.
       walletBalanceCents = await getWalletBalanceCents(stripe, userId);
@@ -157,6 +177,10 @@ router.post('/calculate-cart', optionalAuthMiddleware, async (req, res) => {
       gstAud:      priced.gstCents / 100,
       includedGstAud: priced.includedGstCents / 100,
       shippingAud: priced.shippingCents / 100,
+      // A shipping fee was due and waived by the applied code — the UI shows the
+      // saving and keeps treating the code as applied even when the % off is $0.
+      freeShipping: priced.shippingWaivedCents > 0,
+      shippingWaivedAud: priced.shippingWaivedCents / 100,
       discountAud: (discountCents + walletAppliedCents) / 100,
       walletBalanceAud: walletBalanceCents / 100,
       walletAppliedAud: walletAppliedCents / 100,
@@ -236,7 +260,18 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       return res.status(400).json({ error: message, code: 'address_unverified' });
     }
 
-    const { lineItems, orderLines, itemsCents, commissionCents, gstCents, includedGstCents, shippingCents, grandCents } = await priceCart(items, userId);
+    // Resolve a partner referral code before pricing: an approved partner whose
+    // perk includes free shipping waives the cart's shipping fee, so priceCart
+    // has to know before it builds the Stripe line items (the fee is a line on
+    // the session, not something a coupon can take off afterwards). An invalid
+    // code throws here exactly as it did when it was validated further down.
+    const promoCodeText = typeof promoCode === 'string' ? promoCode.trim() : '';
+    const partner = userId && promoCodeText && !isWelcomeCodeFormat(promoCodeText)
+      ? await validatePartnerCode(userId, promoCodeText)
+      : null;
+
+    const { lineItems, orderLines, itemsCents, commissionCents, gstCents, includedGstCents, shippingCents, shippingWaivedCents, grandCents } =
+      await priceCart(items, userId, { waiveShipping: !!partner?.free_shipping });
 
     // Fraud control: cap order size / frequency for brand-new, unverified buyers.
     const velocity = await checkPurchaseVelocity({ userId, guestEmail: userId ? null : email, orderValueAud: grandCents / 100 });
@@ -262,9 +297,9 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
     if (!userId) {
       // Guest checkout — promo codes, wallet balance and partner attribution are
       // all account-scoped, so any supplied code is harmlessly ignored.
-    } else if (typeof promoCode === 'string' && promoCode.trim()) {
-      if (isWelcomeCodeFormat(promoCode)) {
-        const offer = await validateWelcomeDiscount(userId, promoCode);
+    } else if (promoCodeText) {
+      if (isWelcomeCodeFormat(promoCodeText)) {
+        const offer = await validateWelcomeDiscount(userId, promoCodeText);
         const built = await buildWelcomeDiscount(stripe, offer, itemsCents);
         if (built) {
           // Claim the one-time offer for this checkout so concurrent sessions
@@ -275,7 +310,8 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
           welcomeOfferId = offer.id;
         }
       } else {
-        const partner = await validatePartnerCode(userId, promoCode);
+        // `partner` was resolved before pricing (its free-shipping perk had to
+        // be applied to the shipping line), so it is non-null on this branch.
         const built = await buildPartnerDiscount(stripe, partner, partnerDiscountCents(partner, orderLines));
         if (built) {
           discounts = [{ coupon: built.couponId }];
@@ -287,6 +323,10 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
           partnerId: partner.id,
           partnerCode: partner.code,
           partnerDiscountCents: String(discountCents),
+          // Recorded so the waived fee is auditable from the session alone —
+          // the order's shipping_aud is 0 either way, which can't tell a waiver
+          // apart from a cart that never owed shipping.
+          ...(shippingWaivedCents > 0 ? { partnerFreeShippingCents: String(shippingWaivedCents) } : {}),
         };
       }
     } else if (useWalletBalance) {

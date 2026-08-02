@@ -138,6 +138,36 @@ describe('priceCart — shipping', () => {
 
     const result = await priceCart([{ type: 'shop', id: 'p1', quantity: 2 }], 'buyer-1'); // $200
     expect(result.shippingCents).toBe(0);
+    // Nothing was due, so nothing was waived by a perk.
+    expect(result.shippingWaivedCents).toBe(0);
+  });
+
+  it('waives the fee (and reports the saving) when the caller asks for free shipping', async () => {
+    setPlatformSettings({ default_shipping_rate_aud: 9.95, free_shipping_threshold_aud: 200 });
+    mockSupabase.from.mockReturnValueOnce(rowBuilder({
+      data: { id: 'p1', title: 'Box', price_aud: 100, stock_quantity: 5, status: 'active' },
+      error: null,
+    }));
+
+    const result = await priceCart([{ type: 'shop', id: 'p1', quantity: 1 }], 'buyer-1', { waiveShipping: true });
+    expect(result.shippingCents).toBe(0);
+    expect(result.shippingWaivedCents).toBe(995);
+    // The waived fee leaves the total, and its GST leaves the reported tax with it.
+    expect(result.grandCents).toBe(10000);
+    expect(result.includedGstCents).toBe(909);
+    expect(result.lineItems.some((l) => l.price_data.product_data.name === 'Shipping')).toBe(false);
+  });
+
+  it('claims no saving from free shipping when the cart never owed a fee', async () => {
+    setPlatformSettings({ default_shipping_rate_aud: 9.95, free_shipping_threshold_aud: 200 });
+    mockSupabase.from.mockReturnValueOnce(rowBuilder({
+      data: { id: 'p1', title: 'Box', price_aud: 100, stock_quantity: 5, status: 'active' },
+      error: null,
+    }));
+
+    const result = await priceCart([{ type: 'shop', id: 'p1', quantity: 2 }], 'buyer-1', { waiveShipping: true }); // $200, already free
+    expect(result.shippingCents).toBe(0);
+    expect(result.shippingWaivedCents).toBe(0);
   });
 });
 
