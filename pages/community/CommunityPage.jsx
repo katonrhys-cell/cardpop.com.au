@@ -254,7 +254,7 @@ const CommunityPage = () => {
         {/* ── Building Your Business promo ── */}
         <Link
           to="/community/building-your-business"
-          className="group flex items-center gap-4 sm:gap-5 mb-10 rounded-2xl border border-border bg-gradient-to-br from-brand-red/[0.06] via-card to-brand-blue/[0.06] p-5 sm:p-6 hover:shadow-md hover:-translate-y-0.5 transition-all"
+          className="group flex items-center gap-4 sm:gap-5 mb-10 rounded-2xl border border-border bg-gradient-to-br from-brand-red/[0.06] via-card to-brand-charcoal/[0.06] p-5 sm:p-6 hover:shadow-md hover:-translate-y-0.5 transition-all"
         >
           <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-rose-500 to-orange-500 flex items-center justify-center shrink-0 shadow-sm">
             <Rocket className="w-6 h-6 sm:w-7 sm:h-7 text-white" />

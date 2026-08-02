@@ -207,7 +207,7 @@ const MarketplaceManagementPage = () => {
                           href={listingUrl(l)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 text-brand-blue hover:underline"
+                          className="inline-flex items-center gap-1.5 text-primary hover:underline"
                           title="Open listing in a new tab"
                         >
                           <span>{listingName(l)}</span>

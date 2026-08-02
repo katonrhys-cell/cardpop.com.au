@@ -251,7 +251,7 @@ const BuildingYourBusinessPage = () => {
                     <div className="flex items-start gap-4 mb-4">
                       <div
                         className={`h-16 w-44 rounded-2xl flex items-center justify-center shrink-0 shadow-sm overflow-hidden px-4 py-2.5 ${
-                          brand ? '' : `bg-gradient-to-br ${tool.accent || 'from-brand-red to-brand-blue'}`
+                          brand ? '' : `bg-gradient-to-br ${(tool.accent || 'from-brand-red to-brand-charcoal').replace('brand-blue', 'brand-charcoal')}`
                         }`}
                         style={brand ? {
                           background: brand.bg,

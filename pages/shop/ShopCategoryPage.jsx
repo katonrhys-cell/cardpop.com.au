@@ -140,7 +140,7 @@ const ShopCategoryPage = () => {
   const heroDesc = shopCategory?.desc || category?.description || subcategory?.description
     || `Browse our range of ${heroTitle.toLowerCase()} — sourced, checked and shipped fast across Australia.`;
   const HeroIcon = shopCategory?.LeafIcon || shopCategory?.Icon || ShoppingBag;
-  const heroGradient = shopCategory?.gradient || 'from-brand-red to-brand-blue';
+  const heroGradient = shopCategory?.gradient || 'from-brand-red to-brand-charcoal';
 
   const breadcrumbs = shopCategory
     ? [

@@ -9,17 +9,17 @@ import { ArrowRightLeft, ShoppingBag, Tag } from 'lucide-react';
  * Shown on the account dashboard so every logged-in member sees it.
  */
 const P2PTradingNotice = () => (
-  <div className="rounded-2xl border border-brand-blue/30 bg-brand-blue/5 p-5 shadow-sm">
+  <div className="rounded-2xl border border-border bg-muted/30 p-5 shadow-sm">
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-blue/10">
-        <ArrowRightLeft className="h-5 w-5 text-brand-blue" />
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-red/10">
+        <ArrowRightLeft className="h-5 w-5 text-brand-red" />
       </div>
       <div className="space-y-1.5">
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-heading text-lg font-bold text-foreground">
             Peer-to-peer trading is on the way
           </p>
-          <span className="rounded-full bg-brand-blue/10 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-brand-blue">
+          <span className="rounded-full bg-brand-red/10 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-brand-red">
             Coming late 2026
           </span>
         </div>

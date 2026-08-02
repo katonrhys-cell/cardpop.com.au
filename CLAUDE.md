@@ -42,7 +42,7 @@ All pages are lazy-loaded in `App.jsx` via React Router v7. The provider wrappin
 
 **UI components** are shadcn/ui ("new-york" style, Radix UI primitives) in `components/ui/`. Add new shadcn components via the config in `components.json`. Icons are from `lucide-react`.
 
-**Styling**: Tailwind CSS with CSS variable-based theming. Brand colors are `brand-red` and `brand-blue`. Dark mode is class-based via `next-themes`.
+**Styling**: Tailwind CSS with CSS variable-based theming. The brand palette (see `tailwind.config.js`) is `brand-red` (#CE1126), `brand-charcoal`, `brand-silver`, `brand-lightgrey` and `brand-white` — **there is no blue in the branding guide**; don't introduce `brand-blue` or blue accents. Dark mode is class-based via `next-themes`.
 
 **Toasts**: Use `sonner` via `import { toast } from 'sonner'`.
 

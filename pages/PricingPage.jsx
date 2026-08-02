@@ -72,14 +72,7 @@ const PricingPage = () => {
         : `Get started with ${plan.name}`;
     const to = isAuthenticated ? `/account/membership?tier=${plan.key}` : '/signup';
     return (
-      <Button
-        asChild
-        className={`h-11 w-full font-bold ${
-          plan.key === PLAN_PRO
-            ? 'bg-brand-red hover:bg-brand-red/90'
-            : 'bg-brand-blue hover:bg-brand-blue/90'
-        }`}
-      >
+      <Button asChild className="h-11 w-full bg-brand-red font-bold hover:bg-brand-red/90">
         <Link to={to}>{label}</Link>
       </Button>
     );
@@ -159,8 +152,8 @@ const PricingPage = () => {
       </div>
 
       {/* Paid-tier highlight */}
-      <div className="mt-10 flex flex-col items-start gap-4 rounded-2xl border border-brand-blue/30 bg-brand-blue/5 p-6 sm:flex-row sm:items-center">
-        <Store className="h-8 w-8 shrink-0 text-brand-blue" />
+      <div className="mt-10 flex flex-col items-start gap-4 rounded-2xl border border-border bg-muted/30 p-6 sm:flex-row sm:items-center">
+        <Store className="h-8 w-8 shrink-0 text-brand-red" />
         <div className="flex-1">
           <h3 className="font-heading text-lg font-bold text-foreground">Why upgrade?</h3>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -169,7 +162,7 @@ const PricingPage = () => {
             monthly listing allowance the higher you go, all the way to unlimited on Ultimate.
           </p>
         </div>
-        <Button asChild className="bg-brand-blue font-bold hover:bg-brand-blue/90">
+        <Button asChild className="bg-brand-red font-bold hover:bg-brand-red/90">
           <Link to={isAuthenticated ? '/account/membership' : '/signup'}>Start free trial</Link>
         </Button>
       </div>
