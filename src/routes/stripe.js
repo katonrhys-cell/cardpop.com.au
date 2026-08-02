@@ -23,6 +23,7 @@ import {
 import { processRefund } from '../services/refundService.js';
 import { connectOnboard, getConnectStatus, getDashboardLink, withdrawHeldBalance } from '../services/connectService.js';
 import { createIdentitySession, getIdentityStatus, applyIdentitySession } from '../services/identityService.js';
+import { reconcilePendingOrders } from '../services/pendingOrderAlertService.js';
 import { applyStripeSubscription } from '../services/subscriptionService.js';
 import { ensureWalletCustomer, getWalletBalanceCents, handleWalletTopup, assertNoOpenWalletCheckout, reserveWalletCheckout, releaseWalletCheckout } from '../services/walletService.js';
 import { validateShippingAddress } from '../utils/addressValidation.js';
@@ -795,6 +796,13 @@ router.post('/connect/dashboard-link', authMiddleware, getDashboardLink);
 // Pays a held wallet balance out to the seller's connected Stripe account.
 
 router.post('/connect/withdraw', authMiddleware, withdrawHeldBalance);
+
+// ─── GET /reconcile-pending ──────────────────────────────────────────────────
+// Vercel Cron: flags orders Stripe reports as paid that are still 'pending'
+// because checkout.session.completed never fulfilled them. Guarded by
+// CRON_SECRET (fail-closed) inside the handler — reports only, never fulfils.
+
+router.get('/reconcile-pending', reconcilePendingOrders(stripe));
 
 export default router;
 
