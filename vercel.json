@@ -36,7 +36,7 @@
     },
     {
       "path": "/api/stripe/reconcile-pending",
-      "schedule": "15 * * * *"
+      "schedule": "15 21 * * *"
     }
   ],
   "redirects": [

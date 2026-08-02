@@ -149,7 +149,7 @@ describe('alertStuckOrders', () => {
     expect(state.inserted[0].body).toContain('cs_1');
   });
 
-  it('stays quiet on an order already reported (hourly cron must not spam)', async () => {
+  it('stays quiet on an order already reported (a repeat run must not spam)', async () => {
     state.priorAlerts = [{ related_id: 'ord-1' }];
 
     const result = await alertStuckOrders(stuck);
