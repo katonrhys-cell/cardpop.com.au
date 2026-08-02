@@ -31,16 +31,40 @@ describe('CardShowcase', () => {
     expect(container.querySelector('.cardshowcase--classic')).toBeTruthy();
   });
 
-  it('only renders the holographic overlay for the holographic style', () => {
+  it('only renders the holographic overlays for the holographic style', () => {
     const { container: holo } = render(
       <CardShowcase {...baseProps} displayStyle="holographic" />,
     );
     expect(holo.querySelector('.cardshowcase__holo')).toBeTruthy();
+    // The foil look is three layers: rainbow, glitter field and glare.
+    expect(holo.querySelector('.cardshowcase__sparkle')).toBeTruthy();
+    expect(holo.querySelector('.cardshowcase__glare')).toBeTruthy();
 
     const { container: classic } = render(
       <CardShowcase {...baseProps} displayStyle="classic" />,
     );
     expect(classic.querySelector('.cardshowcase__holo')).toBeNull();
+    expect(classic.querySelector('.cardshowcase__sparkle')).toBeNull();
+  });
+
+  it('renders the style-specific layers for the new styles', () => {
+    const { container: spotlight } = render(
+      <CardShowcase {...baseProps} displayStyle="spotlight" />,
+    );
+    expect(spotlight.querySelector('.cardshowcase__beam')).toBeTruthy();
+    expect(spotlight.querySelector('.cardshowcase__shadow')).toBeTruthy();
+
+    const { container: prism } = render(
+      <CardShowcase {...baseProps} displayStyle="prism" />,
+    );
+    expect(prism.querySelector('.cardshowcase__prism')).toBeTruthy();
+
+    // Neon is a pure filter effect — no extra layers beyond the card itself.
+    const { container: neon } = render(
+      <CardShowcase {...baseProps} displayStyle="neon" />,
+    );
+    expect(neon.querySelector('.cardshowcase--neon')).toBeTruthy();
+    expect(neon.querySelector('.cardshowcase__beam')).toBeNull();
   });
 
   it('still renders the image when src is missing (No Image fallback)', () => {

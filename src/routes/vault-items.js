@@ -21,6 +21,7 @@ import express from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import createUserScopedClient from '../utils/userScopedSupabase.js';
 import { buildVaultItemRow, validateVaultItemRow } from '../utils/vaultItemInput.js';
+import { canUseStyle, normalizeStyle, normalizeTier, getStyleByKey, TIER_META } from '../../lib/displayStyles.js';
 import { syncMarketplaceListing } from '../services/vaultListingService.js';
 import logger from '../utils/logger.js';
 
@@ -147,6 +148,45 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
   logger.info(`[VAULT] User ${req.user.id} updated card ${id} (${row.listing_type}, listing: ${listingStatus})`);
   res.json({ success: true, item: { id }, listing: { status: listingStatus } });
+});
+
+// PATCH /vault/items/:id/display-style — change only how a card is shown.
+// Deliberately NOT the PUT above: that is a full-replace contract whose
+// derived fields (listing_type, flags) are recomputed from the submission, so
+// sending just a style through it would unlist the card. This endpoint
+// touches a single cosmetic column and re-checks the tier gate server-side.
+router.patch('/:id/display-style', authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  if (!UUID_RE.test(id || '')) return res.status(400).json({ error: 'Invalid card id' });
+
+  const token = (req.headers.authorization || '').slice(7);
+  const userClient = createUserScopedClient(token);
+
+  const requested = normalizeStyle(req.body?.displayStyle);
+  const tier = await fetchOwnerTier(userClient, req.user.id);
+  if (!canUseStyle(requested, normalizeTier(tier))) {
+    const style = getStyleByKey(requested);
+    const need = TIER_META[style?.minTier]?.label || style?.minTier;
+    return res.status(403).json({ error: `${style?.label || requested} is a ${need} display style. Upgrade to use it.` });
+  }
+
+  const { data, error } = await userClient
+    .from('vault_items')
+    .update({ display_style: requested })
+    .eq('id', id)
+    .eq('owner_id', req.user.id)
+    .select('id')
+    .maybeSingle();
+  if (error) {
+    if (error.code === '42501' || /row-level security/i.test(error.message || '')) {
+      return res.status(403).json({ error: 'You are not allowed to update this card.' });
+    }
+    throw error;
+  }
+  if (!data) return res.status(404).json({ error: 'Card not found in your vault' });
+
+  logger.info(`[VAULT] User ${req.user.id} set display style of card ${id} to ${requested}`);
+  res.json({ success: true, displayStyle: requested });
 });
 
 export default router;

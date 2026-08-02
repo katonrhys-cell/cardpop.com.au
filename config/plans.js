@@ -189,7 +189,7 @@ export const PLANS = {
       'Everything in Hobby, plus:',
       `${LISTINGS_PER_MONTH.pro} listings a month`,
       'Your own branded store page on Local Traders',
-      'Pro display styles for your listings',
+      'Pro display styles — Premium Stand, Floating and Neon Glow',
       'Pro seller badge for extra buyer trust',
       'Advanced sales analytics and price insights',
       'Up to 20 images per listing',
@@ -214,7 +214,7 @@ export const PLANS = {
     features: [
       'Everything in Pro, plus:',
       `${LISTINGS_PER_MONTH.premium} listings a month`,
-      'Premium display styles — Glass Museum and Slab Display',
+      'Premium display styles — Glass Museum, Slab Display and Spotlight',
       'Advertise your Whatnot live shows on the community directory',
       'Your cards fill the homepage Featured Cards spots',
       'Priority placement in the Local Traders directory',
@@ -239,7 +239,7 @@ export const PLANS = {
     features: [
       'Everything in Premium, plus:',
       `${LISTINGS_PER_MONTH.elite} listings a month`,
-      'Elite display styles — Rotating Premium showcase',
+      'Elite display styles — Rotating Premium and Prism showcases',
       'Priority support',
     ],
   },

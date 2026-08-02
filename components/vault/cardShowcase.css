@@ -210,6 +210,109 @@
 }
 
 /* -----------------------------------------------------------------------------
+   Neon Glow — the card radiates a breathing neon aura in the brand red.
+   The glow hugs the card's silhouette (drop-shadow, not box-shadow) so the
+   photo itself is never tinted or obscured.
+   -------------------------------------------------------------------------- */
+.cardshowcase--neon .cardshowcase__card {
+  filter:
+    drop-shadow(0 0 8px hsl(var(--primary) / 0.45))
+    drop-shadow(0 0 22px hsl(var(--primary) / 0.2));
+}
+.cardshowcase--neon.is-visible .cardshowcase__card {
+  animation: csNeonPulse 3.4s ease-in-out infinite;
+}
+@keyframes csNeonPulse {
+  0%, 100% {
+    filter:
+      drop-shadow(0 0 8px hsl(var(--primary) / 0.45))
+      drop-shadow(0 0 22px hsl(var(--primary) / 0.2));
+  }
+  50% {
+    filter:
+      drop-shadow(0 0 14px hsl(var(--primary) / 0.65))
+      drop-shadow(0 0 34px hsl(var(--primary) / 0.32));
+  }
+}
+
+/* -----------------------------------------------------------------------------
+   Spotlight — dark gallery stage; a soft spotlight beam sweeps slowly across.
+   -------------------------------------------------------------------------- */
+.cardshowcase--spotlight {
+  background: linear-gradient(
+    to bottom,
+    hsl(215 28% 9%) 0%,
+    hsl(215 28% 15%) 100%
+  );
+}
+.cardshowcase--spotlight .cardshowcase__beam {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 55% 80% at var(--cs-beam, 50%) 0%,
+    rgba(255, 253, 240, 0.30) 0%,
+    rgba(255, 253, 240, 0.10) 42%,
+    transparent 70%
+  );
+}
+.cardshowcase--spotlight.is-visible .cardshowcase__beam {
+  animation: csSpotlight 8s ease-in-out infinite;
+}
+@keyframes csSpotlight {
+  0%, 100% { --cs-beam: 26%; }
+  50%      { --cs-beam: 74%; }
+}
+@property --cs-beam {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 50%;
+}
+.cardshowcase--spotlight .cardshowcase__shadow {
+  opacity: 0.6;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0.55) 0%,
+    transparent 70%
+  );
+}
+
+/* -----------------------------------------------------------------------------
+   Prism — a beam of refracted rainbow light drifts across the card, like
+   sunlight through glass. Distinct from Holographic: geometric, not foil,
+   and never pointer-driven.
+   -------------------------------------------------------------------------- */
+.cardshowcase--prism .cardshowcase__prism {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: 0.45;
+  background: linear-gradient(
+    115deg,
+    transparent calc(var(--cs-prism, 30%) - 18%),
+    rgba(255, 110, 110, 0.4) calc(var(--cs-prism, 30%) - 9%),
+    rgba(255, 220, 130, 0.4) calc(var(--cs-prism, 30%) - 4%),
+    rgba(140, 255, 190, 0.4) var(--cs-prism, 30%),
+    rgba(150, 210, 255, 0.4) calc(var(--cs-prism, 30%) + 4%),
+    rgba(210, 150, 255, 0.4) calc(var(--cs-prism, 30%) + 9%),
+    transparent calc(var(--cs-prism, 30%) + 18%)
+  );
+}
+.cardshowcase--prism.is-visible .cardshowcase__prism {
+  animation: csPrism 7.5s ease-in-out infinite;
+}
+@keyframes csPrism {
+  0%, 100% { --cs-prism: 20%; opacity: 0.35; }
+  50%      { --cs-prism: 80%; opacity: 0.55; }
+}
+@property --cs-prism {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 30%;
+}
+
+/* -----------------------------------------------------------------------------
    6. Rotating Premium — slow, refined back-and-forth Y rotation. Never spins.
    -------------------------------------------------------------------------- */
 .cardshowcase--rotating .cardshowcase__shadow {
@@ -273,6 +376,53 @@
   0%, 100% { --cs-px: 30%; opacity: 0.4; }
   50%      { --cs-px: 70%; opacity: 0.6; }
 }
+/* Glitter field — tiny bright speckles that read as foil sparkle. Several
+   tiled dot gradients at co-prime sizes so the pattern never visibly repeats. */
+.cardshowcase--holographic .cardshowcase__sparkle {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  pointer-events: none;
+  mix-blend-mode: color-dodge;
+  opacity: 0.3;
+  background-image:
+    radial-gradient(circle at 25% 35%, rgba(255, 255, 255, 0.9) 0, rgba(255, 255, 255, 0.9) 1px, transparent 2px),
+    radial-gradient(circle at 75% 15%, rgba(255, 255, 255, 0.8) 0, rgba(255, 255, 255, 0.8) 1px, transparent 2px),
+    radial-gradient(circle at 55% 70%, rgba(255, 255, 255, 0.85) 0, rgba(255, 255, 255, 0.85) 1px, transparent 2px),
+    radial-gradient(circle at 15% 85%, rgba(255, 255, 255, 0.7) 0, rgba(255, 255, 255, 0.7) 1px, transparent 2px);
+  background-size: 67px 67px, 89px 89px, 103px 103px, 127px 127px;
+  transition: opacity 0.3s ease;
+}
+.cardshowcase--holographic.is-pointing .cardshowcase__sparkle {
+  opacity: 0.55;
+}
+.cardshowcase--holographic.is-visible .cardshowcase__sparkle {
+  animation: csSparkle 9s linear infinite;
+}
+@keyframes csSparkle {
+  0%   { background-position: 0 0, 0 0, 0 0, 0 0; }
+  100% { background-position: 67px 134px, -89px 89px, 103px -103px, -127px -254px; }
+}
+/* Glare — a soft white highlight that sits where the pointer (or the phone's
+   tilt) says the light source is. Only visible while being driven. */
+.cardshowcase--holographic .cardshowcase__glare {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  pointer-events: none;
+  mix-blend-mode: overlay;
+  opacity: 0;
+  background: radial-gradient(
+    circle at var(--cs-px, 50%) var(--cs-py, 50%),
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0.14) 26%,
+    transparent 55%
+  );
+  transition: opacity 0.3s ease;
+}
+.cardshowcase--holographic.is-pointing .cardshowcase__glare {
+  opacity: 0.85;
+}
 /* The custom property must be registered for the keyframe above to animate it
    smoothly; without @property browsers still fall back to discrete steps,
    which is acceptable. */
@@ -287,7 +437,11 @@
    -------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   .cardshowcase__card,
-  .cardshowcase__holo {
+  .cardshowcase__holo,
+  .cardshowcase__sparkle,
+  .cardshowcase__glare,
+  .cardshowcase__beam,
+  .cardshowcase__prism {
     animation: none !important;
     transition: none !important;
   }

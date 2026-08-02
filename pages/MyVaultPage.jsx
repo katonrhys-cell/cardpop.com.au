@@ -4,7 +4,7 @@ import { Helmet } from 'react-helmet-async';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Plus, ShieldCheck, AlertCircle, MoreHorizontal, Edit,
-  Trash2, ImageOff, Lock, ArrowRightLeft, X, ShoppingCart, Layers, HandCoins
+  Trash2, ImageOff, Lock, ArrowRightLeft, X, ShoppingCart, Layers, HandCoins, Sparkles
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 import VaultListingModal from '@/components/VaultListingModal.jsx';
+import DisplayStyleDialog from '@/components/vault/DisplayStyleDialog.jsx';
 import { VARIANT_BADGES, ROOKIE_VARIANT } from '@/lib/cardVariants.js';
 import RookiePill from '@/components/RookiePill.jsx';
 import { slugify } from '@/lib/slugify.js';
@@ -42,8 +43,14 @@ const MyVaultPage = () => {
 
   const [filterCollection, setFilterCollection] = useState('');
   const [listingModal, setListingModal] = useState({ open: false, card: null });
+  const [styleModal, setStyleModal] = useState({ open: false, card: null });
   const [page, setPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+
+  // A saved style is reflected in place — no refetch for a cosmetic change.
+  const handleStyleSaved = (cardId, styleKey) => {
+    setCards(prev => prev.map(c => (c.id === cardId ? { ...c, display_style: styleKey } : c)));
+  };
 
   // Change the collection filter and jump back to page 1 in one update (avoids a
   // stale fetch — this page's fetchVault has no cancellation guard).
@@ -199,6 +206,9 @@ const MyVaultPage = () => {
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => { setTimeout(() => setListingModal({ open: true, card }), 0); }} className="cursor-pointer gap-2 font-medium">
                 <ShoppingCart className="w-4 h-4" /> Manage Listing
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setTimeout(() => setStyleModal({ open: true, card }), 0); }} className="cursor-pointer gap-2 font-medium">
+                <Sparkles className="w-4 h-4" /> Display Style
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => handleDelete(card.id)} className="cursor-pointer gap-2 text-destructive focus:text-destructive focus:bg-destructive/10 font-medium">
@@ -397,6 +407,13 @@ const MyVaultPage = () => {
         onClose={() => setListingModal({ open: false, card: null })}
         product={listingModal.card}
         onUpdate={fetchVault}
+      />
+
+      <DisplayStyleDialog
+        open={styleModal.open}
+        onOpenChange={(open) => setStyleModal(s => ({ ...s, open }))}
+        card={styleModal.card}
+        onSaved={(styleKey) => handleStyleSaved(styleModal.card?.id, styleKey)}
       />
     </div>
   );

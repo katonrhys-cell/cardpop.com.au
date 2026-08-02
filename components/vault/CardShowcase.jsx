@@ -15,8 +15,12 @@ import './cardShowcase.css';
  * Performance: CSS keyframe animations only run while the card is on screen
  * (an IntersectionObserver toggles `.is-visible`), and the heavier pointer
  * tracking for the holographic style only attaches for that style and only for
- * mouse input — touch scrolling is never intercepted. Reduced-motion users get
- * the static framing with no animation (handled in CSS).
+ * mouse input — touch scrolling is never intercepted. On touch devices the
+ * holographic tilt/shine is driven by the gyroscope instead, but only where
+ * `deviceorientation` works without a permission dialog (Android — iOS 13+
+ * gates it behind a user-gesture prompt, and interrupting a browse to ask for
+ * motion access is worse than the ambient shimmer those devices keep).
+ * Reduced-motion users get the static framing with no animation.
  */
 const CardShowcase = ({
   src,
@@ -41,6 +45,7 @@ const CardShowcase = ({
   const cardRef = useRef(null);
   const [visible, setVisible] = useState(!needsObserver);
   const [pointing, setPointing] = useState(false);
+  const [tilting, setTilting] = useState(false);
 
   // Play animations only while on screen.
   useEffect(() => {
@@ -70,6 +75,7 @@ const CardShowcase = ({
     card.style.setProperty('--cs-rx', `${(0.5 - y) * 8}deg`);
     card.style.setProperty('--cs-ry', `${(x - 0.5) * 8}deg`);
     card.style.setProperty('--cs-px', `${x * 100}%`);
+    card.style.setProperty('--cs-py', `${y * 100}%`);
     if (!pointing) setPointing(true);
   };
   const handleMouseLeave = () => {
@@ -79,15 +85,62 @@ const CardShowcase = ({
       card.style.removeProperty('--cs-rx');
       card.style.removeProperty('--cs-ry');
       card.style.removeProperty('--cs-px');
+      card.style.removeProperty('--cs-py');
     }
     setPointing(false);
   };
+
+  // Holographic on touch devices: the gyroscope plays the pointer's role.
+  // The first reading becomes the neutral posture (people don't hold phones
+  // flat), and deviations from it drive the same CSS variables the mouse does.
+  useEffect(() => {
+    if (!interactive || !visible) return;
+    if (typeof window === 'undefined' || typeof window.DeviceOrientationEvent === 'undefined') return;
+    // iOS 13+ requires a permission dialog from a user gesture — skip rather
+    // than nag; those devices keep the ambient shimmer.
+    if (typeof window.DeviceOrientationEvent.requestPermission === 'function') return;
+    if (!window.matchMedia?.('(pointer: coarse)')?.matches) return;
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return;
+
+    let base = null;
+    let raf = 0;
+    const onOrient = (e) => {
+      if (e.beta == null || e.gamma == null) return;
+      if (base === null) base = { beta: e.beta, gamma: e.gamma };
+      const db = Math.max(-30, Math.min(30, e.beta - base.beta));   // front-back
+      const dg = Math.max(-30, Math.min(30, e.gamma - base.gamma)); // left-right
+      if (raf) return;
+      raf = window.requestAnimationFrame(() => {
+        raf = 0;
+        const card = cardRef.current;
+        if (!card) return;
+        card.style.setProperty('--cs-rx', `${(-db / 30) * 8}deg`);
+        card.style.setProperty('--cs-ry', `${(dg / 30) * 8}deg`);
+        card.style.setProperty('--cs-px', `${50 + (dg / 30) * 40}%`);
+        card.style.setProperty('--cs-py', `${50 + (db / 30) * 40}%`);
+      });
+      setTilting(true);
+    };
+    window.addEventListener('deviceorientation', onOrient);
+    return () => {
+      window.removeEventListener('deviceorientation', onOrient);
+      if (raf) window.cancelAnimationFrame(raf);
+      setTilting(false);
+      const card = cardRef.current;
+      if (card) {
+        card.style.removeProperty('--cs-rx');
+        card.style.removeProperty('--cs-ry');
+        card.style.removeProperty('--cs-px');
+        card.style.removeProperty('--cs-py');
+      }
+    };
+  }, [interactive, visible]);
 
   const stageClass = [
     'cardshowcase',
     `cardshowcase--${styleKey}`,
     visible ? 'is-visible' : '',
-    pointing ? 'is-pointing' : '',
+    (pointing || tilting) ? 'is-pointing' : '',
     className,
   ].filter(Boolean).join(' ');
 
@@ -117,17 +170,25 @@ const CardShowcase = ({
             priority={priority}
             imgClassName={`w-full h-full object-contain ${imgPad}`}
           />
-          {styleKey === 'holographic' && <div className="cardshowcase__holo" aria-hidden="true" />}
+          {styleKey === 'holographic' && (
+            <>
+              <div className="cardshowcase__holo" aria-hidden="true" />
+              <div className="cardshowcase__sparkle" aria-hidden="true" />
+              <div className="cardshowcase__glare" aria-hidden="true" />
+            </>
+          )}
+          {styleKey === 'prism' && <div className="cardshowcase__prism" aria-hidden="true" />}
         </div>
 
         {/* Per-style decorative layers (purely visual). */}
-        {(def?.key === 'stand' || def?.key === 'floating' || def?.key === 'glass' || def?.key === 'rotating') && (
+        {(def?.key === 'stand' || def?.key === 'floating' || def?.key === 'glass' || def?.key === 'rotating' || def?.key === 'spotlight') && (
           <div className="cardshowcase__shadow" aria-hidden="true" />
         )}
         {(styleKey === 'stand' || styleKey === 'slab') && (
           <div className="cardshowcase__prop" aria-hidden="true" />
         )}
         {styleKey === 'glass' && <div className="cardshowcase__glass" aria-hidden="true" />}
+        {styleKey === 'spotlight' && <div className="cardshowcase__beam" aria-hidden="true" />}
       </div>
     </div>
   );
