@@ -15,6 +15,8 @@ import {
   isProTier,
   isProAccount,
   hasStorefront,
+  canListWhatnotShows,
+  WHATNOT_SHOW_TIERS,
 } from '@/config/plans.js';
 import { TIER_PRICES_AUD, SUBSCRIPTION_PRICE_AUD } from '@/config/subscription.js';
 
@@ -68,6 +70,16 @@ describe('config/plans', () => {
       expect(PLANS[planKeyFromTier(tier)].limits.storefront).toBe(true);
     });
     expect(PLANS[PLAN_HOBBY].limits.storefront).toBe(false);
+  });
+
+  it('Whatnot show listing is Premium-and-up only', () => {
+    expect(WHATNOT_SHOW_TIERS).toEqual(['premium', 'elite', 'ultimate']);
+    expect(canListWhatnotShows('free')).toBe(false);
+    expect(canListWhatnotShows('pro')).toBe(false);
+    expect(canListWhatnotShows('premium')).toBe(true);
+    expect(canListWhatnotShows('elite')).toBe(true);
+    expect(canListWhatnotShows('ultimate')).toBe(true);
+    expect(canListWhatnotShows(undefined)).toBe(false);
   });
 
   it('declares the agreed monthly listing ladder (5/15/30/50/unlimited)', () => {

@@ -1682,6 +1682,7 @@ const STATIC_CONTENT = {
       { h2: 'Premium — $40/month AUD', paras: ['More listings and the Premium showcase styles.'], items: [
         { text: 'Everything in Pro, plus 30 listings a month.' },
         { text: 'Premium display styles — Glass Museum and Slab Display.' },
+        { text: 'Advertise your Whatnot live shows on the community directory.' },
         { text: 'Priority placement in the Local Traders directory.' },
       ] },
       { h2: 'Elite — $80/month AUD', paras: ['High-volume selling with the Elite showcase.'], items: [

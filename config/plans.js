@@ -126,6 +126,19 @@ export function hasStorefront({ subscriptionTier, subscriptionStatus } = {}) {
 }
 
 /**
+ * Listing Whatnot live shows on the community directory is a Premium-and-up
+ * perk (Hobby and Pro don't get it). No status fallback here — the status
+ * only says "paid", not WHICH tier, so it can't distinguish Pro from
+ * Premium. Mirrored in the DB by the `whatnot_shows_insert_access` policy —
+ * keep the two in sync.
+ */
+export const WHATNOT_SHOWS_MIN_TIER = PLAN_PREMIUM;
+export const WHATNOT_SHOW_TIERS = ['premium', 'elite', 'ultimate'];
+export function canListWhatnotShows(tier) {
+  return WHATNOT_SHOW_TIERS.includes(tier);
+}
+
+/**
  * Feature / limit matrix. `listingsPerMonth: null` means unlimited. Kept
  * declarative so the pricing page and any server-side quota check read from
  * the same table. `vaultDisplayStyles` names the ladder step in
@@ -202,6 +215,7 @@ export const PLANS = {
       'Everything in Pro, plus:',
       `${LISTINGS_PER_MONTH.premium} listings a month`,
       'Premium display styles — Glass Museum and Slab Display',
+      'Advertise your Whatnot live shows on the community directory',
       'Priority placement in the Local Traders directory',
     ],
   },
@@ -272,5 +286,8 @@ export default {
   isProTier,
   isProAccount,
   hasStorefront,
+  WHATNOT_SHOWS_MIN_TIER,
+  WHATNOT_SHOW_TIERS,
+  canListWhatnotShows,
   HOBBY_LISTINGS_PER_MONTH,
 };
