@@ -465,7 +465,14 @@ const ProductDetailPage = ({ source: sourceProp }) => {
             at lg because the cert section brings its own mt-8. */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-x-16 lg:gap-y-0">
           <div className="lg:col-span-6 xl:col-span-7">
-            <ProductImageCarousel images={product.images} record={product} />
+            {/* display_style is a vault-only field: on marketplace listings it
+                rides on the embedded vault_item, on vault records it's on the
+                record itself. Shop products have none and stay Classic. */}
+            <ProductImageCarousel
+              images={product.images}
+              record={product}
+              displayStyle={product.vault_item?.display_style || product.display_style}
+            />
           </div>
 
           <div className="lg:col-span-6 xl:col-span-5 lg:row-span-2 flex flex-col">

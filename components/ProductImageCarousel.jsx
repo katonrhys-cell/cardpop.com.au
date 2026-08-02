@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 import { ImageOff } from 'lucide-react';
 import { cn } from '@/lib/utils.js';
 import CardImage from '@/components/CardImage.jsx';
+import CardShowcase from '@/components/vault/CardShowcase.jsx';
+import { normalizeStyle, DEFAULT_STYLE } from '@/lib/displayStyles.js';
 import { getCardImage } from '@/utils/imageUrl.js';
 import CardMicroscope from '@/components/CardMicroscope.jsx';
 
@@ -10,7 +12,7 @@ import CardMicroscope from '@/components/CardMicroscope.jsx';
 // eagerly at high priority and served responsively (480/800/1200 w, auto-WebP).
 const MAIN_SIZES = '(min-width: 1024px) 700px, 90vw';
 
-const ProductImageCarousel = ({ images = [], record = null, frameClassName = 'bg-white dark:bg-zinc-950' }) => {
+const ProductImageCarousel = ({ images = [], record = null, displayStyle, frameClassName = 'bg-white dark:bg-zinc-950' }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [microscopeOpen, setMicroscopeOpen] = useState(false);
 
@@ -24,6 +26,12 @@ const ProductImageCarousel = ({ images = [], record = null, frameClassName = 'bg
   const validImages = Array.isArray(images) ? images : (images ? [images] : []);
   const mainSource = validImages.length > 0 ? sourceFor(validImages[activeIndex]) : null;
   const main = getCardImage(mainSource, { widths: [480, 800, 1200], quality: 78 });
+
+  // A vault listing carries the seller's chosen display style. Anything other
+  // than Classic renders the hero through the Card Showcase Engine so the style
+  // the seller paid for is what a buyer actually sees on the listing page.
+  const style = normalizeStyle(displayStyle);
+  const useShowcase = style !== DEFAULT_STYLE;
 
   if (validImages.length === 0 || !main.src) {
     return (
@@ -41,18 +49,41 @@ const ProductImageCarousel = ({ images = [], record = null, frameClassName = 'bg
         onClick={() => setMicroscopeOpen(true)}
         className={cn("relative w-full aspect-[4/5] md:aspect-square rounded-3xl border border-border overflow-hidden cursor-zoom-in group shadow-sm", frameClassName)}
       >
-        <CardImage
-          src={main.src}
-          srcSet={main.srcSet}
-          sizes={MAIN_SIZES}
-          fallbackSrc={main.fallbackSrc}
-          alt={`Product view ${activeIndex + 1}`}
-          imgClassName="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
-          loading="eager"
-          fetchPriority="high"
-        />
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300" />
-        <div className="absolute top-4 right-4 bg-background/80 backdrop-blur-md p-2 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+        {useShowcase ? (
+          // The showcase frames the card itself (shine, slab, glass cabinet…),
+          // so it gets a card-proportioned stage centred in the square hero
+          // rather than the full frame — otherwise the effect layers spill
+          // across the empty gutter either side of a portrait card.
+          <div className="absolute inset-0 flex items-center justify-center p-3 sm:p-5">
+            <div className="relative h-full aspect-[5/7] max-w-full">
+              <CardShowcase
+                src={main.src}
+                srcSet={main.srcSet}
+                sizes={MAIN_SIZES}
+                fallbackSrc={main.fallbackSrc}
+                alt={`Product view ${activeIndex + 1}`}
+                displayStyle={style}
+                loading="eager"
+                priority
+              />
+            </div>
+          </div>
+        ) : (
+          <CardImage
+            src={main.src}
+            srcSet={main.srcSet}
+            sizes={MAIN_SIZES}
+            fallbackSrc={main.fallbackSrc}
+            alt={`Product view ${activeIndex + 1}`}
+            imgClassName="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
+            loading="eager"
+            fetchPriority="high"
+          />
+        )}
+        {/* Decorative only — pointer-events pass through so the interactive
+            display styles (holographic pointer tracking) still see the cursor. */}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors duration-300 pointer-events-none" />
+        <div className="absolute top-4 right-4 bg-background/80 backdrop-blur-md p-2 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
           <svg className="w-5 h-5 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
