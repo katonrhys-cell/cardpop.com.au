@@ -67,6 +67,25 @@ describe('buildVaultItemRow', () => {
     expect(row.rookie_type).toBeNull();
   });
 
+  it('derives is_auto from the Auto chip', () => {
+    const { row } = build({ variant: 'Auto', is_auto: false });
+    expect(row.is_auto).toBe(true);
+    expect(row.auto_signers).toBe(1);
+  });
+
+  it('keeps autograph detail when only the flag is set', () => {
+    const { row } = build({ is_auto: true, variant: '', auto_type: 'on_card' });
+    expect(row.is_auto).toBe(true);
+    expect(row.auto_type).toBe('on_card');
+  });
+
+  it('clears is_auto when neither the flag nor the chip is present', () => {
+    const { row } = build({ is_auto: false, variant: 'Numbered', auto_type: 'on_card' });
+    expect(row.is_auto).toBe(false);
+    expect(row.auto_type).toBeNull();
+    expect(row.auto_signers).toBeNull();
+  });
+
   it('normalises unknown listing types to Private', () => {
     const { row } = build({ listing_type: 'private' });
     expect(row.listing_type).toBe('Private');

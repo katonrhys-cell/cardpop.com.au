@@ -6,8 +6,8 @@
    without touching the cards that use them.
 
    Design rules:
-   - The card image stays the hero. Transforms are subtle (≤ ~8°) so the photo
-     a buyer cares about is never distorted or obscured.
+   - The card image stays the hero. Transforms are restrained (≤ ~10°) so the
+     photo a buyer cares about is never distorted or obscured.
    - Effects are pure CSS where possible (GPU transforms / keyframes). Only the
      holographic style needs JS, and only for pointer tracking.
    - Animations run only while the card is on screen (`.is-visible`, toggled by
@@ -314,16 +314,69 @@
 
 /* -----------------------------------------------------------------------------
    6. Rotating Premium — slow, refined back-and-forth Y rotation. Never spins.
+
+   Three cues sell the turn together: the geometry (a ±10° swing under a
+   tighter perspective than the other styles), a specular sheen that sweeps
+   the card face in time with it (the moving light is what the eye actually
+   reads as rotation), and a contact shadow that slides and squashes against
+   the motion. The photo itself is never tinted — the sheen is a soft white
+   band at screen blend, gone at the extremes of the swing.
    -------------------------------------------------------------------------- */
+.cardshowcase--rotating .cardshowcase__stage {
+  /* Tighter than the default 1100px so the same degrees read deeper. */
+  perspective: 750px;
+}
 .cardshowcase--rotating .cardshowcase__shadow {
   opacity: 0.55;
 }
 .cardshowcase--rotating.is-visible .cardshowcase__card {
-  animation: csRotate 7s ease-in-out infinite;
+  animation: csRotate 6.5s ease-in-out infinite;
 }
 @keyframes csRotate {
-  0%, 100% { transform: rotateY(-4deg); }
-  50%      { transform: rotateY(4deg); }
+  0%, 100% { transform: rotateY(-10deg) rotateX(1.25deg); }
+  50%      { transform: rotateY(10deg) rotateX(-1.25deg); }
+}
+/* Specular highlight riding the card face, synced to the same clock as the
+   swing: brightest mid-turn (when the face sweeps past the "light"), gone at
+   the rest points. */
+.cardshowcase--rotating .cardshowcase__sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  opacity: 0;
+  background: linear-gradient(
+    100deg,
+    transparent calc(var(--cs-sheen, 50%) - 16%),
+    rgba(255, 255, 255, 0.28) calc(var(--cs-sheen, 50%) - 5%),
+    rgba(255, 255, 255, 0.42) var(--cs-sheen, 50%),
+    rgba(255, 255, 255, 0.28) calc(var(--cs-sheen, 50%) + 5%),
+    transparent calc(var(--cs-sheen, 50%) + 16%)
+  );
+}
+.cardshowcase--rotating.is-visible .cardshowcase__sheen {
+  animation: csRotateSheen 6.5s ease-in-out infinite;
+}
+@keyframes csRotateSheen {
+  0%, 100% { --cs-sheen: 8%;  opacity: 0; }
+  25%      { --cs-sheen: 30%; opacity: 0.55; }
+  50%      { --cs-sheen: 92%; opacity: 0; }
+  75%      { --cs-sheen: 70%; opacity: 0.55; }
+}
+@property --cs-sheen {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 50%;
+}
+/* The contact shadow slides against the turn and squashes as the card face
+   angles away — the grounding cue that keeps the motion physical. */
+.cardshowcase--rotating.is-visible .cardshowcase__shadow {
+  animation: csRotateShadow 6.5s ease-in-out infinite;
+}
+@keyframes csRotateShadow {
+  0%, 100% { opacity: 0.55; transform: translateX(-46%) scaleX(0.9); }
+  25%, 75% { opacity: 0.65; transform: translateX(-50%) scaleX(1); }
+  50%      { opacity: 0.55; transform: translateX(-54%) scaleX(0.9); }
 }
 
 /* -----------------------------------------------------------------------------
@@ -441,7 +494,9 @@
   .cardshowcase__sparkle,
   .cardshowcase__glare,
   .cardshowcase__beam,
-  .cardshowcase__prism {
+  .cardshowcase__prism,
+  .cardshowcase__sheen,
+  .cardshowcase__shadow {
     animation: none !important;
     transition: none !important;
   }

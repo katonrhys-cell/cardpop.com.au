@@ -142,10 +142,13 @@ export const buildVaultItemRow = (raw, { userId, tier, isEdit }) => {
   row.is_rookie = has(ROOKIE_VARIANT);
   row.is_refractor = has('Refractor');
   row.is_sealed = bool(row.is_sealed);
-  row.is_auto = bool(row.is_auto);
+  // The Auto chip and the is_auto flag both mean "this card is autographed";
+  // the chip implies the flag so the two can never disagree — a mismatch is
+  // how a removed Auto pill used to survive (flag stayed true, chip gone).
+  row.is_auto = bool(row.is_auto) || has('Auto');
 
-  row.auto_type = has('Auto') ? (row.auto_type ?? null) : null;
-  row.auto_signers = has('Auto') ? (row.auto_signers ?? 1) : null;
+  row.auto_type = row.is_auto ? (row.auto_type ?? null) : null;
+  row.auto_signers = row.is_auto ? (row.auto_signers ?? 1) : null;
   row.patch_type = has('Patch') ? (row.patch_type ?? null) : null;
   row.patch_pieces = has('Patch') ? (row.patch_pieces ?? 1) : null;
   row.relic_material = has('Relic / Jersey') ? (row.relic_material ?? null) : null;

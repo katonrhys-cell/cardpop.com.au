@@ -308,6 +308,22 @@ const AddEditCardPage = () => {
     });
   };
 
+  // The 'Auto' variant chip and the '✍️ Autograph' attribute toggle are one
+  // fact — a card either is autographed or it isn't. Every user action that
+  // changes either goes through here so the two can never disagree: a mismatch
+  // is how a removed Auto pill used to survive (the chip went, the flag stayed,
+  // and every display surface reads flag OR chip).
+  const setAutograph = (on) => {
+    formDirtyRef.current = true;
+    setFormData(f => ({
+      ...f,
+      isAuto: on,
+      variant: on
+        ? (f.variant.includes('Auto') ? f.variant : [...f.variant, 'Auto'])
+        : f.variant.filter(v => v !== 'Auto'),
+    }));
+  };
+
   // Derive collection slug for era lookups (uses franchise name stored in formData.collection)
   const collectionSlug = (() => {
     const selected = formData.collection?.toLowerCase();
@@ -541,9 +557,13 @@ const AddEditCardPage = () => {
           // The "Rookie Card (RC)" variant chip is the single source of truth for
           // the rookie designation — surface the legacy is_rookie flag through it
           // so older rows still show (and keep) their rookie status when edited.
+          // Same for is_auto: rows written before the chip/flag sync can carry
+          // the flag with no chip; surfacing it here means removing the chip is
+          // a real removal (setAutograph clears both) rather than a no-op.
           variant:        (() => {
             const v = [...split.variants];
             if (card.is_rookie && !v.includes('Rookie Card (RC)')) v.push('Rookie Card (RC)');
+            if (card.is_auto && !v.includes('Auto')) v.push('Auto');
             return v;
           })(),
           foilFinishes:   split.foilFinishes,
@@ -1261,7 +1281,9 @@ const AddEditCardPage = () => {
         is_foil:             formData.isFoil,
         is_sealed:           formData.isSealed,
         serial_number:       formData.serialNumber?.trim() || null,
-        is_auto:             formData.isAuto,
+        // Chip and toggle are kept in sync by setAutograph; the OR covers a
+        // draft or OCR merge that set one without the other.
+        is_auto:             formData.isAuto || formData.variant.includes('Auto'),
         auto_type:           formData.variant.includes('Auto') ? (formData.autoType || null) : null,
         auto_signers:        formData.variant.includes('Auto') ? (formData.autoSigners || 1) : null,
         patch_type:          formData.variant.includes('Patch') ? (formData.patchType || null) : null,
@@ -1972,7 +1994,7 @@ const AddEditCardPage = () => {
                       {formData.variant.length > 0 && (
                         <button
                           type="button"
-                          onClick={() => { set('variant', []); set('foilFinishes', []); }}
+                          onClick={() => { set('variant', []); set('foilFinishes', []); set('isAuto', false); }}
                           className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
                         >
                           Clear all
@@ -1995,7 +2017,9 @@ const AddEditCardPage = () => {
                             <button
                               key={v}
                               type="button"
-                              onClick={() => set('variant', active ? formData.variant.filter(x => x !== v) : [...formData.variant, v])}
+                              onClick={() => (v === 'Auto'
+                                ? setAutograph(!active)
+                                : set('variant', active ? formData.variant.filter(x => x !== v) : [...formData.variant, v]))}
                               className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs font-medium transition-all ${
                                 active
                                   ? 'border-primary bg-primary/10 text-primary shadow-sm'
@@ -2112,7 +2136,7 @@ const AddEditCardPage = () => {
                         <button
                           key={key}
                           type="button"
-                          onClick={() => set(key, !formData[key])}
+                          onClick={() => setAutograph(!formData.isAuto)}
                           className={`flex-1 flex flex-col items-start px-4 py-3 rounded-xl border-2 text-left transition-all ${
                             formData[key]
                               ? 'border-primary bg-primary/10 text-primary shadow-sm'

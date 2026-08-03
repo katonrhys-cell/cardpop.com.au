@@ -71,6 +71,15 @@ describe('ProductImageCarousel × display style', () => {
     expect(container.querySelector('.cardshowcase__holo')).toBeTruthy();
   });
 
+  it('renders Rotating Premium with its sheen and shadow layers', () => {
+    const { container } = render(
+      <ProductImageCarousel images={images} displayStyle="rotating" />,
+    );
+    expect(container.querySelector('.cardshowcase--rotating')).toBeTruthy();
+    expect(container.querySelector('.cardshowcase__sheen')).toBeTruthy();
+    expect(container.querySelector('.cardshowcase__shadow')).toBeTruthy();
+  });
+
   it('leaves the hero untouched for classic / shop products', () => {
     const { container } = render(<ProductImageCarousel images={images} />);
     expect(container.querySelector('.cardshowcase')).toBeNull();
