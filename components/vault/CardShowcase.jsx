@@ -178,6 +178,10 @@ const CardShowcase = ({
             </>
           )}
           {styleKey === 'prism' && <div className="cardshowcase__prism" aria-hidden="true" />}
+          {/* Rotating: a specular sheen rides the card surface in sync with the
+              turn — the moving light is what makes the rotation read clearly
+              even when the geometry change alone would be subtle. */}
+          {styleKey === 'rotating' && <div className="cardshowcase__sheen" aria-hidden="true" />}
         </div>
 
         {/* Per-style decorative layers (purely visual). */}
