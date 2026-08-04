@@ -225,6 +225,13 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
             ) : (
               <span className={`font-extrabold text-xl tabular-nums ${isSold ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
                 ${Number(listing.price_aud || 0).toFixed(2)}
+                {/* Seller-set postage — free stays quiet, a cost is disclosed on
+                    the card so checkout's shipping line is never a surprise. */}
+                {!isSold && Number(listing.shipping_cost_aud) > 0 && (
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    + ${Number(listing.shipping_cost_aud).toFixed(2)} shipping
+                  </span>
+                )}
               </span>
             )}
             {isSold && (

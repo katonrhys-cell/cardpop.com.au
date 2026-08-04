@@ -7,10 +7,11 @@ import { getPlatformSetting } from './stripeWebhookService.js';
  *
  * @param items    cart lines ({ type: 'shop' | 'listing', id, quantity })
  * @param userId   buyer's id, or null for a guest
- * @param options  `waiveShipping: true` drops the flat shipping fee — used by
- *                 partner codes whose perk includes free shipping. The amount
- *                 that would otherwise have been charged comes back as
- *                 `shippingWaivedCents` so the UI can show what was saved.
+ * @param options  `waiveShipping: true` drops the flat CardPop Shop shipping
+ *                 fee — used by partner codes whose perk includes free
+ *                 shipping. Seller postage on marketplace listings is money
+ *                 owed to the seller and is never waived. The waived amount
+ *                 comes back as `shippingWaivedCents` so the UI can show it.
  */
 export async function priceCart(items, userId, options = {}) {
   const httpError = (statusCode, message) => Object.assign(new Error(message), { statusCode });
@@ -30,9 +31,10 @@ export async function priceCart(items, userId, options = {}) {
   // the shipping fee — Australian consumer prices are quoted GST-inclusive). It
   // is reported for the tax invoice but never re-added to the total.
   let includedGstCents = 0;
-  // Only CardPop Shop items (platform-owned stock) attract the flat shipping
-  // fee — marketplace listings ship seller-arranged. Tracked separately so both
-  // the fee and the free-shipping threshold key off the shop-item subtotal.
+  // CardPop Shop items (platform-owned stock) attract the flat platform
+  // shipping fee; marketplace listings charge the seller's own per-listing
+  // postage price (combined per seller, below). Tracked separately so the flat
+  // fee and the free-shipping threshold key off the shop-item subtotal only.
   let shopItemsCents = 0;
 
   // Merge duplicate lines before pricing. Two lines for one listing would both
@@ -87,12 +89,24 @@ export async function priceCart(items, userId, options = {}) {
         commission_aud: 0, gst_aud: lineGstCents / 100,
       });
     } else if (type === 'listing') {
-      const { data: listing, error } = await supabase
+      let { data: listing, error } = await supabase
         .from('listings')
-        .select('id, price_aud, seller_id, listing_type, status, vault_item:vault_items!inner(card_name), seller:profiles!seller_id(seller_tier)')
+        .select('id, price_aud, shipping_cost_aud, seller_id, listing_type, status, vault_item:vault_items!inner(card_name), seller:profiles!seller_id(seller_tier)')
         .eq('id', id)
         .eq('status', 'active')
         .maybeSingle();
+      // Vercel can redeploy before `supabase db push` lands the
+      // shipping_cost_aud migration — retry without the column (shipping
+      // simply prices as free, exactly as before) rather than 500ing every
+      // marketplace checkout for the window.
+      if (error && /shipping_cost_aud/.test(error.message || '')) {
+        ({ data: listing, error } = await supabase
+          .from('listings')
+          .select('id, price_aud, seller_id, listing_type, status, vault_item:vault_items!inner(card_name), seller:profiles!seller_id(seller_tier)')
+          .eq('id', id)
+          .eq('status', 'active')
+          .maybeSingle());
+      }
       if (error) throw error;
       if (!listing) throw httpError(404, 'A listing in your cart is no longer available');
       if (listing.seller_id === userId) throw httpError(403, 'You cannot purchase your own listing');
@@ -115,6 +129,9 @@ export async function priceCart(items, userId, options = {}) {
         type: 'listing', id: listing.id, seller_id: listing.seller_id, title: name,
         quantity: 1, unit_price_aud: itemC / 100, line_total_aud: itemC / 100,
         commission_aud: commC / 100, gst_aud: gstC / 100,
+        // The seller's own postage price — combined per seller below, so it is
+        // NOT yet the amount this line will charge (that lands in shipping_aud).
+        listing_shipping_cost_aud: Math.max(0, Number(listing.shipping_cost_aud) || 0),
       });
     } else {
       throw httpError(400, `Unknown cart item type: ${type}`);
@@ -150,6 +167,31 @@ export async function priceCart(items, userId, options = {}) {
   if (gstEnabled && shippingCents > 0) {
     includedGstCents += Math.round(shippingCents * gstRate / (100 + gstRate));
   }
+
+  // Seller postage on marketplace listings, combined per seller: one seller's
+  // cards ship as one parcel, so the buyer pays that seller's single highest
+  // postage price, not the sum. The charge is recorded as shipping_aud on the
+  // line that set it (the parcel-defining line) so the webhook can pass it
+  // through to the seller's payout and refunds can reverse it per line. It is
+  // the seller's own consumer-quoted price — no commission is taken from it
+  // and no GST is added or reported on it (unlike the platform's shop fee, it
+  // is not platform revenue), and the partner free-shipping perk only ever
+  // waives the platform's shop fee above, never money owed to a seller.
+  let sellerShippingCents = 0;
+  const parcelLineBySeller = new Map();
+  for (const line of orderLines) {
+    if (line.type !== 'listing') continue;
+    const costCents = Math.round((line.listing_shipping_cost_aud || 0) * 100);
+    delete line.listing_shipping_cost_aud;
+    const best = parcelLineBySeller.get(line.seller_id);
+    if (!best || costCents > best.costCents) parcelLineBySeller.set(line.seller_id, { line, costCents });
+  }
+  for (const { line, costCents } of parcelLineBySeller.values()) {
+    if (costCents <= 0) continue;
+    line.shipping_aud = costCents / 100;
+    sellerShippingCents += costCents;
+  }
+  shippingCents += sellerShippingCents;
 
   if (commissionCents > 0) {
     lineItems.push({ price_data: { currency: 'aud', product_data: { name: 'Platform Fee' }, unit_amount: commissionCents }, quantity: 1 });

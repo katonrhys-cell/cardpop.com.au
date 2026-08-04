@@ -171,6 +171,106 @@ describe('priceCart — shipping', () => {
   });
 });
 
+describe('priceCart — seller postage', () => {
+  const listingRow = (id, sellerId, price, shipping) => ({
+    data: {
+      id, price_aud: price, shipping_cost_aud: shipping, seller_id: sellerId,
+      listing_type: 'fixed', status: 'active',
+      vault_item: { card_name: `Card ${id}` }, seller: { seller_tier: 'standard' },
+    },
+    error: null,
+  });
+
+  it('charges the seller-set postage on a marketplace listing and records it on the line', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder(listingRow('l1', 'seller-9', 40, 8.95)));
+    mockCalculateBreakdown.mockResolvedValueOnce({ itemPrice: 40, commissionAud: 1.2, gstAud: 4.12 });
+
+    const result = await priceCart([{ type: 'listing', id: 'l1', quantity: 1 }], 'buyer-1');
+
+    expect(result.shippingCents).toBe(895);
+    expect(result.grandCents).toBe(4000 + 120 + 412 + 895);
+    // Postage is the seller's own consumer-quoted price: no commission, and no
+    // GST added or reported on it.
+    expect(result.includedGstCents).toBe(0);
+    const line = result.orderLines.find((l) => l.type === 'listing');
+    expect(line.shipping_aud).toBe(8.95);
+    // The internal combining field never leaks into the persisted order lines.
+    expect(line.listing_shipping_cost_aud).toBeUndefined();
+    expect(result.lineItems.some((l) => l.price_data.product_data.name === 'Shipping' && l.price_data.unit_amount === 895)).toBe(true);
+  });
+
+  it('combines postage per seller: one parcel, the single highest price — not the sum', async () => {
+    mockSupabase.from
+      .mockReturnValueOnce(rowBuilder(listingRow('l1', 'seller-9', 40, 8.95)))
+      .mockReturnValueOnce(rowBuilder(listingRow('l2', 'seller-9', 20, 5)));
+    mockCalculateBreakdown
+      .mockResolvedValueOnce({ itemPrice: 40, commissionAud: 0, gstAud: 0 })
+      .mockResolvedValueOnce({ itemPrice: 20, commissionAud: 0, gstAud: 0 });
+
+    const result = await priceCart(
+      [{ type: 'listing', id: 'l1', quantity: 1 }, { type: 'listing', id: 'l2', quantity: 1 }],
+      'buyer-1',
+    );
+
+    expect(result.shippingCents).toBe(895);
+    // The charge sits on the parcel-defining line (the one with the highest
+    // postage) so the payout and any refund reversal can follow it.
+    expect(result.orderLines.find((l) => l.id === 'l1').shipping_aud).toBe(8.95);
+    expect(result.orderLines.find((l) => l.id === 'l2').shipping_aud).toBeUndefined();
+  });
+
+  it('sums postage across different sellers — separate parcels', async () => {
+    mockSupabase.from
+      .mockReturnValueOnce(rowBuilder(listingRow('l1', 'seller-9', 40, 8.95)))
+      .mockReturnValueOnce(rowBuilder(listingRow('l2', 'seller-7', 20, 5)));
+    mockCalculateBreakdown
+      .mockResolvedValueOnce({ itemPrice: 40, commissionAud: 0, gstAud: 0 })
+      .mockResolvedValueOnce({ itemPrice: 20, commissionAud: 0, gstAud: 0 });
+
+    const result = await priceCart(
+      [{ type: 'listing', id: 'l1', quantity: 1 }, { type: 'listing', id: 'l2', quantity: 1 }],
+      'buyer-1',
+    );
+
+    expect(result.shippingCents).toBe(895 + 500);
+    expect(result.orderLines.find((l) => l.id === 'l1').shipping_aud).toBe(8.95);
+    expect(result.orderLines.find((l) => l.id === 'l2').shipping_aud).toBe(5);
+  });
+
+  it('never waives seller postage for a partner free-shipping perk (only the shop fee)', async () => {
+    setPlatformSettings({ default_shipping_rate_aud: 9.95, free_shipping_threshold_aud: 200 });
+    mockSupabase.from
+      .mockReturnValueOnce(rowBuilder(listingRow('l1', 'seller-9', 40, 8.95)))
+      .mockReturnValueOnce(rowBuilder({
+        data: { id: 'p1', title: 'Box', price_aud: 100, stock_quantity: 5, status: 'active' },
+        error: null,
+      }));
+    mockCalculateBreakdown.mockResolvedValueOnce({ itemPrice: 40, commissionAud: 0, gstAud: 0 });
+
+    const result = await priceCart(
+      [{ type: 'listing', id: 'l1', quantity: 1 }, { type: 'shop', id: 'p1', quantity: 1 }],
+      'buyer-1',
+      { waiveShipping: true },
+    );
+
+    // The $9.95 shop fee is waived; the seller's $8.95 postage is money owed
+    // to the seller and survives.
+    expect(result.shippingWaivedCents).toBe(995);
+    expect(result.shippingCents).toBe(895);
+  });
+
+  it('treats a listing without postage (or a pre-migration row) as free shipping', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder(listingRow('l1', 'seller-9', 40, undefined)));
+    mockCalculateBreakdown.mockResolvedValueOnce({ itemPrice: 40, commissionAud: 0, gstAud: 0 });
+
+    const result = await priceCart([{ type: 'listing', id: 'l1', quantity: 1 }], 'buyer-1');
+
+    expect(result.shippingCents).toBe(0);
+    expect(result.orderLines.find((l) => l.type === 'listing').shipping_aud).toBeUndefined();
+    expect(result.lineItems.some((l) => l.price_data.product_data.name === 'Shipping')).toBe(false);
+  });
+});
+
 describe('priceCart — listings', () => {
   it('blocks a buyer from purchasing their own listing (403)', async () => {
     mockSupabase.from.mockReturnValueOnce(rowBuilder({

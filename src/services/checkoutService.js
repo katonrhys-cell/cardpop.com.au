@@ -25,12 +25,24 @@ export async function createSingleItemCheckout(req, res) {
 
     const email = req.user.email;
 
-    const { data: listing, error: listingErr } = await supabase
+    let { data: listing, error: listingErr } = await supabase
       .from('listings')
-      .select('id, price_aud, vault_item_id, seller_id, title, seller:profiles!seller_id(seller_tier, display_name), vault_item:vault_items!inner(card_name)')
+      .select('id, price_aud, shipping_cost_aud, vault_item_id, seller_id, title, seller:profiles!seller_id(seller_tier, display_name), vault_item:vault_items!inner(card_name)')
       .eq('id', listingId)
       .eq('status', 'active')
       .maybeSingle();
+
+    // Vercel can redeploy before `supabase db push` lands the shipping_cost_aud
+    // migration — retry without the column (postage prices as free, exactly as
+    // before) rather than failing every single-item checkout for the window.
+    if (listingErr && /shipping_cost_aud/.test(listingErr.message || '')) {
+      ({ data: listing, error: listingErr } = await supabase
+        .from('listings')
+        .select('id, price_aud, vault_item_id, seller_id, title, seller:profiles!seller_id(seller_tier, display_name), vault_item:vault_items!inner(card_name)')
+        .eq('id', listingId)
+        .eq('status', 'active')
+        .maybeSingle());
+    }
 
     if (listingErr || !listing) {
       return res.status(404).json({ error: 'Listing not found or no longer active' });
@@ -118,6 +130,22 @@ export async function createSingleItemCheckout(req, res) {
       });
     }
 
+    // The seller's postage price, charged to the buyer and passed through to
+    // the seller's payout in full — no commission comes off it and no GST is
+    // added on top (it is the seller's own consumer-quoted price, not
+    // platform revenue). 0 means the seller ships free.
+    const shippingAud = Math.max(0, Number(listing.shipping_cost_aud) || 0);
+    if (shippingAud > 0) {
+      lineItems.push({
+        price_data: {
+          currency: 'aud',
+          product_data: { name: 'Shipping' },
+          unit_amount: Math.round(shippingAud * 100),
+        },
+        quantity: 1,
+      });
+    }
+
     const metadata = {
       userId,
       listingId,
@@ -128,13 +156,14 @@ export async function createSingleItemCheckout(req, res) {
       commissionPct: String(breakdown.commissionPct),
       commissionAud: String(breakdown.commissionAud),
       gstAud: String(breakdown.gstAud),
-      sellerProceedsAud: String(Math.round((breakdown.itemPrice - breakdown.commissionAud) * 100) / 100),
+      shippingAud: String(shippingAud),
+      sellerProceedsAud: String(Math.round((breakdown.itemPrice - breakdown.commissionAud + shippingAud) * 100) / 100),
       configId: breakdown.configId || '',
     };
     if (offerId) metadata.offerId = offerId;
     if (bidId) metadata.bidId = bidId;
 
-    const buyerTotal = breakdown.itemPrice + (breakdown.commissionAud || 0) + (breakdown.gstAud || 0);
+    const buyerTotal = breakdown.itemPrice + (breakdown.commissionAud || 0) + (breakdown.gstAud || 0) + shippingAud;
     const velocity = await checkPurchaseVelocity({ userId, orderValueAud: buyerTotal });
     if (!velocity.allowed) {
       logger.warn(`[VELOCITY] Blocked checkout for ${userId} (${velocity.reason})`);
@@ -233,7 +262,13 @@ export async function createSingleItemCheckout(req, res) {
     walletSlotHeldForCleanup = false;
 
     logger.info(`[STRIPE] Session created: ${session.id} for listing ${listingId}`);
-    res.json({ url: session.url, sessionId: session.id, breakdown });
+    // The returned breakdown drives the CheckoutModal's price rows — fold the
+    // shipping line in so the modal's total matches what Stripe will charge.
+    res.json({
+      url: session.url,
+      sessionId: session.id,
+      breakdown: { ...breakdown, shippingAud, total: Math.round((breakdown.total + shippingAud) * 100) / 100 },
+    });
   } catch (err) {
     // We claimed the wallet slot but never handed it to a live session — free it
     // now so a failed attempt doesn't lock the buyer out until the TTL.

@@ -572,6 +572,16 @@ const ProductDetailPage = ({ source: sourceProp }) => {
                       </span>
                     )}
                     {isShop && <span className="text-sm font-medium text-muted-foreground pb-1">+ Shipping</span>}
+                    {/* Seller-set postage on marketplace listings — surfaced next
+                        to the price so the checkout shipping line is never a
+                        surprise. 0 (or a pre-migration row) reads as free. */}
+                    {!isShop && (
+                      <span className="text-sm font-medium text-muted-foreground pb-1">
+                        {Number(product.shipping_cost_aud) > 0
+                          ? `+ $${Number(product.shipping_cost_aud).toFixed(2)} shipping`
+                          : 'Free shipping'}
+                      </span>
+                    )}
                   </div>
                   <BnplMessage amount={product.price} className="mt-2" />
                   {/* Market context beside the price — the number buyers actually
