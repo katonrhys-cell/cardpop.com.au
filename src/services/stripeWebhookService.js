@@ -69,7 +69,7 @@ async function getPlatformSetting(key, defaultValue) {
 // having to check email or refresh Admin -> Orders. Best-effort — a failure
 // here must never re-throw and turn a fulfilled order into a webhook 500
 // (which Stripe would retry).
-async function notifyAdminOfOrder({ orderId, buyerName, buyerEmail, total, itemsSummary, sellerName }) {
+export async function notifyAdminOfOrder({ orderId, buyerName, buyerEmail, total, itemsSummary, sellerName }) {
   try {
     const to = await getAdminNotificationEmails();
     await sendOrderAdminNotice({ to, orderId, buyerName, buyerEmail, total, itemsSummary, sellerName });
@@ -78,17 +78,23 @@ async function notifyAdminOfOrder({ orderId, buyerName, buyerEmail, total, items
   }
 
   try {
-    const { data: admins } = await supabase.from('profiles').select('id').eq('is_admin', true);
+    const { data: admins, error: adminsErr } = await supabase.from('profiles').select('id').eq('is_admin', true);
+    if (adminsErr) throw adminsErr;
     if (admins?.length) {
       const amount = typeof total === 'number' ? `$${total.toFixed(2)}` : 'an order';
-      await supabase.from('notifications').insert(admins.map(a => ({
+      // supabase-js resolves failed inserts with { error } instead of throwing,
+      // so the error must be checked explicitly or the notification vanishes
+      // silently (which is exactly how the previous `entity_id` column mismatch
+      // went unnoticed — the table's column is `related_id`).
+      const { error: insertErr } = await supabase.from('notifications').insert(admins.map(a => ({
         user_id: a.id,
         type: 'order_placed',
         title: 'New order placed',
         body: `${buyerName || 'A buyer'} placed ${amount} order for ${itemsSummary || 'an item'}${sellerName ? ` from ${sellerName}` : ''}.`,
         link: '/admin/orders',
-        entity_id: orderId,
+        related_id: orderId,
       })));
+      if (insertErr) throw insertErr;
     }
   } catch (e) {
     logger.warn(`[STRIPE] admin order notice in-app notification failed for order ${orderId || 'n/a'}: ${e.message}`);

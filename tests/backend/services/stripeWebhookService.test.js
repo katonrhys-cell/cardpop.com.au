@@ -29,7 +29,10 @@ import {
   getPlatformSetting,
   handlePaymentFailed,
   handleCheckoutSessionExpired,
+  notifyAdminOfOrder,
 } from '../../../src/services/stripeWebhookService.js';
+import { getAdminNotificationEmails } from '../../../src/utils/adminNotificationRecipient.js';
+import { sendOrderAdminNotice } from '../../../src/utils/emailService.js';
 
 function builder({ single = { data: null, error: null }, value = { data: null, error: null } } = {}) {
   const b = {};
@@ -72,6 +75,40 @@ describe('handlePaymentFailed', () => {
     expect(mockSupabase.from).toHaveBeenCalledWith('orders');
     expect(orders.update).toHaveBeenCalledWith({ status: 'payment_failed' });
     expect(orders.eq).toHaveBeenCalledWith('stripe_payment_intent_id', 'pi_123');
+  });
+});
+
+describe('notifyAdminOfOrder', () => {
+  it('emails every admin recipient and inserts an order_placed bell notification per admin', async () => {
+    getAdminNotificationEmails.mockResolvedValue(['admin@cardpop.com.au']);
+    const profiles = builder({ value: { data: [{ id: 'a1' }, { id: 'a2' }], error: null } });
+    const notifications = builder({ value: { data: null, error: null } });
+    queueFrom(profiles, notifications);
+
+    await notifyAdminOfOrder({
+      orderId: 'ord-1', buyerName: 'Jess', buyerEmail: 'jess@example.com',
+      total: 42.5, itemsSummary: 'Charizard EX',
+    });
+
+    expect(sendOrderAdminNotice).toHaveBeenCalledWith(expect.objectContaining({
+      to: ['admin@cardpop.com.au'], orderId: 'ord-1', total: 42.5,
+    }));
+    const rows = notifications.insert.mock.calls[0][0];
+    expect(rows).toHaveLength(2);
+    // The notifications table links via related_id — `entity_id` doesn't exist
+    // and previously made Postgres reject every admin order notification.
+    expect(rows[0]).toMatchObject({ user_id: 'a1', type: 'order_placed', related_id: 'ord-1' });
+    expect(rows[0]).not.toHaveProperty('entity_id');
+  });
+
+  it('never throws when the email or the notification insert fails', async () => {
+    getAdminNotificationEmails.mockResolvedValue(['admin@cardpop.com.au']);
+    sendOrderAdminNotice.mockRejectedValueOnce(new Error('resend down'));
+    const profiles = builder({ value: { data: [{ id: 'a1' }], error: null } });
+    const notifications = builder({ value: { data: null, error: { message: 'insert rejected' } } });
+    queueFrom(profiles, notifications);
+
+    await expect(notifyAdminOfOrder({ orderId: 'ord-2', total: 10 })).resolves.toBeUndefined();
   });
 });
 
