@@ -65,11 +65,14 @@ describe.each([
   it("renders each card in the vault in the card's chosen style", async () => {
     h.vaultResult = { data: [card('holographic')], count: 1, error: null };
     const { container } = renderPage(Page);
+    // Both assertions live inside the waitFor: the page re-renders as its
+    // fetches settle, so a synchronous assertion after a passing waitFor can
+    // catch the DOM mid-swap and flake (seen intermittently in CI). The holo
+    // overlay layer is what produces the shine.
     await waitFor(() => {
       expect(container.querySelector('.cardshowcase--holographic')).toBeTruthy();
+      expect(container.querySelector('.cardshowcase__holo')).toBeTruthy();
     });
-    // The holographic overlay layer is what produces the shine.
-    expect(container.querySelector('.cardshowcase__holo')).toBeTruthy();
   });
 
   it('keeps the flat vault image for classic cards', async () => {

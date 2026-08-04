@@ -136,7 +136,10 @@ describe('GET /price-estimate', () => {
     expect(res.body.error).toMatch(/name/i);
   });
 
-  it('returns price statistics on success', async () => {
+  // 15s timeout: this test intermittently blew the default 5s on loaded CI
+  // runners (the mocks resolve instantly — the time goes to supertest/app
+  // startup under contention), which turned Main CI red on unrelated merges.
+  it('returns price statistics on success', { timeout: 15000 }, async () => {
     mockCallEbayApi.mockImplementationOnce(async () => ({
       itemSummaries: [
         { itemId: 'i1', title: 'Card A', price: { value: '100' }, condition: '3000', itemWebUrl: '', image: {} },
