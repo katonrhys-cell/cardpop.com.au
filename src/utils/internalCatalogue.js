@@ -19,9 +19,13 @@ import supabase from './supabaseClient.js';
 import { cardNumbersMatch } from '../../utils/cardNumber.js';
 import { normalizeName } from '../../utils/cardMatch.js';
 
-/** Escapes LIKE/ILIKE wildcards in user text so it matches literally. */
+/**
+ * Escapes LIKE/ILIKE wildcards in user text so it matches literally.
+ * `*` is stripped rather than escaped: PostgREST rewrites it to `%` before
+ * the SQL layer sees it, so there is no way to match a literal asterisk.
+ */
 function escapeLike(text) {
-  return String(text).replace(/[\\%_]/g, ch => `\\${ch}`);
+  return String(text).replace(/\*/g, '').replace(/[\\%_]/g, ch => `\\${ch}`);
 }
 
 /**
@@ -52,6 +56,11 @@ export async function searchInternalCatalogue(q, take, { number, collection } = 
   const name = String(q ?? '').trim();
   if (!name) return [];
 
+  // The bound is generous on purpose: the collection and number filters run
+  // below in JS (they need accent- and format-tolerant comparisons SQL ILIKE
+  // can't do), so a tight SQL cap would let a heavily-confirmed common name
+  // crowd the actually-requested printing out of the window before those
+  // filters ever see it. Rows are narrow; 200 of them is nothing.
   const { data, error } = await supabase
     .from('card_catalogue')
     .select('catalogue_key, collection, set_name, insert_name, card_number, parallel, card_name, year, confirmations, observations')
@@ -59,7 +68,7 @@ export async function searchInternalCatalogue(q, take, { number, collection } = 
     .ilike('card_name', `%${escapeLike(name)}%`)
     .order('confirmations', { ascending: false })
     .order('observations', { ascending: false })
-    .limit(40);
+    .limit(200);
 
   if (error || !Array.isArray(data)) return [];
 
@@ -71,7 +80,13 @@ export async function searchInternalCatalogue(q, take, { number, collection } = 
       id: row.catalogue_key,
       name: row.card_name,
       setName: row.set_name ?? null,
-      year: row.year ? parseInt(row.year, 10) || null : null,
+      // Kept as the stored text: sports "years" are seasons ("2003-04"), and
+      // parseInt would truncate one to "2003" — which both breaks the
+      // grounding year comparison (String("2003") !== "2003-04") and, worse,
+      // would *overwrite* a correctly-read season since the catalogue is
+      // authoritative for year. The public adapters return integers; the
+      // grounding layer stringifies both, so the shapes coexist.
+      year: row.year ?? null,
       cardNumber: row.card_number ?? null,
       rarity: null,
       imageUrl: null,

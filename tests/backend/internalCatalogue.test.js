@@ -53,7 +53,7 @@ describe('searchInternalCatalogue', () => {
       id: 'nba basketball|2003-04 topps|221',
       name: 'LeBron James',
       setName: '2003-04 Topps',
-      year: 2003,
+      year: '2003',
       cardNumber: '221',
       rarity: null,
       imageUrl: null,
@@ -77,6 +77,21 @@ describe('searchInternalCatalogue', () => {
     await searchInternalCatalogue('100% Authentic_Card', 10);
     const ilike = state.calls.find(([method]) => method === 'ilike');
     expect(ilike[2]).toBe('%100\\% Authentic\\_Card%');
+  });
+
+  it('strips the PostgREST * wildcard alias from the query text', async () => {
+    state.result = { data: [], error: null };
+    await searchInternalCatalogue('Char*zard', 10);
+    const ilike = state.calls.find(([method]) => method === 'ilike');
+    expect(ilike[2]).toBe('%Charzard%');
+  });
+
+  it('keeps season years as the stored text instead of truncating them', async () => {
+    // Sports "years" are seasons; parseInt would turn "2003-04" into 2003,
+    // which the grounding overlay would then write over a correct read.
+    state.result = { data: [row({ year: '2003-04' })], error: null };
+    const results = await searchInternalCatalogue('LeBron', 10);
+    expect(results[0].year).toBe('2003-04');
   });
 
   it('filters by collector number using the pipeline equivalence rules', async () => {

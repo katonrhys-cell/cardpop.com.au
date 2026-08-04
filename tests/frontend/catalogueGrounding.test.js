@@ -51,6 +51,17 @@ describe('groundAgainstCatalogue with internal candidates', () => {
     expect(resolved.catalogueMatch.parallel).toBeNull();
   });
 
+  it('corroborates and preserves season-format years from internal candidates', async () => {
+    // Sports "years" are seasons. The internal adapter passes them through as
+    // text, so an exact season must count as year agreement and must survive
+    // the overlay un-truncated.
+    const read = { ...sportsRead, cardNumber: '', releaseYear: '2003-04' };
+    const seasonCandidate = { ...internalCandidate, cardNumber: null, year: '2003-04' };
+    const resolved = await groundAgainstCatalogue(read, async () => ({ results: [seasonCandidate] }));
+    expect(resolved.catalogueMatch?.verified).toContain('year');
+    expect(resolved.releaseYear).toBe('2003-04');
+  });
+
   it('still rejects a candidate whose number conflicts', async () => {
     const wrongPrinting = { ...internalCandidate, cardNumber: '23' };
     const resolved = await groundAgainstCatalogue(sportsRead, async () => ({ results: [wrongPrinting] }));

@@ -19,9 +19,14 @@
 // eslint-disable-next-line import/no-unresolved -- Vite `?url` asset suffix, invisible to the node resolver
 import cvScriptUrl from '@techstark/opencv-js/dist/opencv.js?url';
 
+// Script downloaded but the wasm runtime never came up — give up after this
+// long so the promise rejects (and resets for retry) instead of wedging the
+// crop feature for the whole session.
+const RUNTIME_INIT_TIMEOUT_MS = 30_000;
+
 let cvPromise = null;
 
-function whenRuntimeReady(cv, resolve) {
+function whenRuntimeReady(cv, resolve, reject) {
   // Strip the legacy Emscripten thenable *before* this object can become a
   // promise resolution value — see the module comment.
   delete cv.then;
@@ -29,8 +34,22 @@ function whenRuntimeReady(cv, resolve) {
     resolve(cv);
     return;
   }
+  // The script can execute and still never initialise: wasm instantiation can
+  // abort (iOS Safari under memory pressure is the classic case), and then
+  // onRuntimeInitialized simply never fires. Both failure paths must reject —
+  // a forever-pending promise here leaves the UI spinning and, because it
+  // stays cached, bricks every later attempt too.
+  const timer = setTimeout(
+    () => reject(new Error('OpenCV runtime initialisation timed out')),
+    RUNTIME_INIT_TIMEOUT_MS,
+  );
+  cv.onAbort = (what) => {
+    clearTimeout(timer);
+    reject(new Error(`OpenCV runtime aborted: ${what}`));
+  };
   const prev = cv.onRuntimeInitialized;
   cv.onRuntimeInitialized = () => {
+    clearTimeout(timer);
     if (typeof prev === 'function') prev();
     resolve(cv);
   };
@@ -46,7 +65,7 @@ export function loadOpenCV() {
     }
     // Already on the page (earlier load, HMR) — just wait for the runtime.
     if (window.cv && (window.cv.Mat || typeof window.cv.then === 'function' || window.cv.onRuntimeInitialized !== undefined)) {
-      whenRuntimeReady(window.cv, resolve);
+      whenRuntimeReady(window.cv, resolve, reject);
       return;
     }
     const script = document.createElement('script');
@@ -57,7 +76,7 @@ export function loadOpenCV() {
         reject(new Error('OpenCV.js loaded but window.cv is missing'));
         return;
       }
-      whenRuntimeReady(window.cv, resolve);
+      whenRuntimeReady(window.cv, resolve, reject);
     };
     script.onerror = () => {
       script.remove();

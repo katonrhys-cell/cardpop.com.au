@@ -198,7 +198,7 @@ describe('GET /search', () => {
     expect(res.body.results).toHaveLength(1);
     expect(res.body.results[0]).toMatchObject({
       source: 'cardpop', name: 'LeBron James', setName: '2003-04 Topps',
-      cardNumber: '221', year: 2003, insertName: null, collection: 'NBA Basketball',
+      cardNumber: '221', year: '2003', insertName: null, collection: 'NBA Basketball',
     });
   });
 });

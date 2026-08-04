@@ -445,6 +445,19 @@ function findCardQuad(cv, canvas) {
 /** Warps the full-resolution source so `quad` becomes a flat 5:7 rectangle. */
 function warpCard(cv, fullCanvas, quad) {
   const ordered = orderCorners(quad);
+
+  // orderCorners' sum/diff heuristic collapses on diamond-oriented quads —
+  // one point can win two corner slots. getPerspectiveTransform doesn't
+  // throw on the resulting singular system; it silently produces a junk
+  // matrix and the warp comes out as garbage reported as success. That
+  // mostly matters for the manual adjuster, which feeds user-dragged
+  // corners straight in here. Fail instead: both callers turn a throw into
+  // their clean "could not crop" path.
+  const distinct = new Set(ordered.map(([x, y]) => `${x},${y}`));
+  if (distinct.size < 4 || quadArea(ordered) < 0.5 * quadArea(quad)) {
+    throw new Error('Degenerate corner arrangement');
+  }
+
   const { width, height } = outputDimsFor(quad);
 
   const src = cv.imread(fullCanvas);
