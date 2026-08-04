@@ -10,6 +10,7 @@ import {
   maxAngleError,
   isRectangularQuad,
   rectifyQuad,
+  isConvexQuad,
   OUTPUT,
 } from '@/utils/cardCrop.js';
 
@@ -87,6 +88,33 @@ describe('isPlausibleCard', () => {
     // Top edge shorter than bottom (perspective) but overall ratio in range.
     const tilted = [[150, 100], [550, 100], [600, 800], [100, 800]];
     expect(isPlausibleCard(tilted, imgW, imgH)).toBe(true);
+  });
+});
+
+describe('isConvexQuad', () => {
+  it('accepts a sequentially wound rectangle', () => {
+    expect(isConvexQuad(CARD_SEQ)).toBe(true);
+  });
+
+  it('rejects the same corners wound as a bow-tie', () => {
+    expect(isConvexQuad(JUMBLED)).toBe(false);
+  });
+
+  it('accepts a tilted convex quad', () => {
+    const tilted = [[150, 100], [550, 130], [590, 780], [110, 800]];
+    expect(isConvexQuad(tilted)).toBe(true);
+  });
+
+  it('rejects a quad with a corner pushed inside (concave)', () => {
+    // Bottom-right corner dragged deep into the shape.
+    const concave = [[100, 100], [600, 100], [300, 450], [100, 800]];
+    expect(isConvexQuad(concave)).toBe(false);
+  });
+
+  it('rejects degenerate input', () => {
+    expect(isConvexQuad(null)).toBe(false);
+    expect(isConvexQuad([[0, 0], [1, 1], [2, 2]])).toBe(false);
+    expect(isConvexQuad([[0, 0], [0, 0], [0, 0], [0, 0]])).toBe(false);
   });
 });
 

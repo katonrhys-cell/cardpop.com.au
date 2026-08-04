@@ -10,13 +10,28 @@ vi.mock('../../src/utils/logger.js', () => ({ default: { info: vi.fn(), warn: vi
 // client) before the free APIs. Mock it: default no override; a test can make
 // mockMaybeSingle return a row to exercise the override path.
 const mockMaybeSingle = vi.hoisted(() => vi.fn(async () => ({ data: null, error: null })));
-vi.mock('../../src/utils/supabaseClient.js', () => ({
-  default: {
-    from: () => ({
-      select: () => ({ eq: () => ({ limit: () => ({ maybeSingle: mockMaybeSingle }) }) }),
-    }),
-  },
-}));
+// Fixture rows for the internal card_catalogue source (searchInternalCatalogue).
+const internalCatalogue = vi.hoisted(() => ({ data: [], error: null }));
+vi.mock('../../src/utils/supabaseClient.js', () => {
+  // card_catalogue queries build a filter chain and are awaited directly, so
+  // the builder returns itself from every method and is thenable.
+  const catalogueBuilder = new Proxy({}, {
+    get(_target, prop) {
+      if (prop === 'then') {
+        return (onFulfilled, onRejected) =>
+          Promise.resolve({ data: internalCatalogue.data, error: internalCatalogue.error }).then(onFulfilled, onRejected);
+      }
+      return () => catalogueBuilder;
+    },
+  });
+  return {
+    default: {
+      from: (table) => table === 'card_catalogue'
+        ? catalogueBuilder
+        : { select: () => ({ eq: () => ({ limit: () => ({ maybeSingle: mockMaybeSingle }) }) }) },
+    },
+  };
+});
 
 import catalogRouter from '../../src/routes/catalog.js';
 
@@ -35,6 +50,7 @@ const h = { pokemon: [], scryfall: [], yugioh: [] };
 beforeEach(() => {
   vi.clearAllMocks();
   mockMaybeSingle.mockResolvedValue({ data: null, error: null });
+  internalCatalogue.data = []; internalCatalogue.error = null;
   h.pokemon = []; h.scryfall = []; h.yugioh = [];
   global.fetch = vi.fn((url) => {
     const u = String(url);
@@ -156,6 +172,34 @@ describe('GET /search', () => {
     global.fetch = vi.fn(() => Promise.resolve({ ok: false, json: async () => ({}) }));
     const res = await request(app).get('/search?q=x&collection=pokemon');
     expect(res.body.results).toEqual([]);
+  });
+
+  it('includes confirmed internal catalogue entries alongside the public APIs', async () => {
+    h.pokemon = [{ id: 'p1', name: 'Pikachu', set: { name: 'Base' }, number: '25' }];
+    internalCatalogue.data = [{
+      catalogue_key: 'pokemon|base set|25', collection: 'Pokémon', set_name: 'Base Set',
+      insert_name: null, card_number: '25', parallel: null, card_name: 'Pikachu',
+      year: '1999', confirmations: 2, observations: 5,
+    }];
+    const res = await request(app).get('/search?q=Pikachu&collection=pokemon');
+    expect(res.body.results.map(r => r.source).sort()).toEqual(['cardpop', 'pokemon-tcg']);
+  });
+
+  it('answers sports-card searches from the internal catalogue alone', async () => {
+    // No public API covers sports cards; the accumulated CardPop catalogue is
+    // the only source that can corroborate this read.
+    internalCatalogue.data = [{
+      catalogue_key: 'nba basketball|2003-04 topps|221', collection: 'NBA Basketball',
+      set_name: '2003-04 Topps', insert_name: null, card_number: '221', parallel: null,
+      card_name: 'LeBron James', year: '2003', confirmations: 1, observations: 4,
+    }];
+    const res = await request(app).get('/search').query({ q: 'LeBron James', collection: 'NBA Basketball', number: '221' });
+    expect(res.body.precise).toBe(true);
+    expect(res.body.results).toHaveLength(1);
+    expect(res.body.results[0]).toMatchObject({
+      source: 'cardpop', name: 'LeBron James', setName: '2003-04 Topps',
+      cardNumber: '221', year: '2003', insertName: null, collection: 'NBA Basketball',
+    });
   });
 });
 
