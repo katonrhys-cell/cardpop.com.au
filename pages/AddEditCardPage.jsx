@@ -676,6 +676,12 @@ const AddEditCardPage = () => {
     clearCrop();
     setAdjusting(null);
     runPhotoQuality(file);
+    // Warm the OpenCV load now, while the seller is still filling in fields.
+    // Rectification runs inside an 8-second budget when they hit Identify, and
+    // on a phone's cold cache the library download alone can eat all of it —
+    // prefetched here, the first detection starts hot. Fire-and-forget: a
+    // failed warmup just means the old cold-start behaviour.
+    import('@/utils/opencvLoader.js').then(m => m.loadOpenCV()).catch(() => {});
     setErrors(prev => {
       if (!('cardImage' in prev)) return prev;
       const { cardImage: _cardImage, ...rest } = prev;

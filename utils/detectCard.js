@@ -339,7 +339,6 @@ function findCardQuad(cv, canvas) {
   const otsuSat = new cv.Mat();
   const channels = new cv.MatVector();
   let clahe = null;
-  let kernel3 = null;
   let kernel5 = null;
 
   try {
@@ -360,7 +359,9 @@ function findCardQuad(cv, canvas) {
     cv.cvtColor(src, hsv, cv.COLOR_RGBA2RGB);
     cv.cvtColor(hsv, hsv, cv.COLOR_RGB2HSV);
     cv.split(hsv, channels);
-    channels.get(1).copyTo(sat);
+    const satChannel = channels.get(1);
+    satChannel.copyTo(sat);
+    satChannel.delete();
     cv.GaussianBlur(sat, sat, new cv.Size(5, 5), 0);
 
     // Median-adaptive Canny on both channels, OR'd together.
@@ -371,7 +372,6 @@ function findCardQuad(cv, canvas) {
     cv.Canny(sat, edgesSat, 40, 120);
     cv.bitwise_or(edgesGray, edgesSat, edges);
 
-    kernel3 = cv.Mat.ones(3, 3, cv.CV_8U);
     kernel5 = cv.Mat.ones(5, 5, cv.CV_8U);
     cv.morphologyEx(edges, closed, cv.MORPH_CLOSE, kernel5);
     // Support map is deliberately generous (dilated) — it grades candidate
@@ -438,7 +438,6 @@ function findCardQuad(cv, canvas) {
     otsuSat.delete();
     channels.delete();
     if (clahe) clahe.delete();
-    if (kernel3) kernel3.delete();
     if (kernel5) kernel5.delete();
   }
 }

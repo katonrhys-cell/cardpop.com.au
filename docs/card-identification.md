@@ -105,11 +105,15 @@ third-party APIs and JPEG is what both unambiguously accept.
 A 413 that still gets through is reported as "those photos are too large to
 analyse together" rather than the raw Vercel body.
 
-**Cost.** OpenCV is a lazily-loaded ~3.5 MB (gzipped) wasm chunk, and this puts
-it on the default path for every seller rather than only those who use the
-manual crop. First scan on a cold cache pays that download inside the 8-second
-budget; later scans are cached. Set `VITE_OCR_AUTOCROP=false` at build time to
-send the original photo straight to the models.
+**Cost.** OpenCV is a lazily-loaded ~3.5 MB (gzipped) script asset (a classic
+`<script>` tag, not an `import()` — its Emscripten build carries a legacy
+thenable that hangs every promise-interop path; see `utils/opencvLoader.js`),
+and this puts it on the default path for every seller rather than only those
+who use the manual crop. `handleImageChange` warms the load the moment a photo
+is selected, so by the time the seller hits Identify the library is normally
+resident and the 8-second budget is spent on detection rather than download.
+Set `VITE_OCR_AUTOCROP=false` at build time to send the original photo straight
+to the models.
 
 ### 1. OCR first
 
