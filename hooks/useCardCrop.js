@@ -41,7 +41,17 @@ export function useCardCrop() {
         setCandidate({ key, croppedFile, croppedUrl: res.url, corners: res.corners ?? null });
         return true;
       }
-      if (!silent) toast.info('No card outline detected — keeping the original.');
+      if (!silent) {
+        // Two different failures must not share one message: an engine that
+        // never loaded says nothing about the photo, and telling the seller
+        // "no outline detected" sends them chasing lighting and angles when
+        // the fix is simply retrying the load.
+        if (res?.reason === 'engine' || res?.reason === 'error') {
+          toast.error('The card detector could not load. Check your connection and try again.');
+        } else {
+          toast.info('No card outline detected — keeping the original.');
+        }
+      }
       return false;
     } catch {
       if (run === runRef.current && !silent) {

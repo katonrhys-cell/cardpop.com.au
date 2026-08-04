@@ -42,8 +42,20 @@ describe('useCardCrop', () => {
     expect(result.current.candidate.key).toBe(2);
   });
 
+  it('reports an engine failure as an error, not as "no card found"', async () => {
+    // An engine that never loaded says nothing about the photo — telling the
+    // seller "no outline detected" sends them chasing lighting and angles.
+    mockDetect.mockResolvedValue({ found: false, reason: 'engine' });
+
+    const { result } = renderHook(() => useCardCrop());
+    await act(async () => { await result.current.detect('main', FILE); });
+
+    expect(mockToast.error).toHaveBeenCalled();
+    expect(mockToast.info).not.toHaveBeenCalled();
+  });
+
   it('sets no candidate and informs the user when no card is found', async () => {
-    mockDetect.mockResolvedValue({ found: false });
+    mockDetect.mockResolvedValue({ found: false, reason: 'no-card' });
 
     const { result } = renderHook(() => useCardCrop());
     let returned;

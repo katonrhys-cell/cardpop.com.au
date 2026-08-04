@@ -7,6 +7,7 @@ import { Loader2, Check, CheckCircle2, Frame, Square } from 'lucide-react';
 import {
   defaultCorners, orderCorners, isRectangularQuad, rectifyQuad,
 } from '@/utils/cardCrop.js';
+import { warpCanvasPreview } from '@/utils/detectCard.js';
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
 const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
@@ -33,6 +34,8 @@ const LOUPE_ZOOM = 3;     // magnification relative to the on-screen image
  */
 const CardCornerAdjuster = ({ imageUrl, initialCorners, onApply, onCancel }) => {
   const imgRef = useRef(null);
+  // Offscreen downscaled copy of the image, cached across corner drags and
+  // rebuilt when the image itself changes (see the preview effect).
   const previewCanvasRef = useRef(null);
   const [natural, setNatural] = useState(null); // { w, h } natural image size
   const [displayW, setDisplayW] = useState(0);   // rendered image width (px)
@@ -68,93 +71,37 @@ const CardCornerAdjuster = ({ imageUrl, initialCorners, onApply, onCancel }) => 
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  // Generate live preview of the perspective-warped crop result
+  // Live preview: the REAL perspective warp — the same one Apply runs — on a
+  // downscaled copy of the image, debounced behind the drag. The previous
+  // implementation approximated the warp with two bounding-box-stretched
+  // canvas triangles, which visibly sheared and seamed whenever the selection
+  // was tilted (any slab or hand-held card), so the preview contradicted the
+  // crop it was previewing.
   useEffect(() => {
-    if (!imgRef.current || !natural || !corners || !previewCanvasRef.current) return;
+    if (!imgRef.current || !natural || !corners) return undefined;
 
-    const img = imgRef.current;
-    const canvas = previewCanvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Set preview dimensions to 5:7 card ratio (smaller for performance)
-    const previewWidth = 300;
-    const previewHeight = 420;
-    canvas.width = previewWidth;
-    canvas.height = previewHeight;
-
-    // Perspective transform: map the crop corners to the full preview rect
-    const [tl, tr, br, bl] = corners.map(([x, y]) => [x, y]);
-    const srcPoints = [tl, tr, br, bl];
-    const dstPoints = [[0, 0], [previewWidth, 0], [previewWidth, previewHeight], [0, previewHeight]];
-
-    // Use canvas 2D transforms (approximation; 3D would need WebGL)
-    // Draw the image with perspective using triangle subdivisions
-    ctx.clearRect(0, 0, previewWidth, previewHeight);
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, previewWidth, previewHeight);
-
-    // Subdivide the quad into triangles for better perspective accuracy
-    const triangles = [
-      [0, 1, 2], // top-right triangle
-      [0, 2, 3], // bottom-left triangle
-    ];
-
-    try {
-      ctx.save();
-      for (const [i0, i1, i2] of triangles) {
-        const p0 = srcPoints[i0];
-        const p1 = srcPoints[i1];
-        const p2 = srcPoints[i2];
-        const dp0 = dstPoints[i0];
-        const dp1 = dstPoints[i1];
-        const dp2 = dstPoints[i2];
-
-        // Simple bilinear sampling: map destination rect to source triangle
-        ctx.beginPath();
-        ctx.moveTo(dp0[0], dp0[1]);
-        ctx.lineTo(dp1[0], dp1[1]);
-        ctx.lineTo(dp2[0], dp2[1]);
-        ctx.closePath();
-
-        ctx.save();
-        ctx.clip();
-
-        // Draw stretched/warped version - approximate perspective
-        const minX = Math.min(dp0[0], dp1[0], dp2[0]);
-        const maxX = Math.max(dp0[0], dp1[0], dp2[0]);
-        const minY = Math.min(dp0[1], dp1[1], dp2[1]);
-        const maxY = Math.max(dp0[1], dp1[1], dp2[1]);
-
-        // Calculate the bounding box in source space for this triangle
-        const srcMinX = Math.min(p0[0], p1[0], p2[0]);
-        const srcMaxX = Math.max(p0[0], p1[0], p2[0]);
-        const srcMinY = Math.min(p0[1], p1[1], p2[1]);
-        const srcMaxY = Math.max(p0[1], p1[1], p2[1]);
-
-        const srcW = srcMaxX - srcMinX;
-        const srcH = srcMaxY - srcMinY;
-        const dstW = maxX - minX;
-        const dstH = maxY - minY;
-
-        if (srcW > 0 && srcH > 0 && dstW > 0 && dstH > 0) {
-          ctx.drawImage(
-            img,
-            srcMinX, srcMinY, srcW, srcH,
-            minX, minY, dstW, dstH
-          );
-        }
-
-        ctx.restore();
+    let stale = false;
+    const timer = setTimeout(async () => {
+      // Draw (and cache) a downscaled copy once per image; re-warp it as the
+      // handles move. ~700px is plenty for a side-panel preview.
+      let source = previewCanvasRef.current;
+      if (!source || source.dataset.for !== imageUrl) {
+        const scale = Math.min(1, 700 / Math.max(natural.w, natural.h));
+        source = document.createElement('canvas');
+        source.width = Math.max(1, Math.round(natural.w * scale));
+        source.height = Math.max(1, Math.round(natural.h * scale));
+        source.getContext('2d').drawImage(imgRef.current, 0, 0, source.width, source.height);
+        source.dataset.for = imageUrl;
+        source.dataset.scale = String(scale);
+        previewCanvasRef.current = source;
       }
-    } catch {
-      // Fallback: just show a darkened preview
-      ctx.fillStyle = 'rgba(0,0,0,0.3)';
-      ctx.fillRect(0, 0, previewWidth, previewHeight);
-    }
+      const scale = Number(source.dataset.scale) || 1;
+      const url = await warpCanvasPreview(source, corners.map(([x, y]) => [x * scale, y * scale]));
+      if (!stale && url) setPreviewUrl(url);
+    }, 150);
 
-    setPreviewUrl(canvas.toDataURL('image/jpeg', 0.8));
-  }, [corners, natural]);
+    return () => { stale = true; clearTimeout(timer); };
+  }, [corners, natural, imageUrl]);
 
   const scale = natural && displayW ? displayW / natural.w : 1;
   const displayH = natural ? natural.h * scale : 0;
@@ -373,10 +320,6 @@ const CardCornerAdjuster = ({ imageUrl, initialCorners, onApply, onCancel }) => 
                 <p className="text-xs text-muted-foreground">Preview loading…</p>
               )}
             </div>
-            <canvas
-              ref={previewCanvasRef}
-              className="hidden"
-            />
           </div>
         </div>
 

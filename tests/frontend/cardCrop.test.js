@@ -11,6 +11,7 @@ import {
   isRectangularQuad,
   rectifyQuad,
   isConvexQuad,
+  quadContains,
   OUTPUT,
 } from '@/utils/cardCrop.js';
 
@@ -126,6 +127,53 @@ describe('outputDimsFor', () => {
   it('returns landscape dimensions for a landscape card', () => {
     const landscape = [[100, 100], [800, 100], [800, 600], [100, 600]]; // 700×500
     expect(outputDimsFor(landscape)).toEqual({ width: OUTPUT.height, height: OUTPUT.width });
+  });
+
+  it('snaps a near-5:7 quad (perspective bias) to the standard card output', () => {
+    // 496×700 → ratio 0.709, within 6% of 5:7 — a real card seen slightly askew.
+    const nearCard = [[100, 100], [596, 100], [596, 800], [100, 800]];
+    expect(outputDimsFor(nearCard)).toEqual({ width: OUTPUT.width, height: OUTPUT.height });
+  });
+
+  it('keeps a graded slab at its own aspect instead of squashing it to 5:7', () => {
+    // 430×700 → ratio ~0.614, a PSA-case shape.
+    const slab = [[100, 100], [530, 100], [530, 800], [100, 800]];
+    const dims = outputDimsFor(slab);
+    expect(dims.height).toBe(OUTPUT.height);
+    expect(dims.width).toBe(Math.round(OUTPUT.height * (430 / 700)));
+    expect(dims.width).not.toBe(OUTPUT.width);
+  });
+});
+
+describe('quadContains', () => {
+  const outer = [[100, 100], [700, 100], [700, 1000], [100, 1000]];
+
+  it('accepts a quad fully inside another', () => {
+    const inner = [[200, 250], [600, 250], [600, 850], [200, 850]];
+    expect(quadContains(outer, inner)).toBe(true);
+  });
+
+  it('accepts an inner quad grazing the boundary within tolerance', () => {
+    const grazing = [[95, 105], [700, 100], [700, 995], [100, 1000]];
+    expect(quadContains(outer, grazing)).toBe(true);
+  });
+
+  it('rejects a quad that pokes well outside', () => {
+    const poking = [[200, 250], [850, 250], [600, 850], [200, 850]];
+    expect(quadContains(outer, poking)).toBe(false);
+  });
+
+  it('rejects overlapping-but-not-nested quads and malformed input', () => {
+    const shifted = outer.map(([x, y]) => [x + 400, y]);
+    expect(quadContains(outer, shifted)).toBe(false);
+    expect(quadContains(null, outer)).toBe(false);
+    expect(quadContains(outer, [[0, 0]])).toBe(false);
+  });
+
+  it('is winding-order agnostic for the outer quad', () => {
+    const reversed = [...outer].reverse();
+    const inner = [[200, 250], [600, 250], [600, 850], [200, 850]];
+    expect(quadContains(reversed, inner)).toBe(true);
   });
 });
 
