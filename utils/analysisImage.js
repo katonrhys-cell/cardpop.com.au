@@ -25,6 +25,10 @@ import { ANALYSIS_IMAGE_LIMIT } from './listingFlow.js';
 // a slow connection or a failed load delays the scan by this much at worst.
 const DETECT_TIMEOUT_MS = 8000;
 
+// Extra angles get a tighter budget each: by the time they run, the front's
+// pass has already paid the library load, so this is detection time only.
+const EXTRA_DETECT_TIMEOUT_MS = 4000;
+
 // Longest edge worth sending. Both identification models downscale their input
 // (Anthropic caps the long edge near 1568px), so pixels beyond this cost payload
 // and buy nothing — a 4 MB phone photo and a 400 KB resize of it are the same
@@ -118,7 +122,18 @@ export async function prepareAnalysisImages(files, options = {}) {
   const [front, ...extras] = present;
   const { file: rectified, cropped } = await prepareAnalysisImage(front, options);
 
-  const bounded = await Promise.all([rectified, ...extras].map(boundForUpload));
+  // The extra angles are usually the back — where the set code, collector
+  // number and copyright line live — so they deserve the same treatment the
+  // front gets. Sequential on purpose: the wasm runtime is single-threaded,
+  // so parallel calls would only queue behind each other anyway. Each is
+  // fail-safe and time-boxed; `cropped` stays a statement about the front.
+  const rectifiedExtras = [];
+  for (const extra of extras) {
+    const { file } = await prepareAnalysisImage(extra, { timeoutMs: EXTRA_DETECT_TIMEOUT_MS });
+    rectifiedExtras.push(file);
+  }
+
+  const bounded = await Promise.all([rectified, ...rectifiedExtras].map(boundForUpload));
 
   // Trim from the back until the body fits: the front is the read that matters,
   // the extra angles only add set codes and copyright lines.

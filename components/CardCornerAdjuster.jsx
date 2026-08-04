@@ -15,6 +15,12 @@ const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 // rectangle, the brand primary while it still needs straightening.
 const OK_COLOR = '#10b981';
 
+// Loupe shown while dragging a corner: on a phone the finger hides exactly
+// the pixels being aligned, so a magnified view is the difference between
+// "roughly there" and actually on the card edge.
+const LOUPE_SIZE = 110;   // diameter, px
+const LOUPE_ZOOM = 3;     // magnification relative to the on-screen image
+
 /**
  * Manual crop editor: shows the original image with four draggable corner
  * handles (seeded from the auto-detected quad when available, otherwise an
@@ -318,6 +324,38 @@ const CardCornerAdjuster = ({ imageUrl, initialCorners, onApply, onCancel }) => 
                   ))}
                 </svg>
               )}
+              {/* Magnifier loupe while a corner is being dragged. Anchored at
+                  the same left-0/top-0 origin as the SVG overlay so it shares
+                  its coordinate system; pointer-events-none so the drag keeps
+                  flowing to the captured handle underneath. */}
+              {ready && typeof dragging === 'number' && (() => {
+                const [cx, cy] = corners[dragging];
+                const dx = cx * scale;
+                const dy = cy * scale;
+                const zoom = LOUPE_ZOOM * scale; // background px per natural px
+                const above = dy > LOUPE_SIZE + 28;
+                return (
+                  <div className="pointer-events-none absolute left-0 top-0 z-10">
+                    <div
+                      className="absolute overflow-hidden rounded-full border-2 border-white shadow-xl"
+                      style={{
+                        width: LOUPE_SIZE,
+                        height: LOUPE_SIZE,
+                        left: clamp(dx - LOUPE_SIZE / 2, 0, Math.max(0, displayW - LOUPE_SIZE)),
+                        top: above ? dy - LOUPE_SIZE - 20 : dy + 20,
+                        backgroundColor: '#000',
+                        backgroundImage: `url(${imageUrl})`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: `${natural.w * zoom}px ${natural.h * zoom}px`,
+                        backgroundPosition: `${LOUPE_SIZE / 2 - cx * zoom}px ${LOUPE_SIZE / 2 - cy * zoom}px`,
+                      }}
+                    >
+                      <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2" style={{ background: lineColor, opacity: 0.9 }} />
+                      <div className="absolute top-1/2 left-0 h-px w-full -translate-y-1/2" style={{ background: lineColor, opacity: 0.9 }} />
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 

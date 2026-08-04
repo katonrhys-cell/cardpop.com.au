@@ -82,8 +82,11 @@ Every failure path keeps the original: nothing detected, OpenCV failing to
 load, a warp smaller than 600px on its long edge, or the whole step exceeding
 8 seconds. It can improve the input or leave it alone, never block a scan.
 
-Only the front is *rectified* — cropping the extra angles too would double the
-wait for a secondary read — but **every** image is resized before it is sent.
+Every image is rectified — the extra angles are usually the back, where the
+set code, collector number and copyright line live, so they benefit at least
+as much as the front. The front gets the full 8-second budget (it may pay the
+library load); each extra angle gets a tighter 4-second, fail-safe pass of its
+own. And **every** image is resized before it is sent.
 
 ### The payload cap (why identification used to fail outright)
 

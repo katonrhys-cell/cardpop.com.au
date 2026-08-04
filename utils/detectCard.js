@@ -320,7 +320,7 @@ function expandToOuterEdge(support, quad, width, height) {
  * Finds the card quad in the downscaled image: generate candidates from every
  * strategy, score them all against the edge map, return the winner (or null).
  */
-function findCardQuad(cv, canvas) {
+export function findCardQuad(cv, canvas) {
   const width = canvas.width;
   const height = canvas.height;
   const frameArea = width * height;

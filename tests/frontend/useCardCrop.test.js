@@ -75,6 +75,52 @@ describe('useCardCrop', () => {
     expect(mockDetect).not.toHaveBeenCalled();
   });
 
+  it('suppresses the not-found and error toasts in silent mode', async () => {
+    const { result } = renderHook(() => useCardCrop());
+
+    mockDetect.mockResolvedValue({ found: false });
+    await act(async () => { await result.current.detect('main', FILE, { silent: true }); });
+    expect(mockToast.info).not.toHaveBeenCalled();
+
+    mockDetect.mockRejectedValue(new Error('opencv exploded'));
+    await act(async () => { await result.current.detect('main', FILE, { silent: true }); });
+    expect(mockToast.error).not.toHaveBeenCalled();
+  });
+
+  it('still stores a candidate found by a silent run', async () => {
+    mockDetect.mockResolvedValue({ found: true, blob: new Blob(['x']), url: 'u' });
+
+    const { result } = renderHook(() => useCardCrop());
+    let returned;
+    await act(async () => { returned = await result.current.detect('main', FILE, { silent: true }); });
+
+    expect(returned).toBe(true);
+    expect(result.current.candidate.key).toBe('main');
+  });
+
+  it('a superseded run cannot clobber the newer pick', async () => {
+    // First detection resolves late, after a second photo was picked; the
+    // stale result must be discarded rather than replacing the fresh one.
+    let resolveFirst;
+    mockDetect
+      .mockImplementationOnce(() => new Promise(res => { resolveFirst = res; }))
+      .mockResolvedValueOnce({ found: true, blob: new Blob(['new']), url: 'u-new' });
+
+    const { result } = renderHook(() => useCardCrop());
+    let first;
+    await act(async () => {
+      first = result.current.detect('main', FILE);
+      await result.current.detect('main', FILE);
+    });
+    await act(async () => {
+      resolveFirst({ found: true, blob: new Blob(['old']), url: 'u-old' });
+      expect(await first).toBe(false);
+    });
+
+    expect(result.current.candidate.croppedUrl).toBe('u-new');
+    expect(result.current.detectingKey).toBeNull();
+  });
+
   it('clear() discards the current candidate', async () => {
     mockDetect.mockResolvedValue({ found: true, blob: new Blob(['x']), url: 'u' });
 
