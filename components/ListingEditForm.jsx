@@ -16,6 +16,9 @@ const ListingEditForm = ({ listing, onSuccess, onCancel }) => {
   const [price, setPrice] = useState(
     listing?.price_aud !== null && listing?.price_aud !== undefined ? String(listing.price_aud) : ''
   );
+  const [shippingCost, setShippingCost] = useState(
+    Number(listing?.shipping_cost_aud) > 0 ? String(listing.shipping_cost_aud) : ''
+  );
 
   const vi = listing?.vault_item || {};
   const cardName = vi.card_name || 'this listing';
@@ -34,11 +37,19 @@ const ListingEditForm = ({ listing, onSuccess, onCancel }) => {
       return;
     }
 
+    // Blank = free shipping (stored as 0). The $200 ceiling matches the DB
+    // check constraint, so the save can't bounce off it.
+    const shippingValue = shippingCost === '' ? 0 : Number(shippingCost);
+    if (Number.isNaN(shippingValue) || shippingValue < 0 || shippingValue > 200) {
+      toast.error('Enter a shipping cost between $0 and $200');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const { data: updated, error } = await supabase
         .from('listings')
-        .update({ price_aud: priceValue })
+        .update({ price_aud: priceValue, shipping_cost_aud: shippingValue })
         .eq('id', listing.id)
         .select('*, vault_item:vault_items(card_name, set_name, card_image, card_images, category_id, condition, grade)')
         .single();
@@ -71,6 +82,18 @@ const ListingEditForm = ({ listing, onSuccess, onCancel }) => {
         />
         <p className="text-xs text-muted-foreground">
           Leave blank for an offers-only listing. Card details are edited by the seller in the vault.
+        </p>
+      </div>
+
+      <div className="space-y-2 max-w-xs">
+        <Label htmlFor="shippingCost">Shipping (AUD)</Label>
+        <Input
+          id="shippingCost" name="shippingCost" type="number" min="0" max="200" step="0.01"
+          value={shippingCost} onChange={(e) => setShippingCost(e.target.value)}
+          placeholder="0.00 — free shipping"
+        />
+        <p className="text-xs text-muted-foreground">
+          Charged to the buyer at checkout and paid out to the seller in full. Leave blank for free shipping.
         </p>
       </div>
 

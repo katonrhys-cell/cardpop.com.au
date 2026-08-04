@@ -47,16 +47,30 @@ router.get('/calculate', authMiddleware, validateRequestQuery(calculateBreakdown
   try {
     const { listingId, transactionType = 'fixed' } = req.query;
 
-    const { data: listing, error } = await supabase
+    let { data: listing, error } = await supabase
       .from('listings')
-      .select('id, price_aud, seller_id, seller:profiles!seller_id(seller_tier)')
+      .select('id, price_aud, shipping_cost_aud, seller_id, seller:profiles!seller_id(seller_tier)')
       .eq('id', listingId)
       .eq('status', 'active')
       .maybeSingle();
 
+    // Redeploy-before-migration window: price the breakdown without postage
+    // rather than failing it (mirrors the fallback in the checkout services).
+    if (error && /shipping_cost_aud/.test(error.message || '')) {
+      ({ data: listing, error } = await supabase
+        .from('listings')
+        .select('id, price_aud, seller_id, seller:profiles!seller_id(seller_tier)')
+        .eq('id', listingId)
+        .eq('status', 'active')
+        .maybeSingle());
+    }
+
     if (error || !listing) return res.status(404).json({ error: 'Listing not found or not active' });
 
     const breakdown = await calculateBreakdown(listing, transactionType);
+    // Seller postage rides on top of the commission breakdown: charged to the
+    // buyer, passed through to the seller, no commission or GST touches it.
+    const shippingAud = Math.max(0, Number(listing.shipping_cost_aud) || 0);
 
     res.json({
       listingId,
@@ -65,7 +79,8 @@ router.get('/calculate', authMiddleware, validateRequestQuery(calculateBreakdown
       commissionPct: breakdown.commissionPct,
       commissionAud: breakdown.commissionAud,
       gstAud:        breakdown.gstAud,
-      total:         breakdown.total,
+      shippingAud,
+      total:         Math.round((breakdown.total + shippingAud) * 100) / 100,
     });
   } catch (err) {
     logger.error(`[STRIPE] /calculate error: ${err.message}`);

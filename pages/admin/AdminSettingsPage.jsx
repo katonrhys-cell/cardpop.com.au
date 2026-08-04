@@ -242,7 +242,7 @@ const AdminSettingsPage = () => {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Applied to CardPop Shop items at checkout — a flat rate charged once per order, waived when the shop-item subtotal reaches the threshold. A rate of 0 disables shipping charges; a threshold of 0 means no free-shipping tier. Marketplace listings ship seller-arranged and are unaffected.
+                  Applied to CardPop Shop items at checkout — a flat rate charged once per order, waived when the shop-item subtotal reaches the threshold. A rate of 0 disables shipping charges; a threshold of 0 means no free-shipping tier. Marketplace listings are unaffected: each seller sets their own shipping price per listing, charged to the buyer and paid out to the seller in full.
                 </p>
               </div>
             </CardContent>

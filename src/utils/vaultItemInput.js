@@ -213,6 +213,7 @@ export const validateVaultItemRow = (row, { pricing = {}, isEdit = false, existi
     year: row.year || '',
     listingType: row.listing_type,
     askingPrice: pricing.askingPrice != null ? String(pricing.askingPrice) : '',
+    shippingCost: pricing.shippingCost != null ? String(pricing.shippingCost) : '',
     offerMin: pricing.offerMin != null ? String(pricing.offerMin) : '',
     offerMax: pricing.offerMax != null ? String(pricing.offerMax) : '',
     tradeValue: row.trade_value_aud != null ? String(row.trade_value_aud) : '',

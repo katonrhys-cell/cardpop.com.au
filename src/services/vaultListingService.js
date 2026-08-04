@@ -57,6 +57,14 @@ export const syncMarketplaceListing = async (userClient, { cardId, userId, listi
       status: 'active',
       accepts_trade: acceptsTrade,
       price_aud: isSale ? (Number(pricing.askingPrice) || null) : null,
+      // Seller-set postage, charged to the buyer at checkout and passed through
+      // to the seller's payout. 0 = free shipping. Applies to anything buyable
+      // (sale and EOI listings — EOI sells via accepted offers); trade-only
+      // listings never charge postage. Clamped to the DB check constraint's
+      // range so a malformed value degrades to free shipping, not a failed save.
+      shipping_cost_aud: (isSale || isEOI)
+        ? Math.min(200, Math.max(0, Number(pricing.shippingCost) || 0))
+        : 0,
       // Expression of Interest: no fixed price — publish the seller's target
       // range and open the listing to offers.
       price_min_aud: isEOI ? (Number(pricing.offerMin) || null) : null,
@@ -77,21 +85,27 @@ export const syncMarketplaceListing = async (userClient, { cardId, userId, listi
     // Read the status back: the enforce_listing_approval trigger may have
     // downgraded a new 'active' listing to 'pending', and the seller needs to
     // know their card isn't visible yet.
-    let row, error;
-    if (existing) {
-      ({ data: row, error } = await userClient
-        .from('listings')
-        .update(listingPayload)
-        .eq('id', existing.id)
-        .eq('seller_id', userId)
-        .select('status')
-        .single());
-    } else {
-      ({ data: row, error } = await userClient
-        .from('listings')
-        .insert(listingPayload)
-        .select('status')
-        .single());
+    const writeListing = async (payload) => existing
+      ? userClient
+          .from('listings')
+          .update(payload)
+          .eq('id', existing.id)
+          .eq('seller_id', userId)
+          .select('status')
+          .single()
+      : userClient
+          .from('listings')
+          .insert(payload)
+          .select('status')
+          .single();
+
+    let { data: row, error } = await writeListing(listingPayload);
+    // Vercel can redeploy before `supabase db push` lands the
+    // shipping_cost_aud migration — retry without the column (the listing
+    // saves with free shipping) rather than failing the seller's save.
+    if (error && /shipping_cost_aud/.test(error.message || '')) {
+      const { shipping_cost_aud: _dropped, ...withoutShipping } = listingPayload;
+      ({ data: row, error } = await writeListing(withoutShipping));
     }
     if (error) throw error;
     return row?.status === 'pending' ? 'pending' : 'listed';

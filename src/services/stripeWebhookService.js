@@ -386,6 +386,13 @@ async function handleCartOrder(existing, session, stripe) {
   let payoutsRecorded = false;
   let fulfilledLines = 0;
 
+  // Listing lines settle in two passes: first claim every listing (the sold
+  // race decides which lines this order actually fulfils), then pay sellers.
+  // The split exists for seller postage — shipping_aud sits on one line per
+  // seller (the parcel-defining line), and if THAT line loses the race while a
+  // sibling line from the same seller wins, the postage the buyer paid must
+  // follow the parcel that still ships rather than vanish from the payout.
+  const claimedListingLines = [];
   for (const line of lines) {
     if (line.type === 'listing' && line.id) {
       // Only pay the seller if THIS order won the race to sell the item. If the
@@ -397,24 +404,7 @@ async function handleCartOrder(existing, session, stripe) {
         continue;
       }
       fulfilledLines += 1;
-      if (line.seller_id) {
-        sellerIds.add(line.seller_id);
-        const proceeds = Number(line.line_total_aud || 0) - Number(line.commission_aud || 0);
-        if (proceeds > 0) {
-          // Record the payout on the line itself (a cart can span multiple
-          // sellers, so the order-level payout columns can't hold it) —
-          // without this, refunds/chargebacks on cart orders had nothing to
-          // reverse and the seller kept the proceeds while the buyer was
-          // repaid from platform funds.
-          const payout = await payoutSeller(stripe, { sellerId: line.seller_id, sellerProceeds: proceeds, listingId: line.id })
-            .catch(e => {
-              logger.error(`[STRIPE] cart payout failed for seller ${line.seller_id}: ${e.message}`);
-              return { status: 'failed' };
-            });
-          line.payout = { status: payout.status, transferId: payout.transferId || null, proceeds };
-          payoutsRecorded = true;
-        }
-      }
+      claimedListingLines.push(line);
     } else if (line.type === 'shop' && line.id) {
       // An RPC *error* must not count as fulfilled: data is null on error, so
       // checking only `ok === false` would silently skip the stock decrement
@@ -427,6 +417,45 @@ async function handleCartOrder(existing, session, stripe) {
       } else {
         fulfilledLines += 1;
       }
+    }
+  }
+
+  // Re-home orphaned postage: shipping_aud whose carrying line lost the sold
+  // race moves to a claimed line of the same seller (the parcel still ships).
+  // If the seller has no surviving line, the postage stays on the lost line,
+  // where the double-sale refund path returns it to the buyer with the rest.
+  const claimedIds = new Set(claimedListingLines.map(l => l.id));
+  for (const line of lines) {
+    if (line.type !== 'listing' || claimedIds.has(line.id)) continue;
+    const shipping = Number(line.shipping_aud || 0);
+    if (shipping <= 0) continue;
+    const heir = claimedListingLines.find(l => l.seller_id === line.seller_id);
+    if (heir) {
+      heir.shipping_aud = Number(heir.shipping_aud || 0) + shipping;
+      delete line.shipping_aud;
+      payoutsRecorded = true; // lines changed — persist them below
+    }
+  }
+
+  for (const line of claimedListingLines) {
+    if (!line.seller_id) continue;
+    sellerIds.add(line.seller_id);
+    // Seller postage (shipping_aud) passes through in full — commission only
+    // ever comes off the item price.
+    const proceeds = Number(line.line_total_aud || 0) - Number(line.commission_aud || 0) + Number(line.shipping_aud || 0);
+    if (proceeds > 0) {
+      // Record the payout on the line itself (a cart can span multiple
+      // sellers, so the order-level payout columns can't hold it) —
+      // without this, refunds/chargebacks on cart orders had nothing to
+      // reverse and the seller kept the proceeds while the buyer was
+      // repaid from platform funds.
+      const payout = await payoutSeller(stripe, { sellerId: line.seller_id, sellerProceeds: proceeds, listingId: line.id })
+        .catch(e => {
+          logger.error(`[STRIPE] cart payout failed for seller ${line.seller_id}: ${e.message}`);
+          return { status: 'failed' };
+        });
+      line.payout = { status: payout.status, transferId: payout.transferId || null, proceeds };
+      payoutsRecorded = true;
     }
   }
 
@@ -581,17 +610,21 @@ async function handleSingleItemOrder(session, stripe) {
   const commissionPct = parseFloat(meta.commissionPct || '0');
   const commissionAud = parseFloat(meta.commissionAud || '0');
   const gstAud = parseFloat(meta.gstAud || '0');
-  const sellerProceeds = parseFloat(meta.sellerProceedsAud || String(itemPrice - commissionAud));
+  // Seller postage: charged to the buyer as its own line and passed through to
+  // the seller in full (sellerProceedsAud already includes it at session
+  // creation; the fallback below mirrors that formula for legacy sessions).
+  const shippingAud = parseFloat(meta.shippingAud || '0');
+  const sellerProceeds = parseFloat(meta.sellerProceedsAud || String(itemPrice - commissionAud + shippingAud));
   const configId = meta.configId || null;
   const discountAud = parseFloat(meta.discountAud || '0');
   const amountCents = session.amount_total || 0;
 
-  if (![itemPrice, commissionAud, gstAud, discountAud].every(Number.isFinite)) {
+  if (![itemPrice, commissionAud, gstAud, shippingAud, discountAud].every(Number.isFinite)) {
     logger.error(`[STRIPE] Non-finite amount in metadata for session ${session.id} — order rejected`);
     return;
   }
 
-  const expectedTotalCents = Math.round((itemPrice + commissionAud + gstAud - discountAud) * 100);
+  const expectedTotalCents = Math.round((itemPrice + commissionAud + gstAud + shippingAud - discountAud) * 100);
   if (Math.abs(amountCents - expectedTotalCents) > 2) {
     logger.error(`[STRIPE] Amount mismatch for session ${session.id}: Stripe=${amountCents}¢ expected=${expectedTotalCents}¢ — order rejected`);
     await flagAmountMismatch({ stripe, session, orderId: null, buyerId: userId, amountCents, expectedCents: expectedTotalCents });
@@ -615,7 +648,7 @@ async function handleSingleItemOrder(session, stripe) {
     stripe_payment_intent_id: paymentIntentId,
     total_aud: amountCents / 100,
     item_price_aud: itemPrice,
-    shipping_aud: 0,
+    shipping_aud: shippingAud,
     discount_aud: discountAud,
     platform_fee_aud: commissionAud + gstAud,
     commission_pct: commissionPct,

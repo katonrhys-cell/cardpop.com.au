@@ -154,6 +154,9 @@ const CheckoutModal = ({ isOpen, onClose, listingId, transactionType = 'fixed', 
               {breakdown.gstAud > 0 && (
                 <LineRow label="GST" value={`$${breakdown.gstAud.toFixed(2)} AUD`} />
               )}
+              {/* Seller-set postage — always shown so "Free" is a statement,
+                  not an omission the buyer discovers later. */}
+              <LineRow label="Shipping" value={breakdown.shippingAud > 0 ? `$${breakdown.shippingAud.toFixed(2)} AUD` : 'Free'} />
               <Separator />
               <LineRow label="Total" value={`$${breakdown.total.toFixed(2)} AUD`} bold />
             </div>

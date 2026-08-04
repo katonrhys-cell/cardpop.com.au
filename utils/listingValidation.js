@@ -51,6 +51,19 @@ const FIELD_VALIDATORS = {
     return !ap || ap <= 0 ? 'Enter a valid asking price' : null;
   },
 
+  // Postage the buyer pays at checkout, passed through to the seller. Blank or
+  // 0 means the seller ships free. The $200 ceiling matches the DB check
+  // constraint — well above any real AU postage cost, low enough that a typo
+  // can't turn the postage line into a second asking price.
+  shippingCost: (f) => {
+    if (!SALE_TYPES.includes(f.listingType) && f.listingType !== 'Expression of Interest') return null;
+    if (!f.shippingCost || !String(f.shippingCost).trim()) return null;
+    const sc = parseFloat(f.shippingCost);
+    if (!Number.isFinite(sc) || sc < 0) return 'Enter a valid shipping cost (or leave blank for free shipping)';
+    if (sc > 200) return 'Shipping cannot be more than $200';
+    return null;
+  },
+
   offerMin: (f) => {
     if (f.listingType !== 'Expression of Interest') return null;
     const min = parseFloat(f.offerMin);

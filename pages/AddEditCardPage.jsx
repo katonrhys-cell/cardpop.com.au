@@ -4,7 +4,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, ChevronDown, Sparkles, Loader2,
   Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X, Crop,
-  Frame, Wand2, SlidersHorizontal, HandCoins, History, Camera, ScanLine,
+  Frame, Wand2, SlidersHorizontal, HandCoins, History, Camera, ScanLine, Truck,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { listingsPerMonthForTier } from '@/config/plans.js';
@@ -93,7 +93,7 @@ const WIZARD_STEPS = [
   { key: 'photos',  title: 'Photos',  fields: ['cardImage'] },
   { key: 'details', title: 'Details', fields: ['hierarchy', 'cardName', 'year'] },
   { key: 'value',   title: 'Value',   fields: ['estimatedValue'] },
-  { key: 'publish', title: 'List it', fields: ['askingPrice', 'offerMin', 'offerMax', 'tradeValue'] },
+  { key: 'publish', title: 'List it', fields: ['askingPrice', 'shippingCost', 'offerMin', 'offerMax', 'tradeValue'] },
 ];
 
 const FULL_FORM_PREF_KEY = 'cardpop.listingFormMode';
@@ -283,6 +283,7 @@ const AddEditCardPage = () => {
     // Listing
     tradeValue:     '',
     askingPrice:    '',
+    shippingCost:   '',
     listingType:    'private',
     offerMin:       '',
     offerMax:       '',
@@ -301,7 +302,7 @@ const AddEditCardPage = () => {
     // Editing a field clears its inline error (blur re-validates). Changing
     // the listing type also drops price errors that may no longer apply.
     setErrors(prev => {
-      const dependents = key === 'listingType' ? ['askingPrice', 'offerMin', 'offerMax', 'tradeValue'] : [];
+      const dependents = key === 'listingType' ? ['askingPrice', 'shippingCost', 'offerMin', 'offerMax', 'tradeValue'] : [];
       const stale = [key, ...dependents].filter(k => k in prev);
       if (!stale.length) return prev;
       const next = { ...prev };
@@ -610,7 +611,7 @@ const AddEditCardPage = () => {
         // separate from estimated_value_aud (a reference comp, not a floor).
         supabase
           .from('listings')
-          .select('price_min_aud, price_max_aud, price_aud')
+          .select('price_min_aud, price_max_aud, price_aud, shipping_cost_aud')
           .eq('vault_item_id', id)
           .neq('status', 'archived')
           .maybeSingle()
@@ -621,6 +622,9 @@ const AddEditCardPage = () => {
               offerMin: data.price_min_aud != null ? String(data.price_min_aud) : f.offerMin,
               offerMax: data.price_max_aud != null ? String(data.price_max_aud) : f.offerMax,
               askingPrice: data.price_aud != null ? String(data.price_aud) : f.askingPrice,
+              // 0 (free shipping) renders as an empty field, matching how the
+              // seller left it — the input's placeholder already reads "free".
+              shippingCost: Number(data.shipping_cost_aud) > 0 ? String(data.shipping_cost_aud) : f.shippingCost,
             }));
           });
         if (card.card_image) {
@@ -1351,6 +1355,7 @@ const AddEditCardPage = () => {
           item: payload,
           pricing: {
             askingPrice: formData.askingPrice || null,
+            shippingCost: formData.shippingCost || null,
             offerMin: formData.offerMin || null,
             offerMax: formData.offerMax || null,
           },
@@ -3890,6 +3895,37 @@ const AddEditCardPage = () => {
                     )}
                     <p className="text-xs text-muted-foreground">
                       Buyers see this range and make offers — you can accept, decline or counter each one from your account.
+                    </p>
+                  </div>
+                )}
+
+                {/* Postage applies to anything buyable — sale listings and EOI
+                    (which sells via accepted offers). Trade-only cards never
+                    ship for money, so the field hides for them. */}
+                {(formData.listingType === 'For Sale' || formData.listingType === 'For Sale & Trade' || formData.listingType === 'Expression of Interest') && (
+                  <div className="space-y-2 pt-3 border-t border-border">
+                    <Label htmlFor="shippingCost" className="font-bold flex items-center gap-1.5">
+                      <Truck className="w-4 h-4 text-amber-500" /> Shipping (AUD)
+                    </Label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">$</span>
+                      <input
+                        id="shippingCost"
+                        type="number"
+                        min="0"
+                        max="200"
+                        step="0.01"
+                        value={formData.shippingCost}
+                        onChange={e => set('shippingCost', e.target.value)}
+                        onBlur={() => validateFieldOnBlur('shippingCost')}
+                        placeholder="0.00 — free shipping"
+                        className={`flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm pl-8 tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${errors.shippingCost ? 'border-destructive' : ''}`}
+                      />
+                    </div>
+                    {errors.shippingCost && <p className="text-destructive text-xs">{errors.shippingCost}</p>}
+                    <p className="text-xs text-muted-foreground">
+                      Charged to the buyer at checkout and paid out to you in full — leave blank to offer free shipping.
+                      If a buyer purchases more than one of your cards, they pay your single highest shipping price (one parcel).
                     </p>
                   </div>
                 )}
