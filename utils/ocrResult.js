@@ -48,14 +48,17 @@ export function mapOCRResult(data) {
 }
 
 // Maps the OCR collectionType to the /catalog/search collection param. The
-// catalogue route only covers Pokemon, Magic and Yu-Gi-Oh; for anything else
-// we send no collection and let the backend try all three.
+// public adapters cover Pokemon, Magic and Yu-Gi-Oh, keyed by these short
+// names. Any other collection is passed through as-is: the public trio treats
+// an unrecognised name exactly like a blank one (fan out to all three), while
+// the internal CardPop catalogue — the only source that covers sports cards
+// and the other uncatalogued hobbies — uses it to filter its candidates.
 export function catalogueCollectionParam(collectionType) {
   const c = (collectionType || '').toLowerCase();
   if (c.includes('pokemon') || c.includes('pokémon')) return 'pokemon';
   if (c.includes('magic')) return 'magic';
   if (c.includes('yu-gi-oh') || c.includes('yugioh')) return 'yu-gi-oh';
-  return '';
+  return (collectionType || '').trim();
 }
 
 export function mapCondition(raw) {

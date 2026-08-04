@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { callEbayApi } from '../utils/ebayClient.js';
 import { resolveCardImage } from '../utils/cardImageResolver.js';
+import { searchInternalCatalogue } from '../utils/internalCatalogue.js';
 import { leadingCardNumber } from '../../utils/cardNumber.js';
 import logger from '../utils/logger.js';
 import { queryString } from '../utils/queryString.js';
@@ -75,13 +76,19 @@ async function searchYugioh(q, take) {
 	}));
 }
 
+// Every search also asks CardPop's own catalogue (accumulated from confirmed
+// scans — src/utils/internalCatalogue.js). For the hobbies no public API
+// covers (sports, One Piece, AFL, …) it is the only source there is; for the
+// covered ones it adds printings sellers have already verified on this
+// marketplace. An unrecognised collection name (e.g. "NBA Basketball") still
+// fans out to the public trio — same as no collection — but is passed through
+// to the internal search, which can filter on it.
 function resolveApis(collection) {
 	const col = (collection || '').toLowerCase();
-	if (col === 'pokemon') return ['pokemon'];
-	if (col === 'magic' || col === 'magic: the gathering' || col === 'mtg') return ['scryfall'];
-	if (col === 'yu-gi-oh' || col === 'yugioh') return ['yugioh'];
-	// No collection specified — try all three
-	return ['pokemon', 'scryfall', 'yugioh'];
+	if (col === 'pokemon') return ['pokemon', 'cardpop'];
+	if (col === 'magic' || col === 'magic: the gathering' || col === 'mtg') return ['scryfall', 'cardpop'];
+	if (col === 'yu-gi-oh' || col === 'yugioh') return ['yugioh', 'cardpop'];
+	return ['pokemon', 'scryfall', 'yugioh', 'cardpop'];
 }
 
 async function runSearches(apis, q, take, opts = {}) {
@@ -90,6 +97,7 @@ async function runSearches(apis, q, take, opts = {}) {
 		if (api === 'scryfall') return searchScryfall(q, take, opts).catch(() => []);
 		// YGOPRODeck has no collector-number filter, so it always runs name-only.
 		if (api === 'yugioh')   return searchYugioh(q, take).catch(() => []);
+		if (api === 'cardpop')  return searchInternalCatalogue(q, take, opts).catch(() => []);
 		return Promise.resolve([]);
 	});
 	const results = await Promise.all(tasks);
@@ -117,9 +125,9 @@ router.get('/search', async (req, res) => {
 	try {
 		const apis = resolveApis(col);
 
-		let raw = cardNumber ? await runSearches(apis, q, limit, { number: cardNumber }) : [];
+		let raw = cardNumber ? await runSearches(apis, q, limit, { number: cardNumber, collection: col }) : [];
 		const precise = raw.length > 0;
-		if (!raw.length) raw = await runSearches(apis, q, limit);
+		if (!raw.length) raw = await runSearches(apis, q, limit, { collection: col });
 
 		// Deduplicate by source+id, cap at limit
 		const seen = new Set();
@@ -151,7 +159,7 @@ router.get('/autocomplete', async (req, res) => {
 
 	try {
 		const apis = resolveApis(col);
-		const raw = await runSearches(apis, q, limit);
+		const raw = await runSearches(apis, q, limit, { collection: col });
 
 		const seen = new Set();
 		const results = raw

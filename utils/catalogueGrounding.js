@@ -158,6 +158,10 @@ export async function groundAgainstCatalogue(result, searchCatalogue, collection
       // The collector number is printed on the card and was read directly, so
       // it stands. The catalogue only supplies one when OCR couldn't read it.
       cardNumber: result.cardNumber || m.cardNumber || '',
+      // Sports-card identity only the internal CardPop catalogue carries (the
+      // public adapters have no concept of an insert). Fills a gap, never
+      // overwrites a read.
+      insertName: result.insertName || m.insertName || '',
       catalogueMatch: {
         id: m.id,
         name: m.name,
@@ -167,6 +171,8 @@ export async function groundAgainstCatalogue(result, searchCatalogue, collection
         rarity: m.rarity ?? null,
         imageUrl: m.imageUrl ?? null,
         source: m.source ?? null,
+        insertName: m.insertName ?? null,
+        parallel: m.parallel ?? null,
         // Exactly which fields agreed, so the UI can say what was checked
         // rather than claiming a blanket verification.
         verified: best.evaluation.verified,

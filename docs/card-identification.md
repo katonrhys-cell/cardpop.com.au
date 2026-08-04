@@ -140,10 +140,13 @@ something to check.
 The escalation result is only taken when it actually read a card — a flaky or
 truncated second call must not replace a usable first one.
 
-The result is then grounded against the public card catalogue
-(`resolveAgainstCatalogue` → `/catalog/search`, covering Pokemon / Magic /
-Yu-Gi-Oh) — see "Grounding rules" below, which govern when that lookup is
-allowed to overwrite anything.
+The result is then grounded against the card catalogue
+(`groundAgainstCatalogue` → `/catalog/search`). The search fans out to the
+public APIs (Pokemon / Magic / Yu-Gi-Oh) **and to CardPop's own
+`card_catalogue`** (`src/utils/internalCatalogue.js`) — the database
+accumulated from every scan, and the only source that exists for sports cards,
+One Piece, AFL and the other hobbies no public API covers. See "Grounding
+rules" below, which govern when that lookup is allowed to overwrite anything.
 
 **OCR runs first because it is the only step that can name the category.**
 Everything downstream depends on that.
@@ -177,7 +180,17 @@ off the card. Grounding made the answer worse than no grounding.
 **What the overlay may change.** The catalogue is authoritative for set name,
 year and rarity — often absent or ambiguous on the card. The **collector number
 is not overwritten**: it is printed on the card and was read directly, so the
-catalogue only supplies one when OCR couldn't read it.
+catalogue only supplies one when OCR couldn't read it. An internal-catalogue
+match can additionally fill `insertName` (sports-card identity the public
+adapters have no concept of) — again only when OCR read nothing.
+
+**Internal candidates must be human-confirmed.** Only `card_catalogue` rows
+with `confirmations >= 1` — a seller saved the identification untouched — are
+eligible as grounding candidates. An unconfirmed row is just an earlier model
+read, and letting it corroborate a new read would be the pipeline confirming
+itself: one bad read could snowball into a permanently "verified" wrong answer.
+The corroboration bar (name + number, or name + set/year) is the same as for
+public candidates; internal ones get no shortcut.
 
 `catalogueMatch.verified` lists the fields that actually agreed (`['name',
 'number', 'set', 'year']`), and the UI badge renders exactly that instead of
@@ -332,6 +345,11 @@ accumulating observations, so CardPop ends up with its own card database rather
 than depending on third-party catalogues to recognise a card. It is a **shared**
 table — `vault_items` already holds a seller's own cards — readable by anyone and
 written only by the backend, so no seller can corrupt it.
+
+That loop is closed: `/catalog/search` reads the confirmed entries back as a
+grounding source (`src/utils/internalCatalogue.js`), so every seller-confirmed
+identification makes the next scan of that card more accurate — including for
+the hobbies where it is the only catalogue there is.
 
 Identity comes from `utils/catalogueKey.js`. What counts as a distinct card is
 what counts as a distinct thing to sell, so the **parallel and insert are part of
