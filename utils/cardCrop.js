@@ -76,6 +76,29 @@ export function isPlausibleCard(quad, imgW, imgH, { minAreaFrac = 0.12 } = {}) {
 }
 
 /**
+ * Whether the quad, traversed in the order given, is convex — every cross
+ * product of consecutive edges has the same sign. Points must be sequentially
+ * wound (as contours, hulls and intersection chains produce them); do NOT
+ * pre-apply orderCorners, which can collapse a concave quad into a degenerate
+ * shape that reads as convex. Filters out bow-ties and dented quads.
+ */
+export function isConvexQuad(quad) {
+  if (!Array.isArray(quad) || quad.length !== 4) return false;
+  let sign = 0;
+  for (let i = 0; i < 4; i++) {
+    const [ax, ay] = quad[i];
+    const [bx, by] = quad[(i + 1) % 4];
+    const [cx, cy] = quad[(i + 2) % 4];
+    const cross = (bx - ax) * (cy - by) - (by - ay) * (cx - bx);
+    if (cross === 0) continue;
+    const s = Math.sign(cross);
+    if (sign === 0) sign = s;
+    else if (s !== sign) return false;
+  }
+  return sign !== 0;
+}
+
+/**
  * Output dimensions for the warped card, preserving the detected orientation
  * (portrait vs landscape) at the standard 5:7 size.
  */
