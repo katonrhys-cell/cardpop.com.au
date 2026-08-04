@@ -11,16 +11,21 @@ import { getAdminNotificationEmails } from '../utils/adminNotificationRecipient.
 // cause Stripe to retry it.
 async function notifyAdminsOfIdentityReview({ userId, userName, userEmail }) {
   try {
-    const { data: admins } = await supabase.from('profiles').select('id').eq('is_admin', true);
+    const { data: admins, error: adminsErr } = await supabase.from('profiles').select('id').eq('is_admin', true);
+    if (adminsErr) throw adminsErr;
     if (admins?.length) {
-      await supabase.from('notifications').insert(admins.map(a => ({
+      // supabase-js resolves failed inserts with { error } instead of throwing —
+      // check it explicitly so a rejected insert is logged rather than silently
+      // dropped (the table's link column is related_id, not entity_id).
+      const { error: insertErr } = await supabase.from('notifications').insert(admins.map(a => ({
         user_id: a.id,
         type: 'verification_requested',
         title: 'Identity verification needs review',
         body: `${userName || 'A user'}'s ID name doesn't match their profile — needs manual approve/reject.`,
         link: `/admin/users/${userId}`,
-        entity_id: userId,
+        related_id: userId,
       })));
+      if (insertErr) throw insertErr;
     }
   } catch (e) {
     logger.warn(`[IDENTITY] admin review in-app notification failed for ${userId}: ${e.message}`);
