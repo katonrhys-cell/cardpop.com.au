@@ -22,11 +22,15 @@
  */
 
 import { loadOpenCV } from './opencvLoader.js';
-import { orderCorners, isPlausibleCard, outputDimsFor, quadArea, quadSides, isConvexQuad, maxAngleError } from './cardCrop.js';
+import { orderCorners, isPlausibleCard, outputDimsFor, quadArea, quadSides, isConvexQuad, maxAngleError, quadContains } from './cardCrop.js';
 
 const DETECT_MAX_DIM = 1024; // downscale long edge to this for contour detection
 const JPEG_QUALITY = 0.95;
 const MIN_AREA_FRAC = 0.05;  // a card can sit fairly small in a hand-held photo
+// Candidate generation reaches below the card floor on purpose: grading-slab
+// labels are ~1-4% of the frame and must exist as quads for the label-union
+// step. Card candidates are still held to MIN_AREA_FRAC when scored.
+const GEN_AREA_FRAC = 0.008;
 
 async function decodeImage(file) {
   if (typeof createImageBitmap === 'function') return createImageBitmap(file);
@@ -71,7 +75,7 @@ function contourQuads(cv, binary, frameArea) {
   const hierarchy = new cv.Mat();
   try {
     cv.findContours(binary, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
-    const minArea = MIN_AREA_FRAC * frameArea;
+    const minArea = GEN_AREA_FRAC * frameArea;
     for (let i = 0; i < contours.size(); i++) {
       const contour = contours.get(i);
       try {
@@ -334,12 +338,15 @@ export function findCardQuad(cv, canvas) {
   const edgesSat = new cv.Mat();
   const edges = new cv.Mat();
   const closed = new cv.Mat();
+  const faint = new cv.Mat();
+  const faintClosed = new cv.Mat();
   const support = new cv.Mat();
   const otsuGray = new cv.Mat();
   const otsuSat = new cv.Mat();
   const channels = new cv.MatVector();
   let clahe = null;
   let kernel5 = null;
+  let kernel7 = null;
 
   try {
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
@@ -373,10 +380,19 @@ export function findCardQuad(cv, canvas) {
     cv.bitwise_or(edgesGray, edgesSat, edges);
 
     kernel5 = cv.Mat.ones(5, 5, cv.CV_8U);
+    kernel7 = cv.Mat.ones(7, 7, cv.CV_8U);
     cv.morphologyEx(edges, closed, cv.MORPH_CLOSE, kernel5);
     // Support map is deliberately generous (dilated) — it grades candidate
     // perimeters, so a corner landing a pixel or two off still counts.
     cv.dilate(edges, support, kernel5);
+
+    // Faint-edge pass: fixed low thresholds and a wider close, for boundaries
+    // the adaptive pass can't hold onto — above all the translucent shell of
+    // a grading slab, whose whole outline may be a few grey levels of
+    // difference. Only feeds candidate generation; support is still graded
+    // against the honest edge map, so these can't inflate their own scores.
+    cv.Canny(eq, faint, 15, 45);
+    cv.morphologyEx(faint, faintClosed, cv.MORPH_CLOSE, kernel7);
 
     // Otsu binarisations give contour candidates that don't depend on an
     // unbroken edge outline at all.
@@ -387,18 +403,33 @@ export function findCardQuad(cv, canvas) {
       ...contourQuads(cv, closed, frameArea),
       ...contourQuads(cv, otsuGray, frameArea),
       ...contourQuads(cv, otsuSat, frameArea),
+      ...contourQuads(cv, faintClosed, frameArea),
       ...houghQuads(cv, closed, width, height),
+      ...houghQuads(cv, faintClosed, width, height),
     ];
 
     const scored = [];
+    const labels = [];
     for (const quad of candidates) {
-      if (!isPlausibleCard(quad, width, height, { minAreaFrac: MIN_AREA_FRAC })) continue;
       if (!isConvexQuad(quad)) continue;
 
+      // Wide strips can never be cards, but a strongly-supported one is very
+      // possibly a grading-slab label — kept for the union step below.
+      const { width: sw, height: sh } = quadSides(quad);
+      const stripRatio = sw && sh ? Math.min(sw, sh) / Math.max(sw, sh) : 0;
+      const stripArea = quadArea(quad);
+      if (stripRatio > 0 && stripRatio < 0.5 && sw > sh
+          && stripArea >= 0.008 * frameArea && stripArea <= 0.12 * frameArea) {
+        const { mean: stripMean } = edgeSupport(support, quad, width, height);
+        if (stripMean >= 0.5) labels.push({ quad, area: stripArea });
+        continue;
+      }
+
+      if (!isPlausibleCard(quad, width, height, { minAreaFrac: MIN_AREA_FRAC })) continue;
+
       const { sides, mean } = edgeSupport(support, quad, width, height);
-      // A real border has support on every side; one fully unsupported side
-      // means a phantom line (usually the frame edge or an arm).
-      if (mean < 0.45 || Math.min(...sides) < 0.18) continue;
+      const minSide = Math.min(...sides);
+      const restMean = (sides.reduce((a, b) => a + b, 0) - minSide) / 3;
 
       const { width: qw, height: qh } = quadSides(quad);
       const ratio = Math.min(qw, qh) / Math.max(qw, qh);
@@ -412,17 +443,99 @@ export function findCardQuad(cv, canvas) {
       const areaBoost = Math.min(1, quadArea(quad) / (0.3 * frameArea)) ** 0.3;
 
       const score = mean * (0.6 + 0.4 * ratioScore) * (0.55 + 0.45 * angleScore) * areaBoost;
-      scored.push({ quad, score, area: quadArea(quad) });
+      // Everything plausible is retained — sub-threshold quads still matter to
+      // the slab step below, where a transparent shell earns a lower bar.
+      scored.push({ quad, score, mean, minSide, restMean, ratio, area: quadArea(quad) });
     }
     if (!scored.length) return null;
+
+    // Main gate: a real border has support on every side — one fully
+    // unsupported side means a phantom line (usually the frame edge or an
+    // arm). The concession: when three sides are strongly supported, the
+    // fourth may be nearly gone — that is a hand holding the card across one
+    // edge, not a phantom.
+    const strong = scored.filter(s =>
+      s.mean >= 0.45 && (s.minSide >= 0.18 || (s.minSide >= 0.1 && s.restMean >= 0.6)));
+    if (!strong.length) return null;
 
     // Among near-tied candidates, take the outermost: the card's real border
     // strictly contains every internal near-miss, and when both explain the
     // edges about equally well the outer one is the card.
-    const bestScore = Math.max(...scored.map(s => s.score));
-    const near = scored.filter(s => s.score >= 0.92 * bestScore);
+    const bestScore = Math.max(...strong.map(s => s.score));
+    const near = strong.filter(s => s.score >= 0.92 * bestScore);
     near.sort((a, b) => b.area - a.area);
-    return expandToOuterEdge(support, near[0].quad, width, height);
+    let winner = near[0];
+
+    // Graded-slab step: when the winner sits inside a bigger quad shaped like
+    // a grading case (PSA/BGS shells run ~0.55-0.85 side ratio and roughly
+    // 1.2-3x the card's area), prefer the case. Its transparent shell edges
+    // never score like a card border — hence the lower support bar — but a
+    // strong card nested inside it is exactly the corroboration that makes
+    // the outer reading safe. Cropping a slab to the bare card would cut off
+    // the label that carries the grade and cert number.
+    const shell = scored
+      .filter(s => s !== winner
+        && s.area >= 1.15 * winner.area && s.area <= 3.5 * winner.area
+        && s.ratio >= 0.5 && s.ratio <= 0.85
+        && s.mean >= 0.32 && s.minSide >= 0.1
+        && quadContains(s.quad, winner.quad))
+      .sort((a, b) => b.area - a.area)[0];
+    if (shell) winner = shell;
+
+    // Label-union fallback: a fully transparent shell often produces no
+    // candidate at all, but the slab's *label* — white, red- or silver-framed,
+    // printed — always does. A supported wide strip sitting directly above
+    // the card, about the card's width, is that label; the union of the two
+    // is the part of a graded slab a listing actually needs (grade and cert
+    // live on the label). The outward-expansion pass then picks up whatever
+    // shell margin is visible.
+    if (!shell && labels.length) {
+      const w = orderCorners(winner.quad);
+      const { width: wWidth, height: wHeight } = quadSides(w);
+      const wTopY = (w[0][1] + w[1][1]) / 2;
+      const wCx = (w[0][0] + w[1][0] + w[2][0] + w[3][0]) / 4;
+
+      const matching = labels
+        .map(lab => ({ ...lab, ordered: orderCorners(lab.quad) }))
+        .filter(({ quad, ordered }) => {
+          const { width: lWidth } = quadSides(quad);
+          const lCx = (ordered[0][0] + ordered[1][0] + ordered[2][0] + ordered[3][0]) / 4;
+          const lBottomY = (ordered[2][1] + ordered[3][1]) / 2;
+          const gap = wTopY - lBottomY;
+          return Math.abs(lCx - wCx) <= 0.25 * wWidth
+            && lWidth >= 0.7 * wWidth && lWidth <= 1.45 * wWidth
+            && gap >= -0.08 * wHeight && gap <= 0.4 * wHeight;
+        })
+        .sort((a, b) => b.area - a.area)[0];
+
+      if (matching) {
+        const l = matching.ordered;
+        const union = [l[0], l[1], w[2], w[3]];
+        if (isConvexQuad(union)
+            && isPlausibleCard(union, width, height, { minAreaFrac: MIN_AREA_FRAC })) {
+          winner = { quad: union, area: quadArea(union) };
+        }
+      }
+    }
+
+    if (typeof window !== 'undefined' && window.__CARD_DEBUG) {
+      window.__scanDebug = {
+        labels: labels.map(l => ({ area: Math.round(l.area), quad: l.quad.map(p => p.map(Math.round)) })),
+        winner: { area: winner.area, ratio: winner.ratio, mean: winner.mean, minSide: winner.minSide, quad: winner.quad.map(p => p.map(Math.round)) },
+        outer: scored
+          .filter(s => s.area >= 1.05 * winner.area)
+          .map(s => ({
+            area: +(s.area / winner.area).toFixed(2), ratio: +s.ratio.toFixed(2),
+            mean: +s.mean.toFixed(2), minSide: +s.minSide.toFixed(2),
+            contains: quadContains(s.quad, winner.quad),
+            quad: s.quad.map(p => p.map(Math.round)),
+          }))
+          .sort((a, b) => b.area - a.area)
+          .slice(0, 12),
+        total: scored.length,
+      };
+    }
+    return expandToOuterEdge(support, winner.quad, width, height);
   } finally {
     src.delete();
     gray.delete();
@@ -433,12 +546,15 @@ export function findCardQuad(cv, canvas) {
     edgesSat.delete();
     edges.delete();
     closed.delete();
+    faint.delete();
+    faintClosed.delete();
     support.delete();
     otsuGray.delete();
     otsuSat.delete();
     channels.delete();
     if (clahe) clahe.delete();
     if (kernel5) kernel5.delete();
+    if (kernel7) kernel7.delete();
   }
 }
 
@@ -486,14 +602,20 @@ function canvasToBlob(canvas) {
 
 /**
  * Detects and crops the card in `file`.
- * @returns {Promise<{ found: false } | { found: true, blob: Blob, url: string, width: number, height: number, corners: number[][] }>}
+ *
+ * `reason` on the not-found result separates outcomes the UI must not
+ * conflate: 'engine' (OpenCV never loaded — retryable, nothing to say about
+ * the photo), 'no-card' (detection ran and found nothing card-shaped), and
+ * 'error' (something broke mid-detection).
+ *
+ * @returns {Promise<{ found: false, reason: 'engine' | 'no-card' | 'error' } | { found: true, blob: Blob, url: string, width: number, height: number, corners: number[][] }>}
  */
 export async function detectAndCropCard(file) {
   let cv;
   try {
     cv = await loadOpenCV();
   } catch {
-    return { found: false };
+    return { found: false, reason: 'engine' };
   }
 
   let bitmap;
@@ -508,7 +630,7 @@ export async function detectAndCropCard(file) {
 
     const detectCanvas = drawToCanvas(bitmap, dW, dH);
     const quadSmall = findCardQuad(cv, detectCanvas);
-    if (!quadSmall) return { found: false };
+    if (!quadSmall) return { found: false, reason: 'no-card' };
 
     // Scale corners back up to full-resolution coordinates, clamped into frame
     // (Hough intersections can land a whisker outside it).
@@ -517,13 +639,13 @@ export async function detectAndCropCard(file) {
       Math.min(naturalH, Math.max(0, y / scale)),
     ]);
     if (!isPlausibleCard(quadFull, naturalW, naturalH, { minAreaFrac: MIN_AREA_FRAC })) {
-      return { found: false };
+      return { found: false, reason: 'no-card' };
     }
 
     const fullCanvas = drawToCanvas(bitmap, naturalW, naturalH);
     const outCanvas = warpCard(cv, fullCanvas, quadFull);
     const blob = await canvasToBlob(outCanvas);
-    if (!blob) return { found: false };
+    if (!blob) return { found: false, reason: 'error' };
 
     return {
       found: true,
@@ -536,7 +658,7 @@ export async function detectAndCropCard(file) {
       corners: quadFull,
     };
   } catch {
-    return { found: false };
+    return { found: false, reason: 'error' };
   } finally {
     if (bitmap && typeof bitmap.close === 'function') bitmap.close();
   }

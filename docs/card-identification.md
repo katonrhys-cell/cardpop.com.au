@@ -84,7 +84,11 @@ load, a warp smaller than 600px on its long edge, or the whole step exceeding
 
 Every image is rectified — the extra angles are usually the back, where the
 set code, collector number and copyright line live, so they benefit at least
-as much as the front. The front gets the full 8-second budget (it may pay the
+as much as the front. Graded slabs get their own handling: when the detected
+card sits inside a slab-shaped outer quad (or under a label-shaped strip —
+PSA/BGS shells are often too transparent to outline), the crop widens to the
+case (or the label∪card union) so the grade and cert number survive, and the
+output keeps the slab's own aspect instead of being squashed to 5:7. The front gets the full 8-second budget (it may pay the
 library load); each extra angle gets a tighter 4-second, fail-safe pass of its
 own. And **every** image is resized before it is sent.
 

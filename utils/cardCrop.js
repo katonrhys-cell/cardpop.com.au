@@ -99,14 +99,62 @@ export function isConvexQuad(quad) {
 }
 
 /**
- * Output dimensions for the warped card, preserving the detected orientation
- * (portrait vs landscape) at the standard 5:7 size.
+ * Output dimensions for the warped crop, preserving the detected orientation.
+ *
+ * A quad within ~6% of the 5:7 card ratio snaps to the standard card output —
+ * measured sides carry perspective bias, and for a raw card the true answer is
+ * known. Anything else (a graded slab is ~0.61, a PSA case with its tab even
+ * squarer) keeps its own measured aspect, scaled to the standard long edge:
+ * force-warping a slab to 5:7 visibly squashes it and the label.
  */
 export function outputDimsFor(quad) {
   const { width, height } = quadSides(quad);
+  const long = Math.max(width, height) || 1;
+  const short = Math.min(width, height) || 1;
+  const ratio = short / long;
+
+  const shortOut = Math.abs(ratio - CARD_RATIO) <= 0.06 * CARD_RATIO
+    ? OUTPUT.width
+    : Math.round(OUTPUT.height * ratio);
+
   return width > height
-    ? { width: OUTPUT.height, height: OUTPUT.width }
-    : { width: OUTPUT.width, height: OUTPUT.height };
+    ? { width: OUTPUT.height, height: shortOut }
+    : { width: shortOut, height: OUTPUT.height };
+}
+
+/**
+ * Whether `inner` sits entirely inside the convex quad `outer`, with a
+ * tolerance (fraction of the outer quad's mean side length) so a corner
+ * grazing the boundary still counts. Used to recognise a card nested inside
+ * its grading slab.
+ */
+export function quadContains(outer, inner, tolerance = 0.03) {
+  if (!Array.isArray(outer) || outer.length !== 4) return false;
+  if (!Array.isArray(inner) || inner.length !== 4) return false;
+  const o = orderCorners(outer);
+  const { width, height } = quadSides(o);
+  const tol = tolerance * ((width + height) / 2);
+
+  // Winding of the ordered quad decides which side of each edge is "inside".
+  let area = 0;
+  for (let i = 0; i < 4; i++) {
+    const [x1, y1] = o[i];
+    const [x2, y2] = o[(i + 1) % 4];
+    area += x1 * y2 - x2 * y1;
+  }
+  const sign = Math.sign(area) || 1;
+
+  return inner.every(([px, py]) => {
+    for (let i = 0; i < 4; i++) {
+      const [x1, y1] = o[i];
+      const [x2, y2] = o[(i + 1) % 4];
+      const len = Math.hypot(x2 - x1, y2 - y1) || 1;
+      // Signed distance of the point from this edge, positive toward inside.
+      const d = (sign * ((x2 - x1) * (py - y1) - (y2 - y1) * (px - x1))) / len;
+      if (d < -tol) return false;
+    }
+    return true;
+  });
 }
 
 /**
