@@ -665,6 +665,29 @@ export async function detectAndCropCard(file) {
 }
 
 /**
+ * Warps an already-drawn canvas with corners given in that canvas's
+ * coordinates, returning a JPEG data URL — or null when OpenCV is unavailable
+ * or the corners are degenerate. This is the live-preview path: the corner
+ * adjuster draws its (downscaled) image once and re-warps it as the handles
+ * move, so the preview is the *same* perspective warp Apply will run, not an
+ * approximation of it.
+ */
+export async function warpCanvasPreview(sourceCanvas, corners) {
+  let cv;
+  try {
+    cv = await loadOpenCV();
+  } catch {
+    return null;
+  }
+  try {
+    const out = warpCard(cv, sourceCanvas, corners);
+    return out.toDataURL('image/jpeg', 0.85);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Warps `file` using an explicit set of 4 corners (full-resolution image
  * coordinates), e.g. from the manual corner adjuster. Returns the cropped
  * image, or { ok: false } if OpenCV is unavailable or the warp fails.
