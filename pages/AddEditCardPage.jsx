@@ -4,7 +4,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, ChevronDown, Sparkles, Loader2,
   Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X, Crop,
-  Frame, Wand2, SlidersHorizontal, HandCoins, History, Camera,
+  Frame, Wand2, SlidersHorizontal, HandCoins, History, Camera, ScanLine,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { listingsPerMonthForTier } from '@/config/plans.js';
@@ -40,6 +40,7 @@ import { useCardCrop } from '@/hooks/useCardCrop.js';
 import { useCardDescription } from '@/hooks/useCardDescription.js';
 import CardCropPreview from '@/components/CardCropPreview.jsx';
 import CardCornerAdjuster from '@/components/CardCornerAdjuster.jsx';
+import CardScanCamera from '@/components/CardScanCamera.jsx';
 import { warpCardWithCorners } from '@/utils/detectCard.js';
 import DisplayStylePicker from '@/components/vault/DisplayStylePicker.jsx';
 import { normalizeTier } from '@/lib/displayStyles.js';
@@ -184,6 +185,7 @@ const AddEditCardPage = () => {
   const [checkingQuality, setCheckingQuality] = useState(false);
   const { detectingKey, candidate: cropCandidate, detect: detectCrop, clear: clearCrop } = useCardCrop();
   const [adjusting, setAdjusting]             = useState(null); // { key, file, imageUrl, initialCorners }
+  const [showScanner, setShowScanner]         = useState(false); // live camera scan overlay
   const [showAutoGuide, setShowAutoGuide]     = useState(false);
   const [showPatchGuide, setShowPatchGuide]   = useState(false);
   const [showRelicGuide, setShowRelicGuide]   = useState(false);
@@ -659,8 +661,9 @@ const AddEditCardPage = () => {
       .finally(() => setCheckingQuality(false));
   };
 
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
+  // Shared intake for the main photo, whether it came from the file picker,
+  // the mobile camera input, or the live scanner.
+  const acceptMainImage = (file) => {
     if (!file) return;
     if (file.size > 5242880) { toast.error('Image must be less than 5MB'); return; }
     setImageFile(file);
@@ -676,24 +679,29 @@ const AddEditCardPage = () => {
     clearCrop();
     setAdjusting(null);
     runPhotoQuality(file);
-    // Warm the OpenCV load now, while the seller is still filling in fields.
-    // Rectification runs inside an 8-second budget when they hit Identify, and
-    // on a phone's cold cache the library download alone can eat all of it —
-    // prefetched here, the first detection starts hot. Fire-and-forget: a
-    // failed warmup just means the old cold-start behaviour.
-    import('@/utils/opencvLoader.js').then(m => m.loadOpenCV()).catch(() => {});
+    // Auto-suggest the crop: detection is local and costs nothing, so it runs
+    // the moment a photo lands rather than waiting for a button tap — the
+    // seller just sees the straightened card offered with Apply/Adjust.
+    // Silent because "no card outline found" is not news they asked for; the
+    // button stays for a loud manual retry. This also warms the OpenCV load,
+    // so the Identify-time rectification starts hot. Fire-and-forget.
+    detectCrop('main', file, { silent: true }).catch(() => {});
     setErrors(prev => {
       if (!('cardImage' in prev)) return prev;
       const { cardImage: _cardImage, ...rest } = prev;
       return rest;
     });
-    // Allow re-picking the same file (change events don't fire otherwise) —
-    // the main dropzone and the mobile take-photo input share this handler.
-    e.target.value = '';
     // Identification deliberately does NOT fire here. Reading the front alone is
     // the weakest read available — the set code, collector number and year are
     // often only on the back — so the seller adds their photos first and presses
     // Identify once. See utils/listingFlow.js.
+  };
+
+  const handleImageChange = (e) => {
+    acceptMainImage(e.target.files[0]);
+    // Allow re-picking the same file (change events don't fire otherwise) —
+    // the main dropzone and the mobile take-photo input share this handler.
+    e.target.value = '';
   };
 
   // Apply a cropped image to the given slot ('main' or an extra-photo index).
@@ -1466,6 +1474,20 @@ const AddEditCardPage = () => {
                   />
                 </div>
 
+                {/* Live scanner: camera view with a real-time card outline
+                    that auto-captures when steady. Shown wherever a camera
+                    can exist; the scanner itself degrades gracefully (and
+                    offers the picker) if permission or hardware is missing. */}
+                {typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia && (
+                  <button
+                    type="button"
+                    onClick={() => setShowScanner(true)}
+                    className="mt-3 flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-primary/40 bg-primary/5 text-sm font-bold text-primary hover:bg-primary/10 transition-colors"
+                  >
+                    <ScanLine className="w-4 h-4" /> Scan card with camera
+                  </button>
+                )}
+
                 {/* Mobile: jump straight to the camera. The dropzone above
                     still opens the OS picker (library or camera); `capture`
                     skips the sheet and starts the camera immediately. Hidden
@@ -1594,6 +1616,9 @@ const AddEditCardPage = () => {
                                   setExtraPreviews(np);
                                 };
                                 reader.readAsDataURL(file);
+                                // Same auto-suggest as the main photo — backs
+                                // are shot at the same angles fronts are.
+                                detectCrop(idx, file, { silent: true }).catch(() => {});
                                 e.target.value = '';
                               }}
                             />
@@ -1620,6 +1645,20 @@ const AddEditCardPage = () => {
                     initialCorners={adjusting.initialCorners}
                     onApply={handleAdjustApply}
                     onCancel={() => setAdjusting(null)}
+                  />
+                )}
+
+                {showScanner && (
+                  <CardScanCamera
+                    onCapture={(file) => {
+                      setShowScanner(false);
+                      // Same intake as a picked photo — including the
+                      // auto-suggested crop, which the scanner has usually
+                      // already proven will land (it captured on a stable
+                      // outline).
+                      acceptMainImage(file);
+                    }}
+                    onCancel={() => setShowScanner(false)}
                   />
                 )}
 

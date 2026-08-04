@@ -172,6 +172,29 @@ describe('prepareAnalysisImages', () => {
     expect(cropped).toBe(true);
   });
 
+  it('rectifies the extra angles too', async () => {
+    // The back carries the set code and collector number — it gets the same
+    // treatment as the front.
+    mockDetect.mockResolvedValue(found());
+    await prepareAnalysisImages([
+      sized('front.jpg', 400 * 1024),
+      sized('back.jpg', 400 * 1024),
+      sized('angle.jpg', 400 * 1024),
+    ]);
+    expect(mockDetect).toHaveBeenCalledTimes(3);
+  });
+
+  it('a failed extra-angle detection keeps that original without affecting the rest', async () => {
+    mockDetect
+      .mockResolvedValueOnce(found())               // front rectified
+      .mockRejectedValueOnce(new Error('boom'));    // back detection fails
+    const back = sized('back.jpg', 400 * 1024);
+    const { files, cropped } = await prepareAnalysisImages([sized('front.jpg', 400 * 1024), back]);
+    expect(cropped).toBe(true);
+    expect(files).toHaveLength(2);
+    expect(files[1].name).toBe('back.jpg'); // original, just resized
+  });
+
   it('keeps the original when compression fails', async () => {
     mockCompress.mockRejectedValue(new Error('canvas unavailable'));
     const original = sized('front.jpg', 400 * 1024);
