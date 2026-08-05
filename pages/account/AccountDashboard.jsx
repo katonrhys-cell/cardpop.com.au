@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Package, List, ArrowRightLeft, DollarSign, ArrowRight, AlertCircle, RefreshCw, PackageOpen, Award } from 'lucide-react';
+import { Package, List, ArrowRightLeft, DollarSign, ArrowRight, AlertCircle, RefreshCw, PackageOpen, Award, Plus } from 'lucide-react';
 import SellerTierBadge from '@/components/SellerTierBadge.jsx';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -185,16 +185,31 @@ const AccountDashboard = () => {
       title="Dashboard"
       description="Welcome back! Here's your live account overview."
       actions={
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleRefresh}
-          disabled={statsLoading || vaultLoading}
-          className="rounded-xl shadow-sm h-10 px-4 font-bold transition-transform active:scale-95"
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${(statsLoading || vaultLoading) ? 'animate-spin' : ''}`} />
-          Refresh Data
-        </Button>
+        <>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={statsLoading || vaultLoading}
+            className="rounded-xl shadow-sm h-10 px-4 font-bold transition-transform active:scale-95"
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${(statsLoading || vaultLoading) ? 'animate-spin' : ''}`} />
+            Refresh Data
+          </Button>
+          {/* Primary action, sitting to the right of Refresh Data. Adding a card
+              is the thing most people land on the dashboard to do — on mobile the
+              quick-action tiles further down are below the fold, so this needs to
+              be in the header row. `primary` is --brand-red (see index.css). */}
+          <Button
+            asChild
+            size="sm"
+            className="rounded-xl shadow-sm h-10 px-4 font-bold transition-transform active:scale-95"
+          >
+            <Link to="/vault/add" className="gap-2">
+              <Plus className="w-4 h-4" /> Add Card
+            </Link>
+          </Button>
+        </>
       }
     >
       {statsError && (
