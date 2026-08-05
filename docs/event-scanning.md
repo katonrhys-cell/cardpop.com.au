@@ -149,8 +149,28 @@ Two kinds:
 
 - **`search_query`** — handed to the web-search tool verbatim. Write it the way
   you'd type it into Google: `"Pokemon card show Sydney upcoming"`.
-- **`seed_url`** — a page fetched directly every run without searching. Use for
-  an organiser's calendar or a venue's "what's on" page you already know about.
+- **`seed_url`** — a page fetched directly without searching. Use for an
+  organiser's calendar or a venue's "what's on" page you already know about.
+  **See the limitation below before adding one.**
+
+### `seed_url` is read once, not every run
+
+The intent was that a seed page is re-read on every run. The engine doesn't do
+that, and two things stop it:
+
+- seed URLs go through `registerCandidates()` like any other candidate, and that
+  function returns only URLs it has *never* seen. After the first run the seed's
+  URL is in the ledger, so it is touched and skipped forever;
+- `extractEventFromPage()` returns a **single** event per page, so a calendar
+  listing twenty shows yields at most one of them anyway.
+
+Together those make a seed URL on an aggregator calendar close to worthless: it
+imports one event, then goes dormant. Until that changes, prefer a
+`search_query` naming the series or venue — those re-run properly every rotation.
+
+Making seed URLs behave as described needs both an exemption from the dedupe
+ledger (or a re-read window) and multi-event extraction. That's an engine
+change, not a config change.
 
 `priority` orders the rotation (lower runs first); `is_active` switches one off
 without deleting it. Seeds live in
