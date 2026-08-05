@@ -827,7 +827,7 @@ const MobileShopSection = ({ onNavigate }) => {
                   <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground shrink-0 transition-transform ${groupOpen ? 'rotate-180' : ''}`} />
                 </button>
                 {groupOpen && (
-                  <div className="grid gap-0.5 mb-1">
+                  <div className="grid gap-0.5 mb-1 ml-5 pl-2 border-l border-border">
                     <SheetClose asChild>
                       <Link
                         to={`/shop/${group.slug}`}
