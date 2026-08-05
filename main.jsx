@@ -206,16 +206,6 @@ const loadThirdPartyScripts = () => {
     } catch { /* analytics is non-critical */ }
   }
 
-  // Google AdSense loader (adsbygoogle.js), site-wide. AdSense publishes this
-  // as a static <script> for the document <head>, but the `strict-dynamic` CSP
-  // blocks markup-inserted third-party scripts — injecting it from here makes
-  // it trusted transitively (same reasoning as the Cloudflare beacon above).
-  // Loading it on every page, rather than only where an <ins> slot mounts, is
-  // what site verification and Auto ads need. See lib/adsense.js.
-  try {
-    loadAdsenseScript();
-  } catch { /* ads are non-critical */ }
-
   // Impact affiliate tracking
   try {
     (function (i, m, p, a, c, t) {
@@ -245,6 +235,30 @@ if (typeof window !== 'undefined') {
     window.requestIdleCallback(initSentry, { timeout: 5000 });
   } else {
     window.setTimeout(initSentry, 3000);
+  }
+
+  // Google AdSense loader (adsbygoogle.js), site-wide. AdSense publishes this
+  // as a static <script> for the document <head>, but the `strict-dynamic` CSP
+  // blocks markup-inserted third-party scripts — injecting it from here makes
+  // it trusted transitively (same reasoning as the Cloudflare beacon). Loading
+  // it on every page, rather than only where an <ins> slot mounts, is what site
+  // verification and Auto ads need. See lib/adsense.js.
+  //
+  // Deliberately NOT part of loadThirdPartyScripts() below: those tags wait for
+  // the first pointerdown/keydown/touchstart/scroll, falling back to `load` + 4s.
+  // AdSense's review crawler does none of those things, and on a page this heavy
+  // `load` alone can land past a renderer's budget — so behind that gate the
+  // snippet was never in the DOM Google actually saw, leaving the site stuck on
+  // "Getting ready" (ad code not found) no matter how long we waited. Idle with a
+  // 5s timeout still keeps it off the critical path for real visitors.
+  const loadAds = () => {
+    if (!import.meta.env.PROD || !analyticsEnabled) return;
+    try { loadAdsenseScript(); } catch { /* ads are non-critical */ }
+  };
+  if ('requestIdleCallback' in window) {
+    window.requestIdleCallback(loadAds, { timeout: 5000 });
+  } else {
+    window.setTimeout(loadAds, 1500);
   }
 
   // Analytics/affiliate tags wait for the first user interaction (or a few
