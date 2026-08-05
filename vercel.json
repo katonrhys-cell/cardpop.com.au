@@ -32,7 +32,7 @@
     },
     {
       "path": "/cron/event-scan",
-      "schedule": "0 17 * * *"
+      "schedule": "0 17 * * 0"
     },
     {
       "path": "/api/stripe/reconcile-pending",

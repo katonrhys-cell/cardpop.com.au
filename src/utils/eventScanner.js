@@ -37,17 +37,34 @@ const MODEL = 'claude-opus-5';
 
 // Per-run budgets. The cron function has a 300s ceiling (vercel.json), and one
 // slow page plus one extraction is comfortably 20s, so these are sized to
-// finish well inside it rather than to maximise throughput. Sources rotate on
-// last_scanned_at, so a capped run still works through the whole list over a
-// few nights.
-const MAX_SOURCES_PER_RUN = 6;
-const MAX_CANDIDATES_PER_RUN = 8;
+// finish well inside it rather than to maximise throughput.
+//
+// These were set when the scan ran nightly, where a small per-run cap was fine
+// because the source rotation came back around the next day. The scan now runs
+// **weekly** (Mondays, 3am AEST), so a run that only touched 6 sources would
+// take over a month to work through the list. Sources are the cheap axis to
+// widen: discovery is ONE batched Claude call whose queries all share it, so
+// doubling the source count doubles the searches inside a single call rather
+// than doubling the number of calls.
+//
+// The binding constraint is wall clock, not cost. Discovery runs before the
+// extraction loop and is not deadline-checked, so it must not be widened to the
+// point where it alone approaches the 300s ceiling — that kills the function
+// mid-run and strands the run row at 'running'. 12 is about half the budget.
+const MAX_SOURCES_PER_RUN = 12;
+const MAX_CANDIDATES_PER_RUN = 12;
 const RUN_DEADLINE_MS = 240_000;
 
 // How far ahead an event may sit and still be worth importing. Anything beyond
 // this is usually a recurring "every second Sunday" page rather than a real
 // dated event.
-const MAX_DAYS_AHEAD = 400;
+//
+// Raised from 400 to 550 days because 400 was quietly cutting off the thing the
+// calendar most needs: the big national circuits (Supanova, CollectFest, Play!
+// Pokémon, PAX) publish a full year or more ahead, and at 400 days anything
+// past next September was rejected as "likely not a real date" — so the events
+// with the *most* reliable dates were the ones being thrown away.
+const MAX_DAYS_AHEAD = 550;
 
 // Login-walled or infinite-scroll hosts: the fetcher gets a consent page rather
 // than event details, so the extraction spend is wasted. Excluded at search

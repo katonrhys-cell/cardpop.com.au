@@ -13,22 +13,35 @@ into — flagged `auto_discovered = true`. A human approves each one in
 
 ## Schedule
 
-Vercel Cron hits `/cron/event-scan` at **17:00 UTC daily**, which is **3am AEST**.
+Vercel Cron hits `/cron/event-scan` **weekly**, at `0 17 * * 0` — **17:00 UTC on
+Sunday**, which is **3am Monday AEST**.
 
-Vercel Cron expressions are UTC only, and Australia observes daylight saving, so
-the local fire time drifts by an hour across the year:
+The day-of-week offset is the easy thing to get wrong here. Cron expressions are
+UTC only and Australia is UTC+10/+11, so a Monday-morning local job fires on
+**Sunday** in UTC. `0 17 * * 1` would be Tuesday 3am local, not Monday.
+
+Australia observes daylight saving, so the local fire time drifts by an hour
+across the year:
 
 | Period | UTC offset | Local fire time |
 |---|---|---|
-| Winter (AEST) | UTC+10 | 3:00am |
-| Summer (AEDT) | UTC+11 | 4:00am |
+| Winter (AEST) | UTC+10 | Monday 3:00am |
+| Summer (AEDT) | UTC+11 | Monday 4:00am |
 
 That's fine for a background job — nothing downstream depends on the exact hour.
 If it ever needs to be 3am local year-round, the schedule has to be edited twice
 a year in `vercel.json`.
 
-The two existing crons (`/api/prices/refresh` at 19:30 UTC, `/cron/blog-generate`
-at 21:00 UTC) run earlier in the UTC day, so the three don't overlap.
+**It ran nightly until August 2026.** Weekly is a deliberate trade: one run a
+week costs roughly a seventh of the Claude spend, but it also discovers roughly a
+seventh as much, because each run is capped by the function's 300s ceiling and
+cannot simply do seven nights' work in one go. The per-run budgets below were
+widened to claw some of that back. To go back to nightly, set the schedule to
+`0 17 * * *` — that single change is the whole revert.
+
+The other crons (`/api/prices/refresh` at 19:30 UTC, `/cron/blog-generate` at
+21:00 UTC, `/api/stripe/reconcile-pending` at 21:15 UTC) run later in the UTC
+day, so they don't overlap.
 
 ---
 
@@ -113,10 +126,15 @@ Per-run budgets (`src/utils/eventScanner.js`):
 
 | Constant | Value | Why |
 |---|---|---|
-| `MAX_SOURCES_PER_RUN` | 6 | Sources rotate on `last_scanned_at`, so a capped run still works through the whole list over a few nights |
-| `MAX_CANDIDATES_PER_RUN` | 8 | One fetch + one extraction is comfortably 20s |
-| `RUN_DEADLINE_MS` | 240,000 | Stops gracefully inside the function's 300s ceiling; leftovers stay `pending` for tomorrow |
-| `MAX_DAYS_AHEAD` | 400 | Beyond this a "date" is almost always a misparse |
+| `MAX_SOURCES_PER_RUN` | 12 | Sources rotate on `last_scanned_at`. Discovery is one batched call, so widening this adds searches inside a single request rather than extra requests — the cheap axis |
+| `MAX_CANDIDATES_PER_RUN` | 12 | One fetch + one extraction is comfortably 20s |
+| `RUN_DEADLINE_MS` | 240,000 | Stops gracefully inside the function's 300s ceiling; leftovers stay `pending` for next week |
+| `MAX_DAYS_AHEAD` | 550 | Beyond this a "date" is usually a misparse — but 400 was rejecting the national circuits, which publish a year-plus ahead |
+
+**Don't raise `MAX_SOURCES_PER_RUN` much further without testing.** Discovery
+runs *before* the extraction loop and is not deadline-checked, so if that single
+call grows past the 300s function ceiling the run is killed outright and its row
+is stranded at `running`. The extraction loop is the part that degrades safely.
 
 ---
 
