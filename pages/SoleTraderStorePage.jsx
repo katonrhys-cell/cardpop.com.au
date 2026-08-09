@@ -5,6 +5,8 @@ import BackButton from '@/components/BackButton.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { LISTING_CARD_VAULT_EMBED, VAULT_ITEM_CARD_SELECT } from '@/lib/listingCardColumns.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
+import { OFFICIAL_STORE_NAME } from '@/lib/sellerIdentity.js';
+import CardPopLogo from '@/components/CardPopLogo.jsx';
 import {
   Star, ShieldCheck, MapPin, Calendar, ExternalLink, ShieldAlert,
   Package, MessageSquare, BadgeCheck, CheckCircle2, Truck, Heart, Zap, RotateCcw, Instagram,
@@ -155,7 +157,11 @@ const SoleTraderStorePage = () => {
   const categories   = dealer.business_categories ?? [];
   const trustBadges  = (dealer.dealer_trust_badges ?? []).map(k => BADGE_META[k]).filter(Boolean);
 
-  const displayName  = dealer.business_name || dealer.display_name || 'Dealer';
+  // The platform's own storefront carries the official branding, not the bare
+  // business_name ('CardPop') — same rule as the product page's seller box.
+  const displayName  = dealer.is_admin
+    ? OFFICIAL_STORE_NAME
+    : dealer.business_name || dealer.display_name || 'Dealer';
   const location     = [dealer.location_suburb, dealer.location_state].filter(Boolean).join(', ');
 
   // SEO: absolute logo URL + Store / BreadcrumbList JSON-LD describing this
@@ -258,6 +264,9 @@ const SoleTraderStorePage = () => {
               <div className="w-32 h-32 md:w-40 md:h-40 rounded-2xl bg-black border-4 border-card shadow-xl flex items-center justify-center overflow-hidden">
                 {logoUrl ? (
                   <img src={logoUrl} alt={displayName} className="w-full h-full rounded-2xl object-cover" />
+                ) : dealer.is_admin ? (
+                  // The platform's own store gets the brand mark, not a letter.
+                  <CardPopLogo variant="icon" iconClassName="w-16 h-[78px]" />
                 ) : (
                   <span className="text-5xl font-bold text-white">
                     {displayName.charAt(0).toUpperCase()}
