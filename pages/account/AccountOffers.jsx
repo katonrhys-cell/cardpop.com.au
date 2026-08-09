@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Tag, CheckCircle2, XCircle, Undo2, Clock, Loader2, RefreshCw, DollarSign } from 'lucide-react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { Tag, CheckCircle2, XCircle, Undo2, Clock, Loader2, RefreshCw, DollarSign, CreditCard } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,9 @@ import { toast } from 'sonner';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+
+// Lazy: only needed once a buyer pays for an accepted offer.
+const CheckoutModal = lazy(() => import('@/components/CheckoutModal.jsx'));
 
 const STATUS_CONFIG = {
   pending:   { label: 'Pending',   className: 'bg-amber-500/10 text-amber-700 border-amber-500/20' },
@@ -26,14 +29,27 @@ const formatCurrency = (val) => `$${(Number(val) || 0).toFixed(2)}`;
 const formatDate = (ts) =>
   ts ? new Date(ts).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
-const OfferCard = ({ offer, perspective, onAction, actionLoading, onCounter }) => {
+// Nothing flips a stale row to 'expired' in the database, so derive it: a
+// pending offer past its expires_at is expired for every display and action
+// decision on this page (otherwise a week-old "48-hour" offer still shows
+// Accept/Decline buttons).
+const effectiveStatus = (offer) =>
+  offer.status === 'pending' && offer.expires_at && new Date(offer.expires_at) <= new Date()
+    ? 'expired'
+    : offer.status;
+
+const OfferCard = ({ offer, perspective, onAction, actionLoading, onCounter, onPay }) => {
   const isReceived = perspective === 'received';
   const other = isReceived ? offer.buyer : offer.seller;
   const cardName = offer.listing?.vault_item?.card_name || 'Unknown Card';
   const listingPrice = offer.listing?.price_aud;
-  const status = offer.status;
+  const status = effectiveStatus(offer);
   const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG.pending;
   const isPending = status === 'pending';
+  const listingActive = offer.listing?.status === 'active';
+  // The agreed price: the seller's counter when one was made, else the
+  // buyer's original amount (mirrors resolveOfferPrice on the server).
+  const agreedAmount = offer.counter_amount_aud ?? offer.amount_aud;
 
   return (
     <div className="bg-card border border-border rounded-2xl p-5 flex flex-col sm:flex-row gap-4">
@@ -124,6 +140,28 @@ const OfferCard = ({ offer, perspective, onAction, actionLoading, onCounter }) =
         </div>
       )}
 
+      {/* An accepted offer still needs paying — checkout at the agreed price
+          completes the deal. Once the listing sells (or is pulled) the button
+          goes away because checkout only prices active listings. */}
+      {status === 'accepted' && !isReceived && listingActive && (
+        <div className="flex sm:flex-col gap-2 shrink-0 self-start sm:self-center">
+          <Button
+            size="sm"
+            className="rounded-xl font-bold gap-1.5"
+            onClick={() => onPay(offer)}
+          >
+            <CreditCard className="w-3.5 h-3.5" />
+            Pay {formatCurrency(agreedAmount)}
+          </Button>
+        </div>
+      )}
+
+      {status === 'accepted' && isReceived && listingActive && (
+        <div className="shrink-0 self-start sm:self-center text-xs text-muted-foreground italic">
+          Waiting on the buyer's payment
+        </div>
+      )}
+
       {isPending && (
         <div className="flex sm:flex-col gap-2 shrink-0 self-start sm:self-center">
           {isReceived ? (
@@ -204,6 +242,7 @@ const AccountOffers = () => {
   const [counterAmount, setCounterAmount] = useState('');
   const [counterMessage, setCounterMessage] = useState('');
   const [counterSaving, setCounterSaving] = useState(false);
+  const [payOffer, setPayOffer] = useState(null);
 
   const fetchOffers = useCallback(async () => {
     if (!currentUser?.id) { setLoading(false); return; }
@@ -214,7 +253,7 @@ const AccountOffers = () => {
           .from('offers')
           .select(`
             *,
-            listing:listings(id, price_aud, price_min_aud, price_max_aud, listing_type, vault_item:vault_items(card_name, card_image)),
+            listing:listings(id, status, price_aud, price_min_aud, price_max_aud, listing_type, vault_item:vault_items(card_name, card_image)),
             buyer:profiles!buyer_id(display_name, username, avatar_url, rating, reviews_count)
           `)
           .eq('seller_id', currentUser.id)
@@ -223,7 +262,7 @@ const AccountOffers = () => {
           .from('offers')
           .select(`
             *,
-            listing:listings(id, price_aud, price_min_aud, price_max_aud, listing_type, vault_item:vault_items(card_name, card_image)),
+            listing:listings(id, status, price_aud, price_min_aud, price_max_aud, listing_type, vault_item:vault_items(card_name, card_image)),
             seller:profiles!seller_id(display_name, username, avatar_url, rating, reviews_count)
           `)
           .eq('buyer_id', currentUser.id)
@@ -296,7 +335,7 @@ const AccountOffers = () => {
     }
   };
 
-  const pendingCount = received.filter(o => o.status === 'pending').length;
+  const pendingCount = received.filter(o => effectiveStatus(o) === 'pending').length;
 
   const renderList = (offers, perspective) => {
     if (loading) {
@@ -317,6 +356,7 @@ const AccountOffers = () => {
             onAction={handleAction}
             actionLoading={actionLoading}
             onCounter={openCounter}
+            onPay={setPayOffer}
           />
         ))}
       </div>
@@ -405,6 +445,20 @@ const AccountOffers = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Pay for an accepted offer — checkout carries the offerId so the
+          server prices the session from the agreed amount, not the listing. */}
+      <Suspense fallback={null}>
+        {payOffer && (
+          <CheckoutModal
+            isOpen
+            onClose={() => setPayOffer(null)}
+            listingId={payOffer.listing?.id}
+            transactionType="offer"
+            offerId={payOffer.id}
+            cardName={payOffer.listing?.vault_item?.card_name || 'Trading Card'}
+          />
+        )}
+      </Suspense>
     </AccountPageShell>
   );
 };

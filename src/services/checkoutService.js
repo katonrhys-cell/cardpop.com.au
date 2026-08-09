@@ -6,6 +6,46 @@ import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
 import { validateWelcomeDiscount, buildWelcomeDiscount, reserveWelcomeDiscount } from './welcomeOfferService.js';
 import { ensureWalletCustomer, getWalletBalanceCents, assertNoOpenWalletCheckout, reserveWalletCheckout, releaseWalletCheckout } from './walletService.js';
 
+/**
+ * Resolve the price the buyer owes on an offer-based purchase, enforcing that
+ * the offer is theirs, matches the listing, and carries seller consent.
+ * Shared by the checkout itself and the /stripe/calculate preview so the
+ * number the buyer is shown is the number they are charged.
+ *
+ * Returns { itemPrice } on success or { error } for the caller to 400 on.
+ */
+export async function resolveOfferPrice({ offerId, listingId, userId }) {
+  const { data: offer } = await supabase
+    .from('offers')
+    .select('amount_aud, counter_amount_aud, status, buyer_id, listing_id')
+    .eq('id', offerId)
+    .maybeSingle();
+
+  if (!offer || offer.listing_id !== listingId || offer.buyer_id !== userId) {
+    return { error: 'Invalid offer' };
+  }
+  // Only offers the SELLER has consented to may be paid. A 'pending' offer
+  // is the buyer's own un-accepted proposal whose amount_aud the buyer sets
+  // freely (there is no server-side floor, and the tamper trigger only
+  // freezes the amount *after* insert) — allowing it let a buyer purchase
+  // any active listing at a self-chosen price ($1 for a $1000 card) with no
+  // seller consent. The consent-bearing states are 'accepted' (seller
+  // accepted the buyer's amount) and 'countered' (seller proposed a price).
+  if (!['accepted', 'countered'].includes(offer.status)) {
+    return { error: 'Offer is no longer valid' };
+  }
+  // counter_amount_aud is only ever written by the seller on the single
+  // pending -> countered transition (enforced by offers_prevent_price_tamper),
+  // so when it is set it IS the agreed price — both while the offer sits at
+  // 'countered' (checking out is how the buyer accepts the counter) and after
+  // the buyer pressed "Accept Counter" (status 'accepted', counter still set).
+  // Keying off status === 'countered' alone charged an accepted counter at the
+  // buyer's original, pre-counter amount.
+  return {
+    itemPrice: Number(offer.counter_amount_aud != null ? offer.counter_amount_aud : offer.amount_aud),
+  };
+}
+
 export async function createSingleItemCheckout(req, res) {
   // Declared before the try so the catch block can see them (block-scoped `let`
   // inside try is not visible in catch).
@@ -54,34 +94,11 @@ export async function createSingleItemCheckout(req, res) {
 
     let itemPrice = Number(listing.price_aud);
     if (offerId) {
-      const { data: offer } = await supabase
-        .from('offers')
-        .select('amount_aud, counter_amount_aud, status, buyer_id, listing_id')
-        .eq('id', offerId)
-        .maybeSingle();
-
-      if (!offer || offer.listing_id !== listingId || offer.buyer_id !== userId) {
-        return res.status(400).json({ error: 'Invalid offer' });
+      const resolved = await resolveOfferPrice({ offerId, listingId, userId });
+      if (resolved.error) {
+        return res.status(400).json({ error: resolved.error });
       }
-      // Only offers the SELLER has consented to may be paid. A 'pending' offer
-      // is the buyer's own un-accepted proposal whose amount_aud the buyer sets
-      // freely (there is no server-side floor, and the tamper trigger only
-      // freezes the amount *after* insert) — allowing it let a buyer purchase
-      // any active listing at a self-chosen price ($1 for a $1000 card) with no
-      // seller consent. The consent-bearing states are 'accepted' (seller
-      // accepted the buyer's amount) and 'countered' (seller proposed a price).
-      if (!['accepted', 'countered'].includes(offer.status)) {
-        return res.status(400).json({ error: 'Offer is no longer valid' });
-      }
-      // A 'countered' offer means the seller proposed a different price —
-      // checking out on it is how the buyer accepts that counter, so the
-      // counter amount (not the buyer's original, pre-counter amount) is what
-      // must be charged.
-      itemPrice = Number(
-        offer.status === 'countered' && offer.counter_amount_aud != null
-          ? offer.counter_amount_aud
-          : offer.amount_aud
-      );
+      itemPrice = resolved.itemPrice;
     }
 
     // Derive the commission tier from server-side context, NEVER the request

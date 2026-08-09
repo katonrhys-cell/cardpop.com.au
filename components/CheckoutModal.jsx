@@ -46,6 +46,7 @@ const CheckoutModal = ({ isOpen, onClose, listingId, transactionType = 'fixed', 
       setIdentityRequired(false);
       try {
         const params = new URLSearchParams({ listingId, transactionType });
+        if (offerId) params.set('offerId', offerId);
         const res = await apiClient.fetch(`/stripe/calculate?${params}`);
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
@@ -62,7 +63,7 @@ const CheckoutModal = ({ isOpen, onClose, listingId, transactionType = 'fixed', 
 
     fetchBreakdown();
     return () => { cancelled = true; };
-  }, [isOpen, listingId, transactionType]);
+  }, [isOpen, listingId, transactionType, offerId]);
 
   const handleConfirmPay = async () => {
     if (!breakdown) return;

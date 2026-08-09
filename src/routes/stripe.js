@@ -11,7 +11,7 @@ import { calculateBreakdown } from '../services/commissionService.js';
 import { handleCheckoutSessionCompleted, handlePaymentFailed, handleCheckoutSessionExpired, getPlatformSetting } from '../services/stripeWebhookService.js';
 import { validateRequestBody, validateRequestQuery } from '../middleware/validateRequest.js';
 import { createCheckoutSchema, calculateBreakdownSchema, processRefundSchema } from '../schemas/stripeSchemas.js';
-import { createSingleItemCheckout } from '../services/checkoutService.js';
+import { createSingleItemCheckout, resolveOfferPrice } from '../services/checkoutService.js';
 import { priceCart } from '../services/cartService.js';
 import { validateWelcomeDiscount, welcomeDiscountCents, buildWelcomeDiscount, reserveWelcomeDiscount } from '../services/welcomeOfferService.js';
 import {
@@ -45,7 +45,8 @@ const requireEmailVerifiedIfAuthed = (req, res, next) =>
 
 router.get('/calculate', authMiddleware, validateRequestQuery(calculateBreakdownSchema), async (req, res) => {
   try {
-    const { listingId, transactionType = 'fixed' } = req.query;
+    const { listingId, offerId } = req.query;
+    let { transactionType = 'fixed' } = req.query;
 
     let { data: listing, error } = await supabase
       .from('listings')
@@ -67,7 +68,19 @@ router.get('/calculate', authMiddleware, validateRequestQuery(calculateBreakdown
 
     if (error || !listing) return res.status(404).json({ error: 'Listing not found or not active' });
 
-    const breakdown = await calculateBreakdown(listing, transactionType);
+    // Offer-based preview: price the breakdown from the agreed offer amount
+    // (same resolution + consent rules as checkout), not the listing price, so
+    // the modal shows exactly what /create-checkout will charge. The type is
+    // forced to 'offer' for the same reason checkout derives it server-side.
+    let priceSource = listing;
+    if (offerId) {
+      const resolved = await resolveOfferPrice({ offerId, listingId, userId: req.user.id });
+      if (resolved.error) return res.status(400).json({ error: resolved.error });
+      priceSource = { ...listing, price_aud: resolved.itemPrice };
+      transactionType = 'offer';
+    }
+
+    const breakdown = await calculateBreakdown(priceSource, transactionType);
     // Seller postage rides on top of the commission breakdown: charged to the
     // buyer, passed through to the seller, no commission or GST touches it.
     const shippingAud = Math.max(0, Number(listing.shipping_cost_aud) || 0);
