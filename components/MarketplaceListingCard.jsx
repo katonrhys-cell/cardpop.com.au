@@ -220,7 +220,9 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
                 {listing.price_min_aud != null && listing.price_max_aud != null
                   ? `$${Number(listing.price_min_aud).toFixed(2)} – $${Number(listing.price_max_aud).toFixed(2)}`
                   : 'Open to offers'}
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-sky-600">Seeking offers</span>
+                {/* sky-700 (not 600): at 10px bold on the white card face, axe holds this
+    to the normal-text 4.5:1 contrast bar, which sky-600 misses (4.09:1). */}
+<span className="block text-[10px] font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400">Seeking offers</span>
               </span>
             ) : (
               <span className={`font-extrabold text-xl tabular-nums ${isSold ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
