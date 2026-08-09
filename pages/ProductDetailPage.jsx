@@ -26,6 +26,8 @@ import GradeBadge from '@/components/GradeBadge.jsx';
 import BnplMessage from '@/components/BnplMessage.jsx';
 import { ROOKIE_VARIANT } from '@/lib/cardVariants.js';
 import { getAutographLabel, getRefractorLabel, getRefractorBadgeClass, genericVariantChips } from '@/lib/cardAttributeLabels.js';
+import { sellerFromProfile, OFFICIAL_STORE_NAME } from '@/lib/sellerIdentity.js';
+import CardPopLogo from '@/components/CardPopLogo.jsx';
 import RookiePill from '@/components/RookiePill.jsx';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
@@ -99,7 +101,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
         if (source === 'marketplace') {
           const { data: listing, error: fetchError } = await supabase
             .from('listings')
-            .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified)')
+            .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, is_admin, is_sole_trader, business_name, business_logo_url, store_slug)')
             .eq('id', id)
             // Sold listings still render (marked "Sold" + buy disabled); only
             // archived listings are treated as gone.
@@ -139,12 +141,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
           });
 
           if (listing.seller) {
-            setSeller({
-              id: listing.seller_id,
-              business_name: listing.seller.display_name || listing.seller.username || 'Community Member',
-              is_verified: listing.seller.is_verified || false,
-              type: 'user',
-            });
+            setSeller(sellerFromProfile(listing.seller, listing.seller_id));
           }
           return;
         }
@@ -177,7 +174,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
             stockQuantity: data.stock_quantity,
             listing_type: 'For Sale',
           });
-          setSeller({ business_name: 'CardPop Official Store', is_verified: true, type: 'official' });
+          setSeller({ business_name: OFFICIAL_STORE_NAME, is_verified: true, type: 'official', storePath: '/shop' });
           return;
         }
 
@@ -249,18 +246,13 @@ const ProductDetailPage = ({ source: sourceProp }) => {
         setProduct(data);
 
         if (source === 'vault' && data.owner) {
-          setSeller({
-            id: data.owner_id,
-            business_name: data.owner.display_name || data.owner.username || data.owner.full_name || 'Community Member',
-            is_verified: data.owner.is_verified || false,
-            type: 'user',
-          });
+          setSeller(sellerFromProfile(data.owner, data.owner_id));
         } else if (data.owner_id) {
           try {
             const { data: user } = await supabase.from('profiles').select(PUBLIC_PROFILE_COLUMNS).eq('id', data.owner_id).single();
-            if (isMounted) setSeller({ business_name: user?.display_name || user?.username || user?.full_name || 'Community Member', is_verified: user?.is_verified || false, type: 'user' });
+            if (isMounted) setSeller(sellerFromProfile(user, data.owner_id));
           } catch (e) {
-            if (isMounted) setSeller({ business_name: 'Community Member', is_verified: false, type: 'user' });
+            if (isMounted) setSeller(sellerFromProfile(null, data.owner_id));
           }
         }
       } catch (err) {
@@ -477,9 +469,12 @@ const ProductDetailPage = ({ source: sourceProp }) => {
 
           <div className="lg:col-span-6 xl:col-span-5 lg:row-span-2 flex flex-col">
             <div className="flex flex-wrap gap-2 mb-4">
-              {isShop ? (
+              {isShop || seller?.type === 'official' ? (
+                // The platform's own listings are official stock, wherever
+                // they're sold from — never badged as a community vault item.
                 <Badge className="bg-primary text-primary-foreground border-none font-bold shadow-sm px-2.5 py-1">
-                  Official Store
+                  <Store className="w-3 h-3 mr-1.5 inline-block" />
+                  {OFFICIAL_STORE_NAME}
                 </Badge>
               ) : (
                 <Badge className="bg-accent text-accent-foreground border-none font-bold shadow-sm px-2.5 py-1">
@@ -604,8 +599,16 @@ const ProductDetailPage = ({ source: sourceProp }) => {
             {seller && (
               <div className="flex items-center justify-between gap-4 mb-8 p-5 bg-card border border-border rounded-2xl shadow-sm">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                    {seller.type === 'official' ? <Store className="w-6 h-6" /> : <User className="w-6 h-6" />}
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0 overflow-hidden">
+                    {seller.type === 'official' ? (
+                      <CardPopLogo variant="icon" iconClassName="w-6 h-[30px]" />
+                    ) : seller.logoUrl ? (
+                      <img src={publicImageUrl(seller.logoUrl)} alt={`${seller.business_name} logo`} className="w-full h-full object-cover" />
+                    ) : seller.isDealer ? (
+                      <Store className="w-6 h-6" />
+                    ) : (
+                      <User className="w-6 h-6" />
+                    )}
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-0.5">Owner / Seller</p>
@@ -615,11 +618,18 @@ const ProductDetailPage = ({ source: sourceProp }) => {
                     </p>
                   </div>
                 </div>
-                {!isShop && (
+                {/* A seller with a storefront links to the full store (which
+                    lists this card among the rest of their stock); everyone
+                    else links to their public profile. */}
+                {seller.storePath ? (
+                  <Button asChild variant="outline" size="sm" className="rounded-full hidden sm:flex">
+                    <Link to={seller.storePath}>View Store</Link>
+                  </Button>
+                ) : !isShop && seller.id ? (
                   <Button asChild variant="outline" size="sm" className="rounded-full hidden sm:flex">
                     <Link to={`/seller/${seller.id}`}>View Profile</Link>
                   </Button>
-                )}
+                ) : null}
               </div>
             )}
 

@@ -112,6 +112,10 @@ describe('useCardOCR — scanning', () => {
       // Treatments read off the card, and the printed print-run serial.
       attributes: [],
       serialNumber: '',
+      // Sports-card observations — blank on a TCG card.
+      team: '',
+      parallel: '',
+      parallelColor: '',
       brand: 'Wizards of the Coast',
       series: 'Base Set',
       confidence: null,

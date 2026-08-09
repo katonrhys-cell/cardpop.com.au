@@ -18,7 +18,12 @@ import { useCollectionEras } from '@/hooks/useCollectionEras.js';
 import {
   getVariantGroups, mergeIdentifiedVariants, resolveVariantChips, impliesFoil,
   FOIL_VARIANT, getFoilFinishes, splitFoilFinishes, expandFoilFinishes,
+  productFinishNames,
 } from '@/lib/cardVariants.js';
+import {
+  parseSerialNumber, isGenericSetName, pickSetByNameAndYear,
+  matchTeam, matchParallel, finishFamilies, refractorColorValue,
+} from '@/utils/scanAutofill.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -124,7 +129,10 @@ const AddEditCardPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { currentUser, isIdentityVerified } = useAuth();
-  const { getCategories, getParallelsByFranchise, getSubsetsBySet } = useCategories();
+  const {
+    getCategories, getParallelsByFranchise, getSubsetsBySet,
+    getManufacturersByFranchise, getTeamsByFranchise, getSetsByFranchiseAndManufacturer,
+  } = useCategories();
 
   // Subscription tier gates which display styles the user can choose.
   const subscriptionTier = normalizeTier(currentUser?.subscription_tier);
@@ -239,6 +247,7 @@ const AddEditCardPage = () => {
     year:           '',
     variant:        [],
     manufacturerName: '',
+    teamName:       '',
     parallelName:   '',
     parallelPrintRun: '',
     notesFromCardSight: '',
@@ -374,22 +383,90 @@ const AddEditCardPage = () => {
     if (franchiseId) getParallelsByFranchise(franchiseId).then(setParallelOpts);
   }, [franchiseId, getParallelsByFranchise]);
 
-  // When AI autofills formData.manufacturerName (e.g., "Topps"), look up the matching manufacturer ID
+  // Each auto-select below runs ONCE per identified value: the ref remembers
+  // the last signal it acted on, so a seller who clears an auto-selected
+  // dropdown isn't fighting an effect that instantly re-selects it. A fresh
+  // scan writes a new value (or the franchise changes) and re-arms it.
+  const autoSelectedRef = useRef({ manufacturer: '', team: '', set: '', parallel: '' });
+
+  // When AI autofills formData.manufacturerName (e.g., "Topps"), look up the
+  // matching manufacturer ID. Manufacturers live in their own table (the same
+  // list CardHierarchySelector offers) — they are NOT child categories, which
+  // is what this used to search, so no scan could ever select one.
   useEffect(() => {
     if (!franchiseId || !formData.manufacturerName || manufacturerId) return;
-    getCategories().then(cats => {
-      const manufacturers = cats.filter(c => c.parent_id === franchiseId);
-      const match = manufacturers.find(m => m.name.toLowerCase() === formData.manufacturerName.toLowerCase());
+    const key = `${franchiseId}|${formData.manufacturerName}`;
+    if (autoSelectedRef.current.manufacturer === key) return;
+    autoSelectedRef.current.manufacturer = key;
+    getManufacturersByFranchise(franchiseId).then(manufacturers => {
+      const target = formData.manufacturerName.toLowerCase();
+      // "Topps" should still resolve when the DB row reads "Topps Company",
+      // and "Panini America" when the card says "Panini" — but a loose match
+      // only counts when it is the ONLY manufacturer matching that loosely.
+      const partial = manufacturers.filter(m => {
+        const name = m.name.toLowerCase();
+        return name.includes(target) || target.includes(name);
+      });
+      const match = manufacturers.find(m => m.name.toLowerCase() === target)
+        ?? (partial.length === 1 ? partial[0] : null);
       if (match) setManufacturerId(match.id);
     });
   }, [franchiseId, formData.manufacturerName]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // When AI detects a parallel, try to auto-select it from available parallels
+  // When AI autofills formData.teamName (e.g., "Boston Celtics"), select the team
   useEffect(() => {
-    if (!formData.parallelName || !parallelOpts.length || parallelId) return;
-    const match = parallelOpts.find(p => p.name?.toLowerCase() === formData.parallelName.toLowerCase());
+    if (!franchiseId || !formData.teamName || teamId) return;
+    const key = `${franchiseId}|${formData.teamName}`;
+    if (autoSelectedRef.current.team === key) return;
+    autoSelectedRef.current.team = key;
+    getTeamsByFranchise(franchiseId).then(teams => {
+      const match = matchTeam(teams, formData.teamName);
+      if (match) setTeamId(match.id);
+    });
+  }, [franchiseId, formData.teamName]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When AI autofills formData.setName (e.g., "Topps Chrome"), select the
+  // catalogue set — the year read off the card picks the season, so "Topps
+  // Chrome" + "2025-26" lands on "2025-26 Topps Chrome Basketball".
+  useEffect(() => {
+    if (!franchiseId || !formData.setName || setId) return;
+    const key = `${franchiseId}|${manufacturerId}|${formData.setName}|${formData.year}`;
+    if (autoSelectedRef.current.set === key) return;
+    autoSelectedRef.current.set = key;
+    getSetsByFranchiseAndManufacturer(franchiseId, manufacturerId).then(sets => {
+      const match = pickSetByNameAndYear(sets, formData.setName, formData.year);
+      if (!match) return;
+      setSetId(match.id);
+      // Mirror a manual pick: the canonical catalogue name becomes the set
+      // name — and counts as already-handled so re-clearing the dropdown
+      // doesn't re-trigger on the canonical name.
+      autoSelectedRef.current.set = `${franchiseId}|${manufacturerId}|${match.name}|${formData.year}`;
+      setFormData(prev => ({ ...prev, setName: match.name }));
+    });
+  }, [franchiseId, manufacturerId, formData.setName, formData.year, setId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When AI detects a parallel, try to auto-select it from available parallels.
+  // A named parallel is the strongest signal, but most cards don't print the
+  // name — colour + print run ("teal", /199) or print run + finish family
+  // (a /150 on a Chrome product → "Blue Refractor /150") also pin one down,
+  // and matchParallel refuses anything ambiguous.
+  useEffect(() => {
+    if (parallelId || !parallelOpts.length) return;
+    const signals = {
+      name: formData.parallelName,
+      color: formData.refractorColor,
+      printRun: formData.serialPrintRun || formData.parallelPrintRun,
+      families: finishFamilies([
+        ...formData.variant,
+        ...productFinishNames(formData.setName),
+      ]),
+    };
+    const key = `${signals.name}|${signals.color}|${signals.printRun}|${signals.families.join(',')}`;
+    if (autoSelectedRef.current.parallel === key) return;
+    autoSelectedRef.current.parallel = key;
+    const match = matchParallel(parallelOpts, signals);
     if (match) setParallelId(match.id);
-  }, [formData.parallelName, parallelOpts]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [formData.parallelName, formData.refractorColor, formData.serialPrintRun, formData.parallelPrintRun, formData.variant, formData.setName, parallelOpts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Append CardSight-detected artist/HP info to notes
   useEffect(() => {
@@ -808,6 +885,14 @@ const AddEditCardPage = () => {
         [...(ocrResult.attributes ?? []), ...(ocrResult.serialNumber ? ['Numbered'] : [])],
         variantCollection,
       );
+      // The printed serial ("097/199") is also the Numbering Details answer —
+      // position 97 of a 199 print run — so both panel fields fill from it.
+      const serialParts = parseSerialNumber(ocrResult.serialNumber);
+      // A coloured chromium finish on a product that IS the finish (Topps
+      // Chrome, Prizm…) identifies a colour parallel — base chrome is silver —
+      // so the Refractor Details panel can be pre-filled from the observation.
+      const isChromeProduct = productFinishNames(ocrResult.cardSetName || formData.setName).includes('Chrome');
+      const observedColor = refractorColorValue(ocrResult.parallelColor);
       setFormData(prev => ({
         ...prev,
         cardName:       ocrResult.name          || prev.cardName,
@@ -815,6 +900,17 @@ const AddEditCardPage = () => {
         setName:        ocrResult.cardSetName   || prev.setName,
         cardNumber:     ocrResult.cardNumber    || prev.cardNumber,
         year:           ocrResult.releaseYear   || prev.year,
+        manufacturerName: ocrResult.brand       || prev.manufacturerName,
+        teamName:       ocrResult.team          || prev.teamName,
+        // Only a parallel name actually printed on the card — the prompt
+        // forbids naming one from appearance, so this is usually null.
+        parallelName:   ocrResult.parallel      || prev.parallelName,
+        serialPosition: prev.serialPosition || serialParts?.position || '',
+        serialPrintRun: prev.serialPrintRun || serialParts?.printRun || '',
+        ...(observedColor && isChromeProduct && !prev.refractorColor ? {
+          refractorType:  prev.refractorType || 'base',
+          refractorColor: observedColor,
+        } : {}),
         condition:      conditionMap[ocrResult.condition] || prev.condition,
         grade:          ocrResult.gradeScore    || prev.grade,
         gradingCompany: ocrResult.gradingService !== 'None'
@@ -876,7 +972,15 @@ const AddEditCardPage = () => {
       && !isLowConfidence(csResult.confidenceScore ?? csResult.confidence);
 
     if (trustworthy) {
-      setFormData(prev => ({ ...prev, ...mapCardSightToFormFields(csResult) }));
+      setFormData(prev => {
+        const fields = mapCardSightToFormFields(csResult);
+        // CardSight's sports catalog names its base release literally "Base
+        // Set" — that must not replace a real product name OCR already read
+        // off the card ("Topps Chrome"). Genuine Base Set cards (Pokemon) are
+        // unaffected: OCR reads "Base Set" there too, or the field is empty.
+        if (prev.setName && isGenericSetName(fields.setName)) delete fields.setName;
+        return { ...prev, ...fields };
+      });
       if (csResult.pricing?.avgPrice) {
         set('estimatedValue', String(csResult.pricing.avgPrice.toFixed(2)));
       }
@@ -2453,6 +2557,7 @@ const AddEditCardPage = () => {
                               { value: 'green',    label: 'Green',    sub: 'often /99',   dot: 'bg-green-500' },
                               { value: 'purple',   label: 'Purple',   sub: 'scarce',      dot: 'bg-purple-500' },
                               { value: 'blue',     label: 'Blue',     sub: 'often /150',  dot: 'bg-blue-500' },
+                              { value: 'teal',     label: 'Teal',     sub: 'often /199',  dot: 'bg-teal-500' },
                               { value: 'aqua',     label: 'Aqua',     sub: 'retail',      dot: 'bg-cyan-400' },
                               { value: 'pink',     label: 'Pink',     sub: 'retail',      dot: 'bg-pink-400' },
                               { value: 'yellow',   label: 'Yellow',   sub: 'set-based',   dot: 'bg-yellow-400' },

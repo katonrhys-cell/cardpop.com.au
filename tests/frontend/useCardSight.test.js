@@ -143,8 +143,11 @@ describe('mapCardSightToFormFields', () => {
       setName: 'Base Set',
       cardNumber: '4',
       year: '1999',
-      variant: 'Holo',
+      // Rarity is a note, NOT `variant`: variant is the chip-selection ARRAY,
+      // and writing a catalog string there broke every .includes/.filter caller.
+      notesFromCardSight: 'Rarity: Holo',
     });
+    expect(fields.variant).toBeUndefined();
   });
 
   it.each([

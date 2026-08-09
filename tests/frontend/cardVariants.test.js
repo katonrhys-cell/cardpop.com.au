@@ -265,4 +265,21 @@ describe('mergeIdentifiedVariants — product-implied finish', () => {
     // Mosaic chip, so a product name mentioning it contributes nothing.
     expect(mergeIdentifiedVariants([], { cardSetName: 'Mosaic' }, 'Pokemon')).toEqual([]);
   });
+
+  it('a coloured chrome finish is a refractor parallel', () => {
+    // Base chrome is plain silver, so an observed colour on a chrome product
+    // identifies a colour refractor — without the model naming a parallel.
+    const merged = mergeIdentifiedVariants(
+      [], { cardSetName: 'Topps Chrome', parallelColor: 'Teal' }, 'NBA',
+    );
+    expect(merged).toContain('Chrome');
+    expect(merged).toContain('Refractor');
+  });
+
+  it('an observed colour without a chrome product names nothing', () => {
+    const merged = mergeIdentifiedVariants(
+      [], { cardSetName: 'Donruss', parallelColor: 'Teal' }, 'NBA',
+    );
+    expect(merged).not.toContain('Refractor');
+  });
 });

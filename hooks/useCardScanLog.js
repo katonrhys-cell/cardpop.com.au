@@ -74,7 +74,7 @@ export function buildScanPayload({ ocr, cardSight, imageCount, variants }) {
     cardNumber: ocr?.cardNumber || cs?.card?.cardNumber || null,
     cardName: cs?.card?.name || ocr?.name || null,
     year: cs?.card?.year ? String(cs.card.year) : (ocr?.releaseYear || null),
-    parallel: cs?.parallel?.name || null,
+    parallel: cs?.parallel?.name || ocr?.parallel || null,
     rookie: ocr?.rookie || null,
     manufacturer: cs?.card?.manufacturer || ocr?.brand || null,
     gradingCompany: ocr?.gradingService && ocr.gradingService !== 'None' ? ocr.gradingService : null,
