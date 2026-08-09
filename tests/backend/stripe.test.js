@@ -170,6 +170,51 @@ describe('POST /create-checkout', () => {
     expect(itemLine.price_data.unit_amount).toBe(8000);
   });
 
+  it("charges the counter amount when the buyer accepted the counter first (status 'accepted', counter set)", async () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: { value: false }, error: null }) // email_verification_required (gate off)
+      .mockResolvedValueOnce({ data: MOCK_LISTING, error: null }) // listing lookup
+      .mockResolvedValueOnce({
+        data: {
+          amount_aud: 50,
+          counter_amount_aud: 80,
+          status: 'accepted',
+          buyer_id: 'user-123',
+          listing_id: 'listing-1',
+        },
+        error: null,
+      }); // offer lookup
+    mockStripe.checkout.sessions.create.mockResolvedValue({ id: 'cs_1', url: 'https://stripe.com/pay/cs_1' });
+
+    const res = await request(app).post('/create-checkout').send({ ...VALID_CHECKOUT_BODY, offerId: 'offer-1' });
+
+    expect(res.status).toBe(200);
+    const [[sessionArgs]] = mockStripe.checkout.sessions.create.mock.calls;
+    const itemLine = sessionArgs.line_items.find((li) => li.price_data.product_data.name === 'Charizard VMAX');
+    expect(itemLine.price_data.unit_amount).toBe(8000);
+  });
+
+  it("rejects checkout on a 'pending' offer the seller never consented to", async () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: { value: false }, error: null }) // email_verification_required (gate off)
+      .mockResolvedValueOnce({ data: MOCK_LISTING, error: null }) // listing lookup
+      .mockResolvedValueOnce({
+        data: {
+          amount_aud: 1,
+          counter_amount_aud: null,
+          status: 'pending',
+          buyer_id: 'user-123',
+          listing_id: 'listing-1',
+        },
+        error: null,
+      }); // offer lookup
+
+    const res = await request(app).post('/create-checkout').send({ ...VALID_CHECKOUT_BODY, offerId: 'offer-1' });
+
+    expect(res.status).toBe(400);
+    expect(mockStripe.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
   it('never trusts a client-supplied bidId to change the commission transaction type', async () => {
     mockStripe.checkout.sessions.create.mockResolvedValue({ id: 'cs_1', url: 'https://stripe.com/pay/cs_1' });
 
@@ -178,6 +223,54 @@ describe('POST /create-checkout', () => {
     expect(res.status).toBe(200);
     const [[sessionArgs]] = mockStripe.checkout.sessions.create.mock.calls;
     expect(sessionArgs.metadata.transactionType).toBe('fixed');
+  });
+});
+
+// ─── GET /calculate ───────────────────────────────────────────────────────────
+
+describe('GET /calculate', () => {
+  it('prices an offer-based preview from the agreed offer amount, not the listing price', async () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: MOCK_LISTING, error: null }) // listing lookup ($99.99)
+      .mockResolvedValueOnce({
+        data: {
+          amount_aud: 50,
+          counter_amount_aud: 80,
+          status: 'accepted',
+          buyer_id: 'user-123',
+          listing_id: 'listing-1',
+        },
+        error: null,
+      }) // offer lookup
+      .mockResolvedValueOnce({ data: { value: false }, error: null }) // commissions_enabled
+      .mockResolvedValueOnce({ data: { value: false }, error: null }) // gst_enabled
+      .mockResolvedValueOnce({ data: { value: 10 }, error: null }) // gst_rate_pct
+      .mockResolvedValueOnce({ data: { value: false }, error: null }); // gst_on_commission_only
+
+    const res = await request(app).get('/calculate?listingId=listing-1&offerId=offer-1&transactionType=offer');
+
+    expect(res.status).toBe(200);
+    expect(res.body.itemPrice).toBe(80);
+    expect(res.body.transactionType).toBe('offer');
+  });
+
+  it("rejects an offer preview for a 'pending' offer (mirrors the checkout gate)", async () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: MOCK_LISTING, error: null }) // listing lookup
+      .mockResolvedValueOnce({
+        data: {
+          amount_aud: 1,
+          counter_amount_aud: null,
+          status: 'pending',
+          buyer_id: 'user-123',
+          listing_id: 'listing-1',
+        },
+        error: null,
+      }); // offer lookup
+
+    const res = await request(app).get('/calculate?listingId=listing-1&offerId=offer-1');
+
+    expect(res.status).toBe(400);
   });
 });
 

@@ -163,9 +163,9 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
                 <div className="grid grid-cols-3 gap-2">
                   {(isRange
                     ? [
-                        { label: 'Low end', value: rangeMin ?? rangeMax },
+                        { label: 'Low End', value: rangeMin ?? rangeMax },
                         { label: 'Middle', value: ((rangeMin ?? rangeMax) + (rangeMax ?? rangeMin)) / 2 },
-                        { label: 'Top end', value: rangeMax ?? rangeMin },
+                        { label: 'Top End', value: rangeMax ?? rangeMin },
                       ]
                     : QUICK_PERCENTAGES.map(({ label, pct }) => ({ label, value: listingPrice * pct }))
                   ).map(({ label, value }) => (

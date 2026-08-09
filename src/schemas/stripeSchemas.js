@@ -26,6 +26,7 @@ export const createCheckoutSchema = z.object({
 
 export const calculateBreakdownSchema = z.object({
   listingId: z.string().min(1, 'listingId is required'),
+  offerId: z.string().min(1).optional(),
   transactionType: z.enum(['fixed', 'auction', 'trade', 'offer']).default('fixed'),
 });
 
