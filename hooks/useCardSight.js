@@ -110,7 +110,6 @@ export function mapCardSightToFormFields(result) {
   if (card?.setName)      fields.setName         = card.setName;
   if (card?.cardNumber)   fields.cardNumber      = card.cardNumber;
   if (card?.year)         fields.year            = String(card.year);
-  if (card?.rarity)       fields.variant         = card.rarity;  // closest match
   if (card?.manufacturer) fields.manufacturerName = card.manufacturer;
 
   // Grading slab detection + condition mapping
@@ -140,8 +139,11 @@ export function mapCardSightToFormFields(result) {
     fields.parallelPrintRun = parallel.print_run || null;
   }
 
-  // Append artist and HP info to notes
+  // Append rarity, artist and HP info to notes. Rarity must NOT be written
+  // into `variant`: that field is the chip-selection array, and overwriting it
+  // with a catalog string broke every variant.includes/filter consumer.
   const notes = [];
+  if (card?.rarity) notes.push(`Rarity: ${card.rarity}`);
   if (card?.artist) notes.push(`Artist: ${card.artist}`);
   if (card?.hp) notes.push(`HP: ${card.hp}`);
   if (notes.length > 0) fields.notesFromCardSight = notes.join('\n');

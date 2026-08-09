@@ -40,6 +40,13 @@ export function mapOCRResult(data) {
     attributes: Array.isArray(data.attributes) ? data.attributes : [],
     // The printed print-run serial ("23/99"), distinct from the collector number.
     serialNumber: data.serialNumber || '',
+    // Sports: the player's team as printed / shown by the logo.
+    team: data.team || '',
+    // A parallel NAME only when printed on the card; the colour of a coloured
+    // chromium finish is a separate visual observation the form combines with
+    // the product (Chrome + Teal → teal refractor) — see mergeIdentifiedVariants.
+    parallel: data.parallel || '',
+    parallelColor: data.parallelColor || '',
     brand: data.brand || '',
     series: data.series || data.cardSetName || '',
     confidence: data.confidence || null,
