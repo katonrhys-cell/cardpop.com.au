@@ -122,6 +122,22 @@ resident and the 8-second budget is spent on detection rather than download.
 Set `VITE_OCR_AUTOCROP=false` at build time to send the original photo straight
 to the models.
 
+**CSP.** The production CSP (`vercel.json`) has no `'unsafe-eval'`, but the
+OpenCV.js embind build generates every C++ binding's JS invoker with
+`new Function(...)` during wasm init — so unpatched, the script executes but
+`cv` never initialises, and every crop/rectify attempt fails with "The card
+detector could not load. Check your connection and try again" (an `engine`
+failure in `utils/detectCard.js`). The build patches the emitted asset:
+`tools/opencvCspPatch.mjs` (applied by the `cardpop-opencv-csp-patch` plugin in
+`vite.config.js`) rewrites the four dynamic-codegen sites into the equivalent
+closures Emscripten itself uses in `DYNAMIC_EXECUTION=0` builds, and also stops
+the loader `fetch()`ing its embedded data-URI wasm (which `connect-src` blocks,
+noisily, before the inline-decode fallback). The patch throws — failing the
+build and `tests/backend/opencvCspPatch.test.js` — if an `@techstark/opencv-js`
+upgrade reshapes that glue, so it can't silently regress to requiring
+`'unsafe-eval'`. Dev is unaffected: no CSP headers, and the dev server serves
+the file straight from `node_modules`.
+
 ### 1. OCR first
 
 `useCardOCR` streams the images to `/card-ocr/scan`, which asks Claude for a

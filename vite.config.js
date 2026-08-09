@@ -5,6 +5,7 @@ import { createLogger, defineConfig } from 'vite';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import Beasties from 'beasties';
+import { patchOpenCvSource } from './tools/opencvCspPatch.mjs';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
 const allDeps = Object.keys(pkg.dependencies || {});
@@ -289,6 +290,35 @@ function homeShellPlugin() {
 	};
 }
 
+// The production CSP has no 'unsafe-eval', but the OpenCV.js build generates
+// its embind invokers with `new Function` at wasm init — so in production the
+// script executed, cv never initialised, and card auto-crop always failed with
+// "The card detector could not load". Rewrite the emitted asset's codegen into
+// the equivalent closures (Emscripten's own DYNAMIC_EXECUTION=0 shapes) so it
+// runs under the strict CSP. Dev is unaffected (no CSP, and the dev server
+// serves the file straight from node_modules). patchOpenCvSource throws on any
+// drift, so an opencv-js upgrade fails the build rather than shipping a crop
+// feature that needs 'unsafe-eval'. See tools/opencvCspPatch.mjs.
+function opencvCspPatchPlugin() {
+	return {
+		name: 'cardpop-opencv-csp-patch',
+		apply: 'build',
+		generateBundle(_options, bundle) {
+			const asset = Object.values(bundle).find(
+				(a) => a.type === 'asset' && /(^|\/)opencv-[\w-]+\.js$/.test(a.fileName),
+			);
+			// The asset only exists in builds that include the loader chunk (the
+			// main app build; not e.g. a route-scoped harness build without it).
+			if (!asset) return;
+			try {
+				asset.source = patchOpenCvSource(asset.source.toString());
+			} catch (e) {
+				this.error(e.message);
+			}
+		},
+	};
+}
+
 console.warn = () => { };
 
 const logger = createLogger()
@@ -310,6 +340,7 @@ export default defineConfig({
 	plugins: [
 		react(),
 		homeShellPlugin(),
+		opencvCspPatchPlugin(),
 	],
 	server: {
 		port: 3000,
