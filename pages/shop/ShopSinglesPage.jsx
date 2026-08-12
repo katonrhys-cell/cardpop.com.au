@@ -8,6 +8,8 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { useCart } from '@/hooks/useCart.jsx';
 import { toast } from 'sonner';
 import ProductCard from '@/components/ProductCard.jsx';
+import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
+import { fetchOfficialStoreListings, mergeShopAndListings, OFFICIAL_LISTING_SOURCE } from '@/lib/officialStoreListings.js';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
@@ -50,12 +52,19 @@ const ShopSinglesPage = () => {
         else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
         else query = query.order('created_at', { ascending: false });
 
-        const { data, count, error } = await query;
+        // Cards the platform account has listed on the marketplace are shop
+        // singles too — union them in (resolves to [] on failure so the shop
+        // grid never blanks because of the listings side).
+        const [{ data, count, error }, officialListings] = await Promise.all([
+          query,
+          fetchOfficialStoreListings(supabase, { minPrice, maxPrice }),
+        ]);
         if (error) throw error;
 
         if (isMounted) {
-          setProducts((data || []).map(p => ({ ...p, source: 'shop', type: 'shop' })));
-          setTotalItems(count || 0);
+          const shopRows = (data || []).map(p => ({ ...p, source: 'shop', type: 'shop' }));
+          setProducts(mergeShopAndListings(shopRows, officialListings, sort));
+          setTotalItems((count || 0) + officialListings.length);
         }
       } catch (err) {
         if (isMounted) toast.error('Failed to load products.');
@@ -226,12 +235,20 @@ const ShopSinglesPage = () => {
           ) : products.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
               {products.map((product, i) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  onAddToCart={handleAddToCart}
-                  priority={i < 2}
-                />
+                product.source === OFFICIAL_LISTING_SOURCE ? (
+                  <MarketplaceListingCard
+                    key={`listing-${product.id}`}
+                    listing={product}
+                    priority={i < 2}
+                  />
+                ) : (
+                  <ProductCard
+                    key={product.id}
+                    product={product}
+                    onAddToCart={handleAddToCart}
+                    priority={i < 2}
+                  />
+                )
               ))}
             </div>
           ) : (

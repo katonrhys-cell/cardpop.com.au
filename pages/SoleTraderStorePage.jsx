@@ -92,7 +92,7 @@ const SoleTraderStorePage = () => {
         const resolvedId = profile.id;
         const [marketplaceRes, vaultRes, reviewsRes] = await Promise.all([
           supabase.from('listings')
-            .select(`*, ${LISTING_CARD_VAULT_EMBED}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
+            .select(`*, ${LISTING_CARD_VAULT_EMBED}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, is_admin, seller_tier, rating, reviews_count)`)
             .eq('seller_id', resolvedId).eq('status', 'active')
             .order('created_at', { ascending: false }).limit(24),
           supabase.from('vault_items')

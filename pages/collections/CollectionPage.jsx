@@ -498,7 +498,7 @@ const CollectionPage = () => {
 
       let q = supabase.from('listings')
         .select(
-          `*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(display_name, username, avatar_url, is_verified)`,
+          `*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(display_name, username, avatar_url, is_verified, is_admin)`,
           { count: 'estimated' }
         )
         .eq('status', 'active')

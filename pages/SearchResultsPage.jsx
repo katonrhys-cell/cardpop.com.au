@@ -57,7 +57,7 @@ async function searchListings(tokens) {
   const { data, error } = await applyTokens(
     supabase
       .from('listings')
-      .select(`*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
+      .select(`*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, is_admin, seller_tier, rating, reviews_count)`)
       .eq('status', 'active')
       .neq('listing_type', 'vault'),
     tokens, ['card_name', 'set_name'], 'vault_items',
