@@ -47,7 +47,7 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
             sizes={CARD_GRID_SIZES}
             fallbackSrc={imgFallback}
             thumbSrc={imgThumb}
-            alt={product.name || product.cardName || 'Product Image'}
+            alt={product.name || product.cardName || product.title || 'Product Image'}
             displayStyle={product.display_style}
             width="400"
             height="500"
@@ -59,7 +59,7 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
             srcSet={imgSrcSet}
             sizes={CARD_GRID_SIZES}
             fallbackSrc={imgFallback}
-            alt={product.name || product.cardName || 'Product Image'}
+            alt={product.name || product.cardName || product.title || 'Product Image'}
             imgClassName="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-500"
             width="400"
             height="500"
@@ -105,7 +105,7 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
         isOpen={zoomOpen}
         onClose={() => setZoomOpen(false)}
         imageUrl={imgSrc}
-        altText={product.name || product.cardName || 'Card Image'}
+        altText={product.name || product.cardName || product.title || 'Card Image'}
       />
       
       <div className="p-5 flex flex-col flex-1">
@@ -114,7 +114,7 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
             {product.category || product.collectionType || 'Trading Card'}
           </p>
           <h3 className="font-bold text-base leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors mb-1">
-            {product.name || product.cardName || 'Untitled Card'}
+            {product.name || product.cardName || product.title || 'Untitled Card'}
           </h3>
           {(product.set_name || product.setName) && (
             <p className="text-xs text-muted-foreground mb-2 truncate">{product.set_name || product.setName}</p>
