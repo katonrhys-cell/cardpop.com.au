@@ -59,7 +59,8 @@ import {
   analysisPhotoCount,
   ANALYSIS_IMAGE_LIMIT,
 } from '@/utils/listingFlow.js';
-import { confidenceScore, confidenceLabel, isLowConfidence } from '@/utils/cardsightConfidence.js';
+import { confidenceScore, confidenceLabel } from '@/utils/cardsightConfidence.js';
+import { assessCardSightMatch, cardSightDisagreements } from '@/utils/cardsightTrust.js';
 import { prepareAnalysisImages } from '@/utils/analysisImage.js';
 import { shouldPromptForBack, missingBackFields, backPhotoPromptText } from '@/utils/backPhotoPrompt.js';
 import { useCardScanLog, buildScanPayload } from '@/hooks/useCardScanLog.js';
@@ -219,14 +220,19 @@ const AddEditCardPage = () => {
   const csConfidence = cardSightResult?.confidenceScore ?? confidenceScore(cardSightResult?.confidence);
   const csConfidenceLabel = cardSightResult?.confidenceLabel ?? confidenceLabel(cardSightResult?.confidence);
   // Mirrors the "trustworthy" test in handleAnalyzeWithAI: anything short of a
-  // clean exact hit is shown as a suggestion, because it was NOT applied to the
-  // form — the fields on screen came from the OCR pass instead.
+  // clean exact hit that agrees with what OCR read off the card is shown as a
+  // suggestion, because it was NOT applied to the form — the fields on screen
+  // came from the OCR pass instead.
   const csNeedsReview = Boolean(
     cardSightResult?.identified &&
-    !(cardSightResult.exactMatch
-      && !cardSightResult.ambiguous
-      && !isLowConfidence(cardSightResult.confidenceScore ?? cardSightResult.confidence))
+    !assessCardSightMatch(cardSightResult, scanResult).trustworthy
   );
+  // Which identity fields the catalog match contradicts the photo read on —
+  // drives the panel copy, since "disagrees with your card" is a different
+  // situation from "too uncertain".
+  const csDisagreements = cardSightResult?.identified
+    ? cardSightDisagreements(scanResult, cardSightResult.card)
+    : [];
 
   // Photo template modal state
   const [photoTemplateModal, setPhotoTemplateModal] = useState({ open: false, processType: null, step: 'preview' });
@@ -964,12 +970,14 @@ const AddEditCardPage = () => {
     }
 
     // ── 3. Overlay the catalog record ───────────────────────────────────────
-    // CardSight is authoritative when it returns a clean exact hit; a weak or
-    // cross-category match is left as a suggestion in the results panel so it
-    // can't quietly overwrite what OCR read off the card.
-    const trustworthy = csResult.exactMatch
-      && !csResult.ambiguous
-      && !isLowConfidence(csResult.confidenceScore ?? csResult.confidence);
+    // CardSight is authoritative when it returns a clean exact hit that agrees
+    // with what OCR read off the card; a weak, cross-category or disagreeing
+    // match is left as a suggestion in the results panel so it can't quietly
+    // overwrite the direct read. The disagreement check matters most on
+    // template-styled insert sets, where CardSight — which only sees the front
+    // photo — can return the wrong player in the right set as an "exact" hit
+    // while the name printed on the back was read correctly.
+    const { trustworthy, disagreements } = assessCardSightMatch(csResult, ocrResult);
 
     if (trustworthy) {
       setFormData(prev => {
@@ -985,13 +993,24 @@ const AddEditCardPage = () => {
         set('estimatedValue', String(csResult.pricing.avgPrice.toFixed(2)));
       }
       toast.success('Card identified! Fields auto-filled from catalog.');
+    } else if (disagreements.length) {
+      toast.warning(
+        disagreements.includes('name')
+          ? `The catalog match (${csResult.card?.name ?? 'a different card'}) doesn't agree with what was read off your card — kept as a suggestion only.`
+          : 'The catalog match shows a different card number than your card — kept as a suggestion only.'
+      );
     } else if (csResult.ambiguous) {
       toast.warning('Matched more than one category — check the details before saving.');
     } else {
       toast.warning('Possible match found — please verify the details.');
     }
 
-    if (csResult.card?.id) fetchPricingById(csResult.card.id);
+    // Price the card the seller actually has: a match that disagrees with the
+    // photo read points its catalog id at a *different* card, and charting that
+    // card's sales here would price the listing off the wrong player.
+    if (disagreements.length) {
+      if (ocrResult?.name) fetchPricingByName(ocrResult.name);
+    } else if (csResult.card?.id) fetchPricingById(csResult.card.id);
     else if (csResult.card?.name) fetchPricingByName(csResult.card.name);
 
     logScan(ocrResult, csResult, analysisImages.length);
@@ -1032,7 +1051,9 @@ const AddEditCardPage = () => {
     if (!query) return;
     const [ebayData, csData] = await Promise.all([
       lookupPrice(query),
-      cardSightResult?.card?.id
+      // The stored catalog id is only usable when the match agrees with what
+      // was read off the card — a disagreeing match's id names a different card.
+      cardSightResult?.card?.id && !csDisagreements.length
         ? fetchPricingById(cardSightResult.card.id)
         : fetchPricingByName(query.name),
     ]);
@@ -1436,8 +1457,10 @@ const AddEditCardPage = () => {
         listing_type:        isPublic ? formData.listingType : 'Private',
         display_style:       formData.displayStyle,
         // Persist CardSight ID if we got an exact match during this session
-        // (the server stamps cardsight_identified_at itself)
-        ...(cardSightResult?.exactMatch && cardSightResult?.card?.id
+        // (the server stamps cardsight_identified_at itself). Never when the
+        // match disagrees with the photo read — that id names a different card,
+        // and stamping it would tie every later pricing lookup to the wrong one.
+        ...(cardSightResult?.exactMatch && cardSightResult?.card?.id && !csDisagreements.length
           ? {
               cardsight_card_id: cardSightResult.card.id,
               cardsight_set_id:  cardSightResult.card.setId ?? null,
@@ -1876,6 +1899,8 @@ const AddEditCardPage = () => {
                           <p className="text-[10px] text-muted-foreground mt-1">
                             {cardSightResult.ambiguous
                               ? 'This image also matched a card in another category — check the details below before saving.'
+                              : csDisagreements.length
+                                ? `Strong visual match, but it names a different ${csDisagreements.includes('name') ? 'card' : 'card number'} than your photos show — it was not applied.`
                               : csConfidence >= 0.9 ? 'Strong match — details came straight from the catalog.'
                               : csConfidence >= 0.75 ? 'Reasonable match — review the details before saving.'
                               : 'Weak match — verify every field before saving.'}
@@ -1939,8 +1964,9 @@ const AddEditCardPage = () => {
                         <>
                           {csNeedsReview && (
                             <p className="text-[10px] text-muted-foreground mb-1">
-                              Fields below were read from your photo — the catalog match above was too
-                              uncertain to apply automatically.
+                              {csDisagreements.length
+                                ? 'Fields below were read from your photo — the catalog match above disagrees with them, so it was not applied.'
+                                : 'Fields below were read from your photo — the catalog match above was too uncertain to apply automatically.'}
                             </p>
                           )}
                           {scanResult.catalogueMatch && (
