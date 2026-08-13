@@ -30,7 +30,7 @@ import { mapOCRResult, catalogueCollectionParam } from '../utils/ocrResult.js';
 import { groundAgainstCatalogue, buildCatalogueQuery } from '../utils/catalogueGrounding.js';
 import { getSegmentsForCollection } from '../src/utils/collectionSegmentMap.js';
 import { rankCandidates, hasAmbiguousWinner } from '../src/utils/cardsightRanking.js';
-import { isLowConfidence } from '../utils/cardsightConfidence.js';
+import { assessCardSightMatch } from '../utils/cardsightTrust.js';
 import { mergeIdentifiedVariants } from '../lib/cardVariants.js';
 import { scoreCase, summarise, formatSummary, VERDICT, SCORED_FIELDS } from '../utils/identificationScore.js';
 import { isExactMatch, hasParallel, getParallelInfo } from 'cardsightai';
@@ -202,10 +202,8 @@ async function runCase(fixture, rectifier, log) {
   // Stage 2 — the category OCR read chooses the segment. Front only.
   const cardsight = await identifyWithCardSight(images[0].buffer, images[0].mimetype, ocr.collectionType, log);
 
-  // Stage 4 — overlay only on a clean exact hit.
-  const trustworthy = Boolean(
-    cardsight?.exactMatch && !cardsight.ambiguous && !isLowConfidence(cardsight.confidence),
-  );
+  // Stage 4 — overlay only on a clean exact hit that agrees with the OCR read.
+  const { trustworthy, disagreements } = assessCardSightMatch(cardsight, ocr);
   if (trustworthy) {
     const c = cardsight.card;
     if (c?.name) fields.name = c.name;
@@ -231,6 +229,7 @@ async function runCase(fixture, rectifier, log) {
         exactMatch: cardsight.exactMatch,
         ambiguous: cardsight.ambiguous,
         applied: trustworthy,
+        disagreements,
       },
     },
   };
@@ -246,6 +245,7 @@ function reportCase(id, score, meta) {
     meta.escalated ? `escalated(${meta.escalationReason})` : null,
     meta.cardsight?.applied ? `cardsight:${meta.cardsight.segment}` : null,
     meta.cardsight?.ambiguous ? 'AMBIGUOUS' : null,
+    meta.cardsight?.disagreements?.length ? `CS-DISAGREES(${meta.cardsight.disagreements.join('+')})` : null,
   ].filter(Boolean).join(' ');
 
   out(`\n${score.wrong.length ? '✗' : '✓'} ${id}${flags ? `   [${flags}]` : ''}`);

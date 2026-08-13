@@ -291,10 +291,25 @@ the pick in place.
 ### 4. Overlaying the catalog record
 
 CardSight overwrites the OCR-derived fields only when the match is
-**trustworthy** — an exact hit, not ambiguous, not low confidence. Otherwise the
-OCR fields stand and CardSight's guess is shown as a suggestion in the results
-panel. This is what stops a weak cross-category match from quietly replacing
-what was actually read off the card.
+**trustworthy** — an exact hit, not ambiguous, not low confidence, **and not in
+disagreement with what OCR read off the card**. Otherwise the OCR fields stand
+and CardSight's guess is shown as a suggestion in the results panel. This is
+what stops a weak cross-category match from quietly replacing what was actually
+read off the card.
+
+The disagreement check (`utils/cardsightTrust.js`, shared with the scoring
+harness) demotes an otherwise-clean exact hit when its name positively
+conflicts with the OCR-read name, or its collector number positively disagrees
+with the printed one — the same "a different printing must never be merged in"
+rule the grounding step applies. It exists because CardSight only ever sees the
+front photo and matches on the image alone: on template-styled insert sets
+(2025-26 Topps Hobby Stars, where every card is the same storefront artwork
+with a different player) it returned the wrong player in the right set as an
+exact High-confidence hit, overwriting a name OCR had read correctly off the
+back. Only *positive* disagreement demotes — a field OCR couldn't read can't
+conflict with anything, and containment ("Pikachu" vs "Pikachu VMAX") still
+counts as agreement. A demoted match is also barred from pricing and from being
+persisted as `cardsight_card_id`: its catalog id names a different card.
 
 ## Confidence is an enum, not a number
 
