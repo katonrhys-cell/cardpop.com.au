@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 // from the WebSite JSON-LD name, og:site_name, <title>, headings and
 // application-name. When those sources disagree it discards them all and falls
 // back to the bare domain, which is exactly what happened while og:site_name
-// said "CardPop™ Australia" and the Organization schema said "CardPop™".
+// and the Organization schema named the site two different things.
 // These tests pin every source to one identical string so an edit to a single
 // file can't silently drop the result back to the domain.
 //
@@ -21,7 +21,7 @@ const read = (p) => readFileSync(resolve(root, p), 'utf8');
 
 // The bare naming string, and the trademarked form used in human-facing copy.
 const SITE_NAME = 'CardPop Australia';
-const DISPLAY_NAME = 'CardPop™ Australia';
+const DISPLAY_NAME = 'CardPop Australia™';
 
 const html = read('index.html');
 

@@ -7,7 +7,7 @@ const TermsPage = () => {
   return (
     <InfoPageLayout
       icon={ScrollText}
-      eyebrow="CardPop™ Australia"
+      eyebrow="CardPop Australia™"
       title="Terms of Service"
       description="The rules and guidelines for using the CardPop™ platform."
     >

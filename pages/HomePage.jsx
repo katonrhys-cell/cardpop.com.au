@@ -419,8 +419,8 @@ const HomePage = () => {
           homepage title as a site-name candidate, and this rendered SPA title
           is the one it ends up seeing. */}
       <SEOHead
-        title="CardPop™ Australia | Trading Card Marketplace"
-        description="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop™ Australia — Australia's most trusted trading card platform."
+        title="CardPop Australia™ | Trading Card Marketplace"
+        description="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop Australia™ — Australia's most trusted trading card platform."
       />
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}

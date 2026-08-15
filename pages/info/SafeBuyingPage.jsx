@@ -49,7 +49,7 @@ const SafeBuyingPage = () => {
   return (
     <InfoPageLayout
       icon={ShieldCheck}
-      eyebrow="CardPop™ Australia"
+      eyebrow="CardPop Australia™"
       title="Why CardPop Is Safe: Buyer Protection & Secure Payments"
       description="Australia's safest place to buy Pokémon, Magic and sports cards — secure Stripe payments, ID-verified sellers and buyer protection on every order."
     >

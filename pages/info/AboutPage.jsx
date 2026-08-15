@@ -135,7 +135,7 @@ const AboutPage = () => {
                   src="/images/reece-conway-640.jpg"
                   srcSet="/images/reece-conway-320.jpg 320w, /images/reece-conway-640.jpg 640w"
                   sizes="(max-width: 1024px) 100vw, 420px"
-                  alt="Reece Conway, founder of CardPop™ Australia"
+                  alt="Reece Conway, founder of CardPop Australia™"
                   className="w-full aspect-square object-cover"
                   width="640"
                   height="640"
@@ -145,7 +145,7 @@ const AboutPage = () => {
               </picture>
               <div className="p-6 border-t border-border">
                 <p className="font-extrabold text-foreground text-lg leading-tight">Reece Conway</p>
-                <p className="text-sm text-muted-foreground mt-1">Founder, CardPop™ Australia · Melbourne, Victoria</p>
+                <p className="text-sm text-muted-foreground mt-1">Founder, CardPop Australia™ · Melbourne, Victoria</p>
               </div>
             </div>
           </div>
