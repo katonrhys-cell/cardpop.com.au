@@ -158,7 +158,7 @@ ${robots ? `<meta name="robots" content="${esc(robots)}" />` : ''}
 <meta property="og:title" content="${esc(title)}" />
 <meta property="og:description" content="${esc(description)}" />
 <meta property="og:type" content="${esc(ogType)}" />
-<meta property="og:site_name" content="CardPop™ Australia" />
+<meta property="og:site_name" content="CardPop Australia™" />
 <meta property="og:url" content="${esc(canonical)}" />
 ${ogImage ? `<meta property="og:image" content="${esc(ogImage)}" />` : ''}
 ${ogImage ? `<meta property="og:image:alt" content="${esc(imageAlt)}" />` : ''}
@@ -1295,14 +1295,14 @@ const STATIC_CONTENT = {
 
   '/about': {
     title: "About CardPop™ | Australia's Trading Card Marketplace",
-    description: "Learn about CardPop™ Australia — Australia's premier platform for buying, selling and trading Pokemon, Magic and sports cards.",
+    description: "Learn about CardPop Australia™ — Australia's premier platform for buying, selling and trading Pokemon, Magic and sports cards.",
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'About', path: '/about' }],
     h1: 'The card show that never closes.',
     intro: 'Every collector remembers the moment the hobby truly clicked. CardPop™ was built to recreate the trust, excitement and community of card shows — online, every day of the year.',
     sections: [
       { h2: 'Our story', paras: [
         'For our founder, the hobby clicked at his first card show. The energy was unlike anything else — collectors swapping stories, making deals with a handshake, helping newcomers, celebrating each other’s pickups and vouching for people without hesitation. It wasn’t just about buying and selling cards; it was about being part of a community built on trust.',
-        'Outside those shows, that feeling didn’t always exist online. Collectors were left searching Facebook groups and Discord servers for vouches before every trade, hoping the other person was genuine. For high-value cards, that uncertainty can stop great deals from ever happening. So CardPop™ was built to bring the trust, excitement and community of card shows online. “Collecting deserved better.” — Reece Conway, Founder, CardPop™ Australia, Melbourne, Victoria.',
+        'Outside those shows, that feeling didn’t always exist online. Collectors were left searching Facebook groups and Discord servers for vouches before every trade, hoping the other person was genuine. For high-value cards, that uncertainty can stop great deals from ever happening. So CardPop™ was built to bring the trust, excitement and community of card shows online. “Collecting deserved better.” — Reece Conway, Founder, CardPop Australia™, Melbourne, Victoria.',
       ] },
       { h2: 'More than a marketplace', items: [
         { text: 'Market insights — discover pricing data and follow market trends as they move.' },
@@ -1346,7 +1346,7 @@ const STATIC_CONTENT = {
   },
 
   '/faq': {
-    title: 'FAQ | CardPop™ Australia — Trading Card Marketplace',
+    title: 'FAQ | CardPop Australia™ — Trading Card Marketplace',
     description: "Answers to common questions about buying, selling and trading on CardPop™ — Australia's trusted trading card marketplace. Learn about fees, the Vault, trades, and payments.",
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'FAQ', path: '/faq' }],
     h1: 'Frequently Asked Questions',
