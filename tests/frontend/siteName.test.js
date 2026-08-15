@@ -12,16 +12,15 @@ import { fileURLToPath } from 'node:url';
 // These tests pin every source to one identical string so an edit to a single
 // file can't silently drop the result back to the domain.
 //
-// The naming fields deliberately carry no ™ — it is display copy, and a
-// decorative character is itself grounds for Google to reject a candidate. The
-// ™ lives in the <title> and the social tags, which these tests allow for.
+// One canonical string, ™ included, across every source. The bare
+// "CardPop Australia" is kept only as an alternateName — a fallback form on
+// record in case Google declines to print the symbol.
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (p) => readFileSync(resolve(root, p), 'utf8');
 
-// The bare naming string, and the trademarked form used in human-facing copy.
-const SITE_NAME = 'CardPop Australia';
-const DISPLAY_NAME = 'CardPop Australia™';
+const SITE_NAME = 'CardPop Australia™';
+const PLAIN_NAME = 'CardPop Australia';
 
 const html = read('index.html');
 
@@ -32,17 +31,15 @@ const metaContent = (html_, selector) =>
   html_.match(new RegExp(`<meta (?:name|property)="${selector}" content="([^"]*)"`))?.[1];
 
 describe('Google site name signals', () => {
-  it('names the WebSite entity exactly, with no trademark symbol', () => {
+  it('names the WebSite entity exactly', () => {
     const website = jsonLdBlocks.find((b) => b['@type'] === 'WebSite');
     expect(website).toBeDefined();
     expect(website.name).toBe(SITE_NAME);
   });
 
-  it('still declares the trademarked form as an alternate name', () => {
-    // Dropping ™ from "name" must not drop the trademarked form from the
-    // markup altogether — it stays declared, just not as the primary name.
+  it('keeps a ™-free form on record as an alternate name', () => {
     const website = jsonLdBlocks.find((b) => b['@type'] === 'WebSite');
-    expect(website.alternateName).toContain(DISPLAY_NAME);
+    expect(website.alternateName).toContain(PLAIN_NAME);
   });
 
   it('gives every homepage entity the same name', () => {
@@ -60,11 +57,11 @@ describe('Google site name signals', () => {
     expect(metaContent(html, 'application-name')).toBe(SITE_NAME);
   });
 
-  it('leads the homepage title with the site name, ™ included', () => {
+  it('leads the homepage title with the site name', () => {
     // The title is a site-name candidate too, so it has to lead with the brand
-    // rather than bury it after a tagline — but as display copy it keeps the ™.
+    // rather than bury it after a tagline.
     const title = html.match(/<title>([^<]*)<\/title>/)?.[1];
-    expect(title.startsWith(DISPLAY_NAME)).toBe(true);
+    expect(title.startsWith(SITE_NAME)).toBe(true);
   });
 
   it('keeps the SPA-rendered homepage title identical to the static one', () => {

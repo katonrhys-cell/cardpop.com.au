@@ -180,7 +180,7 @@ const ShopCategoryPage = () => {
     name: metaTitle,
     description: metaDesc,
     url: canonicalUrl,
-    isPartOf: { '@type': 'WebSite', name: 'CardPop Australia', url: SITE_ORIGIN },
+    isPartOf: { '@type': 'WebSite', name: 'CardPop Australia™', url: SITE_ORIGIN },
     mainEntity: {
       '@type': 'ItemList',
       numberOfItems: totalItems,
