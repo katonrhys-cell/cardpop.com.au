@@ -11,11 +11,17 @@ import { fileURLToPath } from 'node:url';
 // said "CardPop™ Australia" and the Organization schema said "CardPop™".
 // These tests pin every source to one identical string so an edit to a single
 // file can't silently drop the result back to the domain.
+//
+// The naming fields deliberately carry no ™ — it is display copy, and a
+// decorative character is itself grounds for Google to reject a candidate. The
+// ™ lives in the <title> and the social tags, which these tests allow for.
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (p) => readFileSync(resolve(root, p), 'utf8');
 
+// The bare naming string, and the trademarked form used in human-facing copy.
 const SITE_NAME = 'CardPop Australia';
+const DISPLAY_NAME = 'CardPop™ Australia';
 
 const html = read('index.html');
 
@@ -30,6 +36,13 @@ describe('Google site name signals', () => {
     const website = jsonLdBlocks.find((b) => b['@type'] === 'WebSite');
     expect(website).toBeDefined();
     expect(website.name).toBe(SITE_NAME);
+  });
+
+  it('still declares the trademarked form as an alternate name', () => {
+    // Dropping ™ from "name" must not drop the trademarked form from the
+    // markup altogether — it stays declared, just not as the primary name.
+    const website = jsonLdBlocks.find((b) => b['@type'] === 'WebSite');
+    expect(website.alternateName).toContain(DISPLAY_NAME);
   });
 
   it('gives every homepage entity the same name', () => {
@@ -47,9 +60,11 @@ describe('Google site name signals', () => {
     expect(metaContent(html, 'application-name')).toBe(SITE_NAME);
   });
 
-  it('leads the homepage title with the site name', () => {
+  it('leads the homepage title with the site name, ™ included', () => {
+    // The title is a site-name candidate too, so it has to lead with the brand
+    // rather than bury it after a tagline — but as display copy it keeps the ™.
     const title = html.match(/<title>([^<]*)<\/title>/)?.[1];
-    expect(title.startsWith(SITE_NAME)).toBe(true);
+    expect(title.startsWith(DISPLAY_NAME)).toBe(true);
   });
 
   it('keeps the SPA-rendered homepage title identical to the static one', () => {

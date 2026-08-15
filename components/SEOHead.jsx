@@ -5,8 +5,10 @@ const SEOHead = ({ title, description, canonicalUrl, ogImage, ogImageAlt, struct
   const siteName = "CardPop";
   // Brand name Google surfaces as the "site name" above search results (via
   // og:site_name here and the WebSite schema in index.html). Must match those
-  // sources byte for byte — including the absent ™ — or Google discards all of
-  // them and prints the bare domain instead. Kept separate from siteName so
+  // sources byte for byte — including the absent ™, which is deliberate: this
+  // is a naming field, not display copy, and a decorative character is reason
+  // enough for Google to reject the candidate and print the bare domain. The ™
+  // stays in the titles this component renders. Kept separate from siteName so
   // page titles stay "CardPop | …" without doubling up on "Australia".
   const brandName = "CardPop Australia";
   const SITE_ORIGIN = "https://cardpop.com.au";

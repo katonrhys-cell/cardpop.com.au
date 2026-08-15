@@ -124,15 +124,19 @@
     <!-- The site name Google prints above a search result is read off the
          homepage only, from (in order) the WebSite JSON-LD "name", og:site_name,
          <title>, headings and application-name — and it falls back to the bare
-         domain ("cardpop.com.au") when those disagree or carry decorative
-         characters. So every machine-readable name below is the byte-identical
-         string "CardPop Australia", with no ™: the trademark symbol stays in the
-         visible wordmark (components/CardPopBrand.jsx), not in the metadata.
-         Keep them in sync — changing one alone reintroduces the fallback. -->
-    <title>CardPop Australia | Trading Card Marketplace</title>
-    <meta name="description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, Yu-Gi-Oh, and sports cards on CardPop Australia — Australia's trusted online trading card marketplace. Browse thousands of listings, check live prices, and shop sealed boxes." />
+         domain ("cardpop.com.au") when those sources disagree. So the three
+         fields that exist purely to *name the site* — the schema "name",
+         og:site_name and application-name — are the byte-identical string
+         "CardPop Australia", and they carry no ™, because a decorative
+         character is itself a reason for Google to reject a candidate.
+         The ™ is preserved everywhere it is read by a human: the wordmark
+         (components/CardPopBrand.jsx), the <title>, and the social/preview
+         tags below. Keep the three naming fields in sync — changing one alone
+         reintroduces the domain fallback. -->
+    <title>CardPop™ Australia | Trading Card Marketplace</title>
+    <meta name="description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, Yu-Gi-Oh, and sports cards on CardPop™ Australia — Australia's trusted online trading card marketplace. Browse thousands of listings, check live prices, and shop sealed boxes." />
     <meta name="keywords" content="trading cards Australia, Pokemon cards Australia, buy sell trade cards, MTG Australia, sports cards Australia, card marketplace" />
-    <meta name="author" content="CardPop Australia" />
+    <meta name="author" content="CardPop™" />
     <meta name="application-name" content="CardPop Australia" />
     <!-- Canonical is emitted per-route by SEOHead (apex-normalised) so it never
          conflicts with a static tag. The www host 301-redirects to apex (vercel.json). -->
@@ -141,8 +145,8 @@
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://cardpop.com.au/" />
     <meta property="og:site_name" content="CardPop Australia" />
-    <meta property="og:title" content="CardPop Australia | Australia's Trusted Digital Card Show - Trading Card Marketplace" />
-    <meta property="og:description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop Australia — Australia's most trusted trading card platform." />
+    <meta property="og:title" content="CardPop™ Australia | Australia's Trusted Digital Card Show - Trading Card Marketplace" />
+    <meta property="og:description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop™ Australia — Australia's most trusted trading card platform." />
     <meta property="og:image" content="https://cardpop.com.au/og-image.jpg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -151,8 +155,8 @@
     <!-- Twitter / X card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@cardpopau" />
-    <meta name="twitter:title" content="CardPop Australia | Australia's Trusted Digital Card Show - Trading Card Marketplace" />
-    <meta name="twitter:description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop Australia — Australia's most trusted trading card platform." />
+    <meta name="twitter:title" content="CardPop™ Australia | Australia's Trusted Digital Card Show - Trading Card Marketplace" />
+    <meta name="twitter:description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop™ Australia — Australia's most trusted trading card platform." />
     <meta name="twitter:image" content="https://cardpop.com.au/og-image.jpg" />
 
     <!-- Favicon — CardPop card-holder icon in brand red -->
@@ -187,7 +191,7 @@
       "@type": "Organization",
       "@id": "https://cardpop.com.au/#organization",
       "name": "CardPop Australia",
-      "alternateName": "CardPop",
+      "alternateName": ["CardPop", "CardPop™ Australia"],
       "url": "https://cardpop.com.au",
       "logo": "https://cardpop.com.au/og-image.jpg",
       "description": "Australia's most trusted trading card marketplace.",
@@ -212,7 +216,7 @@
       "@context": "https://schema.org",
       "@type": "OnlineStore",
       "name": "CardPop Australia",
-      "alternateName": "CardPop",
+      "alternateName": ["CardPop", "CardPop™ Australia"],
       "description": "Australia's most trusted trading card marketplace for Pokémon, Magic: The Gathering, Yu-Gi-Oh and sports cards.",
       "url": "https://cardpop.com.au",
       "currenciesAccepted": "AUD",
