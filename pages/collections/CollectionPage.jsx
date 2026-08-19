@@ -517,7 +517,8 @@ const CollectionPage = () => {
           `*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(display_name, username, avatar_url, is_verified)`,
           { count: 'estimated' }
         )
-        .eq('status', 'active')
+        // Sold listings stay in the grid, badged "Sold" (not purchasable).
+        .in('status', ['active', 'sold'])
         .or(`category_id.eq.${catMatch},franchise_id.eq.${catMatch}`, { referencedTable: 'vault_items' })
         .range(from, from + perPage - 1);
 

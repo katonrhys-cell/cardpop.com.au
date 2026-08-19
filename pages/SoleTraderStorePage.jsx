@@ -93,7 +93,8 @@ const SoleTraderStorePage = () => {
         const [marketplaceRes, vaultRes, reviewsRes] = await Promise.all([
           supabase.from('listings')
             .select(`*, ${LISTING_CARD_VAULT_EMBED}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
-            .eq('seller_id', resolvedId).eq('status', 'active')
+            // Sold cards stay on the storefront, badged "Sold".
+            .eq('seller_id', resolvedId).in('status', ['active', 'sold'])
             .order('created_at', { ascending: false }).limit(24),
           supabase.from('vault_items')
             .select(`${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
@@ -448,7 +449,7 @@ const SoleTraderStorePage = () => {
               <span className="font-bold">{dealer.total_sales ?? 0}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Active Listings</span>
+              <span className="text-muted-foreground">Listings</span>
               <span className="font-bold">{stats.totalListings}</span>
             </div>
           </div>
@@ -472,7 +473,7 @@ const SoleTraderStorePage = () => {
           ) : (
             <div className="text-center py-24 bg-card rounded-[2rem] border border-border border-dashed">
               <Package className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
-              <h3 className="text-lg font-bold text-foreground mb-1">No Active Listings</h3>
+              <h3 className="text-lg font-bold text-foreground mb-1">No Listings</h3>
               <p className="text-muted-foreground">This dealer has no items listed at the moment. Check back soon.</p>
             </div>
           )}

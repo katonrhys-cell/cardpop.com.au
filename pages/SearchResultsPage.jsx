@@ -58,7 +58,10 @@ async function searchListings(tokens) {
     supabase
       .from('listings')
       .select(`*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
-      .eq('status', 'active')
+      // Sold cards stay in the results, badged "Sold" by MarketplaceListingCard
+      // — a card that sold is still the card someone searched for. Only
+      // 'archived' is genuinely off the site.
+      .in('status', ['active', 'sold'])
       .neq('listing_type', 'vault'),
     tokens, ['card_name', 'set_name'], 'vault_items',
   ).order('created_at', { ascending: false }).limit(OVER_FETCH);

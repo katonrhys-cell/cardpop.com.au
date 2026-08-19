@@ -527,7 +527,12 @@ async function renderListing(supabase, id, slugParam) {
   const cardName = listing?.title || card.card_name || 'Trading Card';
   const canonical = `${BASE_URL}/marketplace/${id}/${listing?.slug || slugify(cardName) || slugParam || 'listing'}`;
 
-  if (!listing || listing.status !== 'active') {
+  // A sold listing stays on the site — the card, its photos and its price are
+  // all still there, marked "Sold" and not purchasable — so it is a real page,
+  // not a soft 404. It renders 200 with schema.org availability SoldOut.
+  // Archived (and every other status) is genuinely gone and still 404s.
+  const soldOut = listing?.status === 'sold';
+  if (!listing || (listing.status !== 'active' && !soldOut)) {
     return notFound({
       title: 'Listing Unavailable | CardPop',
       description: 'This marketplace listing is no longer available on CardPop.',
@@ -542,10 +547,10 @@ async function renderListing(supabase, id, slugParam) {
   const grade = listing.grade || card.grade;
   const gradingCompany = listing.grading_company || card.grading_company;
   const sellerName = listing.seller?.business_name || listing.seller?.display_name || listing.seller?.username || 'CardPop Seller';
-  const title = `${cardName} | CardPop Marketplace`;
+  const title = `${cardName}${soldOut ? ' (Sold)' : ''} | CardPop Marketplace`;
   const setLine = [card.set_name, card.year].filter(Boolean).join(' · ');
   const description = listing.description
-    || `${cardName}${setLine ? ` (${setLine})` : ''}${grade ? ` — ${gradingCompany || ''} ${grade}`.trimEnd() : ''} for sale on CardPop, Australia's trading card marketplace.`;
+    || `${cardName}${setLine ? ` (${setLine})` : ''}${grade ? ` — ${gradingCompany || ''} ${grade}`.trimEnd() : ''} ${soldOut ? 'sold on' : 'for sale on'} CardPop, Australia's trading card marketplace.`;
 
   const product = {
     '@context': 'https://schema.org',
@@ -560,7 +565,7 @@ async function renderListing(supabase, id, slugParam) {
           '@type': 'Offer',
           price: Number(price).toFixed(2),
           priceCurrency: 'AUD',
-          availability: 'https://schema.org/InStock',
+          availability: soldOut ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
           ...(schemaItemCondition(condition) ? { itemCondition: schemaItemCondition(condition) } : {}),
           url: canonical,
           seller: { '@type': 'Organization', name: sellerName },
@@ -583,8 +588,9 @@ async function renderListing(supabase, id, slugParam) {
   <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/marketplace">Marketplace</a> / ${esc(cardName)}</nav>
   <h1>${esc(cardName)}</h1>
   ${image ? `<img src="${esc(image)}" alt="${esc(cardName)}" />` : ''}
+  ${soldOut ? '<p><strong>Sold</strong> — this card is no longer available for purchase.</p>' : ''}
   ${price > 0
-    ? `<p><strong>A$${esc(Number(price).toFixed(2))}</strong>${listing.accepts_offers ? ' (offers accepted)' : ''}</p>`
+    ? `<p><strong>A$${esc(Number(price).toFixed(2))}</strong>${soldOut ? '' : (listing.accepts_offers ? ' (offers accepted)' : '')}</p>`
     : (listing.price_min_aud != null && listing.price_max_aud != null
       ? `<p><strong>Seeking offers: A$${esc(Number(listing.price_min_aud).toFixed(2))} – A$${esc(Number(listing.price_max_aud).toFixed(2))}</strong></p>`
       : '')}

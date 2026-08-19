@@ -148,9 +148,29 @@ describe('prerender marketplace listings', () => {
     expect(body).toContain('Charizard Base Set');
   });
 
-  it('returns a 404 with noindex for a sold/inactive listing', async () => {
-    state.result = { data: { id: UUID, slug: 'sold-card', title: 'Sold Card', status: 'sold' } };
+  it('renders a sold listing as a real page marked SoldOut', async () => {
+    // A sold card stays on the site — visible, marked Sold, not purchasable —
+    // so its page has genuine content and must not be a 404 (or a soft 404).
+    state.result = { data: {
+      id: UUID, slug: 'sold-card', title: 'Sold Card', price_aud: 400, status: 'sold',
+      accepts_offers: true,
+      vault_item: { card_name: 'Victor Wembanyama', set_name: 'Topps Chrome', year: 2023 },
+      seller: { username: 'kat', display_name: 'Kat' },
+    } };
     const { status, body } = await run('/marketplace/' + UUID + '/sold-card');
+    expect(status).toBe(200);
+    expect(body).not.toContain('noindex');
+    expect(body).toContain('schema.org/SoldOut');
+    expect(body).not.toContain('schema.org/InStock');
+    expect(body).toContain('(Sold)');
+    expect(body).toContain('no longer available for purchase');
+    // A sold listing never advertises that it takes offers.
+    expect(body).not.toContain('offers accepted');
+  });
+
+  it('returns a 404 with noindex for an archived listing', async () => {
+    state.result = { data: { id: UUID, slug: 'gone-card', title: 'Gone Card', status: 'archived' } };
+    const { status, body } = await run('/marketplace/' + UUID + '/gone-card');
     expect(status).toBe(404);
     expect(body).toContain('noindex');
     expect(body).toContain('Listing Unavailable');
