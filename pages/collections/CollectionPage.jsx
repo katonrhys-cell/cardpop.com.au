@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/lib/supabaseClient.js';
 import { VAULT_ITEM_CARD_SELECT, LISTING_CARD_VAULT_EMBED_INNER } from '@/lib/listingCardColumns.js';
+import { vaultItemListing } from '@/lib/vaultItemListing.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
@@ -48,6 +49,11 @@ const CardSkeleton = () => (
 
 // ─── Mini listing card for horizontal scroll sections ────────────────────────
 const MiniListingCard = ({ listing, accentHex, badge }) => {
+  // Vault-sourced rails carry the card's listing in `listings`; marketplace
+  // rows carry their own status. Either way a sold card is badged, never shown
+  // as available — the vault row's listing_type still reads "For Sale".
+  const rowListing = vaultItemListing(listing);
+  const isSold = listing.status === 'sold' || rowListing?.status === 'sold';
   const imgPath = listing.card_image || listing.vault_images?.[0]?.storage_path || null;
   const imgSrc = imgPath
     ? (publicImageUrl(imgPath))
@@ -57,7 +63,9 @@ const MiniListingCard = ({ listing, accentHex, badge }) => {
   const source = listing.source ?? 'vault';
   const detailPath = source === 'marketplace'
     ? `/marketplace/${listing.id}/${slugify(title)}`
-    : `/product/${source}/${listing.id}/${slugify(title)}`;
+    : (rowListing
+        ? `/marketplace/${rowListing.id}/${slugify(title)}`
+        : `/product/${source}/${listing.id}/${slugify(title)}`);
   const grade = listing.grade;
   const gradingCompany = listing.grading_company;
 
@@ -79,12 +87,17 @@ const MiniListingCard = ({ listing, accentHex, badge }) => {
             <ShoppingBag className="w-8 h-8" />
           </div>
         )}
+        {isSold && (
+          <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider text-white shadow bg-brand-red">
+            Sold
+          </div>
+        )}
         {/* Grade badge overlay */}
         {grade && (
           <GradeBadge grade={grade} gradingCompany={gradingCompany} isPositioned={false} className="absolute top-2 right-2 z-10 text-[10px]" />
         )}
         {/* Custom badge (e.g. "Trending") */}
-        {badge && !grade && (
+        {badge && !grade && !isSold && (
           <div
             className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-extrabold text-white shadow"
             style={{ background: accentHex }}
@@ -100,7 +113,10 @@ const MiniListingCard = ({ listing, accentHex, badge }) => {
         <p className="text-sm font-bold leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors">
           {title}
         </p>
-        <p className="text-base font-extrabold tabular-nums mt-auto" style={{ color: accentHex }}>
+        <p
+          className={`text-base font-extrabold tabular-nums mt-auto ${isSold ? 'line-through opacity-60' : ''}`}
+          style={{ color: isSold ? undefined : accentHex }}
+        >
           ${price.toFixed(2)}
         </p>
       </div>

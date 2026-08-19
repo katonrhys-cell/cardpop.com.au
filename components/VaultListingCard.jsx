@@ -12,6 +12,7 @@ import { VARIANT_BADGES, ROOKIE_VARIANT } from '@/lib/cardVariants.js';
 import RookiePill from '@/components/RookiePill.jsx';
 import { getAutographLabel, getRefractorLabel, getRefractorBadgeClass, genericVariantChips } from '@/lib/cardAttributeLabels.js';
 import { getCardImage, CARD_GRID_SIZES, toCdnUrl } from '@/utils/imageUrl.js';
+import { vaultItemListing } from '@/lib/vaultItemListing.js';
 import { isVerified } from '@/utils/verification.js';
 import GradeBadge, { GRADE_BADGE } from '@/components/GradeBadge.jsx';
 
@@ -28,6 +29,13 @@ const getStatusBadge = (listingType) => {
 
 const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
+  // A sold card keeps its place in the grid, badged "Sold" — same treatment as
+  // MarketplaceListingCard. The vault row itself never records the sale (it
+  // still says "For Sale"), so the listing embedded by VAULT_ITEM_CARD_SELECT
+  // is the only source of truth; without it a sold card advertises itself as
+  // available on the homepage and every seller store.
+  const liveListing = vaultItemListing(vaultItem, listing);
+  const isSold = liveListing?.status === 'sold';
   // Try every place a photo may be stored, in priority order. Featured cards
   // promoted onto the homepage often have their only photo in `card_image` (a
   // storage path) with no `vault_images` rows, and some carry extra shots in
@@ -45,8 +53,8 @@ const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
   const titleSlug = slugify(vaultItem.card_name || vaultItem.name || vaultItem.title || 'card');
 
   // Link to marketplace listing if available, otherwise to vault detail
-  const detailPath = listing
-    ? `/marketplace/${listing.id}/${titleSlug}`
+  const detailPath = liveListing
+    ? `/marketplace/${liveListing.id}/${titleSlug}`
     : `/product/vault/${vaultItem.id}/${titleSlug}`;
 
   const badgeConfig = getStatusBadge(vaultItem.listing_type);
@@ -66,7 +74,7 @@ const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
     : 'border border-border';
 
   return (
-    <div className={`group flex flex-col h-full bg-card rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 ${borderClass}`}>
+    <div className={`group flex flex-col h-full bg-card rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 ${borderClass} ${isSold ? 'opacity-95' : ''}`}>
       <Link to={detailPath} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
         <CardShowcase
           src={imgSrc}
@@ -82,9 +90,13 @@ const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
           priority={priority}
         />
         <div className="absolute top-3 left-3 z-10">
-          <Badge className={`shadow-sm font-bold ${badgeConfig.className}`}>
-            <StatusIcon className="w-3 h-3 mr-1.5" /> {vaultItem.listing_type || 'Private'}
-          </Badge>
+          {isSold ? (
+            <Badge className="bg-brand-red text-white shadow-sm font-bold uppercase tracking-wider">Sold</Badge>
+          ) : (
+            <Badge className={`shadow-sm font-bold ${badgeConfig.className}`}>
+              <StatusIcon className="w-3 h-3 mr-1.5" /> {vaultItem.listing_type || 'Private'}
+            </Badge>
+          )}
         </div>
         {overlayBadge && (
           <div className={`absolute top-3 right-3 z-10 px-2.5 py-1 rounded-full text-[11px] font-extrabold tracking-wide shadow-md ${overlayBadge[1].bg} ${overlayBadge[1].text}`}>
@@ -162,9 +174,12 @@ const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
         
         <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-border">
           <div className="flex items-center justify-between">
-            <span className="font-extrabold text-xl tabular-nums text-foreground">
-              ${Number(vaultItem.estimated_value_aud || 0).toFixed(2)}
+            <span className={`font-extrabold text-xl tabular-nums ${isSold ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+              ${Number(liveListing?.price_aud ?? vaultItem.estimated_value_aud ?? 0).toFixed(2)}
             </span>
+            {isSold && (
+              <span className="text-xs font-bold uppercase tracking-wider text-brand-red">Sold</span>
+            )}
           </div>
           
           {sellerId && (

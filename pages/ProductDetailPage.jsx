@@ -181,7 +181,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
         // Only the 'vault' source reaches here.
         const { data, error: fetchError } = await supabase
           .from('vault_items')
-          .select(`*, owner:profiles!vault_items_owner_id_fkey(${PUBLIC_PROFILE_COLUMNS})`)
+          .select(`*, vault_images(*), owner:profiles!vault_items_owner_id_fkey(${PUBLIC_PROFILE_COLUMNS})`)
           .eq('id', id)
           .single();
 
@@ -243,7 +243,28 @@ const ProductDetailPage = ({ source: sourceProp }) => {
           }
         }
 
-        setProduct(data);
+        // The marketplace branch above shapes its row into the { images, price }
+        // contract the page renders from; the vault fall-through used to hand
+        // the raw vault row straight to setProduct, so a public vault card
+        // rendered "No images available" over $0.00 while holding both a photo
+        // and an estimated value. Shape it the same way.
+        const vaultImages = [];
+        if (data.card_image) vaultImages.push(data.card_image);
+        if (Array.isArray(data.card_images)) {
+          data.card_images.forEach(pth => { if (pth && !vaultImages.includes(pth)) vaultImages.push(pth); });
+        }
+        if (Array.isArray(data.vault_images)) {
+          data.vault_images.forEach(img => {
+            if (img?.storage_path && !vaultImages.includes(img.storage_path)) vaultImages.push(img.storage_path);
+          });
+        }
+
+        setProduct({
+          ...data,
+          name: data.card_name || data.name || 'Untitled',
+          images: vaultImages,
+          price: Number(data.estimated_value_aud) || 0,
+        });
 
         if (source === 'vault' && data.owner) {
           setSeller(sellerFromProfile(data.owner, data.owner_id));
