@@ -6,7 +6,7 @@ import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, IdCar
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
-import { VAULT_ITEM_CARD_COLUMNS, VAULT_IMAGE_CARD_COLUMNS } from '@/lib/listingCardColumns.js';
+import { VAULT_ITEM_CARD_COLUMNS, VAULT_IMAGE_CARD_COLUMNS, VAULT_ITEM_LISTING_EMBED } from '@/lib/listingCardColumns.js';
 import { cachedQuery } from '@/lib/queryCache.js';
 import VaultListingCard from '@/components/VaultListingCard.jsx';
 import SellerCard from '@/components/SellerCard.jsx';
@@ -280,7 +280,9 @@ const HomePage = () => {
             // vault_items has more than one FK to profiles, so the embed must use
             // the explicit constraint-name hint (!vault_items_owner_id_fkey) —
             // the bare !owner_id hint returns a PostgREST 400.
-            const SELECT = `${VAULT_ITEM_CARD_COLUMNS}, owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count), vault_images(${VAULT_IMAGE_CARD_COLUMNS})`;
+            // The listing embed is what lets a featured card that has sold say
+            // so — the vault row keeps its "For Sale" listing_type after a sale.
+            const SELECT = `${VAULT_ITEM_CARD_COLUMNS}, owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count), vault_images(${VAULT_IMAGE_CARD_COLUMNS}), ${VAULT_ITEM_LISTING_EMBED}`;
             const LIMIT = 4;
             // Fresh builder per call — a Supabase query builder is single-use.
             // Backfill uses genuinely-public recent cards.
@@ -309,7 +311,7 @@ const HomePage = () => {
             // else's. The !inner join makes the owner-tier filter drop
             // non-matching rows instead of null-ing the embed. Best-effort —
             // any error just falls through to the generic backfill.
-            const PREMIUM_SELECT = `${VAULT_ITEM_CARD_COLUMNS}, owner:profiles!vault_items_owner_id_fkey!inner(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count, subscription_tier), vault_images(${VAULT_IMAGE_CARD_COLUMNS})`;
+            const PREMIUM_SELECT = `${VAULT_ITEM_CARD_COLUMNS}, owner:profiles!vault_items_owner_id_fkey!inner(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count, subscription_tier), vault_images(${VAULT_IMAGE_CARD_COLUMNS}), ${VAULT_ITEM_LISTING_EMBED}`;
             const premiumRes = await supabase.from('vault_items').select(PREMIUM_SELECT)
               .eq('is_public', true).neq('listing_type', 'Private')
               .in('owner.subscription_tier', ['premium', 'elite', 'ultimate'])

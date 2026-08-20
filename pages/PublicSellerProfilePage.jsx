@@ -52,7 +52,9 @@ const PublicSellerProfilePage = () => {
           .from('listings')
           .select(`*, ${LISTING_CARD_VAULT_EMBED}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
           .eq('seller_id', userId)
-          .eq('status', 'active')
+          // Sold cards stay on the storefront, badged "Sold" — a seller's
+          // sales history is part of what a buyer is judging.
+          .in('status', ['active', 'sold'])
           .order('created_at', { ascending: false })
           .limit(20);
 
@@ -209,7 +211,7 @@ const PublicSellerProfilePage = () => {
                 )}
                 <div className="flex items-center gap-1.5">
                   <Package className="w-4 h-4" />
-                  <span>{stats.totalListings} active listings</span>
+                  <span>{stats.totalListings} listings</span>
                 </div>
               </div>
 
@@ -340,7 +342,7 @@ const PublicSellerProfilePage = () => {
         {/* Listings Grid */}
         <div className="lg:col-span-3">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-serif font-bold text-foreground">Active Listings</h2>
+            <h2 className="text-2xl font-serif font-bold text-foreground">Listings</h2>
             <Badge variant="secondary" className="font-bold rounded-lg">{stats.totalListings} Items</Badge>
           </div>
 
@@ -355,7 +357,7 @@ const PublicSellerProfilePage = () => {
           ) : (
             <div className="text-center py-20 bg-card rounded-[2rem] border border-border border-dashed">
               <Package className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50" />
-              <h3 className="text-lg font-bold text-foreground mb-1">No Active Listings</h3>
+              <h3 className="text-lg font-bold text-foreground mb-1">No Listings</h3>
               <p className="text-muted-foreground">This user currently has no items listed for sale or trade.</p>
             </div>
           )}
