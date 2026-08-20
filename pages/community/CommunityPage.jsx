@@ -313,7 +313,7 @@ const CommunityPage = () => {
                     <div className="flex items-center gap-3 text-sm text-muted-foreground">
                       <span className="flex items-center gap-1.5">
                         <MessageSquare className="w-4 h-4" />
-                        {post.replies?.length || 0} replies
+                        {post.comment_count || 0} replies
                       </span>
                       <Badge variant="secondary">{post.category || 'General'}</Badge>
                     </div>

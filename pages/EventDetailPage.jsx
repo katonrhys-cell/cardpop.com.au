@@ -3,6 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { ArrowLeft, CalendarDays } from 'lucide-react';
 import EventDetailCard from '@/components/EventDetailCard.jsx';
+import EventInfoBoard from '@/components/events/EventInfoBoard.jsx';
+import EventDiscussion from '@/components/events/EventDiscussion.jsx';
 import RelatedEvents from '@/components/RelatedEvents.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
@@ -128,6 +130,10 @@ const EventDetailPage = () => {
         </Button>
 
         <EventDetailCard event={displayEvent} />
+
+        <EventInfoBoard event={event} />
+
+        <EventDiscussion event={event} />
 
         <RelatedEvents currentEventId={event.id} currentState={event.state} />
       </div>
