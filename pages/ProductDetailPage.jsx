@@ -520,7 +520,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
                     <GradeBadge grade={vi.grade} gradingCompany={vi.grading_company} isPositioned={false} className="text-[11px]" />
                   )}
                   {vi.parallel?.name && (
-                    <Badge variant="outline" className="text-[11px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10 dark:text-amber-300">{vi.parallel.name}</Badge>
+                    <Badge variant="outline" className="text-[11px] font-bold border-amber-400/50 text-amber-800 bg-amber-400/10 dark:text-amber-300">{vi.parallel.name}</Badge>
                   )}
                   {vi.subset?.name && (
                     <Badge variant="outline" className="text-[11px] font-bold border-sky-400/50 text-sky-700 bg-sky-400/10 dark:text-sky-300">{vi.subset.name}</Badge>
