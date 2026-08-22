@@ -1,5 +1,5 @@
 import React from 'react';
-import { Lock, Square, Frame, Wind, Gem, Layers, RefreshCw, Sparkles, Crown, Zap, Flashlight, Triangle } from 'lucide-react';
+import { Lock, Square, Frame, Wind, Gem, Layers, RefreshCw, Sparkles, Crown, Zap, Flashlight, Triangle, Orbit } from 'lucide-react';
 import { toast } from 'sonner';
 import CardShowcase from '@/components/vault/CardShowcase.jsx';
 import {
@@ -21,6 +21,7 @@ const STYLE_ICON = {
   slab:        Layers,
   spotlight:   Flashlight,
   rotating:    RefreshCw,
+  spinning:    Orbit,
   prism:       Triangle,
   holographic: Sparkles,
 };

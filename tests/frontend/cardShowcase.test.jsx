@@ -67,6 +67,45 @@ describe('CardShowcase', () => {
     expect(neon.querySelector('.cardshowcase__beam')).toBeNull();
   });
 
+  it('renders the spinning card with a branded back face on the CardPop stand', () => {
+    const { container } = render(
+      <CardShowcase {...baseProps} displayStyle="spinning" />,
+    );
+    // Front and back faces of the 3D plane, with the CardPop-branded back.
+    expect(container.querySelector('.cardshowcase__face--front')).toBeTruthy();
+    expect(container.querySelector('.cardshowcase__face--back')).toBeTruthy();
+    expect(container.querySelector('.cardshowcase__backcard')).toBeTruthy();
+    // The turntable base carries the CardPop wordmark plate.
+    const prop = container.querySelector('.cardshowcase__prop');
+    expect(prop).toBeTruthy();
+    expect(prop.querySelector('.cardshowcase__plate')).toBeTruthy();
+    expect(prop.textContent).toBe('CardPop');
+    // The photo itself is still there.
+    expect(screen.getByAltText('A trading card')).toBeInTheDocument();
+  });
+
+  it('puts the CardPop wordmark plate on the Premium Stand base too', () => {
+    const { container } = render(
+      <CardShowcase {...baseProps} displayStyle="stand" />,
+    );
+    const prop = container.querySelector('.cardshowcase__prop');
+    expect(prop.querySelector('.cardshowcase__plate')).toBeTruthy();
+    expect(prop.textContent).toBe('CardPop');
+
+    // The slab's prop (its label strip) stays unbranded, and non-stand styles
+    // never grow a plate.
+    const { container: slab } = render(
+      <CardShowcase {...baseProps} displayStyle="slab" />,
+    );
+    expect(slab.querySelector('.cardshowcase__prop')).toBeTruthy();
+    expect(slab.querySelector('.cardshowcase__plate')).toBeNull();
+
+    const { container: classic } = render(
+      <CardShowcase {...baseProps} displayStyle="classic" />,
+    );
+    expect(classic.querySelector('.cardshowcase__plate')).toBeNull();
+  });
+
   it('still renders the image when src is missing (No Image fallback)', () => {
     render(<CardShowcase displayStyle="glass" alt="Empty" src={null} />);
     expect(screen.getByText('No Image')).toBeInTheDocument();
