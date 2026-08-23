@@ -15,7 +15,7 @@ import {
   Settings, FolderTree, ListOrdered, BarChart3, Store, Shield,
   BookOpen, Award, TrendingUp, BadgeCheck, Ticket, Handshake,
   Calculator, MapPin, ClipboardList, HelpCircle, MessageSquare,
-  ShoppingBag, LineChart, Info, Sparkles, Rocket, Tag, MoreHorizontal, Tv2,
+  ShoppingBag, LineChart, Info, Sparkles, Rocket, Tag, MoreHorizontal, Tv2, ScanLine,
 } from 'lucide-react';
 import { TCG_CATEGORY_DATA, SPORTS_CATEGORY_DATA } from '@/components/CategoryIcons.jsx';
 import { SHOP_CATEGORY_GROUPS } from '@/utils/shopCategories.js';
@@ -82,6 +82,7 @@ const EVENT_ITEMS = [
 ];
 
 const ANALYTICS_ITEMS = [
+  { href: '/scan',                     label: 'Card Scanner',     desc: 'Scan any card for an instant price check', Icon: ScanLine, gradient: 'from-red-500 to-rose-600' },
   { href: '/analytics',                label: 'Market Analytics', desc: 'Live prices, movers and trends',   Icon: LineChart,  gradient: 'from-blue-500 to-indigo-600'   },
   { href: '/prices',                   label: 'Card Prices',      desc: 'What cards are worth in AUD',       Icon: TrendingUp, gradient: 'from-green-500 to-emerald-600' },
   { href: '/analytics/buying-guides',  label: 'Buying Guides',    desc: 'New releases & chase cards',        Icon: Sparkles,   gradient: 'from-amber-500 to-orange-500' },

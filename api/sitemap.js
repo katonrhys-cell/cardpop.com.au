@@ -59,6 +59,7 @@ const STATIC_PAGES = [
     { loc: `/shop/${slug}`,        lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' }
   )),
   { loc: '/analytics',             lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
+  { loc: '/scan',                  lastmod: SITE_UPDATED,       freq: 'monthly', pri: '0.8' },
   // /prices pages legitimately change every day (fresh price snapshots), so
   // TODAY is an honest lastmod here, unlike the structural pages above.
   { loc: '/prices',                lastmod: TODAY,              freq: 'daily',   pri: '0.9' },

@@ -231,6 +231,7 @@ const SalesHistoryPage = lazy(() => import('@/pages/SalesHistoryPage.jsx'));
 const PublicCollectionsPage = lazy(() => import('@/pages/PublicCollectionsPage.jsx'));
 const CardMarketDetailPage = lazy(() => import('@/pages/CardMarketDetailPage.jsx'));
 const AddYourFirstCardPage = lazy(() => import('@/pages/AddYourFirstCardPage.jsx'));
+const ScanPage = lazy(() => import('@/pages/ScanPage.jsx'));
 
 // Info & Misc Pages
 const SearchResultsPage = lazy(() => import('@/pages/SearchResultsPage.jsx'));
@@ -383,6 +384,9 @@ const App = () => {
                         <Route path="/messaging" element={<ProtectedRoute><MessagingPage /></ProtectedRoute>} />
                         <Route path="/transactions" element={<ProtectedRoute><TransactionHistoryPage /></ProtectedRoute>} />
                         <Route path="/sales-history" element={<SalesHistoryPage />} />
+
+                        {/* Card scanner — public price checker */}
+                        <Route path="/scan" element={<ScanPage />} />
 
                         {/* Markets & Analytics */}
                         <Route path="/analytics" element={<MarketsPage />} />
