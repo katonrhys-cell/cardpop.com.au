@@ -541,14 +541,14 @@ const ProductDetailPage = ({ source: sourceProp }) => {
                     <GradeBadge grade={vi.grade} gradingCompany={vi.grading_company} isPositioned={false} className="text-[11px]" />
                   )}
                   {vi.parallel?.name && (
-                    <Badge variant="outline" className="text-[11px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10 dark:text-amber-300">{vi.parallel.name}</Badge>
+                    <Badge variant="outline" className="text-[11px] font-bold border-amber-400/50 text-amber-800 bg-amber-400/10 dark:text-amber-300">{vi.parallel.name}</Badge>
                   )}
                   {vi.subset?.name && (
                     <Badge variant="outline" className="text-[11px] font-bold border-sky-400/50 text-sky-700 bg-sky-400/10 dark:text-sky-300">{vi.subset.name}</Badge>
                   )}
                   {vi.card_number && <Badge variant="secondary" className="text-[11px] font-medium">#{vi.card_number}</Badge>}
                   {vi.serial_number && <Badge variant="secondary" className="text-[11px] font-bold">#{vi.serial_number}</Badge>}
-                  {vi.is_foil && <Badge variant="outline" className="text-[11px] font-bold border-yellow-400/50 text-yellow-700 bg-yellow-400/10 dark:text-yellow-300">Foil</Badge>}
+                  {vi.is_foil && <Badge variant="outline" className="text-[11px] font-bold border-yellow-400/50 text-yellow-800 bg-yellow-400/10 dark:text-yellow-300">Foil</Badge>}
                   {refractorLabel && <Badge variant="outline" className={`text-[11px] font-bold ${getRefractorBadgeClass(vi)}`}>{refractorLabel}</Badge>}
                   {autoLabel && <Badge variant="outline" className="text-[11px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10 dark:text-blue-300">{autoLabel}</Badge>}
                   {(vi.is_rookie || variantChips.includes(ROOKIE_VARIANT)) && <RookiePill className="text-[11px]" />}

@@ -159,7 +159,7 @@ const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
             {vaultItem.condition && (
               <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground capitalize">{vaultItem.condition.replace(/_/g, ' ')}</Badge>
             )}
-            {vaultItem.is_foil && <Badge variant="outline" className="text-[10px] font-bold border-yellow-400/50 text-yellow-700 bg-yellow-400/10">Foil</Badge>}
+            {vaultItem.is_foil && <Badge variant="outline" className="text-[10px] font-bold border-yellow-400/50 text-yellow-800 bg-yellow-400/10 dark:text-yellow-300">Foil</Badge>}
             {getRefractorLabel(vaultItem) && <Badge variant="outline" className={`text-[10px] font-bold ${getRefractorBadgeClass(vaultItem)}`}>{getRefractorLabel(vaultItem)}</Badge>}
             {autoLabel && (
               <Badge variant="outline" className="text-[10px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10">{autoLabel}</Badge>

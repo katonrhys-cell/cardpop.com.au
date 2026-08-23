@@ -10,7 +10,7 @@ import RookieJerseyIcon from '@/components/icons/RookieJerseyIcon.jsx';
 const RookiePill = ({ className }) => (
   <Badge
     variant="outline"
-    className={cn('text-[10px] font-bold border-amber-400/50 text-amber-700 bg-amber-400/10 dark:text-amber-300 gap-1', className)}
+    className={cn('text-[10px] font-bold border-amber-400/50 text-amber-800 bg-amber-400/10 dark:text-amber-300 gap-1', className)}
   >
     <RookieJerseyIcon className="w-3 h-3 shrink-0" /> Rookie Card (RC)
   </Badge>
