@@ -25,7 +25,7 @@ import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
  * DATA RELATIONSHIPS DOCUMENTATION:
  * - users -> user_vaults (1:N): User's inventory/collection. Filtered by `user_id`.
  * - users -> orders (1:N): User's transactions. Filtered by `buyer_id` OR `seller_id`.
- * - users -> reviews (1:N): Reviews left by the user. Filtered by `reviewer`.
+ * - users -> seller_ratings (1:N): Reviews left by the user. Filtered by `reviewer_id`.
  * - users -> user_addresses (1:N): Shipping/billing addresses. (Optional collection)
  * - users -> user_payment_methods (1:N): Saved payment methods. (Optional collection)
  * - users -> user_preferences (1:1): User settings. (Optional collection)

@@ -19,6 +19,7 @@ import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import EbayMarketSection from '@/components/EbayMarketSection.jsx';
 import MarketPriceAnchor from '@/components/MarketPriceAnchor.jsx';
+import ListingWatchers from '@/components/ListingWatchers.jsx';
 import { addToRecentlyViewed } from '@/utils/recentlyViewed.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import CertificationVerificationSection from '@/components/CertificationVerificationSection.jsx';
@@ -31,6 +32,7 @@ import CardPopLogo from '@/components/CardPopLogo.jsx';
 import RookiePill from '@/components/RookiePill.jsx';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
+const ProposeTradeModal = lazy(() => import('@/components/ProposeTradeModal.jsx'));
 
 const getStatusBadge = (listingType) => {
   switch (listingType) {
@@ -58,6 +60,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
   const [error, setError] = useState(null);
   const [seller, setSeller] = useState(null);
   const [offerOpen, setOfferOpen] = useState(false);
+  const [tradeOpen, setTradeOpen] = useState(false);
   const fetchRef = useRef(null);
 
   // Auth only affects the private-vault authorization branch. Depending on the
@@ -122,6 +125,11 @@ const ProductDetailPage = ({ source: sourceProp }) => {
           }
 
           const listingTypeMap = { fixed: 'For Sale', auction: 'For Sale', trade: 'For Trade', vault: 'Private', expression_of_interest: 'Expression of Interest' };
+          // A fixed-price listing that also accepts trades gets the combined
+          // label — the action area keys the Buy and Trade buttons off it.
+          const displayListingType = listing.accepts_trade && listing.listing_type === 'fixed'
+            ? 'For Sale & Trade'
+            : (listingTypeMap[listing.listing_type] || 'For Sale');
 
           setProduct({
             ...listing,
@@ -136,7 +144,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
             year: vi?.card_year || vi?.year || null,
             set: vi?.set_name || vi?.card_set || vi?.era || vi?.collection || null,
             category: listing.category,
-            listing_type: listingTypeMap[listing.listing_type] || 'For Sale',
+            listing_type: displayListingType,
             owner_id: listing.seller_id,
           });
 
@@ -358,18 +366,16 @@ const ProductDetailPage = ({ source: sourceProp }) => {
       .catch(e => toast.error(e.message));
   };
 
-  // Trading v0: a trade is arranged over messages. Opens (or starts) a
-  // conversation with the seller, pre-filled so the buyer doesn't face a blank
-  // box. Only rendered when the enable_trading platform flag is on — the flag
-  // stays off until trading is a real feature, so this is never a dead end.
+  // Opens the propose-trade modal: pick one of your own listings to offer,
+  // with the value difference settled as a cash top-up. Only rendered when the
+  // enable_trading platform flag is on.
   const handleRequestTrade = () => {
     if (!seller?.id) return;
-    navigate('/messaging', {
-      state: {
-        recipientId: seller.id,
-        prefill: `Hi! I'm interested in trading for your "${product.name}" — ${window.location.origin}${window.location.pathname}. What are you looking for?`,
-      },
-    });
+    if (!currentUser) {
+      navigate('/login');
+      return;
+    }
+    setTradeOpen(true);
   };
 
   if (loading) {
@@ -611,6 +617,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
                         gradeScore={vi?.grade}
                         listingPrice={product.price}
                       />
+                      {source === 'marketplace' && <ListingWatchers listingId={product.id} className="mt-2" />}
                     </div>
                   )}
                 </>
@@ -715,7 +722,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
                  (product.listing_type === 'For Trade' || product.listing_type === 'For Sale & Trade') &&
                  seller?.id && seller.id !== currentUser?.id ? (
                   <Button size="lg" variant={product.listing_type === 'For Sale & Trade' ? 'outline' : 'default'} className="w-full h-14 rounded-xl font-bold text-lg" onClick={handleRequestTrade}>
-                    <ArrowRightLeft className="w-5 h-5 mr-2" /> Request Trade
+                    <ArrowRightLeft className="w-5 h-5 mr-2" /> Propose Trade
                   </Button>
                 ) : null}
 
@@ -740,6 +747,21 @@ const ProductDetailPage = ({ source: sourceProp }) => {
             {offerOpen && (
               <Suspense fallback={null}>
                 <MakeOfferModal isOpen={offerOpen} onClose={() => setOfferOpen(false)} listing={product} />
+              </Suspense>
+            )}
+
+            {tradeOpen && (
+              <Suspense fallback={null}>
+                <ProposeTradeModal
+                  listing={{
+                    id: product.id,
+                    sellerId: product.seller_id || product.owner_id,
+                    name: product.name,
+                    value: Number(product.vault_item?.trade_value_aud ?? product.price ?? product.vault_item?.estimated_value_aud ?? 0),
+                  }}
+                  onClose={() => setTradeOpen(false)}
+                  onSuccess={() => navigate('/trades')}
+                />
               </Suspense>
             )}
 

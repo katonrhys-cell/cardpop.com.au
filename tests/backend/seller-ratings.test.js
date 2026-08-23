@@ -145,7 +145,7 @@ describe('POST /', () => {
   });
 
   it('returns 403 when the order does not belong to the reviewer/seller', async () => {
-    queueFrom(makeBuilder({ data: { buyer_id: 'someone-else', seller_id: 'seller-9' }, error: null }));
+    queueFrom(makeBuilder({ data: { buyer_id: 'someone-else', seller_id: 'seller-9', status: 'completed' }, error: null }));
     const res = await request(app).post('/').send(valid);
     expect(res.status).toBe(403);
     expect(res.body.error).toMatch(/your own completed orders/i);
@@ -157,9 +157,16 @@ describe('POST /', () => {
     expect(res.status).toBe(403);
   });
 
+  it('returns 400 when the order has not shipped yet', async () => {
+    queueFrom(makeBuilder({ data: { buyer_id: 'reviewer-1', seller_id: 'seller-9', status: 'payment_confirmed' }, error: null }));
+    const res = await request(app).post('/').send(valid);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/once your order has shipped/i);
+  });
+
   it('returns 400 when the reviewer already rated this order', async () => {
     queueFrom(
-      makeBuilder({ data: { buyer_id: 'reviewer-1', seller_id: 'seller-9' }, error: null }), // order
+      makeBuilder({ data: { buyer_id: 'reviewer-1', seller_id: 'seller-9', status: 'completed' }, error: null }), // order
       makeBuilder({ data: { id: 'existing-rating' }, error: null }), // existing rating
     );
     const res = await request(app).post('/').send(valid);
@@ -167,15 +174,17 @@ describe('POST /', () => {
     expect(res.body.error).toMatch(/already rated/i);
   });
 
-  it('creates the rating, refreshes seller stats and returns 201', async () => {
+  it('creates the rating, refreshes seller stats, notifies the seller and returns 201', async () => {
     const created = { id: 'r-1', seller_id: 'seller-9', reviewer_id: 'reviewer-1', rating: 5 };
     const profileUpdate = makeBuilder({ data: null, error: null });
+    const notificationInsert = makeBuilder({ data: null, error: null });
     queueFrom(
-      makeBuilder({ data: { buyer_id: 'reviewer-1', seller_id: 'seller-9' }, error: null }), // order
+      makeBuilder({ data: { buyer_id: 'reviewer-1', seller_id: 'seller-9', status: 'completed' }, error: null }), // order
       makeBuilder({ data: null, error: null }), // no existing rating
       makeBuilder({ data: created, error: null }), // insert
       makeBuilder({ data: [{ rating: 5 }, { rating: 4 }], error: null }), // updateSellerStats: read
       profileUpdate, // updateSellerStats: write
+      notificationInsert, // seller notification
     );
 
     const res = await request(app).post('/').send(valid);
@@ -183,6 +192,25 @@ describe('POST /', () => {
     expect(res.body).toEqual(created);
     // average of [5,4] = 4.5, reviews_count = 2
     expect(profileUpdate.update).toHaveBeenCalledWith({ rating: 4.5, reviews_count: 2 });
+    expect(notificationInsert.insert).toHaveBeenCalledWith(expect.objectContaining({
+      user_id: 'seller-9',
+      type: 'review_received',
+    }));
+  });
+
+  it('still returns 201 when the seller notification insert fails', async () => {
+    const created = { id: 'r-1', seller_id: 'seller-9', reviewer_id: 'reviewer-1', rating: 5 };
+    queueFrom(
+      makeBuilder({ data: { buyer_id: 'reviewer-1', seller_id: 'seller-9', status: 'shipped' }, error: null }),
+      makeBuilder({ data: null, error: null }),
+      makeBuilder({ data: created, error: null }),
+      makeBuilder({ data: [{ rating: 5 }], error: null }),
+      makeBuilder({ data: null, error: null }),
+      makeBuilder({ data: null, error: new Error('notifications down') }), // notification insert fails
+    );
+
+    const res = await request(app).post('/').send(valid);
+    expect(res.status).toBe(201);
   });
 
   it('returns 500 when the order lookup errors', async () => {
@@ -193,11 +221,32 @@ describe('POST /', () => {
 
   it('returns 500 when the insert errors', async () => {
     queueFrom(
-      makeBuilder({ data: { buyer_id: 'reviewer-1', seller_id: 'seller-9' }, error: null }),
+      makeBuilder({ data: { buyer_id: 'reviewer-1', seller_id: 'seller-9', status: 'completed' }, error: null }),
       makeBuilder({ data: null, error: null }),
       makeBuilder({ data: null, error: new Error('insert failed') }),
     );
     const res = await request(app).post('/').send(valid);
+    expect(res.status).toBe(500);
+  });
+});
+
+// ─── GET /mine/given ──────────────────────────────────────────────────────────
+
+describe('GET /mine/given', () => {
+  it('returns the ratings the signed-in user has written', async () => {
+    const ratings = [{ id: 'r-1', order_id: 'order-1', seller_id: 'seller-9', rating: 5 }];
+    const builder = makeBuilder({ data: ratings, error: null });
+    queueFrom(builder);
+
+    const res = await request(app).get('/mine/given');
+    expect(res.status).toBe(200);
+    expect(res.body.ratings).toEqual(ratings);
+    expect(builder.eq).toHaveBeenCalledWith('reviewer_id', 'reviewer-1');
+  });
+
+  it('returns 500 when the query errors', async () => {
+    queueFrom(makeBuilder({ data: null, error: new Error('db down') }));
+    const res = await request(app).get('/mine/given');
     expect(res.status).toBe(500);
   });
 });

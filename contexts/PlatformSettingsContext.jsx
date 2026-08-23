@@ -10,8 +10,10 @@ const DEFAULTS = {
   site_name: 'CardPop',
   maintenance_mode: false,
   enable_marketplace: true,
-  // Off until the propose-trade flow exists (mirrors src/routes/settings.js) —
-  // fail-open would flash dead trade UI while the settings fetch is in flight.
+  // The propose-trade flow exists (ProposeTradeModal → trades table), but
+  // launching trading is an admin decision — flip the flag in Admin →
+  // Platform Settings when ready (mirrors src/routes/settings.js). Fail-closed
+  // here also avoids flashing trade UI while the settings fetch is in flight.
   enable_trading: false,
   enable_blog: true,
   max_images_per_listing: 10,

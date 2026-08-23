@@ -38,7 +38,7 @@ describe('useUserDetails', () => {
       profiles: { id: 'u1', username: 'ada' },
       vault_items: [{ id: 'v1' }, { id: 'v2' }],
       orders: [{ id: 'o1' }],            // both buyer/seller queries hit `orders`
-      reviews: [{ id: 'r1' }],
+      seller_ratings: [{ id: 'r1' }],
       shipping_addresses: [{ id: 'a1' }],
     };
     const { result } = renderHook(() => useUserDetails('u1'));
@@ -54,7 +54,7 @@ describe('useUserDetails', () => {
 
   it('degrades gracefully when one source fails (allSettled)', async () => {
     h.tables = { profiles: { id: 'u1' }, vault_items: [{ id: 'v1' }] };
-    h.rejectTable = 'reviews';
+    h.rejectTable = 'seller_ratings';
     const { result } = renderHook(() => useUserDetails('u1'));
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.user).toEqual({ id: 'u1' });

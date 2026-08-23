@@ -182,6 +182,9 @@ and can be cleaned up.
 | `VITE_COMING_SOON` | Pre-launch mode (build-time): `true` redirects the homepage to `/launch` |
 | `VITE_OCR_AUTOCROP` | *(optional, build-time)* `false` disables the card-rectification step that runs before card identification (`utils/analysisImage.js`). Default on — it warps the card flat so the vision models spend their whole downscale budget on the card rather than the desk around it, at the cost of putting the ~3.5 MB OpenCV wasm chunk on the default listing path. See `docs/card-identification.md` |
 | `ENCRYPTION_KEY` | MFA OTP / backup code encryption |
+| `VAPID_PUBLIC_KEY` | Web push (`src/utils/pushService.js`) — generate the pair once with `npx web-push generate-vapid-keys`. Unset = push silently disabled (fail-safe): `/push/public-key` returns null and the enable-push UI hides itself |
+| `VAPID_PRIVATE_KEY` | Web push — the private half of the pair. Never expose client-side |
+| `VAPID_SUBJECT` | *(optional)* Web push contact URI (`mailto:` or https URL) sent to push services — defaults to `mailto:noreply@cardpop.com.au` |
 | `VITE_AWS_LOCATION_API_KEY` | *(optional)* Amazon Location Service Places API key — address autocomplete on the checkout shipping form (build-time, public) — blank = free-text fallback |
 | `VITE_AWS_LOCATION_REGION` | *(optional)* Region for the browser Amazon Location endpoint (`places.geo.<region>.amazonaws.com`) — defaults to `ap-southeast-2` |
 | `AWS_LOCATION_API_KEY` | *(optional)* Amazon Location Service Places API key — server-side geocode check of the chosen shipping address before creating the Stripe session; blank = skipped (fail-open) |

@@ -69,12 +69,6 @@ const PublicSellerProfilePage = () => {
           .order('created_at', { ascending: false })
           .limit(20);
 
-        // Fetch Reviews
-        const { data: reviewsData, count: reviewsCount } = await supabase
-          .from('reviews')
-          .select('*', { count: 'estimated' })
-          .eq('recipient_id', userId);
-
         if (!isMounted) return;
 
         setSeller(userData);
@@ -88,16 +82,12 @@ const PublicSellerProfilePage = () => {
 
         setListings(combined);
 
-        // Calculate stats
-        const totalReviews = reviewsCount || 0;
-        const avgRating = totalReviews > 0
-          ? (reviewsData || []).reduce((acc, curr) => acc + curr.rating, 0) / totalReviews
-          : (userData.rating || 0);
-
+        // Rating stats come off the profile columns, which the seller-ratings
+        // endpoint keeps in sync with the canonical seller_ratings table.
         setStats({
           totalListings: combined.length,
-          averageRating: avgRating,
-          totalReviews: totalReviews || (userData.reviews_count || 0)
+          averageRating: userData.rating || 0,
+          totalReviews: userData.reviews_count || 0
         });
 
       } catch (err) {

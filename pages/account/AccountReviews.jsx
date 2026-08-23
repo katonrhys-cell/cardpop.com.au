@@ -3,11 +3,10 @@ import { Star, ShieldCheck, RefreshCw } from 'lucide-react';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { isVerified } from '@/utils/verification.js';
 import { toCdnUrl } from '@/utils/imageUrl.js';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { supabase } from '@/lib/supabaseClient.js';
+import apiServerClient from '@/lib/apiServerClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
@@ -51,12 +50,9 @@ const ReviewCard = ({ review }) => {
           </div>
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
-          {review.reviewer_role && (
-            <Badge variant="outline" className="text-[10px] font-bold capitalize">
-              {review.reviewer_role}
-            </Badge>
-          )}
-          {review.is_verified_transaction && (
+          {/* Every rating is written through the order-verified endpoint, so an
+              attached order is proof of a real transaction. */}
+          {review.order_id && (
             <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-md">
               <ShieldCheck className="w-3 h-3" /> Verified Transaction
             </div>
@@ -74,7 +70,7 @@ const AccountReviews = () => {
   const { currentUser } = useAuth();
   const [received, setReceived] = useState([]);
   const [given, setGiven] = useState([]);
-  const [profile, setProfile] = useState(null);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const fetchRef = useRef(null);
 
@@ -86,27 +82,22 @@ const AccountReviews = () => {
     const run = async () => {
       setLoading(true);
       try {
-        const [receivedRes, givenRes, profileRes] = await Promise.all([
-          supabase.from('reviews')
-            .select('*, reviewer:profiles!reviewer_id(display_name, username, avatar_url, is_verified)')
-            .eq('seller_id', uid)
-            .eq('is_visible', true)
-            .order('created_at', { ascending: false }),
-          supabase.from('reviews')
-            .select('*, seller:profiles!seller_id(display_name, username, avatar_url, is_verified)')
-            .eq('reviewer_id', uid)
-            .order('created_at', { ascending: false }),
-          supabase.from('profiles').select('rating, reviews_count').eq('id', uid).single(),
+        // Both read the canonical seller_ratings pipeline through the API —
+        // the same source the marketplace rating widgets display.
+        const [receivedRes, givenRes] = await Promise.all([
+          apiServerClient.fetch(`/seller-ratings/${uid}`).catch(() => null),
+          apiServerClient.fetch('/seller-ratings/mine/given').catch(() => null),
         ]);
+        const receivedBody = receivedRes?.ok ? await receivedRes.json() : null;
+        const givenBody = givenRes?.ok ? await givenRes.json() : null;
         if (!cancelled) {
-          const failed = [receivedRes, givenRes, profileRes].some(r => r.error);
-          if (failed) {
-            console.error('Failed to load reviews:', receivedRes.error, givenRes.error, profileRes.error);
+          if (!receivedBody || !givenBody) {
+            console.error('Failed to load reviews:', receivedRes?.status, givenRes?.status);
             toast.error('Some review data failed to load — the totals below may be incomplete.');
           }
-          setReceived(receivedRes.data ?? []);
-          setGiven(givenRes.data ?? []);
-          setProfile(profileRes.data);
+          setReceived(receivedBody?.ratings ?? []);
+          setGiven(givenBody?.ratings ?? []);
+          setStats(receivedBody?.stats ?? null);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -118,8 +109,8 @@ const AccountReviews = () => {
     return () => { cancelled = true; };
   }, [currentUser?.id]);
 
-  const avg = profile?.rating ? parseFloat(profile.rating).toFixed(1) : null;
-  const count = profile?.reviews_count || 0;
+  const count = stats?.total || 0;
+  const avg = count > 0 ? parseFloat(stats.average).toFixed(1) : null;
 
   return (
     <AccountPageShell

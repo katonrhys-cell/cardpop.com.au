@@ -4,7 +4,7 @@ import {
   Bell, DollarSign, Hammer, TrendingUp, TrendingDown, Clock, Award,
   Tag, CheckCircle2, XCircle, RefreshCw, MessageSquare, UserPlus,
   Star, ShieldCheck, ShieldAlert, Shield, Settings, Check, CalendarClock,
-  ShoppingBag, UserCheck,
+  ShoppingBag, UserCheck, ArrowRightLeft,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,9 @@ const TYPE_CONFIG = {
   offer_accepted:           { icon: CheckCircle2,  color: 'text-emerald-500' },
   offer_declined:           { icon: XCircle,       color: 'text-red-500' },
   offer_countered:          { icon: RefreshCw,     color: 'text-blue-500' },
+  trade_proposed:           { icon: ArrowRightLeft, color: 'text-blue-500' },
+  trade_accepted:           { icon: CheckCircle2,  color: 'text-emerald-500' },
+  trade_declined:           { icon: XCircle,       color: 'text-red-500' },
   message:                  { icon: MessageSquare, color: 'text-blue-500' },
   follow:                   { icon: UserPlus,      color: 'text-purple-500' },
   review_received:          { icon: Star,          color: 'text-amber-500' },

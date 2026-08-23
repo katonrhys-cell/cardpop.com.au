@@ -1,0 +1,24 @@
+{
+  "name": "CardPop Australia",
+  "short_name": "CardPop",
+  "description": "Australia's trading card marketplace — buy, sell, trade, scan and track cards.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#CE1126",
+  "lang": "en-AU",
+  "categories": ["shopping", "entertainment"],
+  "icons": [
+    { "src": "/favicon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa-icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Scan a card", "url": "/scan", "icons": [{ "src": "/favicon-192.png", "sizes": "192x192" }] },
+    { "name": "Marketplace", "url": "/marketplace", "icons": [{ "src": "/favicon-192.png", "sizes": "192x192" }] },
+    { "name": "My Vault", "url": "/vault", "icons": [{ "src": "/favicon-192.png", "sizes": "192x192" }] }
+  ]
+}

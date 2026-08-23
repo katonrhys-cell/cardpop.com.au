@@ -1,11 +1,71 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, Save } from 'lucide-react';
+import { Bell, Save, Smartphone } from 'lucide-react';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import { getPushStatus, enablePush, disablePush } from '@/lib/pushNotifications.js';
 import { toast } from 'sonner';
+
+// Per-device web push opt-in. Renders only when the browser/build can do push
+// at all ('unsupported' and 'unconfigured' hide the card entirely) — an
+// unavailable toggle is worse than no toggle.
+const PushCard = () => {
+  const [status, setStatus] = useState(null); // null = probing
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPushStatus().then(s => { if (!cancelled) setStatus(s); });
+    return () => { cancelled = true; };
+  }, []);
+
+  if (!status || status === 'unsupported' || status === 'unconfigured') return null;
+
+  const onToggle = async () => {
+    setBusy(true);
+    try {
+      if (status === 'enabled') {
+        await disablePush();
+        setStatus('available');
+        toast.success('Push notifications turned off on this device');
+      } else {
+        await enablePush();
+        setStatus('enabled');
+        toast.success('Push notifications enabled on this device');
+      }
+    } catch (err) {
+      toast.error(err.message || 'Could not update push notifications');
+      setStatus(await getPushStatus());
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="bg-card border border-border rounded-2xl p-5 flex items-center justify-between gap-4">
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+          <Smartphone className="w-5 h-5 text-primary" />
+        </div>
+        <div>
+          <p className="font-bold text-sm">Push notifications on this device</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {status === 'denied'
+              ? 'Notifications are blocked in your browser settings — allow them for this site to enable push.'
+              : 'Get offers, sales, trades and order updates even when CardPop is closed.'}
+          </p>
+        </div>
+      </div>
+      <Switch
+        checked={status === 'enabled'}
+        disabled={busy || status === 'denied'}
+        onCheckedChange={onToggle}
+      />
+    </div>
+  );
+};
 
 const CATEGORIES = [
   {
@@ -131,6 +191,7 @@ const AccountNotificationSettings = () => {
         <div className="bg-card border border-border rounded-2xl p-8 text-center text-muted-foreground">Loading…</div>
       ) : (
         <div className="space-y-6">
+          <PushCard />
           {CATEGORIES.map(cat => (
             <div key={cat.label} className="bg-card border border-border rounded-2xl overflow-hidden">
               <div className="px-5 py-3 border-b border-border bg-muted/30">

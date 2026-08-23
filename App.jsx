@@ -184,6 +184,7 @@ const CommunityDiscussionPage = lazy(() => import('@/pages/community/CommunityDi
 const CommunityDiscussionNewPage = lazy(() => import('@/pages/community/CommunityDiscussionNewPage.jsx'));
 const WhatnotShowsPage = lazy(() => import('@/pages/community/WhatnotShowsPage.jsx'));
 const ForumPage = lazy(() => import('@/pages/community/ForumPage.jsx'));
+const LeaderboardPage = lazy(() => import('@/pages/community/LeaderboardPage.jsx'));
 const ProfilesPage = lazy(() => import('@/pages/community/ProfilesPage.jsx'));
 const LocalTradersPage = lazy(() => import('@/pages/community/LocalTradersPage.jsx'));
 const LocalMapPage = lazy(() => import('@/pages/community/LocalMapPage.jsx'));
@@ -231,6 +232,7 @@ const SalesHistoryPage = lazy(() => import('@/pages/SalesHistoryPage.jsx'));
 const PublicCollectionsPage = lazy(() => import('@/pages/PublicCollectionsPage.jsx'));
 const CardMarketDetailPage = lazy(() => import('@/pages/CardMarketDetailPage.jsx'));
 const AddYourFirstCardPage = lazy(() => import('@/pages/AddYourFirstCardPage.jsx'));
+const ScanPage = lazy(() => import('@/pages/ScanPage.jsx'));
 
 // Info & Misc Pages
 const SearchResultsPage = lazy(() => import('@/pages/SearchResultsPage.jsx'));
@@ -384,6 +386,9 @@ const App = () => {
                         <Route path="/transactions" element={<ProtectedRoute><TransactionHistoryPage /></ProtectedRoute>} />
                         <Route path="/sales-history" element={<SalesHistoryPage />} />
 
+                        {/* Card scanner — public price checker */}
+                        <Route path="/scan" element={<ScanPage />} />
+
                         {/* Markets & Analytics */}
                         <Route path="/analytics" element={<MarketsPage />} />
                         {/* Buying Guides — new-release + chase-card editorial. Declared
@@ -441,6 +446,7 @@ const App = () => {
                         <Route path="/blog/:id" element={<FeatureRoute flag="enable_blog"><BlogArticlePage /></FeatureRoute>} />
                         <Route path="/community" element={<CommunityPage />} />
                         <Route path="/community/forum" element={<ForumPage />} />
+                        <Route path="/community/leaderboard" element={<LeaderboardPage />} />
                         <Route path="/community/profiles" element={<ProfilesPage />} />
                         <Route path="/community/retailers" element={<Navigate to="/card-shops" replace />} />
                         <Route path="/community/local-traders" element={<LocalTradersPage />} />

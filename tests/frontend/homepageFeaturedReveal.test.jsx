@@ -13,6 +13,7 @@ import { describe, it, expect, beforeAll, vi } from 'vitest';
 
 vi.mock('@/components/SEOHead.jsx', () => ({ default: () => null }));
 vi.mock('@/components/HeroCardShowcase.jsx', () => ({ default: () => null }));
+vi.mock('@/components/LiveActivityTicker.jsx', () => ({ default: () => null }));
 vi.mock('@/components/VaultListingCard.jsx', () => ({
   default: ({ vaultItem }) => <div data-testid="featured-card">{vaultItem.card_name}</div>,
 }));

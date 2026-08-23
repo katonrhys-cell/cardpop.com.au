@@ -286,21 +286,18 @@ async function renderDealer(supabase, param) {
     });
   }
 
-  const [{ data: listings }, reviewsRes] = await Promise.all([
-    supabase
-      .from('listings')
-      .select('id, slug, price_aud, vault_item:vault_items(card_name, condition, card_image, vault_images(storage_path))')
-      .eq('seller_id', dealer.id)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(50),
-    supabase.from('reviews').select('rating', { count: 'exact' }).eq('recipient_id', dealer.id),
-  ]);
+  const { data: listings } = await supabase
+    .from('listings')
+    .select('id, slug, price_aud, vault_item:vault_items(card_name, condition, card_image, vault_images(storage_path))')
+    .eq('seller_id', dealer.id)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false })
+    .limit(50);
 
-  const reviewCount = reviewsRes.count ?? 0;
-  const avgRating = reviewCount > 0
-    ? (reviewsRes.data || []).reduce((s, r) => s + (r.rating || 0), 0) / reviewCount
-    : (dealer.rating || 0);
+  // Rating stats come off the profile columns, which the seller-ratings
+  // endpoint keeps in sync with the canonical seller_ratings table.
+  const reviewCount = dealer.reviews_count ?? 0;
+  const avgRating = dealer.rating || 0;
 
   const name = dealer.business_name || dealer.display_name || 'Dealer';
   const image = toCdnUrl(absUrl(dealer.business_logo_url || dealer.avatar_url));

@@ -341,3 +341,47 @@ self.addEventListener('fetch', (event) => {
   // Default: Network First
   event.respondWith(networkFirst(request));
 });
+
+// ── Web Push ─────────────────────────────────────────────────────────────────
+// Payloads are JSON written by src/utils/pushService.js:
+//   { title, body, url, tag }
+// A malformed or empty payload still shows a generic notification — a push
+// the user granted permission for should never be silently dropped.
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = { body: event.data ? event.data.text() : '' };
+  }
+
+  const title = payload.title || 'CardPop';
+  const options = {
+    body: payload.body || 'You have a new notification.',
+    icon: '/favicon-192.png',
+    badge: '/favicon-192.png',
+    // Same-type notifications collapse instead of stacking endlessly.
+    tag: payload.tag || 'cardpop',
+    data: { url: payload.url || '/account/notifications' },
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || '/';
+
+  // Focus an open CardPop tab if there is one, otherwise open a new one.
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      for (const client of clients) {
+        if (new URL(client.url).origin === self.location.origin && 'focus' in client) {
+          client.navigate(url);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(url);
+    })
+  );
+});

@@ -15,7 +15,7 @@ import {
   Settings, FolderTree, ListOrdered, BarChart3, Store, Shield,
   BookOpen, Award, TrendingUp, BadgeCheck, Ticket, Handshake,
   Calculator, MapPin, ClipboardList, HelpCircle, MessageSquare,
-  ShoppingBag, LineChart, Info, Sparkles, Rocket, Tag, MoreHorizontal, Tv2,
+  ShoppingBag, LineChart, Info, Sparkles, Rocket, Tag, MoreHorizontal, Tv2, ScanLine,
 } from 'lucide-react';
 import { TCG_CATEGORY_DATA, SPORTS_CATEGORY_DATA } from '@/components/CategoryIcons.jsx';
 import { SHOP_CATEGORY_GROUPS } from '@/utils/shopCategories.js';
@@ -68,6 +68,7 @@ const ADMIN_LINKS = [
 
 const COMMUNITY_ITEMS = [
   { href: '/community/forum',          label: 'Forum',                 desc: 'Discussions and community posts',        Icon: MessageSquare, gradient: 'from-violet-500 to-purple-600'  },
+  { href: '/community/leaderboard',    label: 'Leaderboard',           desc: 'Monthly points for active collectors',   Icon: Award,         gradient: 'from-amber-500 to-orange-500'   },
   { href: '/community/profiles',       label: 'Profiles',              desc: 'Browse collector profiles',              Icon: Users,         gradient: 'from-emerald-500 to-teal-600'   },
   { href: '/community/local-traders',  label: 'Local Traders',         desc: 'Endorsed sellers near you',              Icon: BadgeCheck,    gradient: 'from-blue-500 to-cyan-600'    },
   { href: '/community/map',            label: 'Community Map',         desc: 'Stores, shows & traders near you',       Icon: MapPin,        gradient: 'from-blue-500 to-indigo-600'   },
@@ -82,6 +83,7 @@ const EVENT_ITEMS = [
 ];
 
 const ANALYTICS_ITEMS = [
+  { href: '/scan',                     label: 'Card Scanner',     desc: 'Scan any card for an instant price check', Icon: ScanLine, gradient: 'from-red-500 to-rose-600' },
   { href: '/analytics',                label: 'Market Analytics', desc: 'Live prices, movers and trends',   Icon: LineChart,  gradient: 'from-blue-500 to-indigo-600'   },
   { href: '/prices',                   label: 'Card Prices',      desc: 'What cards are worth in AUD',       Icon: TrendingUp, gradient: 'from-green-500 to-emerald-600' },
   { href: '/analytics/buying-guides',  label: 'Buying Guides',    desc: 'New releases & chase cards',        Icon: Sparkles,   gradient: 'from-amber-500 to-orange-500' },

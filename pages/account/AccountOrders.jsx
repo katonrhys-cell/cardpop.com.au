@@ -10,10 +10,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ShoppingBag, RotateCcw, Info, AlertCircle, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { ShoppingBag, RotateCcw, Info, AlertCircle, CheckCircle2, XCircle, Clock, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, differenceInDays } from 'date-fns';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
+import LeaveReviewModal from '@/components/LeaveReviewModal.jsx';
+
+// Order states in which the buyer has something real to review — the seller
+// has shipped, the sale finished, or it ended in a refund. Mirrors the gate in
+// src/routes/seller-ratings.js.
+const REVIEWABLE_STATUSES = ['shipped', 'completed', 'refunded'];
 
 const REFUND_REASONS = [
   { value: 'item_not_received',      label: 'Item not received' },
@@ -150,7 +156,7 @@ const RefundDialog = ({ order, onClose, onSuccess }) => {
 
 // ─── Order Card ───────────────────────────────────────────────────────────────
 
-const OrderCard = ({ order, onRefundRequest }) => {
+const OrderCard = ({ order, onRefundRequest, onReviewRequest, reviewed }) => {
   const statusCfg   = STATUS_CONFIG[order.status]        || STATUS_CONFIG.payment_confirmed;
   const refundCfg   = REFUND_STATUS_CONFIG[order.refund_status];
   const daysSince   = differenceInDays(new Date(), new Date(order.created_at));
@@ -158,6 +164,9 @@ const OrderCard = ({ order, onRefundRequest }) => {
     && !['refunded','cancelled','payment_failed'].includes(order.status)
     && ['payment_confirmed','shipped','completed'].includes(order.status)
     && daysSince <= REFUND_WINDOW_DAYS;
+  const canReview   = !reviewed
+    && !!order.seller_id
+    && REVIEWABLE_STATUSES.includes(order.status);
 
   return (
     <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
@@ -224,16 +233,34 @@ const OrderCard = ({ order, onRefundRequest }) => {
         </div>
       )}
 
-      {/* Action */}
-      {canRefund && (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onRefundRequest(order)}
-          className="w-full rounded-xl font-bold gap-2 text-xs h-9"
-        >
-          <RotateCcw className="w-3.5 h-3.5" /> Request Refund
-        </Button>
+      {/* Actions */}
+      {(canRefund || canReview) && (
+        <div className="flex gap-2">
+          {canReview && (
+            <Button
+              size="sm"
+              onClick={() => onReviewRequest(order)}
+              className="flex-1 rounded-xl font-bold gap-2 text-xs h-9"
+            >
+              <Star className="w-3.5 h-3.5" /> Rate this Seller
+            </Button>
+          )}
+          {canRefund && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onRefundRequest(order)}
+              className="flex-1 rounded-xl font-bold gap-2 text-xs h-9"
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> Request Refund
+            </Button>
+          )}
+        </div>
+      )}
+      {reviewed && (
+        <div className="flex items-center gap-2 text-xs font-semibold text-emerald-600">
+          <CheckCircle2 className="w-4 h-4" /> You reviewed this seller
+        </div>
       )}
     </div>
   );
@@ -247,19 +274,31 @@ const AccountOrders = () => {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
   const [refundTarget, setRefundTarget] = useState(null);
+  const [reviewTarget, setReviewTarget] = useState(null);
+  const [reviewedOrderIds, setReviewedOrderIds] = useState(() => new Set());
 
   const fetchOrders = useCallback(async () => {
     if (!currentUser?.id) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*, seller:profiles!seller_id(id, display_name, username), listing:listings!listing_id(vault_item:vault_items!inner(card_name))')
-        .eq('buyer_id', currentUser.id)
-        .order('created_at', { ascending: false })
-        .limit(100);
+      const [{ data, error }, givenRes] = await Promise.all([
+        supabase
+          .from('orders')
+          .select('*, seller:profiles!seller_id(id, display_name, username), listing:listings!listing_id(vault_item:vault_items!inner(card_name))')
+          .eq('buyer_id', currentUser.id)
+          .order('created_at', { ascending: false })
+          .limit(100),
+        // Which orders already carry a review — drives the Rate button state.
+        // Best-effort: if it fails, buttons still show and the server's
+        // duplicate check remains the backstop.
+        apiServerClient.fetch('/seller-ratings/mine/given').catch(() => null),
+      ]);
       if (error) throw error;
       setOrders(data || []);
+      if (givenRes?.ok) {
+        const { ratings } = await givenRes.json();
+        setReviewedOrderIds(new Set((ratings || []).map(r => r.order_id).filter(Boolean)));
+      }
     } catch (err) {
       console.error('Failed to load orders:', err);
       toast.error('Could not load your orders. Please try again.');
@@ -337,6 +376,8 @@ const AccountOrders = () => {
               key={order.id}
               order={order}
               onRefundRequest={setRefundTarget}
+              onReviewRequest={setReviewTarget}
+              reviewed={reviewedOrderIds.has(order.id)}
             />
           ))}
         </div>
@@ -347,6 +388,14 @@ const AccountOrders = () => {
           order={refundTarget}
           onClose={() => setRefundTarget(null)}
           onSuccess={fetchOrders}
+        />
+      )}
+
+      {reviewTarget && (
+        <LeaveReviewModal
+          order={reviewTarget}
+          onClose={() => setReviewTarget(null)}
+          onSuccess={orderId => setReviewedOrderIds(prev => new Set(prev).add(orderId))}
         />
       )}
     </AccountPageShell>

@@ -90,7 +90,7 @@ const SoleTraderStorePage = () => {
         }
 
         const resolvedId = profile.id;
-        const [marketplaceRes, vaultRes, reviewsRes] = await Promise.all([
+        const [marketplaceRes, vaultRes] = await Promise.all([
           supabase.from('listings')
             .select(`*, ${LISTING_CARD_VAULT_EMBED}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
             // Sold cards stay on the storefront, badged "Sold".
@@ -100,9 +100,6 @@ const SoleTraderStorePage = () => {
             .select(`${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
             .eq('owner_id', resolvedId).eq('is_public', true).neq('listing_type', 'Private')
             .order('created_at', { ascending: false }).limit(24),
-          supabase.from('reviews')
-            .select('*', { count: 'estimated' })
-            .eq('recipient_id', resolvedId),
         ]);
 
         if (!mounted) return;
@@ -113,14 +110,11 @@ const SoleTraderStorePage = () => {
           ...(marketplaceRes.data || []).map(i => ({ ...i, _type: 'marketplace' })),
         ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
-        const totalReviews = reviewsRes.count ?? 0;
-        const avgRating = totalReviews > 0
-          ? (reviewsRes.data || []).reduce((s, r) => s + r.rating, 0) / totalReviews
-          : (profile.rating || 0);
-
         setDealer(profile);
         setListings(combined);
-        setStats({ totalListings: combined.length, averageRating: avgRating, totalReviews: totalReviews || (profile.reviews_count || 0) });
+        // Rating stats come off the profile columns, which the seller-ratings
+        // endpoint keeps in sync with the canonical seller_ratings table.
+        setStats({ totalListings: combined.length, averageRating: profile.rating || 0, totalReviews: profile.reviews_count || 0 });
       } catch (err) {
         if (mounted) setError(err.message || 'Store not found.');
       } finally {
