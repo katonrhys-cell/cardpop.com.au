@@ -56,6 +56,7 @@ const EXISTING = {
   category_id: 'cat-1',
   franchise_id: 'fr-1',
   locked_base_value_aud: null,
+  locked: false,
 };
 
 beforeEach(() => {
@@ -238,6 +239,16 @@ describe('PUT /items/:id', () => {
     expect(res.body.listing.status).toBe('archived');
     expect(archiveB.update).toHaveBeenCalledWith({ status: 'archived' });
   });
+
+  it('423s a locked card without touching the row', async () => {
+    queueFrom(builder({ data: { ...EXISTING, locked: true }, error: null }));
+    const res = await request(app)
+      .put(`/items/${EXISTING.id}`)
+      .send({ item: VALID_ITEM });
+    expect(res.status).toBe(423);
+    // Only the ownership/lock read happened — no profiles read, no write.
+    expect(mockUserClient.from).toHaveBeenCalledTimes(1);
+  });
 });
 
 // ─── PATCH /items/:id/display-style ──────────────────────────────────────────
@@ -293,6 +304,69 @@ describe('PATCH /items/:id/display-style', () => {
       .patch(`/items/${EXISTING.id}/display-style`)
       .send({ displayStyle: 'neon' });
     expect(res.status).toBe(404);
+  });
+});
+
+// ─── PATCH /items/:id/lock ────────────────────────────────────────────────────
+
+describe('PATCH /items/:id/lock', () => {
+  it('rejects a malformed id', async () => {
+    const res = await request(app).patch('/items/nope/lock').send({ locked: true });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a non-boolean body', async () => {
+    const res = await request(app).patch(`/items/${EXISTING.id}/lock`).send({ locked: 'yes' });
+    expect(res.status).toBe(400);
+  });
+
+  it('404s when the card is not in the caller\'s vault', async () => {
+    queueFrom(builder({ data: null, error: null }));
+    const res = await request(app).patch(`/items/${EXISTING.id}/lock`).send({ locked: true });
+    expect(res.status).toBe(404);
+  });
+
+  it('locks an unlocked card, pinned to the caller\'s ownership', async () => {
+    const updateB = builder({ error: null });
+    queueFrom(builder({ data: { id: EXISTING.id, locked: false }, error: null }), updateB);
+
+    const res = await request(app).patch(`/items/${EXISTING.id}/lock`).send({ locked: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.locked).toBe(true);
+    expect(updateB.update).toHaveBeenCalledWith({ locked: true });
+    expect(updateB.eq).toHaveBeenCalledWith('owner_id', 'u1');
+  });
+
+  it('unlocks a locked card', async () => {
+    const updateB = builder({ error: null });
+    queueFrom(builder({ data: { id: EXISTING.id, locked: true }, error: null }), updateB);
+
+    const res = await request(app).patch(`/items/${EXISTING.id}/lock`).send({ locked: false });
+
+    expect(res.status).toBe(200);
+    expect(res.body.locked).toBe(false);
+    expect(updateB.update).toHaveBeenCalledWith({ locked: false });
+  });
+
+  it('is a no-op when already in the requested state, without writing', async () => {
+    queueFrom(builder({ data: { id: EXISTING.id, locked: true }, error: null }));
+
+    const res = await request(app).patch(`/items/${EXISTING.id}/lock`).send({ locked: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.locked).toBe(true);
+    // Only the ownership read happened — no write attempted.
+    expect(mockUserClient.from).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns 403 when RLS denies the update', async () => {
+    queueFrom(
+      builder({ data: { id: EXISTING.id, locked: false }, error: null }),
+      builder({ data: null, error: { code: '42501', message: 'denied' } }),
+    );
+    const res = await request(app).patch(`/items/${EXISTING.id}/lock`).send({ locked: true });
+    expect(res.status).toBe(403);
   });
 });
 

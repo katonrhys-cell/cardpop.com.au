@@ -114,12 +114,15 @@ router.put('/:id', authMiddleware, async (req, res) => {
   // explicit owner filter keeps admins/public rows out of this edit path too.
   const { data: existing, error: findError } = await userClient
     .from('vault_items')
-    .select('id, owner_id, card_image, category_id, franchise_id, locked_base_value_aud')
+    .select('id, owner_id, card_image, category_id, franchise_id, locked_base_value_aud, locked')
     .eq('id', id)
     .eq('owner_id', req.user.id)
     .maybeSingle();
   if (findError) throw findError;
   if (!existing) return res.status(404).json({ error: 'Card not found in your vault' });
+  // Friendly pre-check ahead of the DB trigger (trg_fn_vault_enforce_item_lock),
+  // which still enforces this at the RLS boundary either way.
+  if (existing.locked) return res.status(423).json({ error: 'This card is locked. Unlock it before making changes.' });
 
   const tier = await fetchOwnerTier(userClient, req.user.id);
   const { row, pathErrors } = buildVaultItemRow(item, { userId: req.user.id, tier, isEdit: true });
@@ -187,6 +190,47 @@ router.patch('/:id/display-style', authMiddleware, async (req, res) => {
 
   logger.info(`[VAULT] User ${req.user.id} set display style of card ${id} to ${requested}`);
   res.json({ success: true, displayStyle: requested });
+});
+
+// PATCH /vault/items/:id/lock — toggle the owner's own edit lock. One click
+// either way: locking always succeeds, unlocking is the one path the
+// trg_fn_vault_enforce_item_lock trigger allows through a locked row.
+router.patch('/:id/lock', authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  if (!UUID_RE.test(id || '')) return res.status(400).json({ error: 'Invalid card id' });
+  if (typeof req.body?.locked !== 'boolean') return res.status(400).json({ error: 'locked must be true or false' });
+
+  const token = (req.headers.authorization || '').slice(7);
+  const userClient = createUserScopedClient(token);
+  const locked = req.body.locked;
+
+  const { data: existing, error: findError } = await userClient
+    .from('vault_items')
+    .select('id, locked')
+    .eq('id', id)
+    .eq('owner_id', req.user.id)
+    .maybeSingle();
+  if (findError) throw findError;
+  if (!existing) return res.status(404).json({ error: 'Card not found in your vault' });
+
+  // Idempotent no-op: a repeat toggle to the current state would otherwise hit
+  // the trigger's "still locked" branch and fail with a confusing error.
+  if (existing.locked === locked) return res.json({ success: true, locked });
+
+  const { error } = await userClient
+    .from('vault_items')
+    .update({ locked })
+    .eq('id', id)
+    .eq('owner_id', req.user.id);
+  if (error) {
+    if (error.code === '42501' || /row-level security/i.test(error.message || '')) {
+      return res.status(403).json({ error: 'You are not allowed to update this card.' });
+    }
+    throw error;
+  }
+
+  logger.info(`[VAULT] User ${req.user.id} ${locked ? 'locked' : 'unlocked'} card ${id}`);
+  res.json({ success: true, locked });
 });
 
 export default router;

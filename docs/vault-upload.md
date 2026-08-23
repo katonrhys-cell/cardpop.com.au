@@ -39,6 +39,14 @@ for:
 - the selling gate — the RESTRICTIVE `listings_require_selling_entitlement`
   policy calling `private.can_sell()` (identity verified + card on file)
 - the locked columns — `is_featured` pin, admin-only base-value columns
+- the owner's own edit lock — `vault_items.locked`, toggled by the owner via
+  `PATCH /vault/items/:id/lock` (one call, no confirmation either way) and
+  enforced by `trg_fn_vault_enforce_item_lock`: while `locked` is true, every
+  other column is pinned to its stored value until the owner unlocks it again.
+  `PUT /vault/items/:id` pre-checks this and returns `423` with a friendly
+  message before ever reaching the trigger. `pages/account/AccountListings.jsx`
+  links each listing to `/vault/edit/:id`, and `AddEditCardPage.jsx` disables
+  the whole form (visually and via `inert`) while a card is locked.
 - the `enforce_listing_approval` trigger (new listings may be held `pending`)
 
 A service-role write would silently bypass all of these, and each rule would
