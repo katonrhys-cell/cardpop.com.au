@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, ChevronDown, Sparkles, Loader2,
-  Lock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X, Crop,
+  Lock, Unlock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X, Crop,
   Frame, Wand2, SlidersHorizontal, HandCoins, History, Camera, ScanLine, Truck,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -189,6 +189,8 @@ const AddEditCardPage = () => {
   const [subsetId, setSubsetId]               = useState('');
   const [subsetOpts, setSubsetOpts]           = useState([]);
   const [lockedBaseValue, setLockedBaseValue] = useState(null);
+  const [locked, setLocked] = useState(false);
+  const [togglingLock, setTogglingLock] = useState(false);
   const [psaPopData, setPsaPopData]           = useState(null);
   const [photoQuality, setPhotoQuality]       = useState(null);
   const [checkingQuality, setCheckingQuality] = useState(false);
@@ -601,6 +603,7 @@ const AddEditCardPage = () => {
           return;
         }
         setLockedBaseValue(card.locked_base_value_aud ?? null);
+        setLocked(!!card.locked);
 
         // Restore hierarchy selectors. Arm the one-shot cascade guards first:
         // setting franchise/set here re-fires the cascade-reset effects after
@@ -1348,8 +1351,36 @@ const AddEditCardPage = () => {
   };
 
   // ─── Submit ───────────────────────────────────────────────────────────────
+  // One click either way — locking always succeeds, and unlocking is the one
+  // path the DB trigger allows through a locked row (see
+  // trg_fn_vault_enforce_item_lock in the lock migration).
+  const handleToggleLock = async () => {
+    if (!isEdit || togglingLock) return;
+    const next = !locked;
+    setTogglingLock(true);
+    try {
+      const res = await apiServerClient.fetch(`/vault/items/${id}/lock`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ locked: next }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Could not update the lock.');
+      setLocked(body.locked ?? next);
+      toast.success(next ? 'Card locked' : 'Card unlocked');
+    } catch (err) {
+      toast.error(err.message || 'Could not update the lock.');
+    } finally {
+      setTogglingLock(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isEdit && locked) {
+      toast.error('This card is locked. Unlock it before saving changes.');
+      return;
+    }
     // "Next: List it" and "Save Card" are the same button element swapped in
     // place, so the second click of a double-click (or a second tap while the
     // page is still scrolling) lands on the submit button and would save the
@@ -4113,12 +4144,45 @@ const AddEditCardPage = () => {
 
         <div className="flex items-center justify-between mb-8">
           <h1 className="font-serif text-4xl font-bold">{isEdit ? 'Edit Card Details' : 'Add New Card'}</h1>
-          <Button variant="ghost" asChild className="text-muted-foreground">
-            <Link to="/vault"><ArrowLeft className="w-4 h-4 mr-2" /> Back</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            {isEdit && (
+              <Button
+                type="button"
+                variant={locked ? 'default' : 'outline'}
+                onClick={handleToggleLock}
+                disabled={togglingLock}
+                className="font-bold"
+              >
+                {togglingLock
+                  ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  : locked ? <Lock className="w-4 h-4 mr-2" /> : <Unlock className="w-4 h-4 mr-2" />}
+                {locked ? 'Locked' : 'Unlocked'}
+              </Button>
+            )}
+            <Button variant="ghost" asChild className="text-muted-foreground">
+              <Link to="/vault"><ArrowLeft className="w-4 h-4 mr-2" /> Back</Link>
+            </Button>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {isEdit && locked && (
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 mb-6">
+            <Lock className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-bold text-amber-700">This card is locked</p>
+              <p className="text-xs text-amber-600/80 mt-0.5">
+                Editing is disabled to protect it from accidental changes. Click &quot;Locked&quot; above to unlock it — one click, no confirmation needed.
+              </p>
+            </div>
+          </div>
+        )}
+
+        <form
+          onSubmit={handleSubmit}
+          className={`space-y-6 ${isEdit && locked ? 'opacity-60 pointer-events-none select-none' : ''}`}
+          aria-disabled={isEdit && locked ? 'true' : undefined}
+          inert={isEdit && locked ? true : undefined}
+        >
           {wizardMode ? (
             <>
               {/* Selling gates surfaced up-front (step 1), not sprung on the

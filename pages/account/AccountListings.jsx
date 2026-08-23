@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { List, Plus, RefreshCw, AlertCircle, Trash2, Edit, PackageOpen, ShoppingCart, ArrowRightLeft, Layers, Tag, HandCoins, Sparkles } from 'lucide-react';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { Button } from '@/components/ui/button';
@@ -72,6 +72,7 @@ const getCardDetails = (listing) => {
 
 const AccountListings = () => {
   const { currentUser } = useAuth();
+  const navigate = useNavigate();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -257,8 +258,14 @@ const AccountListings = () => {
                   const cfg = getStatusConfig(listing.status);
                   const StatusIcon = cfg.icon;
                   const card = getCardDetails(listing);
+                  const vaultItemId = listing.vault_item?.id;
                   return (
-                    <TableRow key={listing.id}>
+                    <TableRow
+                      key={listing.id}
+                      onClick={vaultItemId ? () => navigate(`/vault/edit/${vaultItemId}`) : undefined}
+                      className={vaultItemId ? 'cursor-pointer' : undefined}
+                      title={vaultItemId ? 'Open this card in your vault' : undefined}
+                    >
                       <TableCell className="font-bold px-6">
                         <div className="max-w-[240px]">
                           <p className="truncate">{card.name || '—'}</p>
@@ -302,7 +309,7 @@ const AccountListings = () => {
                       <TableCell className="text-muted-foreground text-sm tabular-nums">
                         {listing.created_at ? new Date(listing.created_at).toLocaleDateString() : '—'}
                       </TableCell>
-                      <TableCell className="text-right px-6">
+                      <TableCell className="text-right px-6" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-2">
                           <Button variant="ghost" size="sm" onClick={() => openEdit(listing)} className="h-8 rounded-lg text-xs font-medium">
                             <Edit className="w-3.5 h-3.5 mr-1.5" /> Edit
