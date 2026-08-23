@@ -14,10 +14,10 @@ import {
 } from '@/lib/displayStyles.js';
 
 describe('displayStyles registry integrity', () => {
-  it('exposes exactly the ten canonical styles in ladder order', () => {
+  it('exposes exactly the eleven canonical styles in ladder order', () => {
     expect(DISPLAY_STYLES.map(s => s.key)).toEqual([
       'classic', 'stand', 'floating', 'neon', 'glass', 'slab',
-      'spotlight', 'rotating', 'prism', 'holographic',
+      'spotlight', 'rotating', 'spinning', 'prism', 'holographic',
     ]);
   });
 
@@ -101,9 +101,9 @@ describe('getAccessibleStyles', () => {
     ]);
   });
 
-  it('elite users add Rotating and Prism', () => {
+  it('elite users add Rotating, Spinning and Prism', () => {
     expect(getAccessibleStyles('elite').map(s => s.key)).toEqual([
-      'classic', 'stand', 'floating', 'neon', 'glass', 'slab', 'spotlight', 'rotating', 'prism',
+      'classic', 'stand', 'floating', 'neon', 'glass', 'slab', 'spotlight', 'rotating', 'spinning', 'prism',
     ]);
   });
 

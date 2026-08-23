@@ -22,6 +22,10 @@
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  /* Query container so the stand wordmark / card-back branding can scale with
+     the tile (cqw). Inline-size containment is safe here: the element is
+     absolutely positioned inset-0, so its size never depends on its contents. */
+  container-type: inline-size;
 }
 
 .cardshowcase__stage {
@@ -80,34 +84,87 @@
 }
 
 /* -----------------------------------------------------------------------------
-   2. Premium Stand — card leans back on a subtle acrylic stand with a shadow.
+   2. Premium Stand — card leans back on the black CardPop display base.
    -------------------------------------------------------------------------- */
 .cardshowcase--stand .cardshowcase__card {
-  transform: translateY(-3%) rotateX(7deg);
+  transform: translateY(-4%) rotateX(7deg);
   transform-origin: center bottom;
 }
 .cardshowcase--stand .cardshowcase__shadow {
   opacity: 0.85;
-  bottom: 8%;
+  bottom: 9%;
 }
-/* The acrylic base — a translucent rounded slab the card appears to rest in. */
-.cardshowcase--stand .cardshowcase__prop {
+
+/* The CardPop base — a matte black turntable disc with the wordmark on its
+   front edge, shared by Premium Stand and Spinning Stand. Two layers fake the
+   3D: an elliptical top face (::before) over a rounded front edge (::after). */
+.cardshowcase--stand .cardshowcase__prop,
+.cardshowcase--spinning .cardshowcase__prop {
   position: absolute;
-  bottom: 8%;
+  bottom: 3.5%;
   left: 50%;
-  width: 46%;
-  height: 4.5%;
-  transform: translateX(-50%) rotateX(62deg);
+  width: 58%;
+  height: 10%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.cardshowcase--stand .cardshowcase__prop::before,
+.cardshowcase--spinning .cardshowcase__prop::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 68%;
+  z-index: 1;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at 50% 32%,
+    hsl(228 6% 27%) 0%,
+    hsl(228 8% 15%) 55%,
+    hsl(228 10% 9%) 100%
+  );
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.22),
+    inset 0 -2px 4px rgba(0, 0, 0, 0.55);
+}
+.cardshowcase--stand .cardshowcase__prop::after,
+.cardshowcase--spinning .cardshowcase__prop::after {
+  content: '';
+  position: absolute;
+  left: 1%;
+  right: 1%;
+  top: 34%;
+  bottom: 0;
+  border-radius: 50%;
   background: linear-gradient(
     to bottom,
-    rgba(255, 255, 255, 0.45),
-    rgba(255, 255, 255, 0.08)
+    hsl(228 8% 17%) 0%,
+    hsl(228 10% 7%) 80%
   );
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  border-radius: 999px;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  pointer-events: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+/* The engraved CardPop wordmark on the front edge of the base. */
+.cardshowcase__plate {
+  position: absolute;
+  left: 50%;
+  bottom: 4%;
+  transform: translateX(-50%);
+  z-index: 2;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+.cardshowcase__plate > span {
+  color: hsl(var(--primary));
+}
+@supports (font-size: 1cqw) {
+  .cardshowcase__plate {
+    font-size: clamp(7px, 5.5cqw, 15px);
+  }
 }
 
 /* -----------------------------------------------------------------------------
@@ -377,6 +434,91 @@
   0%, 100% { opacity: 0.55; transform: translateX(-46%) scaleX(0.9); }
   25%, 75% { opacity: 0.65; transform: translateX(-50%) scaleX(1); }
   50%      { opacity: 0.55; transform: translateX(-54%) scaleX(0.9); }
+}
+
+/* -----------------------------------------------------------------------------
+   Spinning Stand — a Courtyard-style continuous 360° revolve above the
+   black CardPop turntable. The photo and a CardPop-branded card back are the
+   two faces of one 3D plane (backface-visibility), so the far side of the
+   turn shows branding instead of a mirrored photo. Linear timing — a
+   turntable never eases.
+   -------------------------------------------------------------------------- */
+.cardshowcase--spinning .cardshowcase__stage {
+  /* Tighter than the default 1100px so the turn reads properly deep. */
+  perspective: 900px;
+}
+.cardshowcase--spinning .cardshowcase__card {
+  width: 86%;
+  height: 82%;
+  margin-bottom: 11%;
+  transform-style: preserve-3d;
+}
+.cardshowcase--spinning.is-visible .cardshowcase__card {
+  animation: csSpin 10s linear infinite;
+}
+@keyframes csSpin {
+  from { transform: rotateY(0deg); }
+  to   { transform: rotateY(360deg); }
+}
+/* Contact shadow pooled on the turntable's top face, under the card. */
+.cardshowcase--spinning .cardshowcase__shadow {
+  opacity: 0.55;
+  bottom: 12%;
+  width: 46%;
+}
+/* The two faces of the spinning card. */
+.cardshowcase__face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.cardshowcase__face--back {
+  transform: rotateY(180deg);
+}
+/* The CardPop card back — charcoal, pinstriped, logo-centred. Sized to a real
+   trading card's 63×88 ratio so it matches the photo's silhouette. */
+.cardshowcase__backcard {
+  height: 96%;
+  max-width: 96%;
+  aspect-ratio: 63 / 88;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7%;
+  border-radius: 10px;
+  background: radial-gradient(
+    circle at 50% 30%,
+    hsl(228 8% 21%) 0%,
+    hsl(228 10% 12%) 55%,
+    hsl(228 12% 8%) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    inset 0 0 0 5px rgba(255, 255, 255, 0.05),
+    inset 0 0 40px rgba(0, 0, 0, 0.5);
+}
+.cardshowcase__backicon {
+  width: 26%;
+  height: auto;
+}
+.cardshowcase__backword {
+  font-size: 14px;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.95);
+}
+.cardshowcase__backword > span {
+  color: hsl(var(--primary));
+}
+@supports (font-size: 1cqw) {
+  .cardshowcase__backword {
+    font-size: clamp(11px, 10cqw, 28px);
+  }
 }
 
 /* -----------------------------------------------------------------------------

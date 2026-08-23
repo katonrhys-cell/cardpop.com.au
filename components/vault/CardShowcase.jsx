@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import CardImage from '@/components/CardImage.jsx';
+import CardPopLogo from '@/components/CardPopLogo.jsx';
 import { normalizeStyle, getStyleByKey } from '@/lib/displayStyles.js';
 import './cardShowcase.css';
 
@@ -144,8 +145,33 @@ const CardShowcase = ({
     className,
   ].filter(Boolean).join(' ');
 
-  // Slab provides its own internal padding; the others inset the photo a touch.
-  const imgPad = styleKey === 'slab' ? '' : 'p-2';
+  // Slab provides its own internal padding, and the spinning card should fill
+  // its face edge-to-edge; the other styles inset the photo a touch.
+  const imgPad = (styleKey === 'slab' || styleKey === 'spinning') ? '' : 'p-2';
+
+  const cardImage = (
+    <CardImage
+      src={src}
+      srcSet={srcSet}
+      sizes={sizes}
+      fallbackSrc={fallbackSrc}
+      canonicalSrc={canonicalSrc}
+      thumbSrc={thumbSrc}
+      alt={alt}
+      width={width}
+      height={height}
+      loading={loading}
+      priority={priority}
+      imgClassName={`w-full h-full object-contain ${imgPad}`}
+    />
+  );
+
+  // The wordmark engraved on the black CardPop stand (Stand + Spinning Stand).
+  const standPlate = (
+    <span className="cardshowcase__plate font-serif font-bold">
+      Card<span>Pop</span>
+    </span>
+  );
 
   return (
     <div
@@ -156,20 +182,22 @@ const CardShowcase = ({
     >
       <div className="cardshowcase__stage">
         <div ref={cardRef} className="cardshowcase__card">
-          <CardImage
-            src={src}
-            srcSet={srcSet}
-            sizes={sizes}
-            fallbackSrc={fallbackSrc}
-            canonicalSrc={canonicalSrc}
-            thumbSrc={thumbSrc}
-            alt={alt}
-            width={width}
-            height={height}
-            loading={loading}
-            priority={priority}
-            imgClassName={`w-full h-full object-contain ${imgPad}`}
-          />
+          {/* Spinning: the photo and a CardPop-branded card back are opposite
+              faces of one 3D plane, so the far side of the 360° turn shows
+              branding rather than a mirrored photo. */}
+          {styleKey === 'spinning' ? (
+            <>
+              <div className="cardshowcase__face cardshowcase__face--front">{cardImage}</div>
+              <div className="cardshowcase__face cardshowcase__face--back" aria-hidden="true">
+                <div className="cardshowcase__backcard">
+                  <CardPopLogo variant="icon" iconClassName="cardshowcase__backicon" />
+                  <span className="cardshowcase__backword font-serif font-bold">
+                    Card<span>Pop</span>
+                  </span>
+                </div>
+              </div>
+            </>
+          ) : cardImage}
           {styleKey === 'holographic' && (
             <>
               <div className="cardshowcase__holo" aria-hidden="true" />
@@ -185,10 +213,13 @@ const CardShowcase = ({
         </div>
 
         {/* Per-style decorative layers (purely visual). */}
-        {(def?.key === 'stand' || def?.key === 'floating' || def?.key === 'glass' || def?.key === 'rotating' || def?.key === 'spotlight') && (
+        {(def?.key === 'stand' || def?.key === 'floating' || def?.key === 'glass' || def?.key === 'rotating' || def?.key === 'spinning' || def?.key === 'spotlight') && (
           <div className="cardshowcase__shadow" aria-hidden="true" />
         )}
-        {(styleKey === 'stand' || styleKey === 'slab') && (
+        {(styleKey === 'stand' || styleKey === 'spinning') && (
+          <div className="cardshowcase__prop" aria-hidden="true">{standPlate}</div>
+        )}
+        {styleKey === 'slab' && (
           <div className="cardshowcase__prop" aria-hidden="true" />
         )}
         {styleKey === 'glass' && <div className="cardshowcase__glass" aria-hidden="true" />}
