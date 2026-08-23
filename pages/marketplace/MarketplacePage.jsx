@@ -10,6 +10,7 @@ import { useCategories } from '@/hooks/useCategories.js';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { FilterChip, CheckRow, RadioRow } from '@/components/FilterChip.jsx';
+import LiveActivityTicker from '@/components/LiveActivityTicker.jsx';
 import {
   CARD_LANGUAGES, GRADERS, GRADE_VALUES, CONDITIONS, FEATURES, TCG_RARITIES, PRICE_PRESETS,
 } from '@/lib/cardFilters.js';
@@ -906,6 +907,8 @@ const MarketplacePage = () => {
       </section>
 
       <section className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 mt-8 w-full flex-1">
+
+        <LiveActivityTicker className="mb-6" />
 
         <div className="flex flex-col gap-8">
 

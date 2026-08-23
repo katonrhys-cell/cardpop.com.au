@@ -19,6 +19,7 @@ import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import EbayMarketSection from '@/components/EbayMarketSection.jsx';
 import MarketPriceAnchor from '@/components/MarketPriceAnchor.jsx';
+import ListingWatchers from '@/components/ListingWatchers.jsx';
 import { addToRecentlyViewed } from '@/utils/recentlyViewed.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import CertificationVerificationSection from '@/components/CertificationVerificationSection.jsx';
@@ -616,6 +617,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
                         gradeScore={vi?.grade}
                         listingPrice={product.price}
                       />
+                      {source === 'marketplace' && <ListingWatchers listingId={product.id} className="mt-2" />}
                     </div>
                   )}
                 </>

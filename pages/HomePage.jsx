@@ -9,6 +9,7 @@ import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { VAULT_ITEM_CARD_COLUMNS, VAULT_IMAGE_CARD_COLUMNS, VAULT_ITEM_LISTING_EMBED } from '@/lib/listingCardColumns.js';
 import { cachedQuery } from '@/lib/queryCache.js';
 import VaultListingCard from '@/components/VaultListingCard.jsx';
+import LiveActivityTicker from '@/components/LiveActivityTicker.jsx';
 import SellerCard from '@/components/SellerCard.jsx';
 import FeaturedSellerCard from '@/components/FeaturedSellerCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -589,6 +590,9 @@ const HomePage = () => {
           </div>
         </section>
       )}
+
+      {/* ── Live activity — just listed / just sold, realtime ────────────── */}
+      <LiveActivityTicker framed />
 
       {/* ── Trust strip ──────────────────────────────────────────────────── */}
       <section className="py-8 md:py-10 bg-background border-b border-border">

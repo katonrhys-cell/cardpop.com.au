@@ -37,6 +37,9 @@ vi.mock('@/lib/supabaseClient.js', () => {
 });
 
 vi.mock('@/components/SEOHead.jsx', () => ({ default: () => null }));
+// The live ticker is its own feature; without this stub its seed queries also
+// consume h.result and duplicate the listing names these tests assert on.
+vi.mock('@/components/LiveActivityTicker.jsx', () => ({ default: () => null }));
 // Anonymous visitor — saved searches stay hidden
 vi.mock('@/contexts/AuthContext.jsx', () => ({ useAuth: () => ({ currentUser: null }) }));
 vi.mock('@/components/MarketplaceListingCard.jsx', () => ({
