@@ -25,6 +25,7 @@ import photoTemplateRouter from './photo-template.js';
 import searchSuggestionsRouter from './search-suggestions.js';
 import sellerRatingsRouter from './seller-ratings.js';
 import listingStatsRouter from './listing-stats.js';
+import pushRouter from './push.js';
 import buyerProtectionRouter from './buyer-protection.js';
 import wishlistRouter from './wishlist.js';
 import recommendationsRouter from './recommendations.js';
@@ -149,6 +150,9 @@ export default () => {
 
     router.use('/listing-stats', apiLimiter);
     router.use('/listing-stats', listingStatsRouter);
+
+    router.use('/push', apiLimiter);
+    router.use('/push', pushRouter);
 
     router.use('/wishlist', apiLimiter);
     router.use('/wishlist', wishlistRouter);

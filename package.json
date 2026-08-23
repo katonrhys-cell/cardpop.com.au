@@ -99,6 +99,7 @@
     "ua-parser-js": "^1.0.37",
     "undici": "^8.7.0",
     "vaul": "^1.1.2",
+    "web-push": "3.6.7",
     "zod": "^4.3.6"
   },
   "devDependencies": {
