@@ -95,6 +95,7 @@ const STATIC_PAGES = [
   { loc: '/community/whatnot',     lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.5' },
   { loc: '/community/building-your-business', lastmod: SITE_UPDATED, freq: 'monthly', pri: '0.6' },
   { loc: '/community/forum',       lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.6' },
+  { loc: '/community/leaderboard', lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.5' },
   { loc: '/community/profiles',    lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.5' },
   { loc: '/community/map',         lastmod: SITE_UPDATED,       freq: 'monthly', pri: '0.5' },
   { loc: '/blog',                  lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' },

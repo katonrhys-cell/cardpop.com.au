@@ -68,6 +68,7 @@ const ADMIN_LINKS = [
 
 const COMMUNITY_ITEMS = [
   { href: '/community/forum',          label: 'Forum',                 desc: 'Discussions and community posts',        Icon: MessageSquare, gradient: 'from-violet-500 to-purple-600'  },
+  { href: '/community/leaderboard',    label: 'Leaderboard',           desc: 'Monthly points for active collectors',   Icon: Award,         gradient: 'from-amber-500 to-orange-500'   },
   { href: '/community/profiles',       label: 'Profiles',              desc: 'Browse collector profiles',              Icon: Users,         gradient: 'from-emerald-500 to-teal-600'   },
   { href: '/community/local-traders',  label: 'Local Traders',         desc: 'Endorsed sellers near you',              Icon: BadgeCheck,    gradient: 'from-blue-500 to-cyan-600'    },
   { href: '/community/map',            label: 'Community Map',         desc: 'Stores, shows & traders near you',       Icon: MapPin,        gradient: 'from-blue-500 to-indigo-600'   },
