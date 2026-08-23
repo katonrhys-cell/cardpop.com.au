@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { List, Plus, RefreshCw, AlertCircle, Trash2, Edit, PackageOpen, ShoppingCart, ArrowRightLeft, Layers, Tag, HandCoins } from 'lucide-react';
+import { List, Plus, RefreshCw, AlertCircle, Trash2, Edit, PackageOpen, ShoppingCart, ArrowRightLeft, Layers, Tag, HandCoins, Sparkles } from 'lucide-react';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +13,8 @@ import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
+import DisplayStyleDialog from '@/components/vault/DisplayStyleDialog.jsx';
+import { getDisplayStyleLabel } from '@/components/vault/DisplayStylePicker.jsx';
 
 const STATUS_CONFIG = {
   'For Sale':        { label: 'For Sale',        className: 'bg-emerald-500/10 text-emerald-700 border-emerald-300 dark:text-emerald-400', icon: ShoppingCart },
@@ -81,6 +83,7 @@ const AccountListings = () => {
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [styleModalOpen, setStyleModalOpen] = useState(false);
 
   const fetchRef = useRef(null);
 
@@ -95,7 +98,7 @@ const AccountListings = () => {
       try {
         const { data, error: fetchError } = await supabase
           .from('listings')
-          .select('*, vault_item:vault_items(card_name, set_name, card_number, grading_company, grade, condition)')
+          .select('*, vault_item:vault_items(id, card_name, set_name, card_number, grading_company, grade, condition, card_image, display_style)')
           .eq('seller_id', uid)
           .order('created_at', { ascending: false })
           .limit(100);
@@ -171,6 +174,15 @@ const AccountListings = () => {
     setNewStatus(VALID_STATUSES.includes(listing.status) ? listing.status : 'active');
     setSaleMode(saleModeOf(listing));
     setAcceptsOffers(listing.accepts_offers ?? false);
+  };
+
+  // A saved style is reflected in place — no refetch for a cosmetic change.
+  const handleStyleSaved = (styleKey) => {
+    const vaultItemId = editListing?.vault_item?.id;
+    setListings(prev => prev.map((l) => (
+      l.vault_item?.id === vaultItemId ? { ...l, vault_item: { ...l.vault_item, display_style: styleKey } } : l
+    )));
+    setEditListing(prev => (prev ? { ...prev, vault_item: { ...prev.vault_item, display_style: styleKey } } : prev));
   };
 
   return (
@@ -361,6 +373,30 @@ const AccountListings = () => {
                 onCheckedChange={setAcceptsOffers}
               />
             </div>
+            {editListing?.vault_item?.id ? (
+              <div className="flex items-center justify-between p-4 bg-muted/50 rounded-xl border border-border">
+                <div className="flex items-start gap-3">
+                  <Sparkles className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                  <div>
+                    <Label className="font-bold text-sm">Display Style</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {getDisplayStyleLabel(editListing.vault_item.display_style) || 'Classic Flat'} — how this card is showcased on the marketplace
+                    </p>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setStyleModalOpen(true)} className="rounded-lg text-xs font-bold shrink-0">
+                  Change
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-start gap-3 p-4 bg-muted/50 rounded-xl border border-border">
+                <Sparkles className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                <div>
+                  <Label className="font-bold text-sm text-muted-foreground">Display Style</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">Only available for cards added via the Vault.</p>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setEditListing(null)} disabled={saving} className="rounded-xl">Cancel</Button>
@@ -370,6 +406,18 @@ const AccountListings = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DisplayStyleDialog
+        open={styleModalOpen}
+        onOpenChange={setStyleModalOpen}
+        card={editListing?.vault_item ? {
+          id: editListing.vault_item.id,
+          card_name: getCardDetails(editListing).name,
+          card_image: editListing.vault_item.card_image,
+          display_style: editListing.vault_item.display_style,
+        } : null}
+        onSaved={handleStyleSaved}
+      />
 
       {/* Delete Confirm Modal */}
       <Dialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
