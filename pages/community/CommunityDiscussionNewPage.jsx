@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import BackButton from '@/components/BackButton.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { MessageSquarePlus } from 'lucide-react';
+import { MessageSquarePlus, CalendarDays } from 'lucide-react';
 
 // Matches the category filters on ForumPage (minus the "All" pseudo-filter).
 const CATEGORIES = ['General', 'Trading', 'Grading', 'Market Talk', 'Buying Advice', 'Show & Tell', 'Events'];
@@ -18,10 +18,27 @@ const CATEGORIES = ['General', 'Trading', 'Grading', 'Market Talk', 'Buying Advi
 const CommunityDiscussionNewPage = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
+  const [searchParams] = useSearchParams();
+  // Arriving from an event page (?eventId=…) attaches the discussion to that
+  // event so it shows up in the event's discussion section too.
+  const eventId = searchParams.get('eventId');
+  const [linkedEvent, setLinkedEvent] = useState(null);
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('General');
+  const [category, setCategory] = useState(eventId ? 'Events' : 'General');
   const [body, setBody] = useState('');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!eventId) { setLinkedEvent(null); return undefined; }
+    supabase
+      .from('events_public')
+      .select('id, title, slug')
+      .eq('id', eventId)
+      .maybeSingle()
+      .then(({ data }) => { if (!cancelled) setLinkedEvent(data || null); });
+    return () => { cancelled = true; };
+  }, [eventId]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -42,6 +59,8 @@ const CommunityDiscussionNewPage = () => {
           category,
           post_type: 'text',
           is_visible: true,
+          // Only attach verified events — a bad ?eventId would fail the FK.
+          event_id: linkedEvent?.id || null,
         })
         .select('id')
         .single();
@@ -70,6 +89,12 @@ const CommunityDiscussionNewPage = () => {
         </div>
         <h1 className="text-2xl font-bold font-serif">Start a Discussion</h1>
       </div>
+
+      {linkedEvent && (
+        <div className="inline-flex items-center gap-2 bg-primary/10 text-primary font-bold text-sm rounded-xl px-4 py-2 mb-6">
+          <CalendarDays className="w-4 h-4" /> This discussion will be linked to: {linkedEvent.title}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6 bg-card border border-border rounded-3xl p-6 md:p-8">
         <div className="space-y-2">

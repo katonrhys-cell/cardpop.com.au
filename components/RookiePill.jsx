@@ -10,6 +10,8 @@ import RookieJerseyIcon from '@/components/icons/RookieJerseyIcon.jsx';
 const RookiePill = ({ className }) => (
   <Badge
     variant="outline"
+    // amber-800, not 700: at 10px this is "small text" (WCAG needs 4.5:1) and
+    // the highlighted card's opacity-95 washes amber-700 down to ~4.4:1.
     className={cn('text-[10px] font-bold border-amber-400/50 text-amber-800 bg-amber-400/10 dark:text-amber-300 gap-1', className)}
   >
     <RookieJerseyIcon className="w-3 h-3 shrink-0" /> Rookie Card (RC)

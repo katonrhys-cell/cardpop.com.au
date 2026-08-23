@@ -133,7 +133,7 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
             {getRefractorLabel(product) && <Badge variant="outline" className={`text-[10px] font-bold ${getRefractorBadgeClass(product)}`}>{getRefractorLabel(product)}</Badge>}
             {autoLabel && <Badge variant="outline" className="text-[10px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10">{autoLabel}</Badge>}
             {isRookie && <RookiePill />}
-            {(product.is_sealed || product.isSealed) && <Badge variant="outline" className="text-[10px] font-bold border-green-400/50 text-green-700 bg-green-400/10">Sealed</Badge>}
+            {(product.is_sealed || product.isSealed) && <Badge variant="outline" className="text-[10px] font-bold border-green-400/50 text-green-800 bg-green-400/10">Sealed</Badge>}
             {genericVariantChips(variants).map(v => (
               <Badge key={v} variant="outline" className="text-[10px] font-bold border-primary/30 text-primary bg-primary/5">{v}</Badge>
             ))}

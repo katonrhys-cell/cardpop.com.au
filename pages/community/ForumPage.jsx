@@ -217,7 +217,7 @@ const ForumPage = () => {
                         )}
                         <span className="flex items-center gap-1 text-xs text-muted-foreground">
                           <MessageSquare className="w-3.5 h-3.5" />
-                          {post.replies?.length || 0} replies
+                          {post.comment_count || 0} replies
                         </span>
                         {post.views > 0 && (
                           <span className="flex items-center gap-1 text-xs text-muted-foreground">

@@ -552,7 +552,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
                   {refractorLabel && <Badge variant="outline" className={`text-[11px] font-bold ${getRefractorBadgeClass(vi)}`}>{refractorLabel}</Badge>}
                   {autoLabel && <Badge variant="outline" className="text-[11px] font-bold border-blue-400/50 text-blue-700 bg-blue-400/10 dark:text-blue-300">{autoLabel}</Badge>}
                   {(vi.is_rookie || variantChips.includes(ROOKIE_VARIANT)) && <RookiePill className="text-[11px]" />}
-                  {vi.is_sealed && <Badge variant="outline" className="text-[11px] font-bold border-green-400/50 text-green-700 bg-green-400/10 dark:text-green-300">Sealed</Badge>}
+                  {vi.is_sealed && <Badge variant="outline" className="text-[11px] font-bold border-green-400/50 text-green-800 bg-green-400/10 dark:text-green-300">Sealed</Badge>}
                   {genericVariantChips(variantChips).map(v => (
                     <Badge key={v} variant="outline" className="text-[11px] font-bold border-primary/30 text-primary bg-primary/5">{v}</Badge>
                   ))}
