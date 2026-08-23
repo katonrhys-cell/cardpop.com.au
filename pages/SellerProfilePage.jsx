@@ -66,13 +66,12 @@ const SellerProfilePage = () => {
         });
         setProducts(mappedProducts);
 
-        const { data: reviewsData } = await supabase
-          .from('reviews')
-          .select('*, reviewer:profiles!reviewer_id(id, username, display_name)')
-          .eq('reviewee_id', sellerId)
-          .order('created_at', { ascending: false })
-          .limit(10);
-        if (!cancelled) setReviews(reviewsData ?? []);
+        // Reviews come from the canonical seller_ratings pipeline (same source
+        // as the marketplace rating widgets), read through the public API.
+        const ratingsBody = await fetch(`/api/seller-ratings/${sellerId}`)
+          .then(r => (r.ok ? r.json() : null))
+          .catch(() => null);
+        if (!cancelled) setReviews((ratingsBody?.ratings ?? []).slice(0, 10));
 
         // Events this collector has RSVP'd to (which show, and in what
         // capacity — attending as a buyer or selling as a vendor).

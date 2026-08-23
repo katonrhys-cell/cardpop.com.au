@@ -39,7 +39,7 @@ export const useUserDetails = (userId) => {
         supabase.from('vault_items').select('*, categories(name,slug)').eq('owner_id', userId).order('created_at', { ascending: false }).limit(50),
         supabase.from('orders').select('*, profiles!seller_id(username,display_name,avatar_url)').eq('buyer_id', userId).order('created_at', { ascending: false }).limit(50),
         supabase.from('orders').select('*, profiles!buyer_id(username,display_name,avatar_url)').eq('seller_id', userId).order('created_at', { ascending: false }).limit(50),
-        supabase.from('reviews').select('*').eq('reviewer_id', userId).order('created_at', { ascending: false }).limit(50),
+        supabase.from('seller_ratings').select('*').eq('reviewer_id', userId).order('created_at', { ascending: false }).limit(50),
         supabase.from('shipping_addresses').select('*').eq('user_id', userId),
       ]);
 

@@ -14,6 +14,27 @@ const router = Router();
 // "auth.uid() = reviewer_id AND the reviewer participated in the order".
 router.use(optionalAuthMiddleware);
 
+// Ratings the signed-in user has written, with the reviewed seller embedded.
+// Serves the account Reviews "Given" tab and lets the orders page mark which
+// orders already have a review. Registered before /:sellerId for clarity, but
+// the two-segment path can't collide with it either way.
+router.get('/mine/given', authMiddleware, async (req, res) => {
+  try {
+    const { data: ratings, error } = await supabase
+      .from('seller_ratings')
+      .select('id, order_id, seller_id, rating, comment, created_at, seller:profiles!seller_id(display_name, username, avatar_url, is_verified)')
+      .eq('reviewer_id', req.user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    res.json({ ratings: ratings || [] });
+  } catch (error) {
+    logger.error('Error fetching given ratings:', error);
+    res.status(500).json({ error: 'Failed to fetch ratings' });
+  }
+});
+
 // Get seller ratings and stats
 router.get('/:sellerId', validateRequestParams(getSellerRatingsSchema), async (req, res) => {
   try {
@@ -22,7 +43,7 @@ router.get('/:sellerId', validateRequestParams(getSellerRatingsSchema), async (r
     // Get all ratings for this seller
     const { data: ratings, error: ratingsError } = await supabase
       .from('seller_ratings')
-      .select('rating, comment, created_at, reviewer:profiles!reviewer_id(display_name, avatar_url)')
+      .select('id, order_id, rating, comment, created_at, reviewer:profiles!reviewer_id(display_name, username, avatar_url, is_verified)')
       .eq('seller_id', sellerId)
       .order('created_at', { ascending: false });
 
@@ -79,13 +100,20 @@ router.post('/', authMiddleware, validateRequestBody(createRatingSchema), async 
     // and that the order belongs to the seller being rated.
     const { data: order, error: orderError } = await supabase
       .from('orders')
-      .select('buyer_id, seller_id')
+      .select('buyer_id, seller_id, status')
       .eq('id', order_id)
       .maybeSingle();
 
     if (orderError) throw orderError;
     if (!order || order.buyer_id !== reviewer_id || order.seller_id !== seller_id) {
       return res.status(403).json({ error: 'You can only rate sellers for your own completed orders' });
+    }
+
+    // A review reflects a lived transaction: allow it once the seller has
+    // shipped (or the order finished, including in a refund) — not while the
+    // order is merely paid, failed, or cancelled.
+    if (!['shipped', 'completed', 'refunded'].includes(order.status)) {
+      return res.status(400).json({ error: 'You can leave a review once your order has shipped' });
     }
 
     // Check if user already rated this seller for this order
@@ -117,6 +145,14 @@ router.post('/', authMiddleware, validateRequestBody(createRatingSchema), async 
 
     // Update seller's average rating and total ratings
     await updateSellerStats(seller_id);
+
+    // Tell the seller (best-effort — a notification failure must not fail the review).
+    await supabase.from('notifications').insert({
+      user_id: seller_id,
+      type: 'review_received',
+      title: 'New Review Received',
+      body: `A buyer left you a ${rating}-star review.`,
+    }).then(() => {}, () => {});
 
     res.status(201).json(newRating);
   } catch (error) {
