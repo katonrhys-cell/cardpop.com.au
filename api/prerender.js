@@ -894,7 +894,12 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
     : null;
   const inStock = ((row && row.stock_quantity) || 0) > 0;
   const isPurchasable = row && row.status === 'active' && price != null;
-  const description = `${product.title}. ${category.blurb} Enquire now through CardPop Australia.`;
+  // Product copy wins where it exists; the product type's shared copy is the
+  // fallback. FAQs stay type-level — they are genuinely shared within a type.
+  const description = product.metaDescription
+    || `${product.title}. ${category.blurb} Enquire now through CardPop Australia.`;
+  const intro = product.intro || category.intro;
+  const highlights = product.highlights || [];
 
   const productLd = {
     '@context': 'https://schema.org',
@@ -947,7 +952,11 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
     ? `<p><strong>A$${esc(price.toFixed(2))}</strong> — ${inStock ? 'In stock' : 'Out of stock'}</p>`
     : rrp != null ? `<p>RRP A$${esc(rrp.toFixed(2))}</p>` : ''}
   <p><a href="${BASE_URL}/signup">Enquire now</a></p>
-  <p>${esc(category.intro)}</p>
+  <p>${esc(intro)}</p>
+  ${highlights.length > 0 ? `<h2>Why collectors pick this one</h2>
+  <ul>
+    ${highlights.map((h) => `<li>${esc(h)}</li>`).join('\n    ')}
+  </ul>` : ''}
   ${category.choosing ? `<h2>Choosing the right one</h2><p>${esc(category.choosing)}</p>` : ''}
   ${product.colours.length > 1 ? `<h2>Available in ${product.colours.length} colours</h2><p>${esc(product.colours.join(', '))}</p>` : ''}
   <h2>Specifications</h2>

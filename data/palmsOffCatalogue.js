@@ -25,6 +25,8 @@
  * directly.
  */
 
+import { PALMS_OFF_PRODUCT_COPY } from './palmsOffProductCopy.js';
+
 const SUPABASE_PUBLIC_BASE = 'https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public';
 export const PALMS_OFF_BUCKET = 'palms off gaming products';
 
@@ -37,7 +39,7 @@ export const palmsOffImageUrl = (storagePath) => {
   return `${SUPABASE_PUBLIC_BASE}/${encoded}`;
 };
 
-export const PALMS_OFF_PRODUCTS = [
+const GENERATED_PRODUCTS = [
   {
     slug: "palms-off-gaming-blackout-deck-sleeves-japanese-mini-size",
     sku: "BODS-JPN",
@@ -930,6 +932,14 @@ export const PALMS_OFF_PRODUCTS = [
       "Team Bags/TEAM-100_team-bags_demo2.png",
     ],
   },];
+
+// Merge the hand-written per-product copy (metaDescription, intro, highlights)
+// onto the generated rows. Kept as a merge rather than baked into the rows
+// above so this file stays safe to regenerate from the bucket.
+export const PALMS_OFF_PRODUCTS = GENERATED_PRODUCTS.map((product) => ({
+  ...product,
+  ...(PALMS_OFF_PRODUCT_COPY[product.sku] || {}),
+}));
 
 /** Ordered absolute image URLs for a product's gallery. */
 export const palmsOffImages = (product) =>

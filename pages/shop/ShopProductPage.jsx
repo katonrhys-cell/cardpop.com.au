@@ -98,7 +98,13 @@ const ShopProductPage = () => {
     });
   };
 
-  const description = `${product.title}. ${category.blurb} Enquire now through CardPop Australia.`;
+  // Product copy wins where it exists; the product type's shared copy is the
+  // fallback. FAQs stay type-level — "what does pt mean" has one answer for
+  // every top loader on the site.
+  const description = product.metaDescription
+    || `${product.title}. ${category.blurb} Enquire now through CardPop Australia.`;
+  const intro = product.intro || category.intro;
+  const highlights = product.highlights || [];
 
   const productLd = {
     '@context': 'https://schema.org',
@@ -199,7 +205,7 @@ const ShopProductPage = () => {
             </div>
 
             <p className="mt-5 text-base leading-relaxed text-muted-foreground">
-              {category.intro}
+              {intro}
             </p>
 
             <div className="mt-6">
@@ -236,6 +242,20 @@ const ShopProductPage = () => {
                   {product.colours.map((colour) => (
                     <li key={colour} className="rounded-full border border-border bg-card px-3 py-1.5 text-sm">
                       {colour}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {highlights.length > 0 && (
+              <div className="mt-8">
+                <h2 className="text-lg font-bold text-foreground">Why collectors pick this one</h2>
+                <ul className="mt-3 space-y-2">
+                  {highlights.map((point) => (
+                    <li key={point} className="flex gap-2.5 text-sm leading-relaxed text-muted-foreground">
+                      <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" aria-hidden="true" />
+                      <span>{point}</span>
                     </li>
                   ))}
                 </ul>
