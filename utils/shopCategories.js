@@ -14,6 +14,7 @@ import {
   PanelTop, Package2, Image,
   ShoppingBag, Mail, PackageOpen, Scissors,
   PackageCheck, Eraser, Hand, Sparkle, Ruler,
+  Grid2x2, Tag, ShieldAlert, Boxes,
 } from 'lucide-react';
 // Purpose-built, card-themed category glyphs — drawn to match the marketplace
 // (Browse Collections) icons so the two menus read as one family instead of the
@@ -59,6 +60,8 @@ export const SHOP_CATEGORY_GROUPS = [
       { name: 'Binders',       slug: 'binders',       Icon: BookMarked,          desc: 'Zip and premium collector binders' },
       { name: 'Pages',         slug: 'pages',         Icon: Files,               desc: '9-pocket and specialty binder pages' },
       { name: 'Dividers',      slug: 'dividers',      Icon: SeparatorHorizontal, desc: 'Tabbed dividers for sorting boxes' },
+      { name: 'Deck Boxes',    slug: 'deck-boxes',    Icon: Boxes,               desc: 'Cases for sleeved, playable decks' },
+      { name: 'Graded Card Cases', slug: 'graded-card-cases', Icon: PackageCheck, desc: 'Hard carry cases sized for graded slabs' },
     ],
   },
   {
@@ -73,6 +76,7 @@ export const SHOP_CATEGORY_GROUPS = [
       { name: 'Display Cases',  slug: 'display-cases',  Icon: Package2, desc: 'UV acrylic cases and slab displays' },
       { name: 'Wall Mounts',    slug: 'wall-mounts',    Icon: Frame,    desc: 'Wall-mounted card display holders' },
       { name: 'Floating Frames', slug: 'floating-frames', Icon: Image,  desc: 'Frameless floating card frames' },
+      { name: 'Playmats',        slug: 'playmats',        Icon: Grid2x2, desc: 'Rubber-backed mats for play and photography' },
     ],
   },
   {
@@ -88,6 +92,8 @@ export const SHOP_CATEGORY_GROUPS = [
       { name: 'Cardboard Mailers',      slug: 'cardboard-mailers',      Icon: PackageOpen, desc: 'Rigid mailers for graded slabs' },
       { name: 'Packing Tape',           slug: 'packing-tape',           Icon: Scissors,    desc: 'Clear tape for secure packaging' },
       { name: 'Graded Card Protectors', slug: 'graded-card-protectors', Icon: ShieldCheck, desc: 'Protective sleeves for graded slabs' },
+      { name: 'Tag Sleeves',            slug: 'tag-sleeves',            Icon: Tag,         desc: 'Sleeves for pricing and inventory tags' },
+      { name: 'Tamper Seals',           slug: 'tamper-seals',           Icon: ShieldAlert, desc: 'Serialised tamper-evident seals' },
     ],
   },
   {

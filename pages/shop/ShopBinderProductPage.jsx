@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { MessageSquare, Check, ChevronRight } from 'lucide-react';
+import { MessageSquare, ShoppingCart, PackageX, Check, ChevronRight } from 'lucide-react';
 import SEOHead from '@/components/SEOHead.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient.js';
+import { useCart } from '@/hooks/useCart.jsx';
+import { toast } from 'sonner';
 import {
   resolveBinderProduct, binderImages, binderImageAlt, binderSpecs, BINDER_PRODUCTS,
 } from '@/data/shopBinderProducts.js';
@@ -17,6 +19,7 @@ const SITE_ORIGIN = 'https://cardpop.com.au';
 
 const ShopBinderProductPage = () => {
   const { productSlug } = useParams();
+  const { addToCart, setIsCartOpen } = useCart();
   const product = resolveBinderProduct(productSlug);
 
   // The DB row carries the commercial fields only (price, stock, status). All
@@ -50,14 +53,37 @@ const ShopBinderProductPage = () => {
     ? Number(row.retail_price_aud)
     : null;
   const inStock = (row?.stock_quantity ?? 0) > 0;
-  // These binders are enquiry-only: the CTA sends people to sign up rather than
-  // to a checkout, so the page is complete (and indexable) without a price. An
-  // Offer is emitted only once a real price is set and the row is switched to
-  // `active` in /admin/products — asserting a price we won't honour is worse
-  // than shipping a Product node with no Offer.
+  // The CTA flips itself. While a product has no price (or is still `draft`) it
+  // is enquiry-only: the button sends people to sign up, and the page is
+  // complete — and indexable — without a price. The moment a price is set and
+  // the row is switched to `active` in /admin/products, the same page starts
+  // rendering Add to cart and emitting an Offer. No code change, no redeploy:
+  // stock arriving is an admin edit, not a release.
   const isPurchasable = row?.status === 'active' && price != null;
 
   const related = BINDER_PRODUCTS.filter((p) => p.slug !== product.slug).slice(0, 4);
+
+  const handleAddToCart = () => {
+    if (!row || !isPurchasable || !inStock) return;
+    addToCart(
+      {
+        id: row.id, source: 'shop', type: 'shop',
+        title: product.title, price, image: images[0] || null,
+      },
+      {
+        id: row.id,
+        price_in_cents: Math.round(price * 100),
+        manage_inventory: row.stock_quantity !== null,
+        inventory_quantity: row.stock_quantity,
+      },
+      1,
+      row.stock_quantity ?? 999,
+    ).then(() => {
+      toast.success('Added to cart', {
+        action: { label: 'View cart', onClick: () => setIsCartOpen(true) },
+      });
+    });
+  };
 
   // ── Structured data ───────────────────────────────────────────────────────
   const productLd = {
@@ -168,21 +194,37 @@ const ShopBinderProductPage = () => {
               {product.intro}
             </p>
 
-            {/* Enquiry-driven, not checkout-driven: every binder sends the
-                visitor to sign up, where the enquiry is taken. `state` carries
-                which product was being viewed so the signup page can attribute
-                the enquiry without putting it in the URL. */}
+            {/* Enquiry until priced, checkout after. `state` carries which
+                product was being viewed so the signup page can attribute the
+                enquiry without putting it in the URL. */}
             <div className="mt-6">
-              <Button size="lg" className="w-full sm:w-auto" asChild>
-                <Link to="/signup" state={{ enquiry: { sku: product.sku, title: product.title } }}>
-                  <MessageSquare className="w-5 h-5 mr-2" />
-                  Enquire now
-                </Link>
-              </Button>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Create a free CardPop account and we&apos;ll come back to you on price,
-                colours and availability.
-              </p>
+              {isPurchasable ? (
+                <Button
+                  size="lg"
+                  className="w-full sm:w-auto"
+                  disabled={!inStock}
+                  onClick={handleAddToCart}
+                >
+                  {inStock ? (
+                    <><ShoppingCart className="w-5 h-5 mr-2" />Add to cart</>
+                  ) : (
+                    <><PackageX className="w-5 h-5 mr-2" />Out of stock</>
+                  )}
+                </Button>
+              ) : (
+                <>
+                  <Button size="lg" className="w-full sm:w-auto" asChild>
+                    <Link to="/signup" state={{ enquiry: { sku: product.sku, title: product.title } }}>
+                      <MessageSquare className="w-5 h-5 mr-2" />
+                      Enquire now
+                    </Link>
+                  </Button>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Create a free CardPop account and we&apos;ll come back to you on price,
+                    colours and availability.
+                  </p>
+                </>
+              )}
             </div>
 
             {/* Colour range. Each colour becomes its own product (and its own

@@ -33,6 +33,8 @@ vi.mock('@supabase/supabase-js', () => {
 
 import handler from '../../api/prerender.js';
 import { BINDER_SLUGS } from '../../data/shopBinderProducts.js';
+import { PALMS_OFF_PRODUCTS } from '../../data/palmsOffCatalogue.js';
+import { PALMS_OFF_CATEGORIES } from '../../data/palmsOffCategories.js';
 
 function run(path) {
   const req = { query: { path } };
@@ -634,5 +636,67 @@ describe('prerender Palms Off Gaming binders', () => {
     const { status, body } = await run('/shop/binders/not-a-real-binder');
     expect(status).toBe(404);
     expect(body).toContain('noindex');
+  });
+});
+
+describe('prerender Palms Off Gaming products', () => {
+  // These products live in the shop's normal product-type taxonomy, so their
+  // URLs carry no brand segment: /shop/<type>/<product>.
+  const CAT = 'top-loaders';
+  const SLUG = 'palms-off-gaming-top-loaders-35pt';
+
+  it('renders a product page with Product, Breadcrumb and FAQ JSON-LD', async () => {
+    state.result = { data: { price_aud: 0, retail_price_aud: null, stock_quantity: 0, status: 'draft' } };
+    const { status, body } = await run(`/shop/${CAT}/${SLUG}`);
+    expect(status).toBe(200);
+    expect(body).toContain(`<link rel="canonical" href="https://cardpop.com.au/shop/${CAT}/${SLUG}" />`);
+    expect(body).toContain('"@type":"Product"');
+    expect(body).toContain('"name":"Palms Off Gaming"');
+    expect(body).toContain('"@type":"BreadcrumbList"');
+    expect(body).toContain('"@type":"FAQPage"');
+    expect(body).toContain('Enquire now');
+    expect(body).not.toContain('"@type":"Offer"');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('breadcrumbs to the existing category page, with no brand level', async () => {
+    state.result = { data: null };
+    const { body } = await run(`/shop/${CAT}/${SLUG}`);
+    expect(body).toContain(`https://cardpop.com.au/shop/category/${CAT}`);
+    expect(body).not.toContain('palms-off-gaming/');
+  });
+
+  it('emits an Offer once the product is priced and active', async () => {
+    state.result = { data: { price_aud: 12.5, retail_price_aud: null, stock_quantity: 6, status: 'active' } };
+    const { body } = await run(`/shop/${CAT}/${SLUG}`);
+    expect(body).toContain('"price":"12.50"');
+    expect(body).toContain('https://schema.org/InStock');
+  });
+
+  it('404s a real product reached through the wrong product type', async () => {
+    const { status } = await run(`/shop/playmats/${SLUG}`);
+    expect(status).toBe(404);
+  });
+
+  it('does not claim /shop/category/<slug>, which is the category page', async () => {
+    // Both are two-segment /shop/ paths; the product matcher must not swallow
+    // the category listing.
+    const { body } = await run('/shop/category/top-loaders');
+    expect(body).not.toContain('"@type":"Product"');
+  });
+
+  it('every catalogue product resolves under its own product type', async () => {
+    for (const p of PALMS_OFF_PRODUCTS) {
+      state.result = { data: null };
+      const { status } = await run(`/shop/${p.categorySlug}/${p.slug}`);
+      expect(status, `${p.categorySlug}/${p.slug}`).toBe(200);
+    }
+  });
+
+  it('assigns every product to a real leaf category in the shop taxonomy', () => {
+    for (const p of PALMS_OFF_PRODUCTS) {
+      expect(PALMS_OFF_CATEGORIES[p.categorySlug], p.slug).toBeTruthy();
+      expect(PALMS_OFF_CATEGORIES[p.categorySlug].name).toBe(p.categoryName);
+    }
   });
 });

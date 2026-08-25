@@ -7,6 +7,10 @@ import { PAID_TIERS, hasStorefront } from '../config/plans.js';
 import {
   BINDER_PRODUCTS, resolveBinderProduct, binderImages, binderImageAlt, binderSpecs,
 } from '../data/shopBinderProducts.js';
+import {
+  resolvePalmsOffProduct, palmsOffImages, palmsOffImageAlt, palmsOffSpecs,
+} from '../data/palmsOffCatalogue.js';
+import { resolvePalmsOffCategory } from '../data/palmsOffCategories.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -847,6 +851,119 @@ async function renderBinderProduct(supabaseClient, slugParam) {
     canonical,
     ogImage: images[0],
     ogImageAlt: binderImageAlt(product, product.imageFiles[0]),
+    ogType: 'product',
+    jsonLdItems: [productLd, breadcrumb, faqLd].filter(Boolean),
+    bodyHtml,
+  });
+}
+
+// ── Palms Off Gaming products ───────────────────────────────────────────────
+//
+//   /shop/<type>/<product>   one product line, inside the shop's normal
+//                            product-type taxonomy (no brand section)
+//
+// Copy comes from data/palmsOffCategories.js keyed by leaf category slug, plus
+// the generated catalogue, so a crawler sees what the SPA renders. Binders keep
+// their own renderers at /shop/binders.
+
+async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) {
+  const product = resolvePalmsOffProduct(productSlug);
+  const category = resolvePalmsOffCategory(categorySlug);
+  // Wrong category for a real product is a 404, matching the SPA — two URLs
+  // resolving to one page is the duplication this structure avoids.
+  if (!product || !category || product.categorySlug !== category.slug) {
+    return notFound({
+      title: 'CardPop Shop',
+      description: 'Browse trading card supplies at CardPop.',
+      canonical: `${BASE_URL}/shop`,
+      bodyHtml: '<main><h1>Product not found</h1><p>Browse <a href="/shop">the shop</a>.</p></main>',
+    });
+  }
+
+  const canonical = `${BASE_URL}/shop/${category.slug}/${product.slug}`;
+  const images = palmsOffImages(product);
+  const { data: row } = await supabaseClient
+    .from('shop_products')
+    .select('price_aud, retail_price_aud, stock_quantity, status')
+    .eq('slug', product.slug)
+    .maybeSingle();
+
+  const price = row && row.price_aud != null && Number(row.price_aud) > 0 ? Number(row.price_aud) : null;
+  const rrp = row && row.retail_price_aud != null && Number(row.retail_price_aud) > 0
+    ? Number(row.retail_price_aud)
+    : null;
+  const inStock = ((row && row.stock_quantity) || 0) > 0;
+  const isPurchasable = row && row.status === 'active' && price != null;
+  const description = `${product.title}. ${category.blurb} Enquire now through CardPop Australia.`;
+
+  const productLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.title,
+    description,
+    image: images,
+    sku: product.sku,
+    brand: { '@type': 'Brand', name: 'Palms Off Gaming' },
+    category: category.name,
+    url: canonical,
+    ...(isPurchasable ? {
+      offers: {
+        '@type': 'Offer',
+        url: canonical,
+        priceCurrency: 'AUD',
+        price: price.toFixed(2),
+        availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+        itemCondition: 'https://schema.org/NewCondition',
+        seller: { '@type': 'Organization', name: 'CardPop Australia\u2122' },
+      },
+    } : {}),
+  };
+
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'Shop', item: `${BASE_URL}/shop` },
+      { '@type': 'ListItem', position: 3, name: category.name, item: `${BASE_URL}/shop/category/${category.slug}` },
+      { '@type': 'ListItem', position: 4, name: product.shortTitle, item: canonical },
+    ],
+  };
+
+  const faqLd = category.faqs && category.faqs.length > 0 ? {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: category.faqs.map((f) => ({
+      '@type': 'Question', name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a },
+    })),
+  } : null;
+
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/shop">Shop</a> / <a href="${BASE_URL}/shop/category/${category.slug}">${esc(category.name)}</a> / ${esc(product.shortTitle)}</nav>
+  <h1>${esc(product.title)}</h1>
+  <img src="${esc(images[0])}" alt="${esc(palmsOffImageAlt(product, product.imagePaths[0]))}" />
+  ${isPurchasable
+    ? `<p><strong>A$${esc(price.toFixed(2))}</strong> — ${inStock ? 'In stock' : 'Out of stock'}</p>`
+    : rrp != null ? `<p>RRP A$${esc(rrp.toFixed(2))}</p>` : ''}
+  <p><a href="${BASE_URL}/signup">Enquire now</a></p>
+  <p>${esc(category.intro)}</p>
+  ${category.choosing ? `<h2>Choosing the right one</h2><p>${esc(category.choosing)}</p>` : ''}
+  ${product.colours.length > 1 ? `<h2>Available in ${product.colours.length} colours</h2><p>${esc(product.colours.join(', '))}</p>` : ''}
+  <h2>Specifications</h2>
+  <dl>
+    ${palmsOffSpecs(product).map((sp) => `<dt>${esc(sp.label)}</dt><dd>${esc(sp.value)}</dd>`).join('\n    ')}
+  </dl>
+  ${faqLd ? `<h2>Common questions</h2>
+  ${category.faqs.map((f) => `<h3>${esc(f.q)}</h3><p>${esc(f.a)}</p>`).join('\n  ')}` : ''}
+</main>`;
+
+  return htmlDoc({
+    title: `${product.title} | CardPop Australia`,
+    description,
+    canonical,
+    ogImage: images[0],
+    ogImageAlt: palmsOffImageAlt(product, product.imagePaths[0]),
     ogType: 'product',
     jsonLdItems: [productLd, breadcrumb, faqLd].filter(Boolean),
     bodyHtml,
@@ -3086,6 +3203,19 @@ export default async function handler(req, res) {
 
     if (LANDINGS[rawPath]) {
       return sendDoc(res, await renderLanding(supabase, rawPath));
+    }
+
+    // Product pages inside the product-type taxonomy: /shop/<type>/<product>.
+    // Two segments, so the single-segment collection matcher below never sees
+    // them. Only a slug that is a real catalogue product is claimed here —
+    // anything else (including /shop/category/<slug>) falls through.
+    const shopTypeProductMatch = rawPath.match(/^\/shop\/([^/?#]+)\/([^/?#]+)\/?$/);
+    if (shopTypeProductMatch && shopTypeProductMatch[1] !== 'category') {
+      const prod = safeDecode(shopTypeProductMatch[2]);
+      if (resolvePalmsOffProduct(prod)) {
+        return sendDoc(res, await renderPalmsOffProduct(
+          supabase, safeDecode(shopTypeProductMatch[1]), prod));
+      }
     }
 
     // Palms Off Gaming binders. Must be tested BEFORE the single-segment
