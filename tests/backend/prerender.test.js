@@ -611,14 +611,23 @@ describe('prerender Palms Off Gaming binders', () => {
     expect(body).toContain('https://schema.org/OutOfStock');
   });
 
-  it('noindexes an unpriced draft product and omits the Offer', async () => {
-    // Seeded rows start as draft with no price — real copy, but nothing to buy.
+  it('stays indexable with an Enquire now CTA when the product has no price', async () => {
+    // Enquiry-only: seeded rows are draft with no price, but the page is still
+    // complete — so it is indexed, just without an Offer it cannot honour.
     state.result = { data: { price_aud: 0, retail_price_aud: null, stock_quantity: 0, status: 'draft' } };
     const { body } = await run(`/shop/binders/${SLUG}`);
-    expect(body).toContain('noindex');
+    expect(body).not.toContain('noindex');
     expect(body).not.toContain('"@type":"Offer"');
-    // The copy is still served so the page is not an empty shell.
+    expect(body).toContain('https://cardpop.com.au/signup');
+    expect(body).toContain('Enquire now');
     expect(body).toContain('Why collectors pick this binder');
+  });
+
+  it('shows RRP without an Offer when only a retail price is known', async () => {
+    state.result = { data: { price_aud: 0, retail_price_aud: 59.95, stock_quantity: 0, status: 'draft' } };
+    const { body } = await run(`/shop/binders/${SLUG}`);
+    expect(body).toContain('RRP A$59.95');
+    expect(body).not.toContain('"@type":"Offer"');
   });
 
   it('404s an unknown binder slug', async () => {

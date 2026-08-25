@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ShoppingCart, PackageX, Check, ChevronRight } from 'lucide-react';
+import { MessageSquare, Check, ChevronRight } from 'lucide-react';
 import SEOHead from '@/components/SEOHead.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
@@ -9,8 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient.js';
-import { useCart } from '@/hooks/useCart.jsx';
-import { toast } from 'sonner';
 import {
   resolveBinderProduct, binderImages, binderImageAlt, binderSpecs, BINDER_PRODUCTS,
 } from '@/data/shopBinderProducts.js';
@@ -19,7 +17,6 @@ const SITE_ORIGIN = 'https://cardpop.com.au';
 
 const ShopBinderProductPage = () => {
   const { productSlug } = useParams();
-  const { addToCart, setIsCartOpen } = useCart();
   const product = resolveBinderProduct(productSlug);
 
   // The DB row carries the commercial fields only (price, stock, status). All
@@ -48,47 +45,21 @@ const ShopBinderProductPage = () => {
   const canonical = `${SITE_ORIGIN}/shop/binders/${product.slug}`;
   const images = binderImages(product);
   const specs = binderSpecs(product);
-  const price = row?.price_aud != null ? Number(row.price_aud) : null;
-  const rrp = row?.retail_price_aud != null ? Number(row.retail_price_aud) : null;
+  const price = row?.price_aud != null && Number(row.price_aud) > 0 ? Number(row.price_aud) : null;
+  const rrp = row?.retail_price_aud != null && Number(row.retail_price_aud) > 0
+    ? Number(row.retail_price_aud)
+    : null;
   const inStock = (row?.stock_quantity ?? 0) > 0;
-  // A product that hasn't been priced and switched to `active` in the admin yet
-  // is still worth rendering (the copy is real) but must not be advertised to
-  // search — an indexed page that can't be bought is a soft 404 waiting to happen.
-  const isBuyable = row?.status === 'active' && price != null && inStock;
-  const isPublished = row?.status === 'active' && price != null;
+  // These binders are enquiry-only: the CTA sends people to sign up rather than
+  // to a checkout, so the page is complete (and indexable) without a price. An
+  // Offer is emitted only once a real price is set and the row is switched to
+  // `active` in /admin/products — asserting a price we won't honour is worse
+  // than shipping a Product node with no Offer.
+  const isPurchasable = row?.status === 'active' && price != null;
 
   const related = BINDER_PRODUCTS.filter((p) => p.slug !== product.slug).slice(0, 4);
 
-  const handleAddToCart = () => {
-    if (!row || !isBuyable) return;
-    const priceInCents = Math.round(price * 100);
-    addToCart(
-      {
-        id: row.id,
-        source: 'shop',
-        type: 'shop',
-        title: product.title,
-        price,
-        image: images[0] || null,
-      },
-      {
-        id: row.id,
-        price_in_cents: priceInCents,
-        manage_inventory: row.stock_quantity !== null,
-        inventory_quantity: row.stock_quantity,
-      },
-      1,
-      row.stock_quantity ?? 999,
-    ).then(() => {
-      toast.success('Added to cart', {
-        action: { label: 'View cart', onClick: () => setIsCartOpen(true) },
-      });
-    });
-  };
-
   // ── Structured data ───────────────────────────────────────────────────────
-  // Offer is only emitted once the product is priced and active; a Product node
-  // advertising availability we can't honour is worse than no Offer at all.
   const productLd = {
     '@context': 'https://schema.org',
     '@type': 'Product',
@@ -99,7 +70,7 @@ const ShopBinderProductPage = () => {
     brand: { '@type': 'Brand', name: 'Palms Off Gaming' },
     category: 'Binders',
     url: canonical,
-    ...(isPublished ? {
+    ...(isPurchasable ? {
       offers: {
         '@type': 'Offer',
         url: canonical,
@@ -143,7 +114,6 @@ const ShopBinderProductPage = () => {
         canonicalUrl={canonical}
         ogImage={images[0]}
         ogImageAlt={binderImageAlt(product, product.imageFiles[0])}
-        noindex={!isPublished}
         structuredData={[productLd, breadcrumbLd, faqLd].filter(Boolean)}
       />
 
@@ -173,7 +143,7 @@ const ShopBinderProductPage = () => {
             <div className="mt-4 flex items-center gap-3 flex-wrap">
               {loading ? (
                 <Skeleton className="h-9 w-28" />
-              ) : price != null ? (
+              ) : isPurchasable ? (
                 <>
                   <span className="text-3xl font-extrabold tabular-nums text-foreground">
                     ${price.toFixed(2)}
@@ -187,28 +157,32 @@ const ShopBinderProductPage = () => {
                     {inStock ? 'In stock' : 'Out of stock'}
                   </Badge>
                 </>
-              ) : (
-                <Badge variant="secondary">Coming soon</Badge>
-              )}
+              ) : rrp != null ? (
+                <span className="text-lg font-semibold tabular-nums text-muted-foreground">
+                  RRP ${rrp.toFixed(2)}
+                </span>
+              ) : null}
             </div>
 
             <p className="mt-5 text-base leading-relaxed text-muted-foreground">
               {product.intro}
             </p>
 
+            {/* Enquiry-driven, not checkout-driven: every binder sends the
+                visitor to sign up, where the enquiry is taken. `state` carries
+                which product was being viewed so the signup page can attribute
+                the enquiry without putting it in the URL. */}
             <div className="mt-6">
-              <Button
-                size="lg"
-                className="w-full sm:w-auto"
-                disabled={!isBuyable}
-                onClick={handleAddToCart}
-              >
-                {isBuyable ? (
-                  <><ShoppingCart className="w-5 h-5 mr-2" />Add to cart</>
-                ) : (
-                  <><PackageX className="w-5 h-5 mr-2" />{price == null ? 'Not yet available' : 'Out of stock'}</>
-                )}
+              <Button size="lg" className="w-full sm:w-auto" asChild>
+                <Link to="/signup" state={{ enquiry: { sku: product.sku, title: product.title } }}>
+                  <MessageSquare className="w-5 h-5 mr-2" />
+                  Enquire now
+                </Link>
               </Button>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Create a free CardPop account and we&apos;ll come back to you on price,
+                colours and availability.
+              </p>
             </div>
 
             {/* Colour range. Each colour becomes its own product (and its own

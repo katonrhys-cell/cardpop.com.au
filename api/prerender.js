@@ -763,9 +763,14 @@ async function renderBinderProduct(supabaseClient, slugParam) {
     .eq('slug', product.slug)
     .maybeSingle();
 
-  const price = row?.price_aud != null ? Number(row.price_aud) : null;
+  const price = row?.price_aud != null && Number(row.price_aud) > 0 ? Number(row.price_aud) : null;
+  const rrp = row?.retail_price_aud != null && Number(row.retail_price_aud) > 0
+    ? Number(row.retail_price_aud)
+    : null;
   const inStock = (row?.stock_quantity ?? 0) > 0;
-  const isPublished = row?.status === 'active' && price != null;
+  // Enquiry-only until a price is set: the page is complete and indexable
+  // without one, but no Offer is emitted for a product that can't be bought.
+  const isPurchasable = row?.status === 'active' && price != null;
 
   const productLd = {
     '@context': 'https://schema.org',
@@ -777,7 +782,7 @@ async function renderBinderProduct(supabaseClient, slugParam) {
     brand: { '@type': 'Brand', name: 'Palms Off Gaming' },
     category: 'Binders',
     url: canonical,
-    ...(isPublished ? {
+    ...(isPurchasable ? {
       offers: {
         '@type': 'Offer',
         url: canonical,
@@ -815,7 +820,10 @@ async function renderBinderProduct(supabaseClient, slugParam) {
   <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/shop">Shop</a> / <a href="${BASE_URL}/shop/binders">Binders</a> / ${esc(product.shortTitle)}</nav>
   <h1>${esc(product.title)}</h1>
   <img src="${esc(images[0])}" alt="${esc(binderImageAlt(product, product.imageFiles[0]))}" />
-  ${isPublished ? `<p><strong>A$${esc(price.toFixed(2))}</strong> — ${inStock ? 'In stock' : 'Out of stock'}</p>` : ''}
+  ${isPurchasable
+    ? `<p><strong>A$${esc(price.toFixed(2))}</strong> — ${inStock ? 'In stock' : 'Out of stock'}</p>`
+    : rrp != null ? `<p>RRP A$${esc(rrp.toFixed(2))}</p>` : ''}
+  <p><a href="${BASE_URL}/signup">Enquire now</a></p>
   <p>${esc(product.intro)}</p>
   <h2>Why collectors pick this binder</h2>
   <ul>
@@ -840,9 +848,6 @@ async function renderBinderProduct(supabaseClient, slugParam) {
     ogImage: images[0],
     ogImageAlt: binderImageAlt(product, product.imageFiles[0]),
     ogType: 'product',
-    // Not yet priced/active in the admin → real content, but keep it out of the
-    // index until it can actually be bought.
-    ...(isPublished ? {} : { robots: 'noindex, follow' }),
     jsonLdItems: [productLd, breadcrumb, faqLd].filter(Boolean),
     bodyHtml,
   });

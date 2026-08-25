@@ -17,11 +17,13 @@
 --   3. Seed the eight products as `draft`.
 --
 -- The rows are seeded as status 'draft' with a price of 0 deliberately: prices
--- have not been set yet. Draft rows are invisible to every shop query (they all
--- filter status = 'active'), and the product pages render their copy but emit
--- noindex until a price is set and the row is switched to 'active' in
--- /admin/products. That keeps an unpriced page out of the index rather than
--- advertising a product nobody can buy.
+-- have not been set yet, and these binders are enquiry-only for now (the
+-- product page's CTA sends visitors to /signup rather than to a checkout).
+-- Draft keeps them out of the shop grid, which filters status = 'active', so
+-- nothing shows up listed at $0.00. The /shop/binders pages are unaffected —
+-- they render from data/shopBinderProducts.js and stay indexable — but no
+-- Offer is emitted in their JSON-LD until a real price is set and the row is
+-- switched to 'active' in /admin/products.
 --
 -- Idempotent: keyed on the unique slug, so re-running is a no-op and never
 -- overwrites prices or stock edited in the admin portal.
