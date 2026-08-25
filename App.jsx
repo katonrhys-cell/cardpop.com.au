@@ -86,6 +86,8 @@ const ShopCategoryPage = lazy(() => import('@/pages/shop/ShopCategoryPage.jsx'))
 // Remounts ShopCategoryPage when the category slug changes so pagination/filters reset
 const ShopCategoryRoute = () => { const { categorySlug } = useParams(); return <ShopCategoryPage key={categorySlug} />; };
 const ShopBindersHubPage = lazy(() => import('@/pages/shop/ShopBindersHubPage.jsx'));
+const PalmsOffBrandPage = lazy(() => import('@/pages/shop/PalmsOffBrandPage.jsx'));
+const PalmsOffProductPage = lazy(() => import('@/pages/shop/PalmsOffProductPage.jsx'));
 const ShopBinderProductPage = lazy(() => import('@/pages/shop/ShopBinderProductPage.jsx'));
 const ShopCollectionPage = lazy(() => import('@/pages/shop/ShopCollectionPage.jsx'));
 // Remounts ShopCollectionPage when the group slug changes so filters/pagination reset
@@ -337,6 +339,10 @@ const App = () => {
                             static-prefixed so they out-rank the /shop/:groupSlug route below. */}
                         <Route path="/shop/binders" element={<ShopBindersHubPage />} />
                         <Route path="/shop/binders/:productSlug" element={<ShopBinderProductPage />} />
+                        {/* Palms Off Gaming brand hub, one page per category, one per product. */}
+                        <Route path="/shop/palms-off-gaming" element={<PalmsOffBrandPage />} />
+                        <Route path="/shop/palms-off-gaming/:categorySlug" element={<PalmsOffBrandPage />} />
+                        <Route path="/shop/palms-off-gaming/:categorySlug/:productSlug" element={<PalmsOffProductPage />} />
                         {/* Supply collection pages (Protection, Storage, Display, Shipping, Grading).
                             Static /shop/* routes above out-rank this single-segment dynamic route. */}
                         <Route path="/shop/:groupSlug" element={<ShopCollectionRoute />} />

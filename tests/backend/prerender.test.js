@@ -33,6 +33,8 @@ vi.mock('@supabase/supabase-js', () => {
 
 import handler from '../../api/prerender.js';
 import { BINDER_SLUGS } from '../../data/shopBinderProducts.js';
+import { PALMS_OFF_PRODUCTS } from '../../data/palmsOffCatalogue.js';
+import { PALMS_OFF_CATEGORY_SLUGS } from '../../data/palmsOffCategories.js';
 
 function run(path) {
   const req = { query: { path } };
@@ -634,5 +636,75 @@ describe('prerender Palms Off Gaming binders', () => {
     const { status, body } = await run('/shop/binders/not-a-real-binder');
     expect(status).toBe(404);
     expect(body).toContain('noindex');
+  });
+});
+
+describe('prerender Palms Off Gaming brand section', () => {
+  const CAT = 'top-loaders';
+  const SLUG = 'palms-off-gaming-top-loaders-35pt';
+
+  it('renders the brand hub with every category and product linked', async () => {
+    const { status, body } = await run('/shop/palms-off-gaming');
+    expect(status).toBe(200);
+    expect(body).toContain('<h1>Palms Off Gaming</h1>');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/shop/palms-off-gaming" />');
+    expect(body).toContain('"@type":"ItemList"');
+    for (const slug of PALMS_OFF_CATEGORY_SLUGS) {
+      expect(body).toContain(`https://cardpop.com.au/shop/palms-off-gaming/${slug}`);
+    }
+    // The binder section is linked from the hub so the brand is one crawlable tree.
+    expect(body).toContain('https://cardpop.com.au/shop/binders');
+  });
+
+  it('renders a category page scoped to its own products', async () => {
+    const { status, body } = await run(`/shop/palms-off-gaming/${CAT}`);
+    expect(status).toBe(200);
+    expect(body).toContain(`<link rel="canonical" href="https://cardpop.com.au/shop/palms-off-gaming/${CAT}" />`);
+    const inCat = PALMS_OFF_PRODUCTS.filter((p) => p.categorySlug === CAT);
+    expect(inCat.length).toBeGreaterThan(0);
+    for (const p of inCat) expect(body).toContain(`/${CAT}/${p.slug}`);
+    // A product from a different category must not leak onto this page.
+    const other = PALMS_OFF_PRODUCTS.find((p) => p.categorySlug !== CAT);
+    expect(body).not.toContain(`/${other.categorySlug}/${other.slug}`);
+  });
+
+  it('renders a product page with Product, Breadcrumb and FAQ JSON-LD', async () => {
+    state.result = { data: { price_aud: 0, retail_price_aud: null, stock_quantity: 0, status: 'draft' } };
+    const { body } = await run(`/shop/palms-off-gaming/${CAT}/${SLUG}`);
+    expect(body).toContain(`<link rel="canonical" href="https://cardpop.com.au/shop/palms-off-gaming/${CAT}/${SLUG}" />`);
+    expect(body).toContain('"@type":"Product"');
+    expect(body).toContain('"name":"Palms Off Gaming"');
+    expect(body).toContain('"@type":"BreadcrumbList"');
+    expect(body).toContain('"@type":"FAQPage"');
+    expect(body).toContain('Enquire now');
+    expect(body).not.toContain('"@type":"Offer"');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('emits an Offer once the product is priced and active', async () => {
+    state.result = { data: { price_aud: 12.5, retail_price_aud: null, stock_quantity: 6, status: 'active' } };
+    const { body } = await run(`/shop/palms-off-gaming/${CAT}/${SLUG}`);
+    expect(body).toContain('"price":"12.50"');
+    expect(body).toContain('https://schema.org/InStock');
+  });
+
+  it('404s a real product reached through the wrong category', async () => {
+    // Two URLs resolving to one page is exactly the duplication this structure
+    // is meant to prevent, so the mismatch must not silently render.
+    const { status } = await run(`/shop/palms-off-gaming/playmats/${SLUG}`);
+    expect(status).toBe(404);
+  });
+
+  it('404s an unknown category', async () => {
+    const { status } = await run('/shop/palms-off-gaming/not-a-category');
+    expect(status).toBe(404);
+  });
+
+  it('every catalogue product resolves under its own category', async () => {
+    for (const p of PALMS_OFF_PRODUCTS) {
+      state.result = { data: null };
+      const { status } = await run(`/shop/palms-off-gaming/${p.categorySlug}/${p.slug}`);
+      expect(status, `${p.categorySlug}/${p.slug}`).toBe(200);
+    }
   });
 });
