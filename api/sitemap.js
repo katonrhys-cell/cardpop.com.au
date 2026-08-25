@@ -4,6 +4,7 @@ import { SHOP_COLLECTION_SEO } from '../data/shopCollectionSeo.js';
 import { BLOG_CATEGORIES } from '../data/blogCategories.js';
 import { BUYING_GUIDES } from '../data/buyingGuides.js';
 import { PAID_TIERS } from '../config/plans.js';
+import { BINDER_SLUGS } from '../data/shopBinderProducts.js';
 
 const SUPABASE_URL = 'https://vrfsaazuqjxotnieqlkd.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_lHlLkeTfwzhWQ80Zz6pL6g_jc7Y8p33';
@@ -57,6 +58,13 @@ const STATIC_PAGES = [
   // Grading) — config-driven, one per group in data/shopCollectionSeo.js.
   ...Object.keys(SHOP_COLLECTION_SEO).map((slug) => (
     { loc: `/shop/${slug}`,        lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' }
+  )),
+  // Palms Off Gaming binders: the brand hub plus one page per product. These
+  // are static, config-driven URLs (data/shopBinderProducts.js), not DB rows,
+  // so they belong here rather than in the shop_products block below.
+  { loc: '/shop/binders',          lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' },
+  ...BINDER_SLUGS.map((slug) => (
+    { loc: `/shop/binders/${slug}`, lastmod: SITE_UPDATED,      freq: 'weekly',  pri: '0.7' }
   )),
   { loc: '/analytics',             lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
   { loc: '/scan',                  lastmod: SITE_UPDATED,       freq: 'monthly', pri: '0.8' },
