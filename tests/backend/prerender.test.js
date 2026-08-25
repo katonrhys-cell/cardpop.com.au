@@ -32,6 +32,7 @@ vi.mock('@supabase/supabase-js', () => {
 });
 
 import handler from '../../api/prerender.js';
+import { BINDER_SLUGS } from '../../data/shopBinderProducts.js';
 
 function run(path) {
   const req = { query: { path } };
@@ -559,5 +560,79 @@ describe('prerender whatnot page', () => {
     expect(body).toContain('<title>Whatnot Shows | CardPop Community</title>');
     expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/community/whatnot" />');
     expect(body).not.toContain('noindex');
+  });
+});
+
+describe('prerender Palms Off Gaming binders', () => {
+  const SLUG = 'palms-off-gaming-collectors-series-4-pocket-zip-binder';
+
+  it('renders the binder hub, not the shop-collection handler', async () => {
+    // /shop/binders is a single segment after /shop, so it matches the
+    // shop-collection regex too. The binder check has to win, or the hub
+    // resolves as an unknown supply group.
+    const { status, body } = await run('/shop/binders');
+    expect(status).toBe(200);
+    expect(body).toContain('<h1>Palms Off Gaming Binders</h1>');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/shop/binders" />');
+    expect(body).toContain('"@type":"ItemList"');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('links every binder product from the hub', async () => {
+    const { body } = await run('/shop/binders');
+    for (const slug of BINDER_SLUGS) {
+      expect(body).toContain(`https://cardpop.com.au/shop/binders/${slug}`);
+    }
+  });
+
+  it('renders a product page with Product, Breadcrumb and FAQ JSON-LD', async () => {
+    state.result = { data: { price_aud: 49.95, retail_price_aud: null, stock_quantity: 12, status: 'active' } };
+    const { body } = await run(`/shop/binders/${SLUG}`);
+    expect(body).toContain(`<link rel="canonical" href="https://cardpop.com.au/shop/binders/${SLUG}" />`);
+    expect(body).toContain('"@type":"Product"');
+    expect(body).toContain('"sku":"ZB-04"');
+    expect(body).toContain('"name":"Palms Off Gaming"');
+    expect(body).toContain('"@type":"FAQPage"');
+    expect(body).toContain('"@type":"BreadcrumbList"');
+  });
+
+  it('emits an Offer with the live price and stock when the product is active', async () => {
+    state.result = { data: { price_aud: 49.95, retail_price_aud: null, stock_quantity: 12, status: 'active' } };
+    const { body } = await run(`/shop/binders/${SLUG}`);
+    expect(body).toContain('"price":"49.95"');
+    expect(body).toContain('"priceCurrency":"AUD"');
+    expect(body).toContain('https://schema.org/InStock');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('marks the product out of stock when stock is zero', async () => {
+    state.result = { data: { price_aud: 49.95, retail_price_aud: null, stock_quantity: 0, status: 'active' } };
+    const { body } = await run(`/shop/binders/${SLUG}`);
+    expect(body).toContain('https://schema.org/OutOfStock');
+  });
+
+  it('stays indexable with an Enquire now CTA when the product has no price', async () => {
+    // Enquiry-only: seeded rows are draft with no price, but the page is still
+    // complete — so it is indexed, just without an Offer it cannot honour.
+    state.result = { data: { price_aud: 0, retail_price_aud: null, stock_quantity: 0, status: 'draft' } };
+    const { body } = await run(`/shop/binders/${SLUG}`);
+    expect(body).not.toContain('noindex');
+    expect(body).not.toContain('"@type":"Offer"');
+    expect(body).toContain('https://cardpop.com.au/signup');
+    expect(body).toContain('Enquire now');
+    expect(body).toContain('Why collectors pick this binder');
+  });
+
+  it('shows RRP without an Offer when only a retail price is known', async () => {
+    state.result = { data: { price_aud: 0, retail_price_aud: 59.95, stock_quantity: 0, status: 'draft' } };
+    const { body } = await run(`/shop/binders/${SLUG}`);
+    expect(body).toContain('RRP A$59.95');
+    expect(body).not.toContain('"@type":"Offer"');
+  });
+
+  it('404s an unknown binder slug', async () => {
+    const { status, body } = await run('/shop/binders/not-a-real-binder');
+    expect(status).toBe(404);
+    expect(body).toContain('noindex');
   });
 });

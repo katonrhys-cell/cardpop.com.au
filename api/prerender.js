@@ -4,6 +4,9 @@ import { SHOP_COLLECTION_SEO, resolveShopCollectionSlug } from '../data/shopColl
 import { BLOG_CATEGORIES, BLOG_CATEGORY_MAP } from '../data/blogCategories.js';
 import { BUYING_GUIDES, getBuyingGuide, GUIDE_CATEGORY_META, GUIDE_PRICE_CATEGORY } from '../data/buyingGuides.js';
 import { PAID_TIERS, hasStorefront } from '../config/plans.js';
+import {
+  BINDER_PRODUCTS, resolveBinderProduct, binderImages, binderImageAlt, binderSpecs,
+} from '../data/shopBinderProducts.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -679,6 +682,175 @@ async function renderShopProduct(supabase, id, slugParam) {
 </main>`;
 
   return htmlDoc({ title: `${name} | CardPop`, description: toText(description, 300), canonical, ogImage: image, jsonLdItems: [productLd, breadcrumb], bodyHtml });
+}
+
+// ── Palms Off Gaming binders (/shop/binders and /shop/binders/:slug) ─────────
+//
+// Copy, specs, gallery and colour list come from data/shopBinderProducts.js so
+// the crawler sees the same words the SPA renders. Only price/stock/status are
+// read from the DB — a product still in `draft` (not yet priced in the admin)
+// renders noindex rather than advertising a page nobody can buy from.
+
+function renderBindersHub() {
+  const canonical = `${BASE_URL}/shop/binders`;
+  const title = 'Palms Off Gaming Binders | Zip & Top Loader Binders | CardPop Australia';
+  const description = "Shop the full Palms Off Gaming binder range in Australia — Collector's Series and Stealth zip binders in 4, 9 and 12 pocket layouts, top loader binders and the ring binder.";
+
+  const itemList = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Palms Off Gaming binders',
+    numberOfItems: BINDER_PRODUCTS.length,
+    itemListElement: BINDER_PRODUCTS.map((p, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      item: {
+        '@type': 'Product',
+        name: p.title,
+        sku: p.sku,
+        brand: { '@type': 'Brand', name: 'Palms Off Gaming' },
+        image: binderImages(p)[0],
+        url: `${BASE_URL}/shop/binders/${p.slug}`,
+      },
+    })),
+  };
+
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'Shop', item: `${BASE_URL}/shop` },
+      { '@type': 'ListItem', position: 3, name: 'Binders', item: canonical },
+    ],
+  };
+
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/shop">Shop</a> / Binders</nav>
+  <h1>Palms Off Gaming Binders</h1>
+  <p>Palms Off Gaming build binders around one idea: a card should not be able to fall out. Every zip binder in the range uses side-loading pockets that open toward the spine rather than the top, a metal zip that runs the full perimeter, and archival pockets that are acid-free and PVC-free.</p>
+  <ul>
+    ${BINDER_PRODUCTS.map((p) => `<li><a href="${BASE_URL}/shop/binders/${p.slug}">${esc(p.title)}</a> — ${esc(p.range)}${p.pocketsPerPage ? `, ${p.pocketsPerPage} pockets per page` : ''}</li>`).join('\n    ')}
+  </ul>
+</main>`;
+
+  return htmlDoc({
+    title,
+    description,
+    canonical,
+    ogImage: binderImages(BINDER_PRODUCTS[0])[0],
+    jsonLdItems: [itemList, breadcrumb],
+    bodyHtml,
+  });
+}
+
+async function renderBinderProduct(supabaseClient, slugParam) {
+  const product = resolveBinderProduct(slugParam);
+  if (!product) {
+    return notFound({
+      title: 'Palms Off Gaming Binders | CardPop',
+      description: 'Browse the Palms Off Gaming binder range at CardPop.',
+      canonical: `${BASE_URL}/shop/binders`,
+      bodyHtml: '<main><h1>Binder not found</h1><p>Browse the full <a href="/shop/binders">Palms Off Gaming binder range</a>.</p></main>',
+    });
+  }
+
+  const canonical = `${BASE_URL}/shop/binders/${product.slug}`;
+  const images = binderImages(product);
+  const { data: row } = await supabaseClient
+    .from('shop_products')
+    .select('price_aud, retail_price_aud, stock_quantity, status')
+    .eq('slug', product.slug)
+    .maybeSingle();
+
+  const price = row?.price_aud != null && Number(row.price_aud) > 0 ? Number(row.price_aud) : null;
+  const rrp = row?.retail_price_aud != null && Number(row.retail_price_aud) > 0
+    ? Number(row.retail_price_aud)
+    : null;
+  const inStock = (row?.stock_quantity ?? 0) > 0;
+  // Enquiry-only until a price is set: the page is complete and indexable
+  // without one, but no Offer is emitted for a product that can't be bought.
+  const isPurchasable = row?.status === 'active' && price != null;
+
+  const productLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.title,
+    description: product.metaDescription,
+    image: images,
+    sku: product.sku,
+    brand: { '@type': 'Brand', name: 'Palms Off Gaming' },
+    category: 'Binders',
+    url: canonical,
+    ...(isPurchasable ? {
+      offers: {
+        '@type': 'Offer',
+        url: canonical,
+        priceCurrency: 'AUD',
+        price: price.toFixed(2),
+        availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+        itemCondition: 'https://schema.org/NewCondition',
+        seller: { '@type': 'Organization', name: 'CardPop Australia™' },
+      },
+    } : {}),
+  };
+
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'Shop', item: `${BASE_URL}/shop` },
+      { '@type': 'ListItem', position: 3, name: 'Binders', item: `${BASE_URL}/shop/binders` },
+      { '@type': 'ListItem', position: 4, name: product.shortTitle, item: canonical },
+    ],
+  };
+
+  const faqLd = product.faqs?.length > 0 ? {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: product.faqs.map((f) => ({
+      '@type': 'Question',
+      name: f.q,
+      acceptedAnswer: { '@type': 'Answer', text: f.a },
+    })),
+  } : null;
+
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/shop">Shop</a> / <a href="${BASE_URL}/shop/binders">Binders</a> / ${esc(product.shortTitle)}</nav>
+  <h1>${esc(product.title)}</h1>
+  <img src="${esc(images[0])}" alt="${esc(binderImageAlt(product, product.imageFiles[0]))}" />
+  ${isPurchasable
+    ? `<p><strong>A$${esc(price.toFixed(2))}</strong> — ${inStock ? 'In stock' : 'Out of stock'}</p>`
+    : rrp != null ? `<p>RRP A$${esc(rrp.toFixed(2))}</p>` : ''}
+  <p><a href="${BASE_URL}/signup">Enquire now</a></p>
+  <p>${esc(product.intro)}</p>
+  <h2>Why collectors pick this binder</h2>
+  <ul>
+    ${product.highlights.map((h) => `<li>${esc(h)}</li>`).join('\n    ')}
+  </ul>
+  <h2>Specifications</h2>
+  <dl>
+    ${binderSpecs(product).map((s) => `<dt>${esc(s.label)}</dt><dd>${esc(s.value)}</dd>`).join('\n    ')}
+  </dl>
+  ${product.faqs?.length > 0 ? `<h2>Common questions</h2>
+  ${product.faqs.map((f) => `<h3>${esc(f.q)}</h3><p>${esc(f.a)}</p>`).join('\n  ')}` : ''}
+  <h2>Other Palms Off Gaming binders</h2>
+  <ul>
+    ${BINDER_PRODUCTS.filter((p) => p.slug !== product.slug).map((p) => `<li><a href="${BASE_URL}/shop/binders/${p.slug}">${esc(p.title)}</a></li>`).join('\n    ')}
+  </ul>
+</main>`;
+
+  return htmlDoc({
+    title: product.metaTitle,
+    description: product.metaDescription,
+    canonical,
+    ogImage: images[0],
+    ogImageAlt: binderImageAlt(product, product.imageFiles[0]),
+    ogType: 'product',
+    jsonLdItems: [productLd, breadcrumb, faqLd].filter(Boolean),
+    bodyHtml,
+  });
 }
 
 // Exact-match landing/category pages. `source` selects the data set; the rest is copy.
@@ -2914,6 +3086,18 @@ export default async function handler(req, res) {
 
     if (LANDINGS[rawPath]) {
       return sendDoc(res, await renderLanding(supabase, rawPath));
+    }
+
+    // Palms Off Gaming binders. Must be tested BEFORE the single-segment
+    // collection matcher below, which would otherwise claim /shop/binders and
+    // resolve it as an (unknown) supply group.
+    if (rawPath === '/shop/binders') {
+      return sendDoc(res, renderBindersHub());
+    }
+
+    const binderMatch = rawPath.match(/^\/shop\/binders\/([^/?#]+)/);
+    if (binderMatch) {
+      return sendDoc(res, await renderBinderProduct(supabase, safeDecode(binderMatch[1])));
     }
 
     // Shop supply collection pages: /shop/<group> (single segment). The exact
