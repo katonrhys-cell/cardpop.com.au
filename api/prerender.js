@@ -8,12 +8,9 @@ import {
   BINDER_PRODUCTS, resolveBinderProduct, binderImages, binderImageAlt, binderSpecs,
 } from '../data/shopBinderProducts.js';
 import {
-  PALMS_OFF_PRODUCTS, resolvePalmsOffProduct, palmsOffImages, palmsOffImageAlt,
-  palmsOffSpecs, palmsOffProductsInCategory,
+  resolvePalmsOffProduct, palmsOffImages, palmsOffImageAlt, palmsOffSpecs,
 } from '../data/palmsOffCatalogue.js';
-import {
-  PALMS_OFF_CATEGORY_SLUGS, PALMS_OFF_CATEGORIES, resolvePalmsOffCategory,
-} from '../data/palmsOffCategories.js';
+import { resolvePalmsOffCategory } from '../data/palmsOffCategories.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -860,93 +857,14 @@ async function renderBinderProduct(supabaseClient, slugParam) {
   });
 }
 
-// ── Palms Off Gaming brand section ──────────────────────────────────────────
+// ── Palms Off Gaming products ───────────────────────────────────────────────
 //
-//   /shop/palms-off-gaming                        brand hub
-//   /shop/palms-off-gaming/<category>             one category
-//   /shop/palms-off-gaming/<category>/<product>   one product line
+//   /shop/<type>/<product>   one product line, inside the shop's normal
+//                            product-type taxonomy (no brand section)
 //
-// Copy comes from data/palmsOffCategories.js and the generated catalogue, so a
-// crawler sees the same words the SPA renders. Binders keep their own
-// /shop/binders URLs and renderers.
-
-function renderPalmsOffIndex(categorySlug) {
-  const category = categorySlug ? resolvePalmsOffCategory(categorySlug) : null;
-  if (categorySlug && !category) {
-    return notFound({
-      title: 'Palms Off Gaming | CardPop',
-      description: 'Browse the Palms Off Gaming range at CardPop.',
-      canonical: `${BASE_URL}/shop/palms-off-gaming`,
-      bodyHtml: '<main><h1>Not found</h1><p>Browse the <a href="/shop/palms-off-gaming">Palms Off Gaming range</a>.</p></main>',
-    });
-  }
-
-  const products = category ? palmsOffProductsInCategory(category.slug) : PALMS_OFF_PRODUCTS;
-  const canonical = category
-    ? `${BASE_URL}/shop/palms-off-gaming/${category.slug}`
-    : `${BASE_URL}/shop/palms-off-gaming`;
-  const title = category
-    ? `${category.heading} | CardPop Australia`
-    : 'Palms Off Gaming Australia | Binders, Sleeves & Card Protection | CardPop';
-  const description = category
-    ? category.blurb
-    : 'Shop the full Palms Off Gaming range in Australia — zip binders, blackout deck sleeves, top loaders, mag lock cases, graded card cases, Mint Fit sleeves, deck boxes and playmats.';
-
-  const itemList = {
-    '@context': 'https://schema.org',
-    '@type': 'ItemList',
-    name: category ? category.heading : 'Palms Off Gaming products',
-    numberOfItems: products.length,
-    itemListElement: products.map((p, i) => ({
-      '@type': 'ListItem',
-      position: i + 1,
-      item: {
-        '@type': 'Product',
-        name: p.title,
-        sku: p.sku,
-        brand: { '@type': 'Brand', name: 'Palms Off Gaming' },
-        image: palmsOffImages(p)[0],
-        url: `${BASE_URL}/shop/palms-off-gaming/${p.categorySlug}/${p.slug}`,
-      },
-    })),
-  };
-
-  const breadcrumb = {
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
-      { '@type': 'ListItem', position: 2, name: 'Shop', item: `${BASE_URL}/shop` },
-      { '@type': 'ListItem', position: 3, name: 'Palms Off Gaming', item: `${BASE_URL}/shop/palms-off-gaming` },
-      ...(category ? [{ '@type': 'ListItem', position: 4, name: category.name, item: canonical }] : []),
-    ],
-  };
-
-  const bodyHtml = `<main>
-  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/shop">Shop</a>${category ? ` / <a href="${BASE_URL}/shop/palms-off-gaming">Palms Off Gaming</a> / ${esc(category.name)}` : ' / Palms Off Gaming'}</nav>
-  <h1>${esc(category ? category.heading : 'Palms Off Gaming')}</h1>
-  <p>${esc(category ? category.intro : 'Palms Off Gaming make card protection built around one idea: every layer between a card and the world should be one you never have to think about again.')}</p>
-  ${category && category.choosing ? `<p>${esc(category.choosing)}</p>` : ''}
-  ${!category ? `<h2>Categories</h2>
-  <ul>
-    <li><a href="${BASE_URL}/shop/binders">Binders</a></li>
-    ${PALMS_OFF_CATEGORY_SLUGS.map((c) => `<li><a href="${BASE_URL}/shop/palms-off-gaming/${c}">${esc(PALMS_OFF_CATEGORIES[c].name)}</a></li>`).join('\n    ')}
-  </ul>` : ''}
-  <h2>Products</h2>
-  <ul>
-    ${products.map((p) => `<li><a href="${BASE_URL}/shop/palms-off-gaming/${p.categorySlug}/${p.slug}">${esc(p.title)}</a></li>`).join('\n    ')}
-  </ul>
-</main>`;
-
-  return htmlDoc({
-    title,
-    description,
-    canonical,
-    ogImage: palmsOffImages(products[0])[0],
-    jsonLdItems: [itemList, breadcrumb],
-    bodyHtml,
-  });
-}
+// Copy comes from data/palmsOffCategories.js keyed by leaf category slug, plus
+// the generated catalogue, so a crawler sees what the SPA renders. Binders keep
+// their own renderers at /shop/binders.
 
 async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) {
   const product = resolvePalmsOffProduct(productSlug);
@@ -955,14 +873,14 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
   // resolving to one page is the duplication this structure avoids.
   if (!product || !category || product.categorySlug !== category.slug) {
     return notFound({
-      title: 'Palms Off Gaming | CardPop',
-      description: 'Browse the Palms Off Gaming range at CardPop.',
-      canonical: `${BASE_URL}/shop/palms-off-gaming`,
-      bodyHtml: '<main><h1>Product not found</h1><p>Browse the <a href="/shop/palms-off-gaming">Palms Off Gaming range</a>.</p></main>',
+      title: 'CardPop Shop',
+      description: 'Browse trading card supplies at CardPop.',
+      canonical: `${BASE_URL}/shop`,
+      bodyHtml: '<main><h1>Product not found</h1><p>Browse <a href="/shop">the shop</a>.</p></main>',
     });
   }
 
-  const canonical = `${BASE_URL}/shop/palms-off-gaming/${category.slug}/${product.slug}`;
+  const canonical = `${BASE_URL}/shop/${category.slug}/${product.slug}`;
   const images = palmsOffImages(product);
   const { data: row } = await supabaseClient
     .from('shop_products')
@@ -1007,9 +925,8 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
       { '@type': 'ListItem', position: 2, name: 'Shop', item: `${BASE_URL}/shop` },
-      { '@type': 'ListItem', position: 3, name: 'Palms Off Gaming', item: `${BASE_URL}/shop/palms-off-gaming` },
-      { '@type': 'ListItem', position: 4, name: category.name, item: `${BASE_URL}/shop/palms-off-gaming/${category.slug}` },
-      { '@type': 'ListItem', position: 5, name: product.shortTitle, item: canonical },
+      { '@type': 'ListItem', position: 3, name: category.name, item: `${BASE_URL}/shop/category/${category.slug}` },
+      { '@type': 'ListItem', position: 4, name: product.shortTitle, item: canonical },
     ],
   };
 
@@ -1023,7 +940,7 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
   } : null;
 
   const bodyHtml = `<main>
-  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/shop">Shop</a> / <a href="${BASE_URL}/shop/palms-off-gaming">Palms Off Gaming</a> / <a href="${BASE_URL}/shop/palms-off-gaming/${category.slug}">${esc(category.name)}</a> / ${esc(product.shortTitle)}</nav>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/shop">Shop</a> / <a href="${BASE_URL}/shop/category/${category.slug}">${esc(category.name)}</a> / ${esc(product.shortTitle)}</nav>
   <h1>${esc(product.title)}</h1>
   <img src="${esc(images[0])}" alt="${esc(palmsOffImageAlt(product, product.imagePaths[0]))}" />
   ${isPurchasable
@@ -3288,15 +3205,17 @@ export default async function handler(req, res) {
       return sendDoc(res, await renderLanding(supabase, rawPath));
     }
 
-    // Palms Off Gaming brand section. Like the binder routes below, these must
-    // beat the single-segment collection matcher further down.
-    const palmsOffMatch = rawPath.match(/^\/shop\/palms-off-gaming(?:\/([^/?#]+))?(?:\/([^/?#]+))?\/?$/);
-    if (palmsOffMatch) {
-      const cat = palmsOffMatch[1] ? safeDecode(palmsOffMatch[1]) : null;
-      const prod = palmsOffMatch[2] ? safeDecode(palmsOffMatch[2]) : null;
-      return sendDoc(res, prod
-        ? await renderPalmsOffProduct(supabase, cat, prod)
-        : renderPalmsOffIndex(cat));
+    // Product pages inside the product-type taxonomy: /shop/<type>/<product>.
+    // Two segments, so the single-segment collection matcher below never sees
+    // them. Only a slug that is a real catalogue product is claimed here —
+    // anything else (including /shop/category/<slug>) falls through.
+    const shopTypeProductMatch = rawPath.match(/^\/shop\/([^/?#]+)\/([^/?#]+)\/?$/);
+    if (shopTypeProductMatch && shopTypeProductMatch[1] !== 'category') {
+      const prod = safeDecode(shopTypeProductMatch[2]);
+      if (resolvePalmsOffProduct(prod)) {
+        return sendDoc(res, await renderPalmsOffProduct(
+          supabase, safeDecode(shopTypeProductMatch[1]), prod));
+      }
     }
 
     // Palms Off Gaming binders. Must be tested BEFORE the single-segment

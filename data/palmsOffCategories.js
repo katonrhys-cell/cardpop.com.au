@@ -1,5 +1,9 @@
 /**
- * Per-category copy for the Palms Off Gaming brand section.
+ * Per-category copy for the Palms Off Gaming products.
+ *
+ * Keyed by LEAF CATEGORY SLUG from utils/shopCategories.js — these products sit
+ * in the shop's normal product-type taxonomy, not a brand section, so the copy
+ * is attached to the product type a page belongs to.
  *
  * The catalogue in data/palmsOffCatalogue.js is generated from what is actually
  * in the `palms off gaming products` Storage bucket — titles, SKUs, colours and
@@ -19,8 +23,8 @@
  */
 
 export const PALMS_OFF_CATEGORIES = {
-  'deck-sleeves': {
-    name: 'Deck Sleeves',
+  'premium-sleeves': {
+    name: 'Premium Sleeves',
     heading: 'Palms Off Gaming Deck Sleeves',
     blurb: 'Blackout deck sleeves and premium over sleeves in standard and Japanese mini sizes.',
     intro:
@@ -35,7 +39,7 @@ export const PALMS_OFF_CATEGORIES = {
   },
 
   'top-loaders': {
-    name: 'Top Loaders & Card Loaders',
+    name: 'Top Loaders',
     heading: 'Palms Off Gaming Top Loaders',
     blurb: 'Rigid top loaders and card loaders from 35pt to 180pt, plus a booster pack size.',
     intro:
@@ -50,8 +54,8 @@ export const PALMS_OFF_CATEGORIES = {
     ],
   },
 
-  'mag-lock-cases': {
-    name: 'Mag Lock Cases',
+  'magnetic-holders': {
+    name: 'Magnetic Holders',
     heading: 'Palms Off Gaming Mag Lock Card Cases',
     blurb: 'Magnetic one-touch acrylic cases from 35pt to 180pt.',
     intro:
@@ -79,8 +83,8 @@ export const PALMS_OFF_CATEGORIES = {
     ],
   },
 
-  'mint-fit': {
-    name: 'Mint Fit',
+  'graded-card-protectors': {
+    name: 'Graded Card Protectors',
     heading: 'Palms Off Gaming Mint Fit Sleeves',
     blurb: 'Sleeves cut to fit specific holders — PSA and BGS slabs, mag lock cases, top loaders and booster packs.',
     intro:
@@ -94,8 +98,8 @@ export const PALMS_OFF_CATEGORIES = {
     ],
   },
 
-  'grading-holders': {
-    name: 'Grading Holders',
+  'card-savers': {
+    name: 'Card Savers',
     heading: 'Palms Off Gaming Semi-Rigid Grading Holders',
     blurb: 'Semi-rigid card holders in 50 and 200 packs — the format grading companies ask for.',
     intro:
@@ -108,14 +112,6 @@ export const PALMS_OFF_CATEGORIES = {
     ],
   },
 
-  'binders-alias': {
-    name: 'Binders',
-    heading: 'Palms Off Gaming Binders',
-    blurb: 'Zip binders, top loader binders and the ring binder.',
-    intro: 'The full binder range lives at /shop/binders.',
-    choosing: '',
-    faqs: [],
-  },
 
   'deck-boxes': {
     name: 'Deck Boxes',
@@ -128,6 +124,21 @@ export const PALMS_OFF_CATEGORIES = {
     faqs: [
       { q: 'Will a double-sleeved deck fit?', a: 'Double-sleeving adds real bulk, so check the stated capacity against your deck rather than against the raw card count. A 100-card deck double-sleeved needs meaningfully more room than 100 bare cards.' },
       { q: 'Can I store a deck long term in one?', a: 'Yes, though for cards that are not being played a storage box or binder is easier to sort and search.' },
+    ],
+  },
+
+  'perfect-fit-sleeves': {
+    name: 'Perfect Fit Sleeves',
+    heading: 'Palms Off Gaming Mint Fit Inner Sleeves',
+    blurb: 'Snug inner sleeves in standard and Japanese mini sizes, top-loading and side-loading.',
+    intro:
+      'An inner sleeve is the first layer, sized to the card rather than to a sleeve — snug enough that the card does not shift inside it, thin enough that the whole thing still fits into a normal deck sleeve on top. That is what double-sleeving is: an inner sleeve for the fit, an outer sleeve for the handling. For anything valuable that still gets played or shuffled, it is the difference between wear landing on a sleeve and wear landing on the card.',
+    choosing:
+      'Two decisions. **Size** — standard fits Pokémon, Magic, One Piece, Lorcana and sports cards; Japanese mini fits Japanese Pokémon and Yu-Gi-Oh. **Loading edge** — a side-loading inner sleeve pairs with a top-loading outer sleeve so the two openings sit at right angles, which seals the card completely.',
+    faqs: [
+      { q: 'Why double-sleeve at all?', a: 'The inner sleeve holds the card snugly and never gets handled; the outer sleeve takes all the shuffling and table contact. Wear ends up on a sleeve you can replace rather than on the card.' },
+      { q: 'Which way up does an inner sleeve go?', a: 'Upside down relative to the outer sleeve, so the two openings do not line up. With a side-loading inner sleeve the openings are already at right angles, which achieves the same thing more reliably.' },
+      { q: 'Will a double-sleeved card still fit a binder pocket?', a: 'Usually yes, though the binder will sit fuller when every pocket is loaded. A top loader binder is the better choice if most of the collection is double-sleeved.' },
     ],
   },
 
@@ -144,8 +155,8 @@ export const PALMS_OFF_CATEGORIES = {
     ],
   },
 
-  'soft-card-sleeves': {
-    name: 'Soft Card Sleeves',
+  'penny-sleeves': {
+    name: 'Penny Sleeves',
     heading: 'Palms Off Gaming Soft Card Sleeves',
     blurb: 'Penny sleeves in standard and Japanese mini sizes.',
     intro:
@@ -194,8 +205,8 @@ export const PALMS_OFF_CATEGORIES = {
     ],
   },
 
-  'command-cases': {
-    name: 'Command Cases',
+  'storage-boxes': {
+    name: 'Storage Boxes',
     heading: 'Palms Off Gaming Command Cases',
     blurb: 'Hard cases for transporting and displaying cards.',
     intro:
@@ -205,10 +216,7 @@ export const PALMS_OFF_CATEGORIES = {
   },
 };
 
-export const PALMS_OFF_CATEGORY_SLUGS = Object.keys(PALMS_OFF_CATEGORIES)
-  .filter((slug) => slug !== 'binders-alias');
+export const PALMS_OFF_CATEGORY_SLUGS = Object.keys(PALMS_OFF_CATEGORIES);
 
 export const resolvePalmsOffCategory = (slug) =>
-  (slug && PALMS_OFF_CATEGORIES[slug] && slug !== 'binders-alias'
-    ? { slug, ...PALMS_OFF_CATEGORIES[slug] }
-    : null);
+  (slug && PALMS_OFF_CATEGORIES[slug] ? { slug, ...PALMS_OFF_CATEGORIES[slug] } : null);

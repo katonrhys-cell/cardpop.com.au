@@ -6,7 +6,6 @@ import { BUYING_GUIDES } from '../data/buyingGuides.js';
 import { PAID_TIERS } from '../config/plans.js';
 import { BINDER_SLUGS } from '../data/shopBinderProducts.js';
 import { PALMS_OFF_PRODUCTS } from '../data/palmsOffCatalogue.js';
-import { PALMS_OFF_CATEGORY_SLUGS } from '../data/palmsOffCategories.js';
 
 const SUPABASE_URL = 'https://vrfsaazuqjxotnieqlkd.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_lHlLkeTfwzhWQ80Zz6pL6g_jc7Y8p33';
@@ -68,14 +67,11 @@ const STATIC_PAGES = [
   ...BINDER_SLUGS.map((slug) => (
     { loc: `/shop/binders/${slug}`, lastmod: SITE_UPDATED,      freq: 'weekly',  pri: '0.7' }
   )),
-  // Palms Off Gaming brand section: hub, one page per category, one per
-  // product line. Config-driven (data/palmsOffCatalogue.js), not DB rows.
-  { loc: '/shop/palms-off-gaming', lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' },
-  ...PALMS_OFF_CATEGORY_SLUGS.map((slug) => (
-    { loc: `/shop/palms-off-gaming/${slug}`, lastmod: SITE_UPDATED, freq: 'weekly', pri: '0.7' }
-  )),
+  // Palms Off Gaming product pages, one per line, inside the normal
+  // product-type taxonomy. Config-driven (data/palmsOffCatalogue.js), not DB
+  // rows, so they belong here rather than in the shop_products block below.
   ...PALMS_OFF_PRODUCTS.map((p) => (
-    { loc: `/shop/palms-off-gaming/${p.categorySlug}/${p.slug}`, lastmod: SITE_UPDATED, freq: 'weekly', pri: '0.7' }
+    { loc: `/shop/${p.categorySlug}/${p.slug}`, lastmod: SITE_UPDATED, freq: 'weekly', pri: '0.7' }
   )),
   { loc: '/analytics',             lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
   { loc: '/scan',                  lastmod: SITE_UPDATED,       freq: 'monthly', pri: '0.8' },

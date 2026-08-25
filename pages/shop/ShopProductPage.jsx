@@ -20,14 +20,16 @@ import { resolvePalmsOffCategory } from '@/data/palmsOffCategories.js';
 const SITE_ORIGIN = 'https://cardpop.com.au';
 
 /**
- * /shop/palms-off-gaming/:categorySlug/:productSlug
+ * /shop/:categorySlug/:productSlug
  *
- * One page per product line. The page's words come from the catalogue (title,
- * SKUs, colours) plus the category's copy — see the note in
- * data/palmsOffCategories.js on why category is the unit of writing. Only
+ * One page per product line, sitting inside the shop's normal product-type
+ * taxonomy rather than a brand section — /shop/top-loaders/<product> alongside
+ * every other top loader. The page's words come from the catalogue (title,
+ * SKUs, colours) plus the product type's copy; see the note in
+ * data/palmsOffCategories.js on why the type is the unit of writing. Only
  * price, stock and status are read from the DB.
  */
-const PalmsOffProductPage = () => {
+const ShopProductPage = () => {
   const { categorySlug, productSlug } = useParams();
   const { addToCart, setIsCartOpen } = useCart();
   const product = resolvePalmsOffProduct(productSlug);
@@ -58,7 +60,7 @@ const PalmsOffProductPage = () => {
   // structure exists to avoid.
   if (!validPair) return <NotFoundPage />;
 
-  const canonical = `${SITE_ORIGIN}/shop/palms-off-gaming/${category.slug}/${product.slug}`;
+  const canonical = `${SITE_ORIGIN}/shop/${category.slug}/${product.slug}`;
   const images = palmsOffImages(product);
   const specs = palmsOffSpecs(product);
   const price = row?.price_aud != null && Number(row.price_aud) > 0 ? Number(row.price_aud) : null;
@@ -127,9 +129,8 @@ const PalmsOffProductPage = () => {
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_ORIGIN },
       { '@type': 'ListItem', position: 2, name: 'Shop', item: `${SITE_ORIGIN}/shop` },
-      { '@type': 'ListItem', position: 3, name: 'Palms Off Gaming', item: `${SITE_ORIGIN}/shop/palms-off-gaming` },
-      { '@type': 'ListItem', position: 4, name: category.name, item: `${SITE_ORIGIN}/shop/palms-off-gaming/${category.slug}` },
-      { '@type': 'ListItem', position: 5, name: product.shortTitle, item: canonical },
+      { '@type': 'ListItem', position: 3, name: category.name, item: `${SITE_ORIGIN}/shop/category/${category.slug}` },
+      { '@type': 'ListItem', position: 4, name: product.shortTitle, item: canonical },
     ],
   };
 
@@ -158,8 +159,7 @@ const PalmsOffProductPage = () => {
         <Breadcrumb items={[
           { label: 'Home', path: '/' },
           { label: 'Shop', path: '/shop' },
-          { label: 'Palms Off Gaming', path: '/shop/palms-off-gaming' },
-          { label: category.name, path: `/shop/palms-off-gaming/${category.slug}` },
+          { label: category.name, path: `/shop/category/${category.slug}` },
           { label: product.shortTitle },
         ]} />
 
@@ -284,7 +284,7 @@ const PalmsOffProductPage = () => {
               {siblings.map((other) => (
                 <Link
                   key={other.slug}
-                  to={`/shop/palms-off-gaming/${category.slug}/${other.slug}`}
+                  to={`/shop/${category.slug}/${other.slug}`}
                   className="group rounded-2xl border border-border bg-card p-4 hover:shadow-lg hover:-translate-y-0.5 transition-all"
                 >
                   <p className="font-bold leading-snug text-foreground group-hover:text-primary transition-colors">
@@ -303,4 +303,4 @@ const PalmsOffProductPage = () => {
   );
 };
 
-export default PalmsOffProductPage;
+export default ShopProductPage;
