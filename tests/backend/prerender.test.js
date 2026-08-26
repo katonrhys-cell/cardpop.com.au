@@ -700,3 +700,59 @@ describe('prerender Palms Off Gaming products', () => {
     }
   });
 });
+
+describe('Palms Off Gaming per-product copy', () => {
+  it('every product has its own description, intro and highlights', () => {
+    for (const p of PALMS_OFF_PRODUCTS) {
+      expect(p.metaDescription, p.sku).toBeTruthy();
+      expect(p.intro, p.sku).toBeTruthy();
+      expect(p.highlights?.length, p.sku).toBeGreaterThan(0);
+    }
+  });
+
+  it('no two products share an intro or a meta description', () => {
+    // The whole point of per-product copy is that sibling pages stop being
+    // reworded duplicates of each other — 10 top loaders differing only by a
+    // point rating is exactly the thin-content shape this guards against.
+    for (const field of ['intro', 'metaDescription']) {
+      const seen = new Map();
+      for (const p of PALMS_OFF_PRODUCTS) {
+        const prev = seen.get(p[field]);
+        expect(prev, `${field} duplicated between ${prev} and ${p.sku}`).toBeUndefined();
+        seen.set(p[field], p.sku);
+      }
+    }
+  });
+
+  it('keeps meta descriptions within the length search engines display', () => {
+    for (const p of PALMS_OFF_PRODUCTS) {
+      expect(p.metaDescription.length, `${p.sku} too long`).toBeLessThanOrEqual(165);
+      expect(p.metaDescription.length, `${p.sku} too short`).toBeGreaterThanOrEqual(80);
+    }
+  });
+
+  it('renders the product copy, not the product type fallback', async () => {
+    const product = PALMS_OFF_PRODUCTS.find((p) => p.sku === 'TL-35PT');
+    state.result = { data: null };
+    const { body } = await run(`/shop/${product.categorySlug}/${product.slug}`);
+    expect(body).toContain('35pt is the thickness of an ordinary modern trading card');
+    expect(body).toContain('Why collectors pick this one');
+    // The type-level intro must not also appear — one page, one description.
+    expect(body).not.toContain('A top loader is the rigid sleeve that turns a card');
+  });
+
+  it('still serves the shared FAQs from the product type', async () => {
+    const product = PALMS_OFF_PRODUCTS.find((p) => p.sku === 'TL-35PT');
+    state.result = { data: null };
+    const { body } = await run(`/shop/${product.categorySlug}/${product.slug}`);
+    expect(body).toContain('"@type":"FAQPage"');
+    expect(body).toContain('Point rating is the card');
+  });
+
+  it('puts the product description in the meta tag and JSON-LD', async () => {
+    const product = PALMS_OFF_PRODUCTS.find((p) => p.sku === 'MAG-180PT');
+    state.result = { data: null };
+    const { body } = await run(`/shop/${product.categorySlug}/${product.slug}`);
+    expect(body).toContain('the largest one-touch in the range');
+  });
+});

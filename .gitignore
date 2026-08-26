@@ -26,9 +26,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# local env files
-.env
-.env*.local
+# local env files. `.env*` rather than just `.env` + `.env*.local`: the repo is
+# public, and the narrower pair left .env.production (and any other
+# .env.<name>) tracked. .env.example is re-included as the committed template.
+.env*
+!.env.example
 
 # vercel
 .vercel
