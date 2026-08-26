@@ -50,3 +50,88 @@ body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
+
+/* ── Card identification scan overlay ───────────────────────────────────────
+   The full-screen visual that plays while a card is being identified
+   (components/CardScanOverlay.jsx). Everything here is CSS so the overlay
+   costs nothing on the listing path — no animation library is pulled in for
+   a screen that is only on-screen for a few seconds.
+
+   The palette is the brand's: charcoal ground, CardPop Red beam. `--cardscan-
+   accent` is the red lifted to #FF4257 because #CE1126 has no glow left in it
+   against a near-black backdrop — the core of the beam and every fill stay
+   brand red, only the highlight is brightened. */
+.cardscan {
+  --cardscan-accent: #ff4257;   /* brand red, lifted for a dark ground */
+  --cardscan-core:   #ce1126;   /* CardPop Red */
+}
+
+/* Ground: charcoal deepened toward black, with a red bloom behind the card. */
+@keyframes cardscan-bloom {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%      { opacity: 0.85; transform: scale(1.06); }
+}
+
+/* Diagonal light bands drifting across the backdrop. */
+@keyframes cardscan-streaks {
+  0%, 100% { opacity: 0.35; transform: translate3d(-2%, 0, 0); }
+  50%      { opacity: 0.7;  transform: translate3d(2%, 0, 0); }
+}
+
+/* The card breathes so the scene never reads as a frozen screenshot. */
+@keyframes cardscan-float {
+  0%, 100% { transform: perspective(1200px) rotateX(0deg)   rotateZ(-3.5deg) translateY(0); }
+  50%      { transform: perspective(1200px) rotateX(2.5deg) rotateZ(-2deg)   translateY(-10px); }
+}
+
+/* The beam. The sweep element is exactly as tall as the card frame, so
+   translateY(-100% → 0) walks its bottom edge — where the bright line sits —
+   from the top of the card to the bottom, in one compositor-only transform. */
+@keyframes cardscan-sweep {
+  0%   { transform: translate3d(0, -100%, 0); opacity: 0; }
+  7%   { opacity: 1; }
+  93%  { opacity: 1; }
+  100% { transform: translate3d(0, 0, 0);     opacity: 0; }
+}
+
+/* Chevron chase under the label — silver at rest, brand red as it fires. */
+@keyframes cardscan-chevron {
+  0%, 65%, 100% { opacity: 0.3; color: #c4ced4; transform: translateX(0); }
+  30%           { opacity: 1;   color: var(--cardscan-accent); transform: translateX(3px); }
+}
+
+.cardscan__bloom {
+  animation: cardscan-bloom 4.5s ease-in-out infinite;
+  will-change: opacity, transform;
+}
+.cardscan__streaks {
+  animation: cardscan-streaks 9s ease-in-out infinite;
+  will-change: opacity, transform;
+}
+.cardscan__card {
+  animation: cardscan-float 6s ease-in-out infinite;
+  will-change: transform;
+}
+.cardscan__sweep {
+  animation: cardscan-sweep 1.9s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  will-change: transform, opacity;
+}
+.cardscan__chevron {
+  animation: cardscan-chevron 1.25s ease-in-out infinite;
+}
+.cardscan__chevron:nth-child(2) { animation-delay: 0.14s; }
+.cardscan__chevron:nth-child(3) { animation-delay: 0.28s; }
+
+/* Reduced motion: hold the scene in a readable pose rather than animating it.
+   The site-wide reduce-motion rule in index.css forces every animation to
+   0.01ms with !important, which would otherwise freeze the beam mid-travel at
+   whatever position the first frame landed on. Naming `animation: none` here
+   drops the animation entirely (the !important applies to duration, not name)
+   and the transforms below decide the resting pose. */
+@media (prefers-reduced-motion: reduce) {
+  .cardscan__bloom   { animation: none; opacity: 0.7; }
+  .cardscan__streaks { animation: none; opacity: 0.5; }
+  .cardscan__card    { animation: none; transform: perspective(1200px) rotateZ(-3.5deg); }
+  .cardscan__sweep   { animation: none; transform: translate3d(0, -50%, 0); opacity: 0.9; }
+  .cardscan__chevron { animation: none; opacity: 0.55; color: #c4ced4; }
+}

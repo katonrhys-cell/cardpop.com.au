@@ -46,6 +46,7 @@ import { useCardDescription } from '@/hooks/useCardDescription.js';
 import CardCropPreview from '@/components/CardCropPreview.jsx';
 import CardCornerAdjuster from '@/components/CardCornerAdjuster.jsx';
 import CardScanCamera from '@/components/CardScanCamera.jsx';
+import CardScanOverlay from '@/components/CardScanOverlay.jsx';
 import { warpCardWithCorners } from '@/utils/detectCard.js';
 import DisplayStylePicker from '@/components/vault/DisplayStylePicker.jsx';
 import { normalizeTier } from '@/lib/displayStyles.js';
@@ -208,6 +209,10 @@ const AddEditCardPage = () => {
   const [showFoilGuide, setShowFoilGuide]     = useState(false);
 
   const { scanCard, isScanning, scanResult, clearScan } = useCardOCR();
+  // Aborts the in-flight identification when the seller cancels the scan
+  // overlay. Held in a ref so the async run can check the same controller it
+  // started with, even after a later run replaces it.
+  const scanAbortRef = useRef(null);
   const { lookupPrice, isLookingUp, priceData, clearPrice } = useEbayPriceLookup();
   const { identify: cardSightIdentify, isIdentifying, result: cardSightResult, clearResult: clearCardSight } = useCardSight();
   const { fetchPricingById, fetchPricingByName, isLoadingCsPrice, csPrice, clearCsPrice } = useCardsightPricing();
@@ -850,6 +855,10 @@ const AddEditCardPage = () => {
     clearScan();
     clearCardSight();
 
+    const controller = new AbortController();
+    scanAbortRef.current = controller;
+    const { signal } = controller;
+
     const conditionMap = {
       'Mint': 'mint', 'Near Mint': 'near_mint', 'Excellent': 'excellent',
       'Good': 'good', 'Fair': 'light_played',
@@ -869,6 +878,7 @@ const AddEditCardPage = () => {
     const { files: analysisImages, dropped } = await prepareAnalysisImages(
       [frontImage, ...extraFiles.filter(Boolean)].slice(0, ANALYSIS_IMAGE_LIMIT),
     ).finally(() => setIsPreparingImage(false));
+    if (signal.aborted) return;
     const analysisImage = analysisImages[0] ?? frontImage;
     setAnalysedImageCount(analysisImages.length);
     if (dropped > 0) {
@@ -884,7 +894,8 @@ const AddEditCardPage = () => {
     //
     // Pass the front plus any back/extra images so OCR can read set codes and
     // collector numbers that are clearer (or only present) on the back.
-    const ocrResult = await scanCard(analysisImages);
+    const ocrResult = await scanCard(analysisImages, { signal });
+    if (signal.aborted) return;
 
     if (ocrResult) {
       // Resolved against the collection OCR just read, falling back to whatever
@@ -957,7 +968,8 @@ const AddEditCardPage = () => {
     // ── 2. CardSight, narrowed to the category OCR read ─────────────────────
     // A collection the seller picked themselves always wins over OCR's guess.
     const collection = formData.collection || ocrResult?.collectionType || '';
-    const csResult = await cardSightIdentify(analysisImage, collection);
+    const csResult = await cardSightIdentify(analysisImage, collection, { signal });
+    if (signal.aborted) return;
 
     // CardSight has no catalog outside its ten segments, so a Magic or AFL card
     // is expected to come back unidentified — the OCR fields above (already
@@ -1017,6 +1029,16 @@ const AddEditCardPage = () => {
     else if (csResult.card?.name) fetchPricingByName(csResult.card.name);
 
     logScan(ocrResult, csResult, analysisImages.length);
+  };
+
+  // Cancel drops the scan overlay at once and aborts whatever is in flight, so
+  // a seller who realises they shot the wrong side isn't held to the end of it.
+  // Nothing identified so far is applied — the run returns at its next
+  // checkpoint without touching the form.
+  const cancelAnalyze = () => {
+    scanAbortRef.current?.abort();
+    scanAbortRef.current = null;
+    setIsPreparingImage(false);
   };
 
   // Records the identification so a catalogue can accumulate out of it. Entirely
@@ -4291,6 +4313,17 @@ const AddEditCardPage = () => {
           )}
         </form>
       </div>
+
+      <CardScanOverlay
+        open={isPreparingImage || isScanning || isIdentifying}
+        imageUrl={imagePreview}
+        label={
+          isPreparingImage ? 'Preparing photo'
+            : isScanning ? 'Reading the card'
+              : 'Matching the catalog'
+        }
+        onCancel={cancelAnalyze}
+      />
 
       {/* Photo Template Modal */}
       <PhotoTemplateModal

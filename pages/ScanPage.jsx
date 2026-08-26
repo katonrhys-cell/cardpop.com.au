@@ -5,6 +5,7 @@ import {
   Sparkles, TrendingUp, BadgeCheck,
 } from 'lucide-react';
 import SEOHead from '@/components/SEOHead.jsx';
+import CardScanOverlay from '@/components/CardScanOverlay.jsx';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -24,6 +25,16 @@ const PHASE_LABELS = {
   price: 'Checking live prices…',
 };
 
+// Same phases, worded for the full-screen scan overlay: no ellipsis (the
+// chevron chase already carries "in progress") and short enough to hold two
+// lines at display size on a phone.
+const PHASE_HEADLINES = {
+  prepare: 'Preparing photo',
+  read: 'Reading the card',
+  match: 'Matching the catalog',
+  price: 'Checking prices',
+};
+
 const aud = (n) => `$${Number(n).toFixed(2)}`;
 
 // Standalone price checker: photo → identification → live pricing, with a
@@ -36,6 +47,7 @@ const ScanPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
+  const abortRef = useRef(null);
 
   const [file, setFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -62,18 +74,24 @@ const ScanPage = () => {
   const handleScan = async () => {
     if (!file || phase) return;
     setScan(null);
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const { signal } = controller;
     try {
       setPhase('prepare');
       const { files } = await prepareAnalysisImages([file]);
+      if (signal.aborted) return;
       const analysisImage = files[0] ?? file;
 
       // OCR first — it names the category, which narrows CardSight to a
       // single segment (the order is load-bearing, see the identification doc).
       setPhase('read');
-      const ocr = await scanCard(analysisImage);
+      const ocr = await scanCard(analysisImage, { signal });
+      if (signal.aborted) return;
 
       setPhase('match');
-      const cardSight = await identify(analysisImage, ocr?.collectionType || '');
+      const cardSight = await identify(analysisImage, ocr?.collectionType || '', { signal });
+      if (signal.aborted) return;
 
       setPhase('price');
       const identity = ocr?.name
@@ -81,15 +99,30 @@ const ScanPage = () => {
         : cardSight?.identified && cardSight.card?.name
           ? { name: cardSight.card.name, cardSetName: cardSight.card.setName }
           : null;
-      const ebay = identity ? await lookupPrice(identity) : null;
+      const ebay = identity ? await lookupPrice(identity, { signal }) : null;
+      if (signal.aborted) return;
 
       setScan({ ocr: ocr ?? null, cardSight: cardSight ?? null, ebay });
     } finally {
-      setPhase(null);
+      // A cancel has already cleared the phase and moved on; only the run that
+      // is still the current one gets to put the overlay away.
+      if (abortRef.current === controller) {
+        abortRef.current = null;
+        setPhase(null);
+      }
     }
   };
 
+  // Cancel drops the overlay immediately and aborts whatever is in flight, so
+  // the seller isn't held on a scan they've changed their mind about.
+  const cancelScan = () => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setPhase(null);
+  };
+
   const reset = () => {
+    cancelScan();
     setScan(null);
     setFile(null);
     setPreviewUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null; });
@@ -302,6 +335,13 @@ const ScanPage = () => {
           </div>
         )}
       </div>
+
+      <CardScanOverlay
+        open={!!phase}
+        imageUrl={previewUrl}
+        label={PHASE_HEADLINES[phase] || 'Identifying card'}
+        onCancel={cancelScan}
+      />
 
       {showCamera && (
         <Suspense fallback={null}>
