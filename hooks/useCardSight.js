@@ -17,7 +17,10 @@ export function useCardSight() {
   const [result, setResult] = useState(null);
   const isMounted = useIsMounted();
 
-  const identify = useCallback(async (imageFile, collection) => {
+  // `signal` aborts an in-flight identification — the scan overlay's "Cancel
+  // scan" control. An abort resolves as undefined, distinct from the
+  // { identified: false } an unmatched card returns.
+  const identify = useCallback(async (imageFile, collection, { signal } = {}) => {
     if (!imageFile) return;
 
     setIsIdentifying(true);
@@ -31,6 +34,7 @@ export function useCardSight() {
       const response = await apiServerClient.fetch('/cardsight/identify', {
         method: 'POST',
         body: formData,
+        signal,
       });
 
       if (!response.ok) {
@@ -45,9 +49,11 @@ export function useCardSight() {
       }
 
       const data = await response.json();
+      if (signal?.aborted) return undefined;
       if (isMounted()) setResult(data);
       return data;
     } catch (err) {
+      if (err.name === 'AbortError' || signal?.aborted) return undefined;
       console.warn('[useCardSight] identify failed:', err.message);
       return { identified: false, apiError: true, message: err.message };
     } finally {

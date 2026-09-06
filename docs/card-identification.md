@@ -24,6 +24,33 @@ photo(s)          front + up to two more angles, ANALYSIS_IMAGE_LIMIT total
   └─4─ Overlay        CardSight fields applied only on a clean exact hit
 ```
 
+## What the seller sees while it runs
+
+`components/CardScanOverlay.jsx` — a full-screen scan that plays for the whole
+run, on both entry points (`pages/ScanPage.jsx` and the Add Card wizard). The
+seller's own photo is held under a red beam that sweeps it top to bottom, with
+the current step named above a chevron chase. Everything is CSS keyframes in
+`global.css` (`.cardscan*`), so no animation library reaches the listing path
+for it, and `prefers-reduced-motion` holds the scene in a static pose instead
+of freezing the beam mid-travel.
+
+The label tracks the pipeline step, so the wait is legible rather than one
+undifferentiated spinner: *Preparing photo* (step 0) → *Reading the card*
+(step 1) → *Matching the catalog* (step 3) → *Checking prices* (ScanPage only).
+
+**Cancel scan really cancels.** The overlay is the only thing that can abandon
+a run, so the abort has to reach the network: `scanCard`, `identify` and
+`lookupPrice` all take an `{ signal }` option and pass it through to fetch, and
+an `AbortError` resolves quietly as `undefined` — no error toast, since a
+cancel is a deliberate act and not a failure. The callers re-check
+`signal.aborted` between steps, so a run cancelled part-way never writes to the
+form or logs a scan. Escape cancels too.
+
+Note that the overlay covers the page while it runs: a seller can no longer
+carry on filling in the form during an identification the way the old inline
+spinner allowed. That is the intended trade — the run is a few seconds, and the
+fields it fills are the ones they would be typing into.
+
 ### Why it is a button
 
 Identification used to fire automatically the moment a seller dropped their

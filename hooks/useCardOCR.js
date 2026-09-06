@@ -17,7 +17,10 @@ export function useCardOCR() {
   const [scanResult, setScanResult] = useState(null);
   const isMounted = useIsMounted();
 
-  const scanCard = useCallback(async (imageInput) => {
+  // `signal` aborts an in-flight scan — the overlay's "Cancel scan" control.
+  // An abort is a deliberate act, not a failure, so it resolves quietly with
+  // no result and no error toast.
+  const scanCard = useCallback(async (imageInput, { signal } = {}) => {
     // Accept a single File or an array of Files (front + back/extra angles).
     const imageFiles = (Array.isArray(imageInput) ? imageInput : [imageInput])
       .filter(Boolean)
@@ -31,6 +34,7 @@ export function useCardOCR() {
       const response = await integratedAiClient.stream('/card-ocr/scan', {
         body: { message: [{ text: 'Analyze this card.', type: 'text' }] },
         images: imageFiles,
+        signal,
       });
 
       const reader = response.body.getReader();
@@ -71,7 +75,7 @@ export function useCardOCR() {
           }
         }
       } finally {
-        reader.cancel();
+        reader.cancel().catch(() => {});
       }
 
       const jsonMatch = fullContent.match(/\{[\s\S]*\}/);
@@ -84,9 +88,13 @@ export function useCardOCR() {
       // (Pokemon / Magic / Yu-Gi-Oh) to correct the set, year and rarity.
       const resolved = await groundAgainstCatalogue(
         result,
-        params => integratedAiClient.fetch(`/catalog/search?${new URLSearchParams(params)}`),
+        params => integratedAiClient.fetch(`/catalog/search?${new URLSearchParams(params)}`, { signal }),
         catalogueCollectionParam(result.collectionType),
       );
+
+      // Cancelled while the last request was in flight — drop the result on
+      // the floor rather than announcing a scan the seller called off.
+      if (signal?.aborted) return undefined;
 
       if (isMounted()) setScanResult(resolved);
       toast.success(resolved.catalogueMatch
@@ -94,6 +102,8 @@ export function useCardOCR() {
         : 'Card scanned — review the extracted details before applying.');
       return resolved;
     } catch (err) {
+      // A cancelled scan is not a failure — say nothing and return nothing.
+      if (err.name === 'AbortError' || signal?.aborted) return undefined;
       // Surface the failure to the user instead of silently swallowing it —
       // otherwise the scan animation just vanishes with no feedback.
       console.warn('[useCardOCR] scan failed:', err.message);
