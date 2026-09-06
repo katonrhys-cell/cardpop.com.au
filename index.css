@@ -120,7 +120,7 @@
     --vault-trade-foreground:   0 0% 100%;
     --vault-both:               38 92% 50%;
     --vault-both-foreground:    215 28% 17%;
-    --vault-eoi:                199 89% 48%;
+    --vault-eoi:                215 28% 17%;   /* Brand Charcoal #1F2937 */
     --vault-eoi-foreground:     0 0% 100%;
 
     /* ── Profile Tokens ─────────────────────────────────────────────── */
@@ -198,7 +198,7 @@
     --vault-trade-foreground:   0 0% 100%;
     --vault-both:               38 92% 50%;
     --vault-both-foreground:    215 28% 10%;
-    --vault-eoi:                199 89% 55%;
+    --vault-eoi:                202 16% 80%;   /* Soft Silver #C4CED4 */
     --vault-eoi-foreground:     215 28% 10%;
 
     /* ── Profile Tokens (Dark) ──────────────────────────────────────── */

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  Plus, Package, ImageOff, Lock, ShoppingCart, ArrowRightLeft,
-  Layers, Edit, Trash2, MoreHorizontal, AlertCircle, X, HandCoins, Sparkles,
+  Plus, Package, ImageOff, ShoppingCart,
+  Edit, Trash2, MoreHorizontal, AlertCircle, X, Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { COLLECTIONS_LIST } from '@/components/Header.jsx';
 import VaultListingModal from '@/components/VaultListingModal.jsx';
 import DisplayStyleDialog from '@/components/vault/DisplayStyleDialog.jsx';
+import { getVaultListingBadge } from '@/utils/vaultListingBadge.js';
 import PSAPopPanel from '@/components/PSAPopPanel.jsx';
 import { publicImageUrl, getCardImage, CARD_GRID_SIZES } from '@/utils/imageUrl.js';
 import CardShowcase from '@/components/vault/CardShowcase.jsx';
@@ -29,18 +30,12 @@ const CONDITION_LABELS = {
 };
 
 const getListingBadge = (card) => {
-  switch (card.listing_type) {
-    case 'For Sale':
-      return <Badge className="bg-emerald-500/10 text-emerald-700 shadow-sm font-bold border-emerald-500/20"><ShoppingCart className="w-3 h-3 mr-1.5" />For Sale</Badge>;
-    case 'For Trade':
-      return <Badge className="bg-violet-500/10 text-violet-700 shadow-sm font-bold border-violet-500/20"><ArrowRightLeft className="w-3 h-3 mr-1.5" />For Trade</Badge>;
-    case 'For Sale & Trade':
-      return <Badge className="bg-amber-500/10 text-amber-700 shadow-sm font-bold border-amber-500/20"><Layers className="w-3 h-3 mr-1.5" />Sale & Trade</Badge>;
-    case 'Expression of Interest':
-      return <Badge className="bg-sky-500/10 text-sky-700 shadow-sm font-bold border-sky-500/20"><HandCoins className="w-3 h-3 mr-1.5" />Expression of Interest</Badge>;
-    default:
-      return <Badge className="bg-muted text-muted-foreground shadow-sm font-bold"><Lock className="w-3 h-3 mr-1.5" />Private</Badge>;
-  }
+  const { label, className, icon: Icon } = getVaultListingBadge(card.listing_type);
+  return (
+    <Badge className={`shadow-sm font-bold ${className}`}>
+      <Icon className="w-3 h-3 mr-1.5" />{label}
+    </Badge>
+  );
 };
 
 const VAULT_PAGE_SIZE = 24;

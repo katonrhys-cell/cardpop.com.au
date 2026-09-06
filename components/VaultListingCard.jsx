@@ -1,7 +1,7 @@
 
 import React, { useState, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, ShieldCheck, Lock, ShoppingCart, ArrowRightLeft, Layers, ZoomIn, HandCoins } from 'lucide-react';
+import { Star, ShieldCheck, ZoomIn } from 'lucide-react';
 // Lazy: the zoom modal drags framer-motion (~110 kB) with it, and this card
 // renders on the homepage — load the modal only when a zoom is opened.
 const ImageZoomModal = lazy(() => import('@/components/ImageZoomModal.jsx'));
@@ -15,17 +15,7 @@ import { getCardImage, CARD_GRID_SIZES, toCdnUrl } from '@/utils/imageUrl.js';
 import { vaultItemListing } from '@/lib/vaultItemListing.js';
 import { isVerified } from '@/utils/verification.js';
 import GradeBadge, { GRADE_BADGE } from '@/components/GradeBadge.jsx';
-
-const getStatusBadge = (listingType) => {
-  switch (listingType) {
-    case 'Private': return { className: 'badge-vault-private', icon: Lock };
-    case 'For Sale': return { className: 'badge-vault-sale', icon: ShoppingCart };
-    case 'For Trade': return { className: 'badge-vault-trade', icon: ArrowRightLeft };
-    case 'For Sale & Trade': return { className: 'badge-vault-both', icon: Layers };
-    case 'Expression of Interest': return { className: 'badge-vault-eoi', icon: HandCoins };
-    default: return { className: 'bg-muted text-muted-foreground', icon: Lock };
-  }
-};
+import { getVaultListingBadge } from '@/utils/vaultListingBadge.js';
 
 const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
@@ -57,7 +47,7 @@ const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
     ? `/marketplace/${liveListing.id}/${titleSlug}`
     : `/product/vault/${vaultItem.id}/${titleSlug}`;
 
-  const badgeConfig = getStatusBadge(vaultItem.listing_type);
+  const badgeConfig = getVaultListingBadge(vaultItem.listing_type);
   const StatusIcon = badgeConfig.icon;
   const rawVariants = vaultItem.variant
     ? vaultItem.variant.split(',').map(s => s.trim()).filter(Boolean)
@@ -94,7 +84,7 @@ const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
             <Badge className="bg-brand-red text-white shadow-sm font-bold uppercase tracking-wider">Sold</Badge>
           ) : (
             <Badge className={`shadow-sm font-bold ${badgeConfig.className}`}>
-              <StatusIcon className="w-3 h-3 mr-1.5" /> {vaultItem.listing_type || 'Private'}
+              <StatusIcon className="w-3 h-3 mr-1.5" /> {badgeConfig.label}
             </Badge>
           )}
         </div>

@@ -14,7 +14,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, ArrowRightLeft, Layers, HandCoins, Tag } from 'lucide-react';
+import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, ArrowRightLeft, HandCoins, Tag } from 'lucide-react';
+import { getVaultListingBadge } from '@/utils/vaultListingBadge.js';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import EbayMarketSection from '@/components/EbayMarketSection.jsx';
@@ -33,17 +34,6 @@ import RookiePill from '@/components/RookiePill.jsx';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
 const ProposeTradeModal = lazy(() => import('@/components/ProposeTradeModal.jsx'));
-
-const getStatusBadge = (listingType) => {
-  switch (listingType) {
-    case 'Private': return { className: 'badge-vault-private', icon: Lock };
-    case 'For Sale': return { className: 'badge-vault-sale', icon: ShoppingCart };
-    case 'For Trade': return { className: 'badge-vault-trade', icon: ArrowRightLeft };
-    case 'For Sale & Trade': return { className: 'badge-vault-both', icon: Layers };
-    case 'Expression of Interest': return { className: 'badge-vault-eoi', icon: HandCoins };
-    default: return { className: 'bg-muted text-muted-foreground', icon: Lock };
-  }
-};
 
 // `source` can come from the route param (/product/:source/:id/:slug?) or be
 // fixed by the mounting route (/marketplace/:id/:slug? passes source="marketplace").
@@ -426,7 +416,10 @@ const ProductDetailPage = ({ source: sourceProp }) => {
   
   const statusBadge = isShop 
     ? { label: product.visibility === 'public' ? 'Shop + Marketplace' : 'Shop Only', config: { className: 'bg-primary text-primary-foreground', icon: Store } }
-    : { label: product.listing_type || 'Private', config: getStatusBadge(product.listing_type) };
+    : (() => {
+        const config = getVaultListingBadge(product.listing_type);
+        return { label: config.label, config };
+      })();
     
   const StatusIcon = statusBadge.config.icon;
 
