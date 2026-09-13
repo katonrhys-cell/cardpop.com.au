@@ -1,0 +1,33 @@
+name: Cron · Blog article generation
+
+# Claims the highest-priority row from the blog_article_topics queue and asks
+# Claude for a draft, checked by blogStyleGuard. Drafts land unpublished unless
+# BLOG_AUTOPUBLISH=true. Runbook: docs/blog-automation.md.
+#
+# Replaces the vercel.json cron { "/cron/blog-generate", "0 21 * * *" }.
+
+on:
+  schedule:
+    # 21:07 UTC = 07:07 AEST. Was 21:00 under Vercel; nudged off the top of the
+    # hour because that is when GitHub's scheduler is most congested and
+    # queued runs drift the furthest.
+    - cron: '7 21 * * *'
+  workflow_dispatch:
+
+# A second run while one is in flight would claim another topic and spend
+# again. Never cancel a run that is already paying for a model call.
+concurrency:
+  group: cron-blog-generate
+  cancel-in-progress: false
+
+jobs:
+  run:
+    uses: ./.github/workflows/cron-job.yml
+    with:
+      endpoint: /cron/blog-generate
+      # api/blog-generate.js runs on its own 300s function.
+      max_seconds: 330
+      # Never retry: a slow-but-successful generation would be billed twice and
+      # leave two drafts in the queue.
+      attempts: 1
+    secrets: inherit

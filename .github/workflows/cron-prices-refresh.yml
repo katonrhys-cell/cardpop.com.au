@@ -1,0 +1,28 @@
+name: Cron · Price refresh
+
+# Refreshes the tracked-card price snapshots that the analytics pages and the
+# blog generator's factual base are built from.
+#
+# Replaces the vercel.json cron { "/api/prices/refresh", "30 19 * * *" }.
+
+on:
+  schedule:
+    # 19:30 UTC = 05:30 AEST, unchanged from the Vercel schedule.
+    - cron: '30 19 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: cron-prices-refresh
+  cancel-in-progress: false
+
+jobs:
+  run:
+    uses: ./.github/workflows/cron-job.yml
+    with:
+      endpoint: /api/prices/refresh
+      # api/index.js is capped at maxDuration 40 in vercel.json; allow a little
+      # headroom so the function's own timeout surfaces rather than curl's.
+      max_seconds: 50
+      # Snapshots are keyed per card per day, so a re-run is a no-op.
+      attempts: 2
+    secrets: inherit
