@@ -30,8 +30,14 @@ const ProductImageCarousel = ({ images = [], record = null, displayStyle, frameC
   // A vault listing carries the seller's chosen display style. Anything other
   // than Classic renders the hero through the Card Showcase Engine so the style
   // the seller paid for is what a buyer actually sees on the listing page.
+  //
+  // The style applies to the FIRST photograph only — that's the term of the
+  // feature. Every listing's first photo is the card front the showcase frames
+  // (shine, slab, glass cabinet…); the extra shots are backs, corners, edges
+  // and flaws a buyer is inspecting for condition, so they stay plain and
+  // unembellished rather than being dressed up by an effect layer.
   const style = normalizeStyle(displayStyle);
-  const useShowcase = style !== DEFAULT_STYLE;
+  const useShowcase = style !== DEFAULT_STYLE && activeIndex === 0;
 
   if (validImages.length === 0 || !main.src) {
     return (

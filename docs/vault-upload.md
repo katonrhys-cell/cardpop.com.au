@@ -63,6 +63,11 @@ What the backend adds on top of RLS:
 - **Display-style tier clamp**: the owner's `subscription_tier` is read
   server-side and `display_style` is clamped with `lib/displayStyles.js` —
   previously this clamp only lived in the client and could be bypassed.
+- **Display style applies to the first photograph only**: the chosen style
+  dresses the listing's first photo — the grid tile and the detail-page hero
+  before the buyer touches the thumbnails. Selecting any later photo in
+  `ProductImageCarousel` drops back to the plain image, so the extra shots
+  (backs, corners, edges, flaws) stay unembellished condition evidence.
 - **Shared validation**: `utils/listingValidation.js` (the exact module the
   form uses on blur/submit) runs again on the server. A 400 response carries
   `{ fields: { cardName: '…', … } }` keyed by the form's field names, so the
