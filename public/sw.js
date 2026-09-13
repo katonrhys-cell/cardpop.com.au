@@ -15,7 +15,13 @@ const CACHE_NAMES = {
   // incognito visitors (no cached shell) were unaffected, which made it look
   // like a logged-in-only bug. Booting the shell network-first fixes it; the
   // bumped suffix evicts the stale PAGES entries via the activate handler.
-  STATIC: 'cardpop-static-v5',
+  // STATIC v6: evicts the v5 cache, which on affected devices held the ~11 MB
+  // OpenCV chunk. That single entry could exhaust the origin's Cache Storage
+  // quota, and the old cacheFirst turned the resulting cache.put rejection into
+  // a fabricated 503 — so every uncached /assets/ file failed to load until the
+  // origin's storage was cleared by hand. Dropping the cache reclaims the space
+  // on the first navigation after this deploy.
+  STATIC: 'cardpop-static-v6',
   DYNAMIC: 'cardpop-dynamic-v5',
   PAGES: 'cardpop-pages-v5',
   IMAGES: 'cardpop-images-v1',
@@ -75,15 +81,9 @@ self.addEventListener('activate', (event) => {
 
 // Helper: Network First strategy
 const networkFirst = async (request) => {
+  let response;
   try {
-    const response = await fetch(request);
-    if (response.ok) {
-      // Cache successful responses
-      const cache = await caches.open(CACHE_NAMES.DYNAMIC);
-      await cache.put(request, response.clone());
-      trimCache(CACHE_NAMES.DYNAMIC, MAX_DYNAMIC_ENTRIES).catch(() => {});
-    }
-    return response;
+    response = await fetch(request);
   } catch (error) {
     const cached = await caches.match(request);
     if (cached) {
@@ -96,6 +96,20 @@ const networkFirst = async (request) => {
       { status: 503, headers: { 'Content-Type': 'application/json' } }
     );
   }
+
+  // Caching is best-effort and happens only after the network has answered, so
+  // a full-quota cache.put can never demote a fresh 200 to a stale entry or a
+  // fabricated offline error (see cacheStatic).
+  if (response.ok) {
+    try {
+      const cache = await caches.open(CACHE_NAMES.DYNAMIC);
+      await cache.put(request, response.clone());
+      await trimCache(CACHE_NAMES.DYNAMIC, MAX_DYNAMIC_ENTRIES);
+    } catch {
+      // Quota exhausted — the fresh response is still returned below.
+    }
+  }
+  return response;
 };
 
 // Helper: Network Only strategy — for authenticated, per-user API responses.
@@ -115,31 +129,64 @@ const networkOnly = async (request) => {
   }
 };
 
+// Largest response the STATIC cache will store. The OpenCV.js build behind the
+// card auto-crop is a single ~11 MB chunk — storing it is what pushed the
+// origin over its Cache Storage quota (Safari's is small, and the image cache
+// already holds up to MAX_IMAGE_ENTRIES photos beside it). It is loaded once
+// per session on demand, so the HTTP cache is a good enough home for it;
+// keeping it out of Cache Storage leaves room for the chunks that do benefit.
+const MAX_STATIC_ENTRY_BYTES = 6 * 1024 * 1024;
+
+// Whether this response is small enough to be worth storing. An absent or
+// unparseable Content-Length is treated as cacheable — the write is best-effort
+// either way (see cacheStatic).
+const isCacheableSize = (response) => {
+  const len = Number(response.headers.get('Content-Length'));
+  return !Number.isFinite(len) || len <= MAX_STATIC_ENTRY_BYTES;
+};
+
+// Write to the STATIC cache, best-effort. Storing a response is an
+// optimisation, never a precondition for serving it: cache.put rejects with
+// QuotaExceededError once the origin's storage is full, and letting that
+// rejection escape used to turn an already-fetched 200 into a fabricated 503
+// "Offline". That bricked whatever the failed asset provided — for the ~11 MB
+// OpenCV chunk it silently killed card auto-crop (auto-detect, the live crop
+// preview and Apply all failed together) on a perfectly good connection.
+const cacheStatic = async (request, response) => {
+  if (!isCacheableSize(response)) return;
+  try {
+    const cache = await caches.open(CACHE_NAMES.STATIC);
+    await cache.put(request, response);
+    await trimCache(CACHE_NAMES.STATIC, MAX_STATIC_ENTRIES);
+  } catch {
+    // Quota exhausted or the entry is too large — serving still works.
+  }
+};
+
 // Helper: Cache First strategy
 const cacheFirst = async (request) => {
   const cached = await caches.match(request);
   if (cached) {
     // Update cache in background
-    fetch(request).then((response) => {
-      if (response.ok) {
-        const cache = caches.open(CACHE_NAMES.STATIC);
-        cache.then((c) => c.put(request, response));
-      }
-    }).catch(() => {});
+    fetch(request)
+      .then((response) => {
+        if (response.ok) return cacheStatic(request, response);
+        return undefined;
+      })
+      .catch(() => {});
     return cached;
   }
 
+  let response;
   try {
-    const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(CACHE_NAMES.STATIC);
-      await cache.put(request, response.clone());
-      trimCache(CACHE_NAMES.STATIC, MAX_STATIC_ENTRIES).catch(() => {});
-    }
-    return response;
-  } catch (error) {
+    response = await fetch(request);
+  } catch {
+    // Only a genuine network failure is an offline response.
     return new Response('Offline', { status: 503 });
   }
+
+  if (response.ok) await cacheStatic(request, response.clone());
+  return response;
 };
 
 // Helper: Cache First for storage-hosted images (Supabase Storage or the
@@ -271,7 +318,7 @@ const navigationNetworkFirst = async (request) => {
     const response = await fetch(request);
     if (response.ok) {
       const cache = await caches.open(CACHE_NAMES.PAGES);
-      cache.put(request, response.clone());
+      cache.put(request, response.clone()).catch(() => {});
     }
     return response;
   } catch (error) {
