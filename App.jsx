@@ -207,6 +207,7 @@ const ContentManagementPage = lazy(() => import('@/pages/admin/ContentManagement
 const SystemDiagnosticsPage = lazy(() => import('@/pages/admin/SystemDiagnosticsPage.jsx'));
 const AnalyticsPage = lazy(() => import('@/pages/admin/AnalyticsPage.jsx'));
 const AnalyticsReportsPage = lazy(() => import('@/pages/admin/AnalyticsReportsPage.jsx'));
+const RevenueBreakdownPage = lazy(() => import('@/pages/admin/RevenueBreakdownPage.jsx'));
 const MediaLibraryPage = lazy(() => import('@/pages/admin/MediaLibraryPage.jsx'));
 const MarketplaceManagementPage = lazy(() => import('@/pages/admin/MarketplaceManagementPage.jsx'));
 const CategoryMappingPage = lazy(() => import('@/pages/admin/CategoryMappingPage.jsx'));
@@ -521,6 +522,7 @@ const App = () => {
                           <Route path="diagnostics" element={<SystemDiagnosticsPage />} />
                           <Route path="analytics" element={<AnalyticsReportsPage />} />
                           <Route path="analytics-reports" element={<AnalyticsReportsPage />} />
+                          <Route path="revenue" element={<RevenueBreakdownPage />} />
                           <Route path="media" element={<MediaLibraryPage />} />
                           <Route path="marketplace" element={<MarketplaceManagementPage />} />
                           <Route path="category-mapping" element={<CategoryMappingPage />} />

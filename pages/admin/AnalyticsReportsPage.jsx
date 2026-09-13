@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import {
   ChevronLeft,
@@ -28,32 +28,41 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 import OrderDetailDialog from '@/components/admin/OrderDetailDialog.jsx';
+import { PAID_ORDER_STATUSES } from '@/utils/revenue.js';
 
 // Orders sit in 'pending' until Stripe confirms payment, and can end in
 // 'payment_failed'/'cancelled' without money ever changing hands — none of
 // those are real revenue, so the report only counts orders that actually paid.
-const PAID_STATUSES = ['payment_confirmed', 'shipped', 'completed', 'refunded'];
+// The list itself lives in utils/revenue.js so this page, the admin dashboard
+// stat card and the revenue breakdown page can never drift apart.
+const PAID_STATUSES = PAID_ORDER_STATUSES;
 
-const StatCard = ({ title, value, icon: Icon, description, loading }) => (
-  <Card className="shadow-sm border-border hover:border-primary/40 transition-colors">
-    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-      <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">{title}</CardTitle>
-      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-        <Icon className="w-4 h-4 text-primary" />
-      </div>
-    </CardHeader>
-    <CardContent>
-      {loading ? (
-        <Skeleton className="h-8 w-24 mb-2" />
-      ) : (
-        <div className="text-3xl font-extrabold tabular-nums tracking-tight text-foreground">{value}</div>
-      )}
-      <p className="text-xs font-medium text-muted-foreground mt-2 flex items-center">
-        {description}
-      </p>
-    </CardContent>
-  </Card>
-);
+// `to` makes the card a link through to the detail behind the number.
+const StatCard = ({ title, value, icon: Icon, description, loading, to }) => {
+  const card = (
+    <Card className={`shadow-sm border-border hover:border-primary/40 transition-colors h-full ${to ? 'group cursor-pointer hover:shadow-md' : ''}`}>
+      <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+        <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">{title}</CardTitle>
+        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+          <Icon className="w-4 h-4 text-primary" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <Skeleton className="h-8 w-24 mb-2" />
+        ) : (
+          <div className="text-3xl font-extrabold tabular-nums tracking-tight text-foreground">{value}</div>
+        )}
+        <p className="text-xs font-medium text-muted-foreground mt-2 flex items-center">
+          {description}
+          {to && <ArrowUpRight className="w-3.5 h-3.5 ml-1 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />}
+        </p>
+      </CardContent>
+    </Card>
+  );
+
+  return to ? <Link to={to} className="block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{card}</Link> : card;
+};
 
 const AnalyticsReportsPage = () => {
   const navigate = useNavigate();
@@ -268,6 +277,7 @@ const AnalyticsReportsPage = () => {
           icon={DollarSign}
           description="Lifetime revenue from paid orders"
           loading={loading}
+          to="/admin/revenue"
         />
         <StatCard
           title="Total Orders"
