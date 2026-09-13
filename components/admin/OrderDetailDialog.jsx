@@ -5,6 +5,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, Package, MapPin } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
+import { apiServerClient } from '@/lib/apiServerClient.js';
 import { format } from 'date-fns';
 
 const STATUS_BADGE = {
@@ -25,6 +26,7 @@ const fmt = (val) => new Intl.NumberFormat('en-AU', { style: 'currency', currenc
 // instead of duplicating this fetch/layout per caller.
 const OrderDetailDialog = ({ orderId, onClose }) => {
   const [order, setOrder] = useState(null);
+  const [buyerEmail, setBuyerEmail] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -33,20 +35,53 @@ const OrderDetailDialog = ({ orderId, onClose }) => {
     const fetchOrder = async () => {
       setLoading(true);
       setError(null);
+      setBuyerEmail(null);
+
+      // Do NOT add `email` to the profiles embed. Migration 20260715210000
+      // revoked the blanket SELECT on profiles for anon/authenticated and
+      // re-granted an explicit column list that deliberately omits email, so
+      // asking for it makes PostgREST reject the WHOLE select with a
+      // permission error — the dialog then renders nothing but that error for
+      // every order, guest or registered. The login email is admin-only and is
+      // fetched from the backend below instead.
       const { data, error: fetchError } = await supabase
         .from('orders')
-        .select('*, buyer:profiles!buyer_id(id, display_name, username, email), seller:profiles!seller_id(id, display_name, username)')
+        .select('*, buyer:profiles!buyer_id(id, display_name, username), seller:profiles!seller_id(id, display_name, username)')
         .eq('id', orderId)
         .maybeSingle();
       if (cancelled) return;
       if (fetchError) {
         setError(fetchError.message);
-      } else if (!data) {
-        setError('Order not found.');
-      } else {
-        setOrder(data);
+        setLoading(false);
+        return;
       }
+      if (!data) {
+        setError('Order not found.');
+        setLoading(false);
+        return;
+      }
+      setOrder(data);
       setLoading(false);
+
+      // Where to find the buyer's email depends on how they checked out: a
+      // guest's is stored on the order row, a registered buyer's lives in
+      // profiles.email and only the service-role backend can read it.
+      // Best-effort — the dialog has already rendered without it.
+      if (data.buyer_email) {
+        setBuyerEmail(data.buyer_email);
+        return;
+      }
+      if (!data.buyer_id) return;
+      try {
+        const res = await apiServerClient.fetch('/admin/user-emails', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ids: [data.buyer_id] }),
+        });
+        if (!res.ok) return;
+        const { emails } = await res.json();
+        if (!cancelled && emails?.[data.buyer_id]) setBuyerEmail(emails[data.buyer_id]);
+      } catch { /* email lookup is best-effort */ }
     };
     fetchOrder();
     return () => { cancelled = true; };
@@ -88,11 +123,19 @@ const OrderDetailDialog = ({ orderId, onClose }) => {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="bg-muted/30 rounded-xl p-3">
+              <div className="bg-muted/30 rounded-xl p-3 min-w-0">
                 <p className="text-muted-foreground text-xs mb-0.5">Buyer</p>
                 <p className="font-semibold text-foreground truncate">
-                  {order.buyer?.display_name || order.buyer?.username || order.buyer_email || 'Unknown User'}
+                  {order.buyer?.display_name || order.buyer?.username || order.shipping_name || buyerEmail || 'Unknown User'}
                 </p>
+                {!order.buyer_id && (
+                  <p className="text-muted-foreground text-xs mt-0.5">Guest checkout</p>
+                )}
+                {buyerEmail && (
+                  <a href={`mailto:${buyerEmail}`} className="block truncate text-xs text-primary hover:underline underline-offset-2 mt-0.5">
+                    {buyerEmail}
+                  </a>
+                )}
               </div>
               <div className="bg-muted/30 rounded-xl p-3">
                 <p className="text-muted-foreground text-xs mb-0.5">Seller</p>

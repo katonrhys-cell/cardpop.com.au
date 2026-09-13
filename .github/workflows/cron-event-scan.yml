@@ -1,0 +1,33 @@
+name: Cron · Event scan
+
+# Discovers Australian trading-card events: one Claude web-search call over the
+# event_scan_sources queries, then each new candidate URL fetched through the
+# SSRF-safe fetcher and extracted under a JSON schema. Results land as
+# pending_review — nothing is ever published automatically.
+# Runbook: docs/event-scanning.md.
+#
+# Replaces the vercel.json cron { "/cron/event-scan", "0 17 * * 0" }.
+
+on:
+  schedule:
+    # 17:07 UTC Sunday = 03:07 AEST Monday. Was 17:00 under Vercel; nudged off
+    # the top of the hour, where GitHub's scheduler is most congested.
+    - cron: '7 17 * * 0'
+  workflow_dispatch:
+
+concurrency:
+  group: cron-event-scan
+  cancel-in-progress: false
+
+jobs:
+  run:
+    uses: ./.github/workflows/cron-job.yml
+    with:
+      endpoint: /cron/event-scan
+      # api/event-scan.js runs on its own 300s function.
+      max_seconds: 330
+      # The endpoint refuses a second run within 10 minutes of one starting, so
+      # a retry would be rejected anyway — and each run spends on search plus
+      # page extractions.
+      attempts: 1
+    secrets: inherit
