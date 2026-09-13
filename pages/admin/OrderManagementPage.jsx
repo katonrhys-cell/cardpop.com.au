@@ -22,6 +22,7 @@ import { format } from 'date-fns';
 import OrderDetailDialog from '@/components/admin/OrderDetailDialog.jsx';
 
 const STATUS_BADGE = {
+  pending:           'bg-muted text-muted-foreground border-border',
   payment_confirmed: 'bg-blue-500/10 text-blue-700 border-blue-200',
   shipped:           'bg-amber-500/10 text-amber-700 border-amber-200',
   completed:         'bg-emerald-500/10 text-emerald-700 border-emerald-200',
@@ -268,11 +269,18 @@ const OrderManagementPage = () => {
     setOrders(orders.map(o => o.id === id ? { ...o, status: newStatus } : o));
   };
 
+  // Guest checkout leaves buyer_id null (so the `buyer` join is null) and there
+  // is no order_number column — matching only those fields silently dropped
+  // every guest order from the table even with an empty search box. Skip the
+  // match entirely when nothing is typed, and search the fields a guest order
+  // actually has: the id shown in the Order # column, the checkout email and
+  // the shipping name.
+  const query = searchTerm.trim().toLowerCase();
   const filtered = orders.filter(o => {
-    const matchSearch = o.order_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        o.buyer?.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        o.buyer?.display_name?.toLowerCase().includes(searchTerm.toLowerCase());
-    if (!matchSearch) return false;
+    if (query) {
+      const haystack = [o.order_number, o.id, o.buyer?.username, o.buyer?.display_name, o.buyer_email, o.shipping_name];
+      if (!haystack.some(v => v && String(v).toLowerCase().includes(query))) return false;
+    }
     if (statusFilter === 'all')              return true;
     if (statusFilter === 'refund_requested') return o.refund_status === 'requested';
     if (statusFilter === 'refund_approved')  return o.refund_status === 'approved';
@@ -312,6 +320,7 @@ const OrderManagementPage = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
+              <SelectItem value="pending">Awaiting Payment</SelectItem>
               <SelectItem value="payment_confirmed">Confirmed</SelectItem>
               <SelectItem value="shipped">Shipped</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
@@ -371,7 +380,12 @@ const OrderManagementPage = () => {
                     </button>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm whitespace-nowrap">{format(new Date(order.created_at), 'dd MMM yyyy')}</TableCell>
-                  <TableCell className="font-medium">{order.buyer?.display_name || order.buyer?.username || 'Unknown'}</TableCell>
+                  <TableCell className="font-medium">
+                    {order.buyer?.display_name || order.buyer?.username || order.shipping_name || order.buyer_email || 'Unknown'}
+                    {!order.buyer_id && (
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">Guest</span>
+                    )}
+                  </TableCell>
                   <TableCell className="tabular-nums font-medium">{fmt(order.total_aud)}</TableCell>
                   <TableCell className="tabular-nums text-sm text-muted-foreground">{fmt(order.platform_fee_aud)}</TableCell>
                   <TableCell>
