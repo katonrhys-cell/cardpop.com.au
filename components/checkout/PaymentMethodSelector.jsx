@@ -4,13 +4,13 @@ import { ShieldCheck, Lock } from 'lucide-react';
 import { PAYMENT_MARKS } from '@/components/checkout/PaymentMarks.jsx';
 
 /*
- * Payment step. Card details, PayPal and Afterpay are never entered on
- * CardPop — the actual payment is completed on Stripe's PCI-compliant hosted
- * checkout after "Confirm & Pay". This panel sets that expectation clearly and
- * shows exactly which methods are accepted, with the trust signals a buyer
- * expects before handing over money. Which methods actually appear on the
- * Stripe page depends on what's enabled in the Stripe Dashboard and on order
- * eligibility (e.g. Afterpay only shows within its supported amount range).
+ * Payment step. Card and PayPal details are never entered on CardPop — the
+ * actual payment is completed on Stripe's PCI-compliant hosted checkout after
+ * "Confirm & Pay". This panel sets that expectation clearly and shows exactly
+ * which methods are accepted, with the trust signals a buyer expects before
+ * handing over money. The methods that appear on the Stripe page are pinned
+ * server-side (src/utils/checkoutPaymentMethods.js), so this row and that page
+ * stay in step — BNPL is not offered.
  *
  * The acceptance marks themselves are real brand artwork — see PaymentMarks.jsx.
  * Every badge is the same size and each logo is pre-fitted to a shared inner

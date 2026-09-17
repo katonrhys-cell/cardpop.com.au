@@ -1,4 +1,5 @@
 import { supabase } from '../utils/supabaseClient.js';
+import { processingFeeCents } from '../utils/processingFee.js';
 
 async function getPlatformSetting(key, defaultValue) {
   const { data } = await supabase
@@ -38,6 +39,36 @@ async function getFeeConfig(sellerTier, transactionType) {
   }
 
   return data || { id: null, fee_pct: 3 };
+}
+
+/**
+ * The buyer-paid payment-processing fee for a given pre-fee subtotal.
+ *
+ * Deliberately NOT part of calculateBreakdown: the fee is a percentage of
+ * everything the buyer is charged, and shipping is only known to the caller
+ * (it comes off the listing, not the commission tier). Every checkout path
+ * therefore prices its lines first and calls this last.
+ *
+ * The fee is treated as GST-INCLUSIVE and sits outside the GST base, exactly
+ * like the Stripe fee it reimburses — Stripe's own AU fees are GST-inclusive.
+ * Adding GST on top of it would bill the buyer tax on a tax.
+ *
+ * @param subtotalAud everything charged before this fee (items + commission +
+ *                    GST + shipping)
+ * @returns {Promise<number>} the fee in AUD, 0 when disabled or nothing to charge
+ */
+async function calculateProcessingFee(subtotalAud) {
+  const enabled = await getPlatformSetting('processing_fee_enabled', true);
+  if (!enabled) return 0;
+
+  const pct = Number(await getPlatformSetting('processing_fee_pct', 1.9));
+  const fixedAud = Number(await getPlatformSetting('processing_fee_fixed_aud', 0.35));
+
+  const cents = processingFeeCents(Math.round(Number(subtotalAud) * 100), {
+    pct: Number.isFinite(pct) ? pct : 0,
+    fixedCents: Number.isFinite(fixedAud) ? Math.round(fixedAud * 100) : 0,
+  });
+  return cents / 100;
 }
 
 /**
@@ -93,4 +124,4 @@ async function calculateBreakdown(listing, transactionType = 'fixed') {
   return { itemPrice, commissionPct, commissionAud, gstAud, total, configId };
 }
 
-export { getPlatformSetting, getFeeConfig, calculateBreakdown };
+export { getPlatformSetting, getFeeConfig, calculateBreakdown, calculateProcessingFee };

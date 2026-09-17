@@ -1,7 +1,8 @@
 import stripe from '../utils/stripeClient.js';
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
-import { calculateBreakdown } from './commissionService.js';
+import { calculateBreakdown, calculateProcessingFee } from './commissionService.js';
+import { checkoutPaymentMethodTypes } from '../utils/checkoutPaymentMethods.js';
 import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
 import { validateWelcomeDiscount, buildWelcomeDiscount, reserveWelcomeDiscount } from './welcomeOfferService.js';
 import { ensureWalletCustomer, getWalletBalanceCents, assertNoOpenWalletCheckout, reserveWalletCheckout, releaseWalletCheckout } from './walletService.js';
@@ -163,6 +164,24 @@ export async function createSingleItemCheckout(req, res) {
       });
     }
 
+    // Payment processing, charged last because it is a percentage of everything
+    // above it. It reimburses the platform for Stripe's cut (CardPop is the
+    // merchant of record) and never touches the seller's payout — proceeds
+    // below are still item - commission + postage.
+    const processingAud = await calculateProcessingFee(
+      breakdown.itemPrice + breakdown.commissionAud + breakdown.gstAud + shippingAud,
+    );
+    if (processingAud > 0) {
+      lineItems.push({
+        price_data: {
+          currency: 'aud',
+          product_data: { name: 'Payment processing' },
+          unit_amount: Math.round(processingAud * 100),
+        },
+        quantity: 1,
+      });
+    }
+
     const metadata = {
       userId,
       listingId,
@@ -174,13 +193,14 @@ export async function createSingleItemCheckout(req, res) {
       commissionAud: String(breakdown.commissionAud),
       gstAud: String(breakdown.gstAud),
       shippingAud: String(shippingAud),
+      processingFeeAud: String(processingAud),
       sellerProceedsAud: String(Math.round((breakdown.itemPrice - breakdown.commissionAud + shippingAud) * 100) / 100),
       configId: breakdown.configId || '',
     };
     if (offerId) metadata.offerId = offerId;
     if (bidId) metadata.bidId = bidId;
 
-    const buyerTotal = breakdown.itemPrice + (breakdown.commissionAud || 0) + (breakdown.gstAud || 0) + shippingAud;
+    const buyerTotal = breakdown.itemPrice + (breakdown.commissionAud || 0) + (breakdown.gstAud || 0) + shippingAud + processingAud;
     const velocity = await checkPurchaseVelocity({ userId, orderValueAud: buyerTotal });
     if (!velocity.allowed) {
       logger.warn(`[VELOCITY] Blocked checkout for ${userId} (${velocity.reason})`);
@@ -255,13 +275,13 @@ export async function createSingleItemCheckout(req, res) {
       }
     }
 
+    // Pinned rather than left to the Dashboard's dynamic selection: the
+    // processing-fee line above is sized for card-rate pricing, so a BNPL
+    // method at ~6% would sell at a loss. See checkoutPaymentMethods.js.
+    const paymentMethodTypes = checkoutPaymentMethodTypes();
+
     const session = await stripe.checkout.sessions.create({
-      // Omitting `payment_method_types` lets Stripe Checkout present every
-      // method enabled on the account (Card, Link / Apple Pay / Google Pay,
-      // PayPal, Afterpay/Clearpay) and show each only when the order is
-      // eligible — enable the individual methods in the Stripe Dashboard →
-      // Settings → Payment methods. (`automatic_payment_methods` is a
-      // PaymentIntent param and is rejected by the Checkout Session API.)
+      ...(paymentMethodTypes ? { payment_method_types: paymentMethodTypes } : {}),
       billing_address_collection: 'auto',
       line_items: lineItems,
       mode: 'payment',
@@ -284,7 +304,12 @@ export async function createSingleItemCheckout(req, res) {
     res.json({
       url: session.url,
       sessionId: session.id,
-      breakdown: { ...breakdown, shippingAud, total: Math.round((breakdown.total + shippingAud) * 100) / 100 },
+      breakdown: {
+        ...breakdown,
+        shippingAud,
+        processingAud,
+        total: Math.round((breakdown.total + shippingAud + processingAud) * 100) / 100,
+      },
     });
   } catch (err) {
     // We claimed the wallet slot but never handed it to a live session — free it

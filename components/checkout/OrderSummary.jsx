@@ -13,7 +13,7 @@ const LineItem = ({ label, value, bold }) => (
   </div>
 );
 
-const OrderSummary = ({ cartItems = [], subtotal = 0, serviceFee = 0, gst = 0, gstIncluded = 0, shipping = 0, shippingWaived = 0, discount = 0, total = 0, onEditCart, onNext }) => {
+const OrderSummary = ({ cartItems = [], subtotal = 0, serviceFee = 0, processingFee = 0, gst = 0, gstIncluded = 0, shipping = 0, shippingWaived = 0, discount = 0, total = 0, onEditCart, onNext }) => {
   return (
     <div className="space-y-4">
       <Card className="border-border shadow-sm">
@@ -47,6 +47,10 @@ const OrderSummary = ({ cartItems = [], subtotal = 0, serviceFee = 0, gst = 0, g
                 already inside GST-inclusive shop prices shows as an "includes"
                 note under the total so the figures still sum to what's charged. */}
             {gst > 0 && <LineItem label="GST (10%)" value={gst} />}
+            {/* Covers the card-processing cost on this order. Its own line
+                rather than folded into the service fee, so the buyer can see
+                what each charge is for. */}
+            {processingFee > 0 && <LineItem label="Payment processing" value={processingFee} />}
             {/* Shipping always shows so buyers see the cost (or that it's free)
                 on every order — $10 flat on CardPop Shop items, free over $50.
                 `shippingWaived` is the fee a promo code's free-shipping perk

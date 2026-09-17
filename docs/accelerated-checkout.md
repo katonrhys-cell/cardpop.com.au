@@ -22,38 +22,46 @@ the **functional equivalent** through Stripe.
 ## What we offer instead (and where it's controlled)
 
 The embedded checkout (`components/checkout/EmbeddedStripeCheckout.jsx`) renders
-Stripe's Embedded Checkout on our own page. Because the Checkout Session omits
-`payment_method_types` (`src/routes/stripe.js`), Stripe presents **every method
-enabled on the account**, each shown only when the order is eligible:
+Stripe's Embedded Checkout on our own page. The Checkout Session **pins**
+`payment_method_types` (`src/utils/checkoutPaymentMethods.js`), so Stripe
+presents exactly what is pinned — not everything enabled on the account:
 
-| Method | What it is | Turned on where |
+| Method | What it is | Offered? |
 |---|---|---|
-| Card (Visa/MC/Amex) | Standard card entry | Stripe Dashboard → Payments |
-| **Link** | Stripe's saved-card, one-tap wallet — the Stripe-native equivalent of Shop Pay | Stripe Dashboard → Payments → Link |
-| Apple Pay / Google Pay | Device wallets | Stripe Dashboard (domain must be verified for Apple Pay) |
-| PayPal | — | Stripe Dashboard → Payments |
-| **Afterpay/Clearpay** | Buy now, pay in 4 | Stripe Dashboard → Payments → Afterpay |
-| Zip | Buy now, pay later (AU) | Stripe Dashboard → Payments → Zip *(optional)* |
+| Card (Visa/MC/Amex) | Standard card entry | **Yes** — pinned |
+| Apple Pay / Google Pay | Device wallets | **Yes** — they ride on `card` (domain must be verified for Apple Pay) |
+| PayPal | — | **Yes** — pinned; must also be active in the Stripe Dashboard |
+| **Link** | Stripe's saved-card, one-tap wallet | No — add `link` to `STRIPE_PAYMENT_METHOD_TYPES` once it's active in the Dashboard |
+| **Afterpay/Clearpay** | Buy now, pay in 4 | No — ~6% + $0.30 sells an order at a loss (`docs/order-pricing.md`) |
+| Zip | Buy now, pay later (AU) | No — same reason |
 
-**Enabling any of these is a Stripe Dashboard toggle, not a code change** — the
-app already asks Stripe to surface whatever is enabled.
+**Adding a method is now two steps, not one**: enable it in the Stripe Dashboard
+*and* add it to the `STRIPE_PAYMENT_METHOD_TYPES` env var. Pinning a type that
+isn't active on the account makes `sessions.create` throw and takes checkout
+down, so make the Dashboard change first. Before adding a BNPL method, raise
+`processing_fee_pct` to cover its rate or the sale loses money.
 
 ## Buy-now-pay-later messaging (code)
 
-Professional retailers advertise instalments *before* checkout. CardPop shows an
-`or 4 interest-free payments of $X.XX with Afterpay` line on product cards, the
-cart drawer, and the checkout summary.
+**Currently off.** Checkout pins its payment methods to card + PayPal
+(`src/utils/checkoutPaymentMethods.js`) because Afterpay costs ~6% + $0.30
+through Stripe — enough to sell an ordinary order at a loss against a card-rate
+processing fee (`docs/order-pricing.md`). The instalment copy is therefore
+disabled by default, since advertising "4 interest-free payments" for a method
+the buyer won't find at checkout is worse than not advertising it.
 
-- Component: `components/BnplMessage.jsx`
+The machinery remains, ready if BNPL is ever repriced or reinstated:
+
+- Component: `components/BnplMessage.jsx` — renders nothing while disabled
 - Config: `lib/payments.js`
-  - `VITE_ENABLE_BNPL=false` hides the copy site-wide (e.g. if Afterpay is
-    switched off in Stripe).
+  - `VITE_ENABLE_BNPL=true` brings the copy back site-wide.
   - `VITE_BNPL_PROVIDER` overrides the provider name (default `Afterpay`).
   - It renders only for amounts inside Afterpay's AU range ($1–$2000), matching
     when Stripe actually offers the option.
 
-Keep this in sync with the Stripe Dashboard: if Afterpay is disabled in Stripe,
-set `VITE_ENABLE_BNPL=false` so we don't advertise an option buyers can't pick.
+Keep this in sync with checkout: turn the copy back on **only** alongside adding
+the method to `STRIPE_PAYMENT_METHOD_TYPES`, or we advertise an option buyers
+can't pick.
 
 ## Google Pay brand guidelines
 

@@ -1,5 +1,5 @@
 import { supabase } from '../utils/supabaseClient.js';
-import { calculateBreakdown } from './commissionService.js';
+import { calculateBreakdown, calculateProcessingFee } from './commissionService.js';
 import { getPlatformSetting } from './stripeWebhookService.js';
 
 /**
@@ -206,5 +206,16 @@ export async function priceCart(items, userId, options = {}) {
     lineItems.push({ price_data: { currency: 'aud', product_data: { name: 'Shipping' }, unit_amount: shippingCents }, quantity: 1 });
   }
 
-  return { lineItems, orderLines, itemsCents, commissionCents, gstCents, includedGstCents, shippingCents, shippingWaivedCents, grandCents: itemsCents + commissionCents + gstCents + shippingCents };
+  // Payment processing — reimburses the platform for Stripe's cut of the whole
+  // captured amount, so it is priced on the finished subtotal (shop items,
+  // commission, added GST and shipping) and added last. It is platform revenue
+  // only in the sense that it cancels a platform cost: no commission or GST is
+  // taken on it and no part of it reaches a seller's payout.
+  const preFeeCents = itemsCents + commissionCents + gstCents + shippingCents;
+  const processingCents = Math.round((await calculateProcessingFee(preFeeCents / 100)) * 100);
+  if (processingCents > 0) {
+    lineItems.push({ price_data: { currency: 'aud', product_data: { name: 'Payment processing' }, unit_amount: processingCents }, quantity: 1 });
+  }
+
+  return { lineItems, orderLines, itemsCents, commissionCents, gstCents, includedGstCents, shippingCents, shippingWaivedCents, processingCents, grandCents: preFeeCents + processingCents };
 }

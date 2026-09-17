@@ -8,6 +8,7 @@ import { recordShopOrderReferral } from './partnerService.js';
 import { debitWalletForOrder, releaseWalletCheckout } from './walletService.js';
 import { subscribeToNewsletter } from '../utils/newsletter.js';
 import { namesMatch } from './identityService.js';
+import { insertWithOptionalColumns } from '../utils/insertWithOptionalColumns.js';
 
 /**
  * Informational cross-check: does the name the buyer typed at Stripe Checkout
@@ -614,17 +615,22 @@ async function handleSingleItemOrder(session, stripe) {
   // the seller in full (sellerProceedsAud already includes it at session
   // creation; the fallback below mirrors that formula for legacy sessions).
   const shippingAud = parseFloat(meta.shippingAud || '0');
+  // Buyer-paid reimbursement of Stripe's cut. Platform money, never the
+  // seller's — it is deliberately absent from sellerProceedsAud below, and from
+  // platform_fee_aud (which is commission + GST, the revenue figure the admin
+  // reports and the refund retention are computed from).
+  const processingFeeAud = parseFloat(meta.processingFeeAud || '0');
   const sellerProceeds = parseFloat(meta.sellerProceedsAud || String(itemPrice - commissionAud + shippingAud));
   const configId = meta.configId || null;
   const discountAud = parseFloat(meta.discountAud || '0');
   const amountCents = session.amount_total || 0;
 
-  if (![itemPrice, commissionAud, gstAud, shippingAud, discountAud].every(Number.isFinite)) {
+  if (![itemPrice, commissionAud, gstAud, shippingAud, processingFeeAud, discountAud].every(Number.isFinite)) {
     logger.error(`[STRIPE] Non-finite amount in metadata for session ${session.id} — order rejected`);
     return;
   }
 
-  const expectedTotalCents = Math.round((itemPrice + commissionAud + gstAud + shippingAud - discountAud) * 100);
+  const expectedTotalCents = Math.round((itemPrice + commissionAud + gstAud + shippingAud + processingFeeAud - discountAud) * 100);
   if (Math.abs(amountCents - expectedTotalCents) > 2) {
     logger.error(`[STRIPE] Amount mismatch for session ${session.id}: Stripe=${amountCents}¢ expected=${expectedTotalCents}¢ — order rejected`);
     await flagAmountMismatch({ stripe, session, orderId: null, buyerId: userId, amountCents, expectedCents: expectedTotalCents });
@@ -651,6 +657,7 @@ async function handleSingleItemOrder(session, stripe) {
     shipping_aud: shippingAud,
     discount_aud: discountAud,
     platform_fee_aud: commissionAud + gstAud,
+    processing_fee_aud: processingFeeAud,
     commission_pct: commissionPct,
     gst_aud: gstAud,
     seller_proceeds_aud: sellerProceeds,
@@ -665,18 +672,16 @@ async function handleSingleItemOrder(session, stripe) {
     shipping_postcode: meta.shippingPostcode || session.shipping_details?.address?.postal_code || null,
   };
 
-  let { error: insertError } = await supabase.from('orders').insert(orderInsert);
-
-  // payment_wallet_type lands with its migration, but a redeploy can briefly
-  // race ahead of `supabase db push` — same window handled for
-  // gst_included_aud in the cart checkout path. Drop it and retry rather than
-  // rejecting an otherwise-good order.
-  const missingWalletColumn =
-    insertError?.code === 'PGRST204' || insertError?.code === '42703' || /payment_wallet_type/.test(insertError?.message || '');
-  if (missingWalletColumn) {
-    delete orderInsert.payment_wallet_type;
-    ({ error: insertError } = await supabase.from('orders').insert(orderInsert));
-  }
+  // These columns land with their migrations, but a redeploy can briefly race
+  // ahead of `supabase db push` — same window handled in the cart checkout
+  // path. Drop the missing one and retry rather than rejecting an otherwise-good
+  // order: the buyer has already paid.
+  const { error: insertError } = await insertWithOptionalColumns(
+    orderInsert,
+    ['payment_wallet_type', 'processing_fee_aud'],
+    row => supabase.from('orders').insert(row),
+    col => logger.warn(`[STRIPE] ${col} column not present yet — inserting order without it`),
+  );
 
   if (insertError) {
     if (insertError.code === '23505') {

@@ -96,6 +96,51 @@ const SettingToggle = ({ label, description, settingKey, value, onChange }) => (
   </div>
 );
 
+// ─── Platform Settings Number Input ───────────────────────────────────────────
+// Numbers (unlike the toggles) only save on an explicit Save, so a half-typed
+// "1." never reaches the database and starts pricing orders.
+
+const SettingNumber = ({ label, description, settingKey, value, suffix, onChange }) => {
+  const [draft, setDraft] = useState(value == null ? '' : String(value));
+  const [saving, setSaving] = useState(false);
+  // Re-sync when the row loads (or another save lands) — but never while the
+  // admin is mid-edit, or their keystrokes would be thrown away.
+  useEffect(() => { setDraft(value == null ? '' : String(value)); }, [value]);
+
+  const dirty = draft !== (value == null ? '' : String(value));
+
+  const save = async () => {
+    const parsed = Number(draft);
+    if (!Number.isFinite(parsed) || parsed < 0) { toast.error('Enter a number of 0 or more'); return; }
+    setSaving(true);
+    await onChange(settingKey, parsed);
+    setSaving(false);
+  };
+
+  return (
+    <div className="flex items-start justify-between gap-4 py-4 border-b border-border last:border-0">
+      <div>
+        <p className="text-sm font-semibold text-foreground">{label}</p>
+        {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <Input
+          type="number"
+          step="0.01"
+          min="0"
+          value={draft}
+          onChange={e => setDraft(e.target.value)}
+          className="h-8 w-24 rounded-lg text-sm text-right"
+        />
+        {suffix && <span className="text-xs text-muted-foreground w-4">{suffix}</span>}
+        <Button size="sm" onClick={save} disabled={!dirty || saving} className="h-8 px-3 rounded-lg text-xs font-bold">
+          <Check className="w-3 h-3" />
+        </Button>
+      </div>
+    </div>
+  );
+};
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 const CommissionSettingsPage = () => {
@@ -127,6 +172,7 @@ const CommissionSettingsPage = () => {
       'commissions_enabled', 'gst_enabled', 'gst_rate_pct', 'gst_on_commission_only',
       'commission_on_fixed', 'commission_on_offers', 'commission_on_auctions', 'commission_on_trades',
       'commission_on_featured',
+      'processing_fee_enabled', 'processing_fee_pct', 'processing_fee_fixed_aud',
     ];
     const { data } = await supabase.from('platform_settings').select('key, value').in('key', keys);
     const map = {};
@@ -361,6 +407,29 @@ const CommissionSettingsPage = () => {
               description="Charge commission on trade transactions."
               settingKey="commission_on_trades"
               value={settings['commission_on_trades']}
+              onChange={handleSettingToggle}
+            />
+            <SettingToggle
+              label="Processing Fee Enabled"
+              description="Charge the buyer a line covering Stripe's cut. Off means the platform absorbs it out of commission."
+              settingKey="processing_fee_enabled"
+              value={settings['processing_fee_enabled']}
+              onChange={handleSettingToggle}
+            />
+            <SettingNumber
+              label="Processing Fee (%)"
+              description="Must exceed Stripe's rate for the methods you accept — AU domestic cards are 1.75%."
+              settingKey="processing_fee_pct"
+              value={settings['processing_fee_pct']}
+              suffix="%"
+              onChange={handleSettingToggle}
+            />
+            <SettingNumber
+              label="Processing Fee Fixed (AUD)"
+              description="Must exceed Stripe's per-charge fee — AU is $0.30."
+              settingKey="processing_fee_fixed_aud"
+              value={settings['processing_fee_fixed_aud']}
+              suffix="$"
               onChange={handleSettingToggle}
             />
           </div>

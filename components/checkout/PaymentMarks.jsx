@@ -79,12 +79,15 @@ export const GooglePayMark = () => (
   </svg>
 );
 
+// Afterpay is deliberately absent: checkout pins its payment methods to card +
+// PayPal (src/utils/checkoutPaymentMethods.js), because BNPL's ~6% fee would
+// sell an order at a loss against a card-rate processing fee. The mark itself
+// is kept below so the row can be restored in one line if that changes.
 export const PAYMENT_MARKS = [
   { label: 'Visa', Mark: VisaMark },
   { label: 'Mastercard', Mark: MastercardMark },
   { label: 'American Express', Mark: AmexMark },
   { label: 'PayPal', Mark: PayPalMark },
-  { label: 'Afterpay', Mark: AfterpayMark },
   { label: 'Apple Pay', Mark: ApplePayMark },
   { label: 'Google Pay', Mark: GooglePayMark },
 ];

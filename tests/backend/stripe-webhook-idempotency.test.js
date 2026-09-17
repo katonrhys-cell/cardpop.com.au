@@ -155,6 +155,43 @@ describe('webhook single-item idempotency', () => {
     // The captured payment must be auto-refunded (money was already taken).
     expect(mockStripe.refunds.create).toHaveBeenCalledWith({ payment_intent: 'pi_single' });
   });
+
+  it('counts the processing fee in the expected total, and keeps it out of the seller payout', async () => {
+    // Regression guard: the fee is a real Stripe line, so leaving it out of the
+    // expected-total check would make the amount guard reject — and auto-refund
+    // — every single order that carries one.
+    state.respond = (ctx) => {
+      if (ctx.table === 'orders' && ctx.single) return { data: null, error: null };
+      if (ctx.table === 'orders' && ctx.op === 'insert') return { data: { id: 'o-new' }, error: null };
+      if (ctx.table === 'profiles' && ctx.single) {
+        return { data: { stripe_connect_account_id: 'acct_1', stripe_connect_onboarded: true }, error: null };
+      }
+      return { data: null, error: null };
+    };
+    mockStripe.webhooks.constructEvent.mockReturnValue({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          ...singleSession,
+          amount_total: 10256, // $100 item + $2.56 processing
+          metadata: { ...singleSession.metadata, processingFeeAud: '2.56' },
+        },
+      },
+    });
+
+    const res = await postWebhook();
+
+    expect(res.status).toBe(200);
+    expect(mockStripe.refunds.create).not.toHaveBeenCalled();
+    const insert = dbCalls.find(c => c.table === 'orders' && c.op === 'insert');
+    expect(insert).toBeDefined();
+    // Recorded as its own column, kept out of platform_fee_aud (commission +
+    // GST) — and the seller's proceeds do not include a cent of it.
+    expect(insert.payload.processing_fee_aud).toBe(2.56);
+    expect(insert.payload.platform_fee_aud).toBe(0);
+    expect(insert.payload.seller_proceeds_aud).toBe(100);
+    expect(insert.payload.total_aud).toBe(102.56);
+  });
 });
 
 // ─── payment_status gating: don't fulfil an unpaid/async-pending session ───────

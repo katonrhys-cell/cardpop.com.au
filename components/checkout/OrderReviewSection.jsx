@@ -22,6 +22,7 @@ const OrderReviewSection = ({
   items = [],
   subtotal = 0,
   serviceFee = 0,
+  processingFee = 0,
   gst = 0,
   gstIncluded = 0,
   shipping = 0,
@@ -100,6 +101,11 @@ const OrderReviewSection = ({
           {gst > 0 && (
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>GST (10%)</span><span>${Number(gst).toFixed(2)}</span>
+            </div>
+          )}
+          {processingFee > 0 && (
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>Payment processing</span><span>${Number(processingFee).toFixed(2)}</span>
             </div>
           )}
           <div className="flex justify-between text-sm text-muted-foreground">

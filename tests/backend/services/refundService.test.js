@@ -142,6 +142,51 @@ describe('processRefund — fee retention math (happy path)', () => {
     expect(mockEmail.sendRefundIssued).toHaveBeenCalledWith(expect.objectContaining({ retainedFee: 5 }));
   });
 
+  it('retains the processing fee IN FULL on top of the commission share', async () => {
+    // Stripe keeps its fee on a refunded charge, so refunding the buyer's
+    // reimbursement of it would make every refund a loss for the platform.
+    queueFrom(
+      builder({ single: { data: { ...refundRow, order: { ...refundRow.order, total_aud: 112.3, processing_fee_aud: 2.3 } }, error: null } }),
+      builder({ value: { data: [{ id: 'r1' }], error: null } }),
+      builder({ value: { data: null, error: null } }),
+      builder({ value: { data: null, error: null } }),
+      builder({ value: { data: null, error: null } }),
+      builder({ value: { data: null, error: null } }),
+      builder({ single: { data: { email: 'buyer@x.com', display_name: 'Buyer' }, error: null } }),
+      builder({ single: { data: { email: 'seller@x.com', display_name: 'Seller' }, error: null } }),
+    );
+    mockStripe.refunds.create.mockResolvedValue({ id: 're_2' });
+
+    const res = makeRes();
+    await processRefund({ body: { refundId: 'r1' } }, res);
+
+    // retained = (10 × 50%) + 2.30 = 7.30 ; refund = 112.30 − 7.30 = 105.00
+    expect(mockStripe.refunds.create).toHaveBeenCalledWith(
+      expect.objectContaining({ amount: 10500 }),
+      { idempotencyKey: 'refund_order_o1' },
+    );
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ refundAmount: 105, retainedFee: 7.3 }));
+  });
+
+  it('treats a pre-fee order (no processing_fee_aud) exactly as before', async () => {
+    queueFrom(
+      builder({ single: { data: refundRow, error: null } }),
+      builder({ value: { data: [{ id: 'r1' }], error: null } }),
+      builder({ value: { data: null, error: null } }),
+      builder({ value: { data: null, error: null } }),
+      builder({ value: { data: null, error: null } }),
+      builder({ value: { data: null, error: null } }),
+      builder({ single: { data: { email: 'buyer@x.com', display_name: 'Buyer' }, error: null } }),
+      builder({ single: { data: { email: 'seller@x.com', display_name: 'Seller' }, error: null } }),
+    );
+    mockStripe.refunds.create.mockResolvedValue({ id: 're_3' });
+
+    const res = makeRes();
+    await processRefund({ body: { refundId: 'r1' } }, res);
+
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ refundAmount: 105, retainedFee: 5 }));
+  });
+
   it('returns 409 without calling Stripe when the approved->processing claim wins zero rows (concurrent processing)', async () => {
     queueFrom(
       builder({ single: { data: refundRow, error: null } }),      // refunds select

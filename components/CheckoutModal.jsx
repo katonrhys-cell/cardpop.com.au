@@ -155,6 +155,11 @@ const CheckoutModal = ({ isOpen, onClose, listingId, transactionType = 'fixed', 
               {breakdown.gstAud > 0 && (
                 <LineRow label="GST" value={`$${breakdown.gstAud.toFixed(2)} AUD`} />
               )}
+              {/* Covers the card-processing cost on this order — its own line,
+                  matching the Stripe line item the buyer will see. */}
+              {breakdown.processingAud > 0 && (
+                <LineRow label="Payment processing" value={`$${breakdown.processingAud.toFixed(2)} AUD`} />
+              )}
               {/* Seller-set postage — always shown so "Free" is a statement,
                   not an omission the buyer discovers later. */}
               <LineRow label="Shipping" value={breakdown.shippingAud > 0 ? `$${breakdown.shippingAud.toFixed(2)} AUD` : 'Free'} />
@@ -173,11 +178,7 @@ const CheckoutModal = ({ isOpen, onClose, listingId, transactionType = 'fixed', 
 
           {/* Refund policy disclosure */}
           {!identityRequired && breakdown && (
-            <RefundPolicyNote
-              variant="full"
-              itemPrice={breakdown.itemPrice}
-              commissionAud={breakdown.commissionAud}
-            />
+            <RefundPolicyNote variant="full" breakdown={breakdown} />
           )}
         </div>
 

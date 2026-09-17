@@ -7,10 +7,16 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 const mockSupabase = vi.hoisted(() => ({ from: vi.fn() }));
 const mockGetPlatformSetting = vi.hoisted(() => vi.fn());
 const mockCalculateBreakdown = vi.hoisted(() => vi.fn());
+// Defaults to 0 so the existing money-math assertions stay about commission and
+// GST; the processing-fee tests at the bottom set a real rate.
+const mockCalculateProcessingFee = vi.hoisted(() => vi.fn(() => Promise.resolve(0)));
 
 vi.mock('../../../src/utils/supabaseClient.js', () => ({ default: mockSupabase, supabase: mockSupabase }));
 vi.mock('../../../src/services/stripeWebhookService.js', () => ({ getPlatformSetting: mockGetPlatformSetting }));
-vi.mock('../../../src/services/commissionService.js', () => ({ calculateBreakdown: mockCalculateBreakdown }));
+vi.mock('../../../src/services/commissionService.js', () => ({
+  calculateBreakdown: mockCalculateBreakdown,
+  calculateProcessingFee: mockCalculateProcessingFee,
+}));
 
 import { priceCart } from '../../../src/services/cartService.js';
 
@@ -41,6 +47,7 @@ function rowBuilder(result) {
 beforeEach(() => {
   vi.clearAllMocks();
   setPlatformSettings();
+  mockCalculateProcessingFee.mockResolvedValue(0);
 });
 
 describe('priceCart — shop items', () => {
