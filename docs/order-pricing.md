@@ -11,15 +11,34 @@ build the same ladder:
 
 | Line | Source | Who gets it |
 |---|---|---|
-| Item price | `listings.price_aud`, or the agreed offer amount | Seller, less commission |
+| Item price (GST-inclusive) | `listings.price_aud`, or the agreed offer amount | Seller, less commission and GST |
 | Platform fee (commission %) | `fee_config` row for the seller's tier | CardPop |
-| GST | `gst_rate_pct` on item + commission | CardPop (see the caveat below) |
-| Shipping | `listings.shipping_cost_aud`, per seller | Seller, in full |
+| Shipping | `listings.shipping_cost_aud`, per seller | Seller, less the GST inside it |
 | Payment processing | `calculateProcessingFee()` | CardPop, to pay Stripe |
 
-The buyer pays the sum. The seller is paid `item − commission + shipping`
-(`sellerProceedsAud` in the session metadata, `seller_proceeds_aud` on the
-order). No part of the GST or the processing fee reaches a seller.
+**There is no GST line.** Every price above is GST-inclusive, as Australian
+consumer prices must be, so nothing is added to the buyer's bill — the checkout
+states "Includes GST of $X" instead of charging it.
+
+The buyer pays the sum. The seller is paid
+`item − commission − their GST + shipping` (`sellerProceedsAud` in the session
+metadata, `seller_proceeds_aud` on the order). No part of the processing fee
+reaches a seller.
+
+### Worked example — a $101.17 card with $6.00 postage
+
+| | |
+|---|---|
+| Item (incl. GST) | $101.17 |
+| Platform fee (3%) | $3.04 |
+| Shipping | $6.00 |
+| Payment processing | $2.50 |
+| **Buyer pays** | **$112.71** |
+| — GST inside that total | $10.52 (stated, not charged) |
+| Seller receives | $94.39 |
+| CardPop gross | $18.32 |
+| …less Stripe's cut | $16.05 |
+| …less all GST remitted | **$5.53** |
 
 ## The processing fee
 
@@ -93,6 +112,27 @@ platform that fee on top of the goods coming back. `processRefund()`
 commission + GST. Orders placed before the column existed carry 0 and behave
 exactly as they did.
 
+## Australia only
+
+CardPop sells and ships within Australia only, enforced in three places:
+
+1. **`checkAustralianAddress()`** (`src/utils/addressValidation.js`) — an AU
+   state and a four-digit postcode, and no explicitly non-Australian country.
+   Runs on both checkout paths *before* the Amazon Location geocode, because
+   that check **fails open** when `AWS_LOCATION_API_KEY` isn't configured and
+   would otherwise wave an overseas address straight through. It also makes a
+   delivery address mandatory on cart checkout, which the fail-open geocode did
+   not.
+2. **`shipping_address_collection: { allowed_countries: ['AU'] }`** on the
+   single-item Checkout Session. That path is reached from the Buy Now modal,
+   which collects no address at all, so Stripe collects one and the country
+   picker offers only Australia.
+3. **A Stripe Radar rule — a dashboard step, not code.** Neither of the above
+   stops an overseas *card* paying for delivery to an Australian address.
+   Stripe Checkout has no billing-country allowlist, so block it in Radar:
+   *Block if `:card_country:` != `AU`*. Until that rule exists, international
+   cards can still pay (and cost 3.5% rather than 1.75%).
+
 ## Payment methods are pinned
 
 `src/utils/checkoutPaymentMethods.js` pins `payment_method_types` to
@@ -119,21 +159,53 @@ one makes `sessions.create` throw, which takes checkout down. Hence the override
 
 Set it in Vercel to correct the list without waiting for a deploy.
 
-## The GST caveat
+## GST
 
-`gst_on_commission_only` is `false`, so GST is charged on the **full sale price**
-(item + commission) and CardPop keeps all of it — the seller receives none of
-it. Whether that money is CardPop's revenue or a liability owed to the ATO is a
-tax question, not a code one, and it is the largest single number in most
-orders. Nothing in this repo remits it. Confirm the treatment with an accountant
-before reading platform revenue off the admin dashboard.
+Every price on CardPop is **GST-inclusive**. The tax is the component inside the
+price — `amount × rate / (100 + rate)`, i.e. 1/11 at 10% — never an amount added
+on top. The shop catalogue has always priced this way; marketplace listings now
+match it.
+
+`calculateGst()` splits the included GST by **who supplied what**:
+
+| Supply | GST on it | Where it comes from |
+|---|---|---|
+| The card, and the seller's postage | `seller_gst_aud` | **Deducted from the seller's payout.** CardPop remits it to the ATO on their behalf |
+| Commission (counted twice — it is charged to the buyer as a line *and* deducted from the seller) and the processing fee | `platform_gst_aud` | Inside fees CardPop already holds |
+
+Both are recorded on the order, and `gst_included_aud` is their sum — the total
+GST CardPop is responsible for remitting on that order. `gst_aud` means GST
+*added on top* and is now always 0; historical rows may carry a real figure.
+
+### It applies to every seller and every transaction
+
+There is no GST-registration test and no exemption path. A seller under the
+$75,000 turnover threshold is not required to be registered and would not
+ordinarily charge GST on their own sales, so for those sellers this withholding
+is conservative rather than strictly required — a deliberate business decision,
+taken so nothing is ever owed to the ATO after the fact. It is a tax position,
+not a code one: **confirm it with an accountant**, and be ready to explain it to
+sellers, because 1/11 of every sale is a visible deduction from their money.
+
+Sellers are told before they list (`components/SellerPayoutEstimate.jsx` prices
+the deduction live under the asking-price field) and again when a sale completes
+(the "you made a sale" email itemises it).
+
+### Changing the rate
+
+`gst_enabled` switches the whole thing off (both shares become 0);
+`gst_rate_pct` sets the rate. Both live in `platform_settings`.
+`gst_on_commission_only` is retired — with inclusive pricing there is no base to
+choose — and nothing reads it.
 
 ## Related files
 
 | File | Role |
 |---|---|
 | `src/utils/processingFee.js` | The gross-up, and the rate clamp |
-| `src/services/commissionService.js` | Settings lookup, commission + GST breakdown, `calculateProcessingFee()` |
+| `src/services/commissionService.js` | Settings lookup, commission breakdown, `calculateGst()`, `calculateProcessingFee()` |
+| `src/utils/addressValidation.js` | The Australia-only gate, and the Amazon Location geocode |
+| `components/SellerPayoutEstimate.jsx` | Live "you'll receive $X" under the asking price |
 | `src/services/checkoutService.js` | Single-item line items, metadata, seller proceeds |
 | `src/services/cartService.js` | Cart line items and per-seller postage |
 | `src/services/stripeWebhookService.js` | Amount-match guard, order row, payout |

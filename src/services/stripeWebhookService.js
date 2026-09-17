@@ -442,8 +442,15 @@ async function handleCartOrder(existing, session, stripe) {
     if (!line.seller_id) continue;
     sellerIds.add(line.seller_id);
     // Seller postage (shipping_aud) passes through in full — commission only
-    // ever comes off the item price.
-    const proceeds = Number(line.line_total_aud || 0) - Number(line.commission_aud || 0) + Number(line.shipping_aud || 0);
+    // ever comes off the item price. The GST inside this seller's supply (the
+    // card and their postage) IS deducted: CardPop remits it on their behalf,
+    // so paying it out as well would leave the platform funding the tax.
+    const proceeds = Math.round((
+      Number(line.line_total_aud || 0)
+      - Number(line.commission_aud || 0)
+      - Number(line.seller_gst_aud || 0)
+      + Number(line.shipping_aud || 0)
+    ) * 100) / 100;
     if (proceeds > 0) {
       // Record the payout on the line itself (a cart can span multiple
       // sellers, so the order-level payout columns can't hold it) —
@@ -578,12 +585,30 @@ async function handleCartOrder(existing, session, stripe) {
     const itemsSummary = names.length
       ? `${itemCount} item${itemCount === 1 ? '' : 's'} — ${names.slice(0, 5).join(', ')}${names.length > 5 ? ', …' : ''}`
       : `${itemCount} item${itemCount === 1 ? '' : 's'}`;
+
+    // Name the marketplace sellers. Without this a cart carrying someone's card
+    // reached the admin inbox looking exactly like a sale of CardPop's own shop
+    // stock — same subject, same body, no seller — so marketplace sales were
+    // invisible in the one place they get watched.
+    let sellerName = null;
+    if (sellerIds.size > 0) {
+      const { data: sellerProfiles } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .in('id', [...sellerIds]);
+      const sellerNames = (sellerProfiles || []).map(p => p.display_name).filter(Boolean);
+      sellerName = sellerNames.length
+        ? sellerNames.slice(0, 3).join(', ') + (sellerNames.length > 3 ? ', …' : '')
+        : `${sellerIds.size} marketplace seller${sellerIds.size === 1 ? '' : 's'}`;
+    }
+
     await notifyAdminOfOrder({
       orderId: existing.id,
       buyerName: receiptName,
       buyerEmail: receiptEmail,
       total: amountCents2 / 100,
       itemsSummary,
+      sellerName,
     });
   }
 
@@ -617,15 +642,23 @@ async function handleSingleItemOrder(session, stripe) {
   const shippingAud = parseFloat(meta.shippingAud || '0');
   // Buyer-paid reimbursement of Stripe's cut. Platform money, never the
   // seller's — it is deliberately absent from sellerProceedsAud below, and from
-  // platform_fee_aud (which is commission + GST, the revenue figure the admin
-  // reports and the refund retention are computed from).
+  // platform_fee_aud (the commission figure the admin reports and the refund
+  // retention are computed from).
   const processingFeeAud = parseFloat(meta.processingFeeAud || '0');
-  const sellerProceeds = parseFloat(meta.sellerProceedsAud || String(itemPrice - commissionAud + shippingAud));
+  // GST is inside every price, never added to the buyer's bill. The seller's
+  // share (the card + their postage) is deducted from their payout and remitted
+  // by CardPop; the platform's share is inside fees it already holds.
+  const sellerGstAud = parseFloat(meta.sellerGstAud || '0');
+  const platformGstAud = parseFloat(meta.platformGstAud || '0');
+  const gstIncludedAud = parseFloat(meta.gstIncludedAud || String(sellerGstAud + platformGstAud));
+  const sellerProceeds = parseFloat(
+    meta.sellerProceedsAud || String(itemPrice - commissionAud - sellerGstAud + shippingAud),
+  );
   const configId = meta.configId || null;
   const discountAud = parseFloat(meta.discountAud || '0');
   const amountCents = session.amount_total || 0;
 
-  if (![itemPrice, commissionAud, gstAud, shippingAud, processingFeeAud, discountAud].every(Number.isFinite)) {
+  if (![itemPrice, commissionAud, gstAud, shippingAud, processingFeeAud, sellerGstAud, discountAud].every(Number.isFinite)) {
     logger.error(`[STRIPE] Non-finite amount in metadata for session ${session.id} — order rejected`);
     return;
   }
@@ -659,7 +692,13 @@ async function handleSingleItemOrder(session, stripe) {
     platform_fee_aud: commissionAud + gstAud,
     processing_fee_aud: processingFeeAud,
     commission_pct: commissionPct,
+    // gst_aud is GST ADDED on top, which is now always 0 — prices are
+    // GST-inclusive. gst_included_aud is the GST inside them, of which
+    // seller_gst_aud is the part deducted from the seller and remitted for them.
     gst_aud: gstAud,
+    gst_included_aud: gstIncludedAud,
+    seller_gst_aud: sellerGstAud,
+    platform_gst_aud: platformGstAud,
     seller_proceeds_aud: sellerProceeds,
     transaction_type: transactionType,
     commission_config_id: configId || null,
@@ -678,7 +717,7 @@ async function handleSingleItemOrder(session, stripe) {
   // order: the buyer has already paid.
   const { error: insertError } = await insertWithOptionalColumns(
     orderInsert,
-    ['payment_wallet_type', 'processing_fee_aud'],
+    ['payment_wallet_type', 'processing_fee_aud', 'gst_included_aud', 'seller_gst_aud', 'platform_gst_aud'],
     row => supabase.from('orders').insert(row),
     col => logger.warn(`[STRIPE] ${col} column not present yet — inserting order without it`),
   );
@@ -763,6 +802,10 @@ async function handleSingleItemOrder(session, stripe) {
   }
 
   if (buyerProfile?.email) {
+    // Best-effort, like the cart path: a Resend outage must not throw out of the
+    // handler. Everything that matters happens BELOW this point — the admin
+    // notice and, more importantly, the seller's payout — so an unhandled
+    // rejection here used to cost the seller their money over a failed email.
     await sendOrderConfirmed({
       buyerEmail: buyerProfile.email,
       buyerName: buyerProfile.display_name || 'Collector',
@@ -784,7 +827,7 @@ async function handleSingleItemOrder(session, stripe) {
         abn: null,
         orderDate: null,
       },
-    });
+    }).catch(e => logger.warn(`[STRIPE] buyer confirm email failed for order ${orderId || 'n/a'}: ${e.message}`));
   }
 
   if (sellerProfile?.email) {
@@ -794,10 +837,13 @@ async function handleSingleItemOrder(session, stripe) {
       cardName,
       itemPrice,
       commissionAud,
-      gstAud,
+      // What actually came out of this sale, so the payout figure in the email
+      // reconciles: GST is now a deduction from the seller, not a buyer charge.
+      gstAud: sellerGstAud,
+      shippingAud,
       sellerProceeds,
       orderId,
-    });
+    }).catch(e => logger.warn(`[STRIPE] seller sold email failed for order ${orderId || 'n/a'}: ${e.message}`));
   }
 
   // Admin heads-up for the confirmed order (independent of buyer/seller emails).

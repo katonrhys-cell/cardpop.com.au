@@ -3,7 +3,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 const mockSupabase = vi.hoisted(() => ({ from: vi.fn() }));
 vi.mock('../../../src/utils/supabaseClient.js', () => ({ default: mockSupabase, supabase: mockSupabase }));
 
-import { calculateBreakdown } from '../../../src/services/commissionService.js';
+import { calculateBreakdown, calculateGst } from '../../../src/services/commissionService.js';
 
 function builder(result) {
   const b = {
@@ -18,44 +18,55 @@ const queue = (...builders) => builders.forEach((b) => mockSupabase.from.mockRet
 
 beforeEach(() => vi.clearAllMocks());
 
-// GST base: confirmed business decision is to tax the full sale price
-// (item price + commission), not just CardPop's commission cut — see
-// supabase/migrations/20260707120240_gst_on_full_sale_price.sql.
-describe('calculateBreakdown — GST base', () => {
-  it('taxes the full sale price when gst_on_commission_only is false', async () => {
+// GST is INSIDE every price now (Australian consumer prices are GST-inclusive),
+// so calculateBreakdown adds none to the buyer's bill — calculateGst splits the
+// included amount between the seller's supply and CardPop's.
+describe('calculateBreakdown — GST is not added on top', () => {
+  it('adds nothing to the buyer total beyond the commission', async () => {
     queue(
       settingRow(false), // commissions_enabled -> disabled, so commissionAud stays 0
-      settingRow(true),  // gst_enabled
-      settingRow(10),    // gst_rate_pct
-      settingRow(false), // gst_on_commission_only
     );
     const result = await calculateBreakdown({ price_aud: 100 }, 'fixed');
     expect(result.commissionAud).toBe(0);
-    expect(result.gstAud).toBe(10); // 10% of the $100 item price
+    expect(result.total).toBe(100); // the listed price, GST already inside it
+    expect(result.gstAud).toBeUndefined();
   });
 
-  it('defaults to taxing the full sale price when no override row exists', async () => {
-    queue(
-      settingRow(false), // commissions_enabled
-      settingRow(true),  // gst_enabled
-      settingRow(10),    // gst_rate_pct
-      noRow(),            // gst_on_commission_only — falls back to the false default
-    );
-    const result = await calculateBreakdown({ price_aud: 200 }, 'fixed');
-    expect(result.gstAud).toBe(20); // 10% of the $200 item price, not $0
-  });
-
-  it('taxes only the commission when gst_on_commission_only is explicitly true', async () => {
+  it('totals item + commission only', async () => {
     queue(
       settingRow(true),  // commissions_enabled
-      settingRow(true),  // gst_enabled
-      settingRow(10),    // gst_rate_pct
-      settingRow(true),  // gst_on_commission_only
-      settingRow(true),  // commission_on_offers (fixed listing type)
+      settingRow(true),  // commission_on_fixed
       builder({ data: { id: 'cfg-1', fee_pct: 5 }, error: null }), // fee_config lookup
     );
     const result = await calculateBreakdown({ price_aud: 100 }, 'fixed');
-    expect(result.commissionAud).toBe(5); // 5% of $100
-    expect(result.gstAud).toBe(0.5); // 10% of the $5 commission, not the $100 item
+    expect(result.commissionAud).toBe(5);
+    expect(result.total).toBe(105);
+  });
+});
+
+describe('calculateGst — who owes what', () => {
+  it('splits the included GST between the seller’s supply and CardPop’s', async () => {
+    queue(
+      settingRow(true), // gst_enabled
+      settingRow(10),   // gst_rate_pct
+    );
+    // $107.17 of seller supply (a $101.17 card + $6.00 postage) and $8.58 of
+    // CardPop fees. GST is 1/11 of each, not 10% on top of either.
+    const gst = await calculateGst({ sellerAmountAud: 107.17, platformAmountAud: 8.58 });
+    expect(gst.sellerGstAud).toBe(9.74);
+    expect(gst.platformGstAud).toBe(0.78);
+    expect(gst.gstIncludedAud).toBe(10.52);
+  });
+
+  it('charges every transaction with no registration test — a $1 sale still carries GST', async () => {
+    queue(settingRow(true), settingRow(10));
+    const gst = await calculateGst({ sellerAmountAud: 1, platformAmountAud: 0 });
+    expect(gst.sellerGstAud).toBe(0.09);
+  });
+
+  it('returns zeroes when GST is switched off platform-wide', async () => {
+    queue(settingRow(false)); // gst_enabled
+    const gst = await calculateGst({ sellerAmountAud: 100, platformAmountAud: 10 });
+    expect(gst).toEqual({ sellerGstAud: 0, platformGstAud: 0, gstIncludedAud: 0, gstRatePct: 0 });
   });
 });

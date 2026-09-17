@@ -42,6 +42,57 @@ async function getFeeConfig(sellerTier, transactionType) {
 }
 
 /**
+ * The GST contained in an amount that is already GST-inclusive.
+ *
+ * Australian consumer prices are quoted GST-inclusive, so the tax is the
+ * component *inside* the price — `amount x rate / (100 + rate)`, i.e. 1/11 at
+ * 10% — never an extra charge on top of it. The shop catalogue has always
+ * priced this way (`priceCart`); marketplace listings now match.
+ */
+function gstInsideCents(amountCents, gstRatePct) {
+  const rate = Number(gstRatePct);
+  if (!Number.isFinite(rate) || rate <= 0) return 0;
+  const amount = Number(amountCents);
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  return Math.round(amount * rate / (100 + rate));
+}
+
+/**
+ * Split the GST on an order between the two parties who actually supplied
+ * something, so each side's share can be handled correctly:
+ *
+ *   - `sellerAmountAud` — the card and the seller's postage. The GST on this is
+ *     **deducted from the seller's payout** and remitted by CardPop on their
+ *     behalf, so the platform is never holding a GST liability it didn't budget
+ *     for. Applied to every seller and every transaction, with no
+ *     GST-registration test: a deliberately conservative business decision, so
+ *     nothing is ever owed to the ATO after the fact.
+ *   - `platformAmountAud` — CardPop's own supplies (commission, payment
+ *     processing). That GST is inside money the platform already holds.
+ *
+ * Both are *included* amounts: neither adds a cent to what the buyer pays.
+ *
+ * @returns {Promise<{ sellerGstAud, platformGstAud, gstIncludedAud, gstRatePct }>}
+ */
+async function calculateGst({ sellerAmountAud = 0, platformAmountAud = 0 } = {}) {
+  const gstEnabled = await getPlatformSetting('gst_enabled', true);
+  if (!gstEnabled) {
+    return { sellerGstAud: 0, platformGstAud: 0, gstIncludedAud: 0, gstRatePct: 0 };
+  }
+  const gstRatePct = Number(await getPlatformSetting('gst_rate_pct', 10));
+
+  const sellerGstAud = gstInsideCents(Math.round(Number(sellerAmountAud) * 100), gstRatePct) / 100;
+  const platformGstAud = gstInsideCents(Math.round(Number(platformAmountAud) * 100), gstRatePct) / 100;
+
+  return {
+    sellerGstAud,
+    platformGstAud,
+    gstIncludedAud: Math.round((sellerGstAud + platformGstAud) * 100) / 100,
+    gstRatePct,
+  };
+}
+
+/**
  * The buyer-paid payment-processing fee for a given pre-fee subtotal.
  *
  * Deliberately NOT part of calculateBreakdown: the fee is a percentage of
@@ -72,17 +123,18 @@ async function calculateProcessingFee(subtotalAud) {
 }
 
 /**
- * Calculate the full cost breakdown for a listing purchase.
- * Returns { itemPrice, commissionPct, commissionAud, gstAud, total, configId }
+ * Calculate the cost breakdown for a listing purchase.
+ *
+ * The listing price is **GST-inclusive** — it is an Australian consumer price,
+ * so the tax is already inside it and nothing is added on top of the buyer's
+ * bill. GST is handled by calculateGst() once the caller knows the postage and
+ * processing fee; it comes out of the seller's payout rather than out of the
+ * buyer's pocket a second time.
+ *
+ * Returns { itemPrice, commissionPct, commissionAud, total, configId }
  */
 async function calculateBreakdown(listing, transactionType = 'fixed') {
   const commEnabled = await getPlatformSetting('commissions_enabled', true);
-  const gstEnabled  = await getPlatformSetting('gst_enabled', true);
-  const gstRate     = Number(await getPlatformSetting('gst_rate_pct', 10));
-  // GST applies to the full sale price (item + commission), not just the
-  // commission — confirmed business decision; matches the live platform_settings
-  // value (see migration 20260707120240_gst_on_full_sale_price.sql).
-  const gstOnCommOnly = await getPlatformSetting('gst_on_commission_only', false);
 
   const itemPrice = Number(listing.price_aud) || 0;
   let commissionPct = 0;
@@ -113,15 +165,9 @@ async function calculateBreakdown(listing, transactionType = 'fixed') {
 
   const commissionAud = Math.round(itemPrice * (commissionPct / 100) * 100) / 100;
 
-  let gstAud = 0;
-  if (gstEnabled) {
-    const gstBase = gstOnCommOnly ? commissionAud : itemPrice + commissionAud;
-    gstAud = Math.round(gstBase * (gstRate / 100) * 100) / 100;
-  }
+  const total = Math.round((itemPrice + commissionAud) * 100) / 100;
 
-  const total = Math.round((itemPrice + commissionAud + gstAud) * 100) / 100;
-
-  return { itemPrice, commissionPct, commissionAud, gstAud, total, configId };
+  return { itemPrice, commissionPct, commissionAud, total, configId };
 }
 
-export { getPlatformSetting, getFeeConfig, calculateBreakdown, calculateProcessingFee };
+export { getPlatformSetting, getFeeConfig, calculateBreakdown, calculateProcessingFee, calculateGst, gstInsideCents };

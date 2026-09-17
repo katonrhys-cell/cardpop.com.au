@@ -254,6 +254,8 @@ describe('Cart checkout: applying wallet balance', () => {
         successUrl: 'https://example.com/success',
         cancelUrl: 'https://example.com/cancel',
         useWalletBalance: true,
+        // Checkout is Australia-only — every cart now needs a local address.
+        shippingAddress: { name: 'A Buyer', address: '1 Test St', suburb: 'Sydney', state: 'NSW', postcode: '2000' },
       });
 
     expect(res.status).toBe(200);

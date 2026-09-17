@@ -1,5 +1,5 @@
 import { supabase } from '../utils/supabaseClient.js';
-import { calculateBreakdown, calculateProcessingFee } from './commissionService.js';
+import { calculateBreakdown, calculateProcessingFee, calculateGst, gstInsideCents } from './commissionService.js';
 import { getPlatformSetting } from './stripeWebhookService.js';
 
 /**
@@ -24,9 +24,12 @@ export async function priceCart(items, userId, options = {}) {
   const orderLines = [];
   let itemsCents = 0;
   let commissionCents = 0;
-  // GST that is ADDED on top of the item price (marketplace listings). This is
-  // the only GST that increases the grand total and gets its own Stripe line.
-  let gstCents = 0;
+  // Retired: GST used to be ADDED on top of marketplace listings as its own
+  // Stripe line. Every price on CardPop is now GST-inclusive (Australian
+  // consumer prices are), so nothing is added and this stays 0 — kept so the
+  // API shape, the order row and the tax invoice keep their `gstAud` field,
+  // which now consistently reports "nothing was added on top".
+  const gstCents = 0;
   // GST that is already BAKED INTO a GST-inclusive price (CardPop Shop items and
   // the shipping fee — Australian consumer prices are quoted GST-inclusive). It
   // is reported for the tax invoice but never re-added to the total.
@@ -114,12 +117,16 @@ export async function priceCart(items, userId, options = {}) {
       const breakdown = await calculateBreakdown(listing, 'fixed');
       const itemC = Math.round(breakdown.itemPrice * 100);
       const commC = Math.round(breakdown.commissionAud * 100);
-      const gstC = Math.round(breakdown.gstAud * 100);
+      // A marketplace listing is an Australian consumer price, so its GST is
+      // INSIDE it exactly like a shop product's — nothing is added on top. The
+      // seller's share is deducted from their payout below (their postage is
+      // added to it once parcels are combined).
+      const lineGstC = gstEnabled ? gstInsideCents(itemC, gstRate) : 0;
       const name = listing.vault_item?.card_name || 'Trading Card';
 
       itemsCents += itemC;
       commissionCents += commC;
-      gstCents += gstC;
+      includedGstCents += lineGstC;
 
       lineItems.push({
         price_data: { currency: 'aud', product_data: { name }, unit_amount: itemC },
@@ -128,7 +135,10 @@ export async function priceCart(items, userId, options = {}) {
       orderLines.push({
         type: 'listing', id: listing.id, seller_id: listing.seller_id, title: name,
         quantity: 1, unit_price_aud: itemC / 100, line_total_aud: itemC / 100,
-        commission_aud: commC / 100, gst_aud: gstC / 100,
+        commission_aud: commC / 100, gst_aud: lineGstC / 100,
+        // The GST deducted from this seller's payout and remitted by CardPop.
+        // Postage GST is folded in below, on whichever line carries the parcel.
+        seller_gst_aud: lineGstC / 100,
         // The seller's own postage price — combined per seller below, so it is
         // NOT yet the amount this line will charge (that lands in shipping_aud).
         listing_shipping_cost_aud: Math.max(0, Number(listing.shipping_cost_aud) || 0),
@@ -190,32 +200,55 @@ export async function priceCart(items, userId, options = {}) {
     if (costCents <= 0) continue;
     line.shipping_aud = costCents / 100;
     sellerShippingCents += costCents;
+    // Postage is part of the seller's own supply, so its GST is deducted from
+    // their payout alongside the card's — it is charged to the buyer as a
+    // GST-inclusive consumer price, same as everything else here.
+    if (gstEnabled) {
+      const shipGstC = gstInsideCents(costCents, gstRate);
+      line.seller_gst_aud = Math.round((Number(line.seller_gst_aud || 0) * 100 + shipGstC)) / 100;
+      includedGstCents += shipGstC;
+    }
   }
   shippingCents += sellerShippingCents;
 
   if (commissionCents > 0) {
     lineItems.push({ price_data: { currency: 'aud', product_data: { name: 'Platform Fee' }, unit_amount: commissionCents }, quantity: 1 });
   }
-  // Only the additive (marketplace) GST becomes its own line — shop-item GST is
-  // already inside each product's unit_amount, so charging it again would
-  // double-bill the buyer.
-  if (gstCents > 0) {
-    lineItems.push({ price_data: { currency: 'aud', product_data: { name: 'GST' }, unit_amount: gstCents }, quantity: 1 });
-  }
   if (shippingCents > 0) {
     lineItems.push({ price_data: { currency: 'aud', product_data: { name: 'Shipping' }, unit_amount: shippingCents }, quantity: 1 });
   }
 
   // Payment processing — reimburses the platform for Stripe's cut of the whole
-  // captured amount, so it is priced on the finished subtotal (shop items,
-  // commission, added GST and shipping) and added last. It is platform revenue
-  // only in the sense that it cancels a platform cost: no commission or GST is
-  // taken on it and no part of it reaches a seller's payout.
-  const preFeeCents = itemsCents + commissionCents + gstCents + shippingCents;
+  // captured amount, so it is priced on the finished subtotal (items,
+  // commission and shipping) and added last. No GST is added on top of it: its
+  // own GST, like the commission's, is inside the amount (counted below).
+  const preFeeCents = itemsCents + commissionCents + shippingCents;
   const processingCents = Math.round((await calculateProcessingFee(preFeeCents / 100)) * 100);
   if (processingCents > 0) {
     lineItems.push({ price_data: { currency: 'aud', product_data: { name: 'Payment processing' }, unit_amount: processingCents }, quantity: 1 });
   }
 
-  return { lineItems, orderLines, itemsCents, commissionCents, gstCents, includedGstCents, shippingCents, shippingWaivedCents, processingCents, grandCents: preFeeCents + processingCents };
+  // CardPop's own supplies: the commission (charged to the buyer as a line AND
+  // deducted from each seller's payout, so it is earned twice) and the
+  // processing fee. That GST is inside money the platform already holds — it is
+  // reported for remittance, not deducted from anyone.
+  const platformGstCents = gstEnabled
+    ? gstInsideCents(commissionCents * 2 + processingCents, gstRate)
+    : 0;
+  includedGstCents += platformGstCents;
+
+  // Every seller's deduction, summed — what CardPop remits on their behalf.
+  const sellerGstCents = orderLines.reduce(
+    (sum, l) => sum + Math.round((Number(l.seller_gst_aud) || 0) * 100), 0,
+  );
+
+  return {
+    lineItems, orderLines, itemsCents, commissionCents,
+    // Nothing is added on top of the buyer's bill any more: gstCents stays 0 so
+    // every caller that reported an "added GST" line reports none.
+    gstCents,
+    includedGstCents, sellerGstCents, platformGstCents,
+    shippingCents, shippingWaivedCents, processingCents,
+    grandCents: preFeeCents + processingCents,
+  };
 }

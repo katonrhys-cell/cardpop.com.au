@@ -152,9 +152,6 @@ const CheckoutModal = ({ isOpen, onClose, listingId, transactionType = 'fixed', 
                   value={`$${breakdown.commissionAud.toFixed(2)} AUD`}
                 />
               )}
-              {breakdown.gstAud > 0 && (
-                <LineRow label="GST" value={`$${breakdown.gstAud.toFixed(2)} AUD`} />
-              )}
               {/* Covers the card-processing cost on this order — its own line,
                   matching the Stripe line item the buyer will see. */}
               {breakdown.processingAud > 0 && (
@@ -165,6 +162,13 @@ const CheckoutModal = ({ isOpen, onClose, listingId, transactionType = 'fixed', 
               <LineRow label="Shipping" value={breakdown.shippingAud > 0 ? `$${breakdown.shippingAud.toFixed(2)} AUD` : 'Free'} />
               <Separator />
               <LineRow label="Total" value={`$${breakdown.total.toFixed(2)} AUD`} bold />
+              {/* GST is inside these prices, never added to them — Australian
+                  consumer prices are quoted GST-inclusive. Stated, not charged. */}
+              {breakdown.gstIncludedAud > 0 && (
+                <p className="text-right text-xs text-muted-foreground">
+                  Includes GST of ${breakdown.gstIncludedAud.toFixed(2)}
+                </p>
+              )}
             </div>
           ) : null}
 
