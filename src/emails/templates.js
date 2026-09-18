@@ -432,3 +432,45 @@ ${summaryTable([
     null,
   );
 }
+
+// ─── Offer / enquiry received (seller) ────────────────────────────────────────
+
+/**
+ * Sent to the seller the moment a buyer makes an offer on one of their
+ * listings — the email half of the `offer_received` notification the
+ * on_offer_created trigger already writes to the notification bell.
+ *
+ * The buyer's message is seller-supplied free text, so it goes through `esc`
+ * like every other user-controlled value in these templates.
+ */
+export function offerReceivedEmail({ sellerName, buyerName, cardName, amountAud, message, listingType, expiresAt }) {
+  const isEOI = listingType === 'Expression of Interest';
+  const rows = [
+    ['Card', esc(cardName || 'Your listing')],
+    ['Offer', `${money(amountAud)} AUD`, true],
+    ['From', esc(buyerName || 'A CardPop buyer')],
+  ];
+  if (expiresAt) rows.push(['Expires', esc(expiresAt)]);
+
+  const quoted = message
+    ? `<p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#111827;">Their message</p>
+<div style="background:#F9FAFB;border-left:3px solid #E63946;border-radius:0 8px 8px 0;padding:14px 18px;margin:0 0 24px;font-size:14px;color:#374151;line-height:1.6;">${esc(message)}</div>`
+    : '';
+
+  const body = `<p>${isEOI
+    ? 'Someone has expressed interest in a card you have listed for offers.'
+    : 'You have a new offer on one of your listings.'}</p>
+${summaryTable(rows)}
+${quoted}
+<p>Head to your offers page to accept, decline or counter. Offers expire automatically if you don't respond in time.</p>`;
+
+  return cpEmail(
+    `New offer of ${money(amountAud)} on ${esc(cardName || 'your listing')}`,
+    'New Offer Received',
+    `You have an offer, ${esc(sellerName || 'there')}!`,
+    body,
+    'https://cardpop.com.au/account/offers',
+    'View Offer',
+    'You are receiving this because someone made an offer on your CardPop listing.',
+  );
+}

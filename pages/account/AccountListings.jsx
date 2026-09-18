@@ -19,9 +19,9 @@ import { getDisplayStyleLabel } from '@/components/vault/DisplayStylePicker.jsx'
 const STATUS_CONFIG = {
   'For Sale':        { label: 'For Sale',        className: 'bg-emerald-500/10 text-emerald-700 border-emerald-300 dark:text-emerald-400', icon: ShoppingCart },
   'active':          { label: 'Active',           className: 'bg-emerald-500/10 text-emerald-700 border-emerald-300 dark:text-emerald-400', icon: ShoppingCart },
-  'For Trade':       { label: 'For Trade',        className: 'bg-blue-500/10 text-blue-700 border-blue-300 dark:text-blue-400', icon: ArrowRightLeft },
-  'For Sale & Trade':{ label: 'Sale & Trade',     className: 'bg-violet-500/10 text-violet-700 border-violet-300 dark:text-violet-400', icon: Layers },
-  'Expression of Interest': { label: 'Expression of Interest', className: 'bg-sky-500/10 text-sky-700 border-sky-300 dark:text-sky-400', icon: HandCoins },
+  'For Trade':       { label: 'For Trade',        className: 'bg-violet-500/10 text-violet-700 border-violet-300 dark:text-violet-400', icon: ArrowRightLeft },
+  'For Sale & Trade':{ label: 'Sale & Trade',     className: 'bg-amber-500/10 text-amber-700 border-amber-300 dark:text-amber-400', icon: Layers },
+  'Expression of Interest': { label: 'Expression of Interest', className: 'bg-slate-700/10 text-slate-700 border-slate-400 dark:text-slate-300', icon: HandCoins },
   'sold':            { label: 'Sold',             className: 'bg-muted text-muted-foreground border-border', icon: ShoppingCart },
   'Sold':            { label: 'Sold',             className: 'bg-muted text-muted-foreground border-border', icon: ShoppingCart },
   'archived':        { label: 'Archived',         className: 'bg-muted text-muted-foreground border-border', icon: PackageOpen },

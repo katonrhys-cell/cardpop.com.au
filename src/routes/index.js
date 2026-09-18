@@ -29,6 +29,7 @@ import pushRouter from './push.js';
 import pointsRouter from './points.js';
 import buyerProtectionRouter from './buyer-protection.js';
 import wishlistRouter from './wishlist.js';
+import offersRouter from './offers.js';
 import recommendationsRouter from './recommendations.js';
 import priceHistoryRouter from './price-history.js';
 import newsletterRouter from './newsletter.js';
@@ -160,6 +161,11 @@ export default () => {
 
     router.use('/wishlist', apiLimiter);
     router.use('/wishlist', wishlistRouter);
+
+    // Buyer offers/enquiries — writes the offer as the caller, then emails
+    // the seller (the in-app notification comes from a database trigger).
+    router.use('/offers', apiLimiter);
+    router.use('/offers', offersRouter);
 
     router.use('/recommendations', apiLimiter);
     router.use('/recommendations', recommendationsRouter);

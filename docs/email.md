@@ -21,7 +21,7 @@ links — but that is a **fourth, separate** pipeline handled entirely by Supaba
 unset it logs a warning and returns without sending, so a missing key never
 crashes a checkout or refund.
 
-The five transactional emails and where they fire:
+The six transactional emails and where they fire:
 
 | Email | Recipient | Triggered from |
 |---|---|---|
@@ -30,8 +30,50 @@ The five transactional emails and where they fire:
 | Refund processed | Buyer | `src/services/refundService.js` |
 | Refund issued | Seller | `src/services/refundService.js` |
 | Welcome offer (trial + discount) | New user | `src/services/welcomeOfferService.js` |
+| Offer received (enquiry) | Seller | `src/routes/offers.js` (see below) |
 
 Email HTML is built by the templates in `src/emails/templates.js`.
+
+### Offer / enquiry notifications
+
+A buyer enquiring on a card is an offer — `MakeOfferModal` → `POST /offers`.
+The seller is told **twice**, by two independent mechanisms, so a failure in
+one never silences the other:
+
+- **In-app (the notification bell):** the `on_offer_created` database trigger
+  calls `create_notification(seller_id, 'offer_received', …)`. This is a
+  security-definer trigger on the `offers` table, so it fires for *any* insert
+  — nothing in application code can skip it.
+- **Email:** `src/routes/offers.js` sends it after the insert commits. The
+  offer is written with a **caller-scoped** Supabase client so RLS is still the
+  enforcement point (the modal used to insert straight from the browser; the
+  route exists so there is a server-side moment to send mail). The send is
+  best-effort: the response carries `emailed: true|false`, and a Resend outage
+  logs but never fails the buyer's offer.
+
+The route is the only writer of `offers` rows. If another one is ever added,
+it must send the email too — the trigger will cover the bell by itself, but
+there is no database-level hook for the email. (Hanging it off the
+`notifications` insert instead would not work on this project: the
+`notifications_push_dispatch` webhook in
+`supabase/migrations/20260823053100_push_dispatch_webhook.sql` degrades to
+"not installed" because `supabase_functions.http_request` is unavailable here,
+which is also why web push for notifications is currently inert.)
+
+**Verifying it end to end** — `scripts/verify-offer-notification.mjs` drives the
+real path: it signs in as a test buyer, posts a real offer through the live
+endpoint, reads the seller's notification row back out of the database, and
+reports whether Resend accepted the email.
+
+```bash
+SUPABASE_SERVICE_ROLE_KEY=... TEST_BUYER_EMAIL=... TEST_BUYER_PASSWORD=... \
+  node scripts/verify-offer-notification.mjs --cleanup
+```
+
+It writes a real offer, so use `--cleanup` (or decline the offer from the
+seller's `/account/offers` page) afterwards. `--listing <uuid>` targets a
+specific listing; `--api http://localhost:3001/api` runs it against a local
+server.
 
 ### Configuration
 

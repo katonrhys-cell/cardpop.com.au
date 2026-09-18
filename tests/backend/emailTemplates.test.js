@@ -5,6 +5,7 @@ import {
   itemSoldEmail,
   eventSubmittedEmail,
   orderAdminNoticeEmail,
+  offerReceivedEmail,
 } from '../../src/emails/templates.js';
 
 // Regression guard: transactional emails are sent from noreply@cardpop.com.au
@@ -43,5 +44,33 @@ describe('email template escaping', () => {
   it('escapes buyer/seller/items in the order admin notice', () => {
     const html = orderAdminNoticeEmail({ orderId: 'o', buyerName: XSS, buyerEmail: 'a@b.co', total: 9, itemsSummary: XSS, sellerName: XSS });
     expect(html).not.toContain('<a href="https://evil.example">click</a>');
+  });
+
+  // The offer note is free text typed by a stranger — the most directly
+  // attacker-controlled string in any of these emails.
+  it('escapes the buyer name, card name and offer message in an offer email', () => {
+    const html = offerReceivedEmail({ sellerName: XSS, buyerName: XSS, cardName: XSS, amountAud: 600, message: XSS });
+    expect(html).not.toContain('<a href="https://evil.example">click</a>');
+    expect(html).toContain('&lt;a href=');
+  });
+});
+
+describe('offerReceivedEmail', () => {
+  it('carries the amount, card, buyer and message, and links to the offers page', () => {
+    const html = offerReceivedEmail({
+      sellerName: 'Kat', buyerName: 'Ash', cardName: 'Nikola Jokic',
+      amountAud: 600, message: 'Would you take $600?', expiresAt: '8 Sep 2026',
+    });
+    expect(html).toContain('$600.00');
+    expect(html).toContain('Nikola Jokic');
+    expect(html).toContain('Ash');
+    expect(html).toContain('Would you take $600?');
+    expect(html).toContain('8 Sep 2026');
+    expect(html).toContain('https://cardpop.com.au/account/offers');
+  });
+
+  it('omits the message block when the buyer left no note', () => {
+    const html = offerReceivedEmail({ sellerName: 'Kat', cardName: 'A card', amountAud: 10 });
+    expect(html).not.toContain('Their message');
   });
 });
