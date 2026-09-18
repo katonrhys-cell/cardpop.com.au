@@ -8,20 +8,25 @@ vi.mock('react-router-dom', () => ({ useNavigate: () => mockNavigate }));
 vi.mock('@/contexts/AuthContext.jsx', () => ({ useAuth: vi.fn() }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-const mockInsert = vi.fn();
-vi.mock('@/lib/supabaseClient.js', () => ({
-  supabase: { from: vi.fn(() => ({ insert: mockInsert })) },
+// The offer is posted to the backend (which emails the seller), not inserted
+// straight into `offers` — see src/routes/offers.js and docs/email.md.
+const mockApiFetch = vi.fn();
+vi.mock('@/lib/apiServerClient.js', () => ({
+  apiServerClient: { fetch: (...args) => mockApiFetch(...args) },
+  default: { fetch: (...args) => mockApiFetch(...args) },
 }));
 
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
-import { supabase } from '@/lib/supabaseClient.js';
 import MakeOfferModal from '@/components/MakeOfferModal.jsx';
+
+/** The parsed JSON body of the nth POST /offers call. */
+const offerBody = (n = 0) => JSON.parse(mockApiFetch.mock.calls[n][1].body);
 
 beforeEach(() => {
   vi.clearAllMocks();
   useAuth.mockReturnValue({ isAuthenticated: true, currentUser: { id: 'buyer-1' } });
-  mockInsert.mockResolvedValue({ error: null });
+  mockApiFetch.mockResolvedValue({ ok: true, json: async () => ({ offer: { id: 'offer-1' }, emailed: true }) });
 });
 
 const fixedListing = {
@@ -49,21 +54,32 @@ describe('MakeOfferModal — fixed-price listing', () => {
     expect(screen.getByRole('button', { name: /90%/ })).toBeInTheDocument();
   });
 
-  it('submits an offer to the offers table', async () => {
+  it('posts the offer to the backend so the seller is emailed', async () => {
     const user = userEvent.setup();
     render(<MakeOfferModal isOpen onClose={vi.fn()} listing={fixedListing} />);
 
     await user.type(screen.getByLabelText(/your offer amount/i), '90');
     await user.click(screen.getByRole('button', { name: /send offer/i }));
 
-    await waitFor(() => expect(mockInsert).toHaveBeenCalledTimes(1));
-    expect(supabase.from).toHaveBeenCalledWith('offers');
-    expect(mockInsert.mock.calls[0][0]).toMatchObject({
-      listing_id: 'listing-1',
-      buyer_id: 'buyer-1',
-      seller_id: 'seller-1',
-      amount_aud: 90,
+    await waitFor(() => expect(mockApiFetch).toHaveBeenCalledTimes(1));
+    expect(mockApiFetch.mock.calls[0][0]).toBe('/offers');
+    expect(mockApiFetch.mock.calls[0][1].method).toBe('POST');
+    expect(offerBody()).toMatchObject({
+      listingId: 'listing-1',
+      sellerId: 'seller-1',
+      amountAud: 90,
     });
+  });
+
+  it('surfaces a backend failure to the buyer', async () => {
+    mockApiFetch.mockResolvedValue({ ok: false, json: async () => ({ error: 'Listing is no longer active' }) });
+    const user = userEvent.setup();
+    render(<MakeOfferModal isOpen onClose={vi.fn()} listing={fixedListing} />);
+
+    await user.type(screen.getByLabelText(/your offer amount/i), '90');
+    await user.click(screen.getByRole('button', { name: /send offer/i }));
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Listing is no longer active'));
   });
 });
 
@@ -97,10 +113,10 @@ describe('MakeOfferModal — expression-of-interest listing', () => {
     await user.click(screen.getByRole('button', { name: /middle/i }));
     await user.click(screen.getByRole('button', { name: /send offer/i }));
 
-    await waitFor(() => expect(mockInsert).toHaveBeenCalledTimes(1));
-    expect(mockInsert.mock.calls[0][0]).toMatchObject({
-      listing_id: 'listing-2',
-      amount_aud: 100,
+    await waitFor(() => expect(mockApiFetch).toHaveBeenCalledTimes(1));
+    expect(offerBody()).toMatchObject({
+      listingId: 'listing-2',
+      amountAud: 100,
     });
   });
 
@@ -112,6 +128,6 @@ describe('MakeOfferModal — expression-of-interest listing', () => {
     await user.click(screen.getByRole('button', { name: /send offer/i }));
 
     expect(toast.error).toHaveBeenCalledWith('Offer amount seems unusually high');
-    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockApiFetch).not.toHaveBeenCalled();
   });
 });

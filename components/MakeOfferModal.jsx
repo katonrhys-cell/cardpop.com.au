@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { supabase } from '@/lib/supabaseClient.js';
+import { apiServerClient } from '@/lib/apiServerClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
@@ -67,14 +67,25 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
 
     setSubmitting(true);
     try {
-      const { error } = await supabase.from('offers').insert({
-        listing_id: listing.id,
-        buyer_id: currentUser.id,
-        seller_id: listing.seller_id,
-        amount_aud: numericAmount,
-        message: message.trim() || null,
+      // Posted through the backend rather than inserted straight into `offers`:
+      // the row is still written as this user (RLS unchanged), but the server
+      // is where the seller's notification email is sent from. The in-app
+      // notification comes from the on_offer_created database trigger either
+      // way, so the bell fills even if the email can't be delivered.
+      const res = await apiServerClient.fetch('/offers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listingId: listing.id,
+          sellerId: listing.seller_id,
+          amountAud: numericAmount,
+          message: message.trim() || null,
+        }),
       });
-      if (error) throw error;
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to submit offer. Please try again.');
+      }
       setSubmitted(true);
     } catch (err) {
       toast.error(err.message || 'Failed to submit offer. Please try again.');

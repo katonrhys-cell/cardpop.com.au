@@ -14,6 +14,7 @@ import {
   identityReviewNeededEmail,
   orderAdminNoticeEmail,
   contactMessageEmail,
+  offerReceivedEmail,
 } from '../emails/templates.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -140,6 +141,22 @@ export async function sendRefundProcessed({ buyerEmail, buyerName, refundAmount,
     to: buyerEmail,
     subject: 'Your CardPop refund has been processed',
     html: refundProcessedEmail({ buyerName, refundAmount, orderId }),
+  });
+}
+
+/**
+ * Tells a seller that a buyer has made an offer (an "enquiry") on one of their
+ * listings. Pairs with the in-app `offer_received` notification the
+ * on_offer_created database trigger writes — the trigger covers the bell, this
+ * covers the inbox.
+ *
+ * @returns {Promise<boolean>} whether the email was actually sent
+ */
+export async function sendOfferReceived({ sellerEmail, sellerName, buyerName, cardName, amountAud, message, listingType, expiresAt }) {
+  return send({
+    to: sellerEmail,
+    subject: `New offer on ${cardName || 'your listing'} — $${Number(amountAud || 0).toFixed(2)} AUD`,
+    html: offerReceivedEmail({ sellerName, buyerName, cardName, amountAud, message, listingType, expiresAt }),
   });
 }
 
