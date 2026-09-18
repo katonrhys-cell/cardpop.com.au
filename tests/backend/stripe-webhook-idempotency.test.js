@@ -191,6 +191,66 @@ describe('webhook single-item idempotency', () => {
     expect(mockStripe.transfers.create).toHaveBeenCalled();
   });
 
+  it('refuses to fulfil an overseas card, refunds it, and never pays the seller', async () => {
+    mockStripe.paymentIntents = {
+      retrieve: vi.fn().mockResolvedValue({
+        payment_method: { type: 'card', card: { country: 'US' } },
+      }),
+    };
+    state.respond = (ctx) => {
+      if (ctx.table === 'orders' && ctx.single) return { data: null, error: null };
+      return { data: null, error: null };
+    };
+
+    const res = await postWebhook();
+
+    expect(res.status).toBe(200);
+    // Blocked BEFORE the order is written, so nothing is fulfilled or paid out.
+    expect(dbCalls.some(c => c.table === 'orders' && c.op === 'insert')).toBe(false);
+    expect(dbCalls.some(c => c.table === 'listings' && c.op === 'update')).toBe(false);
+    expect(mockStripe.transfers.create).not.toHaveBeenCalled();
+    // Checkout captures on completion, so the money is already taken — it goes
+    // back in full.
+    expect(mockStripe.refunds.create).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_intent: 'pi_single' }),
+      expect.objectContaining({ idempotencyKey: 'foreign-card-refund-cs_single' }),
+    );
+  });
+
+  it('fulfils an Australian card normally', async () => {
+    mockStripe.paymentIntents = {
+      retrieve: vi.fn().mockResolvedValue({
+        payment_method: { type: 'card', card: { country: 'AU' } },
+      }),
+    };
+    state.respond = (ctx) => {
+      if (ctx.table === 'orders' && ctx.single) return { data: null, error: null };
+      if (ctx.table === 'orders' && ctx.op === 'insert') return { data: { id: 'o-new' }, error: null };
+      return { data: null, error: null };
+    };
+
+    await postWebhook();
+
+    expect(mockStripe.refunds.create).not.toHaveBeenCalled();
+    expect(dbCalls.some(c => c.table === 'orders' && c.op === 'insert')).toBe(true);
+  });
+
+  it('fulfils a payment method that reports no country (PayPal) rather than refunding it', async () => {
+    mockStripe.paymentIntents = {
+      retrieve: vi.fn().mockResolvedValue({ payment_method: { type: 'paypal', paypal: {} } }),
+    };
+    state.respond = (ctx) => {
+      if (ctx.table === 'orders' && ctx.single) return { data: null, error: null };
+      if (ctx.table === 'orders' && ctx.op === 'insert') return { data: { id: 'o-new' }, error: null };
+      return { data: null, error: null };
+    };
+
+    await postWebhook();
+
+    expect(mockStripe.refunds.create).not.toHaveBeenCalled();
+    expect(dbCalls.some(c => c.table === 'orders' && c.op === 'insert')).toBe(true);
+  });
+
   it('counts the processing fee in the expected total, and keeps it out of the seller payout', async () => {
     // Regression guard: the fee is a real Stripe line, so leaving it out of the
     // expected-total check would make the amount guard reject — and auto-refund

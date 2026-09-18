@@ -127,11 +127,26 @@ CardPop sells and ships within Australia only, enforced in three places:
    single-item Checkout Session. That path is reached from the Buy Now modal,
    which collects no address at all, so Stripe collects one and the country
    picker offers only Australia.
-3. **A Stripe Radar rule — a dashboard step, not code.** Neither of the above
-   stops an overseas *card* paying for delivery to an Australian address.
-   Stripe Checkout has no billing-country allowlist, so block it in Radar:
-   *Block if `:card_country:` != `AU`*. Until that rule exists, international
-   cards can still pay (and cost 3.5% rather than 1.75%).
+3. **`cardCountryPolicy.js`, enforced in the webhook.** Neither of the above
+   stops an overseas *card* paying for delivery to an Australian address or a
+   forwarder. A card's country comes from its BIN, which Stripe only resolves
+   when the payment is authorised — and Checkout captures on completion — so
+   this cannot be blocked at checkout. Instead the webhook refuses to fulfil:
+   no order row, no listing claimed, no seller paid, and the payment is
+   refunded in full. `ALLOWED_CARD_COUNTRIES` (default `AU`) widens the list
+   without a deploy; `any` switches the check off.
+
+   A method that reports **no** country is allowed through. Stripe populates a
+   country for cards and card wallets but not always for PayPal, and failing
+   closed there would refund good domestic payments over a field Stripe never
+   filled in.
+
+4. **A Stripe Radar rule — the cheaper front line.** Stripe does **not** return
+   its processing fee on a refund, so every blocked payment costs CardPop that
+   fee (~$2 on a $100 order). A Radar rule — *Block if `:card_country:` !=
+   `AU`* — declines before capture and costs nothing. It is a dashboard step,
+   and worth doing; point 3 is the backstop that holds whether or not it
+   exists.
 
 ## Payment methods are pinned
 
@@ -204,7 +219,8 @@ choose — and nothing reads it.
 |---|---|
 | `src/utils/processingFee.js` | The gross-up, and the rate clamp |
 | `src/services/commissionService.js` | Settings lookup, commission breakdown, `calculateGst()`, `calculateProcessingFee()` |
-| `src/utils/addressValidation.js` | The Australia-only gate, and the Amazon Location geocode |
+| `src/utils/addressValidation.js` | The Australia-only address gate, and the Amazon Location geocode |
+| `src/utils/cardCountryPolicy.js` | Which card countries may pay |
 | `components/SellerPayoutEstimate.jsx` | Live "you'll receive $X" under the asking price |
 | `src/services/checkoutService.js` | Single-item line items, metadata, seller proceeds |
 | `src/services/cartService.js` | Cart line items and per-seller postage |

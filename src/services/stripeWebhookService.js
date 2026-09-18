@@ -9,6 +9,7 @@ import { debitWalletForOrder, releaseWalletCheckout } from './walletService.js';
 import { subscribeToNewsletter } from '../utils/newsletter.js';
 import { namesMatch } from './identityService.js';
 import { insertWithOptionalColumns } from '../utils/insertWithOptionalColumns.js';
+import { isCardCountryAllowed, allowedCardCountries } from '../utils/cardCountryPolicy.js';
 
 /**
  * Informational cross-check: does the name the buyer typed at Stripe Checkout
@@ -41,18 +42,28 @@ export async function computePayerNameMismatch(buyerId, payerName) {
  * Google's brand guidelines, instead of just "payment successful". Best-
  * effort: a lookup failure must never block order fulfilment.
  */
-async function resolveWalletType(stripe, paymentIntentId) {
-  if (!paymentIntentId) return null;
+async function resolvePaymentMethod(stripe, paymentIntentId) {
+  if (!paymentIntentId) return { walletType: null, cardCountry: null };
   try {
     const pi = await stripe.paymentIntents.retrieve(paymentIntentId, { expand: ['payment_method'] });
     const pm = pi.payment_method;
-    if (!pm || typeof pm === 'string') return null;
-    if (pm.type === 'card' && pm.card?.wallet?.type) return pm.card.wallet.type;
-    if (pm.type === 'link') return 'link';
-    return null;
+    if (!pm || typeof pm === 'string') return { walletType: null, cardCountry: null };
+
+    let walletType = null;
+    if (pm.type === 'card' && pm.card?.wallet?.type) walletType = pm.card.wallet.type;
+    else if (pm.type === 'link') walletType = 'link';
+
+    // Where the method was issued, used to enforce the Australia-only policy
+    // (cardCountryPolicy.js). `pm.card.country` covers cards and card wallets;
+    // the `pm[pm.type]` fallback picks up any other method that reports one.
+    // Methods that report none (often PayPal) come back null, which the policy
+    // treats as allowed rather than refunding a good domestic payment.
+    const cardCountry = pm.card?.country ?? pm[pm.type]?.country ?? null;
+
+    return { walletType, cardCountry };
   } catch (e) {
-    logger.warn(`[STRIPE] Could not resolve wallet type for payment intent ${paymentIntentId}: ${e.message}`);
-    return null;
+    logger.warn(`[STRIPE] Could not resolve payment method for payment intent ${paymentIntentId}: ${e.message}`);
+    return { walletType: null, cardCountry: null };
   }
 }
 
@@ -128,6 +139,59 @@ async function claimListingSold(listingId) {
     return false;
   }
   return Array.isArray(data) && data.length > 0;
+}
+
+/**
+ * The payment came from a card issued outside the countries CardPop sells to.
+ * Checkout captures on completion, so the money is already taken — refuse to
+ * fulfil and hand all of it back rather than shipping to an overseas buyer.
+ *
+ * Stripe does NOT return its processing fee on a refund, so each of these costs
+ * the platform that fee. A Radar rule (`:card_country: != 'AU'`) declines before
+ * capture and costs nothing — this is the backstop for when one isn't in place.
+ */
+async function flagForeignCard({ stripe, session, orderId, buyerId, cardCountry }) {
+  logger.error(`[STRIPE] Foreign card (${cardCountry}) on session ${session.id} — not fulfilling, refunding in full`);
+
+  const paymentIntentId = typeof session.payment_intent === 'string'
+    ? session.payment_intent
+    : (session.payment_intent?.id ?? null);
+  if (paymentIntentId) {
+    try {
+      // Order-scoped idempotency: a redelivered webhook must not issue a second
+      // refund for the same payment.
+      await stripe.refunds.create(
+        { payment_intent: paymentIntentId, reason: 'requested_by_customer' },
+        { idempotencyKey: `foreign-card-refund-${session.id}` },
+      );
+    } catch (e) {
+      logger.error(`[STRIPE] Auto-refund failed for foreign-card session ${session.id}: ${e.message} — needs manual refund`);
+    }
+  }
+
+  // Best-effort notifications — a notify failure must never re-throw and turn a
+  // handled block into a webhook 500 that Stripe retries.
+  try {
+    const { data: admins } = await supabase.from('profiles').select('id').eq('is_admin', true);
+    if (admins?.length) {
+      await supabase.from('notifications').insert(admins.map(a => ({
+        user_id: a.id,
+        type: 'order_foreign_card',
+        title: 'Overseas card blocked — auto-refunded',
+        body: `Session ${session.id} was paid with a ${cardCountry} card (order ${orderId || 'n/a'}). CardPop sells to ${allowedCardCountries().join(', ')} only, so the payment was refunded in full. Verify it settled — Stripe keeps its processing fee on refunds.`,
+      })));
+    }
+    if (buyerId) {
+      await supabase.from('notifications').insert({
+        user_id: buyerId,
+        type: 'order_refund_pending',
+        title: 'Refund on the way',
+        body: 'CardPop currently sells to buyers in Australia only, so your payment is being refunded in full — no action needed.',
+      });
+    }
+  } catch (e) {
+    logger.warn(`[STRIPE] foreign-card notification failed for session ${session.id}: ${e.message}`);
+  }
 }
 
 /**
@@ -315,7 +379,16 @@ async function handleCartOrder(existing, session, stripe) {
     : (session.payment_intent?.id ?? null);
 
   const payerNameMismatch = await computePayerNameMismatch(existing.buyer_id, session.customer_details?.name);
-  const walletType = await resolveWalletType(stripe, cartPaymentIntentId);
+  const { walletType, cardCountry } = await resolvePaymentMethod(stripe, cartPaymentIntentId);
+
+  // Australia only. The shipping address was gated at checkout, but the card's
+  // country is only knowable now — and Checkout already captured the money, so
+  // the block is a refusal to fulfil plus a full refund.
+  if (!isCardCountryAllowed(cardCountry)) {
+    await supabase.from('orders').update({ status: 'payment_failed' }).eq('id', existing.id);
+    await flagForeignCard({ stripe, session, orderId: existing.id, buyerId: existing.buyer_id, cardCountry });
+    return;
+  }
 
   let { data: claimed, error: claimErr } = await supabase.from('orders')
     .update({ status: 'payment_confirmed', stripe_payment_intent_id: cartPaymentIntentId, payer_name_mismatch: payerNameMismatch, payment_wallet_type: walletType })
@@ -675,7 +748,14 @@ async function handleSingleItemOrder(session, stripe) {
     : (session.payment_intent?.id ?? null);
 
   const payerNameMismatch = await computePayerNameMismatch(userId, session.customer_details?.name);
-  const walletType = await resolveWalletType(stripe, paymentIntentId);
+  const { walletType, cardCountry } = await resolvePaymentMethod(stripe, paymentIntentId);
+
+  // Australia only — checked before the order row is written, so a blocked
+  // payment leaves no order, never claims the listing and never pays a seller.
+  if (!isCardCountryAllowed(cardCountry)) {
+    await flagForeignCard({ stripe, session, orderId: null, buyerId: userId, cardCountry });
+    return;
+  }
 
   const orderInsert = {
     buyer_id: userId,
