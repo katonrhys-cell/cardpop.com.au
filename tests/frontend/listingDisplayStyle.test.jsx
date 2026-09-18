@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { vi, describe, it, expect } from 'vitest';
 
@@ -91,5 +92,38 @@ describe('ProductImageCarousel × display style', () => {
       <ProductImageCarousel images={images} displayStyle="not-a-style" />,
     );
     expect(container.querySelector('.cardshowcase')).toBeNull();
+  });
+
+  // The feature's term: the chosen style dresses the FIRST photograph only.
+  // The extra shots (backs, corners, flaws) are condition evidence and must
+  // stay unembellished when the buyer clicks through the thumbnails.
+  describe('applies to the first photograph only', () => {
+    const multi = [
+      'https://cdn/object/noa-front.jpg',
+      'https://cdn/object/noa-back.jpg',
+      'https://cdn/object/noa-corner.jpg',
+    ];
+
+    it('shows the style on the first photo', () => {
+      const { container } = render(
+        <ProductImageCarousel images={multi} displayStyle="holographic" />,
+      );
+      expect(container.querySelector('.cardshowcase--holographic')).toBeTruthy();
+    });
+
+    it('drops the style once a later photo is selected', async () => {
+      const user = userEvent.setup();
+      const { container } = render(
+        <ProductImageCarousel images={multi} displayStyle="holographic" />,
+      );
+
+      await user.click(screen.getByAltText('Thumbnail 2').closest('button'));
+      expect(container.querySelector('.cardshowcase')).toBeNull();
+      expect(screen.getByAltText('Product view 2')).toBeInTheDocument();
+
+      // …and comes back when the buyer returns to the first photo.
+      await user.click(screen.getByAltText('Thumbnail 1').closest('button'));
+      expect(container.querySelector('.cardshowcase--holographic')).toBeTruthy();
+    });
   });
 });
