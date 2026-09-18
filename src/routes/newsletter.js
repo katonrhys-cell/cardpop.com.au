@@ -1,7 +1,7 @@
 import logger from '../utils/logger.js';
 import express from 'express';
 import { subscribeToNewsletter } from '../utils/newsletter.js';
-import { registerLaunchInterest } from '../services/launchRegistrationService.js';
+import { registerLaunchInterest, recordNewsletterSubscriber } from '../services/launchRegistrationService.js';
 import { verifyRecaptchaToken } from '../utils/recaptcha.js';
 import { optionalAuthMiddleware } from '../middleware/auth.js';
 
@@ -41,6 +41,15 @@ router.post('/subscribe', optionalAuthMiddleware, async (req, res) => {
         .catch((e) => logger.error('[newsletter] launch Kit subscribe failed:', e));
       return res.status(200).json({ success: true });
     }
+
+    // Kit is the marketing tool, but our own table is the record of who asked
+    // to hear from us — a Kit outage, a plan lapse or a lost account must not
+    // cost us the list. Best-effort and first, for the same reason the launch
+    // branch persists before pushing to Kit: awaited (not fire-and-forget) so
+    // it reliably completes on serverless, but a DB hiccup never costs the
+    // visitor their subscription.
+    await recordNewsletterSubscriber({ email, firstName })
+      .catch((e) => logger.error('[newsletter] failed to record subscriber:', e));
 
     const result = await subscribeToNewsletter(email, firstName, {});
     if (!result.ok) {

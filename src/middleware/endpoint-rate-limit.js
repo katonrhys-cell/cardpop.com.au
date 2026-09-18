@@ -2,6 +2,7 @@ import rateLimit from 'express-rate-limit';
 import ipKeyGenerator from '../utils/ipKeyGenerator.js';
 import logger from '../utils/logger.js';
 import PgRateLimitStore from '../utils/pgRateLimitStore.js';
+import { welcomeOfferUserId } from '../utils/welcomeOfferRequest.js';
 
 // These limiters guard low-volume, security-sensitive actions (MFA backup-code
 // brute-force, email-triggering resends, HIBP proxy, login/password advisory)
@@ -160,10 +161,12 @@ const welcomeOfferIssueLimiter = rateLimit({
 	store: new PgRateLimitStore('welcomeoffer'),
 	standardHeaders: true,
 	legacyHeaders: false,
-	keyGenerator: (req) =>
-		(typeof req.body?.userId === 'string' && req.body.userId.trim())
-			? `welcome:${req.body.userId.trim().toLowerCase()}`
-			: ipKeyGenerator(req),
+	keyGenerator: (req) => {
+		// Must read the id exactly as the route does — both payload shapes, or
+		// webhook-driven issues all share one IP-keyed bucket. See welcomeOfferUserId.
+		const userId = welcomeOfferUserId(req.body);
+		return userId ? `welcome:${userId}` : ipKeyGenerator(req);
+	},
 	handler: (req, res) => {
 		logger.warn('[RATE_LIMIT] Welcome offer issue limit exceeded');
 		res.status(429).json({

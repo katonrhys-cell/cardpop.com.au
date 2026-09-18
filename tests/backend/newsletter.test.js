@@ -6,11 +6,14 @@ vi.mock('../../src/middleware/auth.js', () => ({
   optionalAuthMiddleware: (req, _res, next) => { if (req.headers.authorization) req.user = { id: 'u1' }; next(); },
 }));
 
-// The launch branch persists to Supabase + sends the welcome email; that path
-// is exercised in launchRegistrationService.test.js, so here we just stub it.
+// Both branches persist to Supabase (the launch one also sends the welcome
+// email); those paths are exercised in launchRegistrationService.test.js, so
+// here we just stub them.
 const mockRegisterLaunchInterest = vi.hoisted(() => vi.fn());
+const mockRecordNewsletterSubscriber = vi.hoisted(() => vi.fn());
 vi.mock('../../src/services/launchRegistrationService.js', () => ({
   registerLaunchInterest: mockRegisterLaunchInterest,
+  recordNewsletterSubscriber: mockRecordNewsletterSubscriber,
   default: mockRegisterLaunchInterest,
 }));
 
@@ -49,6 +52,7 @@ beforeEach(() => {
   delete process.env.RECAPTCHA_SECRET_KEY;
   global.fetch = vi.fn();
   mockRegisterLaunchInterest.mockResolvedValue({ created: true, emailed: true });
+  mockRecordNewsletterSubscriber.mockResolvedValue({ created: true });
 });
 
 afterEach(() => {
@@ -202,6 +206,42 @@ describe('POST /subscribe — launch list', () => {
     const res = await request(app).post('/subscribe').send({ email: 'a@b.com', list: 'launch' });
 
     expect(res.status).toBe(500);
+  });
+});
+
+// ─── general newsletter list ──────────────────────────────────────────────────
+
+describe('POST /subscribe — general list', () => {
+  it('records the subscriber in our own table as well as pushing to Kit', async () => {
+    global.fetch.mockResolvedValue(fetchResponse({ ok: true }));
+
+    const res = await request(app).post('/subscribe').send({ email: 'a@b.com', firstName: 'Ash' });
+
+    expect(res.status).toBe(200);
+    expect(mockRecordNewsletterSubscriber).toHaveBeenCalledWith({ email: 'a@b.com', firstName: 'Ash' });
+    // Never the launch path — a newsletter subscriber gets no reserved Pro
+    // access and no early-access welcome email.
+    expect(mockRegisterLaunchInterest).not.toHaveBeenCalled();
+  });
+
+  it('still subscribes to Kit when recording the subscriber fails (best-effort)', async () => {
+    mockRecordNewsletterSubscriber.mockRejectedValue(new Error('db down'));
+    global.fetch.mockResolvedValue(fetchResponse({ ok: true }));
+
+    const res = await request(app).post('/subscribe').send({ email: 'a@b.com' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('records the subscriber even when the Kit push then fails', async () => {
+    global.fetch.mockResolvedValue(fetchResponse({ ok: false, status: 422, body: { message: 'nope' } }));
+
+    const res = await request(app).post('/subscribe').send({ email: 'a@b.com' });
+
+    expect(res.status).toBe(422);
+    expect(mockRecordNewsletterSubscriber).toHaveBeenCalledTimes(1);
   });
 });
 

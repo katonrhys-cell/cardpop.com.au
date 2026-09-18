@@ -30,7 +30,7 @@ vi.mock('../../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-import { registerLaunchInterest } from '../../../src/services/launchRegistrationService.js';
+import { registerLaunchInterest, recordNewsletterSubscriber } from '../../../src/services/launchRegistrationService.js';
 
 const TABLE = 'launch_registrations';
 
@@ -104,5 +104,41 @@ describe('registerLaunchInterest — idempotency', () => {
     const res = await registerLaunchInterest({ email: 'a@b.com' });
     expect(res).toEqual({ created: false, emailed: false });
     expect(mockSendLaunchWelcome).not.toHaveBeenCalled();
+  });
+});
+
+describe('recordNewsletterSubscriber', () => {
+  it('rejects an invalid email', async () => {
+    await expect(recordNewsletterSubscriber({ email: 'nope' })).rejects.toThrow(/valid email/i);
+  });
+
+  it('inserts a newsletter subscriber without reserving Pro or emailing them', async () => {
+    h.queues[TABLE] = [
+      { data: null, error: null },                 // select existing → none
+      { data: { id: 'n1' }, error: null },         // insert → row
+    ];
+
+    const res = await recordNewsletterSubscriber({ email: ' NEW@Example.COM ', firstName: ' Ash ' });
+
+    expect(res).toEqual({ created: true });
+    // The early-access welcome email belongs to the launch form only.
+    expect(mockSendLaunchWelcome).not.toHaveBeenCalled();
+  });
+
+  it('is idempotent for an address already on the list', async () => {
+    h.queues[TABLE] = [
+      { data: { id: 'n2', welcome_email_sent_at: null }, error: null },
+    ];
+    const res = await recordNewsletterSubscriber({ email: 'a@b.com' });
+    expect(res).toEqual({ created: false });
+  });
+
+  it('treats a unique-violation race on insert as already-subscribed', async () => {
+    h.queues[TABLE] = [
+      { data: null, error: null },
+      { data: null, error: { code: '23505' } },
+    ];
+    const res = await recordNewsletterSubscriber({ email: 'a@b.com' });
+    expect(res).toEqual({ created: false });
   });
 });
