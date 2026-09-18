@@ -21,30 +21,38 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 import { useCategories } from '@/hooks/useCategories.js';
 import { toast } from 'sonner';
 import VaultListingModal from '@/components/VaultListingModal.jsx';
+import { PAID_ORDER_STATUSES, SETTLED_REFUND_STATUSES, summariseRevenue, formatAud } from '@/utils/revenue.js';
 import ShopProductForm from '@/components/ShopProductForm.jsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
-const StatCard = ({ title, value, icon: Icon, trend, description, loading }) => (
-  <Card className="shadow-sm border-border hover:border-primary/40 transition-colors">
-    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-      <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">{title}</CardTitle>
-      <Icon className="w-5 h-5 text-primary" />
-    </CardHeader>
-    <CardContent>
-      {loading ? (
-        <Skeleton className="h-8 w-24 mb-2" />
-      ) : (
-        <div className="text-3xl font-extrabold tabular-nums tracking-tight text-foreground">{value}</div>
-      )}
-      {(trend || description) && !loading && (
-        <p className="text-xs font-medium text-muted-foreground mt-2 flex items-center">
-          {trend && <span className="text-emerald-500 inline-flex items-center bg-emerald-500/10 px-1.5 py-0.5 rounded mr-2"><ArrowUpRight className="w-3 h-3 mr-0.5"/>{trend}</span>}
-          {description && <span>{description}</span>}
-        </p>
-      )}
-    </CardContent>
-  </Card>
-);
+// `to` turns the whole card into a link through to the detail view behind the
+// number (e.g. Total Revenue → the sales ledger it was summed from).
+const StatCard = ({ title, value, icon: Icon, trend, description, loading, to }) => {
+  const card = (
+    <Card className={`shadow-sm border-border hover:border-primary/40 transition-colors h-full ${to ? 'group cursor-pointer hover:shadow-md' : ''}`}>
+      <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+        <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">{title}</CardTitle>
+        <Icon className="w-5 h-5 text-primary" />
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <Skeleton className="h-8 w-24 mb-2" />
+        ) : (
+          <div className="text-3xl font-extrabold tabular-nums tracking-tight text-foreground">{value}</div>
+        )}
+        {(trend || description) && !loading && (
+          <p className="text-xs font-medium text-muted-foreground mt-2 flex items-center">
+            {trend && <span className="text-emerald-500 inline-flex items-center bg-emerald-500/10 px-1.5 py-0.5 rounded mr-2"><ArrowUpRight className="w-3 h-3 mr-0.5"/>{trend}</span>}
+            {description && <span>{description}</span>}
+            {to && <ArrowUpRight className="w-3.5 h-3.5 ml-1 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  return to ? <Link to={to} className="block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{card}</Link> : card;
+};
 
 const ManagementBox = ({ title, description, icon: Icon, link }) => (
   <Card className="shadow-sm border-border hover:border-primary/40 hover:shadow-md transition-all duration-300 group h-full flex flex-col">
@@ -116,9 +124,10 @@ const AdminDashboard = () => {
 
         if (filterCat) vaultQuery = vaultQuery.eq('category_id', filterCat);
 
-        const [usersRes, ordersRes, tradesRes, sysHealth, vaultRes] = await Promise.all([
+        const [usersRes, ordersRes, refundsRes, tradesRes, sysHealth, vaultRes] = await Promise.all([
           Promise.resolve(supabase.from('profiles').select('id', { count: 'exact', head: true })).catch(() => ({ count: 0 })),
-          Promise.resolve(supabase.from('orders').select('total_aud').in('status', ['payment_confirmed', 'shipped', 'completed'])).catch(() => ({ data: [] })),
+          Promise.resolve(supabase.from('orders').select('id, total_aud, status').in('status', PAID_ORDER_STATUSES)).catch(() => ({ data: [] })),
+          Promise.resolve(supabase.from('refunds').select('order_id, status, refund_amount_aud').in('status', SETTLED_REFUND_STATUSES)).catch(() => ({ data: [] })),
           Promise.resolve(supabase.from('listings').select('*', { count: 'exact' }).eq('status', 'active').limit(1)).catch(() => ({ count: 0 })),
           getSystemHealth().catch(() => ({ database: 'OK', storage: 'OK', api: 'OK', uptime: 'Unknown' })),
           Promise.resolve(vaultQuery).catch(() => ({ data: [], count: 0 }))
@@ -130,10 +139,13 @@ const AdminDashboard = () => {
         // per-query .catch() above never fires. Log any partial-load errors so a
         // false "0" stat isn't completely silent (a full failure still hits the
         // catch below and shows the error screen).
-        const loadErrors = [usersRes.error, ordersRes.error, tradesRes.error, vaultRes.error].filter(Boolean);
+        const loadErrors = [usersRes.error, ordersRes.error, refundsRes.error, tradesRes.error, vaultRes.error].filter(Boolean);
         if (loadErrors.length) console.error('[AdminDashboard] partial load errors:', loadErrors);
 
-        const calculatedRevenue = (ordersRes.data || []).reduce((acc, o) => acc + (Number(o.total_aud) || 0), 0);
+        // Headline revenue is net: what the buyers paid, less refunds actually
+        // issued. Same definition as /admin/revenue, which this card links to —
+        // the two must never disagree.
+        const calculatedRevenue = summariseRevenue(ordersRes.data || [], refundsRes.data || []).net;
 
         setStats(prev => ({
           ...prev,
@@ -220,7 +232,14 @@ const AdminDashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard title="Total Users" value={stats.users.toLocaleString()} icon={Users} loading={loading} />
         <StatCard title="Active Trades" value={stats.activeTrades.toLocaleString()} icon={ArrowRightLeft} loading={loading} />
-        <StatCard title="Total Revenue" value={`$${stats.revenue.toLocaleString()}`} icon={DollarSign} loading={loading} />
+        <StatCard
+          title="Total Revenue"
+          value={formatAud(stats.revenue)}
+          icon={DollarSign}
+          description="View full breakdown"
+          loading={loading}
+          to="/admin/revenue"
+        />
         <Card className="shadow-sm border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Health</CardTitle>
@@ -254,6 +273,7 @@ const AdminDashboard = () => {
           <ManagementBox title="Reports & Moderation" description="Triage scam, counterfeit and abuse reports." icon={Flag} link="/admin/reports" />
           <ManagementBox title="Chat Moderation" description="Search and review member conversations." icon={MessagesSquare} link="/admin/messages" />
           <ManagementBox title="Chargebacks" description="Review payment disputes and frozen payouts." icon={CreditCard} link="/admin/disputes" />
+          <ManagementBox title="Revenue Breakdown" description="Every sale behind total revenue — dates, amounts, fees and GST." icon={DollarSign} link="/admin/revenue" />
           <ManagementBox title="Commissions & Revenue" description="Manage fee rates and view revenue reports." icon={DollarSign} link="/admin/commissions" />
           <ManagementBox title="Partner Program" description="Review partner applications, set rates and pay commissions." icon={Handshake} link="/admin/partners" />
         </div>

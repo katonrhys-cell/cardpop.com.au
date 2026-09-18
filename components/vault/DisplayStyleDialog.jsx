@@ -63,6 +63,7 @@ const DisplayStyleDialog = ({ open, onOpenChange, card, onSaved }) => {
           <DialogTitle>Display style</DialogTitle>
           <DialogDescription>
             Choose how {card.card_name ? `“${card.card_name}”` : 'this card'} is showcased in your vault and on the marketplace.
+            The style applies to the card's first photo; any other photos on the listing stay plain.
           </DialogDescription>
         </DialogHeader>
 

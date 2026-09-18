@@ -4119,8 +4119,10 @@ const AddEditCardPage = () => {
   const styleSection = (
               <SectionCard title="Display Style">
                 <p className="text-sm text-muted-foreground -mt-2">
-                  Choose how this card is showcased to collectors. Premium styles
-                  unlock with your subscription — you can always list with Classic.
+                  Choose how this card is showcased to collectors. The style is
+                  applied to your first photo — the rest stay plain so buyers can
+                  inspect condition. Premium styles unlock with your subscription
+                  — you can always list with Classic.
                 </p>
                 <DisplayStylePicker
                   value={formData.displayStyle}

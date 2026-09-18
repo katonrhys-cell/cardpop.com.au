@@ -1,0 +1,119 @@
+name: Scheduled job
+
+# Reusable runner for CardPop's scheduled backend jobs.
+#
+# These used to be `crons` entries in vercel.json. Vercel's Hobby plan rejects
+# any cron firing more than once a day — a sub-daily schedule fails the entire
+# deployment build, which is how it once silently blocked every production
+# deploy — so the stuck-payment reconciler sat on a daily schedule even though
+# it wants to run far more often. GitHub Actions has no such limit, so the
+# schedules live here and vercel.json carries no `crons` block at all.
+#
+# Each job is one authenticated GET against the production API. Nothing is
+# checked out and no toolchain is installed: this runner exists only to make an
+# HTTP call and fail loudly if it doesn't come back 2xx. Keeping it to a single
+# step matters on a private repo, where Actions minutes are metered and every
+# run is billed rounded up to a whole minute — see docs/scheduled-jobs.md.
+#
+# The endpoints authenticate with CRON_SECRET and all fail closed, so this
+# workflow is not a privilege boundary: without the secret nothing runs.
+
+on:
+  workflow_call:
+    inputs:
+      endpoint:
+        description: Site-absolute path to call, e.g. /api/prices/refresh
+        required: true
+        type: string
+      max_seconds:
+        description: Per-attempt timeout. Match the function's maxDuration in vercel.json.
+        required: false
+        default: 60
+        type: number
+      attempts:
+        description: >
+          How many times to try before failing. Keep at 1 for jobs that spend
+          money on a model call — a retry can double-spend on a run that
+          actually succeeded but answered slowly.
+        required: false
+        default: 1
+        type: number
+    secrets:
+      CRON_SECRET:
+        required: true
+
+# No checkout, no API calls back to GitHub — the job needs no token at all.
+permissions: {}
+
+jobs:
+  call:
+    name: ${{ inputs.endpoint }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Call the endpoint
+        env:
+          # Override with a repository variable to point the jobs at a preview
+          # deployment; unset means production.
+          BASE_URL: ${{ vars.CRON_BASE_URL || 'https://cardpop.com.au' }}
+          ENDPOINT: ${{ inputs.endpoint }}
+          MAX_SECONDS: ${{ inputs.max_seconds }}
+          ATTEMPTS: ${{ inputs.attempts }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -uo pipefail
+
+          if [ -z "${CRON_SECRET}" ]; then
+            echo "::error::CRON_SECRET is empty. Add it under Settings → Secrets and variables → Actions → Secrets, using the same value as the CRON_SECRET environment variable in Vercel."
+            exit 1
+          fi
+
+          url="${BASE_URL%/}${ENDPOINT}"
+          status=000
+
+          for attempt in $(seq 1 "${ATTEMPTS}"); do
+            echo "Attempt ${attempt}/${ATTEMPTS}: GET ${url}"
+
+            # Clear the previous attempt's body, or a request that never gets a
+            # response prints the last one and reads like a success.
+            rm -f body.txt
+
+            status="$(curl --silent --show-error \
+              --max-time "${MAX_SECONDS}" \
+              --header "Authorization: Bearer ${CRON_SECRET}" \
+              --header 'Accept: application/json' \
+              --user-agent 'CardPop-Scheduler/1.0 (+https://github.com/katonrhys-cell/cardpop.com.au)' \
+              --output body.txt \
+              --write-out '%{http_code}' \
+              "${url}" || true)"
+            status="${status:-000}"
+
+            echo "HTTP ${status}"
+            echo '--- response body (first 4KB) ---'
+            head -c 4096 body.txt 2>/dev/null || true
+            echo
+            echo '---------------------------------'
+
+            case "${status}" in
+              2??)
+                echo "::notice::${ENDPOINT} succeeded (HTTP ${status})"
+                exit 0
+                ;;
+              401|403)
+                # Retrying a rejected credential just burns minutes. Note that
+                # Cloudflare sits in front of production, so a 403 with an HTML
+                # body is the WAF/Bot Fight Mode blocking the runner rather than
+                # the endpoint rejecting the token — see docs/scheduled-jobs.md.
+                echo "::error::${ENDPOINT} was rejected (HTTP ${status}). Check that the CRON_SECRET secret matches Vercel's, and that Cloudflare isn't challenging the runner."
+                exit 1
+                ;;
+            esac
+
+            if [ "${attempt}" -lt "${ATTEMPTS}" ]; then
+              echo 'Retrying in 30s...'
+              sleep 30
+            fi
+          done
+
+          echo "::error::${ENDPOINT} failed after ${ATTEMPTS} attempt(s) — last status HTTP ${status}"
+          exit 1
