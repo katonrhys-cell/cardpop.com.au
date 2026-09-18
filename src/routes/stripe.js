@@ -7,7 +7,7 @@ import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
 import { requireAdmin } from '../middleware/requireAal2.js';
 import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
 import { handleDisputeCreated, handleDisputeClosed } from '../services/disputeService.js';
-import { calculateBreakdown } from '../services/commissionService.js';
+import { calculateBreakdown, calculateProcessingFee, calculateGst } from '../services/commissionService.js';
 import { handleCheckoutSessionCompleted, handlePaymentFailed, handleCheckoutSessionExpired, getPlatformSetting } from '../services/stripeWebhookService.js';
 import { validateRequestBody, validateRequestQuery } from '../middleware/validateRequest.js';
 import { createCheckoutSchema, calculateBreakdownSchema, processRefundSchema } from '../schemas/stripeSchemas.js';
@@ -26,10 +26,12 @@ import { createIdentitySession, getIdentityStatus, applyIdentitySession } from '
 import { reconcilePendingOrders } from '../services/pendingOrderAlertService.js';
 import { applyStripeSubscription } from '../services/subscriptionService.js';
 import { ensureWalletCustomer, getWalletBalanceCents, handleWalletTopup, assertNoOpenWalletCheckout, reserveWalletCheckout, releaseWalletCheckout } from '../services/walletService.js';
-import { validateShippingAddress } from '../utils/addressValidation.js';
+import { validateShippingAddress, checkAustralianAddress, AU_ONLY_MESSAGE } from '../utils/addressValidation.js';
 import { requireEmailVerified } from '../middleware/requireEmailVerified.js';
 import { requireIdentityForMarketplacePurchase } from '../middleware/requireIdentityForPurchase.js';
 import { isValidAbn, normalizeAbn } from '../../utils/abn.js';
+import { checkoutPaymentMethodTypes } from '../utils/checkoutPaymentMethods.js';
+import { insertWithOptionalColumns } from '../utils/insertWithOptionalColumns.js';
 
 const router = express.Router();
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
@@ -84,6 +86,14 @@ router.get('/calculate', authMiddleware, validateRequestQuery(calculateBreakdown
     // Seller postage rides on top of the commission breakdown: charged to the
     // buyer, passed through to the seller, no commission or GST touches it.
     const shippingAud = Math.max(0, Number(listing.shipping_cost_aud) || 0);
+    // Priced exactly as checkout prices it, so the modal's total is the total.
+    const processingAud = await calculateProcessingFee(
+      breakdown.itemPrice + breakdown.commissionAud + shippingAud,
+    );
+    const gst = await calculateGst({
+      sellerAmountAud: breakdown.itemPrice + shippingAud,
+      platformAmountAud: breakdown.commissionAud * 2 + processingAud,
+    });
 
     res.json({
       listingId,
@@ -91,9 +101,14 @@ router.get('/calculate', authMiddleware, validateRequestQuery(calculateBreakdown
       itemPrice:     breakdown.itemPrice,
       commissionPct: breakdown.commissionPct,
       commissionAud: breakdown.commissionAud,
-      gstAud:        breakdown.gstAud,
+      // Nothing is added on top any more — prices are GST-inclusive, so the
+      // buyer sees an "includes GST" note rather than a GST charge.
+      gstAud:        0,
+      gstIncludedAud: gst.gstIncludedAud,
+      sellerGstAud:  gst.sellerGstAud,
       shippingAud,
-      total:         Math.round((breakdown.total + shippingAud) * 100) / 100,
+      processingAud,
+      total:         Math.round((breakdown.total + shippingAud + processingAud) * 100) / 100,
     });
   } catch (err) {
     logger.error(`[STRIPE] /calculate error: ${err.message}`);
@@ -205,7 +220,9 @@ router.post('/calculate-cart', optionalAuthMiddleware, async (req, res) => {
       // GST already baked into the GST-inclusive shop prices + shipping.
       gstAud:      priced.gstCents / 100,
       includedGstAud: priced.includedGstCents / 100,
+      sellerGstAud: priced.sellerGstCents / 100,
       shippingAud: priced.shippingCents / 100,
+      processingAud: priced.processingCents / 100,
       // A shipping fee was due and waived by the applied code — the UI shows the
       // saving and keeps treating the code as applied even when the % off is $0.
       freeShipping: priced.shippingWaivedCents > 0,
@@ -277,6 +294,15 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       return res.status(400).json({ error: 'Apply either a promo code or your wallet balance, not both.' });
     }
 
+    // Australia-only gate, checked BEFORE the geocode below: that one fails open
+    // when AWS_LOCATION_API_KEY isn't set, so on its own it would wave an
+    // overseas address straight through. This one never fails open.
+    const auCheck = checkAustralianAddress(shippingAddress || {});
+    if (!auCheck.valid) {
+      logger.warn(`[STRIPE] cart checkout blocked — non-Australian address (${auCheck.reason})`);
+      return res.status(400).json({ error: AU_ONLY_MESSAGE, code: 'au_only' });
+    }
+
     // Authoritative "real, deliverable address" gate. The client autocompletes
     // via Amazon Location Service, but a bypassed frontend can't slip a fake
     // address past this server-side check (fails open only when no key is set).
@@ -299,7 +325,7 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       ? await validatePartnerCode(userId, promoCodeText)
       : null;
 
-    const { lineItems, orderLines, itemsCents, commissionCents, gstCents, includedGstCents, shippingCents, shippingWaivedCents, grandCents } =
+    const { lineItems, orderLines, itemsCents, commissionCents, gstCents, includedGstCents, sellerGstCents, shippingCents, shippingWaivedCents, processingCents, grandCents } =
       await priceCart(items, userId, { waiveShipping: !!partner?.free_shipping });
 
     // Fraud control: cap order size / frequency for brand-new, unverified buyers.
@@ -419,13 +445,13 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       }
     }
 
+    // Pinned rather than left to the Dashboard's dynamic selection — the cart's
+    // processing-fee line is sized for card-rate pricing, so a BNPL method at
+    // ~6% would sell at a loss. See src/utils/checkoutPaymentMethods.js.
+    const paymentMethodTypes = checkoutPaymentMethodTypes();
+
     const session = await stripe.checkout.sessions.create({
-      // Omitting `payment_method_types` lets Stripe Checkout present every
-      // method enabled on the account (Card, Link / Apple Pay / Google Pay,
-      // PayPal, Afterpay/Clearpay) and show each only when the order is
-      // eligible — enable the individual methods in the Stripe Dashboard →
-      // Settings → Payment methods. (`automatic_payment_methods` is a
-      // PaymentIntent param and is rejected by the Checkout Session API.)
+      ...(paymentMethodTypes ? { payment_method_types: paymentMethodTypes } : {}),
       billing_address_collection: 'auto',
       line_items:           lineItems,
       mode:                 'payment',
@@ -475,10 +501,18 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       item_price_aud:    itemsCents / 100,
       shipping_aud:      shippingCents / 100,
       platform_fee_aud:  (commissionCents + gstCents) / 100,
+      // Kept out of platform_fee_aud: it is a cost recovery, not commission, and
+      // the refund path has to be able to retain it separately (Stripe does not
+      // return its fee on a refund).
+      processing_fee_aud: processingCents / 100,
       gst_aud:           gstCents / 100,
-      // GST already inside the GST-inclusive shop prices + shipping. Kept
-      // separate from gst_aud (which is GST added on top for listings) so the
-      // receipt can show it as an "includes GST" line without double-counting.
+      // The GST deducted from sellers' payouts on this order and remitted by
+      // CardPop on their behalf. Part of gst_included_aud, not on top of it.
+      seller_gst_aud:    sellerGstCents / 100,
+      // GST already inside every price on the order (cards, shop stock,
+      // postage, commission, processing). Kept separate from gst_aud — which
+      // is GST *added* on top, and is now always 0 — so the receipt can show it
+      // as an "includes GST" line without double-counting.
       gst_included_aud:  includedGstCents / 100,
       discount_aud:      discountCents / 100,
       total_aud:         (grandCents - discountCents) / 100,
@@ -498,25 +532,16 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       ...(business ? { billing_business_name: business.name || null, billing_abn: business.abn } : {}),
     };
 
-    let { error: orderErr } = await supabase.from('orders').insert(orderRow);
-    // gst_included_aud lands in the same merge as its migration, but Vercel can
-    // redeploy before `supabase db push` runs. If the column isn't there yet,
-    // drop it and retry so a shop checkout never fails during that window — the
-    // GST is still recoverable from the per-line gst_aud in order_items.
-    // PostgREST surfaces a missing column as PGRST204 ("Could not find the
-    // 'gst_included_aud' column ... in the schema cache") — NOT the raw Postgres
-    // 42703 — so match either code (plus the column name in the message as a
-    // final safety net) or the retry never fires and checkout 500s.
-    const missingGstColumn =
-      'gst_included_aud' in orderRow &&
-      (orderErr?.code === 'PGRST204' ||
-        orderErr?.code === '42703' ||
-        /gst_included_aud/.test(orderErr?.message || ''));
-    if (missingGstColumn) {
-      logger.warn('[STRIPE] gst_included_aud column not present yet — inserting order without it');
-      delete orderRow.gst_included_aud;
-      ({ error: orderErr } = await supabase.from('orders').insert(orderRow));
-    }
+    // These columns land in the same merge as their migration, but Vercel can
+    // redeploy before `supabase db push` runs. Drop whichever isn't there yet
+    // and retry, so a shop checkout never fails during that window — the
+    // amounts stay recoverable from the per-line order_items.
+    const { error: orderErr } = await insertWithOptionalColumns(
+      orderRow,
+      ['gst_included_aud', 'processing_fee_aud', 'seller_gst_aud'],
+      row => supabase.from('orders').insert(row),
+      col => logger.warn(`[STRIPE] ${col} column not present yet — inserting order without it`),
+    );
 
     if (orderErr) {
       logger.error(`[STRIPE] pending cart order insert failed: ${orderErr.message}`);

@@ -7,7 +7,7 @@ import apiServerClient from '@/lib/apiServerClient.js';
 
 /*
  * Inline Stripe payment. Renders Stripe's Embedded Checkout (card / PayPal /
- * Afterpay / wallets) directly on our page — the buyer never leaves
+ * wallets) directly on our page — the buyer never leaves
  * cardpop.com.au. Card data is entered inside Stripe's own secure iframe, so it
  * never touches our servers (PCI scope stays with Stripe).
  *

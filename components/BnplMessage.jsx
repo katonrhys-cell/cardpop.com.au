@@ -6,11 +6,11 @@ import { BNPL_PROVIDER, BNPL_INSTALMENTS, bnplEligible } from '@/lib/payments.js
  * buy-now-pay-later instalment line professional retailers show up front on
  * product cards, the cart and the checkout summary.
  *
- * Display-only: it never initiates a payment. Afterpay itself is completed
- * inside Stripe's embedded checkout; this just sets the expectation early to
- * lift conversion. Renders nothing when BNPL is disabled (VITE_ENABLE_BNPL=false)
- * or the amount falls outside Afterpay's eligible range, so it's safe to drop in
- * anywhere a price is shown.
+ * Display-only: it never initiates a payment. Renders nothing unless BNPL is
+ * explicitly switched on (VITE_ENABLE_BNPL=true) and the amount is in range —
+ * and it is OFF by default, because checkout no longer offers a BNPL method
+ * (see lib/payments.js and docs/order-pricing.md). Safe to leave in place
+ * anywhere a price is shown: it simply renders nothing.
  */
 const BnplMessage = ({ amount, className = '', align = 'left' }) => {
   const value = Number(amount);

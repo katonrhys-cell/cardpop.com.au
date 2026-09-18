@@ -1,7 +1,9 @@
 import stripe from '../utils/stripeClient.js';
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
-import { calculateBreakdown } from './commissionService.js';
+import { calculateBreakdown, calculateProcessingFee, calculateGst } from './commissionService.js';
+import { checkoutPaymentMethodTypes } from '../utils/checkoutPaymentMethods.js';
+import { checkAustralianAddress, AU_ONLY_MESSAGE } from '../utils/addressValidation.js';
 import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
 import { validateWelcomeDiscount, buildWelcomeDiscount, reserveWelcomeDiscount } from './welcomeOfferService.js';
 import { ensureWalletCustomer, getWalletBalanceCents, assertNoOpenWalletCheckout, reserveWalletCheckout, releaseWalletCheckout } from './walletService.js';
@@ -136,17 +138,6 @@ export async function createSingleItemCheckout(req, res) {
       });
     }
 
-    if (breakdown.gstAud > 0) {
-      lineItems.push({
-        price_data: {
-          currency: 'aud',
-          product_data: { name: 'GST' },
-          unit_amount: Math.round(breakdown.gstAud * 100),
-        },
-        quantity: 1,
-      });
-    }
-
     // The seller's postage price, charged to the buyer and passed through to
     // the seller's payout in full — no commission comes off it and no GST is
     // added on top (it is the seller's own consumer-quoted price, not
@@ -163,6 +154,39 @@ export async function createSingleItemCheckout(req, res) {
       });
     }
 
+    // Payment processing, charged last because it is a percentage of everything
+    // above it. It reimburses the platform for Stripe's cut (CardPop is the
+    // merchant of record) and never touches the seller's payout — proceeds
+    // below are still item - commission + postage.
+    const processingAud = await calculateProcessingFee(
+      breakdown.itemPrice + breakdown.commissionAud + shippingAud,
+    );
+    if (processingAud > 0) {
+      lineItems.push({
+        price_data: {
+          currency: 'aud',
+          product_data: { name: 'Payment processing' },
+          unit_amount: Math.round(processingAud * 100),
+        },
+        quantity: 1,
+      });
+    }
+
+    // GST is INSIDE the prices above, never added to them. The seller supplies
+    // the card and the postage, so the GST on those comes out of their payout
+    // and CardPop remits it; the commission and processing fee are CardPop's own
+    // supplies, so their GST is inside money the platform already holds.
+    // Commission counts twice because it is charged twice — once as a line to
+    // the buyer and once as a deduction from the seller.
+    const gst = await calculateGst({
+      sellerAmountAud: breakdown.itemPrice + shippingAud,
+      platformAmountAud: breakdown.commissionAud * 2 + processingAud,
+    });
+
+    const sellerProceedsAud = Math.round(
+      (breakdown.itemPrice - breakdown.commissionAud - gst.sellerGstAud + shippingAud) * 100,
+    ) / 100;
+
     const metadata = {
       userId,
       listingId,
@@ -172,15 +196,20 @@ export async function createSingleItemCheckout(req, res) {
       itemPrice: String(breakdown.itemPrice),
       commissionPct: String(breakdown.commissionPct),
       commissionAud: String(breakdown.commissionAud),
-      gstAud: String(breakdown.gstAud),
+      // Nothing is added on top of the buyer's bill any more, so the only GST
+      // figures worth carrying are the included ones.
+      sellerGstAud: String(gst.sellerGstAud),
+      platformGstAud: String(gst.platformGstAud),
+      gstIncludedAud: String(gst.gstIncludedAud),
       shippingAud: String(shippingAud),
-      sellerProceedsAud: String(Math.round((breakdown.itemPrice - breakdown.commissionAud + shippingAud) * 100) / 100),
+      processingFeeAud: String(processingAud),
+      sellerProceedsAud: String(sellerProceedsAud),
       configId: breakdown.configId || '',
     };
     if (offerId) metadata.offerId = offerId;
     if (bidId) metadata.bidId = bidId;
 
-    const buyerTotal = breakdown.itemPrice + (breakdown.commissionAud || 0) + (breakdown.gstAud || 0) + shippingAud;
+    const buyerTotal = breakdown.itemPrice + (breakdown.commissionAud || 0) + shippingAud + processingAud;
     const velocity = await checkPurchaseVelocity({ userId, orderValueAud: buyerTotal });
     if (!velocity.allowed) {
       logger.warn(`[VELOCITY] Blocked checkout for ${userId} (${velocity.reason})`);
@@ -188,6 +217,15 @@ export async function createSingleItemCheckout(req, res) {
     }
 
     if (shippingAddress) {
+      // Australia only. The Buy Now modal doesn't collect an address at all —
+      // for that case Stripe collects one, restricted to AU by
+      // shipping_address_collection on the session below — but an address that
+      // IS supplied has to clear the same bar.
+      const auCheck = checkAustralianAddress(shippingAddress);
+      if (!auCheck.valid) {
+        logger.warn(`[STRIPE] checkout blocked — non-Australian address (${auCheck.reason})`);
+        return res.status(400).json({ error: AU_ONLY_MESSAGE, code: 'au_only' });
+      }
       const s = shippingAddress;
       if (s.name) metadata.shippingName = String(s.name).slice(0, 100);
       if (s.address) metadata.shippingAddress = String(s.address).slice(0, 200);
@@ -255,13 +293,19 @@ export async function createSingleItemCheckout(req, res) {
       }
     }
 
+    // Pinned rather than left to the Dashboard's dynamic selection: the
+    // processing-fee line above is sized for card-rate pricing, so a BNPL
+    // method at ~6% would sell at a loss. See checkoutPaymentMethods.js.
+    const paymentMethodTypes = checkoutPaymentMethodTypes();
+
     const session = await stripe.checkout.sessions.create({
-      // Omitting `payment_method_types` lets Stripe Checkout present every
-      // method enabled on the account (Card, Link / Apple Pay / Google Pay,
-      // PayPal, Afterpay/Clearpay) and show each only when the order is
-      // eligible — enable the individual methods in the Stripe Dashboard →
-      // Settings → Payment methods. (`automatic_payment_methods` is a
-      // PaymentIntent param and is rejected by the Checkout Session API.)
+      ...(paymentMethodTypes ? { payment_method_types: paymentMethodTypes } : {}),
+      // Australia only, enforced by Stripe's own address picker: this path is
+      // reached from the Buy Now modal, which collects no address, so without
+      // this an overseas buyer has nothing to fail. The country list is the
+      // gate; the address it captures also lands on the order, since the
+      // webhook already falls back to session.shipping_details.
+      shipping_address_collection: { allowed_countries: ['AU'] },
       billing_address_collection: 'auto',
       line_items: lineItems,
       mode: 'payment',
@@ -284,7 +328,16 @@ export async function createSingleItemCheckout(req, res) {
     res.json({
       url: session.url,
       sessionId: session.id,
-      breakdown: { ...breakdown, shippingAud, total: Math.round((breakdown.total + shippingAud) * 100) / 100 },
+      breakdown: {
+        ...breakdown,
+        shippingAud,
+        processingAud,
+        // gstIncludedAud is shown as an "includes GST" note, not a charge —
+        // it is already inside the total below.
+        gstIncludedAud: gst.gstIncludedAud,
+        sellerGstAud: gst.sellerGstAud,
+        total: Math.round((breakdown.total + shippingAud + processingAud) * 100) / 100,
+      },
     });
   } catch (err) {
     // We claimed the wallet slot but never handed it to a live session — free it

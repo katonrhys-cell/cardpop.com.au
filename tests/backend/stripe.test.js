@@ -140,6 +140,96 @@ describe('POST /create-checkout', () => {
     expect(res.body.url).toBe('https://stripe.com/pay/cs_1');
   });
 
+  // calculateBreakdown then calculateProcessingFee read these settings in this
+  // exact order, so queue them in it. The blanket mockResolvedValue in
+  // beforeEach answers every read with the listing row (whose `.value` is
+  // undefined), which would leave the commission NaN and price no fee at all.
+  const pricingSettings = () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: { value: false }, error: null })          // email_verification_required
+      .mockResolvedValueOnce({ data: MOCK_LISTING, error: null })              // listing lookup
+      .mockResolvedValueOnce({ data: { value: true }, error: null })           // commissions_enabled
+      .mockResolvedValueOnce({ data: { value: true }, error: null })           // commission_on_fixed
+      .mockResolvedValueOnce({ data: { id: 'fc-1', fee_pct: 3 }, error: null }) // fee_config
+      .mockResolvedValueOnce({ data: { value: true }, error: null })           // processing_fee_enabled
+      .mockResolvedValueOnce({ data: { value: 1.9 }, error: null })            // processing_fee_pct
+      .mockResolvedValueOnce({ data: { value: 0.35 }, error: null })           // processing_fee_fixed_aud
+      .mockResolvedValueOnce({ data: { value: true }, error: null })           // gst_enabled
+      .mockResolvedValueOnce({ data: { value: 10 }, error: null });            // gst_rate_pct
+  };
+
+  it('charges the buyer a grossed-up processing fee line that covers Stripe’s cut', async () => {
+    pricingSettings();
+    mockStripe.checkout.sessions.create.mockResolvedValue({ id: 'cs_1', url: 'https://stripe.com/pay/cs_1' });
+    const res = await request(app).post('/create-checkout').send(VALID_CHECKOUT_BODY);
+
+    expect(res.status).toBe(200);
+    const [[sessionArgs]] = mockStripe.checkout.sessions.create.mock.calls;
+    const feeLine = sessionArgs.line_items.find(li => li.price_data.product_data.name === 'Payment processing');
+    expect(feeLine).toBeDefined();
+    // $99.99 item + $3.00 commission (no GST line — prices are GST-inclusive),
+    // so ceil((10299 × 1.9% + 35) / (1 − 1.9%)) = 236¢.
+    expect(feeLine.price_data.unit_amount).toBe(236);
+    // And no GST is charged on top of any of it.
+    expect(sessionArgs.line_items.some(li => /GST/i.test(li.price_data.product_data.name))).toBe(false);
+
+    // The fee must cover what Stripe actually takes from the whole captured
+    // amount (AU domestic card: 1.75% + $0.30) — that is the point of it.
+    const totalCents = sessionArgs.line_items.reduce((sum, li) => sum + li.price_data.unit_amount * li.quantity, 0);
+    expect(feeLine.price_data.unit_amount).toBeGreaterThanOrEqual(Math.round(totalCents * 0.0175 + 30));
+
+    // And the buyer's quoted total is the sum of the lines — no hidden extra.
+    expect(res.body.breakdown.total).toBe(totalCents / 100);
+    expect(res.body.breakdown.processingAud).toBe(2.36);
+  });
+
+  it('deducts GST from the seller and never the processing fee', async () => {
+    pricingSettings();
+    mockStripe.checkout.sessions.create.mockResolvedValue({ id: 'cs_1', url: 'https://stripe.com/pay/cs_1' });
+    await request(app).post('/create-checkout').send(VALID_CHECKOUT_BODY);
+
+    const [[sessionArgs]] = mockStripe.checkout.sessions.create.mock.calls;
+    const { processingFeeAud, sellerGstAud, platformGstAud, sellerProceedsAud } = sessionArgs.metadata;
+
+    // The GST inside the $99.99 listing price: 1/11 = $9.09, withheld from the
+    // seller for CardPop to remit.
+    expect(Number(sellerGstAud)).toBe(9.09);
+    // CardPop's own: 1/11 of 2 × $3.00 commission + $2.36 processing.
+    expect(Number(platformGstAud)).toBe(0.76);
+    // $99.99 − $3.00 commission − $9.09 GST + $0 postage. The buyer's
+    // processing fee is nowhere in it.
+    expect(Number(processingFeeAud)).toBe(2.36);
+    expect(Number(sellerProceedsAud)).toBe(87.9);
+  });
+
+  it('has Stripe collect an Australian-only shipping address (the modal collects none)', async () => {
+    mockStripe.checkout.sessions.create.mockResolvedValue({ id: 'cs_1', url: 'https://stripe.com/pay/cs_1' });
+    await request(app).post('/create-checkout').send(VALID_CHECKOUT_BODY);
+
+    const [[sessionArgs]] = mockStripe.checkout.sessions.create.mock.calls;
+    expect(sessionArgs.shipping_address_collection).toEqual({ allowed_countries: ['AU'] });
+  });
+
+  it('refuses a supplied non-Australian address', async () => {
+    mockMaybeSingle.mockResolvedValue({ data: MOCK_LISTING, error: null });
+    const res = await request(app).post('/create-checkout').send({
+      ...VALID_CHECKOUT_BODY,
+      shippingAddress: { name: 'A Buyer', address: '1 Main St', suburb: 'Austin', state: 'TX', postcode: '73301' },
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('au_only');
+    expect(mockStripe.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
+  it('pins the payment methods so no BNPL option can be offered', async () => {
+    mockStripe.checkout.sessions.create.mockResolvedValue({ id: 'cs_1', url: 'https://stripe.com/pay/cs_1' });
+    await request(app).post('/create-checkout').send(VALID_CHECKOUT_BODY);
+
+    const [[sessionArgs]] = mockStripe.checkout.sessions.create.mock.calls;
+    expect(sessionArgs.payment_method_types).toEqual(['card', 'paypal']);
+    expect(sessionArgs.payment_method_types).not.toContain('afterpay_clearpay');
+  });
+
   it('returns 500 when stripe returns a session without a URL', async () => {
     mockStripe.checkout.sessions.create.mockResolvedValue({ id: 'cs_1', url: null });
     const res = await request(app).post('/create-checkout').send(VALID_CHECKOUT_BODY);
@@ -450,13 +540,19 @@ describe('POST /calculate-cart', () => {
     });
     const res = await request(app).post('/calculate-cart').send({ items: [{ type: 'shop', id: 'p1', quantity: 2 }] });
     expect(res.status).toBe(200);
-    // $200 GST-inclusive: buyer pays $200, GST ($18.18) is inside it, not added.
+    // $200 GST-inclusive: GST ($18.18) is inside it, not added. On top sits the
+    // processing fee at the seeded default rate: ceil((20000 × 1.9% + 35) /
+    // (1 − 1.9%)) = 424¢, grossed up so it still covers Stripe's cut of the
+    // larger total it creates.
     expect(res.body.subtotalAud).toBe(200);
     expect(res.body.commissionAud).toBe(0);
     expect(res.body.gstAud).toBe(0);            // nothing added on top
-    expect(res.body.includedGstAud).toBe(18.18); // round(20000 × 10/110) / 100
+    // $200 of GST-inclusive stock (round(20000 × 10/110) = 1818¢) plus the GST
+    // inside CardPop's own $4.24 processing fee (round(424 × 10/110) = 39¢).
+    expect(res.body.includedGstAud).toBe(18.57);
     expect(res.body.shippingAud).toBe(0);
-    expect(res.body.totalAud).toBe(200);
+    expect(res.body.processingAud).toBe(4.24);
+    expect(res.body.totalAud).toBe(204.24);
   });
 
   // priceCart reads the two shipping settings AFTER the item loop, so queue them
@@ -476,11 +572,13 @@ describe('POST /calculate-cart', () => {
     shippingSettings(9.95, 100);
     const res = await request(app).post('/calculate-cart').send({ items: [{ type: 'shop', id: 'p1', quantity: 1 }] });
     expect(res.status).toBe(200);
-    // $50 GST-inclusive item + $9.95 shipping = $59.95; GST is inside, not added.
+    // $50 GST-inclusive item + $9.95 shipping = $59.95, then $1.52 processing
+    // (the fee is charged on shipping too — Stripe takes its cut of that as well).
     expect(res.body.subtotalAud).toBe(50);
     expect(res.body.gstAud).toBe(0);
     expect(res.body.shippingAud).toBe(9.95);
-    expect(res.body.totalAud).toBe(59.95);
+    expect(res.body.processingAud).toBe(1.52);
+    expect(res.body.totalAud).toBe(61.47);
   });
 
   it('gives free shipping once the shop subtotal reaches the threshold', async () => {
@@ -492,10 +590,11 @@ describe('POST /calculate-cart', () => {
     shippingSettings(9.95, 100);
     const res = await request(app).post('/calculate-cart').send({ items: [{ type: 'shop', id: 'p1', quantity: 2 }] });
     expect(res.status).toBe(200);
-    // $200 GST-inclusive, over the $100 free-shipping threshold → $200 total.
+    // $200 GST-inclusive, over the $100 free-shipping threshold → no shipping,
+    // $4.24 processing.
     expect(res.body.subtotalAud).toBe(200);
     expect(res.body.shippingAud).toBe(0);
-    expect(res.body.totalAud).toBe(200);
+    expect(res.body.totalAud).toBe(204.24);
   });
 
   // A partner code is resolved BEFORE the cart is priced, so its lookup is the
@@ -526,7 +625,10 @@ describe('POST /calculate-cart', () => {
     expect(res.body.shippingAud).toBe(0);
     expect(res.body.freeShipping).toBe(true);
     expect(res.body.shippingWaivedAud).toBe(9.95);
-    expect(res.body.totalAud).toBe(50);
+    // $50 + $0 shipping + $1.33 processing. The waiver shrinks the subtotal the
+    // fee is priced on, so the buyer isn't charged processing on a fee they
+    // didn't pay.
+    expect(res.body.totalAud).toBe(51.33);
     // 0% off but free shipping — the code did something, so no "does nothing" error.
     expect(res.body.promoError).toBeNull();
   });
@@ -547,9 +649,9 @@ describe('POST /calculate-cart', () => {
     expect(res.body.shippingAud).toBe(9.95);
     expect(res.body.freeShipping).toBe(false);
     expect(res.body.shippingWaivedAud).toBe(0);
-    // $50 + $9.95 shipping − $5 (10% of the shop subtotal) = $54.95
+    // $50 + $9.95 shipping + $1.52 processing − $5 (10% of the shop subtotal).
     expect(res.body.discountAud).toBe(5);
-    expect(res.body.totalAud).toBe(54.95);
+    expect(res.body.totalAud).toBe(56.47);
   });
 
   it("reports free shipping as no saving when the order already shipped free", async () => {
@@ -570,11 +672,16 @@ describe('POST /calculate-cart', () => {
     expect(res.body.freeShipping).toBe(false);
     expect(res.body.shippingWaivedAud).toBe(0);
     expect(res.body.promoError).toBe('This code applies to CardPop Shop items only.');
-    expect(res.body.totalAud).toBe(200);
+    expect(res.body.totalAud).toBe(204.24);
   });
 });
 
 describe('POST /create-cart-checkout', () => {
+  // Every cart checkout now needs an Australian delivery address: the
+  // Australia-only gate runs before pricing and, unlike the Amazon Location
+  // geocode, never fails open when no API key is configured.
+  const AU_ADDRESS = { name: 'A Buyer', address: '1 Test St', suburb: 'Sydney', state: 'NSW', postcode: '2000' };
+
   it('returns 400 when items is missing', async () => {
     const res = await request(app).post('/create-cart-checkout').send({ successUrl: 'a', cancelUrl: 'b' });
     expect(res.status).toBe(400);
@@ -585,6 +692,37 @@ describe('POST /create-cart-checkout', () => {
     expect(res.status).toBe(400);
   });
 
+  it('refuses a non-Australian delivery address', async () => {
+    const res = await request(app).post('/create-cart-checkout').send({
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b',
+      shippingAddress: { name: 'A Buyer', address: '1 Main St', suburb: 'Austin', state: 'TX', postcode: '73301' },
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('au_only');
+    // Rejected before anything is priced or charged.
+    expect(mockStripe.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses an address that names a non-Australian country even with an AU-shaped state', async () => {
+    const res = await request(app).post('/create-cart-checkout').send({
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b',
+      shippingAddress: { ...AU_ADDRESS, country: 'NZ' },
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('au_only');
+  });
+
+  it('refuses a missing address rather than failing open', async () => {
+    // The Amazon Location geocode fails open when no API key is set (as in
+    // tests, and in any environment where the key isn't configured), so before
+    // the Australia gate an addressless cart checked out fine.
+    const res = await request(app).post('/create-cart-checkout').send({
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b',
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe('au_only');
+  });
+
   it('returns 409 when a shop item is out of stock', async () => {
     emailVerifyOff();
     gstSettings();
@@ -593,7 +731,7 @@ describe('POST /create-cart-checkout', () => {
       error: null,
     });
     const res = await request(app).post('/create-cart-checkout').send({
-      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b',
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b', shippingAddress: AU_ADDRESS,
     });
     expect(res.status).toBe(409);
   });
@@ -606,7 +744,7 @@ describe('POST /create-cart-checkout', () => {
       error: null,
     });
     const res = await request(app).post('/create-cart-checkout').send({
-      items: [{ type: 'listing', id: 'l1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b',
+      items: [{ type: 'listing', id: 'l1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b', shippingAddress: AU_ADDRESS,
     });
     expect(res.status).toBe(403);
   });
@@ -617,7 +755,7 @@ describe('POST /create-cart-checkout', () => {
     // mockResolvedValueOnce values would bleed into later tests).
     emailVerifyOff();
     const res = await request(app).post('/create-cart-checkout').send({
-      items: [{ type: 'mystery', id: 'x' }], successUrl: 'a', cancelUrl: 'b',
+      items: [{ type: 'mystery', id: 'x' }], successUrl: 'a', cancelUrl: 'b', shippingAddress: AU_ADDRESS,
     });
     expect(res.status).toBe(400);
   });
@@ -632,13 +770,14 @@ describe('POST /create-cart-checkout', () => {
     mockStripe.checkout.sessions.create.mockResolvedValue({ id: 'cs_cart', url: 'https://stripe.com/pay/cs_cart' });
 
     const res = await request(app).post('/create-cart-checkout').send({
-      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b',
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b', shippingAddress: AU_ADDRESS,
     });
 
     expect(res.status).toBe(200);
     expect(res.body.url).toBe('https://stripe.com/pay/cs_cart');
-    // $100 shop item is GST-inclusive (no shipping mocked) → buyer pays $100.
-    expect(res.body.total).toBe(100);
+    // $100 shop item is GST-inclusive (no shipping mocked) → $100 + $2.30
+    // processing.
+    expect(res.body.total).toBe(102.3);
     expect(mockStripe.checkout.sessions.create).toHaveBeenCalled();
   });
 
@@ -660,7 +799,7 @@ describe('POST /create-cart-checkout', () => {
       .mockResolvedValueOnce({ error: null });
 
     const res = await request(app).post('/create-cart-checkout').send({
-      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b',
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b', shippingAddress: AU_ADDRESS,
     });
 
     expect(res.status).toBe(200);
@@ -675,7 +814,7 @@ describe('POST /create-cart-checkout', () => {
     // email_confirmed_at (the auth mock) must be rejected before any pricing.
     mockMaybeSingle.mockResolvedValueOnce({ data: { value: true }, error: null });
     const res = await request(app).post('/create-cart-checkout').send({
-      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b',
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b', shippingAddress: AU_ADDRESS,
     });
     expect(res.status).toBe(403);
     expect(res.body.code).toBe('EMAIL_NOT_VERIFIED');
@@ -685,7 +824,7 @@ describe('POST /create-cart-checkout', () => {
   it('blocks a marketplace listing purchase with 403 when the buyer is not identity-verified', async () => {
     mockProfileMaybeSingle.mockResolvedValue({ data: { is_verified: false }, error: null });
     const res = await request(app).post('/create-cart-checkout').send({
-      items: [{ type: 'listing', id: 'l1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b',
+      items: [{ type: 'listing', id: 'l1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b', shippingAddress: AU_ADDRESS,
     });
     expect(res.status).toBe(403);
     expect(res.body.code).toBe('IDENTITY_NOT_VERIFIED');
@@ -697,7 +836,7 @@ describe('POST /create-cart-checkout', () => {
     // identity — it proceeds past the gate (and fails later only if pricing does).
     mockProfileMaybeSingle.mockResolvedValue({ data: { is_verified: false }, error: null });
     const res = await request(app).post('/create-cart-checkout').send({
-      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b',
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b', shippingAddress: AU_ADDRESS,
     });
     expect(res.body.code).not.toBe('IDENTITY_NOT_VERIFIED');
   });

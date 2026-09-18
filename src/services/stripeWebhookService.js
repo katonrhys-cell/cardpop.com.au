@@ -8,6 +8,8 @@ import { recordShopOrderReferral } from './partnerService.js';
 import { debitWalletForOrder, releaseWalletCheckout } from './walletService.js';
 import { subscribeToNewsletter } from '../utils/newsletter.js';
 import { namesMatch } from './identityService.js';
+import { insertWithOptionalColumns } from '../utils/insertWithOptionalColumns.js';
+import { isCardCountryAllowed, allowedCardCountries } from '../utils/cardCountryPolicy.js';
 
 /**
  * Informational cross-check: does the name the buyer typed at Stripe Checkout
@@ -40,18 +42,28 @@ export async function computePayerNameMismatch(buyerId, payerName) {
  * Google's brand guidelines, instead of just "payment successful". Best-
  * effort: a lookup failure must never block order fulfilment.
  */
-async function resolveWalletType(stripe, paymentIntentId) {
-  if (!paymentIntentId) return null;
+async function resolvePaymentMethod(stripe, paymentIntentId) {
+  if (!paymentIntentId) return { walletType: null, cardCountry: null };
   try {
     const pi = await stripe.paymentIntents.retrieve(paymentIntentId, { expand: ['payment_method'] });
     const pm = pi.payment_method;
-    if (!pm || typeof pm === 'string') return null;
-    if (pm.type === 'card' && pm.card?.wallet?.type) return pm.card.wallet.type;
-    if (pm.type === 'link') return 'link';
-    return null;
+    if (!pm || typeof pm === 'string') return { walletType: null, cardCountry: null };
+
+    let walletType = null;
+    if (pm.type === 'card' && pm.card?.wallet?.type) walletType = pm.card.wallet.type;
+    else if (pm.type === 'link') walletType = 'link';
+
+    // Where the method was issued, used to enforce the Australia-only policy
+    // (cardCountryPolicy.js). `pm.card.country` covers cards and card wallets;
+    // the `pm[pm.type]` fallback picks up any other method that reports one.
+    // Methods that report none (often PayPal) come back null, which the policy
+    // treats as allowed rather than refunding a good domestic payment.
+    const cardCountry = pm.card?.country ?? pm[pm.type]?.country ?? null;
+
+    return { walletType, cardCountry };
   } catch (e) {
-    logger.warn(`[STRIPE] Could not resolve wallet type for payment intent ${paymentIntentId}: ${e.message}`);
-    return null;
+    logger.warn(`[STRIPE] Could not resolve payment method for payment intent ${paymentIntentId}: ${e.message}`);
+    return { walletType: null, cardCountry: null };
   }
 }
 
@@ -127,6 +139,59 @@ async function claimListingSold(listingId) {
     return false;
   }
   return Array.isArray(data) && data.length > 0;
+}
+
+/**
+ * The payment came from a card issued outside the countries CardPop sells to.
+ * Checkout captures on completion, so the money is already taken — refuse to
+ * fulfil and hand all of it back rather than shipping to an overseas buyer.
+ *
+ * Stripe does NOT return its processing fee on a refund, so each of these costs
+ * the platform that fee. A Radar rule (`:card_country: != 'AU'`) declines before
+ * capture and costs nothing — this is the backstop for when one isn't in place.
+ */
+async function flagForeignCard({ stripe, session, orderId, buyerId, cardCountry }) {
+  logger.error(`[STRIPE] Foreign card (${cardCountry}) on session ${session.id} — not fulfilling, refunding in full`);
+
+  const paymentIntentId = typeof session.payment_intent === 'string'
+    ? session.payment_intent
+    : (session.payment_intent?.id ?? null);
+  if (paymentIntentId) {
+    try {
+      // Order-scoped idempotency: a redelivered webhook must not issue a second
+      // refund for the same payment.
+      await stripe.refunds.create(
+        { payment_intent: paymentIntentId, reason: 'requested_by_customer' },
+        { idempotencyKey: `foreign-card-refund-${session.id}` },
+      );
+    } catch (e) {
+      logger.error(`[STRIPE] Auto-refund failed for foreign-card session ${session.id}: ${e.message} — needs manual refund`);
+    }
+  }
+
+  // Best-effort notifications — a notify failure must never re-throw and turn a
+  // handled block into a webhook 500 that Stripe retries.
+  try {
+    const { data: admins } = await supabase.from('profiles').select('id').eq('is_admin', true);
+    if (admins?.length) {
+      await supabase.from('notifications').insert(admins.map(a => ({
+        user_id: a.id,
+        type: 'order_foreign_card',
+        title: 'Overseas card blocked — auto-refunded',
+        body: `Session ${session.id} was paid with a ${cardCountry} card (order ${orderId || 'n/a'}). CardPop sells to ${allowedCardCountries().join(', ')} only, so the payment was refunded in full. Verify it settled — Stripe keeps its processing fee on refunds.`,
+      })));
+    }
+    if (buyerId) {
+      await supabase.from('notifications').insert({
+        user_id: buyerId,
+        type: 'order_refund_pending',
+        title: 'Refund on the way',
+        body: 'CardPop currently sells to buyers in Australia only, so your payment is being refunded in full — no action needed.',
+      });
+    }
+  } catch (e) {
+    logger.warn(`[STRIPE] foreign-card notification failed for session ${session.id}: ${e.message}`);
+  }
 }
 
 /**
@@ -314,7 +379,16 @@ async function handleCartOrder(existing, session, stripe) {
     : (session.payment_intent?.id ?? null);
 
   const payerNameMismatch = await computePayerNameMismatch(existing.buyer_id, session.customer_details?.name);
-  const walletType = await resolveWalletType(stripe, cartPaymentIntentId);
+  const { walletType, cardCountry } = await resolvePaymentMethod(stripe, cartPaymentIntentId);
+
+  // Australia only. The shipping address was gated at checkout, but the card's
+  // country is only knowable now — and Checkout already captured the money, so
+  // the block is a refusal to fulfil plus a full refund.
+  if (!isCardCountryAllowed(cardCountry)) {
+    await supabase.from('orders').update({ status: 'payment_failed' }).eq('id', existing.id);
+    await flagForeignCard({ stripe, session, orderId: existing.id, buyerId: existing.buyer_id, cardCountry });
+    return;
+  }
 
   let { data: claimed, error: claimErr } = await supabase.from('orders')
     .update({ status: 'payment_confirmed', stripe_payment_intent_id: cartPaymentIntentId, payer_name_mismatch: payerNameMismatch, payment_wallet_type: walletType })
@@ -441,8 +515,15 @@ async function handleCartOrder(existing, session, stripe) {
     if (!line.seller_id) continue;
     sellerIds.add(line.seller_id);
     // Seller postage (shipping_aud) passes through in full — commission only
-    // ever comes off the item price.
-    const proceeds = Number(line.line_total_aud || 0) - Number(line.commission_aud || 0) + Number(line.shipping_aud || 0);
+    // ever comes off the item price. The GST inside this seller's supply (the
+    // card and their postage) IS deducted: CardPop remits it on their behalf,
+    // so paying it out as well would leave the platform funding the tax.
+    const proceeds = Math.round((
+      Number(line.line_total_aud || 0)
+      - Number(line.commission_aud || 0)
+      - Number(line.seller_gst_aud || 0)
+      + Number(line.shipping_aud || 0)
+    ) * 100) / 100;
     if (proceeds > 0) {
       // Record the payout on the line itself (a cart can span multiple
       // sellers, so the order-level payout columns can't hold it) —
@@ -577,12 +658,30 @@ async function handleCartOrder(existing, session, stripe) {
     const itemsSummary = names.length
       ? `${itemCount} item${itemCount === 1 ? '' : 's'} — ${names.slice(0, 5).join(', ')}${names.length > 5 ? ', …' : ''}`
       : `${itemCount} item${itemCount === 1 ? '' : 's'}`;
+
+    // Name the marketplace sellers. Without this a cart carrying someone's card
+    // reached the admin inbox looking exactly like a sale of CardPop's own shop
+    // stock — same subject, same body, no seller — so marketplace sales were
+    // invisible in the one place they get watched.
+    let sellerName = null;
+    if (sellerIds.size > 0) {
+      const { data: sellerProfiles } = await supabase
+        .from('profiles')
+        .select('display_name')
+        .in('id', [...sellerIds]);
+      const sellerNames = (sellerProfiles || []).map(p => p.display_name).filter(Boolean);
+      sellerName = sellerNames.length
+        ? sellerNames.slice(0, 3).join(', ') + (sellerNames.length > 3 ? ', …' : '')
+        : `${sellerIds.size} marketplace seller${sellerIds.size === 1 ? '' : 's'}`;
+    }
+
     await notifyAdminOfOrder({
       orderId: existing.id,
       buyerName: receiptName,
       buyerEmail: receiptEmail,
       total: amountCents2 / 100,
       itemsSummary,
+      sellerName,
     });
   }
 
@@ -614,17 +713,30 @@ async function handleSingleItemOrder(session, stripe) {
   // the seller in full (sellerProceedsAud already includes it at session
   // creation; the fallback below mirrors that formula for legacy sessions).
   const shippingAud = parseFloat(meta.shippingAud || '0');
-  const sellerProceeds = parseFloat(meta.sellerProceedsAud || String(itemPrice - commissionAud + shippingAud));
+  // Buyer-paid reimbursement of Stripe's cut. Platform money, never the
+  // seller's — it is deliberately absent from sellerProceedsAud below, and from
+  // platform_fee_aud (the commission figure the admin reports and the refund
+  // retention are computed from).
+  const processingFeeAud = parseFloat(meta.processingFeeAud || '0');
+  // GST is inside every price, never added to the buyer's bill. The seller's
+  // share (the card + their postage) is deducted from their payout and remitted
+  // by CardPop; the platform's share is inside fees it already holds.
+  const sellerGstAud = parseFloat(meta.sellerGstAud || '0');
+  const platformGstAud = parseFloat(meta.platformGstAud || '0');
+  const gstIncludedAud = parseFloat(meta.gstIncludedAud || String(sellerGstAud + platformGstAud));
+  const sellerProceeds = parseFloat(
+    meta.sellerProceedsAud || String(itemPrice - commissionAud - sellerGstAud + shippingAud),
+  );
   const configId = meta.configId || null;
   const discountAud = parseFloat(meta.discountAud || '0');
   const amountCents = session.amount_total || 0;
 
-  if (![itemPrice, commissionAud, gstAud, shippingAud, discountAud].every(Number.isFinite)) {
+  if (![itemPrice, commissionAud, gstAud, shippingAud, processingFeeAud, sellerGstAud, discountAud].every(Number.isFinite)) {
     logger.error(`[STRIPE] Non-finite amount in metadata for session ${session.id} — order rejected`);
     return;
   }
 
-  const expectedTotalCents = Math.round((itemPrice + commissionAud + gstAud + shippingAud - discountAud) * 100);
+  const expectedTotalCents = Math.round((itemPrice + commissionAud + gstAud + shippingAud + processingFeeAud - discountAud) * 100);
   if (Math.abs(amountCents - expectedTotalCents) > 2) {
     logger.error(`[STRIPE] Amount mismatch for session ${session.id}: Stripe=${amountCents}¢ expected=${expectedTotalCents}¢ — order rejected`);
     await flagAmountMismatch({ stripe, session, orderId: null, buyerId: userId, amountCents, expectedCents: expectedTotalCents });
@@ -636,7 +748,14 @@ async function handleSingleItemOrder(session, stripe) {
     : (session.payment_intent?.id ?? null);
 
   const payerNameMismatch = await computePayerNameMismatch(userId, session.customer_details?.name);
-  const walletType = await resolveWalletType(stripe, paymentIntentId);
+  const { walletType, cardCountry } = await resolvePaymentMethod(stripe, paymentIntentId);
+
+  // Australia only — checked before the order row is written, so a blocked
+  // payment leaves no order, never claims the listing and never pays a seller.
+  if (!isCardCountryAllowed(cardCountry)) {
+    await flagForeignCard({ stripe, session, orderId: null, buyerId: userId, cardCountry });
+    return;
+  }
 
   const orderInsert = {
     buyer_id: userId,
@@ -651,8 +770,15 @@ async function handleSingleItemOrder(session, stripe) {
     shipping_aud: shippingAud,
     discount_aud: discountAud,
     platform_fee_aud: commissionAud + gstAud,
+    processing_fee_aud: processingFeeAud,
     commission_pct: commissionPct,
+    // gst_aud is GST ADDED on top, which is now always 0 — prices are
+    // GST-inclusive. gst_included_aud is the GST inside them, of which
+    // seller_gst_aud is the part deducted from the seller and remitted for them.
     gst_aud: gstAud,
+    gst_included_aud: gstIncludedAud,
+    seller_gst_aud: sellerGstAud,
+    platform_gst_aud: platformGstAud,
     seller_proceeds_aud: sellerProceeds,
     transaction_type: transactionType,
     commission_config_id: configId || null,
@@ -665,18 +791,16 @@ async function handleSingleItemOrder(session, stripe) {
     shipping_postcode: meta.shippingPostcode || session.shipping_details?.address?.postal_code || null,
   };
 
-  let { error: insertError } = await supabase.from('orders').insert(orderInsert);
-
-  // payment_wallet_type lands with its migration, but a redeploy can briefly
-  // race ahead of `supabase db push` — same window handled for
-  // gst_included_aud in the cart checkout path. Drop it and retry rather than
-  // rejecting an otherwise-good order.
-  const missingWalletColumn =
-    insertError?.code === 'PGRST204' || insertError?.code === '42703' || /payment_wallet_type/.test(insertError?.message || '');
-  if (missingWalletColumn) {
-    delete orderInsert.payment_wallet_type;
-    ({ error: insertError } = await supabase.from('orders').insert(orderInsert));
-  }
+  // These columns land with their migrations, but a redeploy can briefly race
+  // ahead of `supabase db push` — same window handled in the cart checkout
+  // path. Drop the missing one and retry rather than rejecting an otherwise-good
+  // order: the buyer has already paid.
+  const { error: insertError } = await insertWithOptionalColumns(
+    orderInsert,
+    ['payment_wallet_type', 'processing_fee_aud', 'gst_included_aud', 'seller_gst_aud', 'platform_gst_aud'],
+    row => supabase.from('orders').insert(row),
+    col => logger.warn(`[STRIPE] ${col} column not present yet — inserting order without it`),
+  );
 
   if (insertError) {
     if (insertError.code === '23505') {
@@ -758,6 +882,10 @@ async function handleSingleItemOrder(session, stripe) {
   }
 
   if (buyerProfile?.email) {
+    // Best-effort, like the cart path: a Resend outage must not throw out of the
+    // handler. Everything that matters happens BELOW this point — the admin
+    // notice and, more importantly, the seller's payout — so an unhandled
+    // rejection here used to cost the seller their money over a failed email.
     await sendOrderConfirmed({
       buyerEmail: buyerProfile.email,
       buyerName: buyerProfile.display_name || 'Collector',
@@ -779,7 +907,7 @@ async function handleSingleItemOrder(session, stripe) {
         abn: null,
         orderDate: null,
       },
-    });
+    }).catch(e => logger.warn(`[STRIPE] buyer confirm email failed for order ${orderId || 'n/a'}: ${e.message}`));
   }
 
   if (sellerProfile?.email) {
@@ -789,10 +917,13 @@ async function handleSingleItemOrder(session, stripe) {
       cardName,
       itemPrice,
       commissionAud,
-      gstAud,
+      // What actually came out of this sale, so the payout figure in the email
+      // reconciles: GST is now a deduction from the seller, not a buyer charge.
+      gstAud: sellerGstAud,
+      shippingAud,
       sellerProceeds,
       orderId,
-    });
+    }).catch(e => logger.warn(`[STRIPE] seller sold email failed for order ${orderId || 'n/a'}: ${e.message}`));
   }
 
   // Admin heads-up for the confirmed order (independent of buyer/seller emails).

@@ -314,6 +314,13 @@ const ShippingAddressForm = ({ values = {}, onChange, showEmail = false, emailAc
           className={placesActive ? 'w-32 bg-muted/50' : 'w-32'}
         />
       </div>
+      {/* There is no country field because there is no choice: the server
+          refuses any non-Australian delivery address (checkAustralianAddress in
+          src/utils/addressValidation.js). Saying so here means a buyer finds
+          out before they fill the form in, not after they press pay. */}
+      <p className="text-xs text-muted-foreground">
+        We currently ship within <span className="font-semibold text-foreground">Australia</span> only.
+      </p>
     </div>
   );
 };

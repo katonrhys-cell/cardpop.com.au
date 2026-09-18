@@ -275,15 +275,22 @@ ${summaryTable(rows)}
 
 // ─── Item sold (seller) ───────────────────────────────────────────────────────
 
-export function itemSoldEmail({ sellerName, cardName, itemPrice, commissionAud, gstAud, sellerProceeds, orderId }) {
+export function itemSoldEmail({ sellerName, cardName, itemPrice, commissionAud, gstAud, shippingAud = 0, sellerProceeds, orderId }) {
+  // Every row is signed the way it hits the seller's payout, so the figures
+  // visibly add up to the net. GST and the platform fee are deductions; postage
+  // the buyer paid is passed through, so it is an addition.
+  const rows = [
+    ['Item', esc(cardName)],
+    ['Sale price (incl. GST)', `$${Number(itemPrice).toFixed(2)} AUD`],
+  ];
+  if (Number(shippingAud) > 0) rows.push(['Postage paid by buyer', `+$${Number(shippingAud).toFixed(2)} AUD`]);
+  rows.push(['Platform fee', `−$${Number(commissionAud).toFixed(2)} AUD`]);
+  if (Number(gstAud) > 0) rows.push(['GST remitted for you', `−$${Number(gstAud).toFixed(2)} AUD`]);
+  rows.push(['Net proceeds', `$${Number(sellerProceeds).toFixed(2)} AUD`, true]);
+
   const body = `<p>Congratulations — your listing sold on CardPop! Here's a breakdown of your sale:</p>
-${summaryTable([
-  ['Item', esc(cardName)],
-  ['Sale value', `$${Number(itemPrice).toFixed(2)} AUD`],
-  ['Platform fee', `$${Number(commissionAud).toFixed(2)} AUD`],
-  ['GST', `$${Number(gstAud).toFixed(2)} AUD`],
-  ['Net proceeds', `$${Number(sellerProceeds).toFixed(2)} AUD`, true],
-])}
+${summaryTable(rows)}
+${Number(gstAud) > 0 ? '<p style="font-size:13px;color:#6b7280;">Your listing price included GST. CardPop withholds the GST on your sale and postage and remits it to the ATO on your behalf.</p>' : ''}
 <p>Head to your order details to arrange delivery with the buyer and finalise the sale.</p>`;
 
   return cpEmail(

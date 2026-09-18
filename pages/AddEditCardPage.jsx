@@ -68,6 +68,7 @@ import { useCardScanLog, buildScanPayload } from '@/hooks/useCardScanLog.js';
 import { validateListingForm, validateListingField } from '@/utils/listingValidation.js';
 import WizardStepper from '@/components/WizardStepper.jsx';
 import { CARD_LANGUAGES } from '@/lib/cardFilters.js';
+import SellerPayoutEstimate from '@/components/SellerPayoutEstimate.jsx';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -4008,6 +4009,10 @@ const AddEditCardPage = () => {
                         Estimated value: ${Number(formData.estimatedValue).toFixed(2)} — list above or below it, it's your call.
                       </p>
                     )}
+                    {/* The commission and the GST both come out of this number.
+                        Shown here so a seller meets them while they're choosing
+                        the price, not when the payout lands. */}
+                    <SellerPayoutEstimate price={formData.askingPrice} />
                   </div>
                 )}
 

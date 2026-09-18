@@ -21,13 +21,16 @@ const mockStripe = vi.hoisted(() => ({
 // which bypasses ESM module mocks — so mock the client module itself.
 vi.mock('../../src/utils/stripeClient.js', () => ({ default: mockStripe }));
 
-// Don't send real emails on the happy paths.
-vi.mock('../../src/utils/emailService.js', () => ({
+// Don't send real emails on the happy paths. Hoisted so tests can assert which
+// notices went out — and make one fail on purpose.
+const mockEmail = vi.hoisted(() => ({
   sendOrderConfirmed: vi.fn().mockResolvedValue(undefined),
   sendItemSold: vi.fn().mockResolvedValue(undefined),
+  sendOrderAdminNotice: vi.fn().mockResolvedValue(undefined),
   sendRefundProcessed: vi.fn().mockResolvedValue(undefined),
   sendRefundIssued: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock('../../src/utils/emailService.js', () => mockEmail);
 
 // ─── Programmable Supabase mock ───────────────────────────────────────────────
 
@@ -154,6 +157,135 @@ describe('webhook single-item idempotency', () => {
     expect(mockStripe.transfers.create).not.toHaveBeenCalled();
     // The captured payment must be auto-refunded (money was already taken).
     expect(mockStripe.refunds.create).toHaveBeenCalledWith({ payment_intent: 'pi_single' });
+  });
+
+  it('still notifies admins and pays the seller when the buyer receipt email fails', async () => {
+    // Regression: sendOrderConfirmed / sendItemSold were awaited without a
+    // catch, so a Resend outage threw out of the handler BEFORE the admin
+    // notice and before payoutSeller — costing the seller their money over a
+    // failed email.
+    mockEmail.sendOrderConfirmed.mockRejectedValueOnce(new Error('resend down'));
+    mockEmail.sendItemSold.mockRejectedValueOnce(new Error('resend down'));
+    let ordersSelects = 0;
+    state.respond = (ctx) => {
+      if (ctx.table === 'orders' && ctx.single) {
+        // First select is the "already handled?" pre-check (must be empty so we
+        // take the insert path); the later one resolves the new order's id.
+        ordersSelects += 1;
+        return { data: ordersSelects === 1 ? null : { id: 'o-new' }, error: null };
+      }
+      if (ctx.table === 'orders' && ctx.op === 'insert') return { data: { id: 'o-new' }, error: null };
+      // The listing is claimed successfully, so the handler runs the full
+      // fulfilment path rather than the double-sale bail-out.
+      if (ctx.table === 'listings' && ctx.op === 'update') return { data: [{ id: 'l1' }], error: null };
+      if (ctx.table === 'profiles' && ctx.single) {
+        return { data: { email: 'x@y.com', display_name: 'X', stripe_connect_account_id: 'acct_1', stripe_connect_onboarded: true }, error: null };
+      }
+      return { data: null, error: null };
+    };
+
+    const res = await postWebhook();
+
+    expect(res.status).toBe(200);
+    expect(mockEmail.sendOrderAdminNotice).toHaveBeenCalled();
+    expect(mockStripe.transfers.create).toHaveBeenCalled();
+  });
+
+  it('refuses to fulfil an overseas card, refunds it, and never pays the seller', async () => {
+    mockStripe.paymentIntents = {
+      retrieve: vi.fn().mockResolvedValue({
+        payment_method: { type: 'card', card: { country: 'US' } },
+      }),
+    };
+    state.respond = (ctx) => {
+      if (ctx.table === 'orders' && ctx.single) return { data: null, error: null };
+      return { data: null, error: null };
+    };
+
+    const res = await postWebhook();
+
+    expect(res.status).toBe(200);
+    // Blocked BEFORE the order is written, so nothing is fulfilled or paid out.
+    expect(dbCalls.some(c => c.table === 'orders' && c.op === 'insert')).toBe(false);
+    expect(dbCalls.some(c => c.table === 'listings' && c.op === 'update')).toBe(false);
+    expect(mockStripe.transfers.create).not.toHaveBeenCalled();
+    // Checkout captures on completion, so the money is already taken — it goes
+    // back in full.
+    expect(mockStripe.refunds.create).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_intent: 'pi_single' }),
+      expect.objectContaining({ idempotencyKey: 'foreign-card-refund-cs_single' }),
+    );
+  });
+
+  it('fulfils an Australian card normally', async () => {
+    mockStripe.paymentIntents = {
+      retrieve: vi.fn().mockResolvedValue({
+        payment_method: { type: 'card', card: { country: 'AU' } },
+      }),
+    };
+    state.respond = (ctx) => {
+      if (ctx.table === 'orders' && ctx.single) return { data: null, error: null };
+      if (ctx.table === 'orders' && ctx.op === 'insert') return { data: { id: 'o-new' }, error: null };
+      return { data: null, error: null };
+    };
+
+    await postWebhook();
+
+    expect(mockStripe.refunds.create).not.toHaveBeenCalled();
+    expect(dbCalls.some(c => c.table === 'orders' && c.op === 'insert')).toBe(true);
+  });
+
+  it('fulfils a payment method that reports no country (PayPal) rather than refunding it', async () => {
+    mockStripe.paymentIntents = {
+      retrieve: vi.fn().mockResolvedValue({ payment_method: { type: 'paypal', paypal: {} } }),
+    };
+    state.respond = (ctx) => {
+      if (ctx.table === 'orders' && ctx.single) return { data: null, error: null };
+      if (ctx.table === 'orders' && ctx.op === 'insert') return { data: { id: 'o-new' }, error: null };
+      return { data: null, error: null };
+    };
+
+    await postWebhook();
+
+    expect(mockStripe.refunds.create).not.toHaveBeenCalled();
+    expect(dbCalls.some(c => c.table === 'orders' && c.op === 'insert')).toBe(true);
+  });
+
+  it('counts the processing fee in the expected total, and keeps it out of the seller payout', async () => {
+    // Regression guard: the fee is a real Stripe line, so leaving it out of the
+    // expected-total check would make the amount guard reject — and auto-refund
+    // — every single order that carries one.
+    state.respond = (ctx) => {
+      if (ctx.table === 'orders' && ctx.single) return { data: null, error: null };
+      if (ctx.table === 'orders' && ctx.op === 'insert') return { data: { id: 'o-new' }, error: null };
+      if (ctx.table === 'profiles' && ctx.single) {
+        return { data: { stripe_connect_account_id: 'acct_1', stripe_connect_onboarded: true }, error: null };
+      }
+      return { data: null, error: null };
+    };
+    mockStripe.webhooks.constructEvent.mockReturnValue({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          ...singleSession,
+          amount_total: 10256, // $100 item + $2.56 processing
+          metadata: { ...singleSession.metadata, processingFeeAud: '2.56' },
+        },
+      },
+    });
+
+    const res = await postWebhook();
+
+    expect(res.status).toBe(200);
+    expect(mockStripe.refunds.create).not.toHaveBeenCalled();
+    const insert = dbCalls.find(c => c.table === 'orders' && c.op === 'insert');
+    expect(insert).toBeDefined();
+    // Recorded as its own column, kept out of platform_fee_aud (commission +
+    // GST) — and the seller's proceeds do not include a cent of it.
+    expect(insert.payload.processing_fee_aud).toBe(2.56);
+    expect(insert.payload.platform_fee_aud).toBe(0);
+    expect(insert.payload.seller_proceeds_aud).toBe(100);
+    expect(insert.payload.total_aud).toBe(102.56);
   });
 });
 

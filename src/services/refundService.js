@@ -15,11 +15,21 @@ export async function processRefund(req, res) {
 
     const { refundId } = req.body;
 
-    const { data: refund, error: rErr } = await supabase
-      .from('refunds')
-      .select('*, order:orders!order_id(id, stripe_payment_intent_id, stripe_session_id, total_aud, platform_fee_aud, gst_aud, status, refund_status, seller_id, stripe_transfer_id, payout_status, seller_proceeds_aud, order_items)')
-      .eq('id', refundId)
-      .maybeSingle();
+    const ORDER_COLS = 'id, stripe_payment_intent_id, stripe_session_id, total_aud, platform_fee_aud, gst_aud, status, refund_status, seller_id, stripe_transfer_id, payout_status, seller_proceeds_aud, order_items';
+    const selectRefund = orderCols =>
+      supabase
+        .from('refunds')
+        .select(`*, order:orders!order_id(${orderCols})`)
+        .eq('id', refundId)
+        .maybeSingle();
+
+    let { data: refund, error: rErr } = await selectRefund(`${ORDER_COLS}, processing_fee_aud`);
+    // Redeploy-before-migration window: without this the whole refund path 404s
+    // on a column that simply isn't there yet. Falling back means the fee is
+    // treated as 0 (the pre-fee behaviour) rather than blocking admin refunds.
+    if (rErr && /processing_fee_aud/.test(rErr.message || '')) {
+      ({ data: refund, error: rErr } = await selectRefund(ORDER_COLS));
+    }
 
     if (rErr || !refund) return res.status(404).json({ error: 'Refund not found' });
     if (refund.status !== 'approved') return res.status(400).json({ error: 'Refund must be in approved state before processing' });
@@ -41,10 +51,16 @@ export async function processRefund(req, res) {
     const retentionPct = Number(await getPlatformSetting('refund_fee_retention_pct', 50));
     const orderTotal = Number(refund.order?.total_aud);
     const totalCommission = Number(refund.order?.platform_fee_aud) || 0; // commission + GST
+    // Stripe keeps its processing fee on a refunded payment, so the buyer's
+    // reimbursement of it is retained in full — refunding money Stripe never
+    // gives back would make every refund a loss on top of the goods returning.
+    // Orders placed before the fee existed carry 0 and are unaffected.
+    const processingFee = Math.max(0, Number(refund.order?.processing_fee_aud) || 0);
     if (!Number.isFinite(orderTotal) || orderTotal <= 0) {
       return res.status(400).json({ error: 'Order total is missing or invalid' });
     }
-    const retainedFee = Math.round(totalCommission * (retentionPct / 100) * 100) / 100;
+    const retainedCommission = Math.round(totalCommission * (retentionPct / 100) * 100) / 100;
+    const retainedFee = Math.round((retainedCommission + processingFee) * 100) / 100;
     const refundAmount = Math.round((orderTotal - retainedFee) * 100) / 100;
 
     if (refundAmount <= 0) return res.status(400).json({ error: 'Calculated refund amount is zero or negative' });

@@ -7,10 +7,20 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 const mockSupabase = vi.hoisted(() => ({ from: vi.fn() }));
 const mockGetPlatformSetting = vi.hoisted(() => vi.fn());
 const mockCalculateBreakdown = vi.hoisted(() => vi.fn());
+// Defaults to 0 so the existing money-math assertions stay about commission and
+// GST; the processing-fee tests at the bottom set a real rate.
+const mockCalculateProcessingFee = vi.hoisted(() => vi.fn(() => Promise.resolve(0)));
 
 vi.mock('../../../src/utils/supabaseClient.js', () => ({ default: mockSupabase, supabase: mockSupabase }));
 vi.mock('../../../src/services/stripeWebhookService.js', () => ({ getPlatformSetting: mockGetPlatformSetting }));
-vi.mock('../../../src/services/commissionService.js', () => ({ calculateBreakdown: mockCalculateBreakdown }));
+// Only the two settings-driven functions are stubbed. gstInsideCents is pure
+// arithmetic and stays real, so these tests exercise the actual GST split
+// rather than a mock of it.
+vi.mock('../../../src/services/commissionService.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  calculateBreakdown: mockCalculateBreakdown,
+  calculateProcessingFee: mockCalculateProcessingFee,
+}));
 
 import { priceCart } from '../../../src/services/cartService.js';
 
@@ -41,6 +51,7 @@ function rowBuilder(result) {
 beforeEach(() => {
   vi.clearAllMocks();
   setPlatformSettings();
+  mockCalculateProcessingFee.mockResolvedValue(0);
 });
 
 describe('priceCart — shop items', () => {
@@ -183,17 +194,21 @@ describe('priceCart — seller postage', () => {
 
   it('charges the seller-set postage on a marketplace listing and records it on the line', async () => {
     mockSupabase.from.mockReturnValueOnce(rowBuilder(listingRow('l1', 'seller-9', 40, 8.95)));
-    mockCalculateBreakdown.mockResolvedValueOnce({ itemPrice: 40, commissionAud: 1.2, gstAud: 4.12 });
+    mockCalculateBreakdown.mockResolvedValueOnce({ itemPrice: 40, commissionAud: 1.2 });
 
     const result = await priceCart([{ type: 'listing', id: 'l1', quantity: 1 }], 'buyer-1');
 
     expect(result.shippingCents).toBe(895);
-    expect(result.grandCents).toBe(4000 + 120 + 412 + 895);
-    // Postage is the seller's own consumer-quoted price: no commission, and no
-    // GST added or reported on it.
-    expect(result.includedGstCents).toBe(0);
+    expect(result.grandCents).toBe(4000 + 120 + 895);
+    // Postage is the seller's own consumer-quoted price: no commission comes
+    // off it, but it IS part of their supply, so the GST inside it (81¢) is
+    // deducted from their payout along with the card's (364¢).
+    expect(result.sellerGstCents).toBe(445);
+    expect(result.platformGstCents).toBe(22); // 1/11 of 2 × $1.20 commission
+    expect(result.includedGstCents).toBe(467);
     const line = result.orderLines.find((l) => l.type === 'listing');
     expect(line.shipping_aud).toBe(8.95);
+    expect(line.seller_gst_aud).toBe(4.45);
     // The internal combining field never leaks into the persisted order lines.
     expect(line.listing_shipping_cost_aud).toBeUndefined();
     expect(result.lineItems.some((l) => l.price_data.product_data.name === 'Shipping' && l.price_data.unit_amount === 895)).toBe(true);
@@ -293,16 +308,25 @@ describe('priceCart — listings', () => {
       },
       error: null,
     }));
-    mockCalculateBreakdown.mockResolvedValueOnce({ itemPrice: 100, commissionAud: 5, gstAud: 0.5 });
+    mockCalculateBreakdown.mockResolvedValueOnce({ itemPrice: 100, commissionAud: 5 });
 
     const result = await priceCart([{ type: 'listing', id: 'l1', quantity: 1 }], 'buyer-1');
     expect(result.itemsCents).toBe(10000);
     expect(result.commissionCents).toBe(500);
-    expect(result.gstCents).toBe(50);
-    expect(result.grandCents).toBe(10550);
+    // Nothing is added on top: the buyer pays the listed price plus the fee.
+    expect(result.gstCents).toBe(0);
+    expect(result.grandCents).toBe(10500);
+    // GST is inside those prices — 1/11 of the card (909¢), plus 1/11 of
+    // CardPop's own commission, which is earned twice (charged to the buyer
+    // AND deducted from the seller): 1000¢ × 10/110 = 91¢.
+    expect(result.sellerGstCents).toBe(909);
+    expect(result.platformGstCents).toBe(91);
+    expect(result.includedGstCents).toBe(1000);
     const line = result.orderLines.find((l) => l.type === 'listing');
     expect(line.seller_id).toBe('seller-9');
     expect(line.title).toBe('Blastoise');
+    // Recorded per line so the webhook can deduct it from this seller's payout.
+    expect(line.seller_gst_aud).toBe(9.09);
   });
 
   it('rejects an unknown cart item type (400)', async () => {

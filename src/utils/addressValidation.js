@@ -25,6 +25,53 @@ const MIN_MATCH_SCORE = 0.8;
 
 const DEFAULT_REGION = 'ap-southeast-2'; // Sydney
 
+// ─── Australia-only gate ──────────────────────────────────────────────────────
+// CardPop sells and ships within Australia only. This check is deliberately
+// separate from the Amazon Location geocode below, and runs first, because that
+// one FAILS OPEN when no API key is configured — an overseas address would sail
+// straight through it. This one has no external dependency and always enforces.
+//
+// It cannot stop a foreign *card* being used to pay (Stripe Checkout has no
+// billing-country allowlist); that needs a Radar rule blocking
+// `:card_country: != 'AU'`. See docs/order-pricing.md.
+
+export const AU_STATES = new Set(['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA']);
+
+// Accept the spellings a form, an autocomplete widget or Stripe might produce.
+const AU_COUNTRY_NAMES = new Set(['AU', 'AUS', 'AUSTRALIA']);
+
+export const AU_ONLY_MESSAGE =
+  'CardPop currently ships within Australia only. Please enter an Australian delivery address.';
+
+/**
+ * Is this an Australian delivery address?
+ *
+ * @param {{ state?: string, postcode?: string, country?: string }} addr
+ * @returns {{ valid: boolean, reason?: 'country'|'state'|'postcode' }}
+ */
+export function checkAustralianAddress(addr = {}) {
+  const country = String(addr.country ?? '').trim().toUpperCase();
+  // A blank country is treated as Australian: the checkout form has no country
+  // field precisely because it only serves Australia. Anything explicitly
+  // non-Australian is refused.
+  if (country && !AU_COUNTRY_NAMES.has(country)) return { valid: false, reason: 'country' };
+
+  if (!AU_STATES.has(String(addr.state ?? '').trim().toUpperCase())) {
+    return { valid: false, reason: 'state' };
+  }
+
+  // Every Australian postcode is exactly four digits. Deliberately not
+  // range-checked per state: the ranges have enough carve-outs (LVRs, PO-box
+  // blocks, 0800 NT, 2600 ACT inside the NSW range) that a stricter rule would
+  // reject real addresses, and the state check above already blocks the
+  // overseas formats this exists to catch.
+  if (!/^\d{4}$/.test(String(addr.postcode ?? '').trim())) {
+    return { valid: false, reason: 'postcode' };
+  }
+
+  return { valid: true };
+}
+
 let warnedMissingKey = false;
 
 function serverKey() {
