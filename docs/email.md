@@ -21,7 +21,7 @@ links — but that is a **fourth, separate** pipeline handled entirely by Supaba
 unset it logs a warning and returns without sending, so a missing key never
 crashes a checkout or refund.
 
-The six transactional emails and where they fire:
+The transactional emails and where they fire:
 
 | Email | Recipient | Triggered from |
 |---|---|---|
@@ -31,8 +31,21 @@ The six transactional emails and where they fire:
 | Refund issued | Seller | `src/services/refundService.js` |
 | Welcome offer (trial + discount) | New user | `src/services/welcomeOfferService.js` |
 | Offer received (enquiry) | Seller | `src/routes/offers.js` (see below) |
+| Supplier dispatch | Drop-ship supplier | `src/services/supplierFulfilmentService.js`, from the Stripe webhook — see [docs/supplier-fulfilment.md](supplier-fulfilment.md) |
 
 Email HTML is built by the templates in `src/emails/templates.js`.
+
+### Supplier dispatch (drop-shipping)
+
+The one transactional email that does **not** go to a CardPop user: when a paid
+order contains shop stock supplied by a third party, that supplier is emailed a
+picking instruction (items + SKUs + quantities, the buyer's address, and the
+blind-shipping note).
+
+Unlike every other email here, this one is **not** best-effort-and-forget. It is
+claimed through a `supplier_dispatches` row whose unique `(order_id,
+supplier_id)` constraint makes it exactly-once, because a duplicate send means a
+duplicate parcel. Full runbook: [docs/supplier-fulfilment.md](supplier-fulfilment.md).
 
 ### Offer / enquiry notifications
 

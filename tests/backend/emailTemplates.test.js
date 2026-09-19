@@ -6,6 +6,7 @@ import {
   eventSubmittedEmail,
   orderAdminNoticeEmail,
   offerReceivedEmail,
+  supplierOrderEmail,
 } from '../../src/emails/templates.js';
 
 // Regression guard: transactional emails are sent from noreply@cardpop.com.au
@@ -72,5 +73,85 @@ describe('offerReceivedEmail', () => {
   it('omits the message block when the buyer left no note', () => {
     const html = offerReceivedEmail({ sellerName: 'Kat', cardName: 'A card', amountAud: 10 });
     expect(html).not.toContain('Their message');
+  });
+});
+
+describe('supplierOrderEmail', () => {
+  const base = {
+    supplierName: 'Palms Off Gaming',
+    orderRef: 'A1B2C3D4',
+    orderId: 'a1b2c3d4-0000-0000-0000-000000000000',
+    lines: [{ sku: 'BODS-JPN-BLK', title: 'Japanese Binder', quantity: 2 }],
+    shipTo: { name: 'Jo Smith', address: '12 Example St', suburb: 'Bondi', state: 'nsw', postcode: '2026' },
+    blindShipping: true,
+    blindShippingNote: 'BLIND SHIP: CardPop as sender, no inserts.',
+  };
+
+  it('carries the SKU, quantity and order reference a picker needs', () => {
+    const html = supplierOrderEmail(base);
+    expect(html).toContain('BODS-JPN-BLK');
+    expect(html).toContain('×2');
+    expect(html).toContain('A1B2C3D4');
+    expect(html).toContain('Japanese Binder');
+  });
+
+  it('formats the address to Australian postal convention', () => {
+    const html = supplierOrderEmail(base);
+    expect(html).toContain('Jo Smith');
+    expect(html).toContain('12 Example St');
+    expect(html).toContain('BONDI NSW 2026');
+    expect(html).toContain('AUSTRALIA');
+  });
+
+  it('reproduces the blind-shipping instruction verbatim', () => {
+    const html = supplierOrderEmail(base);
+    expect(html).toContain('Blind shipping required');
+    expect(html).toContain('BLIND SHIP: CardPop as sender, no inserts.');
+  });
+
+  it('falls back to a default instruction when blind shipping has no note', () => {
+    const html = supplierOrderEmail({ ...base, blindShippingNote: null });
+    expect(html).toContain('Blind shipping required');
+    expect(html).toContain('Do not include your own branding');
+  });
+
+  it('omits the blind-shipping callout when the supplier ships under its own name', () => {
+    const html = supplierOrderEmail({ ...base, blindShipping: false });
+    expect(html).not.toContain('Blind shipping required');
+  });
+
+  // The supplier invoices CardPop at wholesale; the retail figure the customer
+  // paid is irrelevant to picking, and leaking it is commercially awkward.
+  it('never shows what the customer paid', () => {
+    const html = supplierOrderEmail({
+      ...base,
+      lines: [{ sku: 'X', title: 'Thing', quantity: 1, line_total_aud: 149.95, unit_price_aud: 149.95 }],
+    });
+    expect(html).not.toContain('149.95');
+    expect(html).not.toContain('$');
+  });
+
+  it('flags a line with no SKU instead of rendering an empty cell', () => {
+    const html = supplierOrderEmail({ ...base, lines: [{ sku: null, title: 'Mystery', quantity: 1 }] });
+    expect(html).toContain('NO SKU');
+  });
+
+  it('escapes admin- and buyer-controlled values', () => {
+    const html = supplierOrderEmail({
+      ...base,
+      lines: [{ sku: XSS, title: XSS, quantity: 1 }],
+      shipTo: { name: XSS, address: XSS, suburb: 'Bondi', state: 'NSW', postcode: '2026' },
+      blindShippingNote: XSS,
+    });
+    expect(html).not.toContain('<a href="https://evil.example">click</a>');
+    expect(html).toContain('&lt;a href=&quot;https://evil.example&quot;&gt;');
+  });
+
+  it('counts total units across lines in the subject preheader', () => {
+    const html = supplierOrderEmail({
+      ...base,
+      lines: [{ sku: 'A', title: 'A', quantity: 2 }, { sku: 'B', title: 'B', quantity: 3 }],
+    });
+    expect(html).toContain('5 units');
   });
 });

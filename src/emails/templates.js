@@ -474,3 +474,114 @@ ${quoted}
     'You are receiving this because someone made an offer on your CardPop listing.',
   );
 }
+
+// ─── Supplier dispatch (drop-ship fulfilment request) ─────────────────────────
+
+/**
+ * Renders the picking table for a supplier dispatch.
+ *
+ * A real table rather than summaryTable's label/value rows: a warehouse reads
+ * this down the SKU column to pick, so the columns have to line up. `sku` is
+ * the only field a picker can act on unambiguously, so it leads, and a line
+ * with no SKU recorded says so loudly rather than rendering an empty cell.
+ */
+function dispatchLinesTable(lines) {
+  const head = `<tr>
+<th align="left" style="padding:8px 12px 8px 0;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;border-bottom:2px solid #E5E7EB;">SKU</th>
+<th align="left" style="padding:8px 12px;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;border-bottom:2px solid #E5E7EB;">Item</th>
+<th align="right" style="padding:8px 0 8px 12px;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;border-bottom:2px solid #E5E7EB;">Qty</th>
+</tr>`;
+
+  const body = lines.map(l => {
+    const sku = l.sku
+      ? `<code style="font-family:'SFMono-Regular',Consolas,monospace;font-size:13px;font-weight:700;color:#111827;">${esc(l.sku)}</code>`
+      : `<span style="font-size:12px;font-weight:700;color:#B91C1C;">NO SKU — CONFIRM BEFORE PICKING</span>`;
+    return `<tr>
+<td style="padding:12px 12px 12px 0;border-bottom:1px solid #F3F4F6;vertical-align:top;">${sku}</td>
+<td style="padding:12px;border-bottom:1px solid #F3F4F6;font-size:14px;color:#374151;vertical-align:top;">${esc(l.title || 'Item')}</td>
+<td align="right" style="padding:12px 0 12px 12px;border-bottom:1px solid #F3F4F6;font-size:15px;font-weight:700;color:#111827;vertical-align:top;">×${Number(l.quantity) || 1}</td>
+</tr>`;
+  }).join('');
+
+  return `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:24px 0;">${head}${body}</table>`;
+}
+
+/**
+ * Fulfilment request sent to a supplier when an order containing their stock is
+ * paid. This is an operational document for a warehouse, not a customer email.
+ *
+ * Deliberately carries NO prices. The supplier invoices CardPop at the agreed
+ * wholesale rate, so the retail figure the customer paid is both irrelevant to
+ * picking and commercially none of their business — and leaving it out means a
+ * misdirected dispatch leaks less.
+ *
+ * Every value here is either admin-entered (titles, SKUs, the blind-shipping
+ * note) or buyer-entered (the whole address), so all of it goes through `esc`.
+ *
+ * @param {object}   p
+ * @param {string}   p.supplierName
+ * @param {string}   p.orderRef       Short human reference, e.g. "A1B2C3D4"
+ * @param {string}   p.orderId        Full order UUID, for exact lookups
+ * @param {Array}    p.lines          [{ sku, title, quantity }]
+ * @param {object}   p.shipTo         { name, address, suburb, state, postcode }
+ * @param {boolean}  p.blindShipping
+ * @param {string?}  p.blindShippingNote
+ * @param {string?}  p.orderedAt      Pre-formatted date string
+ */
+export function supplierOrderEmail({
+  supplierName,
+  orderRef,
+  orderId,
+  lines = [],
+  shipTo = {},
+  blindShipping = true,
+  blindShippingNote,
+  orderedAt,
+}) {
+  const unitCount = lines.reduce((n, l) => n + (Number(l.quantity) || 1), 0);
+
+  // Australian postal convention: SUBURB STATE POSTCODE on one line, uppercase.
+  const localityLine = [shipTo.suburb, shipTo.state, shipTo.postcode]
+    .filter(Boolean).map(v => esc(String(v).toUpperCase())).join(' ');
+  const addressBlock = [
+    shipTo.name ? `<strong>${esc(shipTo.name)}</strong>` : null,
+    shipTo.address ? esc(shipTo.address) : null,
+    localityLine || null,
+    'AUSTRALIA',
+  ].filter(Boolean).join('<br>');
+
+  // The blind-shipping instruction is the one thing in here that must not be
+  // missed, so it gets its own bordered callout above the address rather than a
+  // line inside the table.
+  const blindBlock = blindShipping
+    ? `<div style="background:#FEF2F2;border:2px solid #E63946;border-radius:8px;padding:16px 20px;margin:24px 0;">
+<p style="margin:0 0 6px;font-size:13px;font-weight:900;color:#B91C1C;text-transform:uppercase;letter-spacing:0.5px;">Blind shipping required</p>
+<p style="margin:0;font-size:14px;color:#374151;line-height:1.6;">${esc(blindShippingNote
+  || 'Please ship with CardPop as the sender. Do not include your own branding, invoices, pricing or marketing material in the parcel.')}</p>
+</div>`
+    : '';
+
+  const body = `<p>Hi ${esc(supplierName || 'team')}, a CardPop order has been paid and is ready to dispatch. Please pick, pack and post the items below directly to the customer.</p>
+${summaryTable([
+  ['Order reference', `<strong>${esc(orderRef)}</strong>`],
+  ['Units to pick', String(unitCount)],
+  ...(orderedAt ? [['Ordered', esc(orderedAt)]] : []),
+])}
+<p style="margin:0;font-size:13px;font-weight:700;color:#111827;text-transform:uppercase;letter-spacing:0.5px;">Items</p>
+${dispatchLinesTable(lines)}
+${blindBlock}
+<p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#111827;text-transform:uppercase;letter-spacing:0.5px;">Ship to</p>
+<div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:18px 22px;margin:8px 0 24px;font-size:15px;color:#111827;line-height:1.7;">${addressBlock}</div>
+<p>Please reply to this email with the tracking number once the parcel is lodged, quoting order reference <strong>${esc(orderRef)}</strong>.</p>
+<p style="font-size:12px;color:#9CA3AF;">Full order id: ${esc(orderId)}</p>`;
+
+  return cpEmail(
+    `CardPop order ${esc(orderRef)} — ${unitCount} unit${unitCount === 1 ? '' : 's'} to dispatch`,
+    'Order to Dispatch',
+    `Order ${esc(orderRef)}`,
+    body,
+    null,
+    null,
+    'This is an automated fulfilment request from CardPop. The shipping address above was provided by the customer and must only be used to fulfil this order.',
+  );
+}

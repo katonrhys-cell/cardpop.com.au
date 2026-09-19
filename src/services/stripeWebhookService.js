@@ -10,6 +10,7 @@ import { subscribeToNewsletter } from '../utils/newsletter.js';
 import { namesMatch } from './identityService.js';
 import { insertWithOptionalColumns } from '../utils/insertWithOptionalColumns.js';
 import { isCardCountryAllowed, allowedCardCountries } from '../utils/cardCountryPolicy.js';
+import { dispatchSupplierOrders } from './supplierFulfilmentService.js';
 
 /**
  * Informational cross-check: does the name the buyer typed at Stripe Checkout
@@ -457,6 +458,10 @@ async function handleCartOrder(existing, session, stripe) {
   const lines = Array.isArray(existing.order_items) ? existing.order_items : [];
   const sellerIds = new Set();
   const oversoldShopItems = [];
+  // Shop lines whose stock decrement actually succeeded. Only these are handed
+  // to a drop-ship supplier: an oversold line has nothing to pick and is headed
+  // for a refund, so dispatching it would post a parcel CardPop cannot supply.
+  const fulfilledShopLines = [];
   let payoutsRecorded = false;
   let fulfilledLines = 0;
 
@@ -490,6 +495,7 @@ async function handleCartOrder(existing, session, stripe) {
         logger.error(`[STRIPE] ${stockErr ? `Stock decrement failed (${stockErr.message})` : 'Oversell'} on shop product ${line.id} (qty ${line.quantity || 1}) for order ${existing.id} — needs manual resolution`);
       } else {
         fulfilledLines += 1;
+        fulfilledShopLines.push(line);
       }
     }
   }
@@ -683,6 +689,14 @@ async function handleCartOrder(existing, session, stripe) {
       itemsSummary,
       sellerName,
     });
+  }
+
+  // Hand any drop-shipped lines to their supplier. Idempotent (the dispatch row
+  // is claimed under a unique constraint, so a retried webhook delivery sends
+  // nothing) and non-throwing by contract, so it can never fail the order.
+  if (fulfilledShopLines.length > 0) {
+    await dispatchSupplierOrders({ order: existing, lines: fulfilledShopLines })
+      .catch(e => logger.warn(`[STRIPE] supplier dispatch failed for order ${existing.id}: ${e.message}`));
   }
 
   // Newsletter opt-in taken at checkout (guest or registered). Fired only now

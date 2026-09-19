@@ -15,6 +15,7 @@ import {
   orderAdminNoticeEmail,
   contactMessageEmail,
   offerReceivedEmail,
+  supplierOrderEmail,
 } from '../emails/templates.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -198,5 +199,25 @@ export async function sendIdentityReviewNeeded({ to, userId, userName, userEmail
     to,
     subject: `Identity verification needs review: ${userName || 'A user'}`,
     html: identityReviewNeededEmail({ userId, userName, userEmail }),
+  });
+}
+
+/**
+ * Fulfilment request to a drop-ship supplier for a paid order.
+ *
+ * `to` is an array (the supplier's fulfilment address plus any cc addresses),
+ * which `send` passes straight to Resend. `replyTo` matters here more than on
+ * other emails: the supplier is asked to reply with a tracking number, and the
+ * From address is noreply@, so without it their reply is lost.
+ *
+ * @returns {Promise<boolean>} whether Resend accepted the message — the caller
+ *   records this on the supplier_dispatches row, so it must not be swallowed.
+ */
+export async function sendSupplierOrder({ to, replyTo, supplierName, orderRef, orderId, lines, shipTo, blindShipping, blindShippingNote, orderedAt }) {
+  return send({
+    to,
+    replyTo,
+    subject: `CardPop order ${orderRef} — please dispatch`,
+    html: supplierOrderEmail({ supplierName, orderRef, orderId, lines, shipTo, blindShipping, blindShippingNote, orderedAt }),
   });
 }
