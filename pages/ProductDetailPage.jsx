@@ -753,7 +753,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
                     value: Number(product.vault_item?.trade_value_aud ?? product.price ?? product.vault_item?.estimated_value_aud ?? 0),
                   }}
                   onClose={() => setTradeOpen(false)}
-                  onSuccess={() => navigate('/trades')}
+                  onSuccess={() => navigate('/trade-requests')}
                 />
               </Suspense>
             )}

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import stripe from '../utils/stripeClient.js';
 import { payoutSeller } from '../services/payoutService.js';
+import { computeRefundAmounts, getRefundRetentionPct } from '../services/refundAmounts.js';
 import { namesMatch } from '../services/identityService.js';
 import { payoutAccountName } from '../utils/sellerAccountShape.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
@@ -34,7 +35,6 @@ router.use(async (req, res, next) => {
 // 403 above, and never blocks admins who haven't enabled MFA.
 router.use(requireAal2);
 
-const round2 = (n) => Math.round(n * 100) / 100;
 
 // ─── Look up user login emails (admin-only) ───────────────────────────────────
 // profiles.email is deliberately not client-readable (no column grant — see
@@ -375,7 +375,7 @@ router.patch('/refunds/:id', validateRequestParams(processRefundSchema), validat
 
   try {
     const { data: refund, error: fetchErr } = await supabase
-      .from('refunds').select('*, order:orders!order_id(total_aud, platform_fee_aud)').eq('id', id).single();
+      .from('refunds').select('*, order:orders!order_id(total_aud, platform_fee_aud, processing_fee_aud)').eq('id', id).single();
     if (fetchErr || !refund) return res.status(404).json({ error: 'Refund not found' });
 
     // Only a pending request can be approved/rejected. Re-approving an
@@ -401,17 +401,15 @@ router.patch('/refunds/:id', validateRequestParams(processRefundSchema), validat
     }
 
     // Approve — compute the refundable amount from the server-authoritative
-    // ORDER row (total_aud / platform_fee_aud written by the Stripe webhook),
-    // NOT from the buyer-created refunds row. A buyer who set commission_aud/
-    // gst_aud to 0 (or inflated total_paid_aud) could otherwise escape the fee
-    // retention entirely.
-    const totalFee = Number(refund.order?.platform_fee_aud) || 0; // commission + GST
-    const orderTotal = Number(refund.order?.total_aud) || 0;
-    const retainedFee = round2(totalFee * 0.5);
-    const refundAmount = round2(orderTotal - retainedFee);
+    // ORDER row (total_aud / platform_fee_aud / processing_fee_aud written by
+    // the Stripe webhook), NOT from the buyer-created refunds row. A buyer who
+    // set commission_aud/gst_aud to 0 (or inflated total_paid_aud) could
+    // otherwise escape the fee retention entirely. Uses the same arithmetic as
+    // processRefund, so the amount quoted here is the amount Stripe sends.
+    const { retainedFee, refundAmount } = computeRefundAmounts(refund.order, await getRefundRetentionPct());
 
     const { error } = await supabase.from('refunds')
-      .update({ status: 'approved', admin_notes: admin_notes || null })
+      .update({ status: 'approved', admin_notes: admin_notes || null, retained_fee_aud: retainedFee, refund_amount_aud: refundAmount })
       .eq('id', id);
     if (error) throw error;
     await supabase.from('orders').update({ refund_status: 'approved' }).eq('id', refund.order_id);
@@ -430,6 +428,38 @@ router.patch('/refunds/:id', validateRequestParams(processRefundSchema), validat
 
 // ─── Chargeback disputes: list + resolve ──────────────────────────────────────
 const DISPUTE_TERMINAL = ['resolved_released', 'resolved_kept'];
+
+// Re-pay every cart line whose payout a chargeback reversed (mirrors
+// payoutService.reverseSellerPayout's cart branch). Each line's payout record
+// is refreshed with the new transfer, and the order's payout_status leaves
+// 'frozen' the same way payoutSeller would set it for a single-item order.
+async function releaseCartLinePayouts(order, lines, reversedLines) {
+  let transferred = 0;
+  let walletCredited = 0;
+  let failed = 0;
+  for (const line of reversedLines) {
+    const result = await payoutSeller(stripe, {
+      sellerId: line.seller_id,
+      sellerProceeds: Number(line.payout.proceeds),
+      listingId: line.id ?? null,
+    }).catch(e => {
+      logger.error(`[ADMIN] cart release payout failed for seller ${line.seller_id} (order ${order.id}): ${e.message}`);
+      return { status: 'failed' };
+    });
+    if (result.status === 'transferred') transferred += 1;
+    else if (result.status === 'wallet_credited') walletCredited += 1;
+    else failed += 1;
+    line.payout = {
+      ...line.payout,
+      status: result.status,
+      transferId: result.transferId || null,
+      releasedAt: new Date().toISOString(),
+    };
+  }
+  const status = transferred > 0 ? 'transferred' : walletCredited > 0 ? 'wallet_credited' : 'failed';
+  await supabase.from('orders').update({ order_items: lines, payout_status: status }).eq('id', order.id);
+  return { status, lines: reversedLines.length, transferred, walletCredited, failed };
+}
 
 router.get('/disputes', validateRequestQuery(getDisputesSchema), async (req, res) => {
   const { status } = req.query;
@@ -473,17 +503,30 @@ router.patch('/disputes/:id', validateRequestParams(resolveDisputeSchema), valid
       // Look up the order to recover the exact proceeds owed to the seller.
       const { data: order } = await supabase
         .from('orders')
-        .select('id, seller_id, listing_id, seller_proceeds_aud')
+        .select('id, seller_id, listing_id, seller_proceeds_aud, order_items')
         .eq('id', dispute.order_id)
         .maybeSingle();
       if (!order) return res.status(404).json({ error: 'Order for this dispute no longer exists' });
 
-      payout = await payoutSeller(stripe, {
-        sellerId: order.seller_id,
-        sellerProceeds: order.seller_proceeds_aud,
-        orderId: order.id,
-        listingId: order.listing_id,
-      });
+      // Cart orders carry seller_id = null and record each seller's payout on
+      // the order_items line (line.payout) — handleDisputeCreated reversed
+      // those line by line, so release must re-issue them line by line too.
+      // Calling payoutSeller with the order-level columns here returned
+      // { status: 'none' } and paid nobody while reporting success.
+      const lines = Array.isArray(order.order_items) ? order.order_items : [];
+      const reversedLines = lines.filter(l => l?.seller_id && l?.payout
+        && ['transferred', 'wallet_credited'].includes(l.payout.status)
+        && Number(l.payout.proceeds) > 0);
+      if (reversedLines.length > 0) {
+        payout = await releaseCartLinePayouts(order, lines, reversedLines);
+      } else {
+        payout = await payoutSeller(stripe, {
+          sellerId: order.seller_id,
+          sellerProceeds: order.seller_proceeds_aud,
+          orderId: order.id,
+          listingId: order.listing_id,
+        });
+      }
     }
 
     const newStatus = action === 'release' ? 'resolved_released' : 'resolved_kept';

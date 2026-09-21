@@ -56,6 +56,19 @@ export default () => {
     // Health check - no rate limiting
     router.get('/health', healthCheck);
 
+    // Trade routes with email verification middleware: auth first, then trade
+    // access verification, for any path starting with /trade. This gate MUST be
+    // registered before the routers below — Express runs middleware in mount
+    // order, so a gate added after the routers never runs for their paths.
+    router.use((req, res, next) => {
+        if (req.path.toLowerCase().startsWith('/trade')) {
+            return authMiddleware(req, res, () => {
+                verifyTradeAccess(req, res, next);
+            });
+        }
+        next();
+    });
+
     // MCP server (read-only tools for AI agents) with API rate limiting
     router.use('/mcp', apiLimiter);
     router.use('/mcp', mcpRouter);
@@ -244,18 +257,6 @@ export default () => {
     // via the /cron/blog-generate rewrite with a CRON_SECRET bearer.
     router.use('/blog', apiLimiter);
     router.use('/blog', blogRouter);
-
-    // Trade routes with email verification middleware
-    // Apply auth middleware first, then trade access verification
-    // This protects any route containing 'trade' in the path
-    router.use((req, res, next) => {
-        if (req.path.toLowerCase().startsWith('/trade')) {
-            return authMiddleware(req, res, () => {
-                verifyTradeAccess(req, res, next);
-            });
-        }
-        next();
-    });
 
     return router;
 };

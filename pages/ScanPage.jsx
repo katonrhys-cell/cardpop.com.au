@@ -215,7 +215,7 @@ const ScanPage = () => {
           {!isAuthenticated && !previewUrl && (
             <p className="text-center text-sm text-muted-foreground border-t border-border pt-4">
               Scanning is free with a CardPop account —{' '}
-              <Link to="/register" className="text-primary font-semibold hover:underline">create one</Link>{' '}
+              <Link to="/signup" className="text-primary font-semibold hover:underline">create one</Link>{' '}
               or{' '}
               <Link to="/login" className="text-primary font-semibold hover:underline">sign in</Link>.
             </p>

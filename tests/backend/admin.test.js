@@ -12,6 +12,12 @@ const mockPayoutSeller = vi.hoisted(() => vi.fn());
 vi.mock('../../src/utils/supabaseClient.js', () => ({ default: mockSupabase, supabase: mockSupabase }));
 vi.mock('../../src/utils/stripeClient.js', () => ({ default: { transfers: { create: vi.fn() } } }));
 vi.mock('../../src/services/payoutService.js', () => ({ payoutSeller: mockPayoutSeller }));
+// Keep the refund arithmetic real; only the platform_settings lookup is stubbed
+// so it doesn't consume a queued supabase builder.
+vi.mock('../../src/services/refundAmounts.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  getRefundRetentionPct: vi.fn(async () => 50),
+}));
 vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -206,6 +212,21 @@ describe('PATCH /refunds/:id', () => {
     expect(res.body).toMatchObject({ status: 'approved', refundAmount: 95 });
   });
 
+  it('quotes the same amount processing will send: processing fee retained in full', async () => {
+    const refundsUpdate = makeBuilder({ error: null });
+    queueFrom(
+      makeBuilder({ data: { id: 'r1', order_id: 'o1', buyer_id: 'b1', status: 'pending', order: { total_aud: 112.3, platform_fee_aud: 10, processing_fee_aud: 2.3 } }, error: null }),
+      refundsUpdate,
+      makeBuilder({ error: null }),
+      makeBuilder({ error: null }),
+    );
+    const res = await request(app).patch('/admin/refunds/r1').send({ action: 'approve' });
+    expect(res.status).toBe(200);
+    // retained = 10 * 0.5 + 2.3 = 7.3; refund = 112.3 - 7.3 = 105 (matches refundService)
+    expect(res.body).toMatchObject({ status: 'approved', refundAmount: 105 });
+    expect(refundsUpdate.update).toHaveBeenCalledWith(expect.objectContaining({ retained_fee_aud: 7.3, refund_amount_aud: 105 }));
+  });
+
   it('requires a reason to reject', async () => {
     const res = await request(app).patch('/admin/refunds/r1').send({ action: 'reject' });
     expect(res.status).toBe(400);
@@ -267,6 +288,40 @@ describe('PATCH /disputes/:id', () => {
     expect(res.status).toBe(200);
     expect(mockPayoutSeller).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ sellerId: 's1', sellerProceeds: 230, orderId: 'o1' }));
     expect(res.body.dispute.status).toBe('resolved_released');
+  });
+
+  it('re-issues every reversed line payout on a cart order (seller_id is null there)', async () => {
+    const lines = [
+      { id: 'l1', seller_id: 's1', payout: { status: 'transferred', transferId: 'tr_old1', proceeds: 40 } },
+      { id: 'l2', seller_id: 's2', payout: { status: 'wallet_credited', transferId: null, proceeds: 25.5 } },
+      { id: 'l3', seller_id: 's3', payout: { status: 'none', transferId: null, proceeds: 0 } },
+    ];
+    const ordersUpdate = makeBuilder({ error: null });
+    queueFrom(
+      makeBuilder({ data: { id: 'd1', order_id: 'o1' }, error: null }),
+      makeBuilder({ data: { id: 'o1', seller_id: null, listing_id: null, seller_proceeds_aud: null, order_items: lines }, error: null }),
+      ordersUpdate,
+      makeBuilder({ data: { id: 'd1', status: 'resolved_released' }, error: null }),
+    );
+    mockPayoutSeller
+      .mockResolvedValueOnce({ status: 'transferred', transferId: 'tr_new1' })
+      .mockResolvedValueOnce({ status: 'wallet_credited' });
+    const res = await request(app).patch('/admin/disputes/d1').send({ action: 'release' });
+    expect(res.status).toBe(200);
+    expect(mockPayoutSeller).toHaveBeenCalledTimes(2);
+    expect(mockPayoutSeller).toHaveBeenNthCalledWith(1, expect.anything(), expect.objectContaining({ sellerId: 's1', sellerProceeds: 40, listingId: 'l1' }));
+    expect(mockPayoutSeller).toHaveBeenNthCalledWith(2, expect.anything(), expect.objectContaining({ sellerId: 's2', sellerProceeds: 25.5, listingId: 'l2' }));
+    // Never called with the order-level (null) seller.
+    expect(mockPayoutSeller).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ sellerId: null }));
+    expect(ordersUpdate.update).toHaveBeenCalledWith(expect.objectContaining({
+      payout_status: 'transferred',
+      order_items: expect.arrayContaining([
+        expect.objectContaining({ id: 'l1', payout: expect.objectContaining({ status: 'transferred', transferId: 'tr_new1', proceeds: 40 }) }),
+        expect.objectContaining({ id: 'l2', payout: expect.objectContaining({ status: 'wallet_credited', proceeds: 25.5 }) }),
+        expect.objectContaining({ id: 'l3', payout: expect.objectContaining({ status: 'none' }) }),
+      ]),
+    }));
+    expect(res.body.payout).toMatchObject({ status: 'transferred', lines: 2, transferred: 1, walletCredited: 1, failed: 0 });
   });
 
   it('keeps the payout frozen without paying out', async () => {

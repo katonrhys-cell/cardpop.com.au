@@ -205,7 +205,6 @@ const EventsAdminPage = lazy(() => import('@/pages/admin/EventsManagementPage.js
 const WhatnotShowsAdminPage = lazy(() => import('@/pages/admin/WhatnotShowsAdminPage.jsx'));
 const ContentManagementPage = lazy(() => import('@/pages/admin/ContentManagementPage.jsx'));
 const SystemDiagnosticsPage = lazy(() => import('@/pages/admin/SystemDiagnosticsPage.jsx'));
-const AnalyticsPage = lazy(() => import('@/pages/admin/AnalyticsPage.jsx'));
 const AnalyticsReportsPage = lazy(() => import('@/pages/admin/AnalyticsReportsPage.jsx'));
 const RevenueBreakdownPage = lazy(() => import('@/pages/admin/RevenueBreakdownPage.jsx'));
 const MediaLibraryPage = lazy(() => import('@/pages/admin/MediaLibraryPage.jsx'));

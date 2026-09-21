@@ -9,12 +9,15 @@ import logger from '../../utils/logger.js';
 const router = express.Router();
 const PASSWORD_RESET_EXPIRY_MS = parseInt(process.env.PASSWORD_RESET_EXPIRY_MS || '900000', 10);
 
-// Anon client used only for verifying current password during /change
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
-const SUPABASE_URL = process.env.SUPABASE_URL;
-if (!SUPABASE_ANON_KEY || !SUPABASE_URL) {
-  throw new Error('SUPABASE_ANON_KEY and SUPABASE_URL environment variables are required');
-}
+// Anon client used only for verifying current password during /change.
+// This module is imported unconditionally by routes/index.js, so throwing here
+// when the env var is missing used to take the ENTIRE API down at cold start.
+// The anon key is public (it ships in every browser bundle — see
+// lib/supabaseClient.js), so fall back the same way userScopedSupabase.js does.
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://vrfsaazuqjxotnieqlkd.supabase.co';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
+  || process.env.VITE_SUPABASE_ANON_KEY
+  || 'sb_publishable_lHlLkeTfwzhWQ80Zz6pL6g_jc7Y8p33';
 const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Validate password strength (no auth required)
