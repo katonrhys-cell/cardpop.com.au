@@ -59,11 +59,13 @@ app.use(cors({
 }));
 
 app.use(morgan('combined'));
-// Apply the global IP rate limit to everything except the Stripe webhook —
-// a burst of webhook retries from Stripe must never be throttled (the route
-// still has its own high-capacity stripeLimiter). Matches the JSON-skip below.
+// Apply the global IP rate limit to everything except the payment webhooks —
+// a burst of retries from Stripe or PayPal (a handful of fixed egress IPs)
+// must never be throttled, or the provider backs off and eventually disables
+// the webhook. Both routes still carry their own high-capacity stripeLimiter.
+// The Stripe skip matches the JSON-skip below.
 app.use((req, res, next) => {
-	if (req.path.endsWith('/stripe/webhook')) return next();
+	if (req.path.endsWith('/stripe/webhook') || req.path.endsWith('/paypal/webhook')) return next();
 	return globalRateLimit(req, res, next);
 });
 

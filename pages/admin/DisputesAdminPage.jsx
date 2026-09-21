@@ -89,7 +89,11 @@ const DisputesAdminPage = () => {
         const e = await res.json().catch(() => ({}));
         throw new Error(e.error || 'Failed to resolve dispute');
       }
-      toast.success(action === 'release' ? 'Payout released to seller' : 'Payout kept frozen');
+      const { payout } = await res.json().catch(() => ({}));
+      if (action !== 'release') toast.success('Payout kept frozen');
+      else if (payout?.status === 'failed') toast.error('Dispute resolved, but the seller payout failed — check the payout logs');
+      else if (payout?.status === 'none') toast.warning('Dispute resolved, but no payout was owed on this order');
+      else toast.success('Payout released to seller');
       setSelected(null);
       fetchRef.current?.();
     } catch (err) {

@@ -5,6 +5,7 @@ import { sendRefundProcessed, sendRefundIssued } from '../utils/emailService.js'
 import { reverseSellerPayout } from './payoutService.js';
 import { creditWallet } from './walletService.js';
 import { getPlatformSetting } from './stripeWebhookService.js';
+import { computeRefundAmounts, DEFAULT_REFUND_FEE_RETENTION_PCT } from './refundAmounts.js';
 import { isAdminUser } from '../middleware/auth.js';
 
 export async function processRefund(req, res) {
@@ -48,20 +49,14 @@ export async function processRefund(req, res) {
     // Compute from the server-authoritative ORDER row (written by the Stripe
     // webhook), NOT the buyer-created refunds row, so the fee retention can't be
     // bypassed by zeroing commission_aud/gst_aud or inflating total_paid_aud.
-    const retentionPct = Number(await getPlatformSetting('refund_fee_retention_pct', 50));
+    const retentionPct = Number(await getPlatformSetting('refund_fee_retention_pct', DEFAULT_REFUND_FEE_RETENTION_PCT));
     const orderTotal = Number(refund.order?.total_aud);
-    const totalCommission = Number(refund.order?.platform_fee_aud) || 0; // commission + GST
-    // Stripe keeps its processing fee on a refunded payment, so the buyer's
-    // reimbursement of it is retained in full — refunding money Stripe never
-    // gives back would make every refund a loss on top of the goods returning.
-    // Orders placed before the fee existed carry 0 and are unaffected.
-    const processingFee = Math.max(0, Number(refund.order?.processing_fee_aud) || 0);
     if (!Number.isFinite(orderTotal) || orderTotal <= 0) {
       return res.status(400).json({ error: 'Order total is missing or invalid' });
     }
-    const retainedCommission = Math.round(totalCommission * (retentionPct / 100) * 100) / 100;
-    const retainedFee = Math.round((retainedCommission + processingFee) * 100) / 100;
-    const refundAmount = Math.round((orderTotal - retainedFee) * 100) / 100;
+    // Same arithmetic the buyer was quoted at request time and the admin saw
+    // at approval — see refundAmounts.js for what is retained and why.
+    const { retainedFee, refundAmount } = computeRefundAmounts(refund.order, retentionPct);
 
     if (refundAmount <= 0) return res.status(400).json({ error: 'Calculated refund amount is zero or negative' });
     if (refundAmount > orderTotal) return res.status(400).json({ error: 'Refund exceeds order total' });

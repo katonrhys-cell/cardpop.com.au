@@ -2,6 +2,7 @@ import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { authMiddleware } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
+import { computeRefundAmounts, getRefundRetentionPct } from '../services/refundAmounts.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -12,7 +13,6 @@ const REFUND_REASONS = new Set([
 ]);
 // Order states that represent a paid order eligible for a refund request.
 const PAID_STATUSES = new Set(['payment_confirmed', 'shipped', 'completed']);
-const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 // Buyer requests a refund on their own order.
 //
@@ -37,7 +37,7 @@ router.post('/request', async (req, res) => {
 
   const { data: order, error: orderErr } = await supabase
     .from('orders')
-    .select('id, buyer_id, seller_id, status, refund_status, total_aud, item_price_aud, platform_fee_aud, gst_aud')
+    .select('id, buyer_id, seller_id, status, refund_status, total_aud, item_price_aud, platform_fee_aud, gst_aud, processing_fee_aud')
     .eq('id', orderId)
     .maybeSingle();
   if (orderErr) {
@@ -56,10 +56,9 @@ router.post('/request', async (req, res) => {
   }
 
   const notesText = typeof notes === 'string' ? notes.slice(0, 1000).trim() : '';
-  // Estimate shown to the buyer/admin; the admin processing flow recomputes the
-  // authoritative figure from the order when the refund is approved.
-  const retainedFee = round2((order.platform_fee_aud || 0) * 0.5);
-  const refundAmount = round2((order.total_aud || 0) - retainedFee);
+  // Estimate shown to the buyer/admin — the same arithmetic the approval and
+  // processing paths use, so the quoted figure matches what is actually sent.
+  const { retainedFee, refundAmount } = computeRefundAmounts(order, await getRefundRetentionPct());
 
   const { error: insErr } = await supabase.from('refunds').insert({
     order_id: order.id,

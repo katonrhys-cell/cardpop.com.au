@@ -27,8 +27,9 @@ const PROFILE_SELECT = 'profiles:author_id(id, display_name, username, avatar_ur
 
 const CommunityDiscussionPage = () => {
   const { id } = useParams();
-  const { currentUser, isAuthenticated } = useAuth();
-  const isAdmin = currentUser?.role === 'admin';
+  // Admin status lives on profiles.is_admin (exposed as isAdmin by AuthContext);
+  // the Supabase user's `role` is always 'authenticated', so checking it never matched.
+  const { currentUser, isAuthenticated, isAdmin } = useAuth();
 
   const [discussion, setDiscussion] = useState(null);
   const [replies, setReplies] = useState([]);

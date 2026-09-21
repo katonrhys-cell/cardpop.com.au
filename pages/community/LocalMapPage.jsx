@@ -7,6 +7,7 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { geocodeLocation, STATE_CENTROIDS } from '@/lib/geocode.js';
 import { fetchStores, DIRECTORY_CITIES } from '@/lib/storeDirectory.js';
+import { toLocalDateStr } from '@/lib/eventSeo.js';
 import logger from '@/src/utils/logger.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -210,7 +211,8 @@ const LocalMapPage = () => {
 
       // Upcoming events — only those with at least a suburb/state so they can be placed
       try {
-        const today = new Date().toISOString().split('T')[0];
+        // Local date, not UTC: toISOString() is yesterday for AU users until ~10-11am.
+        const today = toLocalDateStr(new Date());
         const { data: events } = await supabase
           .from('events_public')
           .select('id, title, event_type, venue_name, address, suburb, state, postcode, start_date, end_date, website_url, slug')

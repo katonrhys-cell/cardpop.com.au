@@ -85,7 +85,7 @@ const PublicCollectionsPage = () => {
           isForTrade: item.listingStatus === 'For Trade' || item.listingStatus === 'For Both',
           brand,
           series,
-          link: `/market/${item.id}`
+          link: `/marketplace/${item.id}`
         };
       };
 
@@ -115,7 +115,7 @@ const PublicCollectionsPage = () => {
           isForTrade: false,
           brand,
           series,
-          link: `/catalog/${item.id}`
+          link: `/marketplace/${item.id}`
         };
       };
 

@@ -49,10 +49,11 @@ const RefundDetailDialog = ({ order, refund, onClose, onUpdate }) => {
   const [action, setAction] = useState(null); // 'approve' | 'reject' | 'process'
   const [saving, setSaving] = useState(false);
 
-  const retentionPct = 50;
-  const totalFee     = (refund?.commission_aud || 0) + (refund?.gst_aud || 0);
-  const retainedFee  = Math.round(totalFee * (retentionPct / 100) * 100) / 100;
-  const refundAmount = Math.round(((refund?.total_paid_aud || 0) - retainedFee) * 100) / 100;
+  // The server computes these (refund_fee_retention_pct of the platform fee
+  // plus the processing fee) when the buyer requests and again on approval;
+  // show the stored figures rather than re-deriving a different number here.
+  const retainedFee  = Number(refund?.retained_fee_aud) || 0;
+  const refundAmount = Number(refund?.refund_amount_aud) || 0;
 
   // Refund decisions are privileged: a direct client update would let a user
   // self-approve their own refund. Route through the admin-checked backend
@@ -139,7 +140,7 @@ const RefundDetailDialog = ({ order, refund, onClose, onUpdate }) => {
               <span className="font-medium">${((refund?.commission_aud || 0) + (refund?.gst_aud || 0)).toFixed(2)} AUD</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Retained fee (50%)</span>
+              <span className="text-muted-foreground">Retained fee</span>
               <span className="font-medium text-amber-700">${retainedFee.toFixed(2)} AUD</span>
             </div>
             <div className="h-px bg-border" />
