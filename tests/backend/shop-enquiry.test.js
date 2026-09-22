@@ -33,7 +33,7 @@ function makeApp() {
 const app = makeApp();
 
 const PRODUCT_ID = '11111111-2222-4333-8444-555555555555';
-const PRODUCT = { id: PRODUCT_ID, title: 'Palms Off 9-Pocket Binder', slug: 'binder', stock_quantity: 0, status: 'active' };
+const PRODUCT = { id: PRODUCT_ID, title: 'Palms Off 9-Pocket Binder', sku: 'ZB-09', slug: 'binder', stock_quantity: 0, status: 'active' };
 
 const VALID = {
   productId: PRODUCT_ID,
@@ -121,6 +121,7 @@ describe('POST /shop-enquiry — delivery', () => {
     expect(mockSendShopEnquiry).toHaveBeenCalledWith(expect.objectContaining({
       to: 'noreply@cardpop.com.au',
       productTitle: PRODUCT.title,
+      productSku: 'ZB-09',
       productId: PRODUCT_ID,
       productUrl: expect.stringContaining(`/product/shop/${PRODUCT_ID}`),
       name: 'Ash Ketchum',

@@ -10,12 +10,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Loader2, X, ImagePlus } from 'lucide-react';
 import { SHOP_CATEGORY_GROUPS, SHOP_CATEGORIES } from '@/utils/shopCategories.js';
+import { normalizeSku, isValidSku, suggestSku, SKU_MAX_LENGTH } from '@/utils/shopSku.js';
 
 const KNOWN_CATEGORY_NAMES = SHOP_CATEGORIES.map((c) => c.name);
 const CUSTOM_CATEGORY = '__custom__';
 
 const INITIAL_STATE = {
   title: '',
+  sku: '',
   description: '',
   price_aud: '',
   retail_price_aud: '',
@@ -43,6 +45,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
     if (product) {
       setFormData({
         title: product.title || '',
+        sku: product.sku || '',
         description: product.description || '',
         price_aud: product.price_aud != null ? String(product.price_aud) : '',
         retail_price_aud: product.retail_price_aud != null ? String(product.retail_price_aud) : '',
@@ -110,6 +113,14 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.title.trim()) return toast.error('Product Name is required');
+    // SKU: required, stored upper-cased. The DB also enforces uniqueness
+    // (case-insensitive) and fills a CP-… default if a writer omits it, but
+    // the form asks for one explicitly so every upload is deliberate.
+    const sku = normalizeSku(formData.sku);
+    if (!sku) return toast.error('A SKU is required — use Generate to derive one from the name');
+    if (!isValidSku(sku)) {
+      return toast.error(`SKU must be up to ${SKU_MAX_LENGTH} characters: letters, numbers, . _ / -`);
+    }
     const price = Number(formData.price_aud);
     if (formData.price_aud === '' || Number.isNaN(price) || price < 0) {
       return toast.error('A valid price is required');
@@ -124,10 +135,22 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
 
     setLoading(true);
     try {
+      // Friendly pre-check so a duplicate SKU reads as a clear message rather
+      // than a raw constraint error. The unique index is the real guard.
+      let dupQuery = supabase.from('shop_products').select('id, title').ilike('sku', sku).limit(1);
+      if (product?.id) dupQuery = dupQuery.neq('id', product.id);
+      const { data: dup } = await dupQuery;
+      if (dup && dup.length) {
+        toast.error(`SKU ${sku} is already used by "${dup[0].title}"`);
+        setLoading(false);
+        return;
+      }
+
       const imageUrls = await uploadNewImages();
 
       const payload = {
         title: formData.title.trim(),
+        sku,
         description: formData.description.trim() || null,
         price_aud: price,
         retail_price_aud: rrp,
@@ -157,7 +180,11 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
       if (onSuccess) onSuccess();
     } catch (error) {
       console.error('Shop product save error:', error);
-      toast.error(error.message || 'Failed to save product.');
+      if (error?.code === '23505' && /sku/i.test(error.message || '')) {
+        toast.error(`SKU ${sku} is already in use`);
+      } else {
+        toast.error(error.message || 'Failed to save product.');
+      }
     } finally {
       setLoading(false);
     }
@@ -198,8 +225,38 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-5">
           <div className="space-y-2">
-            <Label>Product Name <span className="text-destructive">*</span></Label>
-            <Input required value={formData.title} onChange={(e) => handleInputChange('title', e.target.value)} className="bg-background" />
+            <Label htmlFor="shop-product-title">Product Name <span className="text-destructive">*</span></Label>
+            <Input id="shop-product-title" required value={formData.title} onChange={(e) => handleInputChange('title', e.target.value)} className="bg-background" />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="shop-product-sku">SKU <span className="text-destructive">*</span></Label>
+            <div className="flex gap-2">
+              <Input
+                id="shop-product-sku"
+                required
+                maxLength={SKU_MAX_LENGTH}
+                placeholder="e.g. ZB-09 or CP-ACRYLIC-STAND-5-PACK"
+                value={formData.sku}
+                onChange={(e) => handleInputChange('sku', e.target.value.toUpperCase())}
+                className="bg-background font-mono uppercase"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0"
+                disabled={!formData.title.trim()}
+                onClick={() => handleInputChange('sku', suggestSku(formData.title))}
+                title="Derive a CP-… SKU from the product name"
+              >
+                Generate
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Use the manufacturer's SKU for wholesale stock; house products use <span className="font-mono">CP-…</span>. Must be unique.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

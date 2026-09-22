@@ -38,6 +38,9 @@ node scripts/apply-shop-rrp.mjs --set-price --only-unpriced --apply
 Rules the script follows:
 
 - Products are matched **by SKU** (`shop_products.sku`), case-insensitively.
+  Every product has one: wholesale lines carry the brand SKU, CardPop house
+  products carry `CP-<SLUG>` (backfilled and enforced by
+  `supabase/migrations/*_shop_products_sku_required.sql`).
   A SKU with no product is reported, never inserted.
 - Blank `rrp_aud` cells are skipped, so the template can be filled in a few
   rows at a time.

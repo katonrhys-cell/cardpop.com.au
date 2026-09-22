@@ -51,7 +51,7 @@ router.post('/', async (req, res) => {
   try {
     const { data: product, error: lookupError } = await supabase
       .from('shop_products')
-      .select('id, title, slug, stock_quantity, status')
+      .select('id, title, sku, slug, stock_quantity, status')
       .eq('id', productId)
       .maybeSingle();
     if (lookupError) throw lookupError;
@@ -65,6 +65,7 @@ router.post('/', async (req, res) => {
     const sent = await sendShopEnquiry({
       to: SHOP_ENQUIRY_EMAIL,
       productTitle: product.title,
+      productSku: product.sku || null,
       productId: product.id,
       productUrl,
       name,

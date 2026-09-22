@@ -523,6 +523,11 @@ const ProductDetailPage = ({ source: sourceProp }) => {
             <p className="text-muted-foreground font-medium text-sm mb-2">
               {product.category || product.collectionType}
             </p>
+            {isShop && product.sku && (
+              <p className="text-xs text-muted-foreground mb-2">
+                SKU <span className="font-mono text-foreground/80">{product.sku}</span>
+              </p>
+            )}
             {(product.year || product.set) && (
               <p className="text-muted-foreground text-sm mb-6">
                 {[product.year, product.set].filter(Boolean).join(' · ')}

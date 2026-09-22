@@ -72,7 +72,8 @@ const ProductManagementPage = () => {
 
   const filteredProducts = products.filter(p =>
     p.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.category?.toLowerCase().includes(searchTerm.toLowerCase())
+    p.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const stats = {
@@ -122,7 +123,7 @@ const ProductManagementPage = () => {
             <Input
               name="admin-product-search"
               aria-label="Search products"
-              placeholder="Search products..."
+              placeholder="Search by name, SKU or category..."
               className="pl-9 h-10 rounded-xl bg-background border-border text-foreground"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -135,6 +136,7 @@ const ProductManagementPage = () => {
             <TableHeader className="bg-muted/40">
               <TableRow>
                 <TableHead className="font-semibold text-foreground">Product Name</TableHead>
+                <TableHead className="font-semibold text-foreground">SKU</TableHead>
                 <TableHead className="font-semibold text-foreground">Category</TableHead>
                 <TableHead className="font-semibold text-foreground">Price</TableHead>
                 <TableHead className="font-semibold text-foreground">RRP</TableHead>
@@ -148,6 +150,7 @@ const ProductManagementPage = () => {
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
                     <TableCell><Skeleton className="h-5 w-48" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
@@ -158,14 +161,14 @@ const ProductManagementPage = () => {
                 ))
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-48 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-48 text-center text-muted-foreground">
                     <AlertCircle className="w-10 h-10 text-destructive mb-3 mx-auto" />
                     <p>Failed to load products</p>
                   </TableCell>
                 </TableRow>
               ) : filteredProducts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-48 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-48 text-center text-muted-foreground">
                     <Package className="w-10 h-10 mb-3 mx-auto opacity-40" />
                     <p>No products found</p>
                   </TableCell>
@@ -174,6 +177,7 @@ const ProductManagementPage = () => {
                 filteredProducts.map((product) => (
                   <TableRow key={product.id}>
                     <TableCell className="font-bold text-foreground">{product.title}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{product.sku || <span className="text-destructive">missing</span>}</TableCell>
                     <TableCell className="text-muted-foreground">{product.category || '-'}</TableCell>
                     <TableCell className="tabular-nums">${Number(product.price_aud ?? 0).toFixed(2)}</TableCell>
                     <TableCell className="tabular-nums text-muted-foreground">

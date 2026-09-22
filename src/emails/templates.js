@@ -416,10 +416,11 @@ ${summaryTable([
 
 // A shopper hit "Enquire" on a sold-out shop product. Delivered to the admin
 // inbox with reply_to set to the shopper so a restock reply is one click.
-export function shopEnquiryEmail({ productTitle, productId, productUrl, name, email, message }) {
+export function shopEnquiryEmail({ productTitle, productSku, productId, productUrl, name, email, message }) {
   const body = `<p>A shopper asked about a <strong>sold-out</strong> product in the CardPop shop.</p>
 ${summaryTable([
   ['Product', esc(productTitle)],
+  ...(productSku ? [['SKU', esc(productSku)]] : []),
   ['Product ID', esc(productId)],
   ['From', `${esc(name)} (${esc(email)})`],
 ])}
